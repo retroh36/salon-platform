@@ -57,6 +57,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"services": {
+                  Row: {
+                    "active_minutes": number,"archived_at": string | null,"business_id": string,"category": string,"created_at": string,"description": string | null,"duration_minutes": number | null,"finishing_minutes": number,"id": string,"name": string,"price_cents": number,"processing_minutes": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active_minutes": number,"archived_at"?: string | null,"business_id": string,"category": string,"created_at"?: string,"description"?: string | null,"duration_minutes"?: never,"finishing_minutes"?: number,"id"?: string,"name": string,"price_cents": number,"processing_minutes"?: number,"updated_at"?: string
+                  }
+                  Update: {
+                    "active_minutes"?: number,"archived_at"?: string | null,"business_id"?: string,"category"?: string,"created_at"?: string,"description"?: string | null,"duration_minutes"?: never,"finishing_minutes"?: number,"id"?: string,"name"?: string,"price_cents"?: number,"processing_minutes"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "services_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"staff": {
                   Row: {
                     "business_id": string,"color": string | null,"created_at": string,"email": string | null,"first_name": string,"id": string,"is_active": boolean,"last_name": string,"location_id": string,"phone": string | null,"role": Database["public"]['Enums']["staff_role"],"updated_at": string,"user_id": string | null
@@ -83,13 +103,47 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"staff_services": {
+                  Row: {
+                    "business_id": string,"created_at": string,"price_cents": number | null,"service_id": string,"staff_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"price_cents"?: number | null,"service_id": string,"staff_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"price_cents"?: number | null,"service_id"?: string,"staff_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "staff_services_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "staff_services_service_id_business_id_fkey"
+      columns: ["service_id","business_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "staff_services_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 }
           }
           Views: {
             [_ in never]: never
           }
           Functions: {
-            [_ in never]: never
+            "save_service":
+{ Args: { "p_active_minutes": number,"p_business_id": string,"p_category": string,"p_description": string,"p_finishing_minutes": number,"p_name": string,"p_price_cents": number,"p_processing_minutes": number,"p_service_id": string,"p_staff": Json }; Returns: string
+                           }
           }
           Enums: {
             "staff_role": "owner"|"manager"|"front_desk"|"stylist"

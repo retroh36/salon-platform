@@ -1,78 +1,21 @@
-// Row Level Security checks against the local Supabase database.
+// Row Level Security checks for businesses, locations and staff.
 // Run with `npm run test:db` after `npx supabase db reset`.
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Database } from "@/lib/database.types";
+import { admin, anon, createOtherSalon, SEED, signIn, type Client } from "./helpers";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
-const secretKey = process.env.SUPABASE_SECRET_KEY!;
+const SEED_BUSINESS = SEED.business;
+const SEED_LOCATION = SEED.location;
+const SEED_STYLIST = SEED.staff.hannah;
+const SEED_STAFF_COUNT = SEED.staffCount;
 
-const PASSWORD = "password123";
-const SEED_BUSINESS = "b0000000-0000-4000-8000-000000000001";
-const SEED_LOCATION = "c0000000-0000-4000-8000-000000000001";
-const SEED_STYLIST = "d0000000-0000-4000-8000-000000000006"; // Hannah, no login
-const SEED_STAFF_COUNT = 9;
-
-type Client = SupabaseClient<Database>;
-const options = { auth: { persistSession: false, autoRefreshToken: false } };
-
-const admin: Client = createClient<Database>(url, secretKey, options);
-const anon: Client = createClient<Database>(url, publishableKey, options);
-
-async function signIn(email: string): Promise<Client> {
-  const client = createClient<Database>(url, publishableKey, options);
-  const { error } = await client.auth.signInWithPassword({ email, password: PASSWORD });
-  if (error) throw new Error(`Sign-in failed for ${email}: ${error.message}`);
-  return client;
-}
-
-// A second salon, created fresh for this run, to check tenants can't see each other.
-const other = { email: `owner-${Date.now()}@othersalon.test`, userId: "", businessId: "", locationId: "" };
-
+let other: Awaited<ReturnType<typeof createOtherSalon>>;
 let owner: Client;
 let manager: Client;
 let stylist: Client;
 let otherOwner: Client;
 
 beforeAll(async () => {
-  if (!url || !publishableKey || !secretKey) {
-    throw new Error("Set NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY and SUPABASE_SECRET_KEY in .env.local");
-  }
-
-  const { data: user, error: userError } = await admin.auth.admin.createUser({
-    email: other.email,
-    password: PASSWORD,
-    email_confirm: true,
-  });
-  if (userError) throw userError;
-  other.userId = user.user.id;
-
-  const { data: business, error: bError } = await admin
-    .from("businesses")
-    .insert({ name: "Other Salon" })
-    .select("id")
-    .single();
-  if (bError) throw bError;
-  other.businessId = business.id;
-
-  const { data: location, error: lError } = await admin
-    .from("locations")
-    .insert({ business_id: other.businessId, name: "Other Salon Main", timezone: "America/New_York" })
-    .select("id")
-    .single();
-  if (lError) throw lError;
-  other.locationId = location.id;
-
-  const { error: sError } = await admin.from("staff").insert({
-    business_id: other.businessId,
-    location_id: other.locationId,
-    user_id: other.userId,
-    first_name: "Other",
-    role: "owner",
-  });
-  if (sError) throw sError;
-
+  other = await createOtherSalon();
   [owner, manager, stylist, otherOwner] = await Promise.all([
     signIn("owner@mapleandash.test"),
     signIn("manager@mapleandash.test"),
@@ -82,8 +25,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (other.businessId) await admin.from("businesses").delete().eq("id", other.businessId);
-  if (other.userId) await admin.auth.admin.deleteUser(other.userId);
+  await other?.cleanup();
 });
 
 describe("signed-out visitors", () => {
