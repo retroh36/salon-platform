@@ -287,6 +287,56 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"notifications": {
+                  Row: {
+                    "ai_action_id": string | null,"appointment_id": string | null,"body": string,"business_id": string,"channel": string,"client_id": string | null,"created_at": string,"id": string,"location_id": string,"staff_id": string | null,"status": Database["public"]['Enums']["notification_status"],"template": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "ai_action_id"?: string | null,"appointment_id"?: string | null,"body": string,"business_id": string,"channel"?: string,"client_id"?: string | null,"created_at"?: string,"id"?: string,"location_id": string,"staff_id"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"template": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "ai_action_id"?: string | null,"appointment_id"?: string | null,"body"?: string,"business_id"?: string,"channel"?: string,"client_id"?: string | null,"created_at"?: string,"id"?: string,"location_id"?: string,"staff_id"?: string | null,"status"?: Database["public"]['Enums']["notification_status"],"template"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "notifications_ai_action_id_fkey"
+      columns: ["ai_action_id"]
+isOneToOne: false
+      referencedRelation: "ai_actions"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "notifications_appointment_id_business_id_location_id_fkey"
+      columns: ["appointment_id","business_id","location_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id","business_id","location_id"]
+    },{
+      foreignKeyName: "notifications_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "notifications_client_id_business_id_fkey"
+      columns: ["client_id","business_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "notifications_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "notifications_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"resources": {
                   Row: {
                     "business_id": string,"created_at": string,"id": string,"is_active": boolean,"kind": Database["public"]['Enums']["resource_kind"],"location_id": string,"name": string,"sort_order": number,"updated_at": string
@@ -311,6 +361,68 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "locations"
       referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"schedule_disruptions": {
+                  Row: {
+                    "appointment_id": string | null,"business_id": string,"created_at": string,"id": string,"item_id": string | null,"kind": Database["public"]['Enums']["disruption_kind"],"location_id": string,"minutes": number | null,"on_date": string,"reported_by": string | null,"resolved_by_action": string | null,"staff_id": string | null,"starts_at": string | null,"time_off_id": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "appointment_id"?: string | null,"business_id": string,"created_at"?: string,"id"?: string,"item_id"?: string | null,"kind": Database["public"]['Enums']["disruption_kind"],"location_id": string,"minutes"?: number | null,"on_date": string,"reported_by"?: string | null,"resolved_by_action"?: string | null,"staff_id"?: string | null,"starts_at"?: string | null,"time_off_id"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "appointment_id"?: string | null,"business_id"?: string,"created_at"?: string,"id"?: string,"item_id"?: string | null,"kind"?: Database["public"]['Enums']["disruption_kind"],"location_id"?: string,"minutes"?: number | null,"on_date"?: string,"reported_by"?: string | null,"resolved_by_action"?: string | null,"staff_id"?: string | null,"starts_at"?: string | null,"time_off_id"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "schedule_disruptions_appointment_id_business_id_location_i_fkey"
+      columns: ["appointment_id","business_id","location_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id","business_id","location_id"]
+    },{
+      foreignKeyName: "schedule_disruptions_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "schedule_disruptions_item_id_fkey"
+      columns: ["item_id"]
+isOneToOne: false
+      referencedRelation: "appointment_items"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "schedule_disruptions_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "schedule_disruptions_reported_by_business_id_fkey"
+      columns: ["reported_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "schedule_disruptions_resolved_by_action_fkey"
+      columns: ["resolved_by_action"]
+isOneToOne: false
+      referencedRelation: "ai_actions"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "schedule_disruptions_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "schedule_disruptions_time_off_id_fkey"
+      columns: ["time_off_id"]
+isOneToOne: false
+      referencedRelation: "staff_time_off"
+      referencedColumns: ["id"]
     }
                   ]
                 },"services": {
@@ -498,6 +610,12 @@ isOneToOne: false
 "reject_ai_action":
 { Args: { "p_action_id": string }; Returns: undefined
                            },
+"report_call_out":
+{ Args: { "p_from": string,"p_staff_id": string }; Returns: string
+                           },
+"report_running_late":
+{ Args: { "p_item_id": string,"p_minutes": number }; Returns: string
+                           },
 "save_appointment":
 { Args: { "p_appointment_id": string,"p_client_id": string,"p_expected_version": number,"p_items": Json,"p_location_id": string,"p_notes": string }; Returns: string
                            },
@@ -524,7 +642,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","resource_kind": "chair"|"room"|"station","staff_level": "junior"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined"
+            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","disruption_kind": "overrun"|"client_late"|"call_out","notification_status": "pending"|"sent"|"canceled","resource_kind": "chair"|"room"|"station","staff_level": "junior"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -644,7 +762,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"resource_kind": ["chair", "room", "station"],"staff_level": ["junior", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"]
+            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"disruption_kind": ["overrun", "client_late", "call_out"],"notification_status": ["pending", "sent", "canceled"],"resource_kind": ["chair", "room", "station"],"staff_level": ["junior", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"]
           }
         }
 } as const

@@ -28,9 +28,21 @@ export type ProposedBooking = {
   items: { serviceId: string; staffId: string; resourceId: string | null; start: Date }[];
 };
 
+// A message to a client or stylist, recorded when the change is applied.
+export type NotificationDraft = { appointmentId: string; template: string; body: string } & (
+  | { clientId: string; staffId?: never }
+  | { staffId: string; clientId?: never }
+);
+
 export type Proposal = {
   changes: ItemChange[];
   book?: ProposedBooking | null;
+  notifications?: NotificationDraft[];
+  // Sent on undo instead, to anyone the notifications already reached.
+  undoNotifications?: NotificationDraft[];
+  // Reports (schedule_disruptions) this deals with, e.g. a late client
+  // whose visit it moves.
+  resolves?: string[];
 };
 
 export type ProposalOption = { summary: string; reason: string; proposal: Proposal };
@@ -59,8 +71,15 @@ function placementFrom(json: { staff_id: string; resource_id: string | null; sta
   return { staffId: json.staff_id, resourceId: json.resource_id, start: new Date(json.starts_at) };
 }
 
+function notificationJson(n: NotificationDraft) {
+  return { appointment_id: n.appointmentId, client_id: n.clientId ?? null, staff_id: n.staffId ?? null, template: n.template, body: n.body };
+}
+
 export function proposalToJson(p: Proposal): Json {
   return {
+    notifications: (p.notifications ?? []).map(notificationJson),
+    undo_notifications: (p.undoNotifications ?? []).map(notificationJson),
+    resolves: p.resolves ?? [],
     changes: p.changes.map((c) => ({ item_id: c.itemId, appointment_id: c.appointmentId, from: placementJson(c.from), to: placementJson(c.to) })),
     book: p.book
       ? {
@@ -72,9 +91,17 @@ export function proposalToJson(p: Proposal): Json {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- JSON from our own functions */
+function notificationFrom(n: any): NotificationDraft {
+  const base = { appointmentId: n.appointment_id, template: n.template, body: n.body };
+  return n.client_id ? { ...base, clientId: n.client_id } : { ...base, staffId: n.staff_id };
+}
+
 export function proposalFromJson(json: Json): Proposal {
   const j = json as any;
   return {
+    notifications: (j.notifications ?? []).map(notificationFrom),
+    undoNotifications: (j.undo_notifications ?? []).map(notificationFrom),
+    resolves: j.resolves ?? [],
     changes: (j.changes ?? []).map((c: any) => ({ itemId: c.item_id, appointmentId: c.appointment_id, from: placementFrom(c.from), to: placementFrom(c.to) })),
     book: j.book
       ? {
