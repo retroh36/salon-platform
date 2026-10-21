@@ -23,7 +23,95 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "businesses": {
+            "appointment_items": {
+                  Row: {
+                    "active_minutes": number,"appointment_id": string,"business_id": string,"created_at": string,"ends_at": string,"finishing_minutes": number,"id": string,"location_id": string,"price_cents": number,"processing_minutes": number,"resource_id": string | null,"service_id": string,"staff_id": string,"starts_at": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active_minutes": number,"appointment_id": string,"business_id": string,"created_at"?: string,"ends_at": string,"finishing_minutes"?: number,"id"?: string,"location_id": string,"price_cents": number,"processing_minutes"?: number,"resource_id"?: string | null,"service_id": string,"staff_id": string,"starts_at": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "active_minutes"?: number,"appointment_id"?: string,"business_id"?: string,"created_at"?: string,"ends_at"?: string,"finishing_minutes"?: number,"id"?: string,"location_id"?: string,"price_cents"?: number,"processing_minutes"?: number,"resource_id"?: string | null,"service_id"?: string,"staff_id"?: string,"starts_at"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "appointment_items_appointment_id_business_id_location_id_fkey"
+      columns: ["appointment_id","business_id","location_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id","business_id","location_id"]
+    },{
+      foreignKeyName: "appointment_items_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "appointment_items_resource_id_location_id_fkey"
+      columns: ["resource_id","location_id"]
+isOneToOne: false
+      referencedRelation: "resources"
+      referencedColumns: ["id","location_id"]
+    },{
+      foreignKeyName: "appointment_items_service_id_business_id_fkey"
+      columns: ["service_id","business_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "appointment_items_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"appointments": {
+                  Row: {
+                    "business_id": string,"cancel_reason": string | null,"canceled_at": string | null,"client_id": string | null,"created_at": string,"created_by": string | null,"deposit_cents": number,"ends_at": string,"id": string,"location_id": string,"notes": string | null,"source": Database["public"]['Enums']["appointment_source"],"starts_at": string,"status": Database["public"]['Enums']["appointment_status"],"updated_at": string,"updated_by": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"ends_at": string,"id"?: string,"location_id": string,"notes"?: string | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at": string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "business_id"?: string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"ends_at"?: string,"id"?: string,"location_id"?: string,"notes"?: string | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at"?: string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "appointments_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "appointments_client_id_business_id_fkey"
+      columns: ["client_id","business_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "appointments_created_by_business_id_fkey"
+      columns: ["created_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "appointments_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "appointments_updated_by_business_id_fkey"
+      columns: ["updated_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"businesses": {
                   Row: {
                     "created_at": string,"id": string,"name": string,"plan": string,"settings": NonNullable<Json>,"updated_at": string
                   }
@@ -137,14 +225,14 @@ isOneToOne: false
                   ]
                 },"locations": {
                   Row: {
-                    "address_line1": string | null,"address_line2": string | null,"business_id": string,"city": string | null,"country": string,"created_at": string,"id": string,"name": string,"phone": string | null,"postal_code": string | null,"region": string | null,"timezone": string,"updated_at": string
+                    "address_line1": string | null,"address_line2": string | null,"business_id": string,"calendar_version": number,"city": string | null,"country": string,"created_at": string,"id": string,"name": string,"phone": string | null,"postal_code": string | null,"region": string | null,"timezone": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "address_line1"?: string | null,"address_line2"?: string | null,"business_id": string,"city"?: string | null,"country"?: string,"created_at"?: string,"id"?: string,"name": string,"phone"?: string | null,"postal_code"?: string | null,"region"?: string | null,"timezone": string,"updated_at"?: string
+                    "address_line1"?: string | null,"address_line2"?: string | null,"business_id": string,"calendar_version"?: number,"city"?: string | null,"country"?: string,"created_at"?: string,"id"?: string,"name": string,"phone"?: string | null,"postal_code"?: string | null,"region"?: string | null,"timezone": string,"updated_at"?: string
                   }
                   Update: {
-                    "address_line1"?: string | null,"address_line2"?: string | null,"business_id"?: string,"city"?: string | null,"country"?: string,"created_at"?: string,"id"?: string,"name"?: string,"phone"?: string | null,"postal_code"?: string | null,"region"?: string | null,"timezone"?: string,"updated_at"?: string
+                    "address_line1"?: string | null,"address_line2"?: string | null,"business_id"?: string,"calendar_version"?: number,"city"?: string | null,"country"?: string,"created_at"?: string,"id"?: string,"name"?: string,"phone"?: string | null,"postal_code"?: string | null,"region"?: string | null,"timezone"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -153,6 +241,32 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "businesses"
       referencedColumns: ["id"]
+    }
+                  ]
+                },"resources": {
+                  Row: {
+                    "business_id": string,"created_at": string,"id": string,"is_active": boolean,"kind": Database["public"]['Enums']["resource_kind"],"location_id": string,"name": string,"sort_order": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"id"?: string,"is_active"?: boolean,"kind": Database["public"]['Enums']["resource_kind"],"location_id": string,"name": string,"sort_order"?: number,"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"id"?: string,"is_active"?: boolean,"kind"?: Database["public"]['Enums']["resource_kind"],"location_id"?: string,"name"?: string,"sort_order"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "resources_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "resources_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
     }
                   ]
                 },"services": {
@@ -331,8 +445,17 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "save_service":
+            "save_appointment":
+{ Args: { "p_appointment_id": string,"p_client_id": string,"p_expected_version": number,"p_items": Json,"p_location_id": string,"p_notes": string }; Returns: string
+                           },
+"save_service":
 { Args: { "p_active_minutes": number,"p_business_id": string,"p_category": string,"p_description": string,"p_finishing_minutes": number,"p_name": string,"p_price_cents": number,"p_processing_minutes": number,"p_service_id": string,"p_staff": Json }; Returns: string
+                           },
+"set_appointment_notes":
+{ Args: { "p_appointment_id": string,"p_notes": string }; Returns: undefined
+                           },
+"set_appointment_status":
+{ Args: { "p_appointment_id": string,"p_reason": string,"p_status": Database["public"]['Enums']["appointment_status"] }; Returns: undefined
                            },
 "set_location_hours":
 { Args: { "p_business_id": string,"p_hours": Json,"p_location_id": string }; Returns: undefined
@@ -345,7 +468,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "staff_level": "junior"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined"
+            "appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","resource_kind": "chair"|"room"|"station","staff_level": "junior"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -465,7 +588,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "staff_level": ["junior", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"]
+            "appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"resource_kind": ["chair", "room", "station"],"staff_level": ["junior", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"]
           }
         }
 } as const

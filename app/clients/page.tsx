@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { getCurrentStaff } from "@/lib/auth";
-import { canEditClients, escapeLike, parseClientSearch, SEARCH_LIMIT } from "@/lib/clients";
+import { searchClients } from "@/lib/client-search";
+import { canEditClients, SEARCH_LIMIT } from "@/lib/clients";
 import { fullName } from "@/lib/staff";
 import { ClientSearch } from "./client-search";
 
@@ -22,23 +23,7 @@ async function Clients({ searchParams }: Pick<PageProps<"/clients">, "searchPara
   if (!me) return <NotLinked />;
 
   const query = typeof q === "string" ? q.slice(0, 100) : "";
-  const search = parseClientSearch(query);
-
-  let request = supabase
-    .from("clients")
-    .select("id, first_name, last_name, phone, email, allergies", { count: "exact" })
-    .eq("business_id", me.business_id);
-  if (search.kind === "phone") request = request.like("phone_digits", `%${search.digits}%`);
-  if (search.kind === "name") {
-    for (const term of search.terms) {
-      const escaped = escapeLike(term);
-      if (escaped) request = request.ilike("search_name", `%${escaped}%`);
-    }
-  }
-  const { data: clients, count, error } = await request.order("search_name").order("id").limit(SEARCH_LIMIT);
-  if (error) throw error;
-
-  const total = count ?? clients.length;
+  const { search, clients, total } = await searchClients(supabase, me.business_id, query, SEARCH_LIMIT);
 
   return (
     <AppShell section="clients" businessName={me.location.business?.name} userName={me.first_name}>

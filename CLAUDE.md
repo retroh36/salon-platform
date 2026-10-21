@@ -43,5 +43,11 @@ Business → Location → Staff, Resource; Service, StaffService; Client; Appoin
 - **Never print or log** Phorest credentials, the business ID, or any record values. Report problems through `IssueLog` (entity, field, reason, count: no values) and errors as status + endpoint template.
 - Modules under `lib/import/` and `lib/scheduling/` run under plain Node (for the dry-run script), so relative imports use explicit `.ts` extensions and avoid TypeScript-only runtime syntax (enums, parameter properties).
 
+## Scheduling (`lib/scheduling/`)
+- `availability.ts`: when a staff member can work (opening hours, shifts, one-off changes, approved time off).
+- `booking.ts`: whether an appointment item can be booked (`checkItem`, `checkAppointment`), with a reason code for each problem. Processing time is free for the stylist but not for the chair or room. Any code that creates or moves appointments must check here first.
+- `load.ts`: loads schedules and a `BookingContext` from Supabase for those checks.
+- `book.ts`: the only way to book, edit or move appointments, and to change their status or notes. It checks the rules, then saves through the database functions `save_appointment`, `set_appointment_status` and `set_appointment_notes`, which record who made the change. Appointments and items can't be written directly (no RLS write policies). A per-location `calendar_version` stops two people booking the same slot at once: a save checked against an out-of-date calendar is refused and re-checked.
+
 ## Current phase
-Phase 1 — Foundation: auth, business/location setup, staff (with schedules and skills), services, clients. Phorest import comes at the end of phase 1.
+Phase 1 (foundation) is done, apart from the Phorest import, which is paused waiting on credentials (see `docs/backlog.md`). Phase 2: calendar and booking. Done so far: resources, appointments, booking rules, the day-view calendar, and booking, editing, moving and status changes from it. Next: online booking.

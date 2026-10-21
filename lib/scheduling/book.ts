@@ -1,0 +1,217 @@
+// Booking, changing and moving appointments.
+//
+// Every write to the calendar goes through here: it loads the calendar,
+// checks the changed items against the booking rules (./booking.ts) and
+// saves through the database's save_appointment, passing the calendar
+// version it checked against. If someone else saved in the meantime, the
+// database refuses and this re-checks against the new calendar.
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
+import { allowedActions, ACTION_STATUS, isEditable, type AppointmentAction, type AppointmentStatus } from "../appointments.ts";
+import { checkItem, pickResource, type BookedItem, type BookingProblem, type ServiceTiming } from "./booking.ts";
+import { loadBookingContext } from "./load.ts";
+import { toLocal } from "./time.ts";
+
+type Supabase = SupabaseClient<Database>;
+type Location = { id: string; timezone: string };
+
+export type ResourceChoice =
+  | { kind: "none" }
+  | { kind: "exact"; id: string }
+  // A free chair, `prefer` if it's free.
+  | { kind: "any"; prefer?: string | null };
+
+export type BookingItemInput = {
+  id?: string;
+  serviceId: string;
+  staffId: string;
+  resource: ResourceChoice;
+  start: Date;
+};
+
+export type BookingInput = {
+  // Set to change an existing visit; its items become exactly `items`.
+  appointmentId?: string;
+  clientId: string | null;
+  notes: string | null;
+  items: BookingItemInput[];
+};
+
+export type SaveError = "no_items" | "not_found" | "not_editable" | "forbidden" | "busy";
+
+export type SaveResult =
+  | { ok: true; appointmentId: string }
+  // One list per input item, in order; empty for items that are fine.
+  | { ok: false; error: "invalid"; problems: BookingProblem[][] }
+  | { ok: false; error: SaveError };
+
+const ATTEMPTS = 3;
+
+type ExistingItem = BookedItem & { id: string };
+
+async function loadAppointment(supabase: Supabase, appointmentId: string) {
+  const { data, error } = await supabase
+    .from("appointments")
+    .select(
+      "id, status, client_id, notes, appointment_items(id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes)",
+    )
+    .eq("id", appointmentId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const items: ExistingItem[] = data.appointment_items.map((i) => ({
+    id: i.id,
+    appointmentId: data.id,
+    serviceId: i.service_id,
+    staffId: i.staff_id,
+    resourceId: i.resource_id,
+    start: new Date(i.starts_at),
+    activeMinutes: i.active_minutes,
+    processingMinutes: i.processing_minutes,
+    finishingMinutes: i.finishing_minutes,
+  }));
+  return { status: data.status as AppointmentStatus, clientId: data.client_id, notes: data.notes, items };
+}
+
+// An existing item that the input leaves as it was.
+function unchanged(input: BookingItemInput, old: ExistingItem): boolean {
+  if (input.serviceId !== old.serviceId || input.staffId !== old.staffId || input.start.getTime() !== old.start.getTime()) return false;
+  const r = input.resource;
+  if (r.kind === "none") return old.resourceId == null;
+  if (r.kind === "exact") return old.resourceId === r.id;
+  return old.resourceId != null && r.prefer === old.resourceId;
+}
+
+export async function saveBooking(supabase: Supabase, location: Location, input: BookingInput): Promise<SaveResult> {
+  if (input.items.length === 0) return { ok: false, error: "no_items" };
+
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    // Read the version before the calendar, so any save after this point
+    // makes ours fail and re-check.
+    const version = await supabase.from("locations").select("calendar_version").eq("id", location.id).single();
+    if (version.error) throw version.error;
+
+    const existing = input.appointmentId ? await loadAppointment(supabase, input.appointmentId) : null;
+    if (input.appointmentId && !existing) return { ok: false, error: "not_found" };
+    if (existing && !isEditable(existing.status)) return { ok: false, error: "not_editable" };
+    const oldById = new Map((existing?.items ?? []).map((i) => [i.id, i]));
+    if (input.items.some((i) => i.id && !oldById.has(i.id))) return { ok: false, error: "not_found" };
+
+    const dates = input.items.map((i) => toLocal(i.start, location.timezone).date).sort();
+    const ctx = await loadBookingContext(supabase, location, dates[0], dates.at(-1)!);
+
+    // Items to check: new ones and changed ones. Their old copies, and
+    // removed items, no longer hold time.
+    const changed = input.items.map((i) => !i.id || !unchanged(i, oldById.get(i.id)!));
+    const kept = new Set(input.items.filter((i, n) => i.id && !changed[n]).map((i) => i.id!));
+    const freed = new Set((existing?.items ?? []).filter((i) => !kept.has(i.id)).map((i) => i.id));
+    const calendar = { ...ctx, booked: ctx.booked.filter((b) => !b.id || !freed.has(b.id)) };
+
+    const problems: BookingProblem[][] = input.items.map(() => []);
+    const resources: (string | null)[] = input.items.map((i) => (i.id ? (oldById.get(i.id)!.resourceId ?? null) : null));
+    const accepted: BookedItem[] = [];
+
+    input.items.forEach((item, n) => {
+      if (!changed[n]) return;
+      const old = item.id ? oldById.get(item.id) : undefined;
+      const service = calendar.services.get(item.serviceId);
+      // An item that keeps its service keeps its booked timing.
+      const timing: ServiceTiming | undefined = old && old.serviceId === item.serviceId ? old : undefined;
+
+      let resourceId: string | null = item.resource.kind === "exact" ? item.resource.id : null;
+      if (item.resource.kind === "any" && (service || timing)) {
+        const t = timing ?? service!;
+        const draft: BookedItem = { ...t, id: item.id, serviceId: item.serviceId, staffId: item.staffId, start: item.start };
+        resourceId = pickResource(calendar, draft, item.resource.prefer ?? null, accepted);
+        if (!resourceId) problems[n].push({ code: "no_free_resource" });
+      }
+      resources[n] = resourceId;
+
+      const check = checkItem(calendar, { id: item.id, serviceId: item.serviceId, staffId: item.staffId, resourceId, start: item.start, timing }, accepted);
+      if (check.valid) accepted.push(check.item);
+      else problems[n].push(...check.problems);
+    });
+
+    if (problems.some((p) => p.length > 0)) return { ok: false, error: "invalid", problems };
+
+    const { data, error } = await supabase.rpc("save_appointment", {
+      p_location_id: location.id,
+      p_appointment_id: input.appointmentId ?? null!,
+      p_client_id: input.clientId!,
+      p_notes: input.notes ?? "",
+      p_items: input.items.map((item, n) => ({
+        id: item.id ?? null,
+        service_id: item.serviceId,
+        staff_id: item.staffId,
+        resource_id: resources[n],
+        starts_at: item.start.toISOString(),
+      })),
+      p_expected_version: version.data.calendar_version,
+    });
+    if (error?.code === "40001") continue;
+    if (error?.code === "42501") return { ok: false, error: "forbidden" };
+    // Not found, or a client, stylist, service or chair from elsewhere.
+    if (error?.code === "P0002" || error?.code === "23503") return { ok: false, error: "not_found" };
+    if (error) throw error;
+    return { ok: true, appointmentId: data };
+  }
+  return { ok: false, error: "busy" };
+}
+
+// Moves one item of a visit to a new start time and/or stylist. It keeps
+// its chair if that's free, otherwise takes a free one. The visit's other
+// items stay where they are.
+export async function moveItem(
+  supabase: Supabase,
+  location: Location,
+  move: { itemId: string; staffId: string; start: Date },
+): Promise<SaveResult> {
+  const { data, error } = await supabase.from("appointment_items").select("appointment_id").eq("id", move.itemId).maybeSingle();
+  if (error) throw error;
+  if (!data) return { ok: false, error: "not_found" };
+  const appointment = await loadAppointment(supabase, data.appointment_id);
+  if (!appointment) return { ok: false, error: "not_found" };
+
+  return saveBooking(supabase, location, {
+    appointmentId: data.appointment_id,
+    clientId: appointment.clientId,
+    notes: appointment.notes,
+    items: appointment.items.map((i) =>
+      i.id === move.itemId
+        ? { id: i.id, serviceId: i.serviceId, staffId: move.staffId, start: move.start, resource: { kind: "any", prefer: i.resourceId } }
+        : { id: i.id, serviceId: i.serviceId, staffId: i.staffId, start: i.start, resource: i.resourceId ? { kind: "exact", id: i.resourceId } : { kind: "none" } },
+    ),
+  });
+}
+
+export type StatusResult = { ok: true } | { ok: false; error: "not_found" | "not_allowed" | "needs_reason" | "forbidden" };
+
+export async function changeStatus(
+  supabase: Supabase,
+  appointmentId: string,
+  action: AppointmentAction,
+  reason: string | null = null,
+): Promise<StatusResult> {
+  const { data, error } = await supabase.from("appointments").select("status").eq("id", appointmentId).maybeSingle();
+  if (error) throw error;
+  if (!data) return { ok: false, error: "not_found" };
+  if (!allowedActions(data.status).includes(action)) return { ok: false, error: "not_allowed" };
+  if (action === "cancel" && !reason?.trim()) return { ok: false, error: "needs_reason" };
+
+  const { error: rpcError } = await supabase.rpc("set_appointment_status", {
+    p_appointment_id: appointmentId,
+    p_status: ACTION_STATUS[action],
+    p_reason: reason ?? "",
+  });
+  if (rpcError?.code === "42501") return { ok: false, error: "forbidden" };
+  if (rpcError) throw rpcError;
+  return { ok: true };
+}
+
+export async function saveNotes(supabase: Supabase, appointmentId: string, notes: string): Promise<{ ok: boolean }> {
+  const { error } = await supabase.rpc("set_appointment_notes", { p_appointment_id: appointmentId, p_notes: notes });
+  if (error?.code === "42501") return { ok: false };
+  if (error) throw error;
+  return { ok: true };
+}

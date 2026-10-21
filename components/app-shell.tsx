@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { logout } from "@/app/login/actions";
 
-type Section = "dashboard" | "clients" | "schedule" | "services";
+type Section = "dashboard" | "calendar" | "clients" | "schedule" | "services";
 
 const NAV: { section: Section; href: string; label: string }[] = [
   { section: "dashboard", href: "/dashboard", label: "Dashboard" },
+  { section: "calendar", href: "/calendar", label: "Calendar" },
   { section: "clients", href: "/clients", label: "Clients" },
   { section: "schedule", href: "/schedule", label: "Schedule" },
   { section: "services", href: "/services", label: "Services" },
@@ -16,19 +17,22 @@ export function AppShell({
   section,
   businessName,
   userName,
+  wide = false,
   children,
 }: {
   section?: Section;
   businessName?: string;
   userName?: string;
+  // Full width, for the calendar.
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="flex flex-1 flex-col bg-neutral-50 text-neutral-900">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 bg-white px-6 py-3">
-        <div className="flex items-center gap-6">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <span className="font-semibold">{businessName ?? "Salon Platform"}</span>
-          <nav className="flex gap-1 text-sm">
+          <nav className="flex flex-wrap gap-1 text-sm">
             {NAV.map((item) => (
               <Link
                 key={item.href}
@@ -50,7 +54,7 @@ export function AppShell({
           </form>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-4xl px-6 py-8">{children}</main>
+      <main className={`mx-auto w-full px-6 py-8 ${wide ? "" : "max-w-4xl"}`}>{children}</main>
     </div>
   );
 }
