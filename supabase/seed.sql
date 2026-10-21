@@ -52,22 +52,13 @@ insert into public.businesses (id, name, plan) values
   ('b0000000-0000-4000-8000-000000000001', 'Maple & Ash Hair Studio', 'trial');
 
 insert into public.locations (
-  id, business_id, name, address_line1, city, region, postal_code, country, phone, timezone, hours
+  id, business_id, name, address_line1, city, region, postal_code, country, phone, timezone
 ) values (
   'c0000000-0000-4000-8000-000000000001',
   'b0000000-0000-4000-8000-000000000001',
   'Maple & Ash Downtown',
   '123 Example Street', 'Springfield', 'IL', '62701', 'US', '(555) 010-0100',
-  'America/Chicago',
-  '{
-    "mon": [],
-    "tue": [{"open": "09:00", "close": "19:00"}],
-    "wed": [{"open": "09:00", "close": "19:00"}],
-    "thu": [{"open": "09:00", "close": "20:00"}],
-    "fri": [{"open": "09:00", "close": "20:00"}],
-    "sat": [{"open": "08:00", "close": "17:00"}],
-    "sun": []
-  }'::jsonb
+  'America/Chicago'
 );
 
 -- ---------------------------------------------------------------------------
@@ -349,3 +340,139 @@ select
   now() - make_interval(days => n * (42 + cc.h % 15) + cc.h % 20)
 from color_clients cc
 cross join lateral generate_series(0, cc.h % 5) as n;
+
+-- ---------------------------------------------------------------------------
+-- Opening hours and staff schedules. Times are local to the location
+-- (America/Chicago). Weekdays: 1 = Monday ... 7 = Sunday.
+-- ---------------------------------------------------------------------------
+
+-- Closed Mondays and Sundays.
+insert into public.location_hours (business_id, location_id, weekday, start_minute, end_minute)
+select 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', weekday,
+       extract(epoch from opens::time) / 60, extract(epoch from closes::time) / 60
+from (values
+  (2, '09:00', '19:00'),
+  (3, '09:00', '19:00'),
+  (4, '09:00', '20:00'),
+  (5, '09:00', '20:00'),
+  (6, '08:00', '17:00')
+) as h (weekday, opens, closes);
+
+update public.staff s set level = l.level::public.staff_level
+from (values
+  ('d0000000-0000-4000-8000-000000000004', 'master'), -- Priya
+  ('d0000000-0000-4000-8000-000000000005', 'senior'), -- Marcus
+  ('d0000000-0000-4000-8000-000000000006', 'senior'), -- Hannah
+  ('d0000000-0000-4000-8000-000000000007', 'senior'), -- Jamal
+  ('d0000000-0000-4000-8000-000000000008', 'senior'), -- Sofia
+  ('d0000000-0000-4000-8000-000000000009', 'junior')  -- Ethan
+) as l (id, level)
+where s.id = l.id::uuid;
+
+-- Weekly hours. Two rows on the same day make a split shift.
+insert into public.staff_working_hours (business_id, staff_id, weekday, start_minute, end_minute)
+select 'b0000000-0000-4000-8000-000000000001', staff_id::uuid, weekday,
+       extract(epoch from starts::time) / 60, extract(epoch from ends::time) / 60
+from (values
+  -- Olivia (owner): mid-week, mostly admin
+  ('d0000000-0000-4000-8000-000000000001', 2, '10:00', '16:00'),
+  ('d0000000-0000-4000-8000-000000000001', 3, '10:00', '16:00'),
+  ('d0000000-0000-4000-8000-000000000001', 4, '10:00', '16:00'),
+  -- Daniel (manager)
+  ('d0000000-0000-4000-8000-000000000002', 2, '09:00', '17:00'),
+  ('d0000000-0000-4000-8000-000000000002', 3, '09:00', '17:00'),
+  ('d0000000-0000-4000-8000-000000000002', 4, '11:00', '20:00'),
+  ('d0000000-0000-4000-8000-000000000002', 5, '09:00', '17:00'),
+  ('d0000000-0000-4000-8000-000000000002', 6, '08:00', '14:00'),
+  -- Sam (front desk)
+  ('d0000000-0000-4000-8000-000000000003', 2, '09:00', '17:00'),
+  ('d0000000-0000-4000-8000-000000000003', 3, '09:00', '17:00'),
+  ('d0000000-0000-4000-8000-000000000003', 5, '12:00', '20:00'),
+  ('d0000000-0000-4000-8000-000000000003', 6, '08:00', '17:00'),
+  -- Priya (master): split shifts with a lunch break, short Saturday
+  ('d0000000-0000-4000-8000-000000000004', 2, '09:00', '13:00'),
+  ('d0000000-0000-4000-8000-000000000004', 2, '14:00', '18:00'),
+  ('d0000000-0000-4000-8000-000000000004', 3, '09:00', '13:00'),
+  ('d0000000-0000-4000-8000-000000000004', 3, '14:00', '18:00'),
+  ('d0000000-0000-4000-8000-000000000004', 5, '09:00', '13:00'),
+  ('d0000000-0000-4000-8000-000000000004', 5, '14:00', '18:00'),
+  ('d0000000-0000-4000-8000-000000000004', 6, '08:00', '14:00'),
+  -- Marcus: Wednesday to Saturday
+  ('d0000000-0000-4000-8000-000000000005', 3, '10:00', '19:00'),
+  ('d0000000-0000-4000-8000-000000000005', 4, '10:00', '19:00'),
+  ('d0000000-0000-4000-8000-000000000005', 5, '10:00', '19:00'),
+  ('d0000000-0000-4000-8000-000000000005', 6, '08:00', '17:00'),
+  -- Hannah: late shifts and Saturday (busy for blowouts and updos)
+  ('d0000000-0000-4000-8000-000000000006', 4, '12:00', '20:00'),
+  ('d0000000-0000-4000-8000-000000000006', 5, '12:00', '20:00'),
+  ('d0000000-0000-4000-8000-000000000006', 6, '08:00', '17:00'),
+  -- Jamal: Tuesday to Saturday, late on Thursday
+  ('d0000000-0000-4000-8000-000000000007', 2, '09:00', '17:00'),
+  ('d0000000-0000-4000-8000-000000000007', 3, '09:00', '17:00'),
+  ('d0000000-0000-4000-8000-000000000007', 4, '11:00', '20:00'),
+  ('d0000000-0000-4000-8000-000000000007', 5, '09:00', '17:00'),
+  ('d0000000-0000-4000-8000-000000000007', 6, '08:00', '15:00'),
+  -- Sofia: color days, split Friday, no Saturdays
+  ('d0000000-0000-4000-8000-000000000008', 2, '09:00', '17:00'),
+  ('d0000000-0000-4000-8000-000000000008', 3, '09:00', '17:00'),
+  ('d0000000-0000-4000-8000-000000000008', 4, '09:00', '17:00'),
+  ('d0000000-0000-4000-8000-000000000008', 5, '09:00', '13:00'),
+  ('d0000000-0000-4000-8000-000000000008', 5, '14:00', '20:00'),
+  -- Ethan (junior): full week with a half-hour lunch
+  ('d0000000-0000-4000-8000-000000000009', 2, '09:00', '13:00'),
+  ('d0000000-0000-4000-8000-000000000009', 2, '13:30', '17:30'),
+  ('d0000000-0000-4000-8000-000000000009', 3, '09:00', '13:00'),
+  ('d0000000-0000-4000-8000-000000000009', 3, '13:30', '17:30'),
+  ('d0000000-0000-4000-8000-000000000009', 4, '09:00', '13:00'),
+  ('d0000000-0000-4000-8000-000000000009', 4, '13:30', '17:30'),
+  ('d0000000-0000-4000-8000-000000000009', 5, '09:00', '13:00'),
+  ('d0000000-0000-4000-8000-000000000009', 5, '13:30', '17:30'),
+  ('d0000000-0000-4000-8000-000000000009', 6, '08:00', '16:00')
+) as h (staff_id, weekday, starts, ends);
+
+-- Commission for stylists, by level.
+insert into public.staff_compensation (staff_id, business_id, service_commission_pct, retail_commission_pct)
+select s.id, s.business_id,
+       case s.level when 'master' then 50 when 'senior' then 45 else 35 end,
+       case s.level when 'junior' then 10 else 15 end
+from public.staff s
+where s.business_id = 'b0000000-0000-4000-8000-000000000001' and s.role = 'stylist';
+
+-- Time off and one-off changes, relative to the reset date so they're always
+-- current. next_monday is the Monday after today (local time).
+with d as (
+  select (now() at time zone 'America/Chicago')::date as today,
+         (now() at time zone 'America/Chicago')::date
+           + (8 - extract(isodow from (now() at time zone 'America/Chicago')::date))::int as next_monday
+)
+insert into public.staff_time_off (
+  business_id, staff_id, starts_on, ends_on, start_minute, end_minute, reason, note, status,
+  requested_by, decided_by, decided_at
+)
+select 'b0000000-0000-4000-8000-000000000001', t.staff_id::uuid, t.starts_on, t.ends_on, t.start_minute, t.end_minute,
+       t.reason::public.time_off_reason, t.note, t.status::public.time_off_status,
+       t.requested_by::uuid, t.decided_by::uuid, case when t.status = 'requested' then null else now() end
+from d, lateral (values
+  -- Sofia: a week's vacation, the week after next (approved by Olivia)
+  ('d0000000-0000-4000-8000-000000000008', d.next_monday + 7, d.next_monday + 13, null::int, null::int,
+   'vacation', 'Family trip', 'approved', 'd0000000-0000-4000-8000-000000000008', 'd0000000-0000-4000-8000-000000000001'),
+  -- Marcus: called in sick yesterday (entered by Daniel)
+  ('d0000000-0000-4000-8000-000000000005', d.today - 1, d.today - 1, null, null,
+   'sick', null, 'approved', 'd0000000-0000-4000-8000-000000000002', 'd0000000-0000-4000-8000-000000000002'),
+  -- Hannah: dentist next Thursday afternoon
+  ('d0000000-0000-4000-8000-000000000006', d.next_monday + 3, d.next_monday + 3, 14 * 60, 16 * 60,
+   'personal', 'Dentist', 'approved', 'd0000000-0000-4000-8000-000000000006', 'd0000000-0000-4000-8000-000000000002'),
+  -- Ethan: a pending request for the Friday after next
+  ('d0000000-0000-4000-8000-000000000009', d.next_monday + 11, d.next_monday + 11, null, null,
+   'personal', 'Sister''s graduation', 'requested', 'd0000000-0000-4000-8000-000000000009', null),
+  -- Priya: a declined request (shows the history)
+  ('d0000000-0000-4000-8000-000000000004', d.next_monday + 5, d.next_monday + 5, null, null,
+   'personal', 'Long weekend', 'declined', 'd0000000-0000-4000-8000-000000000004', 'd0000000-0000-4000-8000-000000000001')
+) as t (staff_id, starts_on, ends_on, start_minute, end_minute, reason, note, status, requested_by, decided_by);
+
+-- Jamal covers a late Friday next week, 12:00 to 20:00 instead of 9 to 5.
+insert into public.staff_schedule_overrides (business_id, staff_id, on_date, start_minute, end_minute)
+select 'b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000007',
+       (now() at time zone 'America/Chicago')::date
+         + (8 - extract(isodow from (now() at time zone 'America/Chicago')::date))::int + 4,
+       12 * 60, 20 * 60;

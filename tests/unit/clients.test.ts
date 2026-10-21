@@ -7,8 +7,8 @@ import {
   parseClientForm,
   parseClientSearch,
   parseFormulaForm,
-  todayIn,
 } from "@/lib/clients";
+import { todayIn } from "@/lib/scheduling/time";
 
 function form(fields: Record<string, string>) {
   const data = new FormData();

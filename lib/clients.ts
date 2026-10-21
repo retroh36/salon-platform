@@ -50,11 +50,6 @@ export function normalizePhone(input: string): string | null {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
-// Today's date (YYYY-MM-DD) in a location's timezone.
-export function todayIn(timezone: string, now = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
-}
-
 // "2026-03-04" -> "Mar 4, 2026", without shifting the date by timezone.
 export function formatDate(isoDate: string): string {
   const [y, m, d] = isoDate.split("-").map(Number);

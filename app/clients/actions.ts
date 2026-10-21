@@ -7,11 +7,11 @@ import {
   canEditClients,
   parseClientForm,
   parseFormulaForm,
-  todayIn,
   type ClientFormErrors,
   type FormulaFormErrors,
 } from "@/lib/clients";
 import { isUuid } from "@/lib/ids";
+import { todayIn } from "@/lib/scheduling/time";
 
 // Echoed back so the form keeps what was typed after an error.
 export type ClientFormFields = Record<

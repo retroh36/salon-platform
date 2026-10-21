@@ -95,16 +95,36 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
-                },"locations": {
+                },"location_hours": {
                   Row: {
-                    "address_line1": string | null,"address_line2": string | null,"business_id": string,"city": string | null,"country": string,"created_at": string,"hours": NonNullable<Json>,"id": string,"name": string,"phone": string | null,"postal_code": string | null,"region": string | null,"timezone": string,"updated_at": string
+                    "business_id": string,"end_minute": number,"id": string,"location_id": string,"start_minute": number,"weekday": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "address_line1"?: string | null,"address_line2"?: string | null,"business_id": string,"city"?: string | null,"country"?: string,"created_at"?: string,"hours"?: NonNullable<Json>,"id"?: string,"name": string,"phone"?: string | null,"postal_code"?: string | null,"region"?: string | null,"timezone": string,"updated_at"?: string
+                    "business_id": string,"end_minute": number,"id"?: string,"location_id": string,"start_minute": number,"weekday": number
                   }
                   Update: {
-                    "address_line1"?: string | null,"address_line2"?: string | null,"business_id"?: string,"city"?: string | null,"country"?: string,"created_at"?: string,"hours"?: NonNullable<Json>,"id"?: string,"name"?: string,"phone"?: string | null,"postal_code"?: string | null,"region"?: string | null,"timezone"?: string,"updated_at"?: string
+                    "business_id"?: string,"end_minute"?: number,"id"?: string,"location_id"?: string,"start_minute"?: number,"weekday"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "location_hours_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"locations": {
+                  Row: {
+                    "address_line1": string | null,"address_line2": string | null,"business_id": string,"city": string | null,"country": string,"created_at": string,"id": string,"name": string,"phone": string | null,"postal_code": string | null,"region": string | null,"timezone": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "address_line1"?: string | null,"address_line2"?: string | null,"business_id": string,"city"?: string | null,"country"?: string,"created_at"?: string,"id"?: string,"name": string,"phone"?: string | null,"postal_code"?: string | null,"region"?: string | null,"timezone": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "address_line1"?: string | null,"address_line2"?: string | null,"business_id"?: string,"city"?: string | null,"country"?: string,"created_at"?: string,"id"?: string,"name"?: string,"phone"?: string | null,"postal_code"?: string | null,"region"?: string | null,"timezone"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -137,14 +157,14 @@ isOneToOne: false
                   ]
                 },"staff": {
                   Row: {
-                    "business_id": string,"color": string | null,"created_at": string,"email": string | null,"first_name": string,"id": string,"is_active": boolean,"last_name": string,"location_id": string,"phone": string | null,"role": Database["public"]['Enums']["staff_role"],"updated_at": string,"user_id": string | null
+                    "business_id": string,"color": string | null,"created_at": string,"email": string | null,"first_name": string,"id": string,"is_active": boolean,"last_name": string,"level": Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone": string | null,"role": Database["public"]['Enums']["staff_role"],"updated_at": string,"user_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"first_name": string,"id"?: string,"is_active"?: boolean,"last_name"?: string,"location_id": string,"phone"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
+                    "business_id": string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"first_name": string,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
                   }
                   Update: {
-                    "business_id"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"first_name"?: string,"id"?: string,"is_active"?: boolean,"last_name"?: string,"location_id"?: string,"phone"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
+                    "business_id"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"first_name"?: string,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id"?: string,"phone"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -158,6 +178,46 @@ isOneToOne: false
       columns: ["location_id","business_id"]
 isOneToOne: false
       referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"staff_compensation": {
+                  Row: {
+                    "business_id": string,"retail_commission_pct": number,"service_commission_pct": number,"staff_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"retail_commission_pct"?: number,"service_commission_pct"?: number,"staff_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"retail_commission_pct"?: number,"service_commission_pct"?: number,"staff_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "staff_compensation_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"staff_schedule_overrides": {
+                  Row: {
+                    "business_id": string,"created_at": string,"end_minute": number,"id": string,"on_date": string,"staff_id": string,"start_minute": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"end_minute": number,"id"?: string,"on_date": string,"staff_id": string,"start_minute": number
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"end_minute"?: number,"id"?: string,"on_date"?: string,"staff_id"?: string,"start_minute"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "staff_schedule_overrides_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
       referencedColumns: ["id","business_id"]
     }
                   ]
@@ -193,6 +253,58 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"staff_time_off": {
+                  Row: {
+                    "business_id": string,"created_at": string,"decided_at": string | null,"decided_by": string | null,"end_minute": number | null,"ends_on": string,"id": string,"note": string | null,"reason": Database["public"]['Enums']["time_off_reason"],"requested_by": string,"staff_id": string,"start_minute": number | null,"starts_on": string,"status": Database["public"]['Enums']["time_off_status"],"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"end_minute"?: number | null,"ends_on": string,"id"?: string,"note"?: string | null,"reason": Database["public"]['Enums']["time_off_reason"],"requested_by": string,"staff_id": string,"start_minute"?: number | null,"starts_on": string,"status"?: Database["public"]['Enums']["time_off_status"],"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"end_minute"?: number | null,"ends_on"?: string,"id"?: string,"note"?: string | null,"reason"?: Database["public"]['Enums']["time_off_reason"],"requested_by"?: string,"staff_id"?: string,"start_minute"?: number | null,"starts_on"?: string,"status"?: Database["public"]['Enums']["time_off_status"],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "staff_time_off_decided_by_business_id_fkey"
+      columns: ["decided_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "staff_time_off_requested_by_business_id_fkey"
+      columns: ["requested_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "staff_time_off_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"staff_working_hours": {
+                  Row: {
+                    "business_id": string,"end_minute": number,"id": string,"staff_id": string,"start_minute": number,"weekday": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"end_minute": number,"id"?: string,"staff_id": string,"start_minute": number,"weekday": number
+                  }
+                  Update: {
+                    "business_id"?: string,"end_minute"?: number,"id"?: string,"staff_id"?: string,"start_minute"?: number,"weekday"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "staff_working_hours_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -201,10 +313,19 @@ isOneToOne: false
           Functions: {
             "save_service":
 { Args: { "p_active_minutes": number,"p_business_id": string,"p_category": string,"p_description": string,"p_finishing_minutes": number,"p_name": string,"p_price_cents": number,"p_processing_minutes": number,"p_service_id": string,"p_staff": Json }; Returns: string
+                           },
+"set_location_hours":
+{ Args: { "p_business_id": string,"p_hours": Json,"p_location_id": string }; Returns: undefined
+                           },
+"set_staff_day_override":
+{ Args: { "p_business_id": string,"p_hours": Json,"p_on_date": string,"p_staff_id": string }; Returns: undefined
+                           },
+"set_staff_weekly_hours":
+{ Args: { "p_business_id": string,"p_hours": Json,"p_staff_id": string }; Returns: undefined
                            }
           }
           Enums: {
-            "staff_role": "owner"|"manager"|"front_desk"|"stylist"
+            "staff_level": "junior"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -324,7 +445,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "staff_role": ["owner", "manager", "front_desk", "stylist"]
+            "staff_level": ["junior", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"]
           }
         }
 } as const

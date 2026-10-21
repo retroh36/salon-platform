@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { useEffect, useRef } from "react";
 import { addFormula } from "./actions";
-import { Field, submitWithoutReset } from "./client-form";
+import { Field, submitWithoutReset } from "@/components/form";
 
 const inputClass =
   "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none";
