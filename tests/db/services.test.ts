@@ -97,7 +97,7 @@ describe("stylists", () => {
     const created = await save(stylist, { name: `${PREFIX} by stylist` });
     expect(created.error?.code).toBe("42501");
 
-    const { data: service } = await admin.from("services").select("id, price_cents").eq("name", "Blowout").single();
+    const { data: service } = await admin.from("services").select("id, price_cents").eq("business_id", SEED.business).eq("name", "Blowout").single();
     const edited = await save(stylist, { serviceId: service!.id, name: "Blowout", price: 1 });
     expect(edited.error?.code).toBe("42501");
 
@@ -109,7 +109,7 @@ describe("stylists", () => {
   });
 
   it("can't change who offers a service", async () => {
-    const { data: service } = await admin.from("services").select("id").eq("name", "Balayage").single();
+    const { data: service } = await admin.from("services").select("id").eq("business_id", SEED.business).eq("name", "Balayage").single();
     const insert = await stylist
       .from("staff_services")
       .insert({ business_id: SEED.business, staff_id: SEED.staff.jamal, service_id: service!.id });
@@ -215,7 +215,7 @@ describe("save_service is all-or-nothing", () => {
     });
     expect(error?.code).toBe("23503");
 
-    const { data } = await admin.from("services").select("id").eq("name", name);
+    const { data } = await admin.from("services").select("id").eq("business_id", SEED.business).eq("name", name);
     expect(data).toEqual([]);
   });
 
@@ -255,7 +255,7 @@ describe("tenant isolation", () => {
   });
 
   it("another salon can't edit this salon's services", async () => {
-    const { data: service } = await admin.from("services").select("id").eq("name", "Blowout").single();
+    const { data: service } = await admin.from("services").select("id").eq("business_id", SEED.business).eq("name", "Blowout").single();
     const asOwnBusiness = await save(otherOwner, { businessId: other.businessId, serviceId: service!.id, name: "Hijacked" });
     expect(asOwnBusiness.error?.code).toBe("42501");
 

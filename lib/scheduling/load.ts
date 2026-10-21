@@ -1,7 +1,7 @@
 import type { createClient } from "@/lib/supabase/server";
-import type { LocationSchedule, StaffSchedule, TimeOff, WeeklyHours } from "./availability";
-import type { Interval } from "./intervals";
-import type { LocalDate, Weekday } from "./time";
+import type { LocationSchedule, StaffSchedule, TimeOff, WeeklyHours } from "./availability.ts";
+import type { Interval } from "./intervals.ts";
+import type { LocalDate, Weekday } from "./time.ts";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 

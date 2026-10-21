@@ -95,6 +95,26 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"import_external_ids": {
+                  Row: {
+                    "business_id": string,"entity": string,"external_id": string,"imported_at": string,"internal_id": string,"source": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"entity": string,"external_id": string,"imported_at"?: string,"internal_id": string,"source": string
+                  }
+                  Update: {
+                    "business_id"?: string,"entity"?: string,"external_id"?: string,"imported_at"?: string,"internal_id"?: string,"source"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "import_external_ids_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"location_hours": {
                   Row: {
                     "business_id": string,"end_minute": number,"id": string,"location_id": string,"start_minute": number,"weekday": number

@@ -36,6 +36,12 @@ Business → Location → Staff, Resource; Service, StaffService; Client; Appoin
 - `npm run test:e2e` — Playwright UI tests in `e2e/`; needs local Supabase with the seed, and uses the running dev server (or starts one). Fails on any browser console error, which includes Next.js dev overlay errors. First time: `npx playwright install chromium`
 - `npx supabase db reset` — rebuild local database from migrations + seed
 - `npm run db:types` — regenerate `lib/database.types.ts` after a migration
+- `npm run import:phorest:dry-run` — calls the **real** Phorest API (GET only) with the `PHOREST_*` credentials in `.env.local`, maps everything and prints only record counts and mapping issues; saves nothing. Ask the user before running it. `-- --months-back=N --months-ahead=N` sets the appointment range (default 24 and 12)
+
+## Phorest importer (`lib/import/phorest/`)
+- **Read-only toward Phorest.** All requests go through `http.ts`, which only sends GET (enforced in `readOnlyFetch`, proved by `tests/unit/phorest/http.test.ts`). Never add another way to call Phorest.
+- **Never print or log** Phorest credentials, the business ID, or any record values. Report problems through `IssueLog` (entity, field, reason, count: no values) and errors as status + endpoint template.
+- Modules under `lib/import/` and `lib/scheduling/` run under plain Node (for the dry-run script), so relative imports use explicit `.ts` extensions and avoid TypeScript-only runtime syntax (enums, parameter properties).
 
 ## Current phase
 Phase 1 — Foundation: auth, business/location setup, staff (with schedules and skills), services, clients. Phorest import comes at the end of phase 1.

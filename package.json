@@ -12,7 +12,8 @@
     "test:db": "vitest run --project db",
     "db:reset": "supabase db reset",
     "db:types": "supabase gen types typescript --local > lib/database.types.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "import:phorest:dry-run": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/phorest-dry-run.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

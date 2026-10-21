@@ -1,4 +1,4 @@
-import { MINUTES_PER_DAY } from "./time";
+import { MINUTES_PER_DAY } from "./time.ts";
 
 // A span of wall-clock minutes within one day: [start, end).
 export type Interval = { start: number; end: number };

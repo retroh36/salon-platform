@@ -13,8 +13,8 @@
 // Requested and declined time off don't block anything. Existing
 // appointments are the booking engine's concern, not this module's.
 
-import { containsSpan, intersectIntervals, mergeIntervals, overlapsSpan, subtractIntervals, type Interval } from "./intervals";
-import { MINUTES_PER_DAY, toLocal, weekdayOf, type LocalDate, type Weekday } from "./time";
+import { containsSpan, intersectIntervals, mergeIntervals, overlapsSpan, subtractIntervals, type Interval } from "./intervals.ts";
+import { MINUTES_PER_DAY, toLocal, weekdayOf, type LocalDate, type Weekday } from "./time.ts";
 
 export type WeeklyHours = Partial<Record<Weekday, Interval[]>>;
 

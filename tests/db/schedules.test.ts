@@ -9,7 +9,6 @@ const { owner: OWNER, manager: MANAGER, priya: PRIYA, marcus: MARCUS, hannah: HA
 const h = (hours: number, minutes = 0) => hours * 60 + minutes;
 
 let other: Awaited<ReturnType<typeof createOtherSalon>>;
-let owner: Client;
 let manager: Client;
 let frontDesk: Client;
 let priya: Client;
@@ -35,8 +34,7 @@ function futureDate(days: number) {
 
 beforeAll(async () => {
   other = await createOtherSalon();
-  [owner, manager, frontDesk, priya, marcus, otherOwner] = await Promise.all([
-    signIn("owner@mapleandash.test"),
+  [manager, frontDesk, priya, marcus, otherOwner] = await Promise.all([
     signIn("manager@mapleandash.test"),
     signIn("frontdesk@mapleandash.test"),
     signIn("priya@mapleandash.test"),
