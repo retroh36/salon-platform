@@ -33,6 +33,7 @@ Business → Location → Staff, Resource; Service, StaffService; Client; Appoin
 - `npm run dev` — local app
 - `npm run lint` / `npm run typecheck` / `npm test` — unit tests, no database needed
 - `npm run test:db` — RLS and database tests; needs local Supabase running with the seed loaded
+- `npm run test:e2e` — Playwright UI tests in `e2e/`; needs local Supabase with the seed, and uses the running dev server (or starts one). Fails on any browser console error, which includes Next.js dev overlay errors. First time: `npx playwright install chromium`
 - `npx supabase db reset` — rebuild local database from migrations + seed
 - `npm run db:types` — regenerate `lib/database.types.ts` after a migration
 

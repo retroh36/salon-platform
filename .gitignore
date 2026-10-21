@@ -38,3 +38,9 @@ yarn-error.log*
 # misc
 .DS_Store
 *.pem
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/e2e/.auth/
