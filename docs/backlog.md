@@ -10,6 +10,7 @@ Known gaps to pick up later. Move an item into a task when it's scheduled.
 
 ## Phorest import
 
+- [ ] **Blocked: dry run gets 401 (paused 2026-10-21).** `npm run import:phorest:dry-run` is rejected with 401 on the first request (`GET /api/business/{businessId}/branch`), both times it was tried: first with no `global/` username prefix against the docs host, then with the prefix against the US API gateway. Waiting on Phorest to confirm the username format, which API server the account is on, and the password. Once confirmed, update `.env.local` and run the dry run again (`-- --months-back=6 --months-ahead=3`).
 - [ ] **Save appointments, products and gift cards.** The importer maps them (`lib/import/phorest/model.ts`) but their tables come in phases 2, 5 and 7. Add a save step when each table exists.
 - [ ] **Check processing gaps after import.** Phorest gives a service's total duration and a gap time but not where the gap falls. Imported services treat the gap as processing at the end and are flagged for review; a manager should set service, processing and finishing times for color services.
 - [ ] **Staff-specific durations and gap times.** Phorest's `userDurations` / `userGapTimes` aren't imported (no per-stylist duration yet).
