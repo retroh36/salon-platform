@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
+import { Avatar } from "@/components/ui/avatar";
+import { buttonClass } from "@/components/ui/button";
+import { ChevronRightIcon, PlusIcon } from "@/components/ui/icons";
+import { Badge, Card, listClass, PageHeader, rowLinkClass } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { searchClients } from "@/lib/client-search";
 import { canEditClients, SEARCH_LIMIT } from "@/lib/clients";
@@ -26,22 +30,23 @@ async function Clients({ searchParams }: Pick<PageProps<"/clients">, "searchPara
   const { search, clients, total } = await searchClients(supabase, me.business_id, query, SEARCH_LIMIT);
 
   return (
-    <AppShell section="clients" businessName={me.location.business?.name} userName={me.first_name}>
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Clients</h1>
-        {canEditClients(me.role) && (
-          <Link
-            href="/clients/new"
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700"
-          >
-            Add client
-          </Link>
-        )}
-      </div>
+    <AppShell section="clients" me={me}>
+      <PageHeader
+        title="Clients"
+        description="Search by name or phone to find a client's details, allergies and color history."
+        actions={
+          canEditClients(me.role) && (
+            <Link href="/clients/new" className={buttonClass("primary", "md")}>
+              <PlusIcon className="size-4" />
+              Add client
+            </Link>
+          )
+        }
+      />
 
       <ClientSearch initialQuery={query} />
 
-      <p className="mt-4 mb-2 text-sm text-neutral-500" aria-live="polite">
+      <p className="mt-4 mb-3 text-sm text-ink-muted" aria-live="polite">
         {search.kind === "all"
           ? `${total} clients${total > clients.length ? ` · showing the first ${clients.length}` : ""}`
           : total === 0
@@ -50,23 +55,24 @@ async function Clients({ searchParams }: Pick<PageProps<"/clients">, "searchPara
       </p>
 
       {clients.length > 0 && (
-        <ul className="divide-y divide-neutral-100 rounded-xl border border-neutral-200 bg-white" aria-label="Clients">
-          {clients.map((client) => (
-            <li key={client.id}>
-              <Link
-                href={`/clients/${client.id}`}
-                className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-neutral-50"
-              >
-                <span className="min-w-48 flex-1 font-medium">{fullName(client)}</span>
-                <span className="w-36 text-sm text-neutral-600">{client.phone}</span>
-                <span className="w-64 truncate text-sm text-neutral-500">{client.email}</span>
-                {client.allergies && (
-                  <span className="rounded bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">Allergy</span>
-                )}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <Card flush>
+          <ul className={listClass} aria-label="Clients">
+            {clients.map((client) => (
+              <li key={client.id} className="animate-fade-in">
+                <Link href={`/clients/${client.id}`} className={rowLinkClass}>
+                  <span className="flex min-w-0 flex-1 basis-56 items-center gap-3">
+                    <Avatar name={fullName(client)} size="sm" />
+                    <span className="truncate font-semibold text-ink">{fullName(client)}</span>
+                    {client.allergies && <Badge tone="red">Allergy</Badge>}
+                  </span>
+                  <span className="w-36 text-sm text-ink-muted tabular-nums">{client.phone}</span>
+                  <span className="hidden w-64 truncate text-sm text-ink-muted md:block">{client.email}</span>
+                  <ChevronRightIcon className="hidden size-4 text-ink-muted sm:block" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
     </AppShell>
   );

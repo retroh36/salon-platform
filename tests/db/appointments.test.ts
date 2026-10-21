@@ -112,15 +112,14 @@ afterAll(async () => {
 describe("seed data", () => {
   let ctx: BookingContext;
   beforeAll(async () => {
-    // Seeded rows share the seed transaction's created_at; anything booked
-    // since (by hand, or tests in 2031) is later.
-    const seeded = await admin.from("appointments").select("created_at").eq("business_id", B).order("created_at").limit(1).single();
+    // The seeded month: the app only books in person (source front_desk),
+    // so online and phone bookings all come from the seed.
     const bounds = (ascending: boolean) =>
       admin
         .from("appointments")
         .select("starts_at")
         .eq("business_id", B)
-        .eq("created_at", seeded.data!.created_at)
+        .in("source", ["online", "phone"])
         .order("starts_at", { ascending })
         .limit(1)
         .single();

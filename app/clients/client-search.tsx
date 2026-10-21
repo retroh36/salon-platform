@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useTransition } from "react";
+import { fieldClass } from "@/components/ui/field";
+import { SearchIcon } from "@/components/ui/icons";
 
 const DEBOUNCE_MS = 150;
 
@@ -26,10 +28,16 @@ export function ClientSearch({ initialQuery }: { initialQuery: string }) {
   };
 
   return (
-    <form action="/clients" role="search" className="relative" onSubmit={(e) => {
+    <form
+      action="/clients"
+      role="search"
+      className="relative"
+      onSubmit={(e) => {
         e.preventDefault();
         run(new FormData(e.currentTarget).get("q")?.toString() ?? "");
-      }}>
+      }}
+    >
+      <SearchIcon className="pointer-events-none absolute top-1/2 left-3.5 size-5 -translate-y-1/2 text-ink-muted" />
       <input
         type="search"
         name="q"
@@ -39,10 +47,11 @@ export function ClientSearch({ initialQuery }: { initialQuery: string }) {
         aria-label="Search clients"
         autoComplete="off"
         autoFocus
-        className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none"
+        className={`${fieldClass} h-12 rounded-lg pr-28 pl-11 text-base shadow-card`}
       />
       {pending && (
-        <span className="absolute top-1/2 right-3 -translate-y-1/2 text-sm text-neutral-400" aria-live="polite">
+        <span className="absolute top-1/2 right-4 flex -translate-y-1/2 animate-fade-in items-center gap-2 text-sm text-ink-muted" aria-live="polite">
+          <span aria-hidden className="size-3.5 animate-spin rounded-full border-2 border-plum-200 border-t-plum-900" />
           Searching…
         </span>
       )}

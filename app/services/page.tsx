@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
+import { buttonClass } from "@/components/ui/button";
+import { ChevronRightIcon, PlusIcon } from "@/components/ui/icons";
+import { listClass, PageHeader, rowLinkClass } from "@/components/ui/page";
 import { canManage, getCurrentStaff } from "@/lib/auth";
+import { serviceFamily } from "@/lib/calendar";
 import { formatPrice, formatServiceTime, groupByCategory } from "@/lib/services";
 
 export const metadata: Metadata = { title: "Services · Salon Platform" };
@@ -36,31 +40,35 @@ async function Services() {
   const manage = canManage(me.role);
 
   return (
-    <AppShell section="services" businessName={me.location.business?.name} userName={me.first_name}>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Services</h1>
-          <p className="text-sm text-neutral-500">
+    <AppShell section="services" me={me}>
+      <PageHeader
+        title="Services"
+        description={
+          <>
             {active.length} on the menu{manage ? "" : " · view only"}
-          </p>
-        </div>
-        {manage && (
-          <Link
-            href="/services/new"
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700"
-          >
-            Add service
-          </Link>
-        )}
-      </div>
+          </>
+        }
+        actions={
+          manage && (
+            <Link href="/services/new" className={buttonClass("primary", "md")}>
+              <PlusIcon className="size-4" />
+              Add service
+            </Link>
+          )
+        }
+      />
 
       <div className="flex flex-col gap-6">
         {groupByCategory(active).map(({ category, services }) => (
-          <section key={category} className="rounded-xl border border-neutral-200 bg-white">
-            <h2 className="border-b border-neutral-200 px-4 py-3 font-medium">
-              {category} <span className="text-neutral-500">({services.length})</span>
+          <section
+            key={category}
+            data-family={serviceFamily(category)}
+            className="overflow-hidden rounded-xl border border-line border-l-4 border-l-(--fam-accent) bg-surface shadow-card"
+          >
+            <h2 className="flex items-center gap-2 border-b border-line bg-(--fam-fill)/40 px-5 py-3.5 font-serif text-lg font-semibold text-ink">
+              {category} <span className="font-sans text-sm font-medium text-ink-muted">({services.length})</span>
             </h2>
-            <ul className="divide-y divide-neutral-100">
+            <ul className={listClass}>
               {services.map((service) => {
                 const offeredBy = service.staff_services
                   .map((ss) => ({ ...ss, staff: staffById.get(ss.staff_id) }))
@@ -72,16 +80,13 @@ async function Services() {
 
                 return (
                   <li key={service.id}>
-                    <Link
-                      href={`/services/${service.id}`}
-                      className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-3 hover:bg-neutral-50"
-                    >
-                      <span className="min-w-52 flex-1 font-medium">{service.name}</span>
-                      <span className="w-48 text-sm text-neutral-600">{formatServiceTime(service)}</span>
-                      <span className="w-28 text-sm text-neutral-900">
+                    <Link href={`/services/${service.id}`} className={`${rowLinkClass} items-baseline`}>
+                      <span className="min-w-52 flex-1 font-semibold text-ink">{service.name}</span>
+                      <span className="w-48 text-sm text-ink-muted">{formatServiceTime(service)}</span>
+                      <span className="w-28 text-sm font-medium text-ink tabular-nums">
                         {min === max ? formatPrice(min) : `${formatPrice(min)}–${formatPrice(max)}`}
                       </span>
-                      <span className="w-full text-sm text-neutral-500 sm:w-auto sm:min-w-48">
+                      <span className="w-full text-sm text-ink-muted sm:w-auto sm:min-w-48">
                         {offeredBy.length === 0
                           ? "No one offers this yet"
                           : offeredBy.map((ss) => ss.staff!.first_name).join(", ")}
@@ -95,17 +100,15 @@ async function Services() {
         ))}
 
         {archived.length > 0 && (
-          <details className="rounded-xl border border-neutral-200 bg-white">
-            <summary className="cursor-pointer px-4 py-3 font-medium text-neutral-600">
-              Archived ({archived.length})
+          <details className="group overflow-hidden rounded-xl border border-line bg-surface shadow-card">
+            <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3.5 font-medium text-ink-muted transition-colors duration-(--motion-fast) hover:bg-sunken [&::-webkit-details-marker]:hidden">
+              <ChevronRightIcon className="size-4 transition-transform duration-(--motion-fast) group-open:rotate-90" />
+              <span>Archived ({archived.length})</span>
             </summary>
-            <ul className="divide-y divide-neutral-100 border-t border-neutral-200">
+            <ul className={`${listClass} animate-fade-in border-t border-line`}>
               {archived.map((service) => (
                 <li key={service.id}>
-                  <Link
-                    href={`/services/${service.id}`}
-                    className="flex flex-wrap gap-x-4 px-4 py-3 text-neutral-500 hover:bg-neutral-50"
-                  >
+                  <Link href={`/services/${service.id}`} className={`${rowLinkClass} text-ink-muted`}>
                     <span className="min-w-52 flex-1">{service.name}</span>
                     <span className="text-sm">{service.category}</span>
                   </Link>

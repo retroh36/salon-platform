@@ -31,3 +31,15 @@ export function describeTimeOff(t: TimeOff): string {
 }
 
 export const STATUS_LABELS = { requested: "Pending", approved: "Approved", declined: "Declined" } as const;
+
+// "2026-10-21" -> "Wednesday, October 21, 2026".
+export function formatLongDay(date: LocalDate, withYear = true): string {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    ...(withYear ? { year: "numeric" } : {}),
+  });
+}

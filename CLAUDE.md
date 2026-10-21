@@ -43,6 +43,12 @@ Business → Location → Staff, Resource; Service, StaffService; Client; Appoin
 - **Never print or log** Phorest credentials, the business ID, or any record values. Report problems through `IssueLog` (entity, field, reason, count: no values) and errors as status + endpoint template.
 - Modules under `lib/import/` and `lib/scheduling/` run under plain Node (for the dry-run script), so relative imports use explicit `.ts` extensions and avoid TypeScript-only runtime syntax (enums, parameter properties).
 
+## Design (`docs/design/`)
+- Mockups: `docs/design/mockup-1.png` (features) and `mockup-2.png` (visual style).
+- Tokens (colors, fonts, radius, shadows, motion) live in `app/globals.css` under `@theme`. Every text/background pair must pass WCAG AA: add new pairs to `tests/unit/design-tokens.test.ts`.
+- Shared components are in `components/ui/`: Button, fields (`fieldClass`, `selectClass`, `checkboxClass`), page blocks (`PageHeader`, `Card`, `Badge`, `Alert`), Avatar, StatusChip, Tabs, Segmented, Listbox, DatePicker, FitText (text that shortens instead of being cut off), icons and the AppFrame layout. Every page uses `AppShell` (`components/app-shell.tsx`), which wraps AppFrame. Use only token colors, not Tailwind's palette (`neutral-*` and so on).
+- Motion is CSS only, with no animation library: transitions use `duration-(--motion-fast|base|slow)` (150-250ms), and day changes use React `<ViewTransition>`. `prefers-reduced-motion` turns all of it off (see the end of `globals.css`).
+
 ## Scheduling (`lib/scheduling/`)
 - `availability.ts`: when a staff member can work (opening hours, shifts, one-off changes, approved time off).
 - `booking.ts`: whether an appointment item can be booked (`checkItem`, `checkAppointment`), with a reason code for each problem. Processing time is free for the stylist but not for the chair or room. Any code that creates or moves appointments must check here first.

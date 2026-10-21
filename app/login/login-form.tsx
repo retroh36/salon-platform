@@ -1,6 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
+import { buttonClass } from "@/components/ui/button";
+import { fieldClass, labelClass } from "@/components/ui/field";
+import { Alert } from "@/components/ui/page";
 import { login } from "./actions";
 
 export function LoginForm() {
@@ -8,7 +11,7 @@ export function LoginForm() {
 
   return (
     <form action={action} className="flex flex-col gap-4">
-      <label className="flex flex-col gap-1 text-sm font-medium">
+      <label className={labelClass}>
         Email
         <input
           name="email"
@@ -16,29 +19,21 @@ export function LoginForm() {
           autoComplete="email"
           required
           defaultValue={state?.email}
-          className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-base font-normal text-neutral-900 focus:border-neutral-900 focus:outline-none"
+          className={`${fieldClass} h-11 text-base font-normal`}
         />
       </label>
-      <label className="flex flex-col gap-1 text-sm font-medium">
+      <label className={labelClass}>
         Password
         <input
           name="password"
           type="password"
           autoComplete="current-password"
           required
-          className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-base font-normal text-neutral-900 focus:border-neutral-900 focus:outline-none"
+          className={`${fieldClass} h-11 text-base font-normal`}
         />
       </label>
-      {state?.error && (
-        <p role="alert" className="text-sm text-red-600">
-          {state.error}
-        </p>
-      )}
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-md bg-neutral-900 px-3 py-2 font-medium text-white hover:bg-neutral-700 disabled:opacity-60"
-      >
+      {state?.error && <Alert>{state.error}</Alert>}
+      <button type="submit" disabled={pending} className={buttonClass("primary", "lg", "mt-1 w-full")}>
         {pending ? "Signing in…" : "Sign in"}
       </button>
     </form>

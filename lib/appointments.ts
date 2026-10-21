@@ -19,10 +19,10 @@ export const STATUS_LABELS: Record<AppointmentStatus, string> = {
 export type AppointmentAction = "check_in" | "check_out" | "cancel" | "no_show";
 
 export const ACTION_LABELS: Record<AppointmentAction, string> = {
-  check_in: "Check in",
-  check_out: "Check out",
-  cancel: "Cancel",
-  no_show: "No-show",
+  check_in: "Check in client",
+  check_out: "Check out client",
+  cancel: "Cancel booking",
+  no_show: "Mark no-show",
 };
 
 export const ACTION_STATUS: Record<AppointmentAction, AppointmentStatus> = {

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AppShell, NotLinked } from "@/components/app-shell";
+import { buttonClass } from "@/components/ui/button";
+import { Alert, Badge } from "@/components/ui/page";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
 import { centsToInput, sortCategories } from "@/lib/services";
@@ -76,24 +78,27 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
   const archived = Boolean(service?.archived_at);
 
   return (
-    <AppShell section="services" businessName={me.location.business?.name} userName={me.first_name}>
-      <Link href="/services" className="text-sm text-neutral-500 hover:text-neutral-900">
+    <AppShell section="services" me={me}>
+      <Link
+        href="/services"
+        className="inline-flex items-center gap-1 text-sm font-medium text-ink-muted transition-colors duration-(--motion-fast) hover:text-plum-900"
+      >
         ← Services
       </Link>
-      <div className="mt-2 mb-6 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold">{title}</h1>
-        {archived && <span className="rounded bg-neutral-200 px-2 py-0.5 text-xs text-neutral-700">Archived</span>}
-        {!manage && <span className="text-sm text-neutral-500">View only</span>}
+      <div className="mt-3 mb-6 flex flex-wrap items-center gap-3">
+        <h1 className="font-serif text-4xl font-semibold tracking-tight text-plum-900">{title}</h1>
+        {archived && <Badge tone="neutral">Archived</Badge>}
+        {!manage && <Badge tone="plum">View only</Badge>}
       </div>
 
       {error === "name-taken" && (
-        <p role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          Couldn&apos;t restore: another service on the menu already has this name. Rename one of them first.
-        </p>
+        <Alert className="mb-4">Couldn&apos;t restore: another service on the menu already has this name. Rename one of them first.</Alert>
       )}
 
       {archived && manage && (
-        <p className="mb-4 text-sm text-neutral-600">This service is archived and can&apos;t be booked. Restore it to edit.</p>
+        <Alert tone="info" className="mb-4">
+          This service is archived and can&apos;t be booked. Restore it to edit.
+        </Alert>
       )}
 
       <ServiceForm
@@ -106,19 +111,19 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
       />
 
       {service && manage && (
-        <form action={setServiceArchived.bind(null, service.id, !archived)} className="mt-10 border-t border-neutral-200 pt-6">
-          <p className="mb-3 text-sm text-neutral-600">
+        <form
+          action={setServiceArchived.bind(null, service.id, !archived)}
+          className={`mt-10 rounded-xl border p-5 ${archived ? "border-line bg-surface" : "border-danger/25 bg-danger-soft/40"}`}
+        >
+          <h2 className="font-serif text-lg font-semibold text-ink">{archived ? "Restore" : "Archive"}</h2>
+          <p className="mt-1 mb-4 text-sm text-ink-muted">
             {archived
               ? "Put this service back on the menu."
               : "Archiving removes this service from the menu and booking. Past appointments keep it."}
           </p>
           <button
             type="submit"
-            className={
-              archived
-                ? "rounded-md border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-100"
-                : "rounded-md border border-red-300 px-4 py-2 text-sm text-red-700 hover:bg-red-50"
-            }
+            className={archived ? buttonClass("secondary", "md") : buttonClass("secondary", "md", "border-danger/40 text-danger hover:bg-danger-soft")}
           >
             {archived ? "Restore service" : "Archive service"}
           </button>

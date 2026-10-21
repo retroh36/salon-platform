@@ -2,26 +2,17 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { Drawer } from "@/components/drawer";
-import { inputClass } from "@/components/form";
-import {
-  ACTION_LABELS,
-  allowedActions,
-  CANCEL_REASONS,
-  canEditNotes,
-  isEditable,
-  MAX_NOTES,
-  STATUS_LABELS,
-  type AppointmentAction,
-} from "@/lib/appointments";
-import { formatDay } from "@/lib/schedule-format";
+import { Avatar } from "@/components/ui/avatar";
+import { Button, buttonClass, IconButton } from "@/components/ui/button";
+import { Eyebrow, fieldClass, labelClass, selectClass } from "@/components/ui/field";
+import { CalendarIcon, ClockIcon, CloseIcon } from "@/components/ui/icons";
+import { StatusChip } from "@/components/ui/status-chip";
+import { ACTION_LABELS, allowedActions, CANCEL_REASONS, canEditNotes, isEditable, MAX_NOTES, type AppointmentAction } from "@/lib/appointments";
+import { formatLongDay } from "@/lib/schedule-format";
 import { formatMinute, type LocalDate } from "@/lib/scheduling/time";
-import { formatPrice } from "@/lib/services";
+import { formatMinutes, formatPrice } from "@/lib/services";
 import { changeVisitStatus, saveVisitNotes } from "./actions";
 import type { AppointmentDetail, BoardData } from "./types";
-
-const button = "rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-100 disabled:opacity-60";
-const primary = "rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-60";
 
 export function AppointmentPanel({
   date,
@@ -38,130 +29,145 @@ export function AppointmentPanel({
 }) {
   const { client, items, status } = appointment;
   const [pending, startTransition] = useTransition();
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [canceling, setCanceling] = useState(false);
 
   const start = Math.min(...items.map((i) => i.start));
   const end = Math.max(...items.map((i) => i.end));
   const total = items.reduce((sum, i) => sum + i.priceCents, 0);
   const notesEditable = canEditNotes(me.role, me.staffId, items.map((i) => i.staffId));
+  const actions = me.canBook ? allowedActions(status) : [];
+  const primaryAction = actions.find((a) => a === "check_in" || a === "check_out");
 
   function run(action: AppointmentAction, reason = "", detail = "") {
     setMessage(null);
     startTransition(async () => {
       const result = await changeVisitStatus(appointment.id, action, reason, detail);
-      if (!result.ok) setMessage({ text: result.message, error: true });
+      if (!result.ok) setMessage(result.message);
       else if (action === "cancel") onClose(); // canceled visits leave the calendar
       else setCanceling(false);
     });
   }
 
   return (
-    <Drawer title={client?.name ?? "Walk-in"} onClose={onClose}>
-      <div className="flex flex-col gap-5 text-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-700" data-status={status}>
-            {STATUS_LABELS[status]}
-          </span>
-          <span>
-            {formatDay(date)} · {formatMinute(start)}–{formatMinute(end)}
-          </span>
-        </div>
-
-        {message && (
-          <p role={message.error ? "alert" : "status"} className={message.error ? "rounded-md bg-red-50 px-3 py-2 text-red-700" : "text-green-700"}>
-            {message.text}
-          </p>
-        )}
-
-        {client && (
-          <section aria-label="Client">
-            {client.allergies && <p className="mb-2 rounded-md bg-red-50 px-3 py-2 font-medium text-red-700">Allergy: {client.allergies}</p>}
-            <dl className="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1">
-              {client.phone && (
-                <>
-                  <dt className="text-neutral-500">Phone</dt>
-                  <dd>{client.phone}</dd>
-                </>
-              )}
-              {client.email && (
-                <>
-                  <dt className="text-neutral-500">Email</dt>
-                  <dd className="truncate">{client.email}</dd>
-                </>
-              )}
-              {client.preferences && (
-                <>
-                  <dt className="text-neutral-500">Preferences</dt>
-                  <dd>{client.preferences}</dd>
-                </>
-              )}
-            </dl>
-            <Link href={`/clients/${client.id}`} className="mt-2 inline-block text-neutral-600 underline hover:text-neutral-900">
-              Open client profile
-            </Link>
-          </section>
-        )}
-
-        <section aria-label="Services">
-          <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
-            {items.map((i) => (
-              <li key={i.id} className="flex items-start justify-between gap-3 px-3 py-2">
-                <div>
-                  <div className="font-medium">{i.serviceName}</div>
-                  <div className="text-neutral-500">
-                    {i.staffName} · {formatMinute(i.start)}–{formatMinute(i.end)}
-                    {i.resourceName && ` · ${i.resourceName}`}
-                  </div>
-                </div>
-                <span>{formatPrice(i.priceCents)}</span>
-              </li>
-            ))}
-            <li className="flex justify-between px-3 py-2 font-medium">
-              <span>Total</span>
-              <span>{formatPrice(total)}</span>
-            </li>
-          </ul>
-        </section>
-
-        <NotesForm key={appointment.notes} appointmentId={appointment.id} initial={appointment.notes} editable={notesEditable} />
-
-        {me.canBook && (isEditable(status) || allowedActions(status).length > 0) && (
-          <section aria-label="Actions" className="flex flex-col gap-3">
-            <div className="flex flex-wrap gap-2">
-              {isEditable(status) && (
-                <button type="button" className={button} onClick={onEdit} disabled={pending}>
-                  Edit
-                </button>
-              )}
-              {allowedActions(status)
-                .filter((a) => a !== "cancel")
-                .map((a) => (
-                  <button key={a} type="button" className={a === "check_in" || a === "check_out" ? primary : button} disabled={pending} onClick={() => run(a)}>
-                    {ACTION_LABELS[a]}
-                  </button>
-                ))}
-              {allowedActions(status).includes("cancel") && !canceling && (
-                <button type="button" className={`${button} text-red-700`} disabled={pending} onClick={() => setCanceling(true)}>
-                  Cancel appointment
-                </button>
-              )}
-            </div>
-            {canceling && <CancelForm pending={pending} onCancel={(reason, detail) => run("cancel", reason, detail)} onKeep={() => setCanceling(false)} />}
-          </section>
-        )}
-
-        <p className="text-xs text-neutral-500">
-          {appointment.bookedBy && <>Booked by {appointment.bookedBy}</>}
-          {appointment.changedBy && (
-            <>
-              <br />
-              Last changed by {appointment.changedBy}
-            </>
-          )}
-        </p>
+    <div className="flex flex-col gap-5 py-2 text-sm">
+      <div className="flex items-center justify-between">
+        <h2 className="font-serif text-2xl font-semibold text-plum-900">Booking details</h2>
+        <IconButton label="Close booking details" onClick={onClose}>
+          <CloseIcon />
+        </IconButton>
       </div>
-    </Drawer>
+
+      <div className="flex items-center gap-4">
+        <Avatar name={client?.name ?? "Walk in"} size="lg" />
+        <div className="min-w-0">
+          <h3 className="truncate font-serif text-xl font-semibold" data-testid="client-name">
+            {client?.name ?? "Walk-in"}
+          </h3>
+          {client?.phone && <p className="text-ink-muted">{client.phone}</p>}
+          <StatusChip status={status} className="mt-1.5" />
+        </div>
+      </div>
+
+      {message && (
+        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-danger">
+          {message}
+        </p>
+      )}
+
+      <dl className="flex flex-col gap-3 border-y border-line py-4">
+        <div className="flex items-center gap-3">
+          <dt className="sr-only">Date</dt>
+          <CalendarIcon className="size-5 text-ink-muted" />
+          <dd>{formatLongDay(date, false)}</dd>
+        </div>
+        <div className="flex items-start gap-3">
+          <dt className="sr-only">Time</dt>
+          <ClockIcon className="size-5 text-ink-muted" />
+          <dd>
+            {formatMinute(start)}–{formatMinute(end)}
+            <span className="block text-ink-muted">{formatMinutes(end - start)}</span>
+          </dd>
+        </div>
+      </dl>
+
+      {client?.allergies && <p className="rounded-md border border-danger/30 bg-danger-soft px-3 py-2 font-medium text-danger">Allergy: {client.allergies}</p>}
+
+      <section aria-label="Services" className="flex flex-col gap-3">
+        <Eyebrow>{items.length > 1 ? "Services" : "Service"}</Eyebrow>
+        <ul className="flex flex-col gap-3">
+          {items.map((i) => (
+            <li key={i.id} className="flex items-start justify-between gap-3">
+              <div>
+                <div className="font-semibold">{i.serviceName}</div>
+                <div className="text-ink-muted">
+                  With {i.staffName} · {formatMinute(i.start)}–{formatMinute(i.end)}
+                  {i.resourceName && ` · ${i.resourceName}`}
+                </div>
+              </div>
+              <span className="tabular-nums">{formatPrice(i.priceCents)}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="flex justify-between border-t border-line pt-3 font-semibold">
+          <span>Total</span>
+          <span className="tabular-nums">{formatPrice(total)}</span>
+        </div>
+      </section>
+
+      {client?.preferences && (
+        <section aria-label="Preferences" className="flex flex-col gap-1.5">
+          <Eyebrow>Client preferences</Eyebrow>
+          <p>{client.preferences}</p>
+        </section>
+      )}
+
+      <NotesForm key={appointment.notes} appointmentId={appointment.id} initial={appointment.notes} editable={notesEditable} />
+
+      {(actions.length > 0 || (me.canBook && isEditable(status))) && (
+        <section aria-label="Actions" className="flex flex-col gap-2">
+          {primaryAction && (
+            <Button variant="primary" size="lg" disabled={pending} onClick={() => run(primaryAction)}>
+              {ACTION_LABELS[primaryAction]}
+            </Button>
+          )}
+          {me.canBook && isEditable(status) && (
+            <Button size="lg" disabled={pending} onClick={onEdit}>
+              Edit booking
+            </Button>
+          )}
+          <div className="flex flex-wrap justify-center gap-2">
+            {actions.includes("no_show") && (
+              <Button variant="ghost" size="sm" disabled={pending} onClick={() => run("no_show")}>
+                {ACTION_LABELS.no_show}
+              </Button>
+            )}
+            {actions.includes("cancel") && !canceling && (
+              <Button variant="ghost" size="sm" className="text-danger" disabled={pending} onClick={() => setCanceling(true)}>
+                {ACTION_LABELS.cancel}
+              </Button>
+            )}
+          </div>
+          {canceling && <CancelForm pending={pending} onCancel={(reason, detail) => run("cancel", reason, detail)} onKeep={() => setCanceling(false)} />}
+        </section>
+      )}
+
+      {client && (
+        <Link href={`/clients/${client.id}`} className="self-center font-medium text-plum-900 underline underline-offset-2 hover:text-plum-700">
+          View client profile
+        </Link>
+      )}
+
+      <p className="text-xs text-ink-muted">
+        {appointment.bookedBy}
+        {appointment.changedBy && (
+          <>
+            <br />
+            {appointment.changedBy}
+          </>
+        )}
+      </p>
+    </div>
   );
 }
 
@@ -172,9 +178,9 @@ function NotesForm({ appointmentId, initial, editable }: { appointmentId: string
 
   if (!editable) {
     return (
-      <section aria-label="Notes">
-        <h3 className="mb-1 font-medium">Notes</h3>
-        <p className={initial ? "whitespace-pre-wrap" : "text-neutral-500"}>{initial || "No notes."}</p>
+      <section aria-label="Notes" className="flex flex-col gap-1.5">
+        <Eyebrow>Notes</Eyebrow>
+        <p className={`rounded-md bg-sunken px-3 py-2 whitespace-pre-wrap ${initial ? "" : "text-ink-muted"}`}>{initial || "No notes."}</p>
       </section>
     );
   }
@@ -192,7 +198,7 @@ function NotesForm({ appointmentId, initial, editable }: { appointmentId: string
         });
       }}
     >
-      <label htmlFor="appointment-notes" className="font-medium">
+      <label htmlFor="appointment-notes" className="text-xs font-semibold tracking-wider text-ink-muted uppercase">
         Notes
       </label>
       <textarea
@@ -201,14 +207,15 @@ function NotesForm({ appointmentId, initial, editable }: { appointmentId: string
         onChange={(e) => setNotes(e.target.value)}
         maxLength={MAX_NOTES}
         rows={3}
-        className={inputClass}
+        placeholder="Anything the stylist should know"
+        className={`${fieldClass} bg-sunken/60`}
       />
       <div className="flex items-center gap-3">
-        <button type="submit" className={button} disabled={pending || notes === initial}>
+        <Button type="submit" size="sm" disabled={pending || notes === initial}>
           {pending ? "Saving…" : "Save notes"}
-        </button>
+        </Button>
         {result && (
-          <span role={result.error ? "alert" : "status"} className={result.error ? "text-red-700" : "text-green-700"}>
+          <span role={result.error ? "alert" : "status"} className={`animate-fade-in ${result.error ? "text-danger" : "text-status-confirmed-ink"}`}>
             {result.text}
           </span>
         )}
@@ -222,33 +229,35 @@ function CancelForm({ pending, onCancel, onKeep }: { pending: boolean; onCancel:
   const [detail, setDetail] = useState("");
   return (
     <form
-      aria-label="Cancel appointment"
-      className="flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50/50 p-3"
+      aria-label="Cancel booking"
+      className="flex animate-fade-in flex-col gap-3 rounded-lg border border-danger/30 bg-danger-soft/60 p-3"
       onSubmit={(e) => {
         e.preventDefault();
         onCancel(reason, detail);
       }}
     >
-      <label htmlFor="cancel-reason" className="font-medium">
+      <label className={labelClass}>
         Reason
+        <select value={reason} onChange={(e) => setReason(e.target.value)} required className={selectClass}>
+          <option value="">Choose a reason</option>
+          {CANCEL_REASONS.map((r) => (
+            <option key={r}>{r}</option>
+          ))}
+        </select>
       </label>
-      <select id="cancel-reason" value={reason} onChange={(e) => setReason(e.target.value)} required className={inputClass}>
-        <option value="">Choose a reason</option>
-        {CANCEL_REASONS.map((r) => (
-          <option key={r}>{r}</option>
-        ))}
-      </select>
-      <label htmlFor="cancel-detail" className="font-medium">
-        Details {reason !== "Other" && <span className="font-normal text-neutral-500">(optional)</span>}
+      <label className={labelClass}>
+        <span>
+          Details {reason !== "Other" && <span className="font-normal text-ink-muted">(optional)</span>}
+        </span>
+        <input value={detail} onChange={(e) => setDetail(e.target.value)} maxLength={300} className={fieldClass} />
       </label>
-      <input id="cancel-detail" value={detail} onChange={(e) => setDetail(e.target.value)} maxLength={300} className={inputClass} />
       <div className="flex gap-2">
-        <button type="submit" className="rounded-md bg-red-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-60" disabled={pending}>
-          Cancel appointment
+        <button type="submit" className={buttonClass("danger", "md")} disabled={pending}>
+          Cancel booking
         </button>
-        <button type="button" className={button} onClick={onKeep} disabled={pending}>
+        <Button onClick={onKeep} disabled={pending}>
           Keep it
-        </button>
+        </Button>
       </div>
     </form>
   );

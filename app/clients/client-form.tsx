@@ -2,13 +2,17 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import { Field, submitWithoutReset } from "@/components/form";
+import { Field, inputClass, submitWithoutReset } from "@/components/form";
+import { buttonClass } from "@/components/ui/button";
+import { checkboxClass, selectClass } from "@/components/ui/field";
+import { Alert } from "@/components/ui/page";
 import { saveClient, type ClientFormFields } from "./actions";
 
 export type StylistOption = { id: string; name: string };
 
-const inputClass =
-  "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none disabled:bg-neutral-50 disabled:text-neutral-500";
+const sectionClass = "grid gap-4 rounded-xl border border-line bg-surface p-5 shadow-card sm:grid-cols-2";
+const sectionTitle = "font-serif text-lg font-semibold text-ink sm:col-span-2";
+const checkLabel = "flex cursor-pointer items-center gap-2.5 text-sm text-ink";
 
 export function ClientForm({
   clientId,
@@ -31,14 +35,12 @@ export function ClientForm({
     <form action={action} onSubmit={submitWithoutReset(action)} className="flex flex-col gap-6" noValidate>
       {clientId && <input type="hidden" name="client_id" value={clientId} />}
       {state?.message && (
-        <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {state.message}
-        </p>
+        <Alert>{state.message}</Alert>
       )}
 
       <fieldset disabled={pending} className="flex flex-col gap-6">
-        <section className="grid gap-4 rounded-xl border border-neutral-200 bg-white p-5 sm:grid-cols-2">
-          <h2 className="font-medium sm:col-span-2">Contact</h2>
+        <section className={sectionClass}>
+          <h2 className={sectionTitle}>Contact</h2>
           <Field label="First name" error={errors.first_name}>
             <input name="first_name" defaultValue={fields.first_name} autoComplete="off" required className={inputClass} />
           </Field>
@@ -51,25 +53,25 @@ export function ClientForm({
           <Field label="Email" error={errors.email}>
             <input name="email" type="email" defaultValue={fields.email} autoComplete="off" className={inputClass} />
           </Field>
-          <div className="flex flex-wrap gap-6 text-sm sm:col-span-2">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" name="sms_opt_in" defaultChecked={fields.sms_opt_in} className="size-4" />
+          <div className="flex flex-wrap gap-6 sm:col-span-2">
+            <label className={checkLabel}>
+              <input type="checkbox" name="sms_opt_in" defaultChecked={fields.sms_opt_in} className={checkboxClass} />
               Texts OK (reminders and offers)
             </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" name="email_opt_in" defaultChecked={fields.email_opt_in} className="size-4" />
+            <label className={checkLabel}>
+              <input type="checkbox" name="email_opt_in" defaultChecked={fields.email_opt_in} className={checkboxClass} />
               Marketing emails OK
             </label>
           </div>
         </section>
 
-        <section className="grid gap-4 rounded-xl border border-neutral-200 bg-white p-5 sm:grid-cols-2">
-          <h2 className="font-medium sm:col-span-2">Care</h2>
+        <section className={sectionClass}>
+          <h2 className={sectionTitle}>Care</h2>
           <Field label="Allergies and sensitivities" hint="Shown on every visit" className="sm:col-span-2">
             <textarea name="allergies" defaultValue={fields.allergies} rows={2} className={inputClass} />
           </Field>
           <Field label="Preferred stylist">
-            <select name="preferred_staff_id" defaultValue={fields.preferred_staff_id} className={inputClass}>
+            <select name="preferred_staff_id" defaultValue={fields.preferred_staff_id} className={selectClass}>
               <option value="">No preference</option>
               {stylists.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -85,13 +87,13 @@ export function ClientForm({
             <textarea name="notes" defaultValue={fields.notes} rows={3} className={inputClass} />
           </Field>
           <div className="flex flex-wrap items-end gap-4 sm:col-span-2">
-            <label className="flex items-center gap-2 py-2 text-sm font-medium">
+            <label className={`${checkLabel} py-2.5 font-medium`}>
               <input
                 type="checkbox"
                 name="consent_signed"
                 defaultChecked={fields.consent_signed}
                 onChange={(e) => setConsent(e.target.checked)}
-                className="size-4"
+                className={checkboxClass}
               />
               Consent form signed
             </label>
@@ -110,14 +112,10 @@ export function ClientForm({
       </fieldset>
 
       <div className="flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-neutral-900 px-4 py-2 font-medium text-white hover:bg-neutral-700 disabled:opacity-60"
-        >
+        <button type="submit" disabled={pending} className={buttonClass("primary", "lg")}>
           {pending ? "Saving…" : clientId ? "Save changes" : "Add client"}
         </button>
-        <Link href={clientId ? `/clients/${clientId}` : "/clients"} className="px-4 py-2 text-neutral-600 hover:text-neutral-900">
+        <Link href={clientId ? `/clients/${clientId}` : "/clients"} className={buttonClass("ghost", "lg")}>
           Cancel
         </Link>
       </div>

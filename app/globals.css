@@ -1,26 +1,214 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ---------------------------------------------------------------------------
+   Design tokens (see docs/design/). Colors are checked for WCAG AA text
+   contrast by tests/unit/design-tokens.test.ts: add any new text/background
+   pair there.
+   --------------------------------------------------------------------------- */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@theme {
+  /* Surfaces: warm off-white */
+  --color-canvas: #fbf8f5;
+  --color-surface: #ffffff;
+  --color-sunken: #f5f0eb;
+  --color-line: #ebe4dd;
+  --color-line-strong: #d9cfc5;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  /* Text */
+  --color-ink: #2b2130;
+  --color-ink-muted: #625662;
+  --color-ink-subtle: #75696f;
+
+  /* Primary: deep plum */
+  --color-plum-900: #3d1f42;
+  --color-plum-800: #552c5b;
+  --color-plum-700: #5a2d61;
+  --color-plum-200: #e4d3e7;
+  --color-plum-100: #f1e7f2;
+
+  /* Service families: a soft fill behind text and a stronger accent edge */
+  --color-peach-fill: #fbdfcf;
+  --color-peach-accent: #e2733d;
+  --color-lavender-fill: #e9e0f8;
+  --color-lavender-accent: #8a68d6;
+  --color-sage-fill: #dcecdf;
+  --color-sage-accent: #5a9969;
+  --color-sky-fill: #dae9f4;
+  --color-sky-accent: #4c8bb6;
+  --color-sand-fill: #ede5dd;
+  --color-sand-accent: #a08870;
+
+  /* Status chips */
+  --color-status-booked-bg: #efe9e3;
+  --color-status-booked-ink: #574a40;
+  --color-status-confirmed-bg: #dbeedf;
+  --color-status-confirmed-ink: #1e5730;
+  --color-status-checked-in-bg: #dbe8f6;
+  --color-status-checked-in-ink: #1d4a7a;
+  --color-status-completed-bg: #ece2ee;
+  --color-status-completed-ink: #5a2d61;
+  --color-status-late-bg: #fbecc8;
+  --color-status-late-ink: #7a4a05;
+  --color-status-no-show-bg: #fae1dd;
+  --color-status-no-show-ink: #9a2a1d;
+
+  --color-danger: #b42318;
+  --color-danger-soft: #fdecea;
+  --color-now: #c8323a;
+
+  /* Type */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* Shadows */
+  --shadow-card: 0 1px 2px rgb(43 33 48 / 0.06);
+  --shadow-lift: 0 6px 16px -4px rgb(43 33 48 / 0.18), 0 2px 4px rgb(43 33 48 / 0.08);
+  --shadow-panel: -8px 0 24px -12px rgb(43 33 48 / 0.2);
+
+  /* Motion: quick, so nothing feels slow */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-settle: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --animate-panel-in: panel-in 200ms var(--ease-out) both;
+  --animate-fade-in: fade-in 150ms var(--ease-out) both;
+  --animate-settle: settle 250ms var(--ease-settle) both;
+  --animate-pop-in: pop-in 150ms var(--ease-out) both;
+
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: translateX(12px);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96) translateY(-4px);
+    }
+  }
+  @keyframes settle {
+    from {
+      transform: scale(1.03) translateY(-2px);
+      box-shadow: var(--shadow-lift);
+    }
   }
 }
 
+/* Durations for transitions, as utilities: duration-(--motion-fast) etc. */
+:root {
+  --motion-fast: 150ms;
+  --motion-base: 200ms;
+  --motion-slow: 250ms;
+}
+
+/* Service family colors for a block: set data-family on the element. */
+[data-family="color"] {
+  --fam-fill: var(--color-peach-fill);
+  --fam-accent: var(--color-peach-accent);
+}
+[data-family="cut"] {
+  --fam-fill: var(--color-lavender-fill);
+  --fam-accent: var(--color-lavender-accent);
+}
+[data-family="finish"] {
+  --fam-fill: var(--color-sage-fill);
+  --fam-accent: var(--color-sage-accent);
+}
+[data-family="treatment"] {
+  --fam-fill: var(--color-sky-fill);
+  --fam-accent: var(--color-sky-accent);
+}
+[data-family="other"] {
+  --fam-fill: var(--color-sand-fill);
+  --fam-accent: var(--color-sand-accent);
+}
+
+/* The arrow on styled native selects (selectClass). */
+.select-chevron {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23625662' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1rem;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+/* ---------------------------------------------------------------------------
+   Day-to-day slides (React <ViewTransition> with nav-forward / nav-back).
+   --------------------------------------------------------------------------- */
+
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-old(.day-forward),
+::view-transition-old(.day-back) {
+  animation: 120ms var(--ease-out) both vt-fade reverse, 200ms var(--ease-out) both vt-slide reverse;
+}
+::view-transition-new(.day-forward),
+::view-transition-new(.day-back) {
+  animation: 180ms var(--ease-out) 60ms both vt-fade, 220ms var(--ease-out) both vt-slide;
+}
+::view-transition-old(.day-forward) {
+  --vt-offset: -24px;
+}
+::view-transition-new(.day-forward) {
+  --vt-offset: 24px;
+}
+::view-transition-old(.day-back) {
+  --vt-offset: 24px;
+}
+::view-transition-new(.day-back) {
+  --vt-offset: -24px;
+}
+@keyframes vt-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes vt-slide {
+  from {
+    translate: var(--vt-offset) 0;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Reduce motion: everything changes instantly.
+   --------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+  }
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
 }

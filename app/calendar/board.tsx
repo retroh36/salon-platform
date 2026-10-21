@@ -1,23 +1,41 @@
 "use client";
 
-import { startTransition, useOptimistic, useRef, useState } from "react";
-import { isEditable } from "@/lib/appointments";
-import { hourMarks, layoutColumn } from "@/lib/calendar";
-import { formatMinute } from "@/lib/scheduling/time";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { startTransition, useOptimistic, useRef, useState, ViewTransition } from "react";
+import { Avatar, initials } from "@/components/ui/avatar";
+import { buttonClass, IconButton } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
+import { FitText } from "@/components/ui/fit-text";
+import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, PlusIcon, SendIcon, SparkleIcon } from "@/components/ui/icons";
+import { Listbox } from "@/components/ui/listbox";
+import { Segmented } from "@/components/ui/segmented";
+import { Tabs } from "@/components/ui/tabs";
+import { isEditable, STATUS_LABELS } from "@/lib/appointments";
+import { FAMILIES, FAMILY_LABELS, hourMarks, laneBox, layoutColumn, type ServiceFamily } from "@/lib/calendar";
+import { formatLongDay } from "@/lib/schedule-format";
+import { addDays, formatMinute, toLocal } from "@/lib/scheduling/time";
 import { moveVisitItem } from "./actions";
+import { AiAssist } from "./ai-assist";
 import { AppointmentPanel } from "./appointment-panel";
 import { BookingPanel, type BookingStart } from "./booking-panel";
-import { NowLine } from "./now-line";
+import { NowLine, useNow } from "./now-line";
 import type { BlockData, BoardData, ColumnData } from "./types";
 
-export const PX_PER_MINUTE = 1.6;
+export const PX_PER_MINUTE = 2;
 // Moves snap to 5 minutes; a click on an empty slot to the quarter hour.
 const MOVE_STEP = 5;
 const SLOT_STEP = 15;
 // Pointer travel before a press counts as a drag rather than a click.
 const DRAG_THRESHOLD = 5;
 
-type Panel = { kind: "book"; start: BookingStart } | { kind: "edit"; appointmentId: string } | { kind: "detail"; appointmentId: string } | null;
+type Selection =
+  | { kind: "none" }
+  | { kind: "book"; start: BookingStart }
+  | { kind: "edit"; appointmentId: string }
+  | { kind: "detail"; appointmentId: string };
+
+type Tab = "ai" | "details";
 
 type Move = { itemId: string; staffId: string; start: number };
 
@@ -31,14 +49,34 @@ type Drag = Move & {
   moved: boolean;
 };
 
+// Day changes slide forward or back; other updates don't animate.
+const DAY_SLIDE = { "nav-forward": "day-forward", "nav-back": "day-back", default: "none" };
+
 export function CalendarBoard({ data }: { data: BoardData }) {
-  const { range, columns, me } = data;
+  const { range, me } = data;
+  const router = useRouter();
   const height = (range.end - range.start) * PX_PER_MINUTE;
   const y = (minute: number) => (minute - range.start) * PX_PER_MINUTE;
 
-  const [panel, setPanel] = useState<Panel>(null);
+  // What the right panel shows, and which off-duty stylists are expanded.
+  // Both reset when the day changes.
+  const [shownDate, setShownDate] = useState(data.date);
+  const [selection, setSelection] = useState<Selection>({ kind: "none" });
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  if (shownDate !== data.date) {
+    setShownDate(data.date);
+    setSelection({ kind: "none" });
+    setExpanded(new Set());
+  }
+  const [tab, setTab] = useState<Tab>("ai");
+  // Below 1600px the panel slides over the calendar when opened.
+  const [panelOpen, setPanelOpen] = useState(false);
+
+  const [questions, setQuestions] = useState<string[]>([]);
+  const [department, setDepartment] = useState<"all" | ServiceFamily>("all");
   const [notice, setNotice] = useState<string | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [settling, setSettling] = useState<string | null>(null);
   const dragRef = useRef<Drag | null>(null);
   // A drag ends with a click on the block; this stops it opening the panel.
   const justDragged = useRef(false);
@@ -47,8 +85,27 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // Moves show straight away and snap back if the server refuses them.
   const [moves, addMove] = useOptimistic<Record<string, Move>, Move>({}, (all, m) => ({ ...all, [m.itemId]: m }));
 
-  // While dragging, the block stays put (it holds the pointer) and a ghost
-  // shows where it would go.
+  // Minutes since midnight, when the day shown is today (for "running late").
+  const now = useNow();
+  const nowMinute = now !== null && toLocal(new Date(now), data.timeZone).date === data.date ? toLocal(new Date(now), data.timeZone).minute : null;
+
+  const select = (next: Selection) => {
+    setSelection(next);
+    setTab("details");
+    setPanelOpen(true);
+  };
+  const ask = (question: string) => {
+    setQuestions((q) => [...q, question]);
+    setTab("ai");
+    setPanelOpen(true);
+  };
+
+  // Stylists who do any service in the chosen department.
+  const offersFamily = (c: ColumnData, f: ServiceFamily) =>
+    data.menu.services.some((s) => s.family === f && !s.archived && s.id in (data.menu.offers[c.staffId] ?? {}));
+  const columns = department === "all" ? data.columns : data.columns.filter((c) => offersFamily(c, department));
+  const departments = FAMILIES.filter((f) => data.columns.some((c) => offersFamily(c, f)));
+
   const placed = (b: BlockData): BlockData => {
     const m = moves[b.itemId];
     if (!m) return b;
@@ -56,8 +113,18 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     return { ...b, staffId: m.staffId, start: b.start + shift, end: b.end + shift, segments: b.segments.map((s) => ({ ...s, start: s.start + shift, end: s.end + shift })) };
   };
   const blocks = data.blocks.map(placed);
-
   const canMove = (b: BlockData) => me.canBook && isEditable(b.status);
+  const selectedAppointment = selection.kind === "detail" || selection.kind === "edit" ? selection.appointmentId : null;
+
+  // Off-duty stylists with nothing booked fold to a thin column.
+  const collapsed = (c: ColumnData) => !c.working && !expanded.has(c.staffId) && !blocks.some((b) => b.staffId === c.staffId);
+  const toggle = (staffId: string, show: boolean) =>
+    setExpanded((all) => {
+      const next = new Set(all);
+      if (show) next.add(staffId);
+      else next.delete(staffId);
+      return next;
+    });
 
   function columnAt(clientX: number): string | null {
     for (const [staffId, el] of columnRefs.current) {
@@ -106,6 +173,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     if (d.staffId === d.fromStaffId && d.start === d.fromStart) return;
     const move = { itemId: d.itemId, staffId: d.staffId, start: d.start };
     setNotice(null);
+    setSettling(d.itemId);
     startTransition(async () => {
       addMove(move);
       const result = await moveVisitItem({ itemId: move.itemId, staffId: move.staffId, date: data.date, startMinute: move.start });
@@ -117,189 +185,448 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     if (!me.canBook || (e.target as HTMLElement).closest("[data-block]")) return;
     const top = e.currentTarget.getBoundingClientRect().top;
     const minute = range.start + Math.floor((e.clientY - top) / PX_PER_MINUTE / SLOT_STEP) * SLOT_STEP;
-    setPanel({ kind: "book", start: { staffId: column.staffId, startMinute: Math.min(minute, range.end - SLOT_STEP) } });
+    select({ kind: "book", start: { staffId: column.staffId, startMinute: Math.min(minute, range.end - SLOT_STEP) } });
   }
 
-  const gridColumns = { gridTemplateColumns: `4rem repeat(${columns.length}, minmax(10rem, 1fr))` };
-  const close = () => setPanel(null);
+  const gridColumns = {
+    gridTemplateColumns: `4rem ${columns.map((c) => (collapsed(c) ? "2.75rem" : "minmax(8.5rem, 1fr)")).join(" ")}`,
+  };
+  const dayLink = (d: string) => (d === data.today ? "/calendar" : `/calendar?date=${d}`);
+  const goTo = (d: string) => router.push(dayLink(d), { transitionTypes: [d > data.date ? "nav-forward" : "nav-back"] });
+  const closeDetails = () => setSelection({ kind: "none" });
 
   return (
-    <>
-      {me.canBook && (
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setPanel({ kind: "book", start: { staffId: columns[0].staffId, startMinute: range.start } })}
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700"
-          >
-            New appointment
-          </button>
-          <span className="text-sm text-neutral-500">Click an empty time to book it, or drag an appointment to move it.</span>
-        </div>
-      )}
-
-      {notice && (
-        <div role="alert" className="mb-3 flex items-start justify-between gap-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          <span>{notice}</span>
-          <button type="button" onClick={() => setNotice(null)} className="font-medium" aria-label="Dismiss">
-            ×
-          </button>
-        </div>
-      )}
-
-      <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
-        <div className="min-w-max">
-          <div className="grid border-b border-neutral-200" style={gridColumns}>
-            <div />
-            {columns.map((c) => (
-              <div key={c.staffId} className="border-l border-neutral-200 px-3 py-2">
-                <div className="font-medium">{c.name}</div>
-                <div className="text-xs text-neutral-500">{c.hoursLabel}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="relative grid" style={gridColumns} data-range-start={range.start}>
-            <div className="relative" style={{ height }} aria-hidden>
-              {hourMarks(range).map((m) => (
-                <span
-                  key={m}
-                  className={`absolute right-2 text-xs text-neutral-500 ${m === range.start ? "translate-y-1" : "-translate-y-1/2"}`}
-                  style={{ top: y(m) }}
-                >
-                  {formatMinute(m)}
+    <div className="flex min-h-0 flex-1">
+      <div className="flex min-w-0 flex-1 flex-col gap-4 px-4 pt-6 pb-4 sm:px-6 lg:min-h-0">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="font-serif text-4xl font-semibold tracking-tight text-plum-900">Appointments</h1>
+            <ViewTransition key={data.date} enter={DAY_SLIDE} exit="none" default="none">
+              <p className="mt-1 text-lg text-ink-muted" data-testid="calendar-date">
+                {formatLongDay(data.date)}
+                <span className="ml-2 text-sm">
+                  {data.date === data.today ? "Today · " : ""}
+                  {data.openLabel}
                 </span>
-              ))}
-            </div>
+              </p>
+            </ViewTransition>
+          </div>
+          {me.canBook && (
+            <button
+              type="button"
+              className={buttonClass("primary", "lg")}
+              onClick={() => select({ kind: "book", start: { staffId: (columns.find((c) => c.working) ?? columns[0] ?? data.columns[0]).staffId, startMinute: range.start } })}
+            >
+              <PlusIcon className="size-5" />
+              New booking
+            </button>
+          )}
+        </div>
 
-            {columns.map((c) => (
-              <section
-                key={c.staffId}
-                ref={(el) => {
-                  if (el) columnRefs.current.set(c.staffId, el);
-                  else columnRefs.current.delete(c.staffId);
-                }}
-                aria-label={c.name}
-                data-staff-id={c.staffId}
-                onClick={(e) => onSlotClick(e, c)}
-                className={`relative border-l border-neutral-200 ${me.canBook ? "cursor-cell" : ""} ${drag?.moved && drag.staffId === c.staffId ? "bg-blue-50/40" : ""}`}
-                style={{
-                  height,
-                  backgroundImage: `linear-gradient(to bottom, #e5e5e5 1px, transparent 1px), linear-gradient(to bottom, #f5f5f5 1px, transparent 1px)`,
-                  backgroundSize: `100% ${60 * PX_PER_MINUTE}px, 100% ${30 * PX_PER_MINUTE}px`,
-                }}
-              >
-                {c.offHours.map((o) => (
-                  <div
-                    key={o.start}
-                    data-off-hours
-                    aria-hidden
-                    title="Not bookable"
-                    className="absolute inset-x-0 bg-neutral-100/80"
-                    style={{
-                      top: y(o.start),
-                      height: (o.end - o.start) * PX_PER_MINUTE,
-                      backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, rgb(0 0 0 / 0.04) 6px 12px)",
-                    }}
-                  />
-                ))}
+        <AskAiBar onAsk={ask} />
 
-                {c.timeOff.map((t) => (
-                  <div
-                    key={`${t.start}-${t.label}`}
-                    data-time-off
-                    className="absolute inset-x-0 z-0 border-y border-neutral-300 bg-neutral-200/90 px-2 py-1 text-xs font-medium text-neutral-600"
-                    style={{ top: y(t.start), height: (t.end - t.start) * PX_PER_MINUTE }}
-                  >
-                    Time off: {t.label}
-                    <span className="sr-only"> for {c.name}</span>
-                  </div>
-                ))}
-
-                {drag?.moved && drag.staffId === c.staffId && (
-                  <div
-                    data-drag-ghost
-                    aria-hidden
-                    className="pointer-events-none absolute inset-x-0.5 z-40 rounded-md border-2 border-dashed border-blue-500 bg-blue-100/60 px-1.5 text-xs font-medium text-blue-900"
-                    style={{ top: y(drag.start), height: drag.length * PX_PER_MINUTE }}
-                  >
-                    {formatMinute(drag.start)}
-                  </div>
-                )}
-
-                <ul aria-label={`${c.name}'s appointments`}>
-                  {layoutColumn(blocks.filter((b) => b.staffId === c.staffId)).map((b) => (
-                    <AppointmentBlock
-                      key={b.itemId}
-                      block={b}
-                      color={data.colors[b.category] ?? "#525252"}
-                      y={y}
-                      draggable={canMove(b)}
-                      dragging={drag?.moved === true && drag.itemId === b.itemId}
-                      onPointerDown={(e) => onPointerDown(e, b)}
-                      onPointerMove={onPointerMove}
-                      onPointerUp={(e) => onPointerUp(e, b)}
-                      onPointerCancel={() => {
-                        dragRef.current = null;
-                        setDrag(null);
-                      }}
-                      onOpen={() => {
-                        if (justDragged.current) justDragged.current = false;
-                        else setPanel({ kind: "detail", appointmentId: b.appointmentId });
-                      }}
-                    />
-                  ))}
-                </ul>
-              </section>
-            ))}
-
-            <div className="pointer-events-none absolute inset-y-0 right-0 left-16">
-              <NowLine date={data.date} timeZone={data.timeZone} startMinute={range.start} endMinute={range.end} pxPerMinute={PX_PER_MINUTE} />
-            </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <nav aria-label="Date" className="flex flex-wrap items-center gap-2">
+            <Link href={dayLink(addDays(data.date, -1))} transitionTypes={["nav-back"]} aria-label="Previous day" title="Previous day" className={buttonClass("secondary", "md", "", { square: true })}>
+              <ChevronLeftIcon />
+            </Link>
+            <Link href={dayLink(addDays(data.date, 1))} transitionTypes={["nav-forward"]} aria-label="Next day" title="Next day" className={buttonClass("secondary", "md", "", { square: true })}>
+              <ChevronRightIcon />
+            </Link>
+            <Link
+              href="/calendar"
+              transitionTypes={[data.today > data.date ? "nav-forward" : "nav-back"]}
+              aria-current={data.date === data.today ? "date" : undefined}
+              className={buttonClass("secondary", "md")}
+            >
+              Today
+            </Link>
+            <DatePicker value={data.date} today={data.today} onChange={goTo} label="Go to date" />
+          </nav>
+          <Listbox
+            label="Department"
+            value={department}
+            onChange={setDepartment}
+            className="w-52"
+            options={[
+              { value: "all", label: "All departments" },
+              ...departments.map((f) => ({
+                value: f,
+                label: FAMILY_LABELS[f],
+                icon: (
+                  <span data-family={f} aria-hidden className="h-3 w-3 shrink-0 rounded-[3px] border-l-[3px] border-(--fam-accent) bg-(--fam-fill)" />
+                ),
+              })),
+            ]}
+          />
+          <div className="ml-auto flex items-center gap-2">
+            <Segmented
+              label="View"
+              value="day"
+              onChange={() => {}}
+              options={[
+                { value: "day", label: "Day" },
+                { value: "week", label: "Week", disabled: true, title: "Week view is coming soon" },
+              ]}
+            />
+            <button type="button" className={buttonClass("secondary", "md", "min-[100rem]:hidden")} onClick={() => setPanelOpen(true)}>
+              <SparkleIcon className="size-4 text-plum-700" />
+              AI Assist
+            </button>
           </div>
         </div>
+
+        {notice && (
+          <div role="alert" className="flex animate-fade-in items-start justify-between gap-4 rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">
+            <span>{notice}</span>
+            <button type="button" onClick={() => setNotice(null)} className="font-semibold" aria-label="Dismiss">
+              ×
+            </button>
+          </div>
+        )}
+
+        <ViewTransition key={data.date} enter={DAY_SLIDE} exit={DAY_SLIDE} default="none">
+          <div className="overflow-auto rounded-xl border border-line bg-surface shadow-card lg:min-h-0 lg:flex-1" data-testid="calendar-grid">
+            {columns.length === 0 ? (
+              <p className="p-6 text-ink-muted">No one in this department works here. Choose another department.</p>
+            ) : (
+              // Columns share the width; below their minimum the grid scrolls.
+              <div className="min-w-fit">
+                <div className="sticky top-0 z-30 grid border-b border-line bg-surface" style={gridColumns}>
+                  <div className="sticky left-0 z-10 bg-surface" />
+                  {columns.map((c) =>
+                    collapsed(c) ? (
+                      <button
+                        key={c.staffId}
+                        type="button"
+                        aria-expanded={false}
+                        aria-label={`Show ${c.name} (${c.hoursLabel.toLowerCase()})`}
+                        title={`${c.name} · ${c.hoursLabel}`}
+                        onClick={() => toggle(c.staffId, true)}
+                        className="flex flex-col items-center justify-center gap-1 border-l border-line bg-sunken/60 py-3 text-xs font-semibold text-ink-muted transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-plum-700"
+                      >
+                        {initials(c.name)}
+                        <ChevronRightIcon className="size-3.5" />
+                      </button>
+                    ) : (
+                      <div key={c.staffId} className="flex min-w-0 animate-fade-in items-center gap-2.5 border-l border-line px-3 py-3">
+                        <Avatar name={c.name} color={c.color} />
+                        <div className="min-w-0 flex-1">
+                          <FitText variants={[c.name, `${c.firstName} ${c.name.split(" ").at(-1)![0]}.`, c.firstName]} className="font-semibold" />
+                          <div className="truncate text-sm text-ink-muted">{c.title}</div>
+                          <div className="text-xs leading-4 text-ink-muted">{c.hoursLabel}</div>
+                        </div>
+                        {!c.working && expanded.has(c.staffId) && (
+                          <IconButton label={`Hide ${c.name}`} size="sm" onClick={() => toggle(c.staffId, false)}>
+                            <ChevronLeftIcon className="size-4" />
+                          </IconButton>
+                        )}
+                      </div>
+                    ),
+                  )}
+                </div>
+
+                <div className="relative grid" style={gridColumns} data-range-start={range.start}>
+                  <div className="sticky left-0 z-20 bg-surface" style={{ height }} aria-hidden>
+                    {hourMarks(range).map((m) => (
+                      <span
+                        key={m}
+                        className={`absolute right-2 text-xs font-medium text-ink-muted ${m === range.start ? "translate-y-1" : "-translate-y-1/2"}`}
+                        style={{ top: y(m) }}
+                      >
+                        {formatMinute(m)}
+                      </span>
+                    ))}
+                  </div>
+
+                  {columns.map((c) =>
+                    collapsed(c) ? (
+                      <section
+                        key={c.staffId}
+                        aria-label={c.name}
+                        data-collapsed
+                        onClick={() => toggle(c.staffId, true)}
+                        className="cursor-pointer border-l border-line bg-sunken/80"
+                        style={{ height, backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, rgb(43 33 48 / 0.04) 6px 12px)" }}
+                      />
+                    ) : (
+                      <section
+                        key={c.staffId}
+                        ref={(el) => {
+                          if (el) columnRefs.current.set(c.staffId, el);
+                          else columnRefs.current.delete(c.staffId);
+                        }}
+                        aria-label={c.name}
+                        data-staff-id={c.staffId}
+                        onClick={(e) => onSlotClick(e, c)}
+                        className={`relative min-w-0 border-l border-line transition-colors duration-(--motion-fast) ${me.canBook ? "cursor-cell" : ""} ${
+                          drag?.moved && drag.staffId === c.staffId ? "bg-plum-100/40" : ""
+                        }`}
+                        style={{
+                          height,
+                          backgroundImage: `linear-gradient(to bottom, var(--color-line) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, var(--color-line) 50%, transparent) 1px, transparent 1px)`,
+                          backgroundSize: `100% ${60 * PX_PER_MINUTE}px, 100% ${30 * PX_PER_MINUTE}px`,
+                        }}
+                      >
+                        {c.offHours.map((o) => (
+                          <div
+                            key={o.start}
+                            data-off-hours
+                            aria-hidden
+                            title="Not bookable"
+                            className="absolute inset-x-0 bg-sunken/80"
+                            style={{
+                              top: y(o.start),
+                              height: (o.end - o.start) * PX_PER_MINUTE,
+                              backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, rgb(43 33 48 / 0.04) 6px 12px)",
+                            }}
+                          />
+                        ))}
+
+                        {c.timeOff.map((t) => (
+                          <div
+                            key={`${t.start}-${t.label}`}
+                            data-time-off
+                            className="absolute inset-x-1 z-0 rounded-md border border-line-strong bg-sunken px-2 py-1 text-xs font-medium text-ink-muted"
+                            style={{ top: y(t.start), height: (t.end - t.start) * PX_PER_MINUTE }}
+                          >
+                            Time off: {t.label}
+                            <span className="sr-only"> for {c.name}</span>
+                          </div>
+                        ))}
+
+                        {drag?.moved && drag.staffId === c.staffId && <DragGhost block={blocks.find((b) => b.itemId === drag.itemId)!} start={drag.start} y={y} />}
+
+                        <ul aria-label={`${c.name}'s appointments`}>
+                          {layoutColumn(blocks.filter((b) => b.staffId === c.staffId)).map((b) => (
+                            <AppointmentBlock
+                              key={b.itemId}
+                              block={b}
+                              y={y}
+                              late={nowMinute !== null && (b.status === "booked" || b.status === "confirmed") && b.start <= nowMinute}
+                              draggable={canMove(b)}
+                              dragging={drag?.moved === true && drag.itemId === b.itemId}
+                              selected={b.appointmentId === selectedAppointment}
+                              settling={settling === b.itemId}
+                              onSettled={() => setSettling(null)}
+                              onPointerDown={(e) => onPointerDown(e, b)}
+                              onPointerMove={onPointerMove}
+                              onPointerUp={(e) => onPointerUp(e, b)}
+                              onPointerCancel={() => {
+                                dragRef.current = null;
+                                setDrag(null);
+                              }}
+                              onOpen={() => {
+                                if (justDragged.current) justDragged.current = false;
+                                else select({ kind: "detail", appointmentId: b.appointmentId });
+                              }}
+                            />
+                          ))}
+                        </ul>
+                      </section>
+                    ),
+                  )}
+
+                  <div className="pointer-events-none absolute inset-y-0 right-0 left-16">
+                    <NowLine date={data.date} timeZone={data.timeZone} startMinute={range.start} endMinute={range.end} pxPerMinute={PX_PER_MINUTE} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </ViewTransition>
+
+        <Legend />
       </div>
 
-      {panel?.kind === "detail" && data.appointments[panel.appointmentId] && (
-        <AppointmentPanel
-          key={panel.appointmentId}
-          date={data.date}
-          appointment={data.appointments[panel.appointmentId]}
-          me={me}
-          onEdit={() => setPanel({ kind: "edit", appointmentId: panel.appointmentId })}
-          onClose={close}
-        />
-      )}
-      {panel?.kind === "book" && <BookingPanel data={data} start={panel.start} onClose={close} onSaved={close} />}
-      {panel?.kind === "edit" && data.appointments[panel.appointmentId] && (
-        <BookingPanel
-          key={panel.appointmentId}
-          data={data}
-          appointment={data.appointments[panel.appointmentId]}
-          onClose={() => setPanel({ kind: "detail", appointmentId: panel.appointmentId })}
-          onSaved={() => setPanel({ kind: "detail", appointmentId: panel.appointmentId })}
-        />
-      )}
-    </>
+      {/* The assistant and booking details: a column on wide screens (1600px
+          and up), a panel that slides over the calendar on narrower ones. */}
+      <div
+        aria-hidden
+        onClick={() => setPanelOpen(false)}
+        className={`fixed inset-0 z-40 bg-ink/20 transition-opacity duration-(--motion-base) min-[100rem]:hidden ${panelOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+      />
+      <aside
+        aria-label="Assistant and booking details"
+        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col gap-4 border-l border-line bg-surface p-4 shadow-panel transition-[transform,visibility] duration-(--motion-slow) ease-out min-[100rem]:visible min-[100rem]:static min-[100rem]:z-auto min-[100rem]:w-96 min-[100rem]:max-w-none min-[100rem]:translate-x-0 min-[100rem]:shadow-none ${
+          // Closed, it's hidden once it has slid away, so keyboard focus skips it.
+          panelOpen ? "visible translate-x-0" : "invisible translate-x-full"
+        }`}
+      >
+        <div className="flex items-center gap-2 min-[100rem]:hidden">
+          <span className="font-serif text-lg font-semibold text-plum-900">Assistant</span>
+          <IconButton label="Close panel" className="ml-auto" onClick={() => setPanelOpen(false)}>
+            <CloseIcon />
+          </IconButton>
+        </div>
+        <Tabs
+          label="Assistant"
+          value={tab}
+          onChange={setTab}
+          panelKey={`${tab}-${selection.kind}-${"appointmentId" in selection ? selection.appointmentId : ""}`}
+          tabs={[
+            { value: "ai", label: "AI Assist", icon: <SparkleIcon className="size-4" /> },
+            { value: "details", label: "Booking details", icon: <CalendarIcon className="size-4" /> },
+          ]}
+        >
+          {tab === "ai" ? (
+            <AiAssist data={data} questions={questions} onAsk={ask} onOpen={(appointmentId) => select({ kind: "detail", appointmentId })} />
+          ) : selection.kind === "detail" && data.appointments[selection.appointmentId] ? (
+            <AppointmentPanel
+              date={data.date}
+              appointment={data.appointments[selection.appointmentId]}
+              me={me}
+              onEdit={() => select({ kind: "edit", appointmentId: selection.appointmentId })}
+              onClose={closeDetails}
+            />
+          ) : selection.kind === "book" ? (
+            <BookingPanel data={data} start={selection.start} onClose={closeDetails} onSaved={(id) => select({ kind: "detail", appointmentId: id })} />
+          ) : selection.kind === "edit" && data.appointments[selection.appointmentId] ? (
+            <BookingPanel
+              data={data}
+              appointment={data.appointments[selection.appointmentId]}
+              onClose={() => select({ kind: "detail", appointmentId: selection.appointmentId })}
+              onSaved={() => select({ kind: "detail", appointmentId: selection.appointmentId })}
+            />
+          ) : (
+            <div className="flex flex-col gap-3 py-6 text-sm text-ink-muted">
+              <p>Choose an appointment to see its details{me.canBook ? ", or click an empty time to book it." : "."}</p>
+              {me.canBook && <p>Drag an appointment to move it.</p>}
+            </div>
+          )}
+        </Tabs>
+      </aside>
+    </div>
   );
 }
 
-const STATUS_NOTES: Partial<Record<string, string>> = { checked_in: "Checked in", completed: "Checked out", no_show: "No-show" };
+function AskAiBar({ onAsk }: { onAsk: (question: string) => void }) {
+  const [question, setQuestion] = useState("");
+  return (
+    <form
+      aria-label="Ask AI"
+      className="flex items-center gap-3 rounded-xl border border-plum-200 bg-surface p-2 pl-3 shadow-card transition-[border-color,box-shadow] duration-(--motion-fast) focus-within:border-plum-700 focus-within:ring-2 focus-within:ring-plum-200"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!question.trim()) return;
+        onAsk(question.trim());
+        setQuestion("");
+      }}
+    >
+      <span aria-hidden className="flex size-9 items-center justify-center rounded-lg bg-plum-100 text-plum-700">
+        <SparkleIcon className="size-5" />
+      </span>
+      <label className="flex min-w-0 flex-1 flex-col">
+        <span className="text-xs font-semibold text-plum-700">Ask AI</span>
+        <input
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="Find a haircut with Priya after 1 PM"
+          className="w-full bg-transparent text-sm text-ink placeholder:text-ink-subtle focus:outline-none"
+        />
+      </label>
+      <IconButton type="submit" label="Ask" variant="primary">
+        <SendIcon className="size-5" />
+      </IconButton>
+    </form>
+  );
+}
+
+function Legend() {
+  return (
+    <ul aria-label="Service families" className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-muted">
+      {FAMILIES.filter((f) => f !== "other").map((f) => (
+        <li key={f} className="flex items-center gap-2" data-family={f}>
+          <span aria-hidden className="h-3.5 w-5 rounded-[3px] border-l-[3px] border-(--fam-accent) bg-(--fam-fill)" />
+          {FAMILY_LABELS[f]}
+        </li>
+      ))}
+      <li className="flex items-center gap-2">
+        <span
+          aria-hidden
+          className="h-3.5 w-5 rounded-[3px] border border-line-strong"
+          style={{ backgroundImage: "repeating-linear-gradient(135deg, transparent 0 3px, rgb(43 33 48 / 0.18) 3px 6px)" }}
+        />
+        Processing (stylist free)
+      </li>
+      <li className="flex items-center gap-2">
+        <span aria-hidden className="h-3.5 w-5 rounded-[3px] bg-sunken ring-1 ring-line-strong" />
+        Not bookable
+      </li>
+      <li className="flex items-center gap-2">
+        <span aria-hidden data-family="cut" className="h-3.5 w-5 rounded-[3px] border-l-[3px]" style={{ backgroundColor: "color-mix(in srgb, var(--fam-fill) 40%, white)", borderColor: "color-mix(in srgb, var(--fam-accent) 45%, white)" }} />
+        Checked out
+      </li>
+    </ul>
+  );
+}
+
+// Background for a block's parts: the family fill, lighter while processing,
+// and lighter again once the visit is over.
+function segmentStyle(kind: string, faded: boolean): React.CSSProperties {
+  const strength = faded ? (kind === "processing" ? 25 : 40) : kind === "processing" ? 45 : 100;
+  return {
+    backgroundColor: strength === 100 ? "var(--fam-fill)" : `color-mix(in srgb, var(--fam-fill) ${strength}%, white)`,
+    ...(kind === "processing"
+      ? { backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--fam-accent) 14%, transparent) 6px 12px)" }
+      : {}),
+  };
+}
+
+// A lifted copy of the block that follows the pointer while dragging.
+function DragGhost({ block, start, y }: { block: BlockData; start: number; y: (minute: number) => number }) {
+  const length = block.end - block.start;
+  return (
+    <div
+      data-drag-ghost
+      data-family={block.family}
+      aria-hidden
+      className="pointer-events-none absolute inset-x-1 z-40 scale-[1.02] overflow-hidden rounded-md border-l-4 border-(--fam-accent) bg-(--fam-fill) px-2 py-1 text-sm shadow-lift"
+      style={{ top: y(start), height: length * PX_PER_MINUTE }}
+    >
+      <div className="truncate font-semibold">{block.clientName}</div>
+      <div className="truncate text-[13px] text-ink-muted">
+        {formatMinute(start)}–{formatMinute(start + length)}
+      </div>
+    </div>
+  );
+}
+
+// States that need the front desk's attention get a chip on the block.
+type Attention = "checked_in" | "confirmed" | "late" | "no_show";
+
+const ATTENTION: Record<Attention, { label: string; className: string }> = {
+  checked_in: { label: "Checked in", className: "bg-status-checked-in-bg text-status-checked-in-ink" },
+  confirmed: { label: "Confirmed", className: "bg-status-confirmed-bg text-status-confirmed-ink" },
+  late: { label: "Running late", className: "bg-status-late-bg text-status-late-ink" },
+  no_show: { label: "No-show", className: "bg-status-no-show-bg text-status-no-show-ink" },
+};
+
+// Line heights in a block, in px.
+const NAME_LINE = 18;
+const LINE = 17;
+const CHIP_LINE = 26;
 
 function AppointmentBlock({
   block,
-  color,
   y,
+  late,
   draggable,
   dragging,
+  selected,
+  settling,
+  onSettled,
   onOpen,
   ...pointer
 }: {
-  block: BlockData & { depth: number };
-  color: string;
+  block: BlockData & { lane: number; lanes: number };
   y: (minute: number) => number;
+  late: boolean;
   draggable: boolean;
   dragging: boolean;
+  selected: boolean;
+  settling: boolean;
+  onSettled: () => void;
   onOpen: () => void;
   onPointerDown: (e: React.PointerEvent) => void;
   onPointerMove: (e: React.PointerEvent) => void;
@@ -308,8 +635,40 @@ function AppointmentBlock({
 }) {
   const time = `${formatMinute(block.start)}–${formatMinute(block.end)}`;
   const processing = block.segments.find((s) => s.kind === "processing");
-  const note = STATUS_NOTES[block.status];
   const height = (block.end - block.start) * PX_PER_MINUTE;
+  const box = laneBox(block.lane, block.lanes);
+  // A side lane (a client in another's processing gap) is narrow: first name
+  // and initial only.
+  const narrow = block.lane > 0;
+  const faded = block.status === "completed" || block.status === "no_show";
+  const attention: Attention | null = block.status === "checked_in" ? "checked_in" : block.status === "no_show" ? "no_show" : late ? "late" : block.status === "confirmed" ? "confirmed" : null;
+
+  // Only lines that fit whole: name, service, time, then the chip on its own
+  // line if there's room (otherwise a dot beside the name).
+  let room = height - 6;
+  const show = { name: room >= NAME_LINE, service: false, time: false, chipLine: false, serviceLines: 1 as 1 | 2 };
+  if (show.name) room -= NAME_LINE;
+  if (room >= LINE) {
+    show.service = true;
+    room -= LINE;
+  }
+  if (room >= LINE) {
+    show.time = true;
+    room -= LINE;
+  }
+  if (attention && room >= CHIP_LINE && !narrow) {
+    show.chipLine = true;
+    room -= CHIP_LINE;
+  }
+  // Leftover room lets a long service name wrap rather than shorten.
+  if (show.service && room >= LINE) show.serviceLines = 2;
+
+  // Shorter forms for narrow spaces, longest first.
+  const [first, ...rest] = block.clientName.split(" ");
+  const names = [block.clientName, ...(rest.length ? [`${first} ${rest.at(-1)![0]}.`, first] : []), initials(block.clientName)];
+  const plainService = block.service.replace(/\s*\([^)]*\)/g, "");
+  const services = [...new Set([...(block.with.length ? [`${block.service} · with ${block.with.join(", ")}`] : []), block.service, plainService])];
+  const times = [time, formatMinute(block.start)];
 
   const label = [
     time,
@@ -318,7 +677,8 @@ function AppointmentBlock({
     processing && `processing ${formatMinute(processing.start)}–${formatMinute(processing.end)}`,
     block.with.length > 0 && `with ${block.with.join(" and ")}`,
     block.resource,
-    note,
+    STATUS_LABELS[block.status],
+    late && "running late",
   ]
     .filter(Boolean)
     .join(", ");
@@ -329,9 +689,11 @@ function AppointmentBlock({
         role="button"
         tabIndex={0}
         aria-label={label}
+        aria-pressed={selected}
         title={label}
         data-block
-        data-category={block.category}
+        data-family={block.family}
+        data-faded={faded || undefined}
         onClick={onOpen}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -339,17 +701,20 @@ function AppointmentBlock({
             onOpen();
           }
         }}
+        onAnimationEnd={settling ? onSettled : undefined}
         {...pointer}
-        className={`absolute block touch-none overflow-hidden rounded-md border-l-4 bg-white text-left text-neutral-900 shadow-sm ring-1 ring-white select-none hover:ring-2 hover:ring-neutral-900 focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:outline-none ${
-          block.status === "no_show" ? "opacity-50" : ""
-        } ${draggable ? "cursor-grab" : "cursor-pointer"} ${dragging ? "cursor-grabbing opacity-40" : ""}`}
+        className={`absolute block touch-none overflow-hidden rounded-md border-l-4 bg-surface text-left select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-plum-700 ${
+          faded ? "text-ink-muted" : "text-ink shadow-card"
+        } ${selected ? "ring-2 ring-plum-900" : "ring-1 ring-surface"} ${draggable ? "cursor-grab" : "cursor-pointer"} ${
+          dragging ? "opacity-40 shadow-none outline-2 outline-ink-subtle outline-dashed" : ""
+        } ${settling ? "animate-settle" : ""}`}
         style={{
           top: y(block.start),
           height,
-          left: `calc(${Math.min(block.depth, 3) * 30}% + 2px)`,
-          right: 2,
-          zIndex: 10 + block.depth,
-          borderLeftColor: color,
+          left: `calc(${box.left}% + ${block.lane > 0 ? 1 : 3}px)`,
+          width: `calc(${box.width}% - ${block.lanes > 1 ? 4 : 6}px)`,
+          zIndex: 10 + block.lane,
+          borderLeftColor: faded ? "color-mix(in srgb, var(--fam-accent) 45%, white)" : "var(--fam-accent)",
         }}
       >
         {block.segments.map((s) => (
@@ -358,27 +723,30 @@ function AppointmentBlock({
             aria-hidden
             data-segment={s.kind}
             className="absolute inset-x-0"
-            style={{
-              top: (s.start - block.start) * PX_PER_MINUTE,
-              height: (s.end - s.start) * PX_PER_MINUTE,
-              ...(s.kind === "processing"
-                ? { backgroundColor: `${color}0d`, backgroundImage: `repeating-linear-gradient(135deg, transparent 0 6px, ${color}26 6px 12px)` }
-                : { backgroundColor: `${color}40` }),
-            }}
+            style={{ top: (s.start - block.start) * PX_PER_MINUTE, height: (s.end - s.start) * PX_PER_MINUTE, ...segmentStyle(s.kind, faded) }}
           />
         ))}
-        <span aria-hidden className="relative block truncate px-1.5 pt-0.5 text-xs leading-4">
-          <span className="font-medium">{block.clientName}</span> {formatMinute(block.start)}
-        </span>
-        {height >= 36 && (
-          <span aria-hidden className="relative block truncate px-1.5 text-xs leading-4 text-neutral-700">
-            {block.service}
-            {block.with.length > 0 && ` · with ${block.with.join(", ")}`}
+        {show.name && (
+          <span aria-hidden className={`relative flex items-center gap-1.5 pt-1 ${narrow ? "px-1.5" : "px-2"}`}>
+            <FitText variants={names} className="flex-1 text-sm leading-[18px] font-semibold" />
+            {attention && !show.chipLine && <span data-attention={attention} title={ATTENTION[attention].label} className={`size-2.5 shrink-0 rounded-full ${ATTENTION[attention].className}`} style={{ backgroundColor: "currentColor" }} />}
           </span>
         )}
-        {note && height >= 52 && (
-          <span aria-hidden className="relative block truncate px-1.5 text-xs leading-4 font-medium">
-            {note}
+        {show.service && (
+          <span aria-hidden className={`relative block ${narrow ? "px-1.5" : "px-2"}`}>
+            <FitText variants={services} lines={show.serviceLines} className="text-[13px] leading-[17px] text-ink-muted" />
+          </span>
+        )}
+        {show.time && (
+          <span aria-hidden className={`relative block ${narrow ? "px-1.5" : "px-2"}`}>
+            <FitText variants={times} className="text-[13px] leading-[17px] text-ink-muted" />
+          </span>
+        )}
+        {show.chipLine && attention && (
+          <span aria-hidden className="relative mt-1 block px-2">
+            <span data-attention={attention} className={`inline-block rounded-full px-2 text-xs leading-5 font-semibold ${ATTENTION[attention].className}`}>
+              {ATTENTION[attention].label}
+            </span>
           </span>
         )}
       </div>

@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { formatDay } from "@/lib/schedule-format";
+import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
@@ -8,7 +8,7 @@ const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
 const { priya: PRIYA, ethan: ETHAN, frontDesk: FRONT_DESK, sofia: SOFIA } = SEED.staff;
-const PX_PER_MINUTE = 1.6;
+const PX_PER_MINUTE = 2; // as in app/calendar/board.tsx
 
 // A Tuesday clear of the seeded month and of the calendar tests' day.
 // Priya works 9-1 and 2-6, Ethan 9-1 and 1:30-5:30, Jamal 9-5 (no blowouts).
@@ -80,7 +80,7 @@ async function appointment(id: string) {
 
 async function openDay(page: Page) {
   await page.goto(`/calendar?date=${DAY}`);
-  await expect(ui(page).getByRole("heading", { level: 1, name: formatDay(DAY, true) })).toBeVisible();
+  await expect(ui(page).getByTestId("calendar-date")).toContainText(formatLongDay(DAY));
   await waitForHydration(page, "section[data-staff-id]");
 }
 
@@ -103,10 +103,11 @@ async function drag(page: Page, block: Locator, toStylist: string, minutes: numb
   await page.mouse.up();
 }
 
-const panel = (page: Page) => page.getByRole("dialog");
+// The side panel's Booking details tab.
+const panel = (page: Page) => page.getByRole("tabpanel", { name: "Booking details" });
 
-// Tall enough to click any time of day without scrolling.
-test.use({ viewport: { width: 1440, height: 1500 } });
+// Big enough to click any stylist at any time of day without scrolling.
+test.use({ viewport: { width: 1920, height: 1500 } });
 
 test.describe("front desk", () => {
   test.use({ storageState: AUTH.frontDesk });
@@ -116,7 +117,7 @@ test.describe("front desk", () => {
     await openDay(page);
     await clickSlot(page, "Priya Shah", 10);
 
-    const form = panel(page).getByRole("form", { name: "New appointment" });
+    const form = panel(page).getByRole("form", { name: "New booking" });
     await expect(form.getByRole("group", { name: "Service 1" }).getByLabel("Stylist")).toHaveValue(PRIYA);
     await expect(form.getByRole("group", { name: "Service 1" }).getByLabel("Starts")).toHaveValue("10:00");
 
@@ -137,8 +138,9 @@ test.describe("front desk", () => {
     await expect(second.getByTestId("line-summary")).toHaveText("11:45am–12:30pm · 45m · $45");
     await expect(form.getByTestId("visit-total")).toHaveText("10am–12:30pm · 2h 30m$195");
 
-    await form.getByRole("button", { name: "Book appointment" }).click();
-    await expect(panel(page)).toHaveCount(0);
+    await form.getByRole("button", { name: "Create booking" }).click();
+    // The panel moves on to the new booking.
+    await expect(panel(page).getByTestId("client-name")).toHaveText(`${PREFIX}Ava Test`);
 
     const color = column(page, "Priya Shah").getByRole("button", { name: new RegExp(`^10am–11:45am, ${PREFIX}Ava Test, All-Over Color, .*with Ethan, Chair 1`) });
     await expect(color).toBeVisible();
@@ -151,7 +153,7 @@ test.describe("front desk", () => {
   test("adds a new client while booking", async ({ page }) => {
     await openDay(page);
     await clickSlot(page, "Ethan Brooks", 14);
-    const form = panel(page).getByRole("form", { name: "New appointment" });
+    const form = panel(page).getByRole("form", { name: "New booking" });
     await form.getByLabel("Find a client").fill(`${PREFIX}Zed Newcomer`);
     await form.getByRole("button", { name: "New client" }).click();
 
@@ -165,7 +167,7 @@ test.describe("front desk", () => {
     await expect(form.getByRole("region", { name: "Client" })).toContainText("(312) 555-0188");
 
     await form.getByLabel("Service").selectOption({ label: "Men's Cut" });
-    await form.getByRole("button", { name: "Book appointment" }).click();
+    await form.getByRole("button", { name: "Create booking" }).click();
     await expect(column(page, "Ethan Brooks").getByRole("button", { name: new RegExp(`^2pm–2:30pm, ${PREFIX}Zed Newcomer, Men's Cut`) })).toBeVisible();
 
     const { data } = await admin.from("clients").select("phone").eq("first_name", `${PREFIX}Zed`).single();
@@ -178,8 +180,8 @@ test.describe("front desk", () => {
     await openDay(page);
 
     // 10:30 is under Ben's block, so book it from the button.
-    await ui(page).getByRole("button", { name: "New appointment" }).click();
-    const form = panel(page).getByRole("form", { name: "New appointment" });
+    await ui(page).getByRole("button", { name: "New booking" }).click();
+    const form = panel(page).getByRole("form", { name: "New booking" });
     await form.getByLabel("Find a client").fill(`${PREFIX}ben`);
     await form.getByRole("list", { name: "Matching clients" }).getByRole("button").first().click();
     const first = form.getByRole("group", { name: "Service 1" });
@@ -190,7 +192,7 @@ test.describe("front desk", () => {
     const second = form.getByRole("group", { name: "Service 2" });
     await second.getByLabel("Service").selectOption({ label: "Blowout" });
     await second.getByLabel("Starts").fill("12:30"); // into Priya's lunch break
-    await form.getByRole("button", { name: "Book appointment" }).click();
+    await form.getByRole("button", { name: "Create booking" }).click();
 
     await expect(form.getByRole("alert")).toHaveText("This can't be booked as it is. See the highlighted services.");
     await expect(form.getByRole("group", { name: "Service 1" })).toContainText("The stylist already has a client then.");
@@ -207,12 +209,12 @@ test.describe("front desk", () => {
 
     const detail = panel(page);
     await expect(detail).toContainText("Booked by Sam Rivera");
-    await detail.getByRole("button", { name: "Check in" }).click();
+    await detail.getByRole("button", { name: "Check in client" }).click();
     await expect(detail.locator("[data-status]")).toHaveText("Checked in");
-    await expect(detail.getByRole("button", { name: "No-show" })).toHaveCount(0);
-    await detail.getByRole("button", { name: "Check out" }).click();
+    await expect(detail.getByRole("button", { name: "Mark no-show" })).toHaveCount(0);
+    await detail.getByRole("button", { name: "Check out client" }).click();
     await expect(detail.locator("[data-status]")).toHaveText("Checked out");
-    await expect(detail.getByRole("button", { name: "Edit" })).toHaveCount(0);
+    await expect(detail.getByRole("button", { name: "Edit booking" })).toHaveCount(0);
     await expect(detail).toContainText("Last changed by Sam Rivera");
     expect(await appointment(id)).toMatchObject({ status: "completed", updated_by: FRONT_DESK });
   });
@@ -224,16 +226,16 @@ test.describe("front desk", () => {
     await block.click();
 
     const detail = panel(page);
-    await detail.getByRole("button", { name: "Cancel appointment" }).click();
-    const form = detail.getByRole("form", { name: "Cancel appointment" });
+    await detail.getByRole("button", { name: "Cancel booking" }).click();
+    const form = detail.getByRole("form", { name: "Cancel booking" });
     await form.getByLabel("Reason").selectOption("Other");
-    await form.getByRole("button", { name: "Cancel appointment" }).click();
+    await form.getByRole("button", { name: "Cancel booking" }).click();
     await expect(detail.getByRole("alert")).toHaveText("Say why it was canceled.");
     await form.getByLabel("Reason").selectOption("Client is sick");
     await form.getByLabel("Details").fill("Will call to rebook");
-    await form.getByRole("button", { name: "Cancel appointment" }).click();
+    await form.getByRole("button", { name: "Cancel booking" }).click();
 
-    await expect(panel(page)).toHaveCount(0);
+    await expect(panel(page)).toContainText("Choose an appointment");
     await expect(block).toHaveCount(0);
     expect(await appointment(id)).toMatchObject({ status: "canceled", cancel_reason: "Client is sick: Will call to rebook" });
   });
@@ -242,7 +244,7 @@ test.describe("front desk", () => {
     const id = await seedVisit(await newClient("Eli"), [{ service: "Men's Cut", staff: ETHAN, start: at(9) }]);
     await openDay(page);
     await column(page, "Ethan Brooks").getByRole("button", { name: new RegExp(`${PREFIX}Eli Test`) }).click();
-    await panel(page).getByRole("button", { name: "No-show" }).click();
+    await panel(page).getByRole("button", { name: "Mark no-show" }).click();
     await expect(panel(page).locator("[data-status]")).toHaveText("No-show");
     await expect(column(page, "Ethan Brooks").getByRole("button", { name: new RegExp(`${PREFIX}Eli Test.*No-show$`) })).toBeVisible();
     expect((await appointment(id)).status).toBe("no_show");
@@ -252,9 +254,9 @@ test.describe("front desk", () => {
     const id = await seedVisit(await newClient("Fay"), [{ service: "Women's Cut & Style", staff: PRIYA, start: at(10), resource: "f0000000-0000-4000-8000-000000000001" }]);
     await openDay(page);
     await column(page, "Priya Shah").getByRole("button", { name: new RegExp(`${PREFIX}Fay Test`) }).click();
-    await panel(page).getByRole("button", { name: "Edit" }).click();
+    await panel(page).getByRole("button", { name: "Edit booking" }).click();
 
-    const form = panel(page).getByRole("form", { name: "Edit appointment" });
+    const form = panel(page).getByRole("form", { name: "Edit booking" });
     await expect(form.getByRole("region", { name: "Client" })).toContainText(`${PREFIX}Fay Test`);
     await form.getByLabel("Service").selectOption({ label: "Curly Cut" });
     await form.getByLabel("Notes").fill("Bring curl cream");
@@ -309,15 +311,15 @@ test.describe("stylists", () => {
     await seedVisit(await newClient("Kit"), [{ service: "All-Over Color", staff: SOFIA, start: at(10) }]);
     await openDay(page);
 
-    await expect(ui(page).getByRole("button", { name: "New appointment" })).toHaveCount(0);
+    await expect(ui(page).getByRole("button", { name: "New booking" })).toHaveCount(0);
     await clickSlot(page, "Priya Shah", 14);
-    await expect(panel(page)).toHaveCount(0);
+    await expect(page.getByRole("form", { name: "New booking" })).toHaveCount(0);
 
     // Someone else's visit: read only.
     await column(page, "Sofia Moreno").getByRole("button", { name: new RegExp(`${PREFIX}Kit Test`) }).click();
     await expect(panel(page).getByRole("region", { name: "Notes" })).toContainText("No notes.");
     await expect(panel(page).getByRole("button", { name: /Edit|Check in|Cancel/ })).toHaveCount(0);
-    await panel(page).getByRole("button", { name: "Close" }).click();
+    await panel(page).getByRole("button", { name: "Close booking details" }).click();
 
     // Their own: notes only.
     const block = column(page, "Priya Shah").getByRole("button", { name: new RegExp(`${PREFIX}Jo Test`) });
@@ -328,7 +330,7 @@ test.describe("stylists", () => {
     await expect(notes.getByRole("status")).toHaveText("Notes saved.");
     await expect(panel(page).getByRole("button", { name: /Edit|Check in|Cancel/ })).toHaveCount(0);
     expect(await appointment(mine)).toMatchObject({ notes: "Wants a fringe", updated_by: PRIYA });
-    await panel(page).getByRole("button", { name: "Close" }).click();
+    await panel(page).getByRole("button", { name: "Close booking details" }).click();
 
     // Dragging does nothing.
     await drag(page, block, "Priya Shah", 60);

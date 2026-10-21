@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
+import { Avatar, initials } from "@/components/ui/avatar";
+import { buttonClass } from "@/components/ui/button";
+import { ClockIcon } from "@/components/ui/icons";
+import { Badge, listClass, PageHeader, pillClass, rowClass, type Tone } from "@/components/ui/page";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
 import { describeTimeOff, formatDay, formatIntervals, STATUS_LABELS } from "@/lib/schedule-format";
@@ -26,9 +30,11 @@ export default function SchedulePage({ searchParams }: PageProps<"/schedule">) {
   );
 }
 
-const sectionClass = "mb-8 rounded-xl border border-neutral-200 bg-white";
-const headingClass = "border-b border-neutral-200 px-5 py-3 font-medium";
-const smallButton = "rounded-md border border-neutral-300 px-3 py-1 text-sm hover:bg-neutral-100";
+// Cards with h3 titles (Card from components/ui/page.tsx uses h2, and the
+// staff member's name is this page's h2).
+const cardClass = "mb-6 overflow-hidden rounded-xl border border-line bg-surface shadow-card";
+const cardHeadClass = "border-b border-line px-5 py-3.5";
+const cardTitleClass = "font-serif text-lg font-semibold text-ink";
 
 async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchParams">) {
   const [params, { supabase, staff: me }] = await Promise.all([searchParams, getCurrentStaff()]);
@@ -105,34 +111,41 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
   };
 
   return (
-    <AppShell section="schedule" businessName={me.location.business?.name} userName={me.first_name}>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Schedule</h1>
-        <Link href="/schedule/opening-hours" className="text-sm text-neutral-600 hover:text-neutral-900">
-          Opening hours
-        </Link>
-      </div>
+    <AppShell section="schedule" me={me}>
+      <PageHeader
+        title="Schedule"
+        description="Working hours, one-off changes and time off."
+        actions={
+          <Link href="/schedule/opening-hours" className={buttonClass("secondary", "md")}>
+            <ClockIcon className="size-4" />
+            Opening hours
+          </Link>
+        }
+      />
 
       {manager && pending.data.length > 0 && (
-        <section aria-labelledby="requests-heading" className={`${sectionClass} border-amber-300`}>
-          <h2 id="requests-heading" className={`${headingClass} bg-amber-50`}>
+        <section aria-labelledby="requests-heading" className={`${cardClass} border-status-late-ink/30`}>
+          <h2 id="requests-heading" className={`${cardHeadClass} bg-status-late-bg font-serif text-lg font-semibold text-status-late-ink`}>
             Time off requests ({pending.data.length})
           </h2>
-          <ul className="divide-y divide-neutral-100">
+          <ul className={listClass}>
             {pending.data.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
-                <span className="min-w-36 font-medium">{staffName.get(r.staff_id)}</span>
+              <li key={r.id} className={`${rowClass} flex flex-wrap items-center gap-x-4 gap-y-2 hover:bg-sunken/60`}>
+                <span className="flex min-w-40 items-center gap-2 font-medium">
+                  <Avatar name={staffName.get(r.staff_id) ?? "?"} size="sm" />
+                  {staffName.get(r.staff_id)}
+                </span>
                 <span className="flex-1 text-sm">
                   {describeTimeOff({ startsOn: r.starts_on, endsOn: r.ends_on, startMinute: r.start_minute, endMinute: r.end_minute, status: r.status, reason: r.reason })}
-                  {r.note && <span className="text-neutral-500"> · {r.note}</span>}
+                  {r.note && <span className="text-ink-muted"> · {r.note}</span>}
                 </span>
                 <form action={decideTimeOff.bind(null, r.id, "approved")}>
-                  <button type="submit" className={smallButton}>
+                  <button type="submit" className={buttonClass("primary", "sm")}>
                     Approve
                   </button>
                 </form>
                 <form action={decideTimeOff.bind(null, r.id, "declined")}>
-                  <button type="submit" className={smallButton}>
+                  <button type="submit" className={buttonClass("secondary", "sm")}>
                     Decline
                   </button>
                 </form>
@@ -145,72 +158,74 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
       {seesEveryone && (
         <nav aria-label="Team" className="mb-6 flex flex-wrap gap-2">
           {team.map((s) => (
-            <Link
-              key={s.id}
-              href={link({ staff: s.id })}
-              aria-current={s.id === target.id ? "page" : undefined}
-              className={`rounded-full border px-3 py-1 text-sm ${s.id === target.id ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 hover:bg-neutral-100"}`}
-            >
+            <Link key={s.id} href={link({ staff: s.id })} aria-current={s.id === target.id ? "page" : undefined} className={`${pillClass(s.id === target.id)} gap-2 pl-1`}>
+              <span
+                aria-hidden
+                className={`inline-flex size-6 items-center justify-center rounded-full text-[10px] font-semibold ${s.id === target.id ? "bg-white/20 text-white" : "bg-plum-100 text-plum-900"}`}
+              >
+                {initials(fullName(s))}
+              </span>
               {s.first_name}
             </Link>
           ))}
         </nav>
       )}
 
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold">
-          {fullName(target)}
-          {isSelf && <span className="ml-2 text-sm font-normal text-neutral-500">(you)</span>}
-        </h2>
-        <p className="text-sm text-neutral-500">
-          {roleLabel(target.role)}
-          {target.level && ` · ${LEVEL_LABELS[target.level]}`}
-        </p>
+      <div className="mb-5 flex items-center gap-4">
+        <Avatar name={fullName(target)} size="lg" />
+        <div>
+          <h2 className="font-serif text-2xl font-semibold text-ink">
+            {fullName(target)}
+            {isSelf && <span className="ml-2 font-sans text-sm font-normal text-ink-muted">(you)</span>}
+          </h2>
+          <p className="text-sm text-ink-muted">
+            {roleLabel(target.role)}
+            {target.level && ` · ${LEVEL_LABELS[target.level]}`}
+          </p>
+        </div>
       </div>
 
-      <section aria-labelledby="week-heading" className={sectionClass}>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 px-5 py-3">
-          <h3 id="week-heading" className="font-medium">
+      <section aria-labelledby="week-heading" className={cardClass}>
+        <div className={`${cardHeadClass} flex flex-wrap items-center justify-between gap-2`}>
+          <h3 id="week-heading" className={cardTitleClass}>
             Week of {formatDay(week, true)}
           </h3>
-          <div className="flex gap-2 text-sm">
-            <Link href={link({ week: addDays(week, -7) })} className={smallButton}>
+          <div className="flex gap-2">
+            <Link href={link({ week: addDays(week, -7) })} className={buttonClass("secondary", "sm")}>
               ← Previous
             </Link>
-            <Link href={link({ week: startOfWeek(today) })} className={smallButton}>
+            <Link href={link({ week: startOfWeek(today) })} className={buttonClass("secondary", "sm")}>
               This week
             </Link>
-            <Link href={link({ week: addDays(week, 7) })} className={smallButton}>
+            <Link href={link({ week: addDays(week, 7) })} className={buttonClass("secondary", "sm")}>
               Next →
             </Link>
           </div>
         </div>
-        <ol className="divide-y divide-neutral-100" aria-label="Week">
+        <ol className={listClass} aria-label="Week">
           {days.map((day) => (
             <li
               key={day.date}
               aria-label={formatDay(day.date)}
-              className={`flex flex-wrap gap-x-4 gap-y-1 px-5 py-3 ${day.date === today ? "bg-neutral-50" : ""}`}
+              className={`${rowClass} flex flex-wrap gap-x-4 gap-y-1 ${day.date === today ? "bg-plum-100/60" : "hover:bg-sunken/60"}`}
             >
-              <span className="w-28 text-sm font-medium">
+              <span className="w-28 text-sm font-semibold">
                 {formatDay(day.date)}
-                {day.date === today && <span className="block text-xs font-normal text-neutral-500">Today</span>}
+                {day.date === today && <span className="block text-xs font-medium text-plum-700">Today</span>}
               </span>
               <div className="flex flex-1 flex-col gap-1 text-sm">
-                <span>
-                  {day.hours.length === 0 ? <span className="text-neutral-400">Off</span> : formatIntervals(day.hours)}
+                <span className="flex flex-wrap items-center gap-2">
+                  {day.hours.length === 0 ? <span className="text-ink-muted">Off</span> : formatIntervals(day.hours)}
                   {day.changed && <Badge tone="blue">Changed hours</Badge>}
                   {day.open.length === 0 && <Badge tone="neutral">Salon closed</Badge>}
                 </span>
                 {day.timeOff.map((t, i) => (
-                  <span key={t.id ?? i} className={t.status === "approved" ? "text-red-700" : "text-neutral-500"}>
+                  <span key={t.id ?? i} className={`flex flex-wrap items-center gap-2 ${t.status === "approved" ? "text-ink" : "text-ink-muted"}`}>
                     {describeTimeOff(t)} <Badge tone={statusTone(t)}>{STATUS_LABELS[t.status]}</Badge>
                   </span>
                 ))}
                 {day.hours.length > 0 && formatIntervals(day.available) !== formatIntervals(day.hours) && (
-                  <span className="text-neutral-500">
-                    Bookable: {day.available.length ? formatIntervals(day.available) : "none"}
-                  </span>
+                  <span className="text-ink-muted">Bookable: {day.available.length ? formatIntervals(day.available) : "none"}</span>
                 )}
               </div>
             </li>
@@ -218,39 +233,39 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
         </ol>
       </section>
 
-      <section aria-labelledby="weekly-heading" className={sectionClass}>
-        <h3 id="weekly-heading" className={headingClass}>
+      <section aria-labelledby="weekly-heading" className={cardClass}>
+        <h3 id="weekly-heading" className={`${cardHeadClass} ${cardTitleClass}`}>
           Weekly hours
         </h3>
         {manager ? (
           <HoursEditor key={target.id} action={saveWeeklyHours.bind(null, target.id)} initial={hoursRows} label="Weekly hours" />
         ) : (
-          <dl className="divide-y divide-neutral-100">
+          <dl className={listClass}>
             {WEEKDAYS.map((d) => (
-              <div key={d} className="flex gap-4 px-5 py-2 text-sm">
-                <dt className="w-28 font-medium">{WEEKDAY_NAMES[d]}</dt>
-                <dd className={weekly[d]?.length ? "" : "text-neutral-400"}>{weekly[d]?.length ? formatIntervals(weekly[d]) : "Off"}</dd>
+              <div key={d} className="flex gap-4 px-5 py-2.5 text-sm">
+                <dt className="w-28 font-semibold">{WEEKDAY_NAMES[d]}</dt>
+                <dd className={weekly[d]?.length ? "" : "text-ink-muted"}>{weekly[d]?.length ? formatIntervals(weekly[d]) : "Off"}</dd>
               </div>
             ))}
           </dl>
         )}
       </section>
 
-      <section aria-labelledby="changes-heading" className={sectionClass}>
-        <h3 id="changes-heading" className={headingClass}>
+      <section aria-labelledby="changes-heading" className={cardClass}>
+        <h3 id="changes-heading" className={`${cardHeadClass} ${cardTitleClass}`}>
           One-off changes
         </h3>
         {changes.size === 0 ? (
-          <p className="px-5 py-3 text-sm text-neutral-500">No upcoming changes.</p>
+          <p className="px-5 py-4 text-sm text-ink-muted">No upcoming changes.</p>
         ) : (
-          <ul className="divide-y divide-neutral-100" aria-label="Upcoming changes">
+          <ul className={listClass} aria-label="Upcoming changes">
             {[...changes].map(([date, intervals]) => (
-              <li key={date} className="flex flex-wrap items-center gap-4 px-5 py-3 text-sm">
-                <span className="w-28 font-medium">{formatDay(date)}</span>
+              <li key={date} className={`${rowClass} flex flex-wrap items-center gap-4 text-sm hover:bg-sunken/60`}>
+                <span className="w-28 font-semibold">{formatDay(date)}</span>
                 <span className="flex-1">{formatIntervals(intervals)}</span>
                 {manager && (
                   <form action={removeDayChange.bind(null, target.id, date)}>
-                    <button type="submit" className={smallButton} aria-label={`Remove change on ${formatDay(date)}`}>
+                    <button type="submit" className={buttonClass("secondary", "sm")} aria-label={`Remove change on ${formatDay(date)}`}>
                       Remove
                     </button>
                   </form>
@@ -260,36 +275,36 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
           </ul>
         )}
         {manager && (
-          <div className="border-t border-neutral-200">
+          <div className="border-t border-line bg-sunken/40">
             <DayChangeForm key={target.id} staffId={target.id} today={today} />
           </div>
         )}
       </section>
 
-      <section aria-labelledby="time-off-heading" className={sectionClass}>
-        <h3 id="time-off-heading" className={headingClass}>
+      <section aria-labelledby="time-off-heading" className={cardClass}>
+        <h3 id="time-off-heading" className={`${cardHeadClass} ${cardTitleClass}`}>
           Time off
         </h3>
         {timeOff.length === 0 ? (
-          <p className="px-5 py-3 text-sm text-neutral-500">No time off in the last 60 days or coming up.</p>
+          <p className="px-5 py-4 text-sm text-ink-muted">No time off in the last 60 days or coming up.</p>
         ) : (
-          <ul className="divide-y divide-neutral-100" aria-label="Time off">
+          <ul className={listClass} aria-label="Time off">
             {timeOff.map((t) => (
-              <li key={t.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 text-sm">
+              <li key={t.id} className={`${rowClass} flex animate-fade-in flex-wrap items-center gap-x-4 gap-y-2 text-sm hover:bg-sunken/60`}>
                 <span className="flex-1">
                   {describeTimeOff(t)}
-                  {t.note && <span className="text-neutral-500"> · {t.note}</span>}
+                  {t.note && <span className="text-ink-muted"> · {t.note}</span>}
                 </span>
                 <Badge tone={statusTone(t)}>{STATUS_LABELS[t.status]}</Badge>
                 {manager && t.status === "requested" && (
                   <>
                     <form action={decideTimeOff.bind(null, t.id!, "approved")}>
-                      <button type="submit" className={smallButton}>
+                      <button type="submit" className={buttonClass("primary", "sm")}>
                         Approve
                       </button>
                     </form>
                     <form action={decideTimeOff.bind(null, t.id!, "declined")}>
-                      <button type="submit" className={smallButton}>
+                      <button type="submit" className={buttonClass("secondary", "sm")}>
                         Decline
                       </button>
                     </form>
@@ -297,7 +312,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
                 )}
                 {(manager || (isSelf && t.status === "requested")) && (
                   <form action={deleteTimeOff.bind(null, t.id!)}>
-                    <button type="submit" className={smallButton}>
+                    <button type="submit" className={buttonClass("ghost", "sm", "text-danger")}>
                       {manager ? "Remove" : "Withdraw"}
                     </button>
                   </form>
@@ -307,15 +322,15 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
           </ul>
         )}
         {(manager || isSelf) && (
-          <div className="border-t border-neutral-200">
+          <div className="border-t border-line bg-sunken/40">
             <TimeOffForm key={target.id} staffId={target.id} today={today} isRequest={!manager} />
           </div>
         )}
       </section>
 
       {(manager || isSelf) && (
-        <section aria-labelledby="pay-heading" className={sectionClass}>
-          <h3 id="pay-heading" className={headingClass}>
+        <section aria-labelledby="pay-heading" className={cardClass}>
+          <h3 id="pay-heading" className={`${cardHeadClass} ${cardTitleClass}`}>
             Level and commission
           </h3>
           {manager ? (
@@ -329,16 +344,16 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
           ) : (
             <dl className="flex flex-wrap gap-8 px-5 py-4 text-sm">
               <div>
-                <dt className="text-neutral-500">Level</dt>
-                <dd>{target.level ? LEVEL_LABELS[target.level] : "—"}</dd>
+                <dt className="text-ink-muted">Level</dt>
+                <dd className="font-semibold">{target.level ? LEVEL_LABELS[target.level] : "—"}</dd>
               </div>
               <div>
-                <dt className="text-neutral-500">Service commission</dt>
-                <dd>{compensation.data ? `${Number(compensation.data.service_commission_pct)}%` : "—"}</dd>
+                <dt className="text-ink-muted">Service commission</dt>
+                <dd className="font-semibold">{compensation.data ? `${Number(compensation.data.service_commission_pct)}%` : "—"}</dd>
               </div>
               <div>
-                <dt className="text-neutral-500">Retail commission</dt>
-                <dd>{compensation.data ? `${Number(compensation.data.retail_commission_pct)}%` : "—"}</dd>
+                <dt className="text-ink-muted">Retail commission</dt>
+                <dd className="font-semibold">{compensation.data ? `${Number(compensation.data.retail_commission_pct)}%` : "—"}</dd>
               </div>
             </dl>
           )}
@@ -348,16 +363,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
   );
 }
 
-function statusTone(t: TimeOff) {
-  return t.status === "approved" ? "red" : t.status === "requested" ? "amber" : "neutral";
-}
-
-function Badge({ tone, children }: { tone: "red" | "amber" | "blue" | "neutral"; children: React.ReactNode }) {
-  const tones = {
-    red: "bg-red-50 text-red-700",
-    amber: "bg-amber-50 text-amber-800",
-    blue: "bg-blue-50 text-blue-700",
-    neutral: "bg-neutral-100 text-neutral-600",
-  };
-  return <span className={`ml-2 rounded px-2 py-0.5 text-xs font-medium ${tones[tone]}`}>{children}</span>;
+// Approved time off blocks bookings; requests wait for a manager.
+function statusTone(t: TimeOff): Tone {
+  return t.status === "approved" ? "green" : t.status === "requested" ? "amber" : "neutral";
 }

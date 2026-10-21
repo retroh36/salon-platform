@@ -2,6 +2,7 @@
 // since midnight on the day shown, at the location.
 
 import type { AppointmentStatus } from "@/lib/appointments";
+import type { ServiceFamily } from "@/lib/calendar";
 import type { StaffRole } from "@/lib/staff";
 import type { SegmentKind } from "@/lib/scheduling/booking";
 import type { Interval } from "@/lib/scheduling/intervals";
@@ -11,6 +12,11 @@ export type ColumnData = {
   staffId: string;
   name: string;
   firstName: string;
+  // "Master stylist", or their role.
+  title: string;
+  color: string | null;
+  // On shift and the salon is open; others collapse to a thin column.
+  working: boolean;
   hoursLabel: string;
   offHours: Interval[];
   timeOff: (Interval & { label: string })[];
@@ -21,7 +27,7 @@ export type BlockData = Interval & {
   appointmentId: string;
   staffId: string;
   segments: (Interval & { kind: SegmentKind })[];
-  category: string;
+  family: ServiceFamily;
   clientName: string;
   service: string;
   resource: string | null;
@@ -47,8 +53,9 @@ export type AppointmentDetail = {
   notes: string;
   client: { id: string; name: string; phone: string | null; email: string | null; allergies: string | null; preferences: string | null } | null;
   items: ItemDetail[];
-  // "Sam Rivera · Tue, Oct 21, 3:04pm"
-  bookedBy: string | null;
+  // "Booked by Sam Rivera · Tue, Oct 6, 2:15pm" / "Booked online · …"
+  bookedBy: string;
+  // "Last changed by …", if anyone has changed it since.
   changedBy: string | null;
 };
 
@@ -56,6 +63,7 @@ export type MenuService = {
   id: string;
   name: string;
   category: string;
+  family: ServiceFamily;
   minutes: number;
   priceCents: number;
   archived: boolean;
@@ -70,12 +78,14 @@ export type Menu = {
 
 export type BoardData = {
   date: LocalDate;
+  today: LocalDate;
+  // "Open 9am–7pm" or "Salon closed".
+  openLabel: string;
   timeZone: string;
   range: Interval;
   columns: ColumnData[];
   blocks: BlockData[];
   appointments: Record<string, AppointmentDetail>;
-  colors: Record<string, string>;
   menu: Menu;
   me: { staffId: string; role: StaffRole; canBook: boolean };
 };

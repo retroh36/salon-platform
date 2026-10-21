@@ -2,12 +2,17 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
+import { Avatar } from "@/components/ui/avatar";
+import { buttonClass } from "@/components/ui/button";
+import { checkboxClass, fieldClass } from "@/components/ui/field";
+import { Alert } from "@/components/ui/page";
 import { saveService, type ServiceFormFields } from "./actions";
 
 export type StaffOption = { id: string; name: string; role: string; color: string | null; isActive: boolean };
 
-const inputClass =
-  "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none disabled:bg-neutral-50 disabled:text-neutral-600";
+const inputClass = fieldClass;
+const cardClass = "rounded-xl border border-line bg-surface shadow-card";
+const cardTitle = "font-serif text-lg font-semibold text-ink";
 
 export function ServiceForm({
   serviceId,
@@ -43,13 +48,11 @@ export function ServiceForm({
       {serviceId && <input type="hidden" name="service_id" value={serviceId} />}
 
       {state?.message && (
-        <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {state.message}
-        </p>
+        <Alert>{state.message}</Alert>
       )}
 
       <fieldset disabled={readOnly || pending} className="flex flex-col gap-6">
-        <section className="grid gap-4 rounded-xl border border-neutral-200 bg-white p-5 sm:grid-cols-2">
+        <section className={`grid gap-4 p-5 sm:grid-cols-2 ${cardClass}`}>
           <Field label="Name" error={errors.name} className="sm:col-span-2">
             <input name="name" defaultValue={fields.name} maxLength={100} required className={inputClass} />
           </Field>
@@ -69,9 +72,9 @@ export function ServiceForm({
           </Field>
         </section>
 
-        <section className="rounded-xl border border-neutral-200 bg-white p-5">
-          <h2 className="font-medium">Time</h2>
-          <p className="mb-4 text-sm text-neutral-500">
+        <section className={`p-5 ${cardClass}`}>
+          <h2 className={cardTitle}>Time</h2>
+          <p className="mb-4 text-sm text-ink-muted">
             The stylist is free during processing, so other clients can be booked into that gap. Use 5-minute steps.
           </p>
           <div className="grid gap-4 sm:grid-cols-3">
@@ -87,20 +90,23 @@ export function ServiceForm({
           </div>
         </section>
 
-        <section className="rounded-xl border border-neutral-200 bg-white">
-          <div className="border-b border-neutral-200 px-5 py-3">
-            <h2 className="font-medium">
-              Who offers this <span className="text-neutral-500">({offered.size})</span>
+        <section className={`overflow-hidden ${cardClass}`}>
+          <div className="border-b border-line px-5 py-3.5">
+            <h2 className={cardTitle}>
+              Who offers this <span className="font-sans text-sm font-medium text-ink-muted">({offered.size})</span>
             </h2>
-            <p className="text-sm text-neutral-500">Leave a price blank to use the default price.</p>
+            <p className="text-sm text-ink-muted">Leave a price blank to use the default price.</p>
           </div>
-          <ul className="divide-y divide-neutral-100">
+          <ul className="divide-y divide-line">
             {staffOptions.map((s) => {
               const checked = offered.has(s.id);
               const error = errors.staff?.[s.id];
               return (
-                <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
-                  <label className="flex min-w-56 flex-1 items-center gap-3">
+                <li
+                  key={s.id}
+                  className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 transition-colors duration-(--motion-fast) ${checked ? "bg-plum-100/40" : ""}`}
+                >
+                  <label className="flex min-w-56 flex-1 cursor-pointer items-center gap-3">
                     {/* Uncontrolled like the other fields: React resets the form
                         after each submit, and a reset restores defaultChecked. */}
                     <input
@@ -109,20 +115,16 @@ export function ServiceForm({
                       value={s.id}
                       defaultChecked={s.id in fields.staff}
                       onChange={(e) => toggle(s.id, e.target.checked)}
-                      className="size-4"
+                      className={checkboxClass}
                     />
-                    <span
-                      aria-hidden
-                      className="size-3 shrink-0 rounded-full bg-neutral-300"
-                      style={s.color ? { backgroundColor: s.color } : undefined}
-                    />
-                    <span className="font-medium">{s.name}</span>
-                    <span className="text-sm text-neutral-500">
+                    <Avatar name={s.name} color={s.color} size="sm" />
+                    <span className="font-semibold text-ink">{s.name}</span>
+                    <span className="text-sm text-ink-muted">
                       {s.role}
                       {!s.isActive && " · inactive"}
                     </span>
                   </label>
-                  <label className="flex items-center gap-2 text-sm text-neutral-600">
+                  <label className="flex items-center gap-2 text-sm text-ink-muted">
                     Price ($)
                     <input
                       name={`price_${s.id}`}
@@ -131,10 +133,10 @@ export function ServiceForm({
                       placeholder={fields.price ? `Default $${fields.price}` : "Default"}
                       inputMode="decimal"
                       aria-label={`${s.name} price`}
-                      className={`${inputClass} w-32 py-1.5`}
+                      className={`${inputClass} w-32! py-1.5`}
                     />
                   </label>
-                  {error && <p className="w-full text-sm text-red-600">{error}</p>}
+                  {error && <p className="w-full animate-fade-in text-sm text-danger">{error}</p>}
                 </li>
               );
             })}
@@ -144,15 +146,11 @@ export function ServiceForm({
 
       <div className="flex items-center gap-3">
         {!readOnly && (
-          <button
-            type="submit"
-            disabled={pending}
-            className="rounded-md bg-neutral-900 px-4 py-2 font-medium text-white hover:bg-neutral-700 disabled:opacity-60"
-          >
+          <button type="submit" disabled={pending} className={buttonClass("primary", "lg")}>
             {pending ? "Saving…" : serviceId ? "Save changes" : "Add service"}
           </button>
         )}
-        <Link href="/services" className="rounded-md px-4 py-2 text-neutral-600 hover:text-neutral-900">
+        <Link href="/services" className={buttonClass("ghost", "lg", "text-ink-muted")}>
           {readOnly ? "Back to services" : "Cancel"}
         </Link>
       </div>
@@ -174,13 +172,13 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className={`flex flex-col gap-1 text-sm font-medium ${className}`}>
+    <label className={`flex flex-col gap-1.5 text-sm font-medium text-ink ${className}`}>
       <span>
         {label}
-        {hint && <span className="ml-1 font-normal text-neutral-500">· {hint}</span>}
+        {hint && <span className="ml-1 font-normal text-ink-muted">· {hint}</span>}
       </span>
       {children}
-      {error && <span className="font-normal text-red-600">{error}</span>}
+      {error && <span className="animate-fade-in font-normal text-danger">{error}</span>}
     </label>
   );
 }

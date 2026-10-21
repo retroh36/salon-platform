@@ -1,11 +1,13 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Drawer } from "@/components/drawer";
-import { inputClass } from "@/components/form";
+import { Avatar } from "@/components/ui/avatar";
+import { Button, IconButton } from "@/components/ui/button";
+import { fieldClass, labelClass, selectClass } from "@/components/ui/field";
+import { CloseIcon, PlusIcon } from "@/components/ui/icons";
 import { MAX_NOTES, priceFor, visitSummary } from "@/lib/appointments";
 import { parseClientSearch } from "@/lib/clients";
-import { formatDay } from "@/lib/schedule-format";
+import { formatLongDay } from "@/lib/schedule-format";
 import { formatMinute, minuteToTime, parseTime } from "@/lib/scheduling/time";
 import { formatMinutes, formatPrice, sortCategories } from "@/lib/services";
 import { findClients, quickAddClient, saveVisit, type ClientOption } from "./actions";
@@ -23,7 +25,6 @@ type Line = {
   resource: string;
 };
 
-const small = "rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-100 disabled:opacity-60";
 
 // Books a new visit (from a clicked slot) or edits an existing one.
 export function BookingPanel({
@@ -118,12 +119,19 @@ export function BookingPanel({
   }
 
   return (
-    <Drawer title={appointment ? "Edit appointment" : "New appointment"} onClose={onClose}>
-      <form onSubmit={submit} className="flex flex-col gap-5 text-sm" aria-label={appointment ? "Edit appointment" : "New appointment"}>
-        <p className="text-neutral-600">{formatDay(data.date, true)}</p>
+      <form onSubmit={submit} className="flex flex-col gap-5 py-2 text-sm" aria-label={appointment ? "Edit booking" : "New booking"}>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h2 className="font-serif text-2xl font-semibold text-plum-900">{appointment ? "Edit booking" : "New booking"}</h2>
+            <p className="text-ink-muted">{formatLongDay(data.date)}</p>
+          </div>
+          <IconButton label="Close" onClick={onClose}>
+            <CloseIcon />
+          </IconButton>
+        </div>
 
         {message && (
-          <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700">
+          <p role="alert" className="animate-fade-in rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-danger">
             {message}
           </p>
         )}
@@ -136,8 +144,12 @@ export function BookingPanel({
           const choices = menu.services.filter((s) => (s.id in offered && !s.archived) || s.id === l.serviceId);
           const errors = lineErrors[n] ?? [];
           return (
-            <fieldset key={l.key} className={`flex flex-col gap-3 rounded-lg border p-3 ${errors.length ? "border-red-300" : "border-neutral-200"}`}>
-              <legend className="px-1 font-medium">Service {n + 1}</legend>
+            <fieldset
+              key={l.key}
+              data-family={services.get(l.serviceId)?.family ?? "other"}
+              className={`flex animate-fade-in flex-col gap-3 rounded-lg border border-l-4 border-l-(--fam-accent) bg-surface p-3 ${errors.length ? "border-danger/50" : "border-line"}`}
+            >
+              <legend className="px-1 font-semibold">Service {n + 1}</legend>
               <LabeledSelect label="Service" value={l.serviceId} onChange={(v) => update(l.key, { serviceId: v })}>
                 <option value="">Choose a service</option>
                 {sortCategories(new Set(choices.map((s) => s.category))).map((category) => (
@@ -161,7 +173,7 @@ export function BookingPanel({
                     </option>
                   ))}
                 </LabeledSelect>
-                <label className="flex flex-col gap-1 font-medium">
+                <label className={labelClass}>
                   Starts
                   <input
                     type="time"
@@ -169,7 +181,7 @@ export function BookingPanel({
                     value={l.startMinute != null ? minuteToTime(l.startMinute) : ""}
                     onChange={(e) => update(l.key, { startMinute: parseTime(e.target.value) })}
                     required
-                    className={inputClass}
+                    className={fieldClass}
                   />
                 </label>
               </div>
@@ -182,20 +194,20 @@ export function BookingPanel({
                   </option>
                 ))}
               </LabeledSelect>
-              <div className="flex items-center justify-between text-neutral-600">
+              <div className="flex items-center justify-between text-ink-muted">
                 <span data-testid="line-summary">
                   {info && l.startMinute != null
                     ? `${formatMinute(l.startMinute)}–${formatMinute(l.startMinute + info.minutes)} · ${formatMinutes(info.minutes)} · ${formatPrice(info.priceCents)}`
                     : "Choose a service"}
                 </span>
                 {lines.length > 1 && (
-                  <button type="button" className="text-neutral-500 underline hover:text-neutral-900" onClick={() => setLines((all) => all.filter((x) => x.key !== l.key))}>
+                  <button type="button" className="font-medium text-ink-muted underline underline-offset-2 hover:text-ink" onClick={() => setLines((all) => all.filter((x) => x.key !== l.key))}>
                     Remove
                   </button>
                 )}
               </div>
               {errors.length > 0 && (
-                <ul className="list-disc pl-5 text-red-700">
+                <ul className="list-disc pl-5 text-danger">
                   {errors.map((e) => (
                     <li key={e}>{e}</li>
                   ))}
@@ -205,16 +217,17 @@ export function BookingPanel({
           );
         })}
 
-        <button type="button" className={`${small} self-start`} onClick={addLine}>
+        <Button size="sm" className="self-start" onClick={addLine}>
+          <PlusIcon className="size-4" />
           Add another service
-        </button>
+        </Button>
 
-        <label className="flex flex-col gap-1 font-medium">
+        <label className={labelClass}>
           Notes
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} maxLength={MAX_NOTES} className={inputClass} />
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} maxLength={MAX_NOTES} className={fieldClass} />
         </label>
 
-        <div className="flex items-center justify-between rounded-lg bg-neutral-50 px-3 py-2 font-medium" aria-live="polite" data-testid="visit-total">
+        <div className="flex items-center justify-between rounded-lg bg-plum-100 px-3 py-2.5 font-semibold text-plum-900" aria-live="polite" data-testid="visit-total">
           {summary ? (
             <>
               <span>
@@ -223,28 +236,27 @@ export function BookingPanel({
               <span>{formatPrice(summary.priceCents)}</span>
             </>
           ) : (
-            <span className="text-neutral-500">Total: choose a service</span>
+            <span className="font-normal">Total: choose a service</span>
           )}
         </div>
 
         <div className="flex gap-2">
-          <button type="submit" disabled={pending} className="rounded-md bg-neutral-900 px-4 py-2 font-medium text-white hover:bg-neutral-700 disabled:opacity-60">
-            {pending ? "Saving…" : appointment ? "Save changes" : "Book appointment"}
-          </button>
-          <button type="button" className={small} onClick={onClose}>
+          <Button type="submit" variant="primary" size="lg" className="flex-1" disabled={pending}>
+            {pending ? "Saving…" : appointment ? "Save changes" : "Create booking"}
+          </Button>
+          <Button size="lg" onClick={onClose}>
             Cancel
-          </button>
+          </Button>
         </div>
       </form>
-    </Drawer>
   );
 }
 
 function LabeledSelect({ label, value, onChange, children }: { label: string; value: string; onChange: (v: string) => void; children: React.ReactNode }) {
   return (
-    <label className="flex flex-col gap-1 font-medium">
+    <label className={labelClass}>
       {label}
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputClass}>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={selectClass}>
         {children}
       </select>
     </label>
@@ -267,17 +279,18 @@ function ClientPicker({ client, onChange }: { client: ClientOption | null; onCha
 
   if (client) {
     return (
-      <section aria-label="Client" className="rounded-lg border border-neutral-200 p-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="font-medium">{client.name}</div>
-            {client.phone && <div className="text-neutral-500">{client.phone}</div>}
+      <section aria-label="Client" className="flex animate-fade-in flex-col gap-2 rounded-lg border border-line bg-sunken/50 p-3">
+        <div className="flex items-center gap-3">
+          <Avatar name={client.name} />
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-semibold">{client.name}</div>
+            {client.phone && <div className="text-ink-muted">{client.phone}</div>}
           </div>
-          <button type="button" className="text-neutral-500 underline hover:text-neutral-900" onClick={() => onChange(null)}>
+          <button type="button" className="shrink-0 font-medium text-plum-900 underline underline-offset-2 hover:text-plum-700" onClick={() => onChange(null)}>
             Change client
           </button>
         </div>
-        {client.allergies && <p className="mt-2 rounded-md bg-red-50 px-2 py-1 font-medium text-red-700">Allergy: {client.allergies}</p>}
+        {client.allergies && <p className="rounded-md bg-danger-soft px-2 py-1 font-medium text-danger">Allergy: {client.allergies}</p>}
       </section>
     );
   }
@@ -300,29 +313,29 @@ function ClientPicker({ client, onChange }: { client: ClientOption | null; onCha
 
   if (adding) {
     return (
-      <section aria-label="New client" className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-3">
-        <h3 className="font-medium">New client</h3>
-        {errors.form && <p className="text-red-700">{errors.form}</p>}
+      <section aria-label="New client" className="flex animate-fade-in flex-col gap-3 rounded-lg border border-line bg-sunken/50 p-3">
+        <h3 className="font-semibold">New client</h3>
+        {errors.form && <p className="text-danger">{errors.form}</p>}
         <div className="grid grid-cols-2 gap-2">
-          <label className="flex flex-col gap-1 font-medium">
+          <label className={labelClass}>
             First name
-            <input value={fields.firstName} onChange={(e) => setFields({ ...fields, firstName: e.target.value })} className={inputClass} aria-invalid={!!errors.first_name} />
-            {errors.first_name && <span className="font-normal text-red-700">{errors.first_name}</span>}
+            <input value={fields.firstName} onChange={(e) => setFields({ ...fields, firstName: e.target.value })} className={fieldClass} aria-invalid={!!errors.first_name} />
+            {errors.first_name && <span className="font-normal text-danger">{errors.first_name}</span>}
           </label>
-          <label className="flex flex-col gap-1 font-medium">
+          <label className={labelClass}>
             Last name
-            <input value={fields.lastName} onChange={(e) => setFields({ ...fields, lastName: e.target.value })} className={inputClass} />
+            <input value={fields.lastName} onChange={(e) => setFields({ ...fields, lastName: e.target.value })} className={fieldClass} />
           </label>
         </div>
-        <label className="flex flex-col gap-1 font-medium">
+        <label className={labelClass}>
           Phone
-          <input value={fields.phone} onChange={(e) => setFields({ ...fields, phone: e.target.value })} inputMode="tel" className={inputClass} aria-invalid={!!errors.phone} />
-          {errors.phone && <span className="font-normal text-red-700">{errors.phone}</span>}
+          <input value={fields.phone} onChange={(e) => setFields({ ...fields, phone: e.target.value })} inputMode="tel" className={fieldClass} aria-invalid={!!errors.phone} />
+          {errors.phone && <span className="font-normal text-danger">{errors.phone}</span>}
         </label>
         <div className="flex gap-2">
-          <button
-            type="button"
-            className={small}
+          <Button
+            size="sm"
+            variant="primary"
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
@@ -333,10 +346,10 @@ function ClientPicker({ client, onChange }: { client: ClientOption | null; onCha
             }
           >
             {pending ? "Adding…" : "Add client"}
-          </button>
-          <button type="button" className={small} onClick={() => setAdding(false)}>
+          </Button>
+          <Button size="sm" onClick={() => setAdding(false)}>
             Back to search
-          </button>
+          </Button>
         </div>
       </section>
     );
@@ -344,7 +357,7 @@ function ClientPicker({ client, onChange }: { client: ClientOption | null; onCha
 
   return (
     <section aria-label="Client" className="flex flex-col gap-2">
-      <label htmlFor="client-search" className="font-medium">
+      <label htmlFor="client-search" className="text-sm font-medium">
         Find a client
       </label>
       <input
@@ -354,16 +367,16 @@ function ClientPicker({ client, onChange }: { client: ClientOption | null; onCha
         onChange={(e) => search(e.target.value)}
         placeholder="Search by name or phone"
         autoComplete="off"
-        className={inputClass}
+        className={fieldClass}
       />
       {results && (
-        <ul aria-label="Matching clients" className="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
-          {results.length === 0 && <li className="px-3 py-2 text-neutral-500">No clients match.</li>}
+        <ul aria-label="Matching clients" className="animate-fade-in divide-y divide-line overflow-hidden rounded-lg border border-line">
+          {results.length === 0 && <li className="px-3 py-2 text-ink-muted">No clients match.</li>}
           {results.map((c) => (
             <li key={c.id}>
-              <button type="button" className="flex w-full justify-between gap-3 px-3 py-2 text-left hover:bg-neutral-50" onClick={() => onChange(c)}>
-                <span className="font-medium">{c.name}</span>
-                <span className="text-neutral-500">{c.phone}</span>
+              <button type="button" className="flex w-full justify-between gap-3 px-3 py-2 text-left transition-colors duration-(--motion-fast) hover:bg-sunken active:bg-plum-100" onClick={() => onChange(c)}>
+                <span className="font-semibold">{c.name}</span>
+                <span className="text-ink-muted">{c.phone}</span>
               </button>
             </li>
           ))}
@@ -371,7 +384,7 @@ function ClientPicker({ client, onChange }: { client: ClientOption | null; onCha
       )}
       <button
         type="button"
-        className="self-start text-neutral-600 underline hover:text-neutral-900"
+        className="self-start font-medium text-plum-900 underline underline-offset-2 hover:text-plum-700"
         onClick={() => {
           // Start the form from what was searched for: a phone number or a name.
           const isPhone = parseClientSearch(query).kind === "phone";

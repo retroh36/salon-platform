@@ -5,14 +5,30 @@
 import { subtractIntervals, type Interval } from "@/lib/scheduling/intervals";
 import { MINUTES_PER_DAY } from "@/lib/scheduling/time";
 
-// Distinct from each other, and readable as a tint behind dark text.
-export const CATEGORY_PALETTE = ["#2563eb", "#db2777", "#059669", "#7c3aed", "#d97706", "#0891b2", "#dc2626", "#4f46e5"];
+export type ServiceFamily = "color" | "cut" | "finish" | "treatment" | "other";
 
-// One color per category, in alphabetical order, so the same menu always
-// gets the same colors. Repeats after eight categories.
-export function categoryColors(categories: readonly string[]): Map<string, string> {
-  const sorted = [...new Set(categories)].sort((a, b) => a.localeCompare(b));
-  return new Map(sorted.map((c, i) => [c, CATEGORY_PALETTE[i % CATEGORY_PALETTE.length]]));
+// Families share a calendar color: peach for color work, lavender for cuts,
+// green for glosses, blow-dries and styling, blue for treatments.
+export const FAMILY_LABELS: Record<ServiceFamily, string> = {
+  color: "Color",
+  cut: "Cuts",
+  finish: "Gloss & blowouts",
+  treatment: "Treatments",
+  other: "Other",
+};
+
+export const FAMILIES: ServiceFamily[] = ["color", "cut", "finish", "treatment", "other"];
+
+// A salon names its own categories, so this goes by keywords. A gloss or
+// toner counts as finishing even when it's filed under Color.
+export function serviceFamily(category: string, serviceName = ""): ServiceFamily {
+  if (/gloss|toner/i.test(serviceName)) return "finish";
+  const text = category.toLowerCase();
+  if (/colou?r|highlight|lowlight|balayage|foil|bleach/.test(text)) return "color";
+  if (/cut|fade|barber|trim|beard/.test(text)) return "cut";
+  if (/blow|styl|updo|finish|gloss/.test(text)) return "finish";
+  if (/treat|mask|keratin|condition|scalp|smooth/.test(text)) return "treatment";
+  return "other";
 }
 
 // The hours to draw: the salon's opening hours that day (or `fallback`, e.g.
@@ -39,19 +55,46 @@ export function hourMarks(range: Interval): number[] {
   return marks;
 }
 
-// How far to indent each block: blocks that start while an earlier one is
-// still running (a client booked into a processing gap, or a clash) sit
-// one step further in, so both stay visible. Longer blocks go first when two
-// start together.
-export function layoutColumn<T extends Interval>(blocks: readonly T[]): (T & { depth: number })[] {
+// Lanes for blocks that overlap in a column (a client booked into another's
+// processing gap, or a clash), so nothing covers anything else. Blocks that
+// overlap, directly or through others, form a group; within it each block
+// takes the first lane free at its start. Longer blocks go first when two
+// start together, so the main appointment keeps lane 0.
+export function layoutColumn<T extends Interval>(blocks: readonly T[]): (T & { lane: number; lanes: number })[] {
   const sorted = [...blocks].sort((a, b) => a.start - b.start || b.end - a.end);
-  const placed: (T & { depth: number })[] = [];
+  const result: (T & { lane: number; lanes: number })[] = [];
+  let group: (T & { lane: number; lanes: number })[] = [];
+  let groupEnd = -Infinity;
+  const laneEnds: number[] = [];
+
+  const closeGroup = () => {
+    const lanes = Math.max(1, ...group.map((b) => b.lane + 1));
+    for (const b of group) b.lanes = lanes;
+    result.push(...group);
+    group = [];
+    laneEnds.length = 0;
+  };
+
   for (const block of sorted) {
-    const running = placed.filter((p) => p.start <= block.start && block.start < p.end);
-    const used = new Set(running.map((p) => p.depth));
-    let depth = 0;
-    while (used.has(depth)) depth++;
-    placed.push({ ...block, depth });
+    if (block.start >= groupEnd) {
+      closeGroup();
+      groupEnd = -Infinity;
+    }
+    let lane = laneEnds.findIndex((end) => end <= block.start);
+    if (lane === -1) lane = laneEnds.length;
+    laneEnds[lane] = block.end;
+    groupEnd = Math.max(groupEnd, block.end);
+    group.push({ ...block, lane, lanes: 1 });
   }
-  return placed;
+  closeGroup();
+  return result;
+}
+
+// Where a lane sits across the column, in percent. The first lane (the main
+// appointment) stays wide; the others share a narrow strip on the right.
+export function laneBox(lane: number, lanes: number): { left: number; width: number } {
+  if (lanes <= 1) return { left: 0, width: 100 };
+  const narrow = lanes === 2 ? 40 : 60 / (lanes - 1);
+  const main = 100 - narrow * (lanes - 1);
+  return lane === 0 ? { left: 0, width: main } : { left: main + narrow * (lane - 1), width: narrow };
 }

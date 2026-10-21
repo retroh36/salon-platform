@@ -1,9 +1,10 @@
 "use client";
 
 import { cloneElement, startTransition, useId, type ReactElement } from "react";
+import { fieldClass } from "@/components/ui/field";
 
-export const inputClass =
-  "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none disabled:bg-neutral-50 disabled:text-neutral-500";
+// The shared field look (components/ui/field.tsx), for existing forms.
+export const inputClass = fieldClass;
 
 // React resets a form after its action runs, and a reset doesn't reliably
 // restore every control (selects and checkboxes can lose the submitted
@@ -40,10 +41,10 @@ export function Field({
   const errorId = `${id}-error`;
 
   return (
-    <div className={`flex flex-col gap-1 text-sm font-medium ${className}`}>
+    <div className={`flex flex-col gap-1.5 text-sm font-medium text-ink ${className}`}>
       <label htmlFor={id}>
         {label}
-        {hint && <span className="ml-1 font-normal text-neutral-500">· {hint}</span>}
+        {hint && <span className="ml-1 font-normal text-ink-muted">· {hint}</span>}
       </label>
       {cloneElement(children, {
         id,
@@ -51,7 +52,7 @@ export function Field({
         "aria-describedby": error ? errorId : undefined,
       })}
       {error && (
-        <span id={errorId} className="font-normal text-red-600">
+        <span id={errorId} className="animate-fade-in font-normal text-danger">
           {error}
         </span>
       )}

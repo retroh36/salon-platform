@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
+import { ChevronLeftIcon } from "@/components/ui/icons";
+import { listClass, PageHeader } from "@/components/ui/page";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import { formatIntervals } from "@/lib/schedule-format";
 import { WEEKDAY_NAMES } from "@/lib/schedule-forms";
@@ -30,23 +32,28 @@ async function OpeningHours() {
   );
 
   return (
-    <AppShell section="schedule" businessName={me.location.business?.name} userName={me.first_name}>
-      <Link href="/schedule" className="text-sm text-neutral-500 hover:text-neutral-900">
-        ← Schedule
+    <AppShell section="schedule" me={me}>
+      <Link href="/schedule" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-ink-muted transition-colors duration-(--motion-fast) hover:text-plum-900">
+        <ChevronLeftIcon className="size-4" />
+        Schedule
       </Link>
-      <h1 className="mt-2 text-2xl font-semibold">Opening hours</h1>
-      <p className="mb-6 text-sm text-neutral-500">
-        {me.location.name} · {me.location.timezone}. Staff can only be booked while the salon is open.
-      </p>
-      <section className="rounded-xl border border-neutral-200 bg-white">
+      <PageHeader
+        title="Opening hours"
+        description={
+          <>
+            {me.location.name} · {me.location.timezone}. Staff can only be booked while the salon is open.
+          </>
+        }
+      />
+      <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
         {canManage(me.role) ? (
           <HoursEditor action={saveOpeningHours} initial={rows} label="Opening hours" />
         ) : (
-          <dl className="divide-y divide-neutral-100">
+          <dl className={listClass}>
             {WEEKDAYS.map((d) => (
-              <div key={d} className="flex gap-4 px-5 py-2 text-sm">
-                <dt className="w-28 font-medium">{WEEKDAY_NAMES[d]}</dt>
-                <dd className={weekly[d]?.length ? "" : "text-neutral-400"}>{weekly[d]?.length ? formatIntervals(weekly[d]) : "Closed"}</dd>
+              <div key={d} className="flex gap-4 px-5 py-2.5 text-sm">
+                <dt className="w-28 font-semibold">{WEEKDAY_NAMES[d]}</dt>
+                <dd className={weekly[d]?.length ? "" : "text-ink-muted"}>{weekly[d]?.length ? formatIntervals(weekly[d]) : "Closed"}</dd>
               </div>
             ))}
           </dl>

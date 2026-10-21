@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
+import { Avatar } from "@/components/ui/avatar";
+import { Card, EmptyState, listClass } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { canEditClients, formatDate } from "@/lib/clients";
 import { isUuid } from "@/lib/ids";
 import { todayIn } from "@/lib/scheduling/time";
 import { fullName } from "@/lib/staff";
 import type { ClientFormFields } from "../actions";
+import { BackLink } from "../back-link";
 import { ClientForm } from "../client-form";
 import { FormulaForm } from "../formula-form";
 import { stylistOptions } from "../stylist-options";
@@ -50,45 +52,64 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
   const contact = [client.phone, client.email].filter(Boolean).join(" · ");
 
   return (
-    <AppShell section="clients" businessName={me.location.business?.name} userName={me.first_name}>
-      <Link href="/clients" className="text-sm text-neutral-500 hover:text-neutral-900">
-        ← Clients
-      </Link>
-      <div className="mt-2 mb-6">
-        <h1 className="text-2xl font-semibold">{fullName(client)}</h1>
-        <p className="text-sm text-neutral-500">{contact || "No contact details"}</p>
+    <AppShell section="clients" me={me}>
+      <BackLink href="/clients">Clients</BackLink>
+      <div className="mb-6 flex flex-wrap items-center gap-4">
+        <Avatar name={fullName(client)} size="lg" />
+        <div className="min-w-0">
+          <h1 className="font-serif text-4xl font-semibold tracking-tight text-plum-900">{fullName(client)}</h1>
+          <p className="mt-1 text-ink-muted">{contact || "No contact details"}</p>
+        </div>
       </div>
 
       {client.allergies && (
-        <div role="note" aria-label="Allergies" className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800">
-          <p className="text-sm font-semibold">Allergies and sensitivities</p>
-          <p>{client.allergies}</p>
+        <div
+          role="note"
+          aria-label="Allergies"
+          className="mb-6 flex animate-fade-in gap-3 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-danger"
+        >
+          <span aria-hidden className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-danger font-bold text-white">
+            !
+          </span>
+          <div>
+            <p className="text-sm font-semibold">Allergies and sensitivities</p>
+            <p>{client.allergies}</p>
+          </div>
         </div>
       )}
 
-      <section aria-labelledby="formulas-heading" className="mb-8 rounded-xl border border-neutral-200 bg-white">
-        <h2 id="formulas-heading" className="border-b border-neutral-200 px-5 py-3 font-medium">
-          Color formulas <span className="text-neutral-500">({formulas.length})</span>
-        </h2>
+      <Card
+        titleId="formulas-heading"
+        title={
+          <>
+            Color formulas <span className="font-sans text-base font-normal text-ink-muted">({formulas.length})</span>
+          </>
+        }
+        flush
+      >
         <FormulaForm clientId={client.id} today={today} />
         {formulas.length === 0 ? (
-          <p className="px-5 py-4 text-sm text-neutral-500">No formulas yet.</p>
+          <EmptyState>No formulas yet.</EmptyState>
         ) : (
-          <ol className="divide-y divide-neutral-100" aria-label="Formula history">
+          <ol className={listClass} aria-label="Formula history">
             {formulas.map((f) => (
-              <li key={f.id} className="px-5 py-4">
-                <p className="text-sm text-neutral-500">
-                  {formatDate(f.visit_date)} · {f.author ? fullName(f.author) : "Unknown"}
+              <li key={f.id} className="animate-fade-in px-5 py-4">
+                <p className="flex flex-wrap items-center gap-x-2 text-sm text-ink-muted">
+                  <span className="font-semibold text-ink">{formatDate(f.visit_date)}</span>
+                  <span aria-hidden>·</span>
+                  {f.author ? fullName(f.author) : "Unknown"}
                 </p>
-                <p className="mt-1 whitespace-pre-line">{f.formula}</p>
-                {f.notes && <p className="mt-1 text-sm text-neutral-600">{f.notes}</p>}
+                <p className="mt-2 rounded-md border-l-4 border-peach-accent bg-peach-fill/40 px-3 py-2 font-mono text-sm whitespace-pre-line text-ink">
+                  {f.formula}
+                </p>
+                {f.notes && <p className="mt-2 text-sm text-ink-muted">{f.notes}</p>}
               </li>
             ))}
           </ol>
         )}
-      </section>
+      </Card>
 
-      <h2 className="mb-3 text-lg font-semibold">Details</h2>
+      <h2 className="mb-3 font-serif text-2xl font-semibold text-plum-900">Details</h2>
       {editable ? (
         <ClientForm
           key={client.updated_at}
@@ -98,30 +119,32 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
           today={today}
         />
       ) : (
-        <dl className="grid gap-x-6 gap-y-4 rounded-xl border border-neutral-200 bg-white p-5 sm:grid-cols-2">
-          <Detail label="Phone" value={client.phone} />
-          <Detail label="Email" value={client.email} />
-          <Detail
-            label="Preferred stylist"
-            value={client.preferred ? fullName(client.preferred) : null}
-            empty="No preference"
-          />
-          <Detail label="Preferences" value={client.preferences} />
-          <Detail label="Notes" value={client.notes} wide />
-          <Detail
-            label="Consent form"
-            value={client.consent_signed_on ? `Signed ${formatDate(client.consent_signed_on)}` : null}
-            empty="Not signed"
-          />
-          <Detail
-            label="Messages"
-            value={
-              [client.sms_opt_in && "Texts OK", client.email_opt_in && "Marketing emails OK"].filter(Boolean).join(" · ") ||
-              null
-            }
-            empty="No marketing"
-          />
-        </dl>
+        <Card>
+          <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+            <Detail label="Phone" value={client.phone} />
+            <Detail label="Email" value={client.email} />
+            <Detail
+              label="Preferred stylist"
+              value={client.preferred ? fullName(client.preferred) : null}
+              empty="No preference"
+            />
+            <Detail label="Preferences" value={client.preferences} />
+            <Detail label="Notes" value={client.notes} wide />
+            <Detail
+              label="Consent form"
+              value={client.consent_signed_on ? `Signed ${formatDate(client.consent_signed_on)}` : null}
+              empty="Not signed"
+            />
+            <Detail
+              label="Messages"
+              value={
+                [client.sms_opt_in && "Texts OK", client.email_opt_in && "Marketing emails OK"].filter(Boolean).join(" · ") ||
+                null
+              }
+              empty="No marketing"
+            />
+          </dl>
+        </Card>
       )}
     </AppShell>
   );
@@ -130,8 +153,8 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
 function Detail({ label, value, empty = "—", wide }: { label: string; value: string | null; empty?: string; wide?: boolean }) {
   return (
     <div className={wide ? "sm:col-span-2" : undefined}>
-      <dt className="text-sm text-neutral-500">{label}</dt>
-      <dd className={value ? "whitespace-pre-line" : "text-neutral-400"}>{value || empty}</dd>
+      <dt className="text-xs font-semibold tracking-wider text-ink-muted uppercase">{label}</dt>
+      <dd className={`mt-1 ${value ? "whitespace-pre-line text-ink" : "text-ink-muted"}`}>{value || empty}</dd>
     </div>
   );
 }

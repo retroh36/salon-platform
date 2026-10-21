@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
+import { Avatar } from "@/components/ui/avatar";
+import { Badge, listClass, PageHeader, rowClass, type Tone } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
-import { fullName, roleLabel, sortStaff } from "@/lib/staff";
+import { fullName, roleLabel, sortStaff, type StaffRole } from "@/lib/staff";
 
 export const metadata: Metadata = { title: "Dashboard · Salon Platform" };
+
+const ROLE_TONES: Record<StaffRole, Tone> = { owner: "plum", manager: "blue", front_desk: "green", stylist: "neutral" };
 
 // Per-user page: Dashboard renders at request time (createClient awaits
 // connection()), streaming in behind this boundary.
@@ -29,36 +33,34 @@ async function Dashboard() {
   if (error) throw error;
 
   return (
-    <AppShell section="dashboard" businessName={location.business?.name} userName={me.first_name}>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">{location.name}</h1>
-        <p className="text-sm text-neutral-500">
-          {[location.city, location.region].filter(Boolean).join(", ")} · {location.timezone}
-        </p>
-      </div>
+    <AppShell section="dashboard" me={me}>
+      <PageHeader
+        title={location.name}
+        description={
+          <>
+            {[location.city, location.region].filter(Boolean).join(", ")} · {location.timezone}
+          </>
+        }
+      />
 
-      <section className="rounded-xl border border-neutral-200 bg-white">
-        <h2 className="border-b border-neutral-200 px-4 py-3 font-medium">
-          Staff <span className="text-neutral-500">({staff.length})</span>
+      <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
+        <h2 className="border-b border-line px-5 py-3.5 font-serif text-lg font-semibold text-ink">
+          Staff <span className="font-sans text-sm font-medium text-ink-muted">({staff.length})</span>
         </h2>
-        <ul className="divide-y divide-neutral-100">
+        <ul className={listClass}>
           {sortStaff(staff).map((member) => (
-            <li key={member.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
-              <span
-                aria-hidden
-                className="size-3 shrink-0 rounded-full bg-neutral-300"
-                style={member.color ? { backgroundColor: member.color } : undefined}
-              />
-              <span className="min-w-40 font-medium">
+            <li key={member.id} className={`flex flex-wrap items-center gap-x-4 gap-y-1 hover:bg-sunken/60 ${rowClass}`}>
+              <Avatar name={fullName(member)} color={member.color} />
+              <span className="min-w-44 font-semibold text-ink">
                 {fullName(member)}
-                {member.id === me.id && <span className="ml-2 text-xs text-neutral-500">(you)</span>}
+                {member.id === me.id && <span className="ml-2 text-xs font-normal text-ink-muted">(you)</span>}
               </span>
-              <span className="w-24 text-sm text-neutral-600">{roleLabel(member.role)}</span>
-              <span className="text-sm text-neutral-500">{member.email}</span>
-              <span className="text-sm text-neutral-500">{member.phone}</span>
-              {!member.is_active && (
-                <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">Inactive</span>
-              )}
+              <Badge tone={ROLE_TONES[member.role]} className="w-24 justify-center">
+                {roleLabel(member.role)}
+              </Badge>
+              <span className="text-sm text-ink-muted">{member.email}</span>
+              <span className="text-sm text-ink-muted">{member.phone}</span>
+              {!member.is_active && <Badge tone="neutral">Inactive</Badge>}
             </li>
           ))}
         </ul>

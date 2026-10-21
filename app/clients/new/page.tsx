@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
+import { PageHeader } from "@/components/ui/page";
+import { BackLink } from "../back-link";
 import { getCurrentStaff } from "@/lib/auth";
 import { canEditClients } from "@/lib/clients";
 import { todayIn } from "@/lib/scheduling/time";
@@ -41,11 +42,9 @@ async function NewClient() {
   if (!canEditClients(me.role)) redirect("/clients");
 
   return (
-    <AppShell section="clients" businessName={me.location.business?.name} userName={me.first_name}>
-      <Link href="/clients" className="text-sm text-neutral-500 hover:text-neutral-900">
-        ← Clients
-      </Link>
-      <h1 className="mt-2 mb-6 text-2xl font-semibold">Add client</h1>
+    <AppShell section="clients" me={me}>
+      <BackLink href="/clients">Clients</BackLink>
+      <PageHeader title="Add client" description="Name and a way to reach them are enough to start; the rest can come later." />
       <ClientForm initial={EMPTY} stylists={await stylistOptions(supabase)} today={todayIn(me.location.timezone)} />
     </AppShell>
   );

@@ -2,6 +2,9 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Field, inputClass, submitWithoutReset } from "@/components/form";
+import { buttonClass } from "@/components/ui/button";
+import { Alert } from "@/components/ui/page";
+import { SavedNote } from "./saved-note";
 import { saveDayChange } from "./actions";
 
 // One-off hours for a single date (e.g. a late shift), replacing the weekly hours.
@@ -31,15 +34,13 @@ export function DayChangeForm({ staffId, today }: { staffId: string; today: stri
       noValidate
     >
       {state?.message && !state.saved && (
-        <p role="alert" className="w-full rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {state.message}
-        </p>
+        <Alert className="w-full">{state.message}</Alert>
       )}
       <Field label="Date" error={errors.date}>
         <input name="on_date" type="date" min={today} defaultValue={today} className={inputClass} />
       </Field>
       {rows.map((row, i) => (
-        <div key={i} className="flex items-end gap-2">
+        <div key={i} className="flex animate-fade-in items-end gap-2">
           <Field label={i === 0 ? "From" : `From (${i + 1})`}>
             <input
               name="start_day"
@@ -47,7 +48,7 @@ export function DayChangeForm({ staffId, today }: { staffId: string; today: stri
               step={300}
               value={row.start}
               onChange={(e) => setRows((r) => r.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)))}
-              className={`${inputClass} w-32`}
+              className={`${inputClass} w-36!`}
             />
           </Field>
           <Field label={i === 0 ? "To" : `To (${i + 1})`}>
@@ -57,7 +58,7 @@ export function DayChangeForm({ staffId, today }: { staffId: string; today: stri
               step={300}
               value={row.end}
               onChange={(e) => setRows((r) => r.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)))}
-              className={`${inputClass} w-32`}
+              className={`${inputClass} w-36!`}
             />
           </Field>
         </div>
@@ -65,23 +66,19 @@ export function DayChangeForm({ staffId, today }: { staffId: string; today: stri
       <button
         type="button"
         onClick={() => setRows((r) => [...r, { start: r.at(-1)?.end ?? "", end: "" }])}
-        className="rounded-md border border-neutral-300 px-3 py-2 text-sm hover:bg-neutral-100"
+        className={buttonClass("secondary", "md")}
       >
         Add split
       </button>
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-60"
+        className={buttonClass("primary", "md")}
       >
         {pending ? "Saving…" : "Save change"}
       </button>
-      {errors.hours && <p className="w-full text-sm text-red-600">{errors.hours}</p>}
-      {state?.saved && (
-        <span role="status" className="text-sm text-green-700">
-          Saved.
-        </span>
-      )}
+      {errors.hours && <p className="w-full animate-fade-in text-sm text-danger">{errors.hours}</p>}
+      {state?.saved && <SavedNote>Saved.</SavedNote>}
     </form>
   );
 }

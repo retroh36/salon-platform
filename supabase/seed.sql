@@ -623,15 +623,24 @@ begin
 end;
 $$;
 
+-- Who booked it: the front desk (Sam), the manager (Daniel) or the owner
+-- (Olivia) take in-person and phone bookings; online bookings are made by
+-- the client, so have no staff member. Booked one to three weeks ahead.
 create function pg_temp.new_appointment(p_client uuid, s timestamptz, e timestamptz, key text) returns uuid
 language sql as $$
-  insert into public.appointments (business_id, location_id, client_id, starts_at, ends_at, source, created_by)
+  insert into public.appointments (business_id, location_id, client_id, starts_at, ends_at, source, created_by, updated_by, created_at)
   select 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', p_client, s, e,
-         src::public.appointment_source,
-         case when src in ('front_desk', 'phone') then 'd0000000-0000-4000-8000-000000000003'::uuid end
+         src::public.appointment_source, booker, booker,
+         least(s - make_interval(days => 1 + pg_temp.rnd(key || ':ahead') % 20, mins => pg_temp.rnd(key || ':at') % 600), now())
   from (select case when pg_temp.rnd(key || ':src') % 100 < 45 then 'front_desk'
                     when pg_temp.rnd(key || ':src') % 100 < 80 then 'online'
                     else 'phone' end as src) x
+  cross join lateral (select case
+      when x.src = 'online' then null
+      when pg_temp.rnd(key || ':by') % 10 < 7 then 'd0000000-0000-4000-8000-000000000003'::uuid -- Sam
+      when pg_temp.rnd(key || ':by') % 10 < 9 then 'd0000000-0000-4000-8000-000000000002'::uuid -- Daniel
+      else 'd0000000-0000-4000-8000-000000000001'::uuid -- Olivia
+    end as booker) b
   returning id
 $$;
 
@@ -776,11 +785,29 @@ $$;
 
 -- Statuses: past visits completed (a few no-shows), today's in progress or
 -- done, upcoming ones booked or confirmed. Some, past and future, canceled.
+-- (Set updated_at by hand to when each change happened, rather than the
+-- reset time.)
+alter table public.appointments disable trigger appointments_set_updated_at;
+
 update public.appointments a
 set status = x.status,
     canceled_at = case when x.status = 'canceled' then least(a.starts_at - interval '1 day', now()) end,
     cancel_reason = case when x.status = 'canceled'
-      then (array['Client canceled', 'Client rescheduled', 'Client is sick', 'Stylist unavailable'])[pg_temp.rnd(a.id::text || ':why') % 4 + 1] end
+      then (array['Client canceled', 'Client rescheduled', 'Client is sick', 'Stylist unavailable'])[pg_temp.rnd(a.id::text || ':why') % 4 + 1] end,
+    -- The front desk checks clients in and out and marks no-shows; online
+    -- bookings canceled online have no staff member.
+    updated_by = case
+      when x.status in ('checked_in', 'completed', 'no_show') then 'd0000000-0000-4000-8000-000000000003'::uuid
+      when x.status = 'canceled' and a.source <> 'online' then 'd0000000-0000-4000-8000-000000000003'::uuid
+      else a.created_by
+    end,
+    updated_at = case x.status
+      when 'completed' then least(a.ends_at, now())
+      when 'no_show' then least(a.starts_at + interval '20 minutes', now())
+      when 'checked_in' then least(a.starts_at, now())
+      when 'canceled' then least(a.starts_at - interval '1 day', now())
+      else a.created_at
+    end
 from (
   select id, case
       when pg_temp.rnd(id::text || ':cancel') % 100 < 5 then 'canceled'
@@ -794,3 +821,8 @@ from (
   where business_id = 'b0000000-0000-4000-8000-000000000001'
 ) x
 where a.id = x.id;
+
+-- Canceled bookings made the day before can be after they were booked.
+update public.appointments set updated_at = greatest(updated_at, created_at) where business_id = 'b0000000-0000-4000-8000-000000000001';
+
+alter table public.appointments enable trigger appointments_set_updated_at;
