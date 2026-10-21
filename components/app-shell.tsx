@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { logout } from "@/app/login/actions";
 
-type Section = "dashboard" | "services";
+type Section = "dashboard" | "clients" | "services";
 
 const NAV: { section: Section; href: string; label: string }[] = [
   { section: "dashboard", href: "/dashboard", label: "Dashboard" },
+  { section: "clients", href: "/clients", label: "Clients" },
   { section: "services", href: "/services", label: "Services" },
 ];
 

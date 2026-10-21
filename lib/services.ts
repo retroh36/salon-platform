@@ -7,10 +7,6 @@ const CATEGORY_ORDER = ["Cuts", "Color", "Highlights", "Balayage", "Blowouts & S
 
 export const MAX_MINUTES = 8 * 60;
 
-export function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-}
-
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 // "$85" for whole dollars, "$85.50" otherwise.

@@ -37,6 +37,64 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"client_formulas": {
+                  Row: {
+                    "business_id": string,"client_id": string,"created_at": string,"formula": string,"id": string,"notes": string | null,"staff_id": string,"visit_date": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"client_id": string,"created_at"?: string,"formula": string,"id"?: string,"notes"?: string | null,"staff_id": string,"visit_date"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"client_id"?: string,"created_at"?: string,"formula"?: string,"id"?: string,"notes"?: string | null,"staff_id"?: string,"visit_date"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "client_formulas_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_formulas_client_id_business_id_fkey"
+      columns: ["client_id","business_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "client_formulas_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"clients": {
+                  Row: {
+                    "allergies": string | null,"business_id": string,"consent_signed_on": string | null,"created_at": string,"email": string | null,"email_opt_in": boolean,"first_name": string,"id": string,"last_name": string,"notes": string | null,"phone": string | null,"phone_digits": string | null,"preferences": string | null,"preferred_staff_id": string | null,"search_name": string | null,"sms_opt_in": boolean,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "allergies"?: string | null,"business_id": string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"first_name": string,"id"?: string,"last_name"?: string,"notes"?: string | null,"phone"?: string | null,"phone_digits"?: never,"preferences"?: string | null,"preferred_staff_id"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"updated_at"?: string
+                  }
+                  Update: {
+                    "allergies"?: string | null,"business_id"?: string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"first_name"?: string,"id"?: string,"last_name"?: string,"notes"?: string | null,"phone"?: string | null,"phone_digits"?: never,"preferences"?: string | null,"preferred_staff_id"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "clients_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "clients_preferred_staff_id_business_id_fkey"
+      columns: ["preferred_staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"locations": {
                   Row: {
                     "address_line1": string | null,"address_line2": string | null,"business_id": string,"city": string | null,"country": string,"created_at": string,"hours": NonNullable<Json>,"id": string,"name": string,"phone": string | null,"postal_code": string | null,"region": string | null,"timezone": string,"updated_at": string

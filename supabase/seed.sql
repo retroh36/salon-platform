@@ -214,3 +214,138 @@ from public.services sv
 where sv.id = ss.service_id
   and ss.staff_id = 'd0000000-0000-4000-8000-000000000009'
   and sv.price_cents > 0;
+
+-- ---------------------------------------------------------------------------
+-- Clients (500). Deterministic: values are picked by hashing the row number,
+-- so every reset gives the same clients. Phone numbers use the 555-0100 to
+-- 555-0199 range reserved for fiction; emails use example.com.
+-- ---------------------------------------------------------------------------
+
+with
+first_names (a) as (select array[
+  'Emma','Olivia','Ava','Sophia','Isabella','Mia','Charlotte','Amelia','Harper','Evelyn',
+  'Abigail','Emily','Ella','Elizabeth','Camila','Luna','Sofia','Avery','Mila','Aria',
+  'Scarlett','Penelope','Layla','Chloe','Victoria','Madison','Eleanor','Grace','Nora','Riley',
+  'Zoey','Hannah','Hazel','Lily','Ellie','Violet','Lillian','Zoe','Stella','Aurora',
+  'Natalie','Emilia','Everly','Leah','Aubrey','Willow','Addison','Lucy','Audrey','Bella',
+  'Liam','Noah','Oliver','Elijah','James','William','Benjamin','Lucas','Henry','Theodore',
+  'Mateo','Daniel','Michael','Jackson','Sebastian','Aiden','Samuel','Jayden','Carter','Wyatt',
+  'Maya','Priyanka','Aisha','Fatima','Mei','Yuki','Ananya','Leilani','Ximena','Valentina'
+]),
+last_names (a) as (select array[
+  'Smith','Johnson','Williams','Brown','Jones','Garcia','Miller','Davis','Rodriguez','Martinez',
+  'Hernandez','Lopez','Gonzalez','Wilson','Anderson','Thomas','Taylor','Moore','Jackson','Martin',
+  'Lee','Perez','Thompson','White','Harris','Sanchez','Clark','Ramirez','Lewis','Robinson',
+  'Walker','Young','Allen','King','Wright','Scott','Torres','Nguyen','Hill','Flores',
+  'Green','Adams','Nelson','Baker','Hall','Rivera','Campbell','Mitchell','Carter','Roberts',
+  'Patel','Kim','Chen','Singh','Okafor','Kowalski','Novak','Haddad','Yamamoto','O''Brien'
+]),
+area_codes (a) as (select array['312', '773', '630', '708', '847']),
+preferences (a) as (select array[
+  'Prefers a quiet appointment.', 'Likes sparkling water.', 'Morning appointments only.',
+  'Sensitive scalp; gentle shampoo.', 'Prefers text reminders over calls.', 'Likes to chat; ask about her dogs.',
+  'Runs late often; book a 10-minute buffer.', 'Wants low-maintenance styles.', 'Always books the next visit at checkout.',
+  'Prefers fragrance-free products.', 'Saturday appointments only.', 'Likes a scalp massage during the wash.'
+]),
+notes (a) as (select array[
+  'Referred by a friend.', 'Wedding in June; plan a trial in April.', 'Growing out bangs.',
+  'Moving to blonde gradually over several visits.', 'Uses a sulfate-free shampoo at home.',
+  'Swims regularly; recommend a clarifying treatment.', 'Hair is fine and breaks easily; avoid high heat.',
+  'Interested in a keratin smoothing treatment.', 'Gift card holder.', 'Bought a Bond Repair kit last visit.'
+]),
+allergies (a) as (select array[
+  'PPD sensitivity: patch test 48 hours before any color.', 'Latex allergy: use nitrile gloves.',
+  'Fragrance sensitivity.', 'Nickel allergy: avoid metal clips.', 'Reacted to ammonia color in the past.',
+  'Eczema on scalp; avoid harsh products.'
+]),
+stylists (a) as (select array[
+  'd0000000-0000-4000-8000-000000000004', 'd0000000-0000-4000-8000-000000000005',
+  'd0000000-0000-4000-8000-000000000006', 'd0000000-0000-4000-8000-000000000007',
+  'd0000000-0000-4000-8000-000000000008', 'd0000000-0000-4000-8000-000000000009'
+]::uuid[]),
+rows as (
+  select
+    i,
+    -- Stable pseudo-random number 0..9999 per row and purpose.
+    (abs(hashtext('client' || i || ':' || p)) % 10000) as h,
+    p
+  from generate_series(0, 499) as i, unnest(array['first','last','email','phone','pref','prefv','note','notev','allergy','allergyv','stylist','stylistv','consent','consentd','sms','mail','created']) as p
+),
+r as (
+  select i, jsonb_object_agg(p, h) as h from rows group by i
+)
+insert into public.clients (
+  id, business_id, first_name, last_name, email, phone, preferred_staff_id, preferences, notes, allergies,
+  sms_opt_in, email_opt_in, consent_signed_on, created_at
+)
+select
+  ('e0000000-0000-4000-8000-' || lpad(to_hex(r.i), 12, '0'))::uuid,
+  'b0000000-0000-4000-8000-000000000001',
+  f.first_name,
+  l.last_name,
+  case when (r.h->>'email')::int % 100 < 80
+    then lower(regexp_replace(f.first_name || '.' || l.last_name, '[^A-Za-z.]', '', 'g')) || r.i || '@example.com' end,
+  case when (r.h->>'phone')::int % 100 < 95
+    then '(' || (select a from area_codes)[r.i / 100 + 1] || ') 555-01' || lpad((r.i % 100)::text, 2, '0') end,
+  case when (r.h->>'stylist')::int % 100 < 50
+    then (select a from stylists)[(r.h->>'stylistv')::int % 6 + 1] end,
+  case when (r.h->>'pref')::int % 100 < 40
+    then (select a from preferences)[(r.h->>'prefv')::int % 12 + 1] end,
+  case when (r.h->>'note')::int % 100 < 30
+    then (select a from notes)[(r.h->>'notev')::int % 10 + 1] end,
+  case when (r.h->>'allergy')::int % 100 < 8
+    then (select a from allergies)[(r.h->>'allergyv')::int % 6 + 1] end,
+  (r.h->>'sms')::int % 100 < 70,
+  (r.h->>'mail')::int % 100 < 55,
+  case when (r.h->>'consent')::int % 100 < 60
+    then current_date - ((r.h->>'consentd')::int % 700) end,
+  now() - make_interval(days => (r.h->>'created')::int % 1000)
+from r
+cross join lateral (select (select a from first_names)[(r.h->>'first')::int % 80 + 1] as first_name) f
+cross join lateral (select (select a from last_names)[(r.h->>'last')::int % 60 + 1] as last_name) l;
+
+-- ---------------------------------------------------------------------------
+-- Color formula history for about a third of clients, written by the
+-- colorists (Priya, Sofia, Marcus), roughly every 6 to 8 weeks.
+-- ---------------------------------------------------------------------------
+
+with
+formulas (a) as (select array[
+  'Roots: Redken Shades EQ 6N + 6NB (1:1), 20 vol, 35 min.',
+  'All over: Wella Koleston 7/0 + 7/1 (2:1), 20 vol, 35 min. Gloss ends: Shades EQ 09V, 20 min.',
+  'Partial foils: Blondor + 20 vol, 40 min. Tone: Shades EQ 09T + 09V (1:1), 20 min.',
+  'Balayage: Lightener + 20 vol, open-air 45 min. Root smudge: Shades EQ 07N, 15 min.',
+  'Gray blending: Goldwell Topchic 6NN + 7NN (1:1), 20 vol, 30 min.',
+  'Gloss: Shades EQ 08GI, processing solution, 20 min.',
+  'Full highlights: Blondor + 30 vol, 40 min. Tone: Wella T18, 15 min.',
+  'Lowlights: Shades EQ 06NB, 20 min, in alternating foils.',
+  'Vivid: Pre-lighten to level 9. Pulp Riot Mercury + Clear (1:3), 25 min.',
+  'Root touch-up: L''Oréal Majirel 5.0 + 6.3 (1:1), 20 vol, 35 min.',
+  'Face frame: Blondor + 20 vol, 35 min. Toner: Shades EQ 010P, 15 min.',
+  'Bond repair added to lightener (Olaplex No.1). Gloss: Shades EQ 09N, 20 min.'
+]),
+form_notes (a) as (select array[
+  null, null, null, 'Lifted fast; check at 30 minutes next time.', 'Client wants it a touch cooler next visit.',
+  'Patch test done; no reaction.', 'Used extra toner on the crown.', 'Happy with result.'
+]),
+colorists (a) as (select array[
+  'd0000000-0000-4000-8000-000000000004', 'd0000000-0000-4000-8000-000000000008',
+  'd0000000-0000-4000-8000-000000000005'
+]::uuid[]),
+color_clients as (
+  select c.id, abs(hashtext('formula' || c.id)) as h
+  from public.clients c
+  where c.business_id = 'b0000000-0000-4000-8000-000000000001'
+    and abs(hashtext('has-formula' || c.id)) % 100 < 35
+)
+insert into public.client_formulas (business_id, client_id, staff_id, visit_date, formula, notes, created_at)
+select
+  'b0000000-0000-4000-8000-000000000001',
+  cc.id,
+  (select a from colorists)[(cc.h + n) % 3 + 1],
+  current_date - (n * (42 + cc.h % 15) + cc.h % 20),
+  (select a from formulas)[(cc.h / 7 + n * 5) % 12 + 1],
+  (select a from form_notes)[(cc.h / 3 + n) % 8 + 1],
+  now() - make_interval(days => n * (42 + cc.h % 15) + cc.h % 20)
+from color_clients cc
+cross join lateral generate_series(0, cc.h % 5) as n;

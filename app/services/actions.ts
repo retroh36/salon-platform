@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canManage, getCurrentStaff } from "@/lib/auth";
-import { isUuid, parseServiceForm, type ServiceFormErrors } from "@/lib/services";
+import { isUuid } from "@/lib/ids";
+import { parseServiceForm, type ServiceFormErrors } from "@/lib/services";
 
 export type ServiceFormFields = {
   name: string;

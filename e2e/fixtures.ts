@@ -5,6 +5,7 @@ export const PASSWORD = "password123";
 // Saved sign-ins, created by auth.setup.ts.
 export const AUTH = {
   owner: "e2e/.auth/owner.json",
+  frontDesk: "e2e/.auth/front-desk.json",
   stylist: "e2e/.auth/stylist.json",
 };
 
