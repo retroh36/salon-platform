@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import { isUuid, parseServiceForm, type ServiceFormErrors } from "@/lib/services";
@@ -67,6 +68,7 @@ export async function saveService(_prev: SaveServiceState, formData: FormData): 
     throw error;
   }
 
+  invalidateServicePages();
   redirect("/services");
 }
 
@@ -85,7 +87,14 @@ export async function setServiceArchived(serviceId: string, archived: boolean) {
   if (error) throw error;
   if (data.length === 0) redirect("/services");
 
+  invalidateServicePages();
   redirect(archived ? "/services" : `/services/${serviceId}`);
+}
+
+// The browser keeps visited pages (and Next.js keeps hidden ones mounted), so
+// without this, going back to a service after a change shows the old version.
+function invalidateServicePages() {
+  revalidatePath("/services", "layout");
 }
 
 function readFields(formData: FormData): ServiceFormFields {
