@@ -28,9 +28,13 @@ Business → Location → Staff, Resource; Service, StaffService; Client; Appoin
 - Prefer simple, readable code over clever code. Ask before adding a new dependency.
 
 ## Commands
+- `colima start` — start the Docker runtime that local Supabase needs (stop with `colima stop`)
+- `npx supabase start` — start local Supabase (database, auth, Studio at http://127.0.0.1:54323)
 - `npm run dev` — local app
-- `npm run lint` / `npm run typecheck` / `npm test`
+- `npm run lint` / `npm run typecheck` / `npm test` — unit tests, no database needed
+- `npm run test:db` — RLS and database tests; needs local Supabase running with the seed loaded
 - `npx supabase db reset` — rebuild local database from migrations + seed
+- `npm run db:types` — regenerate `lib/database.types.ts` after a migration
 
 ## Current phase
 Phase 1 — Foundation: auth, business/location setup, staff (with schedules and skills), services, clients. Phorest import comes at the end of phase 1.
