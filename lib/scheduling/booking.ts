@@ -120,7 +120,8 @@ export type BookingProblem =
   | { code: "unknown_resource" }
   | { code: "resource_inactive" }
   | { code: "resource_in_use"; conflictWith?: string }
-  | { code: "no_free_resource" };
+  | { code: "no_free_resource" }
+  | { code: "not_booked" };
 
 export type ItemCheck = { valid: true; item: BookedItem } | { valid: false; problems: BookingProblem[] };
 
@@ -246,6 +247,31 @@ export function checkAppointment(
   return { valid: items.length > 0 && items.every((c) => c.valid), items };
 }
 
+export type MoveRequest = { itemId: string; staffId: string; resourceId: string | null; start: Date };
+
+// Checks moving several booked items at once (e.g. a fix that shifts two
+// clients): each keeps its booked timing and is checked in its new place
+// against the calendar without the moved items' old places, and against the
+// moves before it. One list of problems per move, empty when it's fine.
+export function checkMoves(ctx: BookingContext, moves: readonly MoveRequest[]): { valid: boolean; problems: BookingProblem[][] } {
+  const ids = new Set(moves.map((m) => m.itemId));
+  const calendar = { ...ctx, booked: ctx.booked.filter((b) => !b.id || !ids.has(b.id)) };
+  const accepted: BookedItem[] = [];
+  const problems = moves.map((m): BookingProblem[] => {
+    const old = ctx.booked.find((b) => b.id === m.itemId);
+    if (!old) return [{ code: "not_booked" }];
+    const check = checkItem(
+      calendar,
+      { id: m.itemId, serviceId: old.serviceId, staffId: m.staffId, resourceId: m.resourceId, start: m.start, timing: old },
+      accepted,
+    );
+    if (!check.valid) return check.problems;
+    accepted.push({ ...check.item, appointmentId: old.appointmentId });
+    return [];
+  });
+  return { valid: problems.every((p) => p.length === 0), problems };
+}
+
 const UNAVAILABLE_MESSAGES: Record<Unavailable, string> = {
   location_closed: "The salon is closed for part of this time.",
   not_working: "The stylist isn't working for all of this time.",
@@ -281,5 +307,7 @@ export function describeProblem(problem: BookingProblem): string {
       return "That chair or room is already in use then.";
     case "no_free_resource":
       return "Every chair is in use then.";
+    case "not_booked":
+      return "That appointment is no longer on the calendar.";
   }
 }

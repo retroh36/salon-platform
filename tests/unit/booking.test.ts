@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   checkAppointment,
   checkItem,
+  checkMoves,
   describeProblem,
   fromLocal,
   itemEnd,
@@ -440,6 +441,50 @@ describe("appointments with several items", () => {
   });
 });
 
+describe("moving several items at once", () => {
+  const move = (itemId: string, staffId: string, time: string, resourceId: string | null = null) => ({ itemId, staffId, resourceId, start: at(time) });
+
+  it("checks each move without the moved items' old places", () => {
+    // Two back-to-back cuts with Priya, both shifted 30 minutes: the first
+    // lands where the second was.
+    const ctx = context({ booked: [booked("a", CUT, "priya", "10:00"), booked("b", CUT, "priya", "11:00")] });
+    expect(checkMoves(ctx, [move("a", "priya", "10:30"), move("b", "priya", "11:30")])).toEqual({ valid: true, problems: [[], []] });
+  });
+
+  it("checks the moves against each other", () => {
+    const ctx = context({ booked: [booked("a", CUT, "priya", "10:00"), booked("b", CUT, "priya", "11:00")] });
+    const result = checkMoves(ctx, [move("a", "priya", "11:30"), move("b", "priya", "12:00")]);
+    expect(result.valid).toBe(false);
+    expect(result.problems).toEqual([[], [{ code: "staff_double_booked", conflictWith: "a" }]]);
+  });
+
+  it("checks against items that stay, chairs, and the new stylist's hours and services", () => {
+    const ctx = context({ booked: [booked("a", CUT, "priya", "10:00", "chair-1"), booked("c", CUT, "ethan", "12:00", "chair-2")] });
+    expect(checkMoves(ctx, [move("a", "ethan", "11:30")]).problems).toEqual([[{ code: "staff_double_booked", conflictWith: "c" }]]);
+    expect(checkMoves(ctx, [move("a", "priya", "12:30", "chair-2")]).problems[0].map((p) => p.code)).toEqual(["staff_unavailable", "resource_in_use"]);
+    const color = context({ booked: [booked("k", COLOR, "priya", "10:00")] });
+    expect(checkMoves(color, [move("k", "ethan", "10:00")]).problems).toEqual([[{ code: "service_not_offered" }]]);
+  });
+
+  it("keeps each item's booked timing", () => {
+    // Booked when the cut was 30 minutes; the menu now says 60.
+    const short = { ...booked("a", CUT, "priya", "10:00"), activeMinutes: 30 };
+    const ctx = context({ booked: [short, booked("b", CUT, "priya", "11:00")] });
+    expect(checkMoves(ctx, [move("a", "priya", "10:30")]).valid).toBe(true);
+  });
+
+  it("uses processing gaps", () => {
+    const ctx = context({ booked: [booked("k", COLOR, "priya", "10:00"), booked("m", MENS_CUT, "priya", "15:00")] });
+    // Priya is free 10:45-11:20 while the color processes.
+    expect(checkMoves(ctx, [move("m", "priya", "10:45")]).valid).toBe(true);
+    expect(checkMoves(ctx, [move("m", "priya", "10:55")]).valid).toBe(false);
+  });
+
+  it("reports items that aren't on the calendar", () => {
+    expect(checkMoves(context(), [move("gone", "priya", "10:00")]).problems).toEqual([[{ code: "not_booked" }]]);
+  });
+});
+
 describe("messages", () => {
   it("describes every problem", () => {
     const all: BookingProblem[] = [
@@ -459,6 +504,7 @@ describe("messages", () => {
       { code: "resource_inactive" },
       { code: "resource_in_use" },
       { code: "no_free_resource" },
+      { code: "not_booked" },
     ];
     const messages = all.map(describeProblem);
     expect(new Set(messages).size).toBe(all.length);

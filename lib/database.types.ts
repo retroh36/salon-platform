@@ -23,7 +23,51 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "appointment_items": {
+            "ai_actions": {
+                  Row: {
+                    "business_id": string,"created_at": string,"decided_at": string | null,"decided_by": string | null,"feature": string,"id": string,"location_id": string,"previous_state": Json | null,"proposal": NonNullable<Json>,"proposed_by": string | null,"rank": number,"reason": string,"status": Database["public"]['Enums']["ai_action_status"],"subject": string | null,"summary": string,"undone_at": string | null,"undone_by": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"feature": string,"id"?: string,"location_id": string,"previous_state"?: Json | null,"proposal": NonNullable<Json>,"proposed_by"?: string | null,"rank"?: number,"reason": string,"status"?: Database["public"]['Enums']["ai_action_status"],"subject"?: string | null,"summary": string,"undone_at"?: string | null,"undone_by"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"feature"?: string,"id"?: string,"location_id"?: string,"previous_state"?: Json | null,"proposal"?: NonNullable<Json>,"proposed_by"?: string | null,"rank"?: number,"reason"?: string,"status"?: Database["public"]['Enums']["ai_action_status"],"subject"?: string | null,"summary"?: string,"undone_at"?: string | null,"undone_by"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ai_actions_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "ai_actions_decided_by_business_id_fkey"
+      columns: ["decided_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "ai_actions_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "ai_actions_proposed_by_business_id_fkey"
+      columns: ["proposed_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "ai_actions_undone_by_business_id_fkey"
+      columns: ["undone_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"appointment_items": {
                   Row: {
                     "active_minutes": number,"appointment_id": string,"business_id": string,"created_at": string,"ends_at": string,"finishing_minutes": number,"id": string,"location_id": string,"price_cents": number,"processing_minutes": number,"resource_id": string | null,"service_id": string,"staff_id": string,"starts_at": string,"updated_at": string
                   }
@@ -445,7 +489,16 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "save_appointment":
+            "apply_ai_action":
+{ Args: { "p_action_id": string,"p_client_id"?: string,"p_expected_version": number }; Returns: undefined
+                           },
+"record_ai_proposals":
+{ Args: { "p_feature": string,"p_location_id": string,"p_options": Json,"p_subject": string }; Returns: (string)[]
+                           },
+"reject_ai_action":
+{ Args: { "p_action_id": string }; Returns: undefined
+                           },
+"save_appointment":
 { Args: { "p_appointment_id": string,"p_client_id": string,"p_expected_version": number,"p_items": Json,"p_location_id": string,"p_notes": string }; Returns: string
                            },
 "save_service":
@@ -465,10 +518,13 @@ isOneToOne: false
                            },
 "set_staff_weekly_hours":
 { Args: { "p_business_id": string,"p_hours": Json,"p_staff_id": string }; Returns: undefined
+                           },
+"undo_ai_action":
+{ Args: { "p_action_id": string,"p_expected_version": number }; Returns: undefined
                            }
           }
           Enums: {
-            "appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","resource_kind": "chair"|"room"|"station","staff_level": "junior"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined"
+            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","resource_kind": "chair"|"room"|"station","staff_level": "junior"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -588,7 +644,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"resource_kind": ["chair", "room", "station"],"staff_level": ["junior", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"]
+            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"resource_kind": ["chair", "room", "station"],"staff_level": ["junior", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"]
           }
         }
 } as const
