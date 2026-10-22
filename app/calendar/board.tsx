@@ -109,6 +109,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const [department, setDepartment] = useState<"all" | ServiceFamily>("all");
   const [notice, setNotice] = useState<string | null>(null);
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
+  // The tooltip for a short block: its details and where it is.
+  const [hint, setHint] = useState<{ id: string; details: string[]; rect: DOMRect } | null>(null);
   // A drag of a repeating visit, waiting for "this / following / all".
   const [pendingMove, setPendingMove] = useState<{ move: Move; block: BlockData } | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -652,9 +654,14 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                               selected={b.appointmentId === selectedAppointment}
                               highlight={highlighted.has(b.itemId)}
                               grouped={!!selectedGroup && b.group?.id === selectedGroup && b.appointmentId !== selectedAppointment}
+                              stylist={data.columns.find((c) => c.staffId === b.staffId)?.name ?? ""}
+                              onHint={(details, rect) => setHint(details && !dragRef.current ? { id: b.itemId, details, rect } : null)}
                               settling={settling === b.itemId}
                               onSettled={() => setSettling(null)}
-                              onPointerDown={(e) => onPointerDown(e, b)}
+                              onPointerDown={(e) => {
+                                setHint(null);
+                                onPointerDown(e, b);
+                              }}
                               onPointerMove={onPointerMove}
                               onPointerUp={(e) => onPointerUp(e, b)}
                               onPointerCancel={() => {
@@ -682,8 +689,23 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           </div>
         </ViewTransition>
 
-        <Legend />
+        {/* The legend, with Denise's face at the end of it while her panel
+            is closed (so she never sits on top of the calendar). */}
+        <div className="flex items-center gap-4">
+          <Legend />
+          <DeniseLauncher
+            hidden={panelOpen}
+            count={attention}
+            bounce={unseen.size > 0}
+            onOpen={() => {
+              setTab("denise");
+              setPanelOpen(true);
+            }}
+          />
+        </div>
       </div>
+
+      {hint && <BlockHint {...hint} />}
 
       {/* Denise and booking details: a panel that slides over the calendar
           when something opens it. */}
@@ -833,16 +855,6 @@ export function CalendarBoard({ data }: { data: BoardData }) {
         />
       )}
 
-      {!panelOpen && (
-        <DeniseLauncher
-          count={attention}
-          bounce={unseen.size > 0}
-          onOpen={() => {
-            setTab("denise");
-            setPanelOpen(true);
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -960,16 +972,17 @@ function ScopeDialog({
 
 // Denise's face in the corner while her panel is closed. Her badge counts
 // what she wants looked at, and bounces gently when something is new.
-function DeniseLauncher({ count, bounce, onOpen }: { count: number; bounce: boolean; onOpen: () => void }) {
+function DeniseLauncher({ hidden, count, bounce, onOpen }: { hidden: boolean; count: number; bounce: boolean; onOpen: () => void }) {
+  if (hidden) return null;
   return (
     <button
       type="button"
       onClick={onOpen}
       aria-label={count ? `Open Denise (${count} to look at)` : "Open Denise"}
       data-testid="denise-launcher"
-      className="fixed right-5 bottom-5 z-40 flex size-14 animate-pop-in items-center justify-center rounded-full bg-surface shadow-lift ring-1 ring-denise-200 transition-transform duration-(--motion-fast) hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:scale-95"
+      className="relative ml-auto flex size-11 shrink-0 animate-pop-in items-center justify-center rounded-full bg-surface shadow-card ring-1 ring-denise-200 transition-transform duration-(--motion-fast) hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:scale-95"
     >
-      <DeniseFace size={48} />
+      <DeniseFace size={38} />
       {count > 0 && (
         <span
           data-testid="denise-launcher-badge"
@@ -981,6 +994,26 @@ function DeniseLauncher({ count, bounce, onOpen }: { count: number; bounce: bool
         </span>
       )}
     </button>
+  );
+}
+
+// A short block's details, beside it on hover or focus: fixed to the
+// window, so the calendar's scrolling and clipping don't cut it off.
+function BlockHint({ id, details, rect }: { id: string; details: string[]; rect: DOMRect }) {
+  const above = rect.top > 120;
+  return (
+    <div
+      id={`hint-${id}`}
+      role="tooltip"
+      data-testid="block-hint"
+      className="pointer-events-none fixed z-[60] max-w-72 animate-fade-in rounded-lg bg-navy-900 px-3 py-2 text-xs leading-5 text-white shadow-lift"
+      style={{ left: Math.min(rect.left, window.innerWidth - 300), ...(above ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }) }}
+    >
+      <p className="text-sm font-semibold">{details[0]}</p>
+      {details.slice(1).filter(Boolean).map((d) => (
+        <p key={d}>{d}</p>
+      ))}
+    </div>
   );
 }
 
@@ -1238,6 +1271,8 @@ function AppointmentBlock({
   selected,
   highlight,
   grouped,
+  stylist,
+  onHint,
   settling,
   onSettled,
   onOpen,
@@ -1253,6 +1288,10 @@ function AppointmentBlock({
   highlight: boolean;
   // In the same group booking as the selected visit.
   grouped: boolean;
+  // The stylist's name, for the tooltip.
+  stylist: string;
+  // Shows (or, with null, hides) the tooltip of details the block can't fit.
+  onHint: (details: string[] | null, rect: DOMRect) => void;
   settling: boolean;
   onSettled: () => void;
   onOpen: () => void;
@@ -1290,10 +1329,26 @@ function AppointmentBlock({
   }
   // Leftover room lets a long service name wrap rather than shorten.
   if (show.service && room >= LINE) show.serviceLines = 2;
+  // A short block puts the time on the name line.
+  const timeOnName = show.name && !show.time;
 
   // Shorter forms for narrow spaces, longest first.
   const [first, ...rest] = block.clientName.split(" ");
-  const names = [block.clientName, ...(rest.length ? [`${first} ${rest.at(-1)![0]}.`, first] : []), initials(block.clientName)];
+  const shortNames = [block.clientName, ...(rest.length ? [`${first} ${rest.at(-1)![0]}.`, first] : []), initials(block.clientName)];
+  const startTime = formatMinute(block.start);
+  // On a short block: the name and time, shortening the name first, then
+  // initials alone in a very narrow lane; an ellipsis if even that won't fit.
+  const names = timeOnName
+    ? [...new Set([`${block.clientName} · ${time}`, ...shortNames.slice(0, -1).map((n) => `${n} · ${startTime}`), `${initials(block.clientName)} · ${startTime}`, initials(block.clientName)])]
+    : shortNames;
+  // Everything about the visit, for the tooltip when the block hides some.
+  const hidden = timeOnName || !show.service || narrow;
+  const details = [
+    block.clientName,
+    [block.service, block.with.length > 0 && `with ${block.with.join(" and ")}`].filter(Boolean).join(" · "),
+    `${time} · ${stylist}`,
+    [STATUS_LABELS[block.status], late && "running late", block.group && block.group.label, block.series && "repeating"].filter(Boolean).join(" · "),
+  ];
   const plainService = block.service.replace(/\s*\([^)]*\)/g, "");
   const services = [
     ...new Set([
@@ -1327,7 +1382,6 @@ function AppointmentBlock({
         tabIndex={0}
         aria-label={label}
         aria-pressed={selected}
-        title={label}
         data-block
         data-family={block.family}
         data-faded={faded || undefined}
@@ -1341,10 +1395,15 @@ function AppointmentBlock({
           }
         }}
         onAnimationEnd={settling ? onSettled : undefined}
+        onMouseEnter={(e) => hidden && onHint(details, e.currentTarget.getBoundingClientRect())}
+        onMouseLeave={(e) => onHint(null, e.currentTarget.getBoundingClientRect())}
+        onFocus={(e) => hidden && onHint(details, e.currentTarget.getBoundingClientRect())}
+        onBlur={(e) => onHint(null, e.currentTarget.getBoundingClientRect())}
+        aria-describedby={hidden ? `hint-${block.itemId}` : undefined}
         {...pointer}
-        className={`absolute block touch-none overflow-hidden rounded-md border-l-4 bg-surface text-left select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus ${
+        className={`absolute block touch-none overflow-hidden rounded-md border-l-4 bg-surface text-left select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
           faded ? "text-ink-muted" : "text-ink shadow-card"
-        } ${selected ? "ring-2 ring-navy-900" : highlight ? "animate-glow ring-2 ring-denise-500" : grouped ? "ring-2 ring-navy-700/50" : "ring-1 ring-surface"} ${draggable ? "cursor-grab" : "cursor-pointer"} ${
+        } ${selected || highlight || grouped ? "" : "ring-1 ring-surface"} ${draggable ? "cursor-grab" : "cursor-pointer"} ${
           dragging ? "opacity-40 shadow-none outline-2 outline-ink-subtle outline-dashed" : ""
         } ${settling ? "animate-settle" : ""}`}
         style={{
@@ -1365,6 +1424,15 @@ function AppointmentBlock({
             style={{ top: (s.start - block.start) * PX_PER_MINUTE, height: (s.end - s.start) * PX_PER_MINUTE, ...segmentStyle(s.kind, faded) }}
           />
         ))}
+        {/* The selection (and Denise's or a group's outline) is drawn inside
+            the block, over its segments, so it never covers a neighbor. */}
+        {(selected || highlight || grouped) && (
+          <span
+            aria-hidden
+            data-ring={selected ? "selected" : highlight ? "denise" : "group"}
+            className={`pointer-events-none absolute inset-0 z-10 rounded-md ring-2 ring-inset ${selected ? "ring-navy-900" : highlight ? "animate-glow ring-denise-500" : "ring-navy-700/50"}`}
+          />
+        )}
         {show.name && (
           <span aria-hidden className={`relative flex items-center gap-1.5 pt-1 ${narrow ? "px-1.5" : "px-2"}`}>
             {block.group && <GroupIcon className="size-3.5 shrink-0" />}
