@@ -118,3 +118,9 @@ export const HourglassIcon = (p: IconProps) => (
     <path d="M7 3.5h10M7 20.5h10M8 3.5c0 4.5 8 4.5 8 8.5s-8 4-8 8.5M16 3.5c0 4.5-8 4.5-8 8.5s8 4 8 8.5" />
   </Icon>
 );
+export const BoxIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="m12 3.5 8 4v9l-8 4-8-4v-9l8-4Z" />
+    <path d="m4 7.5 8 4 8-4M12 11.5v9" />
+  </Icon>
+);

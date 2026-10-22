@@ -10,7 +10,7 @@ import { isUuid } from "@/lib/ids";
 import { todayIn } from "@/lib/scheduling/time";
 import { fullName } from "@/lib/staff";
 import type { ClientFormFields } from "../actions";
-import { BackLink } from "../back-link";
+import { BackLink } from "@/components/ui/back-link";
 import { ClientForm } from "../client-form";
 import { FormulaForm } from "../formula-form";
 import { stylistOptions } from "../stylist-options";

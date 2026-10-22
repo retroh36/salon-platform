@@ -337,6 +337,32 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"products": {
+                  Row: {
+                    "barcode": string | null,"brand": string,"business_id": string,"cost_cents": number,"created_at": string,"id": string,"is_active": boolean,"line": string | null,"name": string,"price_cents": number | null,"shelf": string | null,"size": number,"sku": string | null,"supplier_id": string | null,"type": Database["public"]['Enums']["product_type"],"unit": Database["public"]['Enums']["product_unit"],"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "barcode"?: string | null,"brand": string,"business_id": string,"cost_cents"?: number,"created_at"?: string,"id"?: string,"is_active"?: boolean,"line"?: string | null,"name": string,"price_cents"?: number | null,"shelf"?: string | null,"size": number,"sku"?: string | null,"supplier_id"?: string | null,"type": Database["public"]['Enums']["product_type"],"unit": Database["public"]['Enums']["product_unit"],"updated_at"?: string
+                  }
+                  Update: {
+                    "barcode"?: string | null,"brand"?: string,"business_id"?: string,"cost_cents"?: number,"created_at"?: string,"id"?: string,"is_active"?: boolean,"line"?: string | null,"name"?: string,"price_cents"?: number | null,"shelf"?: string | null,"size"?: number,"sku"?: string | null,"supplier_id"?: string | null,"type"?: Database["public"]['Enums']["product_type"],"unit"?: Database["public"]['Enums']["product_unit"],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "products_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "products_supplier_id_business_id_fkey"
+      columns: ["supplier_id","business_id"]
+isOneToOne: false
+      referencedRelation: "suppliers"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"resources": {
                   Row: {
                     "business_id": string,"created_at": string,"id": string,"is_active": boolean,"kind": Database["public"]['Enums']["resource_kind"],"location_id": string,"name": string,"sort_order": number,"updated_at": string
@@ -595,13 +621,118 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"stock_levels": {
+                  Row: {
+                    "business_id": string,"id": string,"location_id": string,"on_hand": number,"product_id": string,"reorder_point": number,"reorder_quantity": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"id"?: string,"location_id": string,"on_hand"?: number,"product_id": string,"reorder_point"?: number,"reorder_quantity"?: number,"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"id"?: string,"location_id"?: string,"on_hand"?: number,"product_id"?: string,"reorder_point"?: number,"reorder_quantity"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "stock_levels_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "stock_levels_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "stock_levels_product_id_business_id_fkey"
+      columns: ["product_id","business_id"]
+isOneToOne: false
+      referencedRelation: "products"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"stock_movements": {
+                  Row: {
+                    "appointment_id": string | null,"appointment_item_id": string | null,"business_id": string,"change": number,"created_at": string,"created_by": string | null,"id": string,"location_id": string,"note": string | null,"on_hand_after": number,"product_id": string,"reason": Database["public"]['Enums']["stock_reason"],"unit_cost_cents": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "appointment_id"?: string | null,"appointment_item_id"?: string | null,"business_id": string,"change": number,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id": string,"note"?: string | null,"on_hand_after": number,"product_id": string,"reason": Database["public"]['Enums']["stock_reason"],"unit_cost_cents"?: number | null
+                  }
+                  Update: {
+                    "appointment_id"?: string | null,"appointment_item_id"?: string | null,"business_id"?: string,"change"?: number,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id"?: string,"note"?: string | null,"on_hand_after"?: number,"product_id"?: string,"reason"?: Database["public"]['Enums']["stock_reason"],"unit_cost_cents"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "stock_movements_appointment_id_fkey"
+      columns: ["appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "stock_movements_appointment_item_id_fkey"
+      columns: ["appointment_item_id"]
+isOneToOne: false
+      referencedRelation: "appointment_items"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "stock_movements_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "stock_movements_created_by_business_id_fkey"
+      columns: ["created_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "stock_movements_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "stock_movements_product_id_business_id_fkey"
+      columns: ["product_id","business_id"]
+isOneToOne: false
+      referencedRelation: "products"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"suppliers": {
+                  Row: {
+                    "account_number": string | null,"business_id": string,"created_at": string,"email": string | null,"id": string,"is_active": boolean,"lead_time_days": number,"name": string,"notes": string | null,"phone": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_number"?: string | null,"business_id": string,"created_at"?: string,"email"?: string | null,"id"?: string,"is_active"?: boolean,"lead_time_days"?: number,"name": string,"notes"?: string | null,"phone"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "account_number"?: string | null,"business_id"?: string,"created_at"?: string,"email"?: string | null,"id"?: string,"is_active"?: boolean,"lead_time_days"?: number,"name"?: string,"notes"?: string | null,"phone"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "suppliers_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
             [_ in never]: never
           }
           Functions: {
-            "apply_ai_action":
+            "adjust_stock":
+{ Args: { "p_change": number,"p_location_id": string,"p_note": string,"p_product_id": string,"p_reason": Database["public"]['Enums']["stock_reason"] }; Returns: number
+                           },
+"apply_ai_action":
 { Args: { "p_action_id": string,"p_client_id"?: string,"p_expected_version": number }; Returns: undefined
                            },
 "record_ai_proposals":
@@ -637,12 +768,15 @@ isOneToOne: false
 "set_staff_weekly_hours":
 { Args: { "p_business_id": string,"p_hours": Json,"p_staff_id": string }; Returns: undefined
                            },
+"set_stock_settings":
+{ Args: { "p_location_id": string,"p_product_id": string,"p_reorder_point": number,"p_reorder_quantity": number }; Returns: undefined
+                           },
 "undo_ai_action":
 { Args: { "p_action_id": string,"p_expected_version": number }; Returns: undefined
                            }
           }
           Enums: {
-            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","disruption_kind": "overrun"|"client_late"|"call_out","notification_status": "pending"|"sent"|"canceled","resource_kind": "chair"|"room"|"station","staff_level": "junior"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined"
+            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","disruption_kind": "overrun"|"client_late"|"call_out","notification_status": "pending"|"sent"|"canceled","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","resource_kind": "chair"|"room"|"station","staff_level": "junior"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -762,7 +896,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"disruption_kind": ["overrun", "client_late", "call_out"],"notification_status": ["pending", "sent", "canceled"],"resource_kind": ["chair", "room", "station"],"staff_level": ["junior", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"]
+            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"disruption_kind": ["overrun", "client_late", "call_out"],"notification_status": ["pending", "sent", "canceled"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"resource_kind": ["chair", "room", "station"],"staff_level": ["junior", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"]
           }
         }
 } as const

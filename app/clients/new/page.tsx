@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { PageHeader } from "@/components/ui/page";
-import { BackLink } from "../back-link";
+import { BackLink } from "@/components/ui/back-link";
 import { getCurrentStaff } from "@/lib/auth";
 import { canEditClients } from "@/lib/clients";
 import { todayIn } from "@/lib/scheduling/time";

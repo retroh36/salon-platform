@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ChevronLeftIcon } from "@/components/ui/icons";
 
-// "‹ Clients" above a client page's title.
+// "‹ Clients" above a page title, back to the list.
 export function BackLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <Link

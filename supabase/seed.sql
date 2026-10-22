@@ -826,3 +826,98 @@ where a.id = x.id;
 update public.appointments set updated_at = greatest(updated_at, created_at) where business_id = 'b0000000-0000-4000-8000-000000000001';
 
 alter table public.appointments enable trigger appointments_set_updated_at;
+
+-- ---------------------------------------------------------------------------
+-- Inventory: three suppliers, back-bar color (by weight or volume, so
+-- partly used tubes count) and retail (by unit). Stock was last counted
+-- three weeks ago; a few things are already low.
+-- ---------------------------------------------------------------------------
+
+insert into public.suppliers (id, business_id, name, email, phone, account_number, lead_time_days, notes) values
+  ('e1000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'Northline Beauty Supply',
+   'orders@northline.example.com', '(555) 010-0201', 'NBS-20417', 2, 'Color, developer and lightener. Order by 2pm for delivery in two days.'),
+  ('e1000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'Prairie Pro Distributors',
+   'salon@prairiepro.example.com', '(555) 010-0202', 'PPD-8812', 4, 'Olaplex and Redken retail. Free shipping over $300.'),
+  ('e1000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 'Lakeshore Salon Wholesale',
+   'hello@lakeshore.example.com', '(555) 010-0203', null, 3, 'Back-bar liters, toners and styling.');
+
+with items (supplier, brand, line, name, type, unit, size, cost, price, shelf, sku, containers, reorder_containers, reorder_qty) as (values
+  -- Permanent color: 60 g tubes.
+  (1, 'Goldwell', 'Topchic', '4N',  'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-4N',  3.5, 2, 4),
+  (1, 'Goldwell', 'Topchic', '5N',  'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-5N',  4.25, 2, 4),
+  (1, 'Goldwell', 'Topchic', '6N',  'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-6N',  5.5, 3, 6),
+  (1, 'Goldwell', 'Topchic', '6NN', 'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-6NN', 3.0, 2, 4),
+  (1, 'Goldwell', 'Topchic', '7N',  'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-7N',  2.4, 3, 6),
+  (1, 'Goldwell', 'Topchic', '7NN', 'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-7NN', 2.75, 2, 4),
+  (1, 'Goldwell', 'Topchic', '8N',  'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-8N',  4.0, 2, 4),
+  (1, 'Goldwell', 'Topchic', '9N',  'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-9N',  3.6, 2, 4),
+  (1, 'Goldwell', 'Topchic', '10N', 'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-10N', 2.0, 1, 3),
+  (1, 'Goldwell', 'Topchic', '6RR', 'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-6RR', 1.5, 1, 2),
+  (1, 'Goldwell', 'Topchic', '7G',  'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-7G',  2.2, 1, 3),
+  (1, 'Goldwell', 'Topchic', '8A',  'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-8A',  1.8, 1, 3),
+  -- Demi-permanent gloss: 60 ml bottles.
+  (1, 'Redken', 'Shades EQ', '06NB',  'back_bar', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-06NB', 3.0, 2, 4),
+  (1, 'Redken', 'Shades EQ', '07N',   'back_bar', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-07N',  2.5, 2, 4),
+  (1, 'Redken', 'Shades EQ', '08GI',  'back_bar', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-08GI', 3.4, 2, 4),
+  (1, 'Redken', 'Shades EQ', '09N',   'back_bar', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-09N',  2.8, 2, 4),
+  (1, 'Redken', 'Shades EQ', '09T',   'back_bar', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-09T',  1.6, 2, 4),
+  (1, 'Redken', 'Shades EQ', '09V',   'back_bar', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-09V',  4.5, 2, 4),
+  (1, 'Redken', 'Shades EQ', '010P',  'back_bar', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-010P', 2.3, 1, 3),
+  (1, 'Redken', 'Shades EQ', 'Clear', 'back_bar', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-CLR',  3.0, 2, 4),
+  (1, 'Redken', 'Shades EQ', 'Processing Solution', 'back_bar', 'ml', 1000, 1600, null, 'Developer shelf', 'RK-EQ-PS', 1.4, 1, 2),
+  -- Developers, one per volume: 1 liter bottles.
+  (1, 'Goldwell', 'Topchic', '10 Vol Developer (3%)', 'back_bar', 'ml', 1000, 1400, null, 'Developer shelf', 'GW-DEV-10', 1.6, 1, 2),
+  (1, 'Goldwell', 'Topchic', '20 Vol Developer (6%)', 'back_bar', 'ml', 1000, 1400, null, 'Developer shelf', 'GW-DEV-20', 2.3, 2, 4),
+  (1, 'Goldwell', 'Topchic', '30 Vol Developer (9%)', 'back_bar', 'ml', 1000, 1400, null, 'Developer shelf', 'GW-DEV-30', 1.2, 1, 2),
+  (1, 'Goldwell', 'Topchic', '40 Vol Developer (12%)', 'back_bar', 'ml', 1000, 1400, null, 'Developer shelf', 'GW-DEV-40', 0.8, 0.5, 1),
+  -- Lighteners.
+  (1, 'Wella', 'Blondor', 'Multi Blonde Powder', 'back_bar', 'g', 800, 3800, null, 'Lightener shelf', 'WE-BLD-800', 1.3, 1, 2),
+  (1, 'Redken', 'Flash Lift', 'Bonder Inside Lightener', 'back_bar', 'g', 500, 3400, null, 'Lightener shelf', 'RK-FL-500', 0.9, 1, 2),
+  -- Toners: 42 ml bottles.
+  (3, 'Wella', 'Color Charm', 'T18 Lightest Ash Blonde', 'back_bar', 'ml', 42, 650, null, 'Color bar B', 'WE-CC-T18', 3.0, 2, 6),
+  (3, 'Wella', 'Color Charm', 'T14 Pale Ash Blonde',     'back_bar', 'ml', 42, 650, null, 'Color bar B', 'WE-CC-T14', 2.5, 2, 6),
+  (3, 'Wella', 'Color Charm', 'T11 Lightest Beige Blonde', 'back_bar', 'ml', 42, 650, null, 'Color bar B', 'WE-CC-T11', 1.0, 1, 4),
+  -- Back-bar treatments and wash.
+  (2, 'Olaplex', null, 'No.1 Bond Multiplier', 'back_bar', 'ml', 525, 9500, null, 'Back bar', 'OLX-1-525', 0.7, 0.5, 1),
+  (2, 'Olaplex', null, 'No.2 Bond Perfector', 'back_bar', 'ml', 2000, 16500, null, 'Back bar', 'OLX-2-2000', 0.6, 0.25, 1),
+  (3, 'Redken', 'All Soft', 'Shampoo (back bar)', 'back_bar', 'ml', 1000, 2800, null, 'Back bar', 'RK-AS-SH-1L', 2.2, 1, 3),
+  (3, 'Redken', 'All Soft', 'Conditioner (back bar)', 'back_bar', 'ml', 1000, 3000, null, 'Back bar', 'RK-AS-CO-1L', 1.8, 1, 3),
+  (3, 'Redken', 'Acidic Bonding Concentrate', 'Intensive Treatment (back bar)', 'back_bar', 'ml', 500, 3600, null, 'Back bar', 'RK-ABC-TR-500', 0.4, 0.5, 2),
+  -- Retail.
+  (2, 'Olaplex', null, 'No.3 Hair Perfector 100 ml',     'retail', 'unit', 1, 1500, 3000, 'Retail wall', 'OLX-3-100', 9, 4, 12),
+  (2, 'Olaplex', null, 'No.4 Bond Maintenance Shampoo 250 ml', 'retail', 'unit', 1, 1500, 3000, 'Retail wall', 'OLX-4-250', 6, 4, 12),
+  (2, 'Olaplex', null, 'No.5 Bond Maintenance Conditioner 250 ml', 'retail', 'unit', 1, 1500, 3000, 'Retail wall', 'OLX-5-250', 3, 4, 12),
+  (2, 'Olaplex', null, 'No.7 Bonding Oil 30 ml',         'retail', 'unit', 1, 1500, 3000, 'Retail wall', 'OLX-7-30', 7, 3, 6),
+  (2, 'Redken', 'All Soft', 'Shampoo 300 ml',            'retail', 'unit', 1, 1400, 2800, 'Retail wall', 'RK-AS-SH-300', 8, 4, 8),
+  (2, 'Redken', 'All Soft', 'Conditioner 300 ml',        'retail', 'unit', 1, 1500, 2900, 'Retail wall', 'RK-AS-CO-300', 5, 4, 8),
+  (2, 'Redken', 'Acidic Bonding Concentrate', 'Shampoo 300 ml', 'retail', 'unit', 1, 1600, 3200, 'Retail wall', 'RK-ABC-SH-300', 4, 3, 6),
+  (2, 'Redken', 'Acidic Bonding Concentrate', 'Conditioner 300 ml', 'retail', 'unit', 1, 1600, 3200, 'Retail wall', 'RK-ABC-CO-300', 2, 3, 6),
+  (2, 'Redken', null, 'Pillow Proof Blowdry Primer 170 ml', 'retail', 'unit', 1, 1300, 2600, 'Styling shelf', 'RK-PP-170', 6, 3, 6),
+  (2, 'Redken', null, 'Shape Control 9 Hairspray 250 ml', 'retail', 'unit', 1, 1200, 2400, 'Styling shelf', 'RK-SC9-250', 5, 3, 6),
+  (3, 'Bumble and bumble', null, 'Thickening Dryspun Finish 150 ml', 'retail', 'unit', 1, 1900, 3800, 'Styling shelf', 'BB-TDF-150', 1, 2, 4),
+  (3, 'Bumble and bumble', null, 'Surf Spray 125 ml', 'retail', 'unit', 1, 1700, 3400, 'Styling shelf', 'BB-SURF-125', 4, 2, 4)
+),
+inserted as (
+  insert into public.products (business_id, supplier_id, brand, line, name, sku, barcode, type, unit, size, cost_cents, price_cents, shelf)
+  select 'b0000000-0000-4000-8000-000000000001',
+         ('e1000000-0000-4000-8000-00000000000' || i.supplier)::uuid,
+         i.brand, i.line, i.name, i.sku,
+         -- In-store (GS1 prefix 2) codes, so they can't clash with real products.
+         '2' || lpad((abs(hashtext(i.sku)) % 100000000000)::text, 11, '0'),
+         i.type::public.product_type, i.unit::public.product_unit, i.size, i.cost, i.price, i.shelf
+  from items i
+  returning id, sku, size, unit
+),
+levels as (
+  insert into public.stock_levels (business_id, location_id, product_id, on_hand, reorder_point, reorder_quantity)
+  select 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', p.id,
+         round(i.containers * p.size, 2), round(i.reorder_containers * p.size, 2), i.reorder_qty
+  from inserted p join items i on i.sku = p.sku
+  returning product_id, on_hand
+)
+-- The last count, three weeks ago (entered by Daniel).
+insert into public.stock_movements (business_id, location_id, product_id, change, on_hand_after, reason, note, created_by, created_at)
+select 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', l.product_id, l.on_hand, l.on_hand,
+       'count', 'Opening count', 'd0000000-0000-4000-8000-000000000002', now() - interval '21 days'
+from levels l
+where l.on_hand <> 0;

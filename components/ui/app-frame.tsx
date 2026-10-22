@@ -2,10 +2,10 @@ import Link from "next/link";
 import { logout } from "@/app/login/actions";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
-import { CalendarIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, TeamIcon, UserIcon } from "@/components/ui/icons";
+import { BoxIcon, CalendarIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, TeamIcon, UserIcon } from "@/components/ui/icons";
 import { roleLabel, type StaffRole } from "@/lib/staff";
 
-export type Section = "dashboard" | "calendar" | "clients" | "schedule" | "services";
+export type Section = "dashboard" | "calendar" | "clients" | "schedule" | "services" | "inventory";
 
 const NAV: { section: Section; href: string; label: string; Icon: (p: { className?: string }) => React.ReactNode }[] = [
   { section: "dashboard", href: "/dashboard", label: "Dashboard", Icon: HomeIcon },
@@ -13,6 +13,7 @@ const NAV: { section: Section; href: string; label: string; Icon: (p: { classNam
   { section: "clients", href: "/clients", label: "Clients", Icon: UserIcon },
   { section: "schedule", href: "/schedule", label: "Team schedule", Icon: TeamIcon },
   { section: "services", href: "/services", label: "Services", Icon: ScissorsIcon },
+  { section: "inventory", href: "/inventory", label: "Inventory", Icon: BoxIcon },
 ];
 
 // The salon's mark: its initial in a soft plum leaf, until salons can
