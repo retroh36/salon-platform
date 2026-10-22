@@ -807,14 +807,14 @@ isOneToOne: false
                   ]
                 },"stock_movements": {
                   Row: {
-                    "appointment_id": string | null,"appointment_item_id": string | null,"business_id": string,"change": number,"created_at": string,"created_by": string | null,"id": string,"location_id": string,"note": string | null,"on_hand_after": number,"product_id": string,"purchase_order_id": string | null,"reason": Database["public"]['Enums']["stock_reason"],"unit_cost_cents": number | null
+                    "appointment_id": string | null,"appointment_item_id": string | null,"business_id": string,"change": number,"created_at": string,"created_by": string | null,"id": string,"location_id": string,"note": string | null,"on_hand_after": number,"product_id": string,"purchase_order_id": string | null,"reason": Database["public"]['Enums']["stock_reason"],"stocktake_id": string | null,"unit_cost_cents": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_id"?: string | null,"appointment_item_id"?: string | null,"business_id": string,"change": number,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id": string,"note"?: string | null,"on_hand_after": number,"product_id": string,"purchase_order_id"?: string | null,"reason": Database["public"]['Enums']["stock_reason"],"unit_cost_cents"?: number | null
+                    "appointment_id"?: string | null,"appointment_item_id"?: string | null,"business_id": string,"change": number,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id": string,"note"?: string | null,"on_hand_after": number,"product_id": string,"purchase_order_id"?: string | null,"reason": Database["public"]['Enums']["stock_reason"],"stocktake_id"?: string | null,"unit_cost_cents"?: number | null
                   }
                   Update: {
-                    "appointment_id"?: string | null,"appointment_item_id"?: string | null,"business_id"?: string,"change"?: number,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id"?: string,"note"?: string | null,"on_hand_after"?: number,"product_id"?: string,"purchase_order_id"?: string | null,"reason"?: Database["public"]['Enums']["stock_reason"],"unit_cost_cents"?: number | null
+                    "appointment_id"?: string | null,"appointment_item_id"?: string | null,"business_id"?: string,"change"?: number,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id"?: string,"note"?: string | null,"on_hand_after"?: number,"product_id"?: string,"purchase_order_id"?: string | null,"reason"?: Database["public"]['Enums']["stock_reason"],"stocktake_id"?: string | null,"unit_cost_cents"?: number | null
                   }
                   Relationships: [
                     {
@@ -859,6 +859,88 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "purchase_orders"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "stock_movements_stocktake_id_fkey"
+      columns: ["stocktake_id"]
+isOneToOne: false
+      referencedRelation: "stocktakes"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"stocktake_counts": {
+                  Row: {
+                    "business_id": string,"counted": number,"counted_at": string,"counted_by": string | null,"expected": number,"id": string,"product_id": string,"stocktake_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"counted": number,"counted_at"?: string,"counted_by"?: string | null,"expected": number,"id"?: string,"product_id": string,"stocktake_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"counted"?: number,"counted_at"?: string,"counted_by"?: string | null,"expected"?: number,"id"?: string,"product_id"?: string,"stocktake_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "stocktake_counts_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "stocktake_counts_counted_by_business_id_fkey"
+      columns: ["counted_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "stocktake_counts_product_id_business_id_fkey"
+      columns: ["product_id","business_id"]
+isOneToOne: false
+      referencedRelation: "products"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "stocktake_counts_stocktake_id_business_id_fkey"
+      columns: ["stocktake_id","business_id"]
+isOneToOne: false
+      referencedRelation: "stocktakes"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"stocktakes": {
+                  Row: {
+                    "business_id": string,"finished_at": string | null,"finished_by": string | null,"id": string,"location_id": string,"started_at": string,"started_by": string | null,"status": Database["public"]['Enums']["stocktake_status"]
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"finished_at"?: string | null,"finished_by"?: string | null,"id"?: string,"location_id": string,"started_at"?: string,"started_by"?: string | null,"status"?: Database["public"]['Enums']["stocktake_status"]
+                  }
+                  Update: {
+                    "business_id"?: string,"finished_at"?: string | null,"finished_by"?: string | null,"id"?: string,"location_id"?: string,"started_at"?: string,"started_by"?: string | null,"status"?: Database["public"]['Enums']["stocktake_status"]
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "stocktakes_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "stocktakes_finished_by_business_id_fkey"
+      columns: ["finished_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "stocktakes_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "stocktakes_started_by_business_id_fkey"
+      columns: ["started_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
     }
                   ]
                 },"suppliers": {
@@ -899,14 +981,26 @@ isOneToOne: false
 "apply_reorder_draft":
 { Args: { "p_action_id": string }; Returns: string
                            },
+"cancel_stocktake":
+{ Args: { "p_stocktake_id": string }; Returns: undefined
+                           },
+"clear_count":
+{ Args: { "p_product_id": string,"p_stocktake_id": string }; Returns: undefined
+                           },
 "delete_purchase_order":
 { Args: { "p_order_id": string }; Returns: undefined
+                           },
+"finish_stocktake":
+{ Args: { "p_stocktake_id": string }; Returns: number
                            },
 "receive_purchase_order":
 { Args: { "p_lines": Json,"p_order_id": string }; Returns: Database["public"]['Enums']["purchase_order_status"]
                            },
 "record_ai_proposals":
 { Args: { "p_feature": string,"p_location_id": string,"p_options": Json,"p_subject": string }; Returns: (string)[]
+                           },
+"record_count":
+{ Args: { "p_counted": number,"p_product_id": string,"p_stocktake_id": string }; Returns: number
                            },
 "reject_ai_action":
 { Args: { "p_action_id": string }; Returns: undefined
@@ -950,6 +1044,9 @@ isOneToOne: false
 "set_stock_settings":
 { Args: { "p_location_id": string,"p_product_id": string,"p_reorder_point": number,"p_reorder_quantity": number }; Returns: undefined
                            },
+"start_stocktake":
+{ Args: { "p_location_id": string }; Returns: string
+                           },
 "undo_ai_action":
 { Args: { "p_action_id": string,"p_expected_version": number }; Returns: undefined
                            },
@@ -958,7 +1055,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","disruption_kind": "overrun"|"client_late"|"call_out","notification_status": "pending"|"sent"|"canceled","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","staff_level": "junior"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined"
+            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","disruption_kind": "overrun"|"client_late"|"call_out","notification_status": "pending"|"sent"|"canceled","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","staff_level": "junior"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -1078,7 +1175,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"disruption_kind": ["overrun", "client_late", "call_out"],"notification_status": ["pending", "sent", "canceled"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"staff_level": ["junior", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"]
+            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"disruption_kind": ["overrun", "client_late", "call_out"],"notification_status": ["pending", "sent", "canceled"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"staff_level": ["junior", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"]
           }
         }
 } as const
