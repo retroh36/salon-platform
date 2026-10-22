@@ -9,7 +9,7 @@ import { canManageInventory } from "@/lib/inventory";
 import { orderProducts } from "../load";
 import { OrderEditor } from "../order-editor";
 
-export const metadata: Metadata = { title: "New order · Salon Platform" };
+export const metadata: Metadata = { title: "New order" };
 
 export default function NewOrderPage() {
   return (

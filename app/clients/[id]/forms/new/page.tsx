@@ -11,7 +11,7 @@ import { isUuid } from "@/lib/ids";
 import { fullName } from "@/lib/staff";
 import { FillForm } from "../fill-form";
 
-export const metadata: Metadata = { title: "Fill in a form · Salon Platform" };
+export const metadata: Metadata = { title: "Fill in a form" };
 
 export default function NewClientFormPage({ params, searchParams }: PageProps<"/clients/[id]/forms/new">) {
   return (

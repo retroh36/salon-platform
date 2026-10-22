@@ -15,7 +15,7 @@ import { orderProducts } from "../load";
 import { DraftActions, ReceiveForm } from "../order-actions";
 import { OrderEditor } from "../order-editor";
 
-export const metadata: Metadata = { title: "Order · Salon Platform" };
+export const metadata: Metadata = { title: "Order" };
 
 export default function OrderPage({ params }: PageProps<"/inventory/orders/[id]">) {
   return (

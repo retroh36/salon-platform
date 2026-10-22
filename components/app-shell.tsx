@@ -1,10 +1,11 @@
 import { AppFrame, type Section } from "@/components/ui/app-frame";
+import { salonLogoUrl } from "@/lib/branding";
 import type { StaffRole } from "@/lib/staff";
 
 type Me = {
   first_name: string;
   role: StaffRole;
-  location: { name: string; business: { name: string } | null };
+  location: { name: string; business: { name: string; logo_path?: string | null } | null };
 };
 
 // The app's page layout: the AppFrame sidebar and search bar around the
@@ -16,6 +17,7 @@ export function AppShell({ section, me, bleed = false, children }: { section: Se
     <AppFrame
       section={section}
       businessName={me.location.business?.name ?? "Salon"}
+      logoUrl={salonLogoUrl(me.location.business?.logo_path)}
       locationName={me.location.name}
       user={{ name: me.first_name, role: me.role }}
     >
@@ -40,8 +42,9 @@ export function NotLinked() {
 export function LoadingShell() {
   return (
     <div className="flex min-h-screen flex-1 items-center justify-center bg-canvas text-sm text-ink-muted" aria-busy>
-      <span className="flex items-center gap-3">
-        <span aria-hidden className="size-4 animate-spin rounded-full border-2 border-plum-200 border-t-plum-900" />
+      <span className="flex flex-col items-center gap-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/maestra/maestra-mark.svg" alt="Maestra" className="h-10 w-auto" />
         Loading…
       </span>
     </div>

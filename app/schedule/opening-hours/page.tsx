@@ -12,7 +12,7 @@ import { minuteToTime, WEEKDAYS } from "@/lib/scheduling/time";
 import { saveOpeningHours } from "../actions";
 import { HoursEditor, type HoursRows } from "../hours-editor";
 
-export const metadata: Metadata = { title: "Opening hours · Salon Platform" };
+export const metadata: Metadata = { title: "Opening hours" };
 
 export default function OpeningHoursPage() {
   return (

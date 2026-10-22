@@ -20,7 +20,7 @@ import { DayChangeForm } from "./day-change-form";
 import { HoursEditor, type HoursRows } from "./hours-editor";
 import { TimeOffForm } from "./time-off-form";
 
-export const metadata: Metadata = { title: "Schedule · Salon Platform" };
+export const metadata: Metadata = { title: "Schedule" };
 
 export default function SchedulePage({ searchParams }: PageProps<"/schedule">) {
   return (

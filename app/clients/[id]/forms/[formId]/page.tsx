@@ -11,7 +11,7 @@ import { formatDate } from "@/lib/clients";
 import { toLocal } from "@/lib/scheduling/time";
 import { fullName } from "@/lib/staff";
 
-export const metadata: Metadata = { title: "Signed form · Salon Platform" };
+export const metadata: Metadata = { title: "Signed form" };
 
 export default function SignedFormPage({ params }: PageProps<"/clients/[id]/forms/[formId]">) {
   return (

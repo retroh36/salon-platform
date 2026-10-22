@@ -1,12 +1,12 @@
-# Salon Platform — Product Spec
+# Maestra — Product Spec
 
 Oct 21, 2026 · @Julian
 
 ## Overview
 
-A full salon management platform, built from scratch, that matches Phorest and Boulevard on core features and beats them with AI running the back office. Working name: Salon Platform (final name TBD).
+A full salon management platform, built from scratch, that matches Phorest and Boulevard on core features and beats them with AI running the back office. The product is called Maestra: the master who conducts the whole salon.
 
-**Positioning.** Phorest and Boulevard are calendars with reports attached. This platform watches the schedule, stock and numbers continuously and acts on them, so the front desk and owner spend less time firefighting.
+**Positioning.** Phorest and Boulevard are calendars with reports attached. Maestra watches the schedule, stock and numbers continuously and acts on them, so the front desk and owner spend less time firefighting.
 
 **Guiding principles**
 
@@ -164,7 +164,7 @@ Phases 1 to 4 make a product one salon can run its whole day on; the pilot salon
 
 **Open questions**
 
-- [ ] Product name and brand
+- [x] Product name and brand: Maestra (see docs/brand.md)
 - [ ] Pilot salon: which salon tests phase 1–4, and who there gives feedback?
 - [ ] Pricing model: per location, per stylist, or tiered plans?
 - [ ] Booth-renter salons: support from launch or later?

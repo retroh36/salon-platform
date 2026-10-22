@@ -10,7 +10,7 @@ import { fullName } from "@/lib/staff";
 import { loadWaitlist } from "@/lib/waitlist-load";
 import { WaitlistManager } from "./waitlist-manager";
 
-export const metadata: Metadata = { title: "Waitlist · Salon Platform" };
+export const metadata: Metadata = { title: "Waitlist" };
 
 export default function WaitlistPage() {
   return (

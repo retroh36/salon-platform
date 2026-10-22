@@ -14,7 +14,7 @@ import { formatDay } from "@/lib/schedule-format";
 import { toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 
-export const metadata: Metadata = { title: "Orders · Salon Platform" };
+export const metadata: Metadata = { title: "Orders" };
 
 export default function OrdersPage() {
   return (

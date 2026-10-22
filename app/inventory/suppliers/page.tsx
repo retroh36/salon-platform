@@ -7,7 +7,7 @@ import { getCurrentStaff } from "@/lib/auth";
 import { canManageInventory } from "@/lib/inventory";
 import { SupplierForm } from "./supplier-form";
 
-export const metadata: Metadata = { title: "Suppliers · Salon Platform" };
+export const metadata: Metadata = { title: "Suppliers" };
 
 export default function SuppliersPage() {
   return (

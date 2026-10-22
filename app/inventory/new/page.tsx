@@ -8,7 +8,7 @@ import { canManageInventory } from "@/lib/inventory";
 import { BackLink } from "@/components/ui/back-link";
 import { ProductForm } from "../product-form";
 
-export const metadata: Metadata = { title: "Add product · Salon Platform" };
+export const metadata: Metadata = { title: "Add product" };
 
 export default function NewProductPage() {
   return (

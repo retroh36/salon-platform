@@ -8,7 +8,7 @@ import { getCurrentStaff } from "@/lib/auth";
 import { loadTemplates, patchSettings } from "@/lib/client-checks";
 import { PatchSettingsForm } from "./patch-settings";
 
-export const metadata: Metadata = { title: "Forms · Salon Platform" };
+export const metadata: Metadata = { title: "Forms" };
 
 export default function FormsPage() {
   return (

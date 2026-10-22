@@ -12,7 +12,7 @@ import { canEditClients, SEARCH_LIMIT } from "@/lib/clients";
 import { fullName } from "@/lib/staff";
 import { ClientSearch } from "./client-search";
 
-export const metadata: Metadata = { title: "Clients · Salon Platform" };
+export const metadata: Metadata = { title: "Clients" };
 
 export default function ClientsPage({ searchParams }: PageProps<"/clients">) {
   return (

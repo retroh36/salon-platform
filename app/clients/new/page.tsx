@@ -11,7 +11,7 @@ import type { ClientFormFields } from "../actions";
 import { ClientForm } from "../client-form";
 import { stylistOptions } from "../stylist-options";
 
-export const metadata: Metadata = { title: "Add client · Salon Platform" };
+export const metadata: Metadata = { title: "Add client" };
 
 const EMPTY: ClientFormFields = {
   first_name: "",

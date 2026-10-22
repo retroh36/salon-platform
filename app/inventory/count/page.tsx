@@ -14,7 +14,7 @@ import { toLocal } from "@/lib/scheduling/time";
 import { startStocktake } from "./actions";
 import { CountMode, type CountProduct } from "./count-mode";
 
-export const metadata: Metadata = { title: "Stocktake · Salon Platform" };
+export const metadata: Metadata = { title: "Stocktake" };
 
 export default function CountPage() {
   return (

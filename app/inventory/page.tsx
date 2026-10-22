@@ -12,7 +12,7 @@ import { formatPrice } from "@/lib/services";
 import { DeniseReorders } from "./denise-reorders";
 import { InventoryFilters } from "./inventory-filters";
 
-export const metadata: Metadata = { title: "Inventory · Salon Platform" };
+export const metadata: Metadata = { title: "Inventory" };
 
 export default function InventoryPage({ searchParams }: PageProps<"/inventory">) {
   return (

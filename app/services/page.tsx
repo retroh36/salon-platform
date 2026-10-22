@@ -9,7 +9,7 @@ import { canManage, getCurrentStaff } from "@/lib/auth";
 import { serviceFamily } from "@/lib/calendar";
 import { formatPrice, formatServiceTime, groupByCategory } from "@/lib/services";
 
-export const metadata: Metadata = { title: "Services · Salon Platform" };
+export const metadata: Metadata = { title: "Services" };
 
 export default function ServicesPage() {
   return (

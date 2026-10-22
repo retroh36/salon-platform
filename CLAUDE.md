@@ -1,6 +1,6 @@
-# Salon Platform — Project Instructions
+# Maestra — Project Instructions
 
-A full salon management platform (booking, POS, inventory, reporting, marketing) built from scratch, with AI handling back-office work. The full product spec lives in `docs/spec.md` — read it before starting any new module.
+Maestra is a full salon management platform (booking, POS, inventory, reporting, marketing) built from scratch, with AI (Denise) handling back-office work. The full product spec lives in `docs/spec.md` — read it before starting any new module.
 
 ## Stack
 - **App:** Next.js (App Router) + TypeScript, Tailwind CSS

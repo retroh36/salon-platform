@@ -239,14 +239,14 @@ isOneToOne: false
                   ]
                 },"businesses": {
                   Row: {
-                    "created_at": string,"id": string,"name": string,"patch_test_enforcement": string,"patch_test_min_hours": number,"patch_test_valid_days": number,"plan": string,"settings": NonNullable<Json>,"updated_at": string
+                    "created_at": string,"id": string,"logo_path": string | null,"name": string,"patch_test_enforcement": string,"patch_test_min_hours": number,"patch_test_valid_days": number,"plan": string,"settings": NonNullable<Json>,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"id"?: string,"name": string,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"plan"?: string,"settings"?: NonNullable<Json>,"updated_at"?: string
+                    "created_at"?: string,"id"?: string,"logo_path"?: string | null,"name": string,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"plan"?: string,"settings"?: NonNullable<Json>,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"id"?: string,"name"?: string,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"plan"?: string,"settings"?: NonNullable<Json>,"updated_at"?: string
+                    "created_at"?: string,"id"?: string,"logo_path"?: string | null,"name"?: string,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"plan"?: string,"settings"?: NonNullable<Json>,"updated_at"?: string
                   }
                   Relationships: [
                     

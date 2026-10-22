@@ -9,7 +9,7 @@ import { isLow, productName } from "@/lib/inventory";
 import { loadInventory } from "@/lib/inventory-load";
 import { fullName, roleLabel, sortStaff, type StaffRole } from "@/lib/staff";
 
-export const metadata: Metadata = { title: "Dashboard · Salon Platform" };
+export const metadata: Metadata = { title: "Dashboard" };
 
 const ROLE_TONES: Record<StaffRole, Tone> = { owner: "plum", manager: "blue", front_desk: "green", stylist: "neutral" };
 

@@ -12,7 +12,7 @@ import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { isPossibleShrinkage, summarize } from "@/lib/stocktake";
 
-export const metadata: Metadata = { title: "Stocktake · Salon Platform" };
+export const metadata: Metadata = { title: "Stocktake" };
 
 export default function StocktakePage({ params }: PageProps<"/inventory/count/[id]">) {
   return (

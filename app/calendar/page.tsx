@@ -19,7 +19,7 @@ import { fullName, roleLabel, sortStaff } from "@/lib/staff";
 import { CalendarBoard } from "./board";
 import type { AppointmentDetail, BlockData, BoardData, ColumnData } from "./types";
 
-export const metadata: Metadata = { title: "Calendar · Salon Platform" };
+export const metadata: Metadata = { title: "Calendar" };
 
 export default function CalendarPage({ searchParams }: PageProps<"/calendar">) {
   return (

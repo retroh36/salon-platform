@@ -2,12 +2,15 @@ import Link from "next/link";
 import { logout } from "@/app/login/actions";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
-import { BoxIcon, CalendarIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, TeamIcon, UserIcon } from "@/components/ui/icons";
+import { BoxIcon, CalendarIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, UserIcon } from "@/components/ui/icons";
+import { SalonMark } from "@/components/ui/salon-mark";
 import { roleLabel, type StaffRole } from "@/lib/staff";
 
-export type Section = "dashboard" | "calendar" | "clients" | "schedule" | "services" | "inventory" | "forms";
+export type Section = "dashboard" | "calendar" | "clients" | "schedule" | "services" | "inventory" | "forms" | "settings";
 
-const NAV: { section: Section; href: string; label: string; Icon: (p: { className?: string }) => React.ReactNode }[] = [
+type NavItem = { section: Section; href: string; label: string; Icon: (p: { className?: string }) => React.ReactNode; ownersOnly?: boolean };
+
+const NAV: NavItem[] = [
   { section: "dashboard", href: "/dashboard", label: "Dashboard", Icon: HomeIcon },
   { section: "calendar", href: "/calendar", label: "Calendar", Icon: CalendarIcon },
   { section: "clients", href: "/clients", label: "Clients", Icon: UserIcon },
@@ -15,15 +18,18 @@ const NAV: { section: Section; href: string; label: string; Icon: (p: { classNam
   { section: "services", href: "/services", label: "Services", Icon: ScissorsIcon },
   { section: "inventory", href: "/inventory", label: "Inventory", Icon: BoxIcon },
   { section: "forms", href: "/forms", label: "Forms", Icon: ClipboardIcon },
+  { section: "settings", href: "/settings", label: "Settings", Icon: SettingsIcon, ownersOnly: true },
 ];
 
-// The salon's mark: its initial in a soft plum leaf, until salons can
-// upload a logo.
-function SalonMark({ name }: { name: string }) {
+// "Powered by Maestra", small, at the foot of the sidebar.
+function PoweredBy() {
   return (
-    <span aria-hidden className="inline-flex size-10 shrink-0 items-center justify-center rounded-[14px_4px_14px_4px] bg-plum-900 font-serif text-xl text-white">
-      {name.trim()[0]?.toUpperCase() ?? "S"}
-    </span>
+    <p className="flex items-center justify-center gap-1.5 px-4 pb-3 text-xs text-ink-subtle" data-testid="powered-by">
+      Powered by
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brand/maestra/maestra-mark.svg" alt="" className="h-3 w-auto" />
+      <span className="font-semibold text-ink-muted">Maestra</span>
+    </p>
   );
 }
 
@@ -33,12 +39,14 @@ function SalonMark({ name }: { name: string }) {
 export function AppFrame({
   section,
   businessName,
+  logoUrl,
   locationName,
   user,
   children,
 }: {
   section: Section;
   businessName: string;
+  logoUrl: string | null;
   locationName: string;
   user: { name: string; role: StaffRole };
   children: React.ReactNode;
@@ -48,14 +56,14 @@ export function AppFrame({
     <div className="flex min-h-screen flex-1 bg-canvas text-ink lg:h-screen lg:min-h-0 lg:flex-none lg:overflow-hidden">
       <aside className="hidden w-60 shrink-0 flex-col border-r border-line bg-sunken/60 lg:flex">
         <div className="flex items-center gap-3 px-5 pt-6 pb-5">
-          <SalonMark name={businessName} />
+          <SalonMark name={businessName} logoUrl={logoUrl} />
           <div className="min-w-0">
             <div className="font-serif text-lg leading-tight font-semibold text-plum-900">{businessName}</div>
             <div className="mt-0.5 text-sm leading-tight text-ink-muted">{locationName}</div>
           </div>
         </div>
         <nav aria-label="Main" className="flex flex-col gap-1 px-3">
-          {NAV.map(({ section: s, href, label, Icon }) => {
+          {NAV.filter((n) => !n.ownersOnly || user.role === "owner").map(({ section: s, href, label, Icon }) => {
             const current = s === section;
             return (
               <Link
@@ -84,13 +92,14 @@ export function AppFrame({
             </button>
           </form>
         </div>
+        <PoweredBy />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-line bg-canvas px-4 py-3 sm:px-6">
           {/* Compact header for screens without the sidebar. */}
           <div className="flex items-center gap-2 lg:hidden">
-            <SalonMark name={businessName} />
+            <SalonMark name={businessName} logoUrl={logoUrl} />
             <span className="font-serif font-semibold text-plum-900">{businessName}</span>
           </div>
           <form action="/clients" role="search" className="relative ml-auto w-full max-w-xl min-w-0 lg:ml-0">
@@ -110,7 +119,7 @@ export function AppFrame({
           </form>
         </header>
         <nav aria-label="Main" className="flex gap-1 overflow-x-auto border-b border-line px-4 py-2 lg:hidden">
-          {NAV.map(({ section: s, href, label }) => (
+          {NAV.filter((n) => !n.ownersOnly || user.role === "owner").map(({ section: s, href, label }) => (
             <Link
               key={href}
               href={href}

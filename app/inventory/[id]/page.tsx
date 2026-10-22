@@ -26,7 +26,7 @@ import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { AdjustForm, SellForm, SettingsForm } from "./stock-actions";
 
-export const metadata: Metadata = { title: "Product · Salon Platform" };
+export const metadata: Metadata = { title: "Product" };
 
 const REASON_TONES: Record<StockReason, "neutral" | "plum" | "green" | "blue" | "amber"> = {
   service_use: "plum",

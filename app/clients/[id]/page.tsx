@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/page";
 import { patchSettings } from "@/lib/client-checks";
 import { patchTestMessage, patchTestState } from "@/lib/scheduling/patch-tests";
 
-export const metadata: Metadata = { title: "Client · Salon Platform" };
+export const metadata: Metadata = { title: "Client" };
 
 export default function ClientPage({ params }: PageProps<"/clients/[id]">) {
   return (

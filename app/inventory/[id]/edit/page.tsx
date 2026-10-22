@@ -9,7 +9,7 @@ import { isUuid } from "@/lib/ids";
 import { canManageInventory, productName } from "@/lib/inventory";
 import { ProductForm } from "../../product-form";
 
-export const metadata: Metadata = { title: "Edit product · Salon Platform" };
+export const metadata: Metadata = { title: "Edit product" };
 
 const money = (cents: number | null) => (cents === null ? "" : (cents / 100).toFixed(2));
 

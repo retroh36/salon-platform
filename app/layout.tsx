@@ -7,8 +7,9 @@ const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 const fraunces = Fraunces({ variable: "--font-fraunces", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Salon Platform",
-  description: "Salon management platform",
+  title: { default: "Maestra", template: "%s · Maestra" },
+  description: "Maestra runs your salon: calendar, clients, stock and more, with Denise handling the back office.",
+  applicationName: "Maestra",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

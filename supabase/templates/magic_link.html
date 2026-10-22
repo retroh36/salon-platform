@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Your Maestra sign-in link</title>
+  </head>
+  <!-- A platform email from Maestra (not from a salon). See docs/brand.md. -->
+  <body style="margin:0;padding:0;background:#fbf8f5;font-family:Inter,Helvetica,Arial,sans-serif;color:#1f2633;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fbf8f5;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #ebe4dd;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:0;">
+                <img src="{{ .SiteURL }}/brand/maestra/maestra-logo.png" width="560" alt="Maestra" style="display:block;width:100%;max-width:560px;height:auto;border:0;" />
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px 32px 8px;">
+                <h1 style="margin:0 0 12px;font-size:24px;line-height:1.3;color:#17273b;">Sign in to Maestra</h1>
+                <p style="margin:0 0 24px;font-size:16px;line-height:1.6;">Use this link to sign in. It works once and expires soon.</p>
+                <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#17273b;color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;padding:12px 24px;border-radius:8px;">Sign in</a>
+                <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#5f6673;">If the button doesn't work, copy this link into your browser:<br /><a href="{{ .ConfirmationURL }}" style="color:#1d64c4;word-break:break-all;">{{ .ConfirmationURL }}</a></p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 32px 32px;font-size:12px;line-height:1.6;color:#5f6673;">Maestra · Your salon&rsquo;s brain.</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

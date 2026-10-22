@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { LoadingShell } from "@/components/app-shell";
 import { TemplatePage } from "../template-page";
 
-export const metadata: Metadata = { title: "New form · Salon Platform" };
+export const metadata: Metadata = { title: "New form" };
 
 export default function NewFormPage() {
   return (
