@@ -20,6 +20,20 @@ export default defineConfig(({ mode }) => ({
         extends: true,
         test: { name: "db", include: ["tests/db/**/*.test.ts"], setupFiles: ["tests/db/demo-check.ts"], testTimeout: 20_000, hookTimeout: 30_000, fileParallelism: false },
       },
+      // npm run eval:denise: real questions to the real Claude API against
+      // the demo data (costs tokens). The only project given the API key.
+      // EVAL_DRY=1 checks the cases and expected facts without calling it.
+      {
+        extends: true,
+        test: {
+          name: "eval",
+          include: ["evals/**/*.eval.ts"],
+          env: loadEnv(mode, process.cwd(), ["NEXT_PUBLIC_SUPABASE_", "SUPABASE_", "ANTHROPIC_API_KEY", "EVAL_"]),
+          testTimeout: 180_000,
+          hookTimeout: 60_000,
+          fileParallelism: false,
+        },
+      },
     ],
   },
 }));
