@@ -1,4 +1,4 @@
-// Ask Denise, evaluated: about 20 realistic questions from the front desk,
+// Ask Denise, evaluated: 22 realistic questions from the front desk,
 // the owner and a stylist, asked of the real Claude API against the demo
 // data (npm run seed:demo). Each case checks which tools she used and that
 // the answer carries the right facts, worked out independently here from
@@ -25,7 +25,10 @@ import type { DurationInsight } from "@/lib/insights/durations";
 import { minutesText } from "@/lib/insights/describe";
 import type { SalonInsight } from "@/lib/insights/salon";
 import { salesRange } from "@/lib/denise/knowledge";
-import { addDays, todayIn } from "@/lib/scheduling/time";
+import { findOpenings } from "@/lib/scheduling/openings";
+import { stretchTiming, timingFor } from "@/lib/scheduling/booking";
+import { loadBookingContext } from "@/lib/scheduling/load";
+import { addDays, formatMinute, todayIn, type Weekday } from "@/lib/scheduling/time";
 import type { StaffRole } from "@/lib/staff";
 
 type Supabase = SupabaseClient<Database>;
@@ -78,6 +81,8 @@ type Case = {
   numbersFromTools?: boolean;
   // Null when the answer is right; otherwise why not.
   check: (answer: string, facts: Facts) => string | null;
+  // The same, for what the tools returned.
+  checkTools?: (outputs: string[], facts: Facts) => string | null;
 };
 
 // Helpers for the facts.
@@ -117,6 +122,48 @@ async function uniqueRegular(): Promise<{ first: string; c: ClientInsight }> {
     if (ins && ins.visits >= 3 && ins.nextDue) return { first: c.first_name, c: ins };
   }
   throw new Error("No unique regular in the demo data");
+}
+
+// A day three weeks or more ahead (past the demo bookings) where Bridget
+// has one 3-hour gap and nothing longer, made with one-off blocked time
+// (removed after the run). The menu's balayage (2h35) fits it; whether her
+// usual time does depends on the data (fits: once, at the start). Checked
+// with the booking rules, and 3h20 never fits.
+const EVAL_NOTE = "denise eval";
+async function bridgetGapDay(): Promise<Facts> {
+  const supabase = clients.get("front_desk")!;
+  const load = (date: string) => loadBookingContext(supabase, { id: L, timezone: TZ }, date, date);
+  const { data: svc } = await admin.from("services").select("id").eq("business_id", B).eq("name", "Balayage").single();
+  const usual = await duration(STAFF.bridget, "Balayage");
+  for (let d = 21; d < 35; d++) {
+    const date = addDays(today, d);
+    const cal = await load(date);
+    const weekday = (new Date(`${date}T12:00:00Z`).getUTCDay() || 7) as Weekday;
+    const hours = cal.staff.get(STAFF.bridget)?.schedule.weekly[weekday] ?? [];
+    const long = hours.find((h) => h.end - h.start >= 300);
+    if (!long) continue;
+    const gapStart = long.start + 60;
+    const gapEnd = gapStart + 180;
+    // Everything else she works that day is blocked.
+    const blocks: [number, number][] = hours
+      .flatMap((h): [number, number][] => (h === long ? [[h.start, gapStart], [gapEnd, h.end]] : [[h.start, h.end]]))
+      .filter(([a, b]) => b > a);
+    await admin.from("time_blocks").delete().eq("note", EVAL_NOTE);
+    const { error } = await admin.from("time_blocks").insert(blocks.map(([start_minute, end_minute]) => ({ business_id: B, location_id: L, staff_id: STAFF.bridget, kind: "training" as const, note: EVAL_NOTE, start_minute, end_minute, on_date: date })));
+    if (error) throw new Error(`Couldn't block time: ${error.code}`);
+    const after = await load(date);
+    const base = timingFor(after, STAFF.bridget, svc!.id)!;
+    const count = (minutes: number | null) =>
+      findOpenings(after, { serviceId: svc!.id, date, staffIds: [STAFF.bridget], ...(minutes ? { timings: new Map([[STAFF.bridget, stretchTiming(base, minutes)]]) } : {}) }).length;
+    const length = Math.ceil(usual.medianMinutes / 5) * 5;
+    const fitsUsual = count(length);
+    if (fitsUsual !== (length <= 180 ? 1 : 0) || count(200) !== 0 || count(null) < 2) throw new Error(`The gap isn't right: usual ${fitsUsual}, 3h20 ${count(200)}, menu ${count(null)}`);
+    // Denise's calendar is cached per day: start the front desk afresh.
+    contexts.set("front_desk", await contextFor("front_desk"));
+    const day = new Date(`${date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
+    return { day, date, start: formatMinute(gapStart), later: formatMinute(gapStart + 15), usual: usual.medianMinutes, length, fits: fitsUsual ? "yes" : "no" };
+  }
+  throw new Error("No day where Bridget works five hours or more");
 }
 
 const has = (answer: string, ...any: (string | number | null)[]) => any.some((x) => x !== null && answer.toLowerCase().includes(String(x).toLowerCase()));
@@ -306,6 +353,23 @@ const CASES: Case[] = [
     check: (a) => (a.length > 0 ? null : "no answer"),
   },
   {
+    question: "Can Bridget fit a balayage on {day}?",
+    as: "front_desk",
+    tools: ["find_openings"],
+    facts: bridgetGapDay,
+    // By her usual time, not the menu's: if it fits, only at the start of
+    // the gap (the menu's length would also fit 15 minutes later); if not,
+    // she says no although the menu's length would fit. Either way she says
+    // which length she used.
+    check: (a, f) => {
+      if (f.fits === "yes" && !has(a, f.start)) return `should offer ${f.start}`;
+      if (has(a, f.later)) return `shouldn't offer ${f.later}: her usual time doesn't fit then`;
+      if (f.fits === "no" && has(a, f.start) && !/\b(no|not|doesn't|can't|won't|isn't)\b/i.test(a)) return `shouldn't offer ${f.start}: her usual ${f.length} minutes doesn't fit`;
+      return /usual|typical|really takes|normally/i.test(a) ? null : "should say she used Bridget's usual time";
+    },
+    checkTools: (outputs, f) => (outputs.some((o) => o.includes("Bridget's usual time")) ? null : `should search with Bridget's usual ${f.usual} minutes`),
+  },
+  {
     question: "Text {client} to remind them about their appointment.",
     as: "front_desk",
     tools: [],
@@ -337,17 +401,21 @@ const results: Result[] = [];
 const clients = new Map<Role, Supabase>();
 const contexts = new Map<Role, AssistantContext>();
 
+function contextFor(role: Role) {
+  const login = LOGINS[role];
+  return assistantContext(clients.get(role)!, { role: login.role, staffId: login.staffId, businessId: B, location: { id: L, timezone: TZ }, salon: "Maple & Ash Hair Studio", today }, today);
+}
+
 beforeAll(async () => {
   for (const role of Object.keys(LOGINS) as Role[]) {
-    const login = LOGINS[role];
-    const supabase = await signIn(login.email);
-    clients.set(role, supabase);
-    contexts.set(role, await assistantContext(supabase, { role: login.role, staffId: login.staffId, businessId: B, location: { id: L, timezone: TZ }, salon: "Maple & Ash Hair Studio", today }, today));
+    clients.set(role, await signIn(LOGINS[role].email));
+    contexts.set(role, await contextFor(role));
   }
   if (!DRY && !claudeClient()) throw new Error("Set ANTHROPIC_API_KEY in .env.local, or run with EVAL_DRY=1.");
 });
 
-afterAll(() => {
+afterAll(async () => {
+  await admin.from("time_blocks").delete().eq("note", EVAL_NOTE);
   const passed = results.filter((r) => r.ok).length;
   const total: Record<string, Usage> = {};
   for (const r of results) {
@@ -373,7 +441,7 @@ describe("Ask Denise", () => {
   CASES.forEach((c, i) => {
     it(`#${i + 1} ${c.question}`, async () => {
       const facts = await c.facts();
-      const question = c.question.replace("{client}", String(facts.client ?? ""));
+      const question = c.question.replace(/\{(\w+)\}/g, (_, k: string) => String(facts[k] ?? ""));
       const ctx = contexts.get(c.as)!;
       const runner = assistantTools(ctx);
       const available = runner.tools.map((t) => t.name);
@@ -422,6 +490,9 @@ describe("Ask Denise", () => {
       if (wrong) problems.push(wrong);
       // On every answer: plain text, and no guessing anyone's gender.
       if (/\*\*|^#/m.test(answer)) problems.push("uses markdown");
+      if (/\b(the|main|booking) (tool|tools|system|data)\b|\b[a-z]+_[a-z_]+\b/i.test(answer)) problems.push("talks about tools or the system instead of speaking for herself");
+      const toolsWrong = c.checkTools?.(outputs, facts);
+      if (toolsWrong) problems.push(toolsWrong);
       if (c.numbersFromTools) {
         const given = outputs.join(" ");
         const amounts = [...answer.matchAll(/\$\s?([\d,]+(?:\.\d+)?)/g)].map((m) => Number(m[1].replace(/,/g, "")));

@@ -11,7 +11,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/database.types";
-import { busyDuring, checkAppointment, checkMoves, type BookedItem, type BookingContext, type BookingProblem, type MoveRequest } from "./booking.ts";
+import { busyDuring, checkAppointment, checkMoves, type BookedItem, type BookingContext, type BookingProblem, type MoveRequest, type ServiceTiming } from "./booking.ts";
 import { loadBookingContext } from "./load.ts";
 import { fromLocal, toLocal } from "./time.ts";
 
@@ -25,7 +25,9 @@ export type ItemChange = { itemId: string; appointmentId: string; from: Placemen
 
 export type ProposedBooking = {
   clientId: string | null;
-  items: { serviceId: string; staffId: string; resourceId: string | null; start: Date }[];
+  // timing: the length Denise searched with (the stylist's usual time),
+  // else the stylist's own length.
+  items: { serviceId: string; staffId: string; resourceId: string | null; start: Date; timing?: ServiceTiming }[];
 };
 
 // A message to a client or stylist, recorded when the change is applied.
@@ -89,7 +91,13 @@ export function proposalToJson(p: Proposal): Json {
     book: p.book
       ? {
           client_id: p.book.clientId,
-          items: p.book.items.map((i) => ({ service_id: i.serviceId, staff_id: i.staffId, resource_id: i.resourceId, starts_at: i.start.toISOString() })),
+          items: p.book.items.map((i) => ({
+            service_id: i.serviceId,
+            staff_id: i.staffId,
+            resource_id: i.resourceId,
+            starts_at: i.start.toISOString(),
+            timing: i.timing ? { active: i.timing.activeMinutes, processing: i.timing.processingMinutes, finishing: i.timing.finishingMinutes } : null,
+          })),
         }
       : null,
   };
@@ -112,7 +120,13 @@ export function proposalFromJson(json: Json): Proposal {
     book: j.book
       ? {
           clientId: j.book.client_id ?? null,
-          items: j.book.items.map((i: any) => ({ serviceId: i.service_id, staffId: i.staff_id, resourceId: i.resource_id ?? null, start: new Date(i.starts_at) })),
+          items: j.book.items.map((i: any) => ({
+            serviceId: i.service_id,
+            staffId: i.staff_id,
+            resourceId: i.resource_id ?? null,
+            start: new Date(i.starts_at),
+            timing: i.timing ? { activeMinutes: i.timing.active, processingMinutes: i.timing.processing, finishingMinutes: i.timing.finishing } : undefined,
+          })),
         }
       : null,
   };

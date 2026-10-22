@@ -148,6 +148,27 @@ describe("Ask Denise", () => {
     );
   });
 
+  it("searches and suggests with a stylist's usual time, and says so", async () => {
+    // Priya has a 1pm client and usually takes 78 minutes for a cut (booked
+    // as 80): from 11:30, only 11:30 still fits before 1pm.
+    const busy = calendar([
+      { id: "x", appointmentId: "a", serviceId: "cut", staffId: "priya", resourceId: null, start: at("13:00"), activeMinutes: 60, processingMinutes: 0, finishingMinutes: 0 },
+    ]);
+    const c = context({ calendar: async () => busy, usualTime: (staffId, serviceId) => (staffId === "priya" && serviceId === "cut" ? { medianMinutes: 78, visits: 12 } : null) });
+    const runner = assistantTools(c);
+    const found = JSON.parse(await runner.run("find_openings", { service_id: "cut", date: DAY, staff_id: null, after: "11:30", before: "12:00", limit: 10 }));
+    const priya = found.filter((o: { stylist: string }) => o.stylist === "Priya");
+    expect(priya.map((o: { start: string }) => o.start)).toEqual(["11:30am"]);
+    expect(priya[0]).toMatchObject({ length_minutes: 80, length_basis: expect.stringContaining("Priya's usual time (typically 78 minutes over 12 visits)") });
+    // Ethan has no usual time yet: the booked length.
+    expect(found.find((o: { stylist: string }) => o.stylist === "Ethan")).toMatchObject({ length_minutes: 60, length_basis: expect.stringContaining("booked length") });
+
+    expect(await runner.run("propose_booking", { service_id: "cut", staff_id: "priya", date: DAY, start: "12:00", client_first_name: null })).toMatch(/already has a client/);
+    const ok = JSON.parse(await runner.run("propose_booking", { service_id: "cut", staff_id: "priya", date: DAY, start: "11:30", client_first_name: null }));
+    expect(ok.length_minutes).toBe(80);
+    expect(c.propose).toHaveBeenCalledWith(expect.objectContaining({ timing: { activeMinutes: 80, processingMinutes: 0, finishingMinutes: 0 }, reason: expect.stringContaining("Priya's usual time") }));
+  });
+
   it("shows suggestions without an action when the asker can't approve", async () => {
     const c = context({ propose: vi.fn(async () => null) });
     const runner = assistantTools(c);
@@ -237,7 +258,7 @@ describe("Ask Denise's knowledge", () => {
     const results = (requests[2].messages as { role: string; content: { content: string }[] }[]).at(-1)!.content.map((r) => r.content);
     expect(results).toEqual([JSON.stringify({ total_dollars: 4210 }), "That day has passed.", "Give the date as YYYY-MM-DD."]);
     // The system prompt says numbers come from tools, and clients are never contacted.
-    expect(String(requests[0].system)).toMatch(/Every number you mention must come from a tool result/);
+    expect(String(requests[0].system)).toMatch(/Every number you mention must come from what you looked up/);
     expect(String(requests[0].system)).toMatch(/never contact clients or write messages to them/);
   });
 

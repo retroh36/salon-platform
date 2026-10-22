@@ -40,6 +40,8 @@ export type ConflictView = {
   // "Ava Chen is already checked in, so I've left that visit as it is."
   note: string | null;
   options: FixView[];
+  // The same with clients' first names only, for Claude (Ask Denise).
+  firstNames: { headline: string; options: string[] };
 };
 
 export type DeniseNotice = { id: string; appointmentId: string; itemId: string; text: string };

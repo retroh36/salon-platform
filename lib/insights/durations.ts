@@ -18,7 +18,14 @@ export const SUGGEST_DIFFERENCE = 10;
 const TREND_VISITS = 12;
 const TREND_MINUTES = 5;
 const TREND_SHARE = 0.08;
-const TREND_TAU = 0.25;
+// Mann-Kendall test: |z| at least this (about 99.7% confidence). Stricter
+// than the usual 95% because a salon has around a hundred stylist and
+// service pairs, and at 95% about five of them would look like trends by
+// chance alone.
+const TREND_Z = 3;
+// And enough recent visits: this many in the last TREND_RECENT_DAYS.
+const TREND_RECENT_VISITS = 5;
+const TREND_RECENT_DAYS = 60;
 
 export type DurationSample = {
   staffId: string;
@@ -62,20 +69,42 @@ export function consistencyOf(p25: number, p75: number, typical: number): Consis
   return spread < 0.1 ? "steady" : spread < 0.2 ? "varies" : "unpredictable";
 }
 
-// The latest third of visits against the earliest third. It's a trend when
-// the change is big enough and visits move that way consistently over
-// time (Kendall's tau at least TREND_TAU), not just two noisy groups.
-export function trendOf(samples: readonly DurationSample[]): { trend: Trend; minutes: number } {
+// The latest third of visits against the earliest third. It's only called
+// a trend when it's statistically meaningful: big enough (5 minutes or 8%),
+// significant over time (Mann-Kendall test, |z| ≥ 3), from at least
+// TREND_VISITS visits with TREND_RECENT_VISITS in the last
+// TREND_RECENT_DAYS days. Anything less is "steady".
+export function trendOf(samples: readonly DurationSample[], asOf = new Date()): { trend: Trend; minutes: number } {
   if (samples.length < TREND_VISITS) return { trend: "steady", minutes: 0 };
+  const recent = samples.filter((s) => asOf.getTime() - s.at.getTime() <= TREND_RECENT_DAYS * 86_400_000).length;
+  if (recent < TREND_RECENT_VISITS) return { trend: "steady", minutes: 0 };
   const ordered = [...samples].sort((a, b) => a.at.getTime() - b.at.getTime());
   const third = Math.floor(ordered.length / 3);
   const early = median(ordered.slice(0, third).map((s) => s.actualMinutes))!;
   const late = median(ordered.slice(-third).map((s) => s.actualMinutes))!;
   const change = late - early;
   const threshold = Math.max(TREND_MINUTES, early * TREND_SHARE);
-  const tau = kendallTau(ordered.map((s) => s.actualMinutes));
-  if (Math.abs(change) < threshold || Math.abs(tau) < TREND_TAU || Math.sign(tau) !== Math.sign(change)) return { trend: "steady", minutes: Math.round(change) };
+  const z = mannKendallZ(ordered.map((s) => s.actualMinutes));
+  if (Math.abs(change) < threshold || Math.abs(z) < TREND_Z || Math.sign(z) !== Math.sign(change)) return { trend: "steady", minutes: Math.round(change) };
   return { trend: change < 0 ? "faster" : "slower", minutes: Math.round(change) };
+}
+
+// The Mann-Kendall test statistic for a trend in values over time: S (rises
+// minus falls over all pairs) scaled by its spread under "no trend", with
+// the usual continuity correction and an adjustment for ties. Beyond ±1.96
+// is a trend at 95% confidence; we ask for more (TREND_Z).
+export function mannKendallZ(values: readonly number[]): number {
+  const n = values.length;
+  if (n < 3) return 0;
+  let s = 0;
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) s += Math.sign(values[j] - values[i]);
+  const ties = new Map<number, number>();
+  for (const v of values) ties.set(v, (ties.get(v) ?? 0) + 1);
+  let tieTerm = 0;
+  for (const t of ties.values()) tieTerm += t * (t - 1) * (2 * t + 5);
+  const variance = (n * (n - 1) * (2 * n + 5) - tieTerm) / 18;
+  if (variance <= 0 || s === 0) return 0;
+  return (s - Math.sign(s)) / Math.sqrt(variance);
 }
 
 // How consistently values rise (1) or fall (-1) in order: concordant minus
@@ -94,7 +123,7 @@ export function kendallTau(values: readonly number[]): number {
 
 // One insight per stylist and service with any timed visits. menuMinutes
 // is each service's length on the menu.
-export function stylistDurations(samples: readonly DurationSample[], menuMinutes: ReadonlyMap<string, number>): DurationInsight[] {
+export function stylistDurations(samples: readonly DurationSample[], menuMinutes: ReadonlyMap<string, number>, asOf = new Date()): DurationInsight[] {
   const groups = new Map<string, DurationSample[]>();
   for (const s of samples) {
     if (!(s.actualMinutes > 0)) continue;
@@ -112,7 +141,7 @@ export function stylistDurations(samples: readonly DurationSample[], menuMinutes
     const menu = menuMinutes.get(group[0].serviceId) ?? median(group.map((s) => s.bookedMinutes))!;
     const trusted = kept.length >= MIN_VISITS;
     const suggested = ceilTo(typical, 5);
-    const { trend, minutes } = trendOf(keptSamples);
+    const { trend, minutes } = trendOf(keptSamples, asOf);
     insights.push({
       staffId: group[0].staffId,
       serviceId: group[0].serviceId,

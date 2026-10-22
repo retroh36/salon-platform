@@ -206,6 +206,7 @@ export async function scanDay(
         shiftMinutes: o.option.shiftMinutes,
         unresolved: [...new Set(o.option.unresolved.map((id) => lookup.visits.get(lookup.items.get(id)?.appointmentId ?? "")?.client?.fullName ?? "A walk-in"))],
       })),
+      firstNames: { headline: headline(w.conflict, lookup, true), options: w.options.map((o) => summary(o.option, lookup, true)) },
     });
   }
 

@@ -147,12 +147,12 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
           outliers_set_aside: d.outliers,
           trusted: d.trusted,
           consistency: d.consistency,
-          trend: d.trend,
-          trend_minutes: d.trendMinutes,
+          // Only real trends (significant, from enough recent visits).
+          ...(d.trend !== "steady" ? { trend: d.trend === "faster" ? "getting faster" : "getting slower", trend_minutes: d.trendMinutes } : {}),
           menu_minutes: d.menuMinutes,
           usually_booked_minutes: d.bookedMinutes,
           ran_over_percent: pct(d.overrunRate),
-          suggested_minutes: d.suggestedMinutes,
+          suggested_booking_minutes: d.suggestedMinutes,
         }));
       return { scope: isStylist ? "your own services" : "all stylists", rows, note: rows.length ? undefined : "No timed visits for that yet." };
     },
@@ -268,7 +268,8 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
           const state = await scanDay(supabase, viewer, date);
           return {
             date,
-            problems: state.conflicts.map((c) => ({ problem: c.headline, kind: c.kind, options: c.options.map((o) => o.summary) })),
+            // Clients by first name only.
+            problems: state.conflicts.map((c) => ({ problem: c.firstNames.headline, kind: c.kind, options: c.firstNames.options })),
             note: state.conflicts.length ? "These fixes are in Denise's panel for staff to approve or dismiss." : "Nothing to fix that day.",
           };
         }

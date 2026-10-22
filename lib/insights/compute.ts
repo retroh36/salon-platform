@@ -194,15 +194,15 @@ function clientRows(businessId: string, byClient: Map<string, ClientVisit[]>, as
   });
 }
 
-function durationRows(businessId: string, h: History, at: string): Row[] {
-  return stylistDurations(durationSamples(h), h.menu).map((d) => ({ business_id: businessId, kind: "duration", key: `${d.staffId}:${d.serviceId}`, data: d as unknown as NonNullable<Json>, computed_at: at }));
+function durationRows(businessId: string, h: History, at: string, asOf: Date): Row[] {
+  return stylistDurations(durationSamples(h), h.menu, asOf).map((d) => ({ business_id: businessId, kind: "duration", key: `${d.staffId}:${d.serviceId}`, data: d as unknown as NonNullable<Json>, computed_at: at }));
 }
 
 // Everything, for one salon. Rows nothing produced any more are removed.
 export async function computeInsights(admin: Admin, businessId: string, asOf = new Date()): Promise<{ durations: number; clients: number; locations: number }> {
   const at = new Date().toISOString();
   const h = await loadHistory(admin, businessId);
-  const durations = durationRows(businessId, h, at);
+  const durations = durationRows(businessId, h, at, asOf);
   const clients = clientRows(businessId, clientVisits(h), asOf, at);
   const weeks = Math.max(1, Math.round((asOf.getTime() - Math.min(...h.items.map((i) => new Date(i.starts_at).getTime()), asOf.getTime())) / (7 * DAY)));
   const salons = [...h.timezones.keys()].map((locationId) => ({
@@ -235,6 +235,6 @@ export async function recomputeForVisit(admin: Admin, appointmentId: string, asO
   ]);
   await store(admin, [
     ...(forClient ? clientRows(visit.business_id, clientVisits(forClient), asOf, at) : []),
-    ...(forStaff ? durationRows(visit.business_id, forStaff, at) : []),
+    ...(forStaff ? durationRows(visit.business_id, forStaff, at, asOf) : []),
   ]);
 }

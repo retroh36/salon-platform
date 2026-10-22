@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { clientInsight, timeOfDay, type ClientVisit } from "@/lib/insights/clients";
 import { describeClient, minutesText, usualTime } from "@/lib/insights/describe";
-import { consistencyOf, kendallTau, MIN_VISITS, stylistDurations, trendOf, type DurationSample } from "@/lib/insights/durations";
+import { consistencyOf, kendallTau, mannKendallZ, MIN_VISITS, stylistDurations, trendOf, type DurationSample } from "@/lib/insights/durations";
 import { salonInsight, type SalonItem } from "@/lib/insights/salon";
 import { ceilTo, median, mode, quantile, withoutOutliers } from "@/lib/insights/stats";
 
@@ -86,20 +86,26 @@ describe("stylist durations", () => {
     expect(consistencyOf(45, 75, 60)).toBe("unpredictable");
   });
 
-  it("notices a stylist getting faster or slower", () => {
-    const faster = [76, 75, 74, 73, 70, 68, 66, 64, 63, 62, 61, 60].map((m, i) => sample("shae", "cut", m, 120 - i * 10, 60));
-    expect(trendOf(faster)).toEqual({ trend: "faster", minutes: -13 });
-    const steady = [60, 61, 59, 60, 62, 61, 60, 59, 61, 60, 62, 59].map((m, i) => sample("shae", "cut", m, 120 - i * 10, 60));
-    expect(trendOf(steady).trend).toBe("steady");
-    const slower = [50, 51, 52, 52, 55, 58, 60, 61, 63, 64, 65, 66].map((m, i) => sample("gil", "cut", m, 120 - i * 10, 60));
-    expect(trendOf(slower).trend).toBe("slower");
-    // A big difference between noisy groups isn't a trend.
-    const noisy = [60, 75, 58, 74, 61, 76, 59, 73, 70, 62, 72, 74].map((m, i) => sample("bridget", "cut", m, 120 - i * 10, 60));
-    expect(trendOf(noisy).trend).toBe("steady");
+  it("calls it a trend only when it's significant, big enough and recent", () => {
+    // Ten days apart, the latest on T0.
+    const series = (values: number[], staff = "shae") => values.map((m, i) => sample(staff, "cut", m, (values.length - 1 - i) * 10, 60));
+    const faster = series([76, 75, 74, 73, 70, 68, 66, 64, 63, 62, 61, 60]);
+    expect(trendOf(faster, T0)).toEqual({ trend: "faster", minutes: -13 });
+    expect(trendOf(series([60, 61, 59, 60, 62, 61, 60, 59, 61, 60, 62, 59]), T0).trend).toBe("steady");
+    expect(trendOf(series([50, 51, 52, 52, 55, 58, 60, 61, 63, 64, 65, 66], "gil"), T0).trend).toBe("slower");
+    // A big difference between noisy groups isn't significant.
+    expect(trendOf(series([60, 75, 58, 74, 61, 76, 59, 73, 70, 62, 72, 74], "bridget"), T0).trend).toBe("steady");
+    // Too few visits, or too few of them recent, to say.
+    expect(trendOf(faster.slice(0, 5), T0).trend).toBe("steady");
+    expect(trendOf(faster, daysAfter(60)).trend).toBe("steady");
+  });
+
+  it("tests for a trend with Mann-Kendall", () => {
+    expect(mannKendallZ([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])).toBeGreaterThan(1.96);
+    expect(mannKendallZ([10, 9, 8, 7, 6, 5, 4, 3, 2, 1])).toBeLessThan(-1.96);
+    expect(Math.abs(mannKendallZ([5, 1, 4, 2, 3, 5, 1, 4, 2, 3]))).toBeLessThan(1.96);
+    expect(mannKendallZ([4, 4, 4, 4])).toBe(0);
     expect(kendallTau([1, 2, 3])).toBe(1);
-    expect(kendallTau([3, 2, 1])).toBe(-1);
-    // Too few visits to say.
-    expect(trendOf(faster.slice(0, 5)).trend).toBe("steady");
   });
 });
 

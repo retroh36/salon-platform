@@ -272,6 +272,22 @@ describe("applying and undoing", () => {
     expect(gone).toBeNull();
   });
 
+  it("books with the length Denise proposed (the stylist's usual time)", async () => {
+    const timing = { activeMinutes: 80, processingMinutes: 0, finishingMinutes: 0 };
+    const proposal: Proposal = {
+      changes: [],
+      book: { clientId, items: [{ serviceId: services.get("Women's Cut & Style")!, staffId: BRIDGET, resourceId: null, start: at(16), timing }] },
+    };
+    const [id] = await recordProposals(frontDesk, SEED.location, { feature: "ask_denise", subject: null, options: [option("Cut with Bridget at 4", proposal)] });
+    oneOffs.push(id);
+    expect(await applyAction(frontDesk, location, id)).toEqual({ ok: true });
+    const created = ((await action(id))!.previous_state as { created_appointment_id: string }).created_appointment_id;
+    appointments.push(created);
+    const { data: line } = await admin.from("appointment_items").select("active_minutes, processing_minutes, finishing_minutes, ends_at").eq("appointment_id", created).single();
+    expect(line).toMatchObject({ active_minutes: 80, processing_minutes: 0, finishing_minutes: 0 });
+    expect(new Date(line!.ends_at)).toEqual(new Date(at(16).getTime() + 80 * 60_000));
+  });
+
   it("won't undo a booking once the client has checked in", async () => {
     const proposal: Proposal = {
       changes: [],

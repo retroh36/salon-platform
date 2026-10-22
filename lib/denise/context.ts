@@ -13,6 +13,7 @@ import { LEVEL_LABELS } from "@/lib/schedule-forms";
 import type { LocalDate } from "@/lib/scheduling/time";
 import type { StaffRole } from "@/lib/staff";
 import type { AssistantContext } from "./assistant";
+import { loadDurations } from "@/lib/insights/read";
 import { knowledgeFor } from "./knowledge";
 
 type Supabase = SupabaseClient<Database>;
@@ -35,7 +36,7 @@ export async function assistantContext(supabase: Supabase, me: Asking, date: Loc
   ]);
   if (services.error) throw services.error;
   if (staff.error) throw staff.error;
-  const offers = await loadOffers(supabase, staff.data.map((m) => m.id));
+  const [offers, learned] = await Promise.all([loadOffers(supabase, staff.data.map((m) => m.id)), loadDurations(supabase, me.businessId)]);
   const calendars = new Map<string, Promise<BookingContext>>();
   const bookers = canBook(me.role);
 
@@ -58,9 +59,13 @@ export async function assistantContext(supabase: Supabase, me: Asking, date: Loc
       const [id] = await recordProposals(supabase, me.location.id, {
         feature: "ask_denise",
         subject: null,
-        options: [{ summary: b.summary, reason: b.reason, proposal: { changes: [], book: { clientId: null, items: [{ serviceId: b.serviceId, staffId: b.staffId, resourceId: b.resourceId, start: b.start }] } } }],
+        options: [{ summary: b.summary, reason: b.reason, proposal: { changes: [], book: { clientId: null, items: [{ serviceId: b.serviceId, staffId: b.staffId, resourceId: b.resourceId, start: b.start, timing: b.timing }] } } }],
       });
       return id ?? null;
+    },
+    usualTime: (staffId, serviceId) => {
+      const d = learned.get(`${staffId}:${serviceId}`);
+      return d?.trusted ? { medianMinutes: d.medianMinutes, visits: d.visits } : null;
     },
     asker: ROLE_NAMES[me.role],
     askerName: staff.data.find((m) => m.id === me.staffId)?.first_name,

@@ -1,9 +1,11 @@
 // Free times for a service: every stylist who offers it, at each start time
 // in a window, checked with the booking rules (./booking.ts), with a free
-// chair. Used by Denise's "Ask Denise" to answer "who's free for a color at
-// 3?". Pure, over a BookingContext from ./load.ts.
+// chair. Each stylist is checked with their own length for the service:
+// `timings` (e.g. how long they really take, from lib/insights/), else
+// their own or the menu's. Used by Denise's "Ask Denise" to answer "who's
+// free for a color at 3?". Pure, over a BookingContext from ./load.ts.
 
-import { checkItem, pickResource, timingFor, type BookedItem, type BookingContext } from "./booking.ts";
+import { checkItem, durationMinutes, pickResource, timingFor, type BookedItem, type BookingContext, type ServiceTiming } from "./booking.ts";
 import { fromLocal, type LocalDate } from "./time.ts";
 
 export type OpeningQuery = {
@@ -19,9 +21,11 @@ export type OpeningQuery = {
   // Not before this instant (now, for today).
   notBefore?: Date;
   limit?: number;
+  // Staff id -> the length to check that stylist with.
+  timings?: ReadonlyMap<string, ServiceTiming>;
 };
 
-export type Opening = { staffId: string; start: Date; startMinute: number; resourceId: string | null };
+export type Opening = { staffId: string; start: Date; startMinute: number; resourceId: string | null; minutes: number };
 
 export function findOpenings(ctx: BookingContext, q: OpeningQuery): Opening[] {
   const service = ctx.services.get(q.serviceId);
@@ -39,11 +43,12 @@ export function findOpenings(ctx: BookingContext, q: OpeningQuery): Opening[] {
     if (!start || (q.notBefore && start < q.notBefore)) continue;
     for (const staff of stylists) {
       if (openings.length >= limit) break;
-      const draft: BookedItem = { ...timingFor(ctx, staff.id, service.id)!, serviceId: service.id, staffId: staff.id, start };
+      const timing = q.timings?.get(staff.id) ?? timingFor(ctx, staff.id, service.id)!;
+      const draft: BookedItem = { ...timing, serviceId: service.id, staffId: staff.id, start };
       const resourceId = pickResource(ctx, draft);
       if (!resourceId && [...ctx.resources.values()].some((r) => r.kind === "chair" && r.isActive)) continue;
-      if (checkItem(ctx, { serviceId: service.id, staffId: staff.id, resourceId, start }).valid) {
-        openings.push({ staffId: staff.id, start, startMinute: minute, resourceId });
+      if (checkItem(ctx, { serviceId: service.id, staffId: staff.id, resourceId, start, timing }).valid) {
+        openings.push({ staffId: staff.id, start, startMinute: minute, resourceId, minutes: durationMinutes(timing) });
       }
     }
   }

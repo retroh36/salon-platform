@@ -77,9 +77,18 @@ describe("as the front desk", () => {
     expect(day).not.toMatch(PRIVATE);
   });
 
-  it("has no sales, but can look for fixes", async () => {
+  it("has no sales, but can look for fixes, with clients' first names only", async () => {
     expect(k().sales).toBeNull();
-    expect(k().fixes).not.toBeNull();
+    const fixes = JSON.stringify(await k().fixes!(today));
+    const { data: visits } = await admin
+      .from("appointments")
+      .select("client:clients(last_name)")
+      .eq("location_id", L)
+      .gte("starts_at", startOfLocalDay(today, TZ).toISOString())
+      .lt("starts_at", startOfLocalDay(addDays(today, 1), TZ).toISOString());
+    const lastNames = new Set(visits!.flatMap((v) => (v.client?.last_name ? [v.client.last_name] : [])));
+    expect(lastNames.size).toBeGreaterThan(0);
+    for (const name of lastNames) expect(fixes).not.toContain(name);
     const stock = (await k().stock("olaplex")) as { products: { product: string }[] };
     expect(stock.products.every((p) => p.product.includes("Olaplex"))).toBe(true);
   });

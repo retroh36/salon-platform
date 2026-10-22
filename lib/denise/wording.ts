@@ -124,10 +124,11 @@ export function moves(option: FixOption, l: Lookup): FixMove[] {
   }));
 }
 
-// "Grace Lewis 11:00 → 11:20", "Ada Brown → Ethan at 2:00".
-export function summary(option: FixOption, l: Lookup): string {
+// "Grace Lewis 11:00 → 11:20", "Ada Brown → Ethan at 2:00". `firstNames`
+// for Claude.
+export function summary(option: FixOption, l: Lookup, firstNames = false): string {
   const parts = visitChanges(option, l).map((v) => {
-    const name = v.client?.fullName ?? "Walk-in";
+    const name = (firstNames ? v.client?.firstName : v.client?.fullName) ?? "Walk-in";
     const staffChanged = v.from.staffId !== v.to.staffId;
     if (v.from.minute === v.to.minute && !staffChanged) {
       const m = option.moves.find((x) => x.appointmentId === v.appointmentId)!;

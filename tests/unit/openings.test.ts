@@ -70,4 +70,17 @@ describe("free times for a service", () => {
     expect(findOpenings(ctx(), { serviceId: "old", date: DAY })).toEqual([]);
     expect(findOpenings(ctx(), { serviceId: "cut", date: DAY, limit: 50 }).some((o) => o.staffId === "gone")).toBe(false);
   });
+
+  it("checks each stylist with their own length when given one", () => {
+    // Priya has a client at 2pm. With the menu's hour, 12:00 fits before
+    // her 1pm break; with her usual 80 minutes it doesn't, and 11:40 does.
+    const usual = new Map([["priya", { activeMinutes: 80, processingMinutes: 0, finishingMinutes: 0 }]]);
+    const q = { serviceId: "cut", date: DAY, staffIds: ["priya"], from: minutes("11:30"), to: minutes("12:00"), step: 5 };
+    expect(findOpenings(ctx(), q).map(label)).toContain("priya 12:00");
+    const found = findOpenings(ctx(), { ...q, timings: usual });
+    expect(found.map(label)).toEqual(["priya 11:30", "priya 11:35", "priya 11:40"]);
+    expect(found[0].minutes).toBe(80);
+    // Others keep the menu's length.
+    expect(findOpenings(ctx(), { serviceId: "cut", date: DAY, staffIds: ["ethan"], limit: 1, timings: usual })[0].minutes).toBe(60);
+  });
 });
