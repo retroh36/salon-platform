@@ -43,6 +43,9 @@ Business → Location → Staff, Resource; Service, StaffService; Client; Appoin
 - **Never print or log** Phorest credentials, the business ID, or any record values. Report problems through `IssueLog` (entity, field, reason, count: no values) and errors as status + endpoint template.
 - Modules under `lib/import/` and `lib/scheduling/` run under plain Node (for the dry-run script), so relative imports use explicit `.ts` extensions and avoid TypeScript-only runtime syntax (enums, parameter properties).
 
+## Brand (`docs/brand.md`)
+- **Follow `docs/brand.md` for anything users see**: the name, logo files and their sizes, colors and their roles, typography, voice and Denise. Keep the two brands apart: Maestra (login, browser tab and icons, loading screen, platform emails, "Powered by Maestra") and the salon's own (its name and logo at the top of the sidebar and on messages to its clients). Logo files are in `public/brand/maestra/`; don't redraw or recolor them.
+
 ## Design (`docs/design/`)
 - Mockups: `docs/design/mockup-1.png` (features) and `mockup-2.png` (visual style).
 - Tokens (colors, fonts, radius, shadows, motion) live in `app/globals.css` under `@theme`. Every text/background pair must pass WCAG AA: add new pairs to `tests/unit/design-tokens.test.ts`.
