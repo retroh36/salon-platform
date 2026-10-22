@@ -258,7 +258,7 @@ test("a client reschedules, then cancels, with their private link", async ({ pag
   const days = move.getByRole("radiogroup", { name: "Date" }).getByRole("radio");
   await expect(days.first()).toBeVisible();
   const labels = await days.evaluateAll((els) => els.map((e) => e.getAttribute("aria-label") ?? ""));
-  await days.nth(labels.findIndex((l, i) => i >= 5 && !l.endsWith("no times"))).click();
+  await days.nth(labels.findIndex((l, i) => i >= 5 && Number(/(\d+) times?$/.exec(l)?.[1] ?? 0) >= 3)).click();
   await move.getByRole("radiogroup", { name: /Morning|Afternoon|Evening/ }).getByRole("radio").nth(2).click();
   await move.getByRole("button", { name: "Move my booking" }).click();
   await expect(page.getByRole("status")).toContainText("Moved to");

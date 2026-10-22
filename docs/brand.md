@@ -136,17 +136,20 @@ check this).
 
 ### Stylist levels
 
-| Level | Token | Hex |
-| --- | --- | --- |
-| Master | `level-master` | `#A67C12` gold |
-| Senior | `level-senior` | `#7C8896` silver |
-| Artisan | `level-artisan` | `#9A5A2B` bronze |
+| Level | Token | Hex | Badge |
+| --- | --- | --- | --- |
+| Master | `level-master` | `#A0700A` rich gold | a star |
+| Senior | `level-senior` | `#7A1F55` berry | two dots |
+| Artisan | `level-artisan` | `#0B6A3C` emerald | one dot |
 
-Levels show as color only: a ring around the stylist's avatar and a thin bar
-along the top of their calendar column, explained by the legend. They're
-graphics, so they meet 3:1 against the page, and they're kept clearly apart
-from the service colors and Denise's periwinkle (the token tests check
-both). The level's name appears in staff settings, not on the calendar.
+On the calendar a level shows as a 3px ring around the stylist's avatar
+with a small badge in its corner (so it's never color alone), and a 4px bar
+along the top of their column, explained by the legend. They're graphics,
+so they meet 3:1 against the page. They're kept clearly apart from each
+other, the service colors and Denise's periwinkle, with normal vision and
+with protanopia, deuteranopia and tritanopia simulated (the token tests
+check all of it). The level's name appears in staff settings and on the
+booking site, not on the calendar.
 
 Status chips have their own pairs (booked, confirmed, checked in, completed,
 running late, no-show) in `globals.css`.

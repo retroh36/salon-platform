@@ -32,7 +32,7 @@ export type ConflictView = {
   // e.g. "2026-10-21:overrun:<id>"
   subject: string;
   kind: ConflictKind;
-  // "Priya's running 20 minutes late."
+  // "Bridget's running 20 minutes late."
   headline: string;
   // Items to highlight: what caused it and who's affected.
   itemIds: string[];

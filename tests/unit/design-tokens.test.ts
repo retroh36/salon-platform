@@ -34,13 +34,24 @@ function overWhite(hex: string, alpha: number): string {
   return `#${[1, 3, 5].map((i) => channel(i).toString(16).padStart(2, "0")).join("")}`;
 }
 
+// Color-blindness simulations (Machado, Oliveira & Fernandes 2009, full
+// severity), applied to linear RGB.
+type Matrix = [number, number, number][];
+const SIMULATIONS: Record<string, Matrix> = {
+  protanopia: [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-0.003882, -0.048116, 1.051998]],
+  deuteranopia: [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.01182, 0.04294, 0.968881]],
+  tritanopia: [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [0.004733, 0.691367, 0.3039]],
+};
+
 // How different two colors look: CIE76 distance in Lab (about 2.3 is
-// just noticeable; 20+ is clearly a different color).
-function lab(hex: string): [number, number, number] {
-  const [r, g, b] = [1, 3, 5].map((i) => {
+// just noticeable; 20+ is clearly a different color), optionally as seen
+// with a color-blindness.
+function lab(hex: string, sim?: Matrix): [number, number, number] {
+  let [r, g, b] = [1, 3, 5].map((i) => {
     const c = parseInt(hex.slice(i, i + 2), 16) / 255;
     return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
   });
+  if (sim) [r, g, b] = sim.map(([x, y, z]) => Math.min(1, Math.max(0, x * r + y * g + z * b)));
   const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
   const x = f((r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047);
   const y = f(r * 0.2126 + g * 0.7152 + b * 0.0722);
@@ -48,8 +59,8 @@ function lab(hex: string): [number, number, number] {
   return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
 }
 
-function deltaE(a: string, b: string): number {
-  const [p, q] = [lab(a), lab(b)];
+function deltaE(a: string, b: string, sim?: Matrix): number {
+  const [p, q] = [lab(a, sim), lab(b, sim)];
   return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
 }
 
@@ -129,15 +140,26 @@ describe("design tokens", () => {
     for (const level of LEVELS) for (const s of SURFACES) expect(contrast(color(level), color(s))).toBeGreaterThanOrEqual(3);
   });
 
-  it("keeps level colors clearly apart from the service colors, Denise and each other", () => {
+  it("keeps level colors clearly apart from each other, the service colors and Denise, with color-blindness too", () => {
     const others = [
       ...FILLS,
       ...FILLS.map((f) => f.replace("-fill", "-accent")),
       "denise-100", "denise-200", "denise-500", "denise-600", "denise-700",
     ];
-    for (const level of LEVELS) {
-      for (const other of [...others, ...LEVELS.filter((l) => l !== level)]) {
-        expect(deltaE(color(level), color(other)), `${level} vs ${other}`).toBeGreaterThanOrEqual(20);
+    // [vision, between levels, level vs others]. The avatar badges (a star,
+    // two dots, one dot) carry the level too, so color is never alone.
+    const checks: [string, Matrix | undefined, number, number][] = [
+      ["normal", undefined, 40, 18],
+      ...Object.entries(SIMULATIONS).map(([name, m]): [string, Matrix, number, number] => [name, m, 20, 10]),
+    ];
+    for (const [vision, sim, apart, fromOthers] of checks) {
+      for (const level of LEVELS) {
+        for (const other of LEVELS.filter((l) => l !== level)) {
+          expect(deltaE(color(level), color(other), sim), `${level} vs ${other} (${vision})`).toBeGreaterThanOrEqual(apart);
+        }
+        for (const other of others) {
+          expect(deltaE(color(level), color(other), sim), `${level} vs ${other} (${vision})`).toBeGreaterThanOrEqual(fromOthers);
+        }
       }
     }
   });

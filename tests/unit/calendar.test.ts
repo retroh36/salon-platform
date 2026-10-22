@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FAMILIES, FAMILY_LABELS, gridRange, hourMarks, laneBox, layoutColumn, offHours, serviceFamily } from "@/lib/calendar";
+import { bookedSummary, FAMILIES, FAMILY_LABELS, gridRange, hourMarks, laneBox, layoutColumn, offHours, serviceFamily } from "@/lib/calendar";
 
 const h = (hours: number, minutes = 0) => hours * 60 + minutes;
 const span = (start: number, end: number) => ({ start, end });
@@ -129,5 +129,20 @@ describe("lane boxes", () => {
     const three = [0, 1, 2].map((l) => laneBox(l, 3));
     expect(three.map((b) => Math.round(b.left))).toEqual([0, 40, 70]);
     expect(Math.round(three.reduce((sum, b) => sum + b.width, 0))).toBe(100);
+  });
+});
+
+describe("bookedSummary", () => {
+  it("counts visits once and adds up their time", () => {
+    expect(bookedSummary([])).toBe("No bookings");
+    expect(bookedSummary([{ appointmentId: "a", minutes: 45 }])).toBe("1 visit · 45m booked");
+    expect(
+      bookedSummary([
+        { appointmentId: "a", minutes: 105 },
+        { appointmentId: "a", minutes: 45 },
+        { appointmentId: "b", minutes: 60 },
+      ]),
+    ).toBe("2 visits · 3h 30m booked");
+    expect(bookedSummary([{ appointmentId: "a", minutes: 120 }])).toBe("1 visit · 2h booked");
   });
 });

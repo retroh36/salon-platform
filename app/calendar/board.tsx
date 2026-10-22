@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { startTransition, useCallback, useEffect, useOptimistic, useRef, useState, ViewTransition } from "react";
 import { DeniseFace } from "@/components/denise";
 import { Avatar, initials } from "@/components/ui/avatar";
-import { LEVEL_BG, LEVEL_BORDER } from "@/components/ui/level";
+import { LEVEL_BG, LevelBadge } from "@/components/ui/level";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { FitText } from "@/components/ui/fit-text";
@@ -71,6 +72,8 @@ type Drag = Move & {
 };
 
 const LIVE_CHECK_MS = 20_000;
+// How close (px) an hour label can be to the current-time pill.
+const NOW_PILL_CLEARANCE = 18;
 
 // Day changes slide forward or back; other updates don't animate.
 const DAY_SLIDE = { "nav-forward": "day-forward", "nav-back": "day-back", default: "none" };
@@ -153,6 +156,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // Minutes since midnight, when the day shown is today (for "running late").
   const now = useNow();
   const nowMinute = now !== null && toLocal(new Date(now), data.timeZone).date === data.date ? toLocal(new Date(now), data.timeZone).minute : null;
+
+  // The pill is about 20px tall, centered on the line; a label is too.
+  const nowHides = (mark: number) => nowMinute !== null && nowMinute >= range.start && nowMinute < range.end && Math.abs(mark - nowMinute) * PX_PER_MINUTE < NOW_PILL_CLEARANCE;
 
   const select = (next: Selection) => {
     setSelection(next);
@@ -455,7 +461,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           </div>
         </div>
 
-        <AskDeniseBar onAsk={ask} />
+        <AskDeniseBar onAsk={ask} example={askExample(data)} />
 
         <div className="flex flex-wrap items-center gap-2">
           <nav aria-label="Date" className="flex flex-wrap items-center gap-2">
@@ -546,12 +552,14 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         <ChevronRightIcon className="size-3.5" />
                       </button>
                     ) : (
-                      <div key={c.staffId} className="relative flex min-w-0 animate-fade-in items-center gap-2.5 border-l border-line px-3 py-3" data-level={c.level ?? undefined}>
-                        {c.level && <span aria-hidden data-testid="level-bar" className={`absolute inset-x-0 top-0 h-[3px] ${LEVEL_BG[c.level]}`} />}
+                      <div key={c.staffId} className="relative flex min-w-0 animate-fade-in items-center gap-2.5 border-l border-line px-3 py-3" data-column-header data-level={c.level ?? undefined}>
+                        {c.level && <span aria-hidden data-testid="level-bar" className={`absolute inset-x-0 top-0 h-1 ${LEVEL_BG[c.level]}`} />}
                         <Avatar name={c.name} color={c.color} level={c.level} />
                         <div className="min-w-0 flex-1">
                           <FitText variants={[c.name, `${c.firstName} ${c.name.split(" ").at(-1)![0]}.`, c.firstName]} className="pr-6 font-semibold" />
-                          <div className="truncate text-sm text-ink-muted">{c.title}</div>
+                          <div className="truncate text-sm text-ink-muted" data-testid="booked-summary">
+                            {c.booked}
+                          </div>
                           <div className="text-xs leading-4 text-ink-muted">{c.hoursLabel}</div>
                         </div>
                         {!c.working && expanded.has(c.staffId) && (
@@ -574,7 +582,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                     {hourMarks(range).map((m) => (
                       <span
                         key={m}
-                        className={`absolute right-2 text-xs font-medium text-ink-muted ${m === range.start ? "translate-y-1" : "-translate-y-1/2"}`}
+                        data-hour-label={m}
+                        // The current-time pill takes the hour label's place when they'd overlap.
+                        aria-hidden={nowHides(m) || undefined}
+                        className={`absolute right-2 text-xs font-medium text-ink-muted transition-opacity duration-(--motion-fast) ${m === range.start ? "translate-y-1" : "-translate-y-1/2"} ${nowHides(m) ? "opacity-0" : ""}`}
                         style={{ top: y(m) }}
                       >
                         {formatMinute(m)}
@@ -893,7 +904,16 @@ function deniseKeys(state: DeniseState): string[] {
   ];
 }
 
-function AskDeniseBar({ onAsk }: { onAsk: (question: string) => void }) {
+// An example question naming someone on the team who does cuts (working
+// today if possible): "Find a haircut with Gil after 1 PM".
+function askExample({ columns, menu }: BoardData): string {
+  const cuts = new Set(menu.services.filter((s) => s.family === "cut" && !s.archived).map((s) => s.id));
+  const cutsHair = (c: ColumnData) => Object.keys(menu.offers[c.staffId] ?? {}).some((id) => cuts.has(id));
+  const who = columns.find((c) => c.working && cutsHair(c)) ?? columns.find(cutsHair);
+  return who ? `Find a haircut with ${who.firstName} after 1 PM` : "Who's free for a haircut after 1 PM?";
+}
+
+function AskDeniseBar({ onAsk, example }: { onAsk: (question: string) => void; example: string }) {
   const [question, setQuestion] = useState("");
   return (
     <form
@@ -912,7 +932,7 @@ function AskDeniseBar({ onAsk }: { onAsk: (question: string) => void }) {
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Find a haircut with Priya after 1 PM"
+          placeholder={example}
           className="w-full bg-transparent text-sm text-ink placeholder:text-ink-subtle focus:outline-none"
         />
       </label>
@@ -1052,20 +1072,41 @@ function BlockHint({ id, details, rect }: { id: string; details: string[]; rect:
 }
 
 // "Out for the day" on a stylist's column.
+const MENU_WIDTH = 340;
+const MENU_MARGIN = 8;
+
 function OutMenu({ column, date, today, onReported }: { column: ColumnData; date: string; today: string; onReported: (state: DeniseState) => void }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
+  const popover = useRef<HTMLDivElement>(null);
+  // Where the popover sits: just below the stylist's header (never over
+  // their name), right-aligned to it, kept inside the screen.
+  const [place, setPlace] = useState<{ top: number; left: number } | null>(null);
   const restOfDay = date === today;
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e: PointerEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false);
+      if (!root.current?.contains(e.target as Node) && !popover.current?.contains(e.target as Node)) setOpen(false);
     };
+    const position = () => {
+      const header = root.current?.closest("[data-column-header]")?.getBoundingClientRect();
+      if (!header) return;
+      const width = Math.min(MENU_WIDTH, window.innerWidth - 2 * MENU_MARGIN);
+      const left = Math.min(Math.max(header.right - width, MENU_MARGIN), window.innerWidth - width - MENU_MARGIN);
+      setPlace({ top: header.bottom + 6, left });
+    };
+    position();
     document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
+    window.addEventListener("resize", position);
+    window.addEventListener("scroll", position, true);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("resize", position);
+      window.removeEventListener("scroll", position, true);
+    };
   }, [open]);
 
   async function markOut() {
@@ -1083,26 +1124,37 @@ function OutMenu({ column, date, today, onReported }: { column: ColumnData; date
       <IconButton label={`More for ${column.name}`} size="sm" aria-expanded={open} onClick={() => setOpen(!open)}>
         <MoreIcon className="size-4" />
       </IconButton>
-      {open && (
-        <div role="dialog" aria-label={`${column.firstName}'s day`} className="absolute top-full right-0 z-50 mt-1 flex w-64 origin-top-right animate-pop-in flex-col gap-3 rounded-xl border border-line bg-surface p-3 text-sm shadow-lift">
-          <p className="text-ink">
-            Mark {column.firstName} out {restOfDay ? "for the rest of the day" : "for the day"}? Denise will find new places for {column.firstName}&apos;s clients.
-          </p>
-          {error && (
-            <p role="alert" className="text-danger">
-              {error}
+      {open &&
+        place &&
+        // On the page itself: the calendar grid would clip it.
+        createPortal(
+          <div
+            ref={popover}
+            onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
+            role="dialog"
+            aria-label={`${column.firstName}'s day`}
+            className="fixed z-[60] flex origin-top-right animate-pop-in flex-col gap-3 rounded-xl border border-line bg-surface p-4 text-sm shadow-lift"
+            style={{ top: place.top, left: place.left, width: `min(${MENU_WIDTH}px, calc(100vw - ${2 * MENU_MARGIN}px))` }}
+          >
+            <p className="text-ink">
+              Mark {column.firstName} out {restOfDay ? "for the rest of the day" : "for the day"}? Denise will find new places for {column.firstName}&apos;s clients.
             </p>
-          )}
-          <div className="flex gap-2">
-            <Button variant="primary" size="sm" disabled={pending} onClick={markOut}>
-              {restOfDay ? "Out for the rest of the day" : "Out for the day"}
-            </Button>
-            <Button size="sm" disabled={pending} onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
+            {error && (
+              <p role="alert" className="text-danger">
+                {error}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button variant="primary" size="sm" disabled={pending} onClick={markOut} className="whitespace-nowrap">
+                {restOfDay ? "Out for the rest of the day" : "Out for the day"}
+              </Button>
+              <Button size="sm" disabled={pending} onClick={() => setOpen(false)} className="whitespace-nowrap">
+                Cancel
+              </Button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -1167,8 +1219,8 @@ function Legend() {
       <li className="flex items-center gap-2" data-testid="level-legend">
         <span className="sr-only">Stylist levels:</span>
         {[...STAFF_LEVELS].reverse().map((l) => (
-          <span key={l} className="flex items-center gap-1.5">
-            <span aria-hidden className={`size-3 rounded-full border-2 ${LEVEL_BORDER[l]}`} />
+          <span key={l} className="mr-1.5 flex items-center gap-1.5">
+            <LevelBadge level={l} className="size-4.5" />
             {LEVEL_LABELS[l]}
           </span>
         ))}

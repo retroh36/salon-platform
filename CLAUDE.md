@@ -54,7 +54,7 @@ Business → Location → Staff, Resource; Service, StaffService; Client; Appoin
 - Motion is CSS only, with no animation library: transitions use `duration-(--motion-fast|base|slow)` (150-250ms), and day changes use React `<ViewTransition>`. `prefers-reduced-motion` turns all of it off (see the end of `globals.css`).
 
 ## Team, levels and prices
-- Stylists have a level: Artisan, Senior or Master (`staff.level`, `STAFF_LEVELS` in `lib/schedule-forms.ts`). It's set in staff settings (Schedule page); on the calendar it shows only as color (gold, silver, bronze: the `level-*` tokens), as a ring around the avatar (`Avatar level`) and a bar along the top of the column, with a legend entry. No level text on the calendar.
+- Stylists have a level: Artisan, Senior or Master (`staff.level`, `STAFF_LEVELS` in `lib/schedule-forms.ts`). It's set in staff settings (Schedule page); on the calendar it shows as color (gold, berry, emerald: the `level-*` tokens) and a badge (star, two dots, one dot): a ring and badge on the avatar (`Avatar level`, `components/ui/level.tsx`) and a bar along the top of the column, with a legend entry. No level text on the calendar; the header line under a stylist's name is their day at a glance (`bookedSummary`).
 - A stylist's price for a service is their own (`staff_services.price_cents`), else their level's (`service_level_prices`, set with `set_service_level_prices`), else the menu price. `stylistPrice` in `lib/services.ts` and `private.stylist_price` in the database work it out the same way; booking and Denise's fixes use the database one.
 
 ## Scheduling (`lib/scheduling/`)

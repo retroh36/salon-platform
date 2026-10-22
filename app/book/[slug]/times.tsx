@@ -41,7 +41,7 @@ export function DateStrip({
             type="button"
             role="radio"
             aria-checked={on}
-            aria-label={`${longDate(d.date)}${empty ? ", no times" : `, ${d.times.length} times`}`}
+            aria-label={`${longDate(d.date)}${empty ? ", no times" : `, ${d.times.length} ${d.times.length === 1 ? "time" : "times"}`}`}
             onClick={() => onSelect(d.date)}
             className={`flex min-h-18 w-15 shrink-0 snap-start flex-col items-center justify-center rounded-xl border text-center transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
               on ? "border-(--accent) bg-(--accent) text-white" : empty ? "border-line bg-sunken text-ink-subtle" : "border-line bg-surface text-ink hover:border-(--accent-line)"

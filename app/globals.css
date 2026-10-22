@@ -54,11 +54,13 @@
   --color-sand-fill: #ede5dd;
   --color-sand-accent: #a08870;
 
-  /* Stylist levels: a ring around the avatar and a bar along the top of
-     their calendar column (graphics, so 3:1 against the page) */
-  --color-level-master: #a67c12;
-  --color-level-senior: #7c8896;
-  --color-level-artisan: #9a5a2b;
+  /* Stylist levels: a ring and badge on the avatar and a bar along the top
+     of their calendar column (graphics, so 3:1 against the page). Gold,
+     berry and emerald: apart from each other, the service colors and
+     Denise, with color-blindness too (checked in the token tests). */
+  --color-level-master: #a0700a;
+  --color-level-senior: #7a1f55;
+  --color-level-artisan: #0b6a3c;
 
   /* Status chips */
   --color-status-booked-bg: #efe9e3;

@@ -15,9 +15,9 @@ export type ColumnData = {
   staffId: string;
   name: string;
   firstName: string;
-  // Their role ("Stylist"). The level shows only as color: a ring around
-  // the avatar and a bar along the top of the column.
-  title: string;
+  // Their day at a glance: "3 visits · 4h 15m booked". The level shows
+  // as color and a badge, not as text.
+  booked: string;
   level: StaffLevel | null;
   color: string | null;
   // On shift and the salon is open; others collapse to a thin column.

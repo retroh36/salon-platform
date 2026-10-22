@@ -97,24 +97,85 @@ test("Denise sits in the legend bar, not on top of the calendar", async ({ page 
   await expect(launcher).toBeHidden();
 });
 
-test("shows each stylist's level as color only: a ring, a bar and the legend", async ({ page }) => {
+test("shows each stylist's level as a colored ring, badge and bar, explained by the legend", async ({ page }) => {
   await openDay(page);
-  const levelColor = (level: string) => page.evaluate((l) => getComputedStyle(document.documentElement).getPropertyValue(`--color-level-${l}`).trim(), level);
-  const header = (name: string) => ui(page).locator("[data-level]").filter({ hasText: name }).first();
+  const header = (name: string) => ui(page).locator("[data-column-header]").filter({ hasText: name }).first();
+  const colors = new Set<string>();
   for (const [name, level] of [["Bridget Callahan", "master"], ["Nola Brennan", "senior"], ["Shae Morgan", "artisan"]] as const) {
     await expect(header(name)).toHaveAttribute("data-level", level);
-    // The bar along the top of the column, in the level's color.
+    // A 4px bar along the top of the column, in the level's color.
     const bar = header(name).getByTestId("level-bar");
-    const rgb = await bar.evaluate((el) => getComputedStyle(el).backgroundColor);
-    const hex = await levelColor(level);
-    expect(rgb).toBe(`rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(", ")})`);
-    // The ring around the avatar.
-    await expect(header(name).locator(`span[data-level=${level}]`)).toBeVisible();
+    expect((await bar.boundingBox())!.height).toBe(4);
+    const color = await bar.evaluate((el) => getComputedStyle(el).backgroundColor);
+    colors.add(color);
+    // The avatar: a 3px ring in the same color, and a badge so it isn't color alone.
+    const ring = header(name).locator(`span[data-level=${level}] > span`).first();
+    expect(await ring.evaluate((el) => [getComputedStyle(el).outlineWidth, getComputedStyle(el).outlineColor])).toEqual(["3px", color]);
+    await expect(header(name).locator(`[data-level-badge=${level}]`)).toBeVisible();
   }
-  // No level text on the calendar, only in the legend.
-  await expect(ui(page).getByTestId("calendar-grid")).not.toContainText(/Master|Senior|Artisan/);
+  expect(colors.size).toBe(3);
+  // The legend has the same badges; the calendar names no levels otherwise.
   const legend = ui(page).getByTestId("level-legend");
-  await expect(legend).toContainText("Master");
-  await expect(legend).toContainText("Senior");
-  await expect(legend).toContainText("Artisan");
+  for (const level of ["master", "senior", "artisan"]) await expect(legend.locator(`[data-level-badge=${level}]`)).toBeVisible();
+  await expect(legend).toHaveText(/Master.*Senior.*Artisan/);
+  await expect(ui(page).getByTestId("calendar-grid")).not.toContainText(/Master|Senior|Artisan|Stylist\b/);
+});
+
+test("each stylist's header shows their day at a glance", async ({ page }) => {
+  await clear();
+  await book("Glance", "Women's Cut & Style", 9, 0, 60);
+  await book("Glance2", "Bang Trim", 10, 0, 15);
+  await openDay(page);
+  await expect(ui(page).locator("[data-column-header]").filter({ hasText: "Bridget Callahan" }).getByTestId("booked-summary")).toHaveText("2 visits · 1h 15m booked");
+  await expect(ui(page).locator("[data-column-header]").filter({ hasText: "Nola Brennan" }).getByTestId("booked-summary")).toHaveText("No bookings");
+});
+
+test("the stylist menu opens below the header, inside the screen", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  // Today, so stylists have the menu.
+  await page.goto("/calendar");
+  await waitForHydration(page, "section[data-staff-id]");
+  const header = ui(page).locator("[data-column-header]").filter({ has: page.getByRole("button", { name: /^More for / }) }).last();
+  const button = header.getByRole("button", { name: /^More for / });
+  await button.click();
+  const dialog = page.getByRole("dialog", { name: /'s day$/ });
+  await expect(dialog).toBeVisible();
+  const [d, h] = [(await dialog.boundingBox())!, (await header.boundingBox())!];
+  // Below the name and hours, never over them, and on screen.
+  expect(d.y).toBeGreaterThanOrEqual(h.y + h.height);
+  expect(d.x).toBeGreaterThanOrEqual(0);
+  expect(d.x + d.width).toBeLessThanOrEqual(1280);
+  // The buttons each fit on one line.
+  for (const b of await dialog.getByRole("button").all()) expect((await b.boundingBox())!.height).toBeLessThanOrEqual(34);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+});
+
+test("the current-time pill takes the hour label's place when they'd meet", async ({ page }) => {
+  await page.clock.setFixedTime(at(10, 3));
+  await openDay(page);
+  await expect(ui(page).getByRole("img", { name: "Now, 10:03am" })).toBeVisible();
+  await expect(ui(page).locator("[data-hour-label='600']")).toHaveCSS("opacity", "0");
+  await expect(ui(page).locator("[data-hour-label='660']")).toHaveCSS("opacity", "1");
+});
+
+test("Ask Denise's example names a stylist on the team", async ({ page }) => {
+  await openDay(page);
+  const placeholder = await ui(page).getByRole("textbox", { name: /Ask Denise/ }).getAttribute("placeholder");
+  expect(placeholder).toMatch(/^Find a haircut with (Bridget|Gil|Hannah|Lois|Shae|Sandra|Nola) after 1 PM$/);
+});
+
+test("the sidebar footer keeps the name, sign-out and Powered by Maestra apart", async ({ page }) => {
+  for (const [width, height] of [[1440, 900], [1280, 640]]) {
+    await page.setViewportSize({ width, height });
+    await openDay(page);
+    const footer = page.getByTestId("sidebar-footer");
+    const boxes = await Promise.all([footer.getByText("Sam", { exact: true }), footer.getByText("Front desk"), footer.getByRole("button", { name: "Sign out" }), footer.getByTestId("powered-by")].map(async (l) => (await l.boundingBox())!));
+    const overlap = (a: { x: number; y: number; width: number; height: number }, b: typeof a) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) expect(overlap(boxes[i], boxes[j]), `${i} and ${j} at ${width}x${height}`).toBe(false);
+    // All on screen, and clear of the navigation above.
+    expect(boxes[3].y + boxes[3].height).toBeLessThanOrEqual(height);
+    const nav = (await page.getByRole("navigation", { name: "Main" }).first().boundingBox())!;
+    expect(nav.y + nav.height).toBeLessThanOrEqual((await footer.boundingBox())!.y + 1);
+  }
 });

@@ -24,7 +24,7 @@ const NAV: NavItem[] = [
 // "Powered by Maestra", small, at the foot of the sidebar.
 function PoweredBy() {
   return (
-    <p className="flex items-center justify-center gap-1.5 px-4 pb-3 text-xs text-ink-subtle" data-testid="powered-by">
+    <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-ink-subtle" data-testid="powered-by">
       Powered by
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/brand/maestra/maestra-mark.svg" alt="" className="h-3 w-auto" />
@@ -62,7 +62,8 @@ export function AppFrame({
             <div className="mt-0.5 text-sm leading-tight text-ink-muted">{locationName}</div>
           </div>
         </div>
-        <nav aria-label="Main" className="flex flex-col gap-1 px-3">
+        {/* Scrolls on short screens, so it never runs into the footer. */}
+        <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 pb-3">
           {NAV.filter((n) => !n.ownersOnly || user.role === "owner").map(({ section: s, href, label, Icon }) => {
             const current = s === section;
             return (
@@ -80,19 +81,21 @@ export function AppFrame({
             );
           })}
         </nav>
-        <div className="mt-auto flex items-center gap-3 border-t border-line px-4 py-4">
-          <Avatar name={user.name} size="sm" />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium">{user.name}</div>
-            <div className="text-xs text-ink-muted">{roleLabel(user.role)}</div>
+        <div className="shrink-0 border-t border-line px-4 pt-4 pb-3" data-testid="sidebar-footer">
+          <div className="flex items-center gap-3">
+            <Avatar name={user.name} size="sm" halo={false} />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium">{user.name}</div>
+              <div className="truncate text-xs text-ink-muted">{roleLabel(user.role)}</div>
+            </div>
+            <form action={logout} className="shrink-0">
+              <button type="submit" aria-label="Sign out" title="Sign out" className={buttonClass("ghost", "sm", "", { square: true })}>
+                <LogOutIcon className="size-4" />
+              </button>
+            </form>
           </div>
-          <form action={logout}>
-            <button type="submit" aria-label="Sign out" title="Sign out" className={buttonClass("ghost", "sm", "", { square: true })}>
-              <LogOutIcon className="size-4" />
-            </button>
-          </form>
+          <PoweredBy />
         </div>
-        <PoweredBy />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">

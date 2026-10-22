@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { canBook, type AppointmentStatus } from "@/lib/appointments";
 import { getCurrentStaff } from "@/lib/auth";
-import { gridRange, offHours, serviceFamily } from "@/lib/calendar";
+import { bookedSummary, gridRange, offHours, serviceFamily } from "@/lib/calendar";
 import { formatAmount, productName } from "@/lib/inventory";
 import { loadBackBarProducts } from "@/lib/inventory-load";
 import { formatDay, formatIntervals } from "@/lib/schedule-format";
@@ -16,7 +16,7 @@ import { occurrences } from "@/lib/scheduling/blocks";
 import { loadBlocks, loadCalendarStamp, loadLocationSchedule, loadOffers, loadStaffSchedules, startOfLocalDay, toBookedItem } from "@/lib/scheduling/load";
 import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn, toLocal, WEEKDAYS } from "@/lib/scheduling/time";
 import { visitWarnings } from "@/lib/client-checks";
-import { fullName, roleLabel, sortStaff } from "@/lib/staff";
+import { fullName, sortStaff } from "@/lib/staff";
 import { CalendarBoard } from "./board";
 import type { AppointmentDetail, BlockData, BoardData, ColumnData } from "./types";
 
@@ -233,7 +233,11 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       staffId: s.id,
       name: fullName(s),
       firstName: s.first_name,
-      title: roleLabel(s.role),
+      booked: bookedSummary(
+        items
+          .filter((i) => i.staff_id === s.id && i.appointment.status !== "no_show")
+          .map((i) => ({ appointmentId: i.appointment_id, minutes: i.active_minutes + i.processing_minutes + i.finishing_minutes })),
+      ),
       level: s.level,
       color: s.color,
       working: !approved.some((t) => t.startMinute == null) && intersectIntervals(day.hours, day.open).length > 0,

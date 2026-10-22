@@ -98,3 +98,17 @@ export function laneBox(lane: number, lanes: number): { left: number; width: num
   const main = 100 - narrow * (lanes - 1);
   return lane === 0 ? { left: 0, width: main } : { left: main + narrow * (lane - 1), width: narrow };
 }
+
+// A stylist's day at a glance, for their column header: "3 visits ·
+// 4h 15m booked", or "No bookings". Counts each visit once however many
+// services they do on it, and the time they're booked for (processing
+// included, since the client is theirs).
+export function bookedSummary(items: readonly { appointmentId: string; minutes: number }[]): string {
+  if (items.length === 0) return "No bookings";
+  const visits = new Set(items.map((i) => i.appointmentId)).size;
+  const minutes = items.reduce((sum, i) => sum + i.minutes, 0);
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const time = h === 0 ? `${m}m` : m === 0 ? `${h}h` : `${h}h ${m}m`;
+  return `${visits} ${visits === 1 ? "visit" : "visits"} · ${time} booked`;
+}
