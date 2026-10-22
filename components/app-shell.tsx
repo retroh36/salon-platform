@@ -38,14 +38,15 @@ export function NotLinked() {
   );
 }
 
-// Shown while a page first loads.
+// Shown while a page first loads: the Maestra mark, breathing gently
+// (still, with reduced motion).
 export function LoadingShell() {
   return (
     <div className="flex min-h-screen flex-1 items-center justify-center bg-canvas text-sm text-ink-muted" aria-busy>
-      <span className="flex flex-col items-center gap-3">
+      <span role="status" className="flex flex-col items-center gap-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/maestra/maestra-mark.svg" alt="Maestra" className="h-10 w-auto" />
-        Loading…
+        <img src="/brand/maestra/maestra-mark.svg" alt="" data-testid="loading-mark" className="h-12 w-auto animate-breathe" />
+        Loading Maestra…
       </span>
     </div>
   );

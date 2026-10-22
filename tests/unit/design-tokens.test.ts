@@ -49,6 +49,9 @@ const PAIRS: [string, string][] = [
   ["navy-900", "navy-100"],
   ["ink-muted", "navy-100"],
   ["link", "navy-100"],
+  // The login screen's navy panel.
+  ["navy-100", "navy-900"],
+  ["denise-200", "navy-900"],
   ["white", "danger"],
   ["danger", "danger-soft"],
   ["white", "now"],

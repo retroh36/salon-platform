@@ -4,6 +4,17 @@
 // docs/brand.md.
 
 export const PRODUCT_NAME = "Maestra";
+export const TAGLINE = "Your salon’s brain. Meet Denise.";
+// Maestra's navy, for the browser theme color and the app icon.
+export const BRAND_NAVY = "#17273b";
+
+// Where the app lives, for absolute links in previews: NEXT_PUBLIC_SITE_URL,
+// else the Vercel production URL, else local.
+export function siteUrl(): string {
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  return "http://localhost:3000";
+}
 
 // Salon logos: the public `salon-logos` bucket, under the business id.
 export const LOGO_BUCKET = "salon-logos";
