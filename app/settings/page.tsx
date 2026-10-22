@@ -5,7 +5,8 @@ import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Card, PageHeader } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { salonLogoUrl } from "@/lib/branding";
-import { SalonSettings } from "./salon-settings";
+import { addDays, todayIn } from "@/lib/scheduling/time";
+import { DeniseUsage, SalonSettings } from "./salon-settings";
 import { SettingsNav } from "./settings-nav";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -19,10 +20,20 @@ export default function SettingsPage() {
 }
 
 async function Settings() {
-  const { staff: me } = await getCurrentStaff();
+  const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
   if (me.role !== "owner") redirect("/dashboard");
   const business = me.location.business;
+  // Usage is counted by UTC day (the database's current_date).
+  const today = todayIn("UTC");
+  const since = addDays(today, -6);
+  const [{ data: usage, error }, { data: limits, error: limitError }] = await Promise.all([
+    supabase.from("ai_usage").select("day, feature, requests, input_tokens, output_tokens").eq("business_id", me.business_id).gte("day", since),
+    supabase.from("businesses").select("ai_daily_token_limit").eq("id", me.business_id).single(),
+  ]);
+  if (error) throw error;
+  if (limitError) throw limitError;
+  const tokens = (rows: typeof usage) => rows.reduce((sum, r) => sum + Number(r.input_tokens) + Number(r.output_tokens), 0);
 
   return (
     <AppShell section="settings" me={me}>
@@ -30,6 +41,15 @@ async function Settings() {
       <SettingsNav current="salon" />
       <Card title="Your salon" titleId="salon-heading">
         <SalonSettings name={business?.name ?? ""} logoUrl={salonLogoUrl(business?.logo_path)} />
+      </Card>
+      <Card title="Denise" titleId="denise-heading" description="What Denise's thinking (the Claude API) uses. At the daily limit she switches to plain wording until tomorrow.">
+        <DeniseUsage
+          today={tokens(usage.filter((r) => r.day === today))}
+          week={tokens(usage)}
+          requests={usage.reduce((sum, r) => sum + r.requests, 0)}
+          limit={limits.ai_daily_token_limit}
+          connected={Boolean(process.env.ANTHROPIC_API_KEY)}
+        />
       </Card>
     </AppShell>
   );

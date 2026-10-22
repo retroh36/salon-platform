@@ -67,10 +67,10 @@ export function headline(c: Conflict, l: Lookup, firstNames = false): string {
     case "overrun":
       return `${possessive(staff!)} running ${c.minutes} minutes late.`;
     case "likely_overrun": {
+      // No client name: this also goes into the morning brief.
       const item = l.items.get(c.causeItemIds[0])!;
-      const visit = item.appointmentId!;
       const service = l.services.get(item.serviceId) ?? "this service";
-      return `${staff} usually takes about ${c.minutes} minutes longer than booked for ${service}, so ${firstNames ? firstName(l, visit) : clientName(l, visit)}'s ${clock(minuteOf(l, item.start))} is likely to run into the next client.`;
+      return `${staff} usually takes about ${c.minutes} minutes longer than booked for ${service}, so the ${clock(minuteOf(l, item.start))} is likely to run into the next client.`;
     }
     case "client_late": {
       const visit = l.items.get(c.causeItemIds[0])!.appointmentId!;

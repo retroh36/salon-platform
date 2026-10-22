@@ -1,24 +1,24 @@
 "use server";
 
+import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { canBook } from "@/lib/appointments";
 import { getCurrentStaff } from "@/lib/auth";
-import { answer, type AssistantContext } from "@/lib/denise/assistant";
-import { claudeClient, explainFixes, isConnected } from "@/lib/denise/claude";
+import { answer } from "@/lib/denise/assistant";
+import { briefFacts, briefTemplate, type Brief, type BriefFacts } from "@/lib/denise/brief";
+import { ANALYSIS_MODEL, claudeClient, explainFixes, firstNamesOnly, isConnected, writeBrief, type ClaudeClient } from "@/lib/denise/claude";
+import { assistantContext } from "@/lib/denise/context";
 import { approveFix, rejectFix, undoFix } from "@/lib/denise/fixes";
-import { scanDay, type Viewer } from "@/lib/denise/scan";
-import type { ChatMessage, DeniseState, FixResult } from "@/lib/denise/types";
 import { suggestReorders } from "@/lib/denise/reorder";
-import { briefFacts, briefTemplate, type Brief } from "@/lib/denise/brief";
+import { scanDay, type Viewer } from "@/lib/denise/scan";
+import type { ChatMessage, DeniseState, FixResult, WaitlistOpening } from "@/lib/denise/types";
+import { DailyLimitReached, metered } from "@/lib/denise/usage";
 import { isUuid } from "@/lib/ids";
 import { canReceiveOrders } from "@/lib/inventory";
-import { recordProposals } from "@/lib/scheduling/ai-actions";
-import type { BookingContext } from "@/lib/scheduling/booking";
 import { LATE_MINUTES, reportCallOut, reportRunningLate } from "@/lib/scheduling/disruptions";
-import { loadBookingContext, loadOffers, startOfLocalDay } from "@/lib/scheduling/load";
-import { LEVEL_LABELS } from "@/lib/schedule-forms";
+import { loadBookingContext, startOfLocalDay } from "@/lib/scheduling/load";
 import { isLocalDate, todayIn, toLocal } from "@/lib/scheduling/time";
-import type { WaitlistOpening } from "@/lib/denise/types";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { freedOn, loadWaitlist, waitlistOpenings } from "@/lib/waitlist-load";
 import { bookWaitlistEntry } from "@/lib/waitlist-book";
 
@@ -41,6 +41,32 @@ async function session() {
 
 type Session = NonNullable<Awaited<ReturnType<typeof session>>>;
 
+// Claude, metered for this salon (tokens logged, daily limit), or null when
+// Denise isn't connected.
+function claudeFor(s: Session, feature: string): ClaudeClient | null {
+  const client = claudeClient();
+  return client ? metered(client, createAdminClient(), s.me.business_id, feature) : null;
+}
+
+// Claude rewrites the brief at most this often while the facts keep
+// changing; in between, the template (always up to date) shows.
+const BRIEF_REWRITE_MS = 20 * 60_000;
+
+async function briefFor(s: Session, facts: BriefFacts): Promise<Brief> {
+  const template: Brief = { facts, text: briefTemplate(facts), writtenBy: "template" };
+  const client = claudeFor(s, "morning_brief");
+  if (!client) return template;
+  const admin = createAdminClient();
+  const hash = createHash("sha256").update(JSON.stringify(firstNamesOnly(facts))).digest("hex");
+  const { data: cached } = await admin.from("denise_briefs").select("facts_hash, text, created_at").eq("location_id", s.viewer.location.id).eq("day", facts.date).maybeSingle();
+  if (cached?.facts_hash === hash) return { facts, text: cached.text, writtenBy: "claude" };
+  if (cached && Date.now() - new Date(cached.created_at).getTime() < BRIEF_REWRITE_MS) return template;
+  const text = await writeBrief(client, facts).catch(() => null);
+  if (!text) return template;
+  await admin.from("denise_briefs").upsert({ location_id: s.viewer.location.id, day: facts.date, facts_hash: hash, text, model: ANALYSIS_MODEL, created_at: new Date().toISOString() });
+  return { facts, text, writtenBy: "claude" };
+}
+
 async function look(s: Session, date: string): Promise<DeniseState> {
   const connected = isConnected();
   // Reorders she's drafted on the Inventory page, for those who order.
@@ -55,7 +81,7 @@ async function look(s: Session, date: string): Promise<DeniseState> {
     : [];
   // Past days can't be changed, so there's nothing to fix.
   if (date < s.today) return { date, conflicts: [], notices: [], reorders, openings: [], brief: null, connected };
-  const client = claudeClient();
+  const client = claudeFor(s, "explain_fixes");
   const [state, openings] = await Promise.all([
     scanDay(s.supabase, s.viewer, date, { explain: client ? (facts) => explainFixes(client, facts) : null }),
     s.viewer.canBook ? openingsOn(s, date) : Promise.resolve([]),
@@ -64,7 +90,7 @@ async function look(s: Session, date: string): Promise<DeniseState> {
   let brief: Brief | null = null;
   if (date === s.today && s.viewer.canBook) {
     const facts = await briefFacts(s.supabase, { businessId: s.me.business_id, location: s.viewer.location }, date, { conflicts: state.conflicts, openings });
-    brief = { facts, text: briefTemplate(facts), writtenBy: "template" };
+    brief = await briefFor(s, facts);
   }
   return { ...state, reorders, openings, brief, connected };
 }
@@ -165,48 +191,23 @@ const NOT_CONNECTED =
 
 const NOT_REACHED = "I couldn't think that through just now. Try again in a moment.";
 
+const LIMIT_REACHED = "I've used up today's thinking for the salon, so I'll be back for questions tomorrow. I'm still watching the calendar for clashes in the meantime.";
+
+
 // Ask Denise about the calendar. Claude answers using tools that call the
 // scheduling functions; bookings it suggests become proposals to approve.
 export async function askDenise(history: ChatMessage[], date: string): Promise<ChatMessage> {
   const s = await session();
   if (!s) return { role: "denise", text: NOT_SIGNED_IN };
   if (!isLocalDate(date) || !history.length) return { role: "denise", text: "What would you like to know?" };
-  const client = claudeClient();
+  const client = claudeFor(s, "ask_denise");
   if (!client) return { role: "denise", text: NOT_CONNECTED };
 
-  const [services, staff] = await Promise.all([
-    s.supabase.from("services").select("id, name, category, duration_minutes").is("archived_at", null).order("name"),
-    s.supabase.from("staff").select("id, first_name, role, level").eq("location_id", s.viewer.location.id).eq("is_active", true),
-  ]);
-  if (services.error) throw services.error;
-  if (staff.error) throw staff.error;
-  const offers = await loadOffers(s.supabase, staff.data.map((m) => m.id));
-
-  const calendars = new Map<string, Promise<BookingContext>>();
-  const context: AssistantContext = {
-    salon: s.viewer.salon,
-    timeZone: s.viewer.location.timezone,
-    today: s.today,
+  const context = await assistantContext(
+    s.supabase,
+    { role: s.me.role, staffId: s.me.id, businessId: s.me.business_id, location: s.viewer.location, salon: s.viewer.salon, today: s.today },
     date,
-    now: new Date(),
-    services: services.data.map((sv) => ({ id: sv.id, name: sv.name, category: sv.category, minutes: sv.duration_minutes ?? 0 })),
-    staff: staff.data
-      .filter((m) => (offers.get(m.id)?.size ?? 0) > 0)
-      .map((m) => ({ id: m.id, firstName: m.first_name, title: m.level ? `${LEVEL_LABELS[m.level]} stylist` : m.role })),
-    calendar: (day) => {
-      if (!calendars.has(day)) calendars.set(day, loadBookingContext(s.supabase, s.viewer.location, day, day));
-      return calendars.get(day)!;
-    },
-    propose: async (b) => {
-      if (!s.viewer.canBook) return null;
-      const [id] = await recordProposals(s.supabase, s.viewer.location.id, {
-        feature: "ask_denise",
-        subject: null,
-        options: [{ summary: b.summary, reason: b.reason, proposal: { changes: [], book: { clientId: null, items: [{ serviceId: b.serviceId, staffId: b.staffId, resourceId: b.resourceId, start: b.start }] } } }],
-      });
-      return id ?? null;
-    },
-  };
+  );
 
   // Text only, starting with the staff member's question.
   const turns = history
@@ -217,7 +218,8 @@ export async function askDenise(history: ChatMessage[], date: string): Promise<C
   try {
     const reply = await answer(client, context, turns);
     return { role: "denise", text: reply.text, suggestions: reply.suggestions };
-  } catch {
+  } catch (error) {
+    if (error instanceof DailyLimitReached) return { role: "denise", text: LIMIT_REACHED };
     // No details: errors from the API aren't logged or shown.
     return { role: "denise", text: NOT_REACHED };
   }

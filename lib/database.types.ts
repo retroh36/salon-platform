@@ -67,6 +67,26 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"ai_usage": {
+                  Row: {
+                    "business_id": string,"cache_read_tokens": number,"day": string,"feature": string,"input_tokens": number,"model": string,"output_tokens": number,"requests": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"cache_read_tokens"?: number,"day": string,"feature": string,"input_tokens"?: number,"model": string,"output_tokens"?: number,"requests"?: number
+                  }
+                  Update: {
+                    "business_id"?: string,"cache_read_tokens"?: number,"day"?: string,"feature"?: string,"input_tokens"?: number,"model"?: string,"output_tokens"?: number,"requests"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ai_usage_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"appointment_groups": {
                   Row: {
                     "business_id": string,"created_at": string,"created_by": string | null,"id": string,"label": string,"location_id": string
@@ -239,14 +259,14 @@ isOneToOne: false
                   ]
                 },"businesses": {
                   Row: {
-                    "created_at": string,"id": string,"logo_path": string | null,"name": string,"patch_test_enforcement": string,"patch_test_min_hours": number,"patch_test_valid_days": number,"plan": string,"settings": NonNullable<Json>,"slug": string | null,"updated_at": string
+                    "ai_daily_token_limit": number,"created_at": string,"id": string,"logo_path": string | null,"name": string,"patch_test_enforcement": string,"patch_test_min_hours": number,"patch_test_valid_days": number,"plan": string,"settings": NonNullable<Json>,"slug": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"id"?: string,"logo_path"?: string | null,"name": string,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"plan"?: string,"settings"?: NonNullable<Json>,"slug"?: string | null,"updated_at"?: string
+                    "ai_daily_token_limit"?: number,"created_at"?: string,"id"?: string,"logo_path"?: string | null,"name": string,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"plan"?: string,"settings"?: NonNullable<Json>,"slug"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"id"?: string,"logo_path"?: string | null,"name"?: string,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"plan"?: string,"settings"?: NonNullable<Json>,"slug"?: string | null,"updated_at"?: string
+                    "ai_daily_token_limit"?: number,"created_at"?: string,"id"?: string,"logo_path"?: string | null,"name"?: string,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"plan"?: string,"settings"?: NonNullable<Json>,"slug"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     
@@ -383,6 +403,26 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "staff"
       referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"denise_briefs": {
+                  Row: {
+                    "created_at": string,"day": string,"facts_hash": string,"location_id": string,"model": string,"text": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"day": string,"facts_hash": string,"location_id": string,"model": string,"text": string
+                  }
+                  Update: {
+                    "created_at"?: string,"day"?: string,"facts_hash"?: string,"location_id"?: string,"model"?: string,"text"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "denise_briefs_location_id_fkey"
+      columns: ["location_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id"]
     }
                   ]
                 },"form_templates": {
@@ -1457,6 +1497,11 @@ isOneToOne: false
 "adjust_stock":
 { Args: { "p_change": number,"p_location_id": string,"p_note": string,"p_product_id": string,"p_reason": Database["public"]['Enums']["stock_reason"] }; Returns: number
                            },
+"ai_usage_today":
+{ Args: { "p_business_id": string }; Returns: {
+              "daily_limit": number,"used": number
+            }[]
+                           },
 "apply_ai_action":
 { Args: { "p_action_id": string,"p_client_id"?: string,"p_expected_version": number }; Returns: undefined
                            },
@@ -1498,6 +1543,9 @@ isOneToOne: false
                            },
 "record_ai_proposals_as_system":
 { Args: { "p_feature": string,"p_location_id": string,"p_options": Json,"p_subject": string }; Returns: (string)[]
+                           },
+"record_ai_usage":
+{ Args: { "p_business_id": string,"p_cache_read": number,"p_feature": string,"p_input": number,"p_model": string,"p_output": number }; Returns: undefined
                            },
 "record_count":
 { Args: { "p_counted": number,"p_product_id": string,"p_stocktake_id": string }; Returns: number

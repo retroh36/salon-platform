@@ -93,6 +93,10 @@ test.describe("formulas and stock", () => {
     const desk = await browser.newPage({ storageState: AUTH.frontDesk, viewport: { width: 1920, height: 1300 } });
     const deskPanel = await openVisit(desk);
     await deskPanel.getByRole("button", { name: "Check out client" }).click();
+    // Using stock can bring up a reorder, which opens Denise's tab; back to the visit.
+    await expect.poll(() => onHand("GW-TC-7N")).toBeCloseTo(before.tc - 30, 2);
+    const detailsTab = desk.getByRole("tab", { name: "Booking details" });
+    if ((await detailsTab.getAttribute("aria-selected")) !== "true") await detailsTab.click();
     await expect(deskPanel.getByText("Checked out")).toBeVisible();
     await expect.poll(() => onHand("GW-TC-7N")).toBeCloseTo(before.tc - 30, 2);
     expect(await onHand("GW-DEV-20")).toBeCloseTo(before.dev - 30, 2);

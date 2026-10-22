@@ -1,7 +1,9 @@
 // Denise's Claude features with a fake API client: no real API calls.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { answer, assistantTools, type AssistantContext } from "@/lib/denise/assistant";
-import { CHAT_MODEL, claudeClient, converse, explainFixes, isConnected, type ClaudeClient } from "@/lib/denise/claude";
+import { ANALYSIS_MODEL, CHAT_MODEL, claudeClient, converse, explainFixes, firstNamesOnly, isConnected, modelFor, writeBrief, type ClaudeClient } from "@/lib/denise/claude";
+import type { Knowledge } from "@/lib/denise/knowledge";
+import { DailyLimitReached, metered } from "@/lib/denise/usage";
 import { fromLocal, parseTime, type BookedItem, type BookingContext } from "@/lib/scheduling";
 
 const TZ = "America/Chicago";
@@ -167,7 +169,7 @@ describe("Ask Denise", () => {
     const looping = fakeClient(Array.from({ length: 10 }, () => toolUse(["t", "list_stylists", {}])));
     const tools = assistantTools(context());
     expect(await converse(looping.client, "system", [{ role: "user", text: "?" }], tools)).toMatch(/more steps/);
-    expect(looping.create).toHaveBeenCalledTimes(6);
+    expect(looping.create).toHaveBeenCalledTimes(8);
   });
 
   it("sends Claude no client details: the tools don't have any", async () => {
@@ -179,5 +181,119 @@ describe("Ask Denise", () => {
       runner.run("find_openings", { service_id: "color", date: null, staff_id: null, after: null, before: null, limit: 10 }),
     ]);
     for (const out of outputs) expect(out).not.toMatch(/phone|email|allerg|notes|@/i);
+  });
+});
+
+// A fake of what Denise can look up (lib/denise/knowledge.ts).
+function knowledge(overrides: Partial<Knowledge> = {}): Knowledge & Record<string, ReturnType<typeof vi.fn> | null> {
+  return {
+    clients: vi.fn(async (name: string) => ({ matches: [{ match: 1, first_name: name, visits: 6, usual_gap_days: 42, due_status: "overdue", days_overdue: 9 }] })),
+    overdue: vi.fn(async () => ({ total_due_or_overdue: 12, clients: [{ first_name: "Liam", days_overdue: 21 }] })),
+    durations: vi.fn(async () => ({ rows: [{ stylist: "Shae", service: "Men's Cut", typical_minutes: 24, visits_counted: 31, trusted: true }] })),
+    salon: vi.fn(async () => ({ running_over_by_day: [{ day: "Thursday", ran_over_percent: 38 }] })),
+    schedule: vi.fn(async (date: string) => ({ date, visits: [] })),
+    stock: vi.fn(async () => ({ products: [] })),
+    sales: vi.fn(async () => ({ total_dollars: 4210 })),
+    fixes: vi.fn(async (date: string) => ({ date, problems: [] })),
+    ...overrides,
+  } as never;
+}
+
+describe("Ask Denise's knowledge", () => {
+  it("picks the stronger model for 'why' questions and the fast one otherwise", () => {
+    expect(modelFor("Why does Thursday always run late?")).toBe(ANALYSIS_MODEL);
+    expect(modelFor("Compare Shae and Nola on men's cuts")).toBe(ANALYSIS_MODEL);
+    expect(modelFor("Who can fit a balayage Saturday?")).toBe(CHAT_MODEL);
+    expect(ANALYSIS_MODEL).toBe("claude-sonnet-5-5");
+  });
+
+  it("offers each tool only to those allowed it", () => {
+    const names = (k?: Knowledge) => assistantTools(context({ knowledge: k })).tools.map((t) => t.name);
+    expect(names(knowledge())).toEqual(expect.arrayContaining(["client_insights", "overdue_clients", "stylist_durations", "salon_patterns", "day_schedule", "inventory_levels", "sales_summary", "propose_fixes", "find_openings", "propose_booking"]));
+    // A stylist: no sales and no fixes to approve.
+    const stylist = names(knowledge({ sales: null, fixes: null }));
+    expect(stylist).not.toContain("sales_summary");
+    expect(stylist).not.toContain("propose_fixes");
+    // Without knowledge, just the booking tools.
+    expect(names()).toEqual(["list_services", "list_stylists", "find_openings", "propose_booking"]);
+  });
+
+  it("passes tool inputs to our functions and their facts back to Claude", async () => {
+    const k = knowledge();
+    const c = context({ knowledge: k });
+    const { client, requests } = fakeClient([
+      toolUse(["t1", "stylist_durations", { staff_id: "shae", service_id: null }], ["t2", "overdue_clients", { limit: 5 }]),
+      toolUse(["t3", "sales_summary", { period: "this_week" }], ["t4", "propose_fixes", { date: "2020-01-01" }], ["t5", "day_schedule", { date: "bad" }]),
+      text("Shae usually takes 24 minutes for a men's cut, from 31 timed visits."),
+    ]);
+    const reply = await answer(client, c, [{ role: "user", text: "How long does Shae take for a men's cut?" }]);
+    expect(reply.text).toBe("Shae usually takes 24 minutes for a men's cut, from 31 timed visits.");
+    expect(k.durations).toHaveBeenCalledWith({ staffId: "shae", serviceId: null });
+    expect(k.overdue).toHaveBeenCalledWith(5);
+    expect(k.sales).toHaveBeenCalledWith("this_week");
+    // Past days and bad dates are refused before anything runs.
+    expect(k.fixes).not.toHaveBeenCalled();
+    expect(k.schedule).not.toHaveBeenCalled();
+    const results = (requests[2].messages as { role: string; content: { content: string }[] }[]).at(-1)!.content.map((r) => r.content);
+    expect(results).toEqual([JSON.stringify({ total_dollars: 4210 }), "That day has passed.", "Give the date as YYYY-MM-DD."]);
+    // The system prompt says numbers come from tools, and clients are never contacted.
+    expect(String(requests[0].system)).toMatch(/Every number you mention must come from a tool result/);
+    expect(String(requests[0].system)).toMatch(/never contact clients or write messages to them/);
+  });
+
+  it("refuses sales to those who can't see them, even if asked for by name", async () => {
+    const runner = assistantTools(context({ knowledge: knowledge({ sales: null }) }));
+    expect(await runner.run("sales_summary", { period: "today" })).toBe("Sales figures are for owners and managers.");
+  });
+});
+
+describe("the morning brief in Denise's words", () => {
+  const facts = {
+    date: DAY,
+    visits: 23,
+    risks: ["Bridget usually takes about 30 minutes longer than booked for Balayage, so the 10am is likely to run into the next client."],
+    likelyNoShows: [{ client: "Emma S.", time: "2pm", noShowPercent: 33, visits: 6 }],
+    dueNotBooked: { total: 37, top: [{ client: "Liam B.", overdueDays: 21, usualWeeks: 5 }] },
+    openings: { count: 1, withMatches: 1 },
+    lowStock: [],
+  };
+
+  it("asks the stronger model, with first names only, and returns its text", async () => {
+    const { client, requests } = fakeClient([text(JSON.stringify({ brief: "Busy day: 23 visits. Watch Bridget's 10am balayage." }))]);
+    expect(await writeBrief(client, facts)).toBe("Busy day: 23 visits. Watch Bridget's 10am balayage.");
+    expect(requests[0].model).toBe(ANALYSIS_MODEL);
+    const sent = JSON.stringify(requests[0].messages);
+    expect(sent).toContain("Emma");
+    expect(sent).not.toContain("Emma S.");
+    expect(sent).not.toContain("Liam B.");
+    expect(String(requests[0].system)).toMatch(/Use only the facts and numbers given/);
+  });
+
+  it("gives up (null) on bad output or a refusal", async () => {
+    expect(await writeBrief(fakeClient([text("not json")]).client, facts)).toBeNull();
+    expect(await writeBrief(fakeClient([{ content: [], stop_reason: "refusal" }]).client, facts)).toBeNull();
+    expect(firstNamesOnly(facts).likelyNoShows[0].client).toBe("Emma");
+  });
+});
+
+describe("metering", () => {
+  // A stand-in for the service-role client: usage so far, and what's recorded.
+  function admin(used: number, limit = 1000) {
+    const rpc = vi.fn(async (name: string) => (name === "ai_usage_today" ? { data: [{ used, daily_limit: limit }], error: null } : { data: null, error: null }));
+    return { admin: { rpc } as never, rpc };
+  }
+
+  it("logs each call's tokens for the salon", async () => {
+    const { client } = fakeClient([{ ...text("hi"), usage: { input_tokens: 120, output_tokens: 30, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } } as never]);
+    const { admin: a, rpc } = admin(0);
+    await metered(client, a, "biz", "ask_denise").messages.create({ model: CHAT_MODEL, max_tokens: 10, messages: [] });
+    expect(rpc).toHaveBeenCalledWith("record_ai_usage", { p_business_id: "biz", p_model: CHAT_MODEL, p_feature: "ask_denise", p_input: 120, p_output: 30, p_cache_read: 0 });
+  });
+
+  it("stops at the salon's daily limit, without calling Claude", async () => {
+    const { client, create } = fakeClient([text("hi")]);
+    const { admin: a } = admin(1000, 1000);
+    await expect(metered(client, a, "biz", "ask_denise").messages.create({ model: CHAT_MODEL, max_tokens: 10, messages: [] })).rejects.toBeInstanceOf(DailyLimitReached);
+    expect(create).not.toHaveBeenCalled();
   });
 });

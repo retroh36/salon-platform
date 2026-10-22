@@ -112,9 +112,32 @@ test.describe("owners", () => {
   });
 
   test("see what Denise knows on a client's profile", async ({ page }) => {
-    const { data } = await admin.from("insights").select("key").eq("business_id", B).eq("kind", "client").not("data->>lastVisit", "is", null).limit(1).single();
+    const { data } = await admin.from("insights").select("key").eq("business_id", B).eq("kind", "client").like("key", "e0000000-0000-4000-8000-%").not("data->>lastVisit", "is", null).limit(1).single();
     await page.goto(`/clients/${data!.key}`);
     await expect(ui(page).getByTestId("client-insight")).toContainText(/ over \d+ visits?/);
+  });
+});
+
+test.describe("owners' settings", () => {
+  test.use({ storageState: AUTH.owner });
+
+  test("show what Denise's thinking uses, and set her daily limit", async ({ page }) => {
+    const { data: before } = await admin.from("businesses").select("ai_daily_token_limit").eq("id", B).single();
+    try {
+      await page.goto("/settings");
+      const usage = ui(page).getByTestId("denise-usage");
+      await expect(usage).toContainText(/Today\s*[\d,]+ of 1,500,000 tokens/);
+      // The test server has no API key.
+      await expect(usage).toContainText("No: plain wording only");
+      await waitForHydration(page, "form[aria-label=\"Denise's daily limit\"] button");
+      const form = ui(page).getByRole("form", { name: "Denise's daily limit" });
+      await form.getByLabel("Daily limit (tokens)").fill("250000");
+      await form.getByRole("button", { name: "Save limit" }).click();
+      await expect(ui(page).getByRole("status")).toHaveText("Saved Denise's daily limit.");
+      expect((await admin.from("businesses").select("ai_daily_token_limit").eq("id", B).single()).data!.ai_daily_token_limit).toBe(250000);
+    } finally {
+      await admin.from("businesses").update({ ai_daily_token_limit: before!.ai_daily_token_limit }).eq("id", B);
+    }
   });
 });
 

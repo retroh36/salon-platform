@@ -9,16 +9,35 @@
 // for staff to approve.
 //
 // Privacy: Claude gets first names and scheduling facts only: never client
-// phone numbers, emails, allergies or notes. The API key is never logged.
+// phone numbers, emails, addresses, allergies, notes or payment details.
+// Every number comes from our code (lib/insights/, the tools); Claude
+// decides what matters and says it. The API key is never logged.
+//
+// Every call goes through a metered client (./usage.ts) that logs tokens
+// per salon and stops at the salon's daily limit; callers fall back to
+// template wording then, or when the API is unreachable.
 
 import Anthropic from "@anthropic-ai/sdk";
+import type { BriefFacts } from "./brief";
 import type { FixFacts } from "./scan";
 
 // A fast model for chat and short explanations.
 export const CHAT_MODEL = "claude-haiku-5-5";
+// A stronger one for the morning brief and "why" questions.
+export const ANALYSIS_MODEL = "claude-sonnet-5-5";
 
-// The part of the SDK client Denise uses (tests pass a fake).
-export type ClaudeClient = Pick<Anthropic, "messages">;
+// The one SDK call Denise makes (tests and the meter stand in for it).
+export type ClaudeClient = {
+  messages: { create: (params: Anthropic.MessageCreateParamsNonStreaming, options?: Anthropic.RequestOptions) => Promise<Anthropic.Message> };
+};
+
+// Questions that ask for reasons or comparisons get the stronger model.
+export function modelFor(question: string): string {
+  return /\b(why|how come|explain|compare|trend|pattern|analy[sz]e|what's behind|reason)/i.test(question) ? ANALYSIS_MODEL : CHAT_MODEL;
+}
+
+// Haiku thinks little; Sonnet a bit more for analysis.
+const effortFor = (model: string) => (model === ANALYSIS_MODEL ? "medium" : "low") as "low" | "medium";
 
 export function isConnected(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
@@ -90,7 +109,7 @@ export type ToolRunner = {
   run: (name: string, input: unknown) => Promise<string>;
 };
 
-const MAX_STEPS = 6;
+const MAX_STEPS = 8;
 
 // One answer to a staff question, letting Claude call tools along the way.
 export async function converse(
@@ -98,12 +117,13 @@ export async function converse(
   system: string,
   history: { role: "user" | "assistant"; text: string }[],
   runner: ToolRunner,
+  model = CHAT_MODEL,
 ): Promise<string> {
   const messages: Anthropic.MessageParam[] = history.map((m) => ({ role: m.role, content: m.text }));
   for (let step = 0; step < MAX_STEPS; step++) {
     const response = await client.messages.create(
-      { model: CHAT_MODEL, max_tokens: 2000, system, tools: runner.tools, output_config: { effort: "low" }, messages },
-      REQUEST,
+      { model, max_tokens: 3000, system, tools: runner.tools, output_config: { effort: effortFor(model) }, messages },
+      model === ANALYSIS_MODEL ? { ...REQUEST, timeout: 45_000 } : REQUEST,
     );
     if (response.stop_reason === "refusal") return "I can't help with that one, sorry.";
     messages.push({ role: "assistant", content: response.content });
@@ -122,4 +142,40 @@ export async function converse(
     messages.push({ role: "user", content: results });
   }
   return "That took me more steps than I expected. Could you ask in a simpler way?";
+}
+
+const BRIEF_SYSTEM = `${VOICE}
+
+Write today's morning brief for the front desk from the facts given, which our scheduling system worked out. Two to four short sentences: what matters most first (risks to the day, clients who might not show, regulars to call back), then anything else worth a moment. Use only the facts and numbers given; don't add, estimate or calculate others. Name clients by first name only. You can't contact clients: suggest what staff might do, and never draft messages to clients.`;
+
+// The brief in Denise's words, from the facts only (first names). Null if
+// it couldn't be written.
+export async function writeBrief(client: ClaudeClient, facts: BriefFacts): Promise<string | null> {
+  const response = await client.messages.create(
+    {
+      model: ANALYSIS_MODEL,
+      max_tokens: 1500,
+      system: BRIEF_SYSTEM,
+      output_config: { effort: "low", format: { type: "json_schema", schema: { type: "object", properties: { brief: { type: "string" } }, required: ["brief"], additionalProperties: false } } },
+      messages: [{ role: "user", content: JSON.stringify(firstNamesOnly(facts)) }],
+    },
+    { ...REQUEST, timeout: 30_000 },
+  );
+  if (response.stop_reason !== "end_turn") return null;
+  try {
+    const text = (JSON.parse(textOf(response.content)) as { brief?: unknown }).brief;
+    return typeof text === "string" && text.trim() ? text.trim().slice(0, 1200) : null;
+  } catch {
+    return null;
+  }
+}
+
+// "Emma S." -> "Emma": Claude gets first names only.
+export function firstNamesOnly(f: BriefFacts): BriefFacts {
+  const first = (name: string) => name.split(" ")[0];
+  return {
+    ...f,
+    likelyNoShows: f.likelyNoShows.map((n) => ({ ...n, client: first(n.client) })),
+    dueNotBooked: { ...f.dueNotBooked, top: f.dueNotBooked.top.map((d) => ({ ...d, client: first(d.client) })) },
+  };
 }

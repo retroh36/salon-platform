@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { SalonMark } from "@/components/ui/salon-mark";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
-import { removeSalonLogo, saveSalonName, uploadSalonLogo, type SettingsResult } from "./actions";
+import { removeSalonLogo, saveDeniseLimit, saveSalonName, uploadSalonLogo, type SettingsResult } from "./actions";
 
 // The salon's own brand: its name and logo, shown at the top of the
 // sidebar and on messages to its clients.
@@ -69,6 +69,53 @@ export function SalonSettings({ name, logoUrl }: { name: string; logoUrl: string
             )}
           </div>
         </div>
+      </form>
+    </div>
+  );
+}
+
+// Denise's Claude usage and the salon's daily limit (owners).
+export function DeniseUsage({ today, week, requests, limit, connected }: { today: number; week: number; requests: number; limit: number; connected: boolean }) {
+  const [value, setValue] = useState(String(limit));
+  const [result, setResult] = useState<SettingsResult | null>(null);
+  const [pending, startTransition] = useTransition();
+  const n = (x: number) => x.toLocaleString("en-US");
+  return (
+    <div className="flex flex-col gap-4">
+      <dl className="flex flex-wrap gap-8 text-sm" data-testid="denise-usage">
+        <div>
+          <dt className="text-ink-muted">Today</dt>
+          <dd className="font-semibold tabular-nums">
+            {n(today)} of {n(limit)} tokens
+          </dd>
+        </div>
+        <div>
+          <dt className="text-ink-muted">Last 7 days</dt>
+          <dd className="font-semibold tabular-nums">
+            {n(week)} tokens, {n(requests)} requests
+          </dd>
+        </div>
+        <div>
+          <dt className="text-ink-muted">Connected</dt>
+          <dd className="font-semibold">{connected ? "Yes" : "No: plain wording only"}</dd>
+        </div>
+      </dl>
+      {result && (result.ok ? <p role="status" className="font-medium text-status-confirmed-ink">{result.message}</p> : <Alert>{result.message}</Alert>)}
+      <form
+        aria-label="Denise's daily limit"
+        className="flex flex-wrap items-end gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          startTransition(async () => setResult(await saveDeniseLimit(Number(value))));
+        }}
+      >
+        <label className={`${labelClass} w-56`}>
+          Daily limit (tokens)
+          <input type="number" min={0} step={10000} value={value} onChange={(e) => setValue(e.target.value)} className={fieldClass} />
+        </label>
+        <Button type="submit" disabled={pending}>
+          Save limit
+        </Button>
       </form>
     </div>
   );

@@ -61,3 +61,14 @@ export async function removeSalonLogo(): Promise<SettingsResult> {
   refresh();
   return { ok: true, message: "Removed the logo. The salon's initial shows instead." };
 }
+
+// How many tokens Denise may use a day (owners). 0 turns her thinking off.
+export async function saveDeniseLimit(limit: number): Promise<SettingsResult> {
+  const s = await owner();
+  if (!s) return { ok: false, message: "Only owners can change Denise's limit." };
+  if (!Number.isInteger(limit) || limit < 0 || limit > 50_000_000) return { ok: false, message: "Enter a whole number of tokens, up to 50,000,000." };
+  const { error } = await s.supabase.from("businesses").update({ ai_daily_token_limit: limit }).eq("id", s.me.business_id);
+  if (error) throw error;
+  revalidatePath("/settings");
+  return { ok: true, message: "Saved Denise's daily limit." };
+}

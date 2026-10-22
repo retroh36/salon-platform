@@ -1,17 +1,21 @@
 // "Ask Denise": the tools Claude gets for answering staff questions, and
-// what they do. Each tool calls our scheduling functions; none writes to
-// the calendar. propose_booking checks the booking rules and records a
-// proposal in the AI action log, which staff approve (choosing the client)
-// in Denise's panel.
+// what they do. Each tool calls our functions; none writes to the calendar.
+// Facts come from our code (the booking rules, lib/insights/ through
+// ./knowledge.ts); Claude reads them, decides what matters and says it.
+// propose_booking checks the booking rules and records a proposal in the
+// AI action log, which staff approve (choosing the client) in Denise's
+// panel; propose_fixes runs her conflict and risk check, recording fixes
+// the same way.
 //
-// Tools return services, stylists' first names and times only: no client
-// data at all.
+// Clients appear by first name only (no contact details, allergies or
+// notes), and what each tool returns depends on who's asking (./knowledge.ts).
 
 import type Anthropic from "@anthropic-ai/sdk";
 import { checkAppointment, describeProblem, pickResource, timingFor, type BookingContext } from "@/lib/scheduling/booking";
 import { findOpenings } from "@/lib/scheduling/openings";
 import { formatMinute, fromLocal, isLocalDate, parseTime, toLocal, type LocalDate } from "@/lib/scheduling/time";
-import { converse, VOICE, type ClaudeClient, type ToolRunner } from "./claude";
+import { converse, modelFor, VOICE, type ClaudeClient, type ToolRunner } from "./claude";
+import { SALES_PERIODS, type Knowledge, type SalesPeriod } from "./knowledge";
 import type { BookingSuggestion } from "./types";
 
 export type AssistantContext = {
@@ -28,6 +32,9 @@ export type AssistantContext = {
   // Records a suggested booking for staff to approve; its action id, or
   // null when the person asking can't approve bookings.
   propose: (booking: { summary: string; reason: string; serviceId: string; staffId: string; resourceId: string | null; start: Date }) => Promise<string | null>;
+  // Who's asking ("front desk", "stylist"…), and what they may look up.
+  asker?: string;
+  knowledge?: Knowledge;
 };
 
 // "haircuts" -> "cut", "colour" -> "color".
@@ -60,7 +67,7 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "find_openings",
     description:
-      "Free times for one service on one day, checked against every booking rule (stylist hours, time off, other clients, processing gaps, free chairs). Returns up to `limit` options, earliest first.",
+      "Search availability: free times for one service on one day, checked against every booking rule (stylist hours, time off, other clients, processing gaps, free chairs). Returns up to `limit` options, earliest first.",
     strict: true,
     input_schema: {
       type: "object",
@@ -96,11 +103,79 @@ const TOOLS: Anthropic.Tool[] = [
   },
 ];
 
+const noInput = { type: "object" as const, properties: {}, required: [], additionalProperties: false as const };
+
+// Read-only lookups of what Denise has learned, and her fixes.
+const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes", Anthropic.Tool> = {
+  clients: {
+    name: "client_insights",
+    description:
+      "A client's habits, by first name: how often they come (usual gap), when they're next due or booked, their usual stylist, day, time and services, how often they're late, cancel or don't show, and churn risk (spend only for owners, managers and front desk). Several clients may share a first name.",
+    strict: true,
+    input_schema: { type: "object", properties: { first_name: { type: "string" } }, required: ["first_name"], additionalProperties: false },
+  },
+  overdue: {
+    name: "overdue_clients",
+    description: "Regulars who are due back or overdue and have nothing booked, most overdue first, with the total.",
+    strict: true,
+    input_schema: { type: "object", properties: { limit: { ...nullable("integer"), description: "How many to list (1-20, default 10)." } }, required: ["limit"], additionalProperties: false },
+  },
+  durations: {
+    name: "stylist_durations",
+    description:
+      "How long stylists really take for services, from actual start and finish times: typical (median) minutes, the middle half, visits counted, consistency, trend, menu and booked minutes, how often it ran over, and any suggested length. Only trusted from 5 visits.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: { staff_id: { ...nullable("string"), description: "One stylist, or null for all." }, service_id: { ...nullable("string"), description: "One service, or null for all." } },
+      required: ["staff_id", "service_id"],
+      additionalProperties: false,
+    },
+  },
+  salon: {
+    name: "salon_patterns",
+    description: "The salon's patterns: busiest and quietest hours, which days and services run over (and who runs over most), no-shows by day and time of day, and rebooking rates by stylist.",
+    strict: true,
+    input_schema: noInput,
+  },
+  schedule: {
+    name: "day_schedule",
+    description: "A day's visits: times, stylist, client first name, service, status, booked minutes, and how long that stylist usually takes for it.",
+    strict: true,
+    input_schema: { type: "object", properties: { date: { ...nullable("string"), description: "YYYY-MM-DD. Null for the day on the calendar." } }, required: ["date"], additionalProperties: false },
+  },
+  stock: {
+    name: "inventory_levels",
+    description: "Products in stock: on hand, reorder point and whether it's low. With no query, only low products.",
+    strict: true,
+    input_schema: { type: "object", properties: { query: { ...nullable("string"), description: "Words in the product name, e.g. 'olaplex' or '7N'." } }, required: ["query"], additionalProperties: false },
+  },
+  sales: {
+    name: "sales_summary",
+    description: "Simple sales figures for a period: services and retail in dollars, visits checked out, average visit and no-shows, with the period before for comparison.",
+    strict: true,
+    input_schema: { type: "object", properties: { period: { type: "string", enum: SALES_PERIODS } }, required: ["period"], additionalProperties: false },
+  },
+  fixes: {
+    name: "propose_fixes",
+    description:
+      "Look over a day for problems (reported overruns, late clients, call-outs, double-bookings, and visits likely to run over from how long stylists usually take) and put fixes in Denise's panel for staff to approve. Changes nothing by itself.",
+    strict: true,
+    input_schema: { type: "object", properties: { date: { ...nullable("string"), description: "YYYY-MM-DD. Null for the day on the calendar." } }, required: ["date"], additionalProperties: false },
+  },
+};
+
 export function systemPrompt(c: AssistantContext): string {
   const local = toLocal(c.now, c.timeZone);
   return `${VOICE}
 
-You help the front desk at ${c.salon} find free times and suggest bookings. Use your tools for every fact about the menu, the stylists and the calendar; never guess a time is free. You can't book, move or cancel anything yourself: propose_booking only puts a suggestion on screen for staff to approve. After proposing, say what you suggested in one sentence and that they can approve it below. If nothing fits, say so and offer the nearest options. Keep answers to a few short sentences. Times are the salon's local time; say them like "1:15pm".
+You help the staff at ${c.salon} (you're talking to the ${c.asker ?? "front desk"}): finding free times, suggesting bookings, and answering questions about clients, stylists, the salon's patterns and stock${c.knowledge?.sales ? ", and sales" : ""}.
+
+Facts: use your tools for every fact; never guess a time is free. Every number you mention must come from a tool result, as given: don't calculate, estimate or invent figures. Say briefly what an answer is based on (e.g. "from 14 timed visits"). If the tools don't cover something, say you don't know.
+
+Actions: you can't book, move or cancel anything yourself. propose_booking and propose_fixes only put suggestions on screen for staff to approve; after proposing, say what you suggested in one sentence and that they can approve it below. If nothing fits, say so and offer the nearest options. You never contact clients or write messages to them; staff do that.
+
+Style: a few short sentences, then one useful next step (e.g. "Want me to look for a time?"). Clients by first name only. Times are the salon's local time; say them like "1:15pm".
 
 Today is ${c.today}; it's now ${formatMinute(local.minute)}. The calendar is showing ${c.date}; questions without a day are about that day.`;
 }
@@ -183,7 +258,47 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
     }
   }
 
-  return { tools: TOOLS, run, suggestions };
+  const k = c.knowledge;
+  const extra = k
+    ? [KNOWLEDGE_TOOLS.clients, KNOWLEDGE_TOOLS.overdue, KNOWLEDGE_TOOLS.durations, KNOWLEDGE_TOOLS.salon, KNOWLEDGE_TOOLS.schedule, KNOWLEDGE_TOOLS.stock, ...(k.sales ? [KNOWLEDGE_TOOLS.sales] : []), ...(k.fixes ? [KNOWLEDGE_TOOLS.fixes] : [])]
+    : [];
+
+  async function runAny(name: string, raw: unknown): Promise<string> {
+    const input = (raw ?? {}) as Record<string, unknown>;
+    if (!k) return run(name, raw);
+    const str = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
+    switch (name) {
+      case "client_insights":
+        return JSON.stringify(await k.clients(String(input.first_name ?? "")));
+      case "overdue_clients":
+        return JSON.stringify(await k.overdue(typeof input.limit === "number" ? input.limit : 10));
+      case "stylist_durations":
+        return JSON.stringify(await k.durations({ staffId: str(input.staff_id), serviceId: str(input.service_id) }));
+      case "salon_patterns":
+        return JSON.stringify(await k.salon());
+      case "day_schedule": {
+        const date = dayOf(input.date);
+        return date ? JSON.stringify(await k.schedule(date)) : "Give the date as YYYY-MM-DD.";
+      }
+      case "inventory_levels":
+        return JSON.stringify(await k.stock(str(input.query)));
+      case "sales_summary":
+        if (!k.sales) return "Sales figures are for owners and managers.";
+        if (!SALES_PERIODS.includes(input.period as SalesPeriod)) return `Choose a period: ${SALES_PERIODS.join(", ")}.`;
+        return JSON.stringify(await k.sales(input.period as SalesPeriod));
+      case "propose_fixes": {
+        if (!k.fixes) return "Only the front desk, managers and owners can approve fixes.";
+        const date = dayOf(input.date);
+        if (!date) return "Give the date as YYYY-MM-DD.";
+        if (date < c.today) return "That day has passed.";
+        return JSON.stringify(await k.fixes(date));
+      }
+      default:
+        return run(name, raw);
+    }
+  }
+
+  return { tools: [...TOOLS, ...extra], run: runAny, suggestions };
 }
 
 // Answers a staff question, with any bookings Denise suggests.
@@ -193,6 +308,7 @@ export async function answer(
   history: { role: "user" | "assistant"; text: string }[],
 ): Promise<{ text: string; suggestions: BookingSuggestion[] }> {
   const runner = assistantTools(c);
-  const text = await converse(client, systemPrompt(c), history, runner);
+  const question = [...history].reverse().find((m) => m.role === "user")?.text ?? "";
+  const text = await converse(client, systemPrompt(c), history, runner, modelFor(question));
   return { text, suggestions: runner.suggestions };
 }
