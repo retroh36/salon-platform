@@ -5,7 +5,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import { notificationsFor } from "@/lib/notifications";
+import { blockNotifications, notificationsFor } from "@/lib/notifications";
 import { recordProposals, type ProposalOption } from "@/lib/scheduling/ai-actions";
 import { loadDisruptions } from "@/lib/scheduling/disruptions";
 import { loadBookingContext } from "@/lib/scheduling/load";
@@ -133,15 +133,23 @@ export async function scanDay(
         feature: FEATURE,
         subject,
         options: w.options.map((o): ProposalOption => {
-          const { notifications, undo } = notificationsFor(visitChanges(o.option, lookup));
+          const minute = (d: Date) => toLocal(d, lookup.timeZone).minute;
+          const visits = notificationsFor(visitChanges(o.option, lookup));
+          const breaks = blockNotifications(o.option.blockMoves.map((b) => ({ staffId: b.staffId, kind: b.kind, from: minute(b.from.start), to: minute(b.to.start) })));
           return {
             summary: o.summary,
             reason: o.reason,
             proposal: {
               changes: o.option.moves,
-              notifications,
-              undoNotifications: undo,
+              notifications: [...visits.notifications, ...breaks.notifications],
+              undoNotifications: [...visits.undo, ...breaks.undo],
               resolves: w.conflict.kind === "client_late" && w.conflict.disruptionId ? [w.conflict.disruptionId] : [],
+              blockMoves: o.option.blockMoves.map((b) => ({
+                blockId: b.blockId,
+                date: b.date,
+                from: { start: minute(b.from.start), end: minute(b.from.end) },
+                to: { start: minute(b.to.start), end: minute(b.to.end) },
+              })),
             },
           };
         }),

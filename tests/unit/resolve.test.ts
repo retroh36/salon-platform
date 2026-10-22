@@ -102,12 +102,19 @@ function only(conflicts: Conflict[]): Conflict {
 // Every option must pass the booking rules on the calendar as it will go.
 function expectValid(d: Day, conflicts: Conflict[]) {
   const eff = effectiveCalendar(d.ctx, activeDisruptions(d));
+  const withMoves = (o: FixOption) => ({
+    ...eff,
+    blocks: (eff.blocks ?? []).map((b) => {
+      const m = o.blockMoves.find((x) => x.blockId === b.blockId && x.date === b.date);
+      return m ? { ...b, ...m.to } : b;
+    }),
+  });
   for (const c of conflicts) {
     expect(c.options.length).toBeLessThanOrEqual(3);
     const scores = c.options.map((o) => o.score);
     expect(scores).toEqual([...scores].sort((a, b) => a - b));
     for (const o of c.options) {
-      expect(checkMoves(eff, o.moves.map((m) => ({ itemId: m.itemId, ...m.to }))).valid).toBe(true);
+      expect(checkMoves(withMoves(o), o.moves.map((m) => ({ itemId: m.itemId, ...m.to }))).valid).toBe(true);
       for (const m of o.moves) {
         // Never earlier than booked, never into the past, never a checked-in client.
         expect(m.to.start.getTime()).toBeGreaterThanOrEqual(m.from.start.getTime());
@@ -224,6 +231,44 @@ describe("a stylist running over", () => {
     // Same time, same stylist: no client is moved.
     expect(c.options[0]).toMatchObject({ clientsMoved: 0, shiftMinutes: 0, stylistChanges: 0 });
     expectValid(d, conflicts);
+  });
+});
+
+describe("lunches and breaks", () => {
+  const blockAt = (kind: "lunch" | "break" | "training", from: string, to: string) => ({ blockId: kind, date: TUESDAY, staffId: "priya", kind, start: at(from), end: at(to) });
+  // Priya's 10:00 runs over into Grace at 11:00; Priya's lunch is at noon
+  // and her afternoon starts at 2. Ethan is booked solid.
+  function lunchDay(overrun: number, kind: "lunch" | "break" | "training" = "lunch", extra: BookedItem[] = []) {
+    const d = day([item("now", CUT, "priya", "10:00"), item("grace", CUT, "priya", "11:00"), ...extra, ...fullDay("ethan")], [{ id: "o", kind: "overrun", itemId: "now", minutes: overrun }], {
+      statuses: checkedIn("now"),
+    });
+    return { ...d, ctx: { ...d.ctx, blocks: [blockAt(kind, "12:00", "12:30")] } };
+  }
+
+  it("shifts lunch a little rather than make a client wait hours", () => {
+    const d = lunchDay(20);
+    const c = only(findConflicts(d));
+    expect(describe_(c.options[0])).toEqual(["grace: priya 11:20"]);
+    expect(c.options[0].blockMoves).toEqual([
+      expect.objectContaining({ blockId: "lunch", kind: "lunch", from: { start: at("12:00"), end: at("12:30") }, to: { start: at("12:20"), end: at("12:50") } }),
+    ]);
+    expectValid(d, [c]);
+  });
+
+  it("never moves training, meetings or personal time", () => {
+    const c = only(findConflicts(lunchDay(20, "training")));
+    expect(c.options.every((o) => o.blockMoves.length === 0)).toBe(true);
+    expect(describe_(c.options[0])).toEqual(["grace: priya 14:00"]);
+  });
+
+  it("moves a break by 30 minutes at most, and never onto a client", () => {
+    for (const o of only(findConflicts(lunchDay(45))).options) {
+      for (const m of o.blockMoves) expect(Math.abs(m.to.start.getTime() - m.from.start.getTime())).toBeLessThanOrEqual(30 * 60_000);
+    }
+    expect(only(findConflicts(lunchDay(45))).options[0].blockMoves).toEqual([]);
+    // A client at 12:30 leaves nowhere for lunch to go.
+    const busy = only(findConflicts(lunchDay(20, "lunch", [item("ada", MENS_CUT, "priya", "12:30")])));
+    expect(busy.options[0].blockMoves).toEqual([]);
   });
 });
 

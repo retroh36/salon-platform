@@ -33,12 +33,15 @@ export function BookingPanel({
   appointment,
   onClose,
   onSaved,
+  onBlockInstead,
 }: {
   data: BoardData;
   start?: BookingStart;
   appointment?: AppointmentDetail;
   onClose: () => void;
   onSaved: (appointmentId: string) => void;
+  // Switch to blocking this time (lunch, a meeting…) instead.
+  onBlockInstead?: () => void;
 }) {
   const { menu, columns } = data;
   const services = new Map(menu.services.map((s) => [s.id, s]));
@@ -124,6 +127,11 @@ export function BookingPanel({
           <div>
             <h2 className="font-serif text-2xl font-semibold text-plum-900">{appointment ? "Edit booking" : "New booking"}</h2>
             <p className="text-ink-muted">{formatLongDay(data.date)}</p>
+            {!appointment && onBlockInstead && (
+              <button type="button" onClick={onBlockInstead} className="mt-1 text-sm font-medium text-plum-900 underline underline-offset-2 hover:text-plum-700">
+                Block this time instead
+              </button>
+            )}
           </div>
           <IconButton label="Close" onClick={onClose}>
             <CloseIcon />

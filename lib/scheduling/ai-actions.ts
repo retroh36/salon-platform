@@ -11,9 +11,9 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/database.types";
-import { checkAppointment, checkMoves, type BookingContext, type BookingProblem, type MoveRequest } from "./booking.ts";
+import { busyDuring, checkAppointment, checkMoves, type BookedItem, type BookingContext, type BookingProblem, type MoveRequest } from "./booking.ts";
 import { loadBookingContext } from "./load.ts";
-import { toLocal } from "./time.ts";
+import { fromLocal, toLocal } from "./time.ts";
 
 type Supabase = SupabaseClient<Database>;
 type Location = { id: string; timezone: string };
@@ -29,7 +29,7 @@ export type ProposedBooking = {
 };
 
 // A message to a client or stylist, recorded when the change is applied.
-export type NotificationDraft = { appointmentId: string; template: string; body: string } & (
+export type NotificationDraft = { appointmentId: string | null; template: string; body: string } & (
   | { clientId: string; staffId?: never }
   | { staffId: string; clientId?: never }
 );
@@ -43,7 +43,11 @@ export type Proposal = {
   // Reports (schedule_disruptions) this deals with, e.g. a late client
   // whose visit it moves.
   resolves?: string[];
+  // Lunches and breaks moved to make room, in local minutes on the day.
+  blockMoves?: ProposedBlockMove[];
 };
+
+export type ProposedBlockMove = { blockId: string; date: string; from: { start: number; end: number }; to: { start: number; end: number } };
 
 export type ProposalOption = { summary: string; reason: string; proposal: Proposal };
 
@@ -80,6 +84,7 @@ export function proposalToJson(p: Proposal): Json {
     notifications: (p.notifications ?? []).map(notificationJson),
     undo_notifications: (p.undoNotifications ?? []).map(notificationJson),
     resolves: p.resolves ?? [],
+    block_moves: (p.blockMoves ?? []).map((m) => ({ block_id: m.blockId, on_date: m.date, from: m.from, to: m.to })),
     changes: p.changes.map((c) => ({ item_id: c.itemId, appointment_id: c.appointmentId, from: placementJson(c.from), to: placementJson(c.to) })),
     book: p.book
       ? {
@@ -102,6 +107,7 @@ export function proposalFromJson(json: Json): Proposal {
     notifications: (j.notifications ?? []).map(notificationFrom),
     undoNotifications: (j.undo_notifications ?? []).map(notificationFrom),
     resolves: j.resolves ?? [],
+    blockMoves: (j.block_moves ?? []).map((m: any) => ({ blockId: m.block_id, date: m.on_date, from: m.from, to: m.to })),
     changes: (j.changes ?? []).map((c: any) => ({ itemId: c.item_id, appointmentId: c.appointment_id, from: placementFrom(c.from), to: placementFrom(c.to) })),
     book: j.book
       ? {
@@ -125,8 +131,25 @@ function previousFromJson(json: Json): { items: PreviousItem[]; createdAppointme
 
 // Whether a proposal can be made on this calendar: its moves, or its new
 // booking, pass the booking rules. Problems from every part, deduplicated.
-export function checkProposal(ctx: BookingContext, proposal: Proposal): BookingProblem[] {
+export function checkProposal(base: BookingContext, proposal: Proposal): BookingProblem[] {
   const problems: BookingProblem[] = [];
+  // Moved lunches and breaks first: they must still be where they were, and
+  // clients are checked against their new times.
+  let ctx = base;
+  for (const m of proposal.blockMoves ?? []) {
+    const block = (ctx.blocks ?? []).find((b) => b.blockId === m.blockId && b.date === m.date);
+    const start = fromLocal(m.date, m.to.start, ctx.location.timeZone);
+    const end = fromLocal(m.date, m.to.end, ctx.location.timeZone);
+    if (!block || !start || !end) return [{ code: "not_booked" }];
+    ctx = { ...ctx, blocks: (ctx.blocks ?? []).map((b) => (b === block ? { ...b, start, end } : b)) };
+    const movedIds = new Set(proposal.changes.map((c) => c.itemId));
+    const after: BookedItem[] = proposal.changes.flatMap((c) => {
+      const old = ctx.booked.find((b) => b.id === c.itemId);
+      return old ? [{ ...old, ...c.to }] : [];
+    });
+    const clash = busyDuring({ ...ctx, booked: ctx.booked.filter((b) => !b.id || !movedIds.has(b.id)) }, block.staffId, start, end, after);
+    if (clash.length) problems.push({ code: "staff_double_booked", conflictWith: clash[0].id });
+  }
   if (proposal.changes.length) {
     problems.push(...checkMoves(ctx, proposal.changes.map((c) => ({ itemId: c.itemId, ...c.to }))).problems.flat());
   }

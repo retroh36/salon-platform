@@ -312,8 +312,11 @@ test.describe("stylists", () => {
     await openDay(page);
 
     await expect(ui(page).getByRole("button", { name: "New booking" })).toHaveCount(0);
+    // An empty slot in their own column blocks their time; it can't book.
     await clickSlot(page, "Priya Shah", 14);
     await expect(page.getByRole("form", { name: "New booking" })).toHaveCount(0);
+    await expect(page.getByRole("form", { name: "Block time" })).toBeVisible();
+    await page.keyboard.press("Escape");
 
     // Someone else's visit: read only.
     await column(page, "Sofia Moreno").getByRole("button", { name: new RegExp(`${PREFIX}Kit Test`) }).click();

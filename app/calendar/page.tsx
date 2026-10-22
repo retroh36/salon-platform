@@ -11,7 +11,8 @@ import { LEVEL_LABELS, REASON_LABELS, type TimeOffReason } from "@/lib/schedule-
 import { dayView } from "@/lib/scheduling/availability";
 import { itemEnd, itemSegments, type BookedItem } from "@/lib/scheduling/booking";
 import { intersectIntervals, type Interval } from "@/lib/scheduling/intervals";
-import { loadLocationSchedule, loadOffers, loadStaffSchedules, startOfLocalDay, toBookedItem } from "@/lib/scheduling/load";
+import { occurrences } from "@/lib/scheduling/blocks";
+import { loadBlocks, loadLocationSchedule, loadOffers, loadStaffSchedules, startOfLocalDay, toBookedItem } from "@/lib/scheduling/load";
 import { addDays, formatMinute, isLocalDate, MINUTES_PER_DAY, todayIn, toLocal, WEEKDAYS } from "@/lib/scheduling/time";
 import { fullName, roleLabel, sortStaff } from "@/lib/staff";
 import { CalendarBoard } from "./board";
@@ -61,7 +62,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   if (resourcesResult.error) throw resourcesResult.error;
 
   const items = itemsResult.data;
-  const [formulaResult, products] = await Promise.all([
+  const [formulaResult, products, timeBlocks] = await Promise.all([
     items.length
       ? supabase
           .from("client_formulas")
@@ -70,6 +71,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
           .order("created_at")
       : Promise.resolve({ data: [], error: null }),
     loadBackBarProducts(supabase),
+    loadBlocks(supabase, me.location.id),
   ]);
   if (formulaResult.error) throw formulaResult.error;
   const team = staffResult.data.filter((s) => s.is_active && s.location_id === me.location.id);
@@ -205,6 +207,19 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     range,
     columns,
     blocks,
+    timeBlocks: timeBlocks.flatMap((b) =>
+      occurrences(b, date, date).map((o) => ({
+        blockId: b.id,
+        staffId: b.staffId,
+        kind: b.kind,
+        note: b.note,
+        start: o.start,
+        end: o.end,
+        weekdays: b.weekdays,
+        startsOn: b.startsOn,
+        endsOn: b.endsOn,
+      })),
+    ),
     appointments,
     menu: {
       services: servicesResult.data.map((s) => ({

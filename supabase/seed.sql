@@ -987,3 +987,40 @@ insert into public.purchase_order_lines (business_id, purchase_order_id, product
 select 'b0000000-0000-4000-8000-000000000001', po.id, p.id, l.quantity, p.cost_cents
 from po, (values ('WE-CC-T11', 4), ('WE-CC-T18', 6), ('RK-AS-SH-1L', 2)) as l (sku, quantity)
 join public.products p on p.sku = l.sku;
+
+-- Blocked time: lunches and a break that repeat, and a one-off training
+-- session. Days where a seeded client is already booked over a repeating
+-- block are skipped, so the calendar keeps to the rules.
+insert into public.time_blocks (id, business_id, location_id, staff_id, kind, note, start_minute, end_minute, repeat_weekdays, starts_on, created_by)
+select id::uuid, 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', staff::uuid, kind::public.time_block_kind,
+       note, start_minute, end_minute, weekdays, (now() at time zone 'America/Chicago')::date - 35, 'd0000000-0000-4000-8000-000000000002'
+from (values
+  ('e2000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000008', 'lunch', null, 750, 780, array[1, 2, 3, 4, 5]::smallint[]),
+  ('e2000000-0000-4000-8000-000000000002', 'd0000000-0000-4000-8000-000000000007', 'lunch', null, 720, 750, array[2, 3, 5, 6]::smallint[]),
+  ('e2000000-0000-4000-8000-000000000003', 'd0000000-0000-4000-8000-000000000005', 'break', 'Coffee', 930, 945, array[3, 4, 5, 6]::smallint[])
+) as b (id, staff, kind, note, start_minute, end_minute, weekdays);
+
+insert into public.time_block_skips (block_id, business_id, on_date)
+select b.id, b.business_id, d::date
+from public.time_blocks b
+cross join generate_series(b.starts_on, b.starts_on + 70, interval '1 day') d
+where b.repeat_weekdays is not null
+  and extract(isodow from d)::smallint = any (b.repeat_weekdays)
+  and exists (
+    select 1 from public.appointment_items i join public.appointments a on a.id = i.appointment_id
+    where i.staff_id = b.staff_id and a.status not in ('canceled', 'no_show')
+      and i.starts_at < (d::date + make_interval(mins => b.end_minute))::timestamp at time zone 'America/Chicago'
+      and i.ends_at > (d::date + make_interval(mins => b.start_minute))::timestamp at time zone 'America/Chicago'
+  );
+
+-- Hannah's color class next Thursday morning, if she's free then.
+insert into public.time_blocks (business_id, location_id, staff_id, kind, note, start_minute, end_minute, on_date, created_by)
+select 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000006',
+       'training', 'Wella color class', 720, 780, d, 'd0000000-0000-4000-8000-000000000002'
+from (select (now() at time zone 'America/Chicago')::date + (11 - extract(isodow from (now() at time zone 'America/Chicago')::date))::int as d) x
+where not exists (
+  select 1 from public.appointment_items i join public.appointments a on a.id = i.appointment_id
+  where i.staff_id = 'd0000000-0000-4000-8000-000000000006' and a.status not in ('canceled', 'no_show')
+    and i.starts_at < (x.d + time '13:00')::timestamp at time zone 'America/Chicago'
+    and i.ends_at > (x.d + time '12:00')::timestamp at time zone 'America/Chicago'
+);

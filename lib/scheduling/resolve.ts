@@ -26,7 +26,9 @@
 
 import type { AppointmentStatus } from "../appointments.ts";
 import type { ItemChange, Placement } from "./ai-actions.ts";
-import { checkItem, checkMoves, itemEnd, pickResource, type BookedItem, type BookingContext, type BookingProblem } from "./booking.ts";
+import { isAvailable } from "./availability.ts";
+import { MAX_BLOCK_SHIFT, MOVABLE_KINDS, type TimeBlockKind } from "./blocks.ts";
+import { busyDuring, checkItem, checkMoves, itemEnd, pickResource, type BlockedTime, type BookedItem, type BookingContext, type BookingProblem } from "./booking.ts";
 
 const MINUTE = 60_000;
 const STEP = 5;
@@ -45,8 +47,17 @@ export type Disruption =
 
 export type ConflictKind = Disruption["kind"] | "double_booking";
 
+// A lunch or break moved to make room (never training, meetings or
+// personal time).
+export type BlockMove = { blockId: string; date: string; staffId: string; kind: TimeBlockKind; from: { start: Date; end: Date }; to: { start: Date; end: Date } };
+
+// Moving a lunch or break counts like this many minutes of delay, plus the
+// minutes it moves.
+export const BLOCK_MOVE_MINUTES = 10;
+
 export type FixOption = {
   moves: ItemChange[];
+  blockMoves: BlockMove[];
   // Items it couldn't find a place for today.
   unresolved: string[];
   clientsMoved: number;
@@ -260,6 +271,8 @@ type Pending = { itemId: string; earliest: number };
 type State = {
   // Item id -> its new place.
   placed: Map<string, Placement>;
+  // "blockId:date" -> a lunch or break moved.
+  blockMoves: Map<string, BlockMove>;
   pending: Pending[];
   unresolved: string[];
   // Lower bound on the final score.
@@ -310,7 +323,9 @@ function resolveConflict(day: Day, eff: BookingContext, conflict: Omit<Conflict,
     // Ties keep the stylist, then the time.
     .sort((a, b) => a.score - b.score || a.stylistChanges - b.stylistChanges || a.shiftMinutes - b.shiftMinutes)
     .filter((o) => {
-      const key = o.moves.map((m) => `${m.itemId}>${m.to.staffId}@${m.to.start.getTime()}`).sort().join("|") + `|${o.unresolved.sort().join(",")}`;
+      const key =
+        o.moves.map((m) => `${m.itemId}>${m.to.staffId}@${m.to.start.getTime()}`).sort().join("|") +
+        `|${o.unresolved.sort().join(",")}|${o.blockMoves.map((m) => `${m.blockId}@${m.to.start.getTime()}`).join(",")}`;
       return !seen.has(key) && seen.add(key);
     })
     .slice(0, MAX_OPTIONS);
@@ -323,7 +338,7 @@ function searchFixes(s: Search, displaced: string[], alsoMoving: string[] = []):
   const startPending = displaced
     .map((id) => ({ itemId: id, earliest: Math.max(s.effective.get(id)!.start.getTime(), s.earliestStart) }))
     .sort((a, b) => a.earliest - b.earliest);
-  const initial: State = { placed: new Map(), pending: startPending, unresolved: [], estimate: 0, score: 0 };
+  const initial: State = { placed: new Map(), blockMoves: new Map(), pending: startPending, unresolved: [], estimate: 0, score: 0 };
   initial.estimate = estimate(s, initial);
 
   const heap = new Heap<State>((a, b) => a.estimate - b.estimate || b.placed.size - a.placed.size);
@@ -362,10 +377,19 @@ function calendarFor(s: Search, state: State, without: Set<string>): BookingCont
     const place = b.id ? state.placed.get(b.id) : undefined;
     booked.push(place ? { ...b, ...place } : b);
   }
-  return { ...s.eff, booked };
+  return { ...s.eff, booked, blocks: movedBlocks(s.eff.blocks ?? [], state.blockMoves) };
 }
 
-type Candidate = { moves: Map<string, Placement>; bumped: string[] };
+const blockKey = (b: { blockId: string; date: string }) => `${b.blockId}:${b.date}`;
+
+function movedBlocks(blocks: readonly BlockedTime[], moves: ReadonlyMap<string, BlockMove>): BlockedTime[] {
+  return blocks.map((b) => {
+    const m = moves.get(blockKey(b));
+    return m ? { ...b, start: m.to.start, end: m.to.end } : b;
+  });
+}
+
+type Candidate = { moves: Map<string, Placement>; bumped: string[]; blockMove?: BlockMove };
 
 // Ways to place the first pending item: for each stylist who could take
 // it, the earliest place that's free, plus (for its own stylist) its
@@ -387,6 +411,8 @@ function expand(s: Search, state: State): State[] {
     // With their own stylist, a client can push the next ones along, at the
     // first time only those clients are in the way.
     let mayPush = staffId === anchor.staffId;
+    // A lunch or break in the way can shift, once per stylist.
+    let mayShiftBlock = true;
     for (let t = first.earliest; t <= latest; t += STEP * MINUTE) {
       const delta = t - anchor.start.getTime();
       const moves = new Map<string, Placement>();
@@ -403,7 +429,14 @@ function expand(s: Search, state: State): State[] {
           break;
         }
         const push = mayPush ? bumpable(s, state, problems, staffId, anchor, bumped) : null;
-        if (!push) break;
+        if (!push) {
+          if (mayShiftBlock && !bumped.length && problems.length === 1 && problems[0].code === "staff_blocked") {
+            mayShiftBlock = false;
+            const blockMove = shiftBlock(s, state, group, moves, new Set(groupIds), problems[0]);
+            if (blockMove) candidates.push({ moves: new Map([...moves].map(([k, v]) => [k, { ...v }])), bumped: [], blockMove });
+          }
+          break;
+        }
         bumped.push(push);
       }
       if (bumped.length) mayPush = false;
@@ -417,14 +450,16 @@ function expand(s: Search, state: State): State[] {
   const states = candidates.map((c) => {
     const placed = new Map(state.placed);
     for (const [id, place] of c.moves) placed.set(id, place);
+    const blockMoves = new Map(state.blockMoves);
+    if (c.blockMove) blockMoves.set(blockKey(c.blockMove), c.blockMove);
     const pending = [
       ...rest.filter((p) => !c.moves.has(p.itemId)),
       ...c.bumped.map((id) => ({ itemId: id, earliest: Math.max(s.effective.get(id)!.start.getTime(), s.earliestStart) })),
     ].sort((a, b) => a.earliest - b.earliest);
-    return withScores(s, { placed, pending, unresolved: state.unresolved, estimate: 0, score: 0 });
+    return withScores(s, { placed, blockMoves, pending, unresolved: state.unresolved, estimate: 0, score: 0 });
   });
   // Leaving it where it is (unsolved) is always possible, and always last.
-  states.push(withScores(s, { placed: state.placed, pending: rest, unresolved: [...state.unresolved, first.itemId], estimate: 0, score: 0 }));
+  states.push(withScores(s, { placed: state.placed, blockMoves: state.blockMoves, pending: rest, unresolved: [...state.unresolved, first.itemId], estimate: 0, score: 0 }));
   return states;
 }
 
@@ -443,6 +478,51 @@ function tryPlace(s: Search, state: State, group: (BookedItem & { id: string })[
     accepted.push(check.item);
   }
   return [];
+}
+
+// Moving the lunch or break in the way by up to MAX_BLOCK_SHIFT minutes,
+// nearest first, if that lets the group fit: within the stylist's hours,
+// and clear of their other clients and blocks.
+function shiftBlock(
+  s: Search,
+  state: State,
+  group: (BookedItem & { id: string })[],
+  moves: Map<string, Placement>,
+  off: Set<string>,
+  problem: Extract<BookingProblem, { code: "staff_blocked" }>,
+): BlockMove | null {
+  if (!MOVABLE_KINDS.has(problem.kind)) return null;
+  const key = blockKey(problem);
+  if (state.blockMoves.has(key)) return null;
+  const block = (s.eff.blocks ?? []).find((b) => blockKey(b) === key);
+  const schedule = s.eff.staff.get(block?.staffId ?? "")?.schedule;
+  if (!block || !schedule) return null;
+  const length = (block.end.getTime() - block.start.getTime()) / MINUTE;
+  for (let d = STEP; d <= MAX_BLOCK_SHIFT; d += STEP) {
+    for (const shift of [d, -d]) {
+      const to = { start: new Date(block.start.getTime() + shift * MINUTE), end: new Date(block.end.getTime() + shift * MINUTE) };
+      if (!isAvailable(schedule, s.eff.location, to.start, length).available) continue;
+      const move: BlockMove = { blockId: block.blockId, date: block.date, staffId: block.staffId, kind: block.kind, from: { start: block.start, end: block.end }, to };
+      const trial: State = { ...state, blockMoves: new Map(state.blockMoves).set(key, move) };
+      const placedGroup = group.map((b) => ({ ...b, staffId: moves.get(b.id)!.staffId, start: moves.get(b.id)!.start }));
+      if (!blockIsClear(s, trial, move, off, placedGroup)) continue;
+      const trialMoves = new Map([...moves].map(([k, v]) => [k, { ...v }]));
+      if (!tryPlace(s, trial, group, trialMoves, off).length) {
+        for (const [k, v] of trialMoves) moves.set(k, v);
+        return move;
+      }
+    }
+  }
+  return null;
+}
+
+// A moved block doesn't land on a client or another block.
+function blockIsClear(s: Search, state: State, move: BlockMove, off: Set<string>, also: readonly BookedItem[] = []): boolean {
+  const ctx = calendarFor(s, state, off);
+  if (busyDuring(ctx, move.staffId, move.to.start, move.to.end, also).length) return false;
+  return !(ctx.blocks ?? []).some(
+    (b) => blockKey(b) !== blockKey(move) && b.staffId === move.staffId && b.start < move.to.end && move.to.start < b.end,
+  );
 }
 
 // The client in the way, if the only problem is one client of the same
@@ -482,7 +562,8 @@ function measure(s: Search, state: State) {
   }
   const shiftMinutes = [...shiftByVisit.values()].reduce((sum, m) => sum + m, 0);
   const clientsMoved = shiftByVisit.size;
-  const score = state.unresolved.length * 100_000 + clientsMoved * 1000 + shiftMinutes + stylistChanges * STYLIST_CHANGE_MINUTES;
+  const blockMinutes = [...state.blockMoves.values()].reduce((sum, m) => sum + BLOCK_MOVE_MINUTES + Math.abs(m.to.start.getTime() - m.from.start.getTime()) / MINUTE, 0);
+  const score = state.unresolved.length * 100_000 + clientsMoved * 1000 + shiftMinutes + stylistChanges * STYLIST_CHANGE_MINUTES + blockMinutes;
   return { clientsMoved, shiftMinutes, stylistChanges, score };
 }
 
@@ -503,9 +584,11 @@ function finish(s: Search, state: State, alsoMoving: string[]): FixOption | null
   if (!moves.length) return null;
   // A late client's visit must move even if the plan left it alone.
   if (alsoMoving.some((id) => !state.placed.has(id) && !state.unresolved.includes(id))) return null;
-  if (!checkMoves(s.eff, moves.map((m) => ({ itemId: m.itemId, ...m.to }))).valid) return null;
+  const withBlocks = { ...s.eff, blocks: movedBlocks(s.eff.blocks ?? [], state.blockMoves) };
+  if (!checkMoves(withBlocks, moves.map((m) => ({ itemId: m.itemId, ...m.to }))).valid) return null;
+  for (const m of state.blockMoves.values()) if (!blockIsClear(s, { ...state, pending: [] }, m, new Set())) return null;
   moves.sort((a, b) => a.to.start.getTime() - b.to.start.getTime());
-  return { moves, unresolved: [...state.unresolved], ...measure(s, state) };
+  return { moves, blockMoves: [...state.blockMoves.values()], unresolved: [...state.unresolved], ...measure(s, state) };
 }
 
 // A small binary heap.

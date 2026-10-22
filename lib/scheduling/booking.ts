@@ -18,6 +18,7 @@
 //      processing included (the client is still in the chair).
 
 import { isAvailable, type LocationSchedule, type StaffSchedule, type Unavailable } from "./availability.ts";
+import type { TimeBlockKind } from "./blocks.ts";
 import { toLocal } from "./time.ts";
 
 const MINUTE_MS = 60_000;
@@ -65,7 +66,7 @@ export function itemSegments(item: BookedItem): Segment[] {
 type Span = { start: number; end: number }; // epoch ms, [start, end)
 
 // When the stylist is with the client: everything but processing.
-function staffBusySpans(item: BookedItem): Span[] {
+export function staffBusySpans(item: BookedItem): Span[] {
   return itemSegments(item)
     .filter((s) => s.kind !== "processing")
     .map((s) => ({ start: s.start.getTime(), end: s.end.getTime() }));
@@ -85,6 +86,9 @@ export type BookingStaff = { id: string; isActive: boolean; schedule: StaffSched
 export type ResourceKind = "chair" | "room" | "station";
 export type BookingResource = { id: string; isActive: boolean; kind?: ResourceKind; sortOrder?: number };
 
+// One day of a stylist's blocked time (lunch, a meeting…), as instants.
+export type BlockedTime = { blockId: string; date: string; staffId: string; kind: TimeBlockKind; start: Date; end: Date; repeating?: boolean };
+
 export type BookingContext = {
   location: LocationSchedule;
   services: ReadonlyMap<string, BookingService>;
@@ -92,6 +96,8 @@ export type BookingContext = {
   resources: ReadonlyMap<string, BookingResource>;
   // Items that hold time: from appointments that aren't canceled or no-shows.
   booked: readonly BookedItem[];
+  // Blocked time: the stylist's busy time can't overlap it.
+  blocks?: readonly BlockedTime[];
 };
 
 export type ItemRequest = {
@@ -117,6 +123,7 @@ export type BookingProblem =
   | { code: "invalid_start" }
   | { code: "staff_unavailable"; reason: Unavailable }
   | { code: "staff_double_booked"; conflictWith?: string }
+  | { code: "staff_blocked"; kind: TimeBlockKind; blockId: string; date: string }
   | { code: "unknown_resource" }
   | { code: "resource_inactive" }
   | { code: "resource_in_use"; conflictWith?: string }
@@ -186,6 +193,9 @@ export function checkItem(
     (o) => o.staffId === item.staffId && staffBusySpans(o).some((s) => busy.some((b) => overlaps(s, b))),
   );
   if (staffConflict) problems.push({ code: "staff_double_booked", conflictWith: staffConflict.id });
+
+  const block = (ctx.blocks ?? []).find((b) => b.staffId === item.staffId && busy.some((s) => overlaps(s, { start: b.start.getTime(), end: b.end.getTime() })));
+  if (block) problems.push({ code: "staff_blocked", kind: block.kind, blockId: block.blockId, date: block.date });
 
   if (item.resourceId != null) {
     const span = resourceSpan(item);
@@ -280,6 +290,14 @@ const UNAVAILABLE_MESSAGES: Record<Unavailable, string> = {
   crosses_midnight: "The appointment would run past midnight.",
 };
 
+const BLOCKED_MESSAGES: Record<TimeBlockKind, string> = {
+  lunch: "The stylist is at lunch then.",
+  break: "The stylist is on a break then.",
+  training: "The stylist is in training then.",
+  meeting: "The stylist is in a meeting then.",
+  personal: "The stylist has blocked out that time.",
+};
+
 // A sentence for the front desk.
 export function describeProblem(problem: BookingProblem): string {
   switch (problem.code) {
@@ -299,6 +317,8 @@ export function describeProblem(problem: BookingProblem): string {
       return UNAVAILABLE_MESSAGES[problem.reason];
     case "staff_double_booked":
       return "The stylist already has a client then.";
+    case "staff_blocked":
+      return BLOCKED_MESSAGES[problem.kind];
     case "unknown_resource":
       return "That chair or room doesn't exist.";
     case "resource_inactive":
@@ -310,4 +330,11 @@ export function describeProblem(problem: BookingProblem): string {
     case "not_booked":
       return "That appointment is no longer on the calendar.";
   }
+}
+
+// Booked items the stylist would be busy with during [start, end): what a
+// block there would clash with (processing time doesn't).
+export function busyDuring(ctx: BookingContext, staffId: string, start: Date, end: Date, also: readonly BookedItem[] = []): BookedItem[] {
+  const span = { start: start.getTime(), end: end.getTime() };
+  return [...ctx.booked, ...also].filter((b) => b.staffId === staffId && staffBusySpans(b).some((s) => overlaps(s, span)));
 }

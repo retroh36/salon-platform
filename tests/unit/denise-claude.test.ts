@@ -80,8 +80,8 @@ describe("connecting", () => {
 
 describe("explaining fixes", () => {
   const facts = [
-    { problem: "Priya's running 20 minutes late.", changes: [{ client: "Grace", service: "Cut", from: "11:00 with Priya", to: "11:20 with Priya" }], clientsMoved: 1, couldNotPlace: [] },
-    { problem: "Priya's running 20 minutes late.", changes: [{ client: "Grace", service: "Cut", from: "11:00 with Priya", to: "11:00 with Ethan" }], clientsMoved: 1, couldNotPlace: [] },
+    { problem: "Priya's running 20 minutes late.", changes: [{ client: "Grace", service: "Cut", from: "11:00 with Priya", to: "11:20 with Priya" }], clientsMoved: 1, couldNotPlace: [], breaksMoved: [] },
+    { problem: "Priya's running 20 minutes late.", changes: [{ client: "Grace", service: "Cut", from: "11:00 with Priya", to: "11:00 with Ethan" }], clientsMoved: 1, couldNotPlace: [], breaksMoved: [] },
   ];
 
   it("asks the fast model for one explanation per fix, as JSON", async () => {

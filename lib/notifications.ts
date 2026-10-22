@@ -56,3 +56,17 @@ export function notificationsFor(changes: readonly VisitChange[]): { notificatio
   }
   return { notifications, undo };
 }
+
+// A lunch or break Denise moved: tell the stylist (and, on undo, that it's
+// back).
+export function blockNotifications(
+  moves: readonly { staffId: string; kind: string; from: number; to: number }[],
+): { notifications: NotificationDraft[]; undo: NotificationDraft[] } {
+  const notifications: NotificationDraft[] = [];
+  const undo: NotificationDraft[] = [];
+  for (const m of moves) {
+    notifications.push({ template: "staff_block_moved", body: `Your ${m.kind} today has moved from ${formatMinute(m.from)} to ${formatMinute(m.to)}.`, appointmentId: null, staffId: m.staffId });
+    undo.push({ template: "staff_block_moved_undone", body: `Your ${m.kind} today is back at ${formatMinute(m.from)}.`, appointmentId: null, staffId: m.staffId });
+  }
+  return { notifications, undo };
+}

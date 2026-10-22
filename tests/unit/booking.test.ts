@@ -485,6 +485,26 @@ describe("moving several items at once", () => {
   });
 });
 
+describe("blocked time", () => {
+  const lunch = (staffId: string, from: string, to: string) => ({ blockId: "l", date: TUESDAY, staffId, kind: "lunch" as const, start: at(from), end: at(to) });
+
+  it("can't be booked over: the stylist's busy time can't overlap it", () => {
+    const ctx = context({ blocks: [lunch("ethan", "12:00", "12:30")] });
+    expect(problems(ctx, request("cut", "ethan", "11:30"))).toEqual([{ code: "staff_blocked", kind: "lunch", blockId: "l", date: TUESDAY }]);
+    expect(codes(ctx, request("cut", "ethan", "11:00"))).toEqual([]);
+    expect(codes(ctx, request("cut", "ethan", "12:30"))).toEqual([]);
+    // Other stylists aren't affected.
+    expect(codes(ctx, request("cut", "priya", "11:30"))).toEqual([]);
+  });
+
+  it("lets a color process over lunch", () => {
+    // Color at 11:00: busy until 11:45, processing until 12:20, busy again.
+    const ctx = context({ blocks: [lunch("priya", "11:45", "12:15")] });
+    expect(codes(ctx, request("color", "priya", "11:00"))).toEqual([]);
+    expect(codes(ctx, request("color", "priya", "10:45"))).toEqual(["staff_blocked"]);
+  });
+});
+
 describe("messages", () => {
   it("describes every problem", () => {
     const all: BookingProblem[] = [
@@ -505,6 +525,11 @@ describe("messages", () => {
       { code: "resource_in_use" },
       { code: "no_free_resource" },
       { code: "not_booked" },
+      { code: "staff_blocked", kind: "lunch", blockId: "b", date: "2026-10-27" },
+      { code: "staff_blocked", kind: "break", blockId: "b", date: "2026-10-27" },
+      { code: "staff_blocked", kind: "training", blockId: "b", date: "2026-10-27" },
+      { code: "staff_blocked", kind: "meeting", blockId: "b", date: "2026-10-27" },
+      { code: "staff_blocked", kind: "personal", blockId: "b", date: "2026-10-27" },
     ];
     const messages = all.map(describeProblem);
     expect(new Set(messages).size).toBe(all.length);

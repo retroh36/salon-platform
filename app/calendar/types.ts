@@ -7,6 +7,7 @@ import type { ServiceFamily } from "@/lib/calendar";
 import type { StaffRole } from "@/lib/staff";
 import type { SegmentKind } from "@/lib/scheduling/booking";
 import type { Interval } from "@/lib/scheduling/intervals";
+import type { TimeBlockKind } from "@/lib/scheduling/blocks";
 import type { LocalDate } from "@/lib/scheduling/time";
 
 export type ColumnData = {
@@ -91,6 +92,20 @@ export type Menu = {
   products: PickerProduct[];
 };
 
+// One day of a stylist's blocked time, with its block's repeat settings.
+export type TimeBlockData = {
+  blockId: string;
+  staffId: string;
+  kind: TimeBlockKind;
+  note: string | null;
+  start: number;
+  end: number;
+  // Repeating: on these weekdays (1 = Monday) from startsOn until endsOn.
+  weekdays: number[] | null;
+  startsOn: LocalDate | null;
+  endsOn: LocalDate | null;
+};
+
 export type BoardData = {
   date: LocalDate;
   today: LocalDate;
@@ -100,6 +115,7 @@ export type BoardData = {
   range: Interval;
   columns: ColumnData[];
   blocks: BlockData[];
+  timeBlocks: TimeBlockData[];
   appointments: Record<string, AppointmentDetail>;
   menu: Menu;
   me: { staffId: string; role: StaffRole; canBook: boolean };

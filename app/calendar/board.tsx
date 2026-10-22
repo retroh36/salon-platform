@@ -15,15 +15,18 @@ import { Tabs } from "@/components/ui/tabs";
 import { isEditable, STATUS_LABELS } from "@/lib/appointments";
 import type { ChatMessage, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
 import { FAMILIES, FAMILY_LABELS, hourMarks, laneBox, layoutColumn, type ServiceFamily } from "@/lib/calendar";
+import { BLOCK_LABELS } from "@/lib/scheduling/blocks";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, toLocal } from "@/lib/scheduling/time";
 import { moveVisitItem } from "./actions";
+import { moveBlock } from "./block-actions";
+import { BlockPanel, repeatLabel } from "./block-panel";
 import { AppointmentPanel } from "./appointment-panel";
 import { approveDeniseFix, askDenise, rejectDeniseFix, reportOut, scanDenise, undoDeniseFix } from "./denise-actions";
 import { DenisePanel, type Outcome, type Preview } from "./denise-panel";
 import { BookingPanel, type BookingStart } from "./booking-panel";
 import { NowLine, useNow } from "./now-line";
-import type { BlockData, BoardData, ColumnData } from "./types";
+import type { BlockData, BoardData, ColumnData, TimeBlockData } from "./types";
 
 export const PX_PER_MINUTE = 2;
 // Moves snap to 5 minutes; a click on an empty slot to the quarter hour.
@@ -34,6 +37,8 @@ const DRAG_THRESHOLD = 5;
 
 type Selection =
   | { kind: "none" }
+  | { kind: "block"; blockId: string }
+  | { kind: "new-block"; start: { staffId: string; startMinute: number } }
   | { kind: "book"; start: BookingStart }
   | { kind: "edit"; appointmentId: string }
   | { kind: "detail"; appointmentId: string };
@@ -41,6 +46,9 @@ type Selection =
 type Tab = "denise" | "details";
 
 type Move = { itemId: string; staffId: string; start: number };
+
+// Dragging blocked time (moving it, or its bottom edge to resize it).
+type BlockDrag = { key: string; block: TimeBlockData; mode: "move" | "resize"; pointerId: number; y: number; start: number; end: number; moved: boolean };
 
 // A block in a column, or a preview of where Denise's fix would put one.
 type Placed = BlockData & { ghost?: boolean; move?: FixMove };
@@ -95,7 +103,12 @@ export function CalendarBoard({ data }: { data: BoardData }) {
 
   const [department, setDepartment] = useState<"all" | ServiceFamily>("all");
   const [notice, setNotice] = useState<string | null>(null);
+  const [doneMessage, setDoneMessage] = useState<string | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
+  // Blocked time being dragged or resized, and where moved blocks now are
+  // until the calendar reloads.
+  const [blockDrag, setBlockDrag] = useState<BlockDrag | null>(null);
+  const [blockMoves, setBlockMoves] = useState<Record<string, { start: number; end: number }>>({});
   const [settling, setSettling] = useState<string | null>(null);
   const dragRef = useRef<Drag | null>(null);
   // A drag ends with a click on the block; this stops it opening the panel.
@@ -290,14 +303,61 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   }
 
   // A click on empty calendar space closes the panel (and does nothing
-  // else); with it closed, it starts a booking there.
+  // else); with it closed, it starts a booking there (or, for stylists,
+  // blocking their own time).
   function onSlotClick(e: React.MouseEvent<HTMLElement>, column: ColumnData) {
-    if ((e.target as HTMLElement).closest("[data-block]")) return;
+    if ((e.target as HTMLElement).closest("[data-block], [data-time-block]")) return;
     if (panelOpen) return setPanelOpen(false);
-    if (!me.canBook) return;
     const top = e.currentTarget.getBoundingClientRect().top;
     const minute = range.start + Math.floor((e.clientY - top) / PX_PER_MINUTE / SLOT_STEP) * SLOT_STEP;
-    select({ kind: "book", start: { staffId: column.staffId, startMinute: Math.min(minute, range.end - SLOT_STEP) } });
+    const start = { staffId: column.staffId, startMinute: Math.min(minute, range.end - SLOT_STEP) };
+    if (me.canBook) select({ kind: "book", start });
+    else if (column.staffId === me.staffId) select({ kind: "new-block", start });
+  }
+
+  // Whose time this person can block: anyone's for the front of house,
+  // their own for stylists.
+  const blockStaff = me.canBook ? data.columns.map((c) => c.staffId) : data.columns.some((c) => c.staffId === me.staffId) ? [me.staffId] : [];
+  const canEditBlock = (b: TimeBlockData) => blockStaff.includes(b.staffId);
+  const timeBlocks = data.timeBlocks.map((b) => ({ ...b, ...blockMoves[`${b.blockId}:${b.start}`] }));
+
+  function onBlockPointerDown(e: React.PointerEvent, b: TimeBlockData, mode: "move" | "resize") {
+    if (e.button !== 0 || !canEditBlock(b)) return;
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setBlockDrag({ key: `${b.blockId}:${data.timeBlocks.find((x) => x.blockId === b.blockId)!.start}`, block: b, mode, pointerId: e.pointerId, y: e.clientY, start: b.start, end: b.end, moved: false });
+  }
+
+  function onBlockPointerMove(e: React.PointerEvent) {
+    const d = blockDrag;
+    if (!d || e.pointerId !== d.pointerId) return;
+    const dy = e.clientY - d.y;
+    if (!d.moved && Math.abs(dy) < DRAG_THRESHOLD) return;
+    const shift = Math.round(dy / PX_PER_MINUTE / MOVE_STEP) * MOVE_STEP;
+    const length = d.block.end - d.block.start;
+    const next =
+      d.mode === "move"
+        ? { start: Math.min(Math.max(d.block.start + shift, range.start), range.end - length), end: 0 }
+        : { start: d.block.start, end: Math.min(Math.max(d.block.end + shift, d.block.start + MOVE_STEP), range.end) };
+    if (d.mode === "move") next.end = next.start + length;
+    setBlockDrag({ ...d, ...next, moved: true });
+  }
+
+  function onBlockPointerUp(e: React.PointerEvent) {
+    const d = blockDrag;
+    setBlockDrag(null);
+    if (!d || e.pointerId !== d.pointerId) return;
+    if (!d.moved) return select({ kind: "block", blockId: d.block.blockId });
+    if (d.start === d.block.start && d.end === d.block.end) return;
+    setNotice(null);
+    setBlockMoves((all) => ({ ...all, [d.key]: { start: d.start, end: d.end } }));
+    startTransition(async () => {
+      const result = await moveBlock({ blockId: d.block.blockId, staffId: d.block.staffId, date: data.date, startMinute: d.start, endMinute: d.end });
+      if (!result.ok) {
+        setNotice(`Couldn't move ${BLOCK_LABELS[d.block.kind].toLowerCase()}: ${result.message}`);
+        setBlockMoves((all) => Object.fromEntries(Object.entries(all).filter(([k]) => k !== d.key)));
+      } else setDoneMessage(result.message);
+    });
   }
 
   const gridColumns = {
@@ -323,6 +383,16 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               </p>
             </ViewTransition>
           </div>
+          <div className="flex flex-wrap gap-2">
+          {blockStaff.length > 0 && (
+            <button
+              type="button"
+              className={buttonClass("secondary", "lg")}
+              onClick={() => select({ kind: "new-block", start: { staffId: blockStaff.includes(me.staffId) ? me.staffId : blockStaff[0], startMinute: 12 * 60 } })}
+            >
+              Block time
+            </button>
+          )}
           {me.canBook && (
             <button
               type="button"
@@ -333,6 +403,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               New booking
             </button>
           )}
+          </div>
         </div>
 
         <AskDeniseBar onAsk={ask} />
@@ -383,6 +454,15 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             />
           </div>
         </div>
+
+        {doneMessage && (
+          <div role="status" className="flex animate-fade-in items-start justify-between gap-4 rounded-md border border-status-confirmed-ink/25 bg-status-confirmed-bg px-3 py-2 text-sm text-status-confirmed-ink">
+            <span>{doneMessage}</span>
+            <button type="button" onClick={() => setDoneMessage(null)} className="font-semibold" aria-label="Dismiss">
+              ×
+            </button>
+          </div>
+        )}
 
         {notice && (
           <div role="alert" className="flex animate-fade-in items-start justify-between gap-4 rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">
@@ -508,6 +588,28 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                           </div>
                         ))}
 
+                        {timeBlocks
+                          .filter((b) => b.staffId === c.staffId)
+                          .map((b) => {
+                            const live = blockDrag && blockDrag.block.blockId === b.blockId ? { ...b, start: blockDrag.start, end: blockDrag.end } : b;
+                            return (
+                              <TimeBlockBox
+                                key={`${b.blockId}:${b.start}`}
+                                block={live}
+                                y={y}
+                                editable={canEditBlock(b)}
+                                dragging={blockDrag?.block.blockId === b.blockId && blockDrag.moved}
+                                selected={selection.kind === "block" && selection.blockId === b.blockId}
+                                columnName={c.name}
+                                onPointerDown={onBlockPointerDown}
+                                onPointerMove={onBlockPointerMove}
+                                onPointerUp={onBlockPointerUp}
+                                onPointerCancel={() => setBlockDrag(null)}
+                                onOpen={() => select({ kind: "block", blockId: b.blockId })}
+                              />
+                            );
+                          })}
+
                         {drag?.moved && drag.staffId === c.staffId && <DragGhost block={blocks.find((b) => b.itemId === drag.itemId)!} start={drag.start} y={y} />}
 
 
@@ -614,7 +716,30 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               products={data.menu.products}
             />
           ) : selection.kind === "book" ? (
-            <BookingPanel data={data} start={selection.start} onClose={closeDetails} onSaved={(id) => select({ kind: "detail", appointmentId: id })} />
+            <BookingPanel
+              data={data}
+              start={selection.start}
+              onClose={closeDetails}
+              onSaved={(id) => select({ kind: "detail", appointmentId: id })}
+              onBlockInstead={blockStaff.includes(selection.start.staffId) ? () => select({ kind: "new-block", start: selection.start }) : undefined}
+            />
+          ) : selection.kind === "new-block" || (selection.kind === "block" && data.timeBlocks.some((b) => b.blockId === selection.blockId)) ? (
+            <BlockPanel
+              key={selection.kind === "block" ? selection.blockId : "new"}
+              date={data.date}
+              columns={data.columns}
+              staffChoices={blockStaff}
+              block={selection.kind === "block" ? data.timeBlocks.find((b) => b.blockId === selection.blockId) : undefined}
+              start={selection.kind === "new-block" ? selection.start : undefined}
+              onClose={closeDetails}
+              onDone={(message) => {
+                closeDetails();
+                setPanelOpen(false);
+                setNotice(null);
+                setBlockMoves({});
+                setDoneMessage(message);
+              }}
+            />
           ) : selection.kind === "edit" && data.appointments[selection.appointmentId] ? (
             <BookingPanel
               data={data}
@@ -847,6 +972,90 @@ function segmentStyle(kind: string, faded: boolean): React.CSSProperties {
       ? { backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--fam-accent) 14%, transparent) 6px 12px)" }
       : {}),
   };
+}
+
+// Blocked time in a stylist's column: neutral, under appointments, and
+// not bookable. Drag to move it; drag its bottom edge to resize.
+function TimeBlockBox({
+  block,
+  y,
+  editable,
+  dragging,
+  selected,
+  columnName,
+  onOpen,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
+}: {
+  block: TimeBlockData;
+  y: (minute: number) => number;
+  editable: boolean;
+  dragging: boolean;
+  selected: boolean;
+  columnName: string;
+  onOpen: () => void;
+  onPointerDown: (e: React.PointerEvent, b: TimeBlockData, mode: "move" | "resize") => void;
+  onPointerMove: (e: React.PointerEvent) => void;
+  onPointerUp: (e: React.PointerEvent) => void;
+  onPointerCancel: () => void;
+}) {
+  const height = (block.end - block.start) * PX_PER_MINUTE;
+  const time = `${formatMinute(block.start)}–${formatMinute(block.end)}`;
+  const label = [BLOCK_LABELS[block.kind], time, block.note, block.weekdays && repeatLabel(block.weekdays).toLowerCase(), columnName].filter(Boolean).join(", ");
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+      aria-pressed={selected}
+      title={label}
+      data-time-block={block.kind}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      onClick={editable ? undefined : onOpen}
+      onPointerDown={(e) => onPointerDown(e, block, "move")}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      className={`absolute inset-x-1 z-[5] touch-none overflow-hidden rounded-md border border-dashed border-line-strong px-2 py-1 text-xs text-ink-muted select-none transition-[box-shadow] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-plum-700 ${
+        editable ? "cursor-grab" : "cursor-pointer"
+      } ${selected ? "ring-2 ring-plum-900" : ""} ${dragging ? "z-40 shadow-lift" : ""}`}
+      style={{
+        top: y(block.start),
+        height,
+        backgroundColor: "var(--color-sunken)",
+        backgroundImage: "repeating-linear-gradient(45deg, transparent 0 5px, rgb(43 33 48 / 0.05) 5px 10px)",
+      }}
+    >
+      {height >= 18 && (
+        <span className="flex items-center gap-1 font-semibold text-ink">
+          {block.weekdays && (
+            <svg aria-hidden viewBox="0 0 24 24" className="size-3 shrink-0" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M4 12a8 8 0 0 1 13.7-5.6L20 8M20 4v4h-4M20 12a8 8 0 0 1-13.7 5.6L4 16M4 20v-4h4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+          {BLOCK_LABELS[block.kind]}
+          {height >= 34 ? null : <span className="font-normal text-ink-muted"> · {time}</span>}
+        </span>
+      )}
+      {height >= 34 && <span className="block truncate">{time}</span>}
+      {height >= 50 && block.note && <span className="block truncate">{block.note}</span>}
+      {editable && (
+        <span
+          aria-hidden
+          data-resize-handle
+          onPointerDown={(e) => onPointerDown(e, block, "resize")}
+          className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize"
+        />
+      )}
+    </div>
+  );
 }
 
 // A lifted copy of the block that follows the pointer while dragging.

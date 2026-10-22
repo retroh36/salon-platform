@@ -115,6 +115,9 @@ export function summary(option: FixOption, l: Lookup): string {
     if (v.from.minute === v.to.minute) return `${name} → ${v.to.staffFirstName} at ${clock(v.to.minute)}`;
     return `${name} ${clock(v.from.minute)} → ${clock(v.to.minute)}${staffChanged ? ` with ${v.to.staffFirstName}` : ""}`;
   });
+  for (const b of option.blockMoves) {
+    parts.push(`${possessive(staffName(l, b.staffId))} ${b.kind} ${clock(minuteOf(l, b.from.start))} → ${clock(minuteOf(l, b.to.start))}`);
+  }
   return parts.join("; ");
 }
 
@@ -148,6 +151,9 @@ export function templateReason(c: Conflict, option: FixOption, l: Lookup): strin
       ? `${v.to.staffFirstName} is free at ${clock(v.to.minute)} and can take ${who} at the same time.`
       : `${v.to.staffFirstName} can take ${who} ${shift} minutes later, at ${clock(v.to.minute)}.`;
   });
+  for (const b of option.blockMoves) {
+    clauses.push(`${staffName(l, b.staffId)} takes ${b.kind} at ${clock(minuteOf(l, b.to.start))} instead of ${clock(minuteOf(l, b.from.start))}.`);
+  }
   const left = unresolvedNames(option, l);
   if (left.length) clauses.push(`No one free today can take ${list(left)}.`);
   else if (option.clientsMoved <= 1 && c.kind !== "call_out") clauses.push("Nothing else on the calendar changes.");
@@ -164,6 +170,7 @@ export function factsFor(c: Conflict, option: FixOption, l: Lookup) {
       from: `${clock(v.from.minute)} with ${v.from.staffFirstName}`,
       to: `${clock(v.to.minute)} with ${v.to.staffFirstName}`,
     })),
+    breaksMoved: option.blockMoves.map((b) => `${staffName(l, b.staffId)}'s ${b.kind}: ${clock(minuteOf(l, b.from.start))} → ${clock(minuteOf(l, b.to.start))}`),
     clientsMoved: option.clientsMoved,
     couldNotPlace: option.unresolved.map((id) => firstName(l, l.items.get(id)?.appointmentId ?? "")),
   };

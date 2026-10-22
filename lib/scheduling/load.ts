@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import type { LocationSchedule, StaffSchedule, TimeOff, WeeklyHours } from "./availability.ts";
-import type { BookedItem, BookingContext } from "./booking.ts";
+import { occurrences, occurrenceSpan, type BlockOccurrence, type TimeBlock } from "./blocks.ts";
+import type { BlockedTime, BookedItem, BookingContext } from "./booking.ts";
 import type { Interval } from "./intervals.ts";
 import { addDays, fromLocal, MINUTES_PER_DAY, type LocalDate, type Weekday } from "./time.ts";
 
@@ -178,11 +179,12 @@ export async function loadBookingContext(
   if (resources.error) throw resources.error;
 
   const staffIds = staff.data.map((s) => s.id);
-  const [locationSchedule, schedules, booked, offers] = await Promise.all([
+  const [locationSchedule, schedules, booked, offers, blocks] = await Promise.all([
     loadLocationSchedule(supabase, location),
     loadStaffSchedules(supabase, staffIds, from, to),
     loadBookedItems(supabase, location, from, to),
     loadOffers(supabase, staffIds),
+    loadBlockOccurrences(supabase, location.id, from, to),
   ]);
 
   return {
@@ -212,7 +214,42 @@ export async function loadBookingContext(
     ),
     resources: new Map(resources.data.map((r) => [r.id, { id: r.id, isActive: r.is_active, kind: r.kind, sortOrder: r.sort_order }])),
     booked,
+    blocks: blockedTimes(blocks, location.timezone),
   };
+}
+
+// Blocks at a location (all of them: a location has a handful).
+export async function loadBlocks(supabase: Supabase, locationId: string): Promise<TimeBlock[]> {
+  const { data, error } = await supabase
+    .from("time_blocks")
+    .select("id, staff_id, kind, note, start_minute, end_minute, on_date, repeat_weekdays, starts_on, ends_on, time_block_skips(on_date)")
+    .eq("location_id", locationId);
+  if (error) throw error;
+  return data.map((b) => ({
+    id: b.id,
+    staffId: b.staff_id,
+    kind: b.kind,
+    note: b.note,
+    startMinute: b.start_minute,
+    endMinute: b.end_minute,
+    onDate: b.on_date,
+    weekdays: b.repeat_weekdays,
+    startsOn: b.starts_on,
+    endsOn: b.ends_on,
+    skips: b.time_block_skips.map((s) => s.on_date),
+  }));
+}
+
+// Each day of each block between two local dates (inclusive).
+export async function loadBlockOccurrences(supabase: Supabase, locationId: string, from: LocalDate, to: LocalDate): Promise<BlockOccurrence[]> {
+  return (await loadBlocks(supabase, locationId)).flatMap((b) => occurrences(b, from, to));
+}
+
+export function blockedTimes(list: readonly BlockOccurrence[], timeZone: string): BlockedTime[] {
+  return list.flatMap((o) => {
+    const span = occurrenceSpan(o, timeZone);
+    return span ? [{ blockId: o.blockId, date: o.date, staffId: o.staffId, kind: o.kind, repeating: o.repeating, ...span }] : [];
+  });
 }
 
 // Which services each staff member offers, with their price for each (null
