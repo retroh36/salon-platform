@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canManage, getCurrentStaff } from "@/lib/auth";
+import { parseUsageLines } from "@/lib/color-usage";
 import { isUuid } from "@/lib/ids";
+import { loadBackBarProducts } from "@/lib/inventory-load";
 import { parseServiceForm, type ServiceFormErrors } from "@/lib/services";
 
 export type ServiceFormFields = {
@@ -113,4 +115,25 @@ function readFields(formData: FormData): ServiceFormFields {
     price: get("price"),
     staff,
   };
+}
+
+export type RecipeResult = { ok: true } | { ok: false; message: string };
+
+// The products a service uses when there's no formula (owners and managers).
+export async function saveRecipe(serviceId: string, linesJson: string): Promise<RecipeResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canManage(me.role)) return { ok: false, message: "Only owners and managers can change recipes." };
+  if (!isUuid(serviceId)) return { ok: false, message: "That service doesn't exist." };
+  const products = new Map((await loadBackBarProducts(supabase)).map((p) => [p.id, p]));
+  const parsed = parseUsageLines(linesJson, products);
+  if (!parsed.ok) return { ok: false, message: parsed.error };
+  const { error } = await supabase.rpc("set_service_recipe", {
+    p_service_id: serviceId,
+    p_lines: parsed.lines.map((l) => ({ product_id: l.productId, amount: l.amount })),
+  });
+  if (error?.code === "42501") return { ok: false, message: "Only owners and managers can change recipes." };
+  if (error?.code === "22023") return { ok: false, message: "Recipes use back-bar products." };
+  if (error) throw error;
+  revalidatePath(`/services/${serviceId}`);
+  return { ok: true };
 }

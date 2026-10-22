@@ -13,7 +13,9 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { LATE_MINUTES } from "@/lib/scheduling/disruptions";
 import { formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { formatMinutes, formatPrice } from "@/lib/services";
-import { changeVisitStatus, saveVisitNotes } from "./actions";
+import { UsageLinesEditor, toUsageJson, type DraftLine } from "@/components/usage-lines";
+import type { PickerProduct } from "@/lib/inventory-load";
+import { addVisitFormula, changeVisitStatus, saveVisitNotes } from "./actions";
 import { reportLate } from "./denise-actions";
 import { useNow } from "./now-line";
 import type { AppointmentDetail, BoardData } from "./types";
@@ -27,9 +29,11 @@ export function AppointmentPanel({
   onEdit,
   onClose,
   onReported,
+  products,
 }: {
   date: LocalDate;
   today: LocalDate;
+  products: PickerProduct[];
   timeZone: string;
   appointment: AppointmentDetail;
   me: BoardData["me"];
@@ -52,6 +56,8 @@ export function AppointmentPanel({
   // The front of house, or a stylist on the visit, can say it's running late.
   const canReportLate = date >= today && isEditable(status) && (me.canBook || items.some((i) => i.staffId === me.staffId));
   const [reportingLate, setReportingLate] = useState(false);
+  // On the day (or after): the front of house, or a stylist on the visit.
+  const canRecordFormula = date <= today && status !== "canceled" && status !== "no_show" && (me.canBook || items.some((i) => i.staffId === me.staffId));
 
   function run(action: AppointmentAction, reason = "", detail = "") {
     setMessage(null);
@@ -134,6 +140,10 @@ export function AppointmentPanel({
           <Eyebrow>Client preferences</Eyebrow>
           <p>{client.preferences}</p>
         </section>
+      )}
+
+      {(appointment.formulas.length > 0 || (canRecordFormula && client)) && (
+        <FormulaSection appointment={appointment} date={date} products={products} canRecord={canRecordFormula && Boolean(client)} />
       )}
 
       <NotesForm key={appointment.notes} appointmentId={appointment.id} initial={appointment.notes} editable={notesEditable} />
@@ -377,5 +387,98 @@ function RunningLateForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+// The visit's color formulas, and recording one with the products used:
+// they're taken from stock when the visit is checked out.
+function FormulaSection({ appointment, date, products, canRecord }: { appointment: AppointmentDetail; date: LocalDate; products: PickerProduct[]; canRecord: boolean }) {
+  const items = [...appointment.items].sort((a, b) => a.start - b.start);
+  const [adding, setAdding] = useState(false);
+  const [itemId, setItemId] = useState(items[0].id);
+  const [lines, setLines] = useState<DraftLine[]>([{ productId: "", amount: "" }]);
+  const [formula, setFormula] = useState("");
+  const [notes, setNotes] = useState("");
+  const [pending, startTransition] = useTransition();
+  const [result, setResult] = useState<{ text: string; error: boolean } | null>(null);
+  const serviceOf = (id: string) => items.find((i) => i.id === id)?.serviceName ?? "";
+
+  return (
+    <section aria-label="Color formula" className="flex flex-col gap-2">
+      <Eyebrow>Color formula</Eyebrow>
+      {appointment.formulas.map((f) => (
+        <div key={f.id} className="rounded-md border-l-4 border-peach-accent bg-peach-fill/40 px-3 py-2">
+          <p className="text-xs text-ink-muted">
+            {serviceOf(f.itemId)} · {f.author}
+          </p>
+          {f.products && <p className="font-medium text-ink" data-testid="visit-formula-products">{f.products}</p>}
+          {f.text !== f.products && <p className="font-mono text-xs whitespace-pre-line text-ink">{f.text}</p>}
+          {f.notes && <p className="text-xs text-ink-muted">{f.notes}</p>}
+        </div>
+      ))}
+      {result && (
+        <p role={result.error ? "alert" : "status"} className={`animate-fade-in ${result.error ? "text-danger" : "font-medium text-status-confirmed-ink"}`}>
+          {result.text}
+        </p>
+      )}
+      {canRecord &&
+        (adding ? (
+          <form
+            aria-label="Record formula"
+            className="flex animate-fade-in flex-col gap-3 rounded-lg border border-line-strong bg-sunken/60 p-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setResult(null);
+              startTransition(async () => {
+                const r = await addVisitFormula({ itemId, date, formula, notes, lines: toUsageJson(lines) });
+                if (!r.ok) return setResult({ text: r.message, error: true });
+                setResult({ text: appointment.status === "completed" ? "Formula saved, and stock updated." : "Formula saved. Stock is taken at checkout.", error: false });
+                setAdding(false);
+                setLines([{ productId: "", amount: "" }]);
+                setFormula("");
+                setNotes("");
+              });
+            }}
+          >
+            {items.length > 1 && (
+              <label className={labelClass}>
+                Service
+                <select value={itemId} onChange={(e) => setItemId(e.target.value)} className={selectClass}>
+                  {items.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.serviceName} with {i.staffName.split(" ")[0]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <UsageLinesEditor products={products} lines={lines} onChange={setLines} label="Products and amounts" />
+            <label className={labelClass}>
+              <span>
+                Formula <span className="font-normal text-ink-muted">(optional: the products are the formula)</span>
+              </span>
+              <textarea value={formula} onChange={(e) => setFormula(e.target.value)} rows={2} maxLength={2000} placeholder="e.g. Roots 6N + 6NN (1:1), 35 min" className={fieldClass} />
+            </label>
+            <label className={labelClass}>
+              <span>
+                Notes <span className="font-normal text-ink-muted">(optional)</span>
+              </span>
+              <input value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} className={fieldClass} />
+            </label>
+            <div className="flex gap-2">
+              <Button type="submit" variant="primary" disabled={pending}>
+                {pending ? "Saving…" : "Save formula"}
+              </Button>
+              <Button onClick={() => setAdding(false)} disabled={pending}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <Button size="sm" className="self-start" onClick={() => setAdding(true)}>
+            {appointment.formulas.length ? "Record another formula" : "Record formula"}
+          </Button>
+        ))}
+    </section>
   );
 }

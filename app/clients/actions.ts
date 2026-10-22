@@ -10,7 +10,9 @@ import {
   type ClientFormErrors,
   type FormulaFormErrors,
 } from "@/lib/clients";
+import { describeUsage, parseUsageLines } from "@/lib/color-usage";
 import { isUuid } from "@/lib/ids";
+import { loadBackBarProducts } from "@/lib/inventory-load";
 import { todayIn } from "@/lib/scheduling/time";
 
 // Echoed back so the form keeps what was typed after an error.
@@ -67,41 +69,56 @@ export async function saveClient(_prev: SaveClientState, formData: FormData): Pr
   redirect(`/clients/${result.data[0].id}`);
 }
 
-export type FormulaFormFields = { visit_date: string; formula: string; notes: string };
+export type FormulaFormFields = { visit_date: string; formula: string; notes: string; appointment_item_id: string; lines: string };
 
 export type AddFormulaState =
-  | { errors: FormulaFormErrors; message?: string; fields: FormulaFormFields; saved?: false }
+  | { errors: FormulaFormErrors & { lines?: string }; message?: string; fields: FormulaFormFields; saved?: false }
   | { saved: true }
   | undefined;
 
+// A formula entry, optionally for a service on one of the client's visits
+// and with the products used (taken from stock once the visit is checked
+// out). Without written text, the products are the formula.
 export async function addFormula(clientId: string, _prev: AddFormulaState, formData: FormData): Promise<AddFormulaState> {
-  const fields = {
+  const fields: FormulaFormFields = {
     visit_date: String(formData.get("visit_date") ?? ""),
     formula: String(formData.get("formula") ?? ""),
     notes: String(formData.get("notes") ?? ""),
+    appointment_item_id: String(formData.get("appointment_item_id") ?? ""),
+    lines: String(formData.get("lines") ?? ""),
   };
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me || !isUuid(clientId)) return { errors: {}, message: "That client doesn't exist.", fields };
 
+  const products = new Map((await loadBackBarProducts(supabase)).map((p) => [p.id, p]));
+  const lines = parseUsageLines(fields.lines, products);
+  if (!lines.ok) return { errors: { lines: lines.error }, message: "Fix the highlighted fields.", fields };
+  if (!fields.formula.trim() && lines.lines.length) formData.set("formula", describeUsage(lines.lines, products));
+  const itemId = fields.appointment_item_id || null;
+  if (itemId && !isUuid(itemId)) return { errors: {}, message: "Choose the visit from the list.", fields };
+
   const parsed = parseFormulaForm(formData, todayIn(me.location.timezone));
   if (!parsed.ok) return { errors: parsed.errors, message: "Fix the highlighted fields.", fields };
 
-  const { error } = await supabase.from("client_formulas").insert({
-    ...parsed.value,
-    business_id: me.business_id,
-    client_id: clientId,
-    // RLS only accepts entries written as the signed-in staff member.
-    staff_id: me.id,
+  const { error } = await supabase.rpc("add_formula", {
+    p_client_id: clientId,
+    p_appointment_item_id: itemId!,
+    p_visit_date: parsed.value.visit_date,
+    p_formula: parsed.value.formula,
+    p_notes: parsed.value.notes ?? "",
+    p_lines: lines.lines.map((l) => ({ product_id: l.productId, amount: l.amount })),
   });
 
   if (error) {
-    // Unknown client, or one in another business.
-    if (error.code === "23503") return { errors: {}, message: "That client doesn't exist.", fields };
     if (error.code === "42501") return { errors: {}, message: "You don't have permission to add formulas.", fields };
+    if (error.code === "22023") return { errors: {}, message: "That visit isn't this client's, or a product isn't back-bar stock.", fields };
+    if (error.code === "23503") return { errors: {}, message: "That client doesn't exist.", fields };
     throw error;
   }
 
   revalidatePath(`/clients/${clientId}`);
+  revalidatePath("/calendar", "layout");
+  revalidatePath("/inventory", "layout");
   return { saved: true };
 }
 

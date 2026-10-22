@@ -36,3 +36,13 @@ export async function loadInventory(supabase: Supabase, locationId: string, { in
     return { ...p, on_hand: level?.on_hand ?? 0, reorder_point: level?.reorder_point ?? 0, reorder_quantity: level?.reorder_quantity ?? 1 };
   });
 }
+
+export type PickerProduct = { id: string; brand: string; line: string | null; name: string; unit: "g" | "ml" | "unit" };
+
+// Back-bar products in use, for formula and recipe pickers, in natural order.
+export async function loadBackBarProducts(supabase: Supabase): Promise<PickerProduct[]> {
+  const { data, error } = await supabase.from("products").select("id, brand, line, name, unit").eq("type", "back_bar").eq("is_active", true);
+  if (error) throw error;
+  const order = (p: PickerProduct) => [p.brand, p.line ?? "", p.name].join("\u0000");
+  return data.sort((a, b) => order(a).localeCompare(order(b), "en", { numeric: true, sensitivity: "base" }));
+}

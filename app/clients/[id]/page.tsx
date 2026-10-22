@@ -7,12 +7,15 @@ import { Card, EmptyState, listClass } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { canEditClients, formatDate } from "@/lib/clients";
 import { isUuid } from "@/lib/ids";
-import { todayIn } from "@/lib/scheduling/time";
+import { BackLink } from "@/components/ui/back-link";
+import { formatAmount, productName } from "@/lib/inventory";
+import { loadBackBarProducts } from "@/lib/inventory-load";
+import { startOfLocalDay } from "@/lib/scheduling/load";
+import { addDays, todayIn, toLocal } from "@/lib/scheduling/time";
 import { fullName } from "@/lib/staff";
 import type { ClientFormFields } from "../actions";
-import { BackLink } from "@/components/ui/back-link";
 import { ClientForm } from "../client-form";
-import { FormulaForm } from "../formula-form";
+import { FormulaForm, type VisitOption } from "../formula-form";
 import { stylistOptions } from "../stylist-options";
 
 export const metadata: Metadata = { title: "Client · Salon Platform" };
@@ -30,7 +33,9 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
   if (!me) return <NotLinked />;
   if (!isUuid(id)) notFound();
 
-  const [{ data: client, error }, { data: formulas, error: formulaError }] = await Promise.all([
+  const tz = me.location.timezone;
+  const today = todayIn(tz);
+  const [{ data: client, error }, { data: formulas, error: formulaError }, { data: items, error: itemError }, products] = await Promise.all([
     supabase
       .from("clients")
       .select("*, preferred:staff(first_name, last_name, is_active)")
@@ -38,17 +43,35 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
       .maybeSingle(),
     supabase
       .from("client_formulas")
-      .select("id, visit_date, formula, notes, created_at, author:staff(first_name, last_name)")
+      .select(
+        "id, visit_date, formula, notes, created_at, author:staff(first_name, last_name), item:appointment_items(service:services(name)), formula_products(amount, position, product:products(brand, line, name, unit))",
+      )
       .eq("client_id", id)
       .order("visit_date", { ascending: false })
       .order("created_at", { ascending: false }),
+    // Services on visits from the last 60 days, for linking a formula.
+    supabase
+      .from("appointment_items")
+      .select("id, starts_at, service:services(name), stylist:staff(first_name), appointment:appointments!inner(client_id, status)")
+      .eq("appointment.client_id", id)
+      .neq("appointment.status", "canceled")
+      .gte("starts_at", startOfLocalDay(addDays(today, -60), tz).toISOString())
+      .lt("starts_at", startOfLocalDay(addDays(today, 1), tz).toISOString())
+      .order("starts_at", { ascending: false })
+      .limit(20),
+    loadBackBarProducts(supabase),
   ]);
   if (error) throw error;
   if (formulaError) throw formulaError;
+  if (itemError) throw itemError;
   if (!client) notFound();
 
+  const visits: VisitOption[] = items.map((i) => {
+    const local = toLocal(new Date(i.starts_at), tz);
+    return { itemId: i.id, date: local.date, label: `${formatDate(local.date)} · ${i.service.name} with ${i.stylist.first_name}` };
+  });
+
   const editable = canEditClients(me.role);
-  const today = todayIn(me.location.timezone);
   const contact = [client.phone, client.email].filter(Boolean).join(" · ");
 
   return (
@@ -87,7 +110,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
         }
         flush
       >
-        <FormulaForm clientId={client.id} today={today} />
+        <FormulaForm clientId={client.id} today={today} visits={visits} products={products} />
         {formulas.length === 0 ? (
           <EmptyState>No formulas yet.</EmptyState>
         ) : (
@@ -102,6 +125,15 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
                 <p className="mt-2 rounded-md border-l-4 border-peach-accent bg-peach-fill/40 px-3 py-2 font-mono text-sm whitespace-pre-line text-ink">
                   {f.formula}
                 </p>
+                {f.formula_products.length > 0 && (
+                  <p className="mt-2 text-sm text-ink" data-testid="formula-products">
+                    <span className="font-medium text-ink-muted">{f.item ? `${f.item.service.name}: ` : "Products: "}</span>
+                    {[...f.formula_products]
+                      .sort((a, b) => a.position - b.position)
+                      .map((fp) => `${formatAmount(fp.amount, fp.product.unit)} ${productName(fp.product)}`)
+                      .join(" + ")}
+                  </p>
+                )}
                 {f.notes && <p className="mt-2 text-sm text-ink-muted">{f.notes}</p>}
               </li>
             ))}

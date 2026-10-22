@@ -2,12 +2,15 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AppShell, NotLinked } from "@/components/app-shell";
 import { buttonClass } from "@/components/ui/button";
-import { Alert, Badge } from "@/components/ui/page";
+import { Alert, Badge, Card } from "@/components/ui/page";
+import { describeUsage } from "@/lib/color-usage";
+import { loadBackBarProducts } from "@/lib/inventory-load";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
 import { centsToInput, sortCategories } from "@/lib/services";
 import { fullName, roleLabel, sortStaff } from "@/lib/staff";
 import { setServiceArchived, type ServiceFormFields } from "./actions";
+import { RecipeEditor } from "./recipe-editor";
 import { ServiceForm } from "./service-form";
 
 const EMPTY: ServiceFormFields = {
@@ -31,7 +34,7 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
   if (!serviceId && !manage) redirect("/services");
   if (serviceId && !isUuid(serviceId)) notFound();
 
-  const [serviceResult, { data: staff, error: staffError }, { data: categoryRows, error: categoryError }] =
+  const [serviceResult, { data: staff, error: staffError }, { data: categoryRows, error: categoryError }, recipeResult, products] =
     await Promise.all([
       serviceId
         ? supabase
@@ -44,7 +47,12 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
         : Promise.resolve(null),
       supabase.from("staff").select("id, first_name, last_name, role, color, is_active"),
       supabase.from("services").select("category"),
+      serviceId ? supabase.from("service_products").select("product_id, amount").eq("service_id", serviceId) : Promise.resolve(null),
+      loadBackBarProducts(supabase),
     ]);
+  if (recipeResult?.error) throw recipeResult.error;
+  const recipe = (recipeResult?.data ?? []).map((r) => ({ productId: r.product_id, amount: r.amount }));
+  const productMap = new Map(products.map((p) => [p.id, p]));
   if (staffError) throw staffError;
   if (categoryError) throw categoryError;
   if (serviceResult?.error) throw serviceResult.error;
@@ -109,6 +117,21 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
         categories={sortCategories(categoryRows.map((r) => r.category))}
         readOnly={!manage || archived}
       />
+
+      {service && (
+        <Card
+          className="mt-10"
+          title="Product recipe"
+          titleId="recipe-heading"
+          description="What this service uses from back-bar stock when the stylist doesn't record a formula. Taken from stock at checkout."
+        >
+          {manage && !archived ? (
+            <RecipeEditor serviceId={service.id} products={products} initial={recipe.map((r) => ({ productId: r.productId, amount: String(r.amount) }))} />
+          ) : (
+            <p className="text-sm text-ink">{recipe.length ? describeUsage(recipe, productMap) : "No products."}</p>
+          )}
+        </Card>
+      )}
 
       {service && manage && (
         <form

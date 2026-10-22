@@ -302,16 +302,16 @@ cross join lateral (select (select a from last_names)[(r.h->>'last')::int % 60 +
 
 with
 formulas (a) as (select array[
-  'Roots: Redken Shades EQ 6N + 6NB (1:1), 20 vol, 35 min.',
-  'All over: Wella Koleston 7/0 + 7/1 (2:1), 20 vol, 35 min. Gloss ends: Shades EQ 09V, 20 min.',
+  'Roots: Redken Shades EQ 06NB + 07N (1:1), processing solution, 20 min.',
+  'All over: Goldwell Topchic 7N + 7G (2:1), 20 vol, 35 min. Gloss ends: Shades EQ 09V, 20 min.',
   'Partial foils: Blondor + 20 vol, 40 min. Tone: Shades EQ 09T + 09V (1:1), 20 min.',
-  'Balayage: Lightener + 20 vol, open-air 45 min. Root smudge: Shades EQ 07N, 15 min.',
+  'Balayage: Blondor + 20 vol, open-air 45 min. Root smudge: Shades EQ 07N, 15 min.',
   'Gray blending: Goldwell Topchic 6NN + 7NN (1:1), 20 vol, 30 min.',
   'Gloss: Shades EQ 08GI, processing solution, 20 min.',
-  'Full highlights: Blondor + 30 vol, 40 min. Tone: Wella T18, 15 min.',
+  'Full highlights: Blondor + 30 vol, 40 min. Tone: Color Charm T18, 15 min.',
   'Lowlights: Shades EQ 06NB, 20 min, in alternating foils.',
   'Vivid: Pre-lighten to level 9. Pulp Riot Mercury + Clear (1:3), 25 min.',
-  'Root touch-up: L''Oréal Majirel 5.0 + 6.3 (1:1), 20 vol, 35 min.',
+  'Root touch-up: Goldwell Topchic 5N + 6N (1:1), 20 vol, 35 min.',
   'Face frame: Blondor + 20 vol, 35 min. Toner: Shades EQ 010P, 15 min.',
   'Bond repair added to lightener (Olaplex No.1). Gloss: Shades EQ 09N, 20 min.'
 ]),
@@ -921,3 +921,56 @@ select 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-00000000
        'count', 'Opening count', 'd0000000-0000-4000-8000-000000000002', now() - interval '21 days'
 from levels l
 where l.on_hand <> 0;
+
+-- The products and amounts in the seeded formulas (the vivid uses a brand
+-- the salon doesn't stock, so it has none).
+with lines (formula, sku, amount, n) as (values
+  ('Roots: Redken Shades EQ 06NB%', 'RK-EQ-06NB', 30, 1), ('Roots: Redken Shades EQ 06NB%', 'RK-EQ-07N', 30, 2), ('Roots: Redken Shades EQ 06NB%', 'RK-EQ-PS', 60, 3),
+  ('All over: Goldwell Topchic 7N%', 'GW-TC-7N', 40, 4), ('All over: Goldwell Topchic 7N%', 'GW-TC-7G', 20, 5), ('All over: Goldwell Topchic 7N%', 'GW-DEV-20', 60, 6),
+  ('All over: Goldwell Topchic 7N%', 'RK-EQ-09V', 30, 7), ('All over: Goldwell Topchic 7N%', 'RK-EQ-PS', 30, 8),
+  ('Partial foils%', 'WE-BLD-800', 40, 9), ('Partial foils%', 'GW-DEV-20', 80, 10), ('Partial foils%', 'RK-EQ-09T', 20, 11), ('Partial foils%', 'RK-EQ-09V', 20, 12), ('Partial foils%', 'RK-EQ-PS', 40, 13),
+  ('Balayage: Blondor%', 'WE-BLD-800', 50, 14), ('Balayage: Blondor%', 'GW-DEV-20', 100, 15), ('Balayage: Blondor%', 'RK-EQ-07N', 30, 16), ('Balayage: Blondor%', 'RK-EQ-PS', 30, 17),
+  ('Gray blending%', 'GW-TC-6NN', 30, 18), ('Gray blending%', 'GW-TC-7NN', 30, 19), ('Gray blending%', 'GW-DEV-20', 60, 20),
+  ('Gloss: Shades EQ 08GI%', 'RK-EQ-08GI', 60, 21), ('Gloss: Shades EQ 08GI%', 'RK-EQ-PS', 60, 22),
+  ('Full highlights%', 'WE-BLD-800', 60, 23), ('Full highlights%', 'GW-DEV-30', 120, 24), ('Full highlights%', 'WE-CC-T18', 42, 25),
+  ('Lowlights%', 'RK-EQ-06NB', 40, 26), ('Lowlights%', 'RK-EQ-PS', 40, 27),
+  ('Root touch-up%', 'GW-TC-5N', 30, 28), ('Root touch-up%', 'GW-TC-6N', 30, 29), ('Root touch-up%', 'GW-DEV-20', 60, 30),
+  ('Face frame%', 'WE-BLD-800', 30, 31), ('Face frame%', 'GW-DEV-20', 60, 32), ('Face frame%', 'RK-EQ-010P', 30, 33), ('Face frame%', 'RK-EQ-PS', 30, 34),
+  ('Bond repair added%', 'WE-BLD-800', 40, 35), ('Bond repair added%', 'GW-DEV-20', 80, 36), ('Bond repair added%', 'OLX-1-525', 7.5, 37),
+  ('Bond repair added%', 'RK-EQ-09N', 60, 38), ('Bond repair added%', 'RK-EQ-PS', 60, 39)
+)
+insert into public.formula_products (business_id, formula_id, product_id, amount, position)
+select f.business_id, f.id, p.id, l.amount, row_number() over (partition by f.id order by l.n)
+from public.client_formulas f
+join lines l on f.formula like l.formula
+join public.products p on p.sku = l.sku and p.business_id = f.business_id;
+
+-- Default product recipes, for services without a formula.
+with recipes (service, sku, amount) as (values
+  ('Root Touch-Up', 'GW-TC-6N', 40), ('Root Touch-Up', 'GW-DEV-20', 40),
+  ('All-Over Color', 'GW-TC-6N', 60), ('All-Over Color', 'GW-DEV-20', 60),
+  ('Gloss / Toner', 'RK-EQ-09V', 60), ('Gloss / Toner', 'RK-EQ-PS', 60),
+  ('Gray Blending', 'GW-TC-7NN', 40), ('Gray Blending', 'GW-DEV-10', 40),
+  ('Men''s Gray Blending', 'GW-TC-6NN', 20), ('Men''s Gray Blending', 'GW-DEV-10', 20),
+  ('Double Process (Bleach & Tone)', 'WE-BLD-800', 60), ('Double Process (Bleach & Tone)', 'GW-DEV-30', 120), ('Double Process (Bleach & Tone)', 'WE-CC-T18', 42),
+  ('Face-Frame Highlights', 'WE-BLD-800', 20), ('Face-Frame Highlights', 'GW-DEV-20', 40),
+  ('Partial Highlights', 'WE-BLD-800', 40), ('Partial Highlights', 'GW-DEV-20', 80),
+  ('Full Highlights', 'WE-BLD-800', 60), ('Full Highlights', 'GW-DEV-20', 120),
+  ('Babylights', 'WE-BLD-800', 50), ('Babylights', 'GW-DEV-20', 100),
+  ('Lowlights', 'RK-EQ-06NB', 60), ('Lowlights', 'RK-EQ-PS', 60),
+  ('Root Smudge', 'RK-EQ-07N', 40), ('Root Smudge', 'RK-EQ-PS', 40),
+  ('Mini Balayage', 'WE-BLD-800', 30), ('Mini Balayage', 'GW-DEV-20', 60),
+  ('Balayage', 'WE-BLD-800', 50), ('Balayage', 'GW-DEV-20', 100),
+  ('Foilayage', 'WE-BLD-800', 50), ('Foilayage', 'GW-DEV-20', 100),
+  ('Lived-In Color', 'WE-BLD-800', 40), ('Lived-In Color', 'GW-DEV-20', 80), ('Lived-In Color', 'RK-EQ-07N', 30), ('Lived-In Color', 'RK-EQ-PS', 30),
+  ('Bond Repair Treatment', 'OLX-2-2000', 30),
+  ('Deep Conditioning', 'RK-ABC-TR-500', 30),
+  ('Women''s Cut & Style', 'RK-AS-SH-1L', 15), ('Women''s Cut & Style', 'RK-AS-CO-1L', 15),
+  ('Curly Cut', 'RK-AS-SH-1L', 20), ('Curly Cut', 'RK-AS-CO-1L', 25),
+  ('Restyle / Big Chop', 'RK-AS-SH-1L', 15), ('Restyle / Big Chop', 'RK-AS-CO-1L', 15)
+)
+insert into public.service_products (business_id, service_id, product_id, amount)
+select s.business_id, s.id, p.id, r.amount
+from recipes r
+join public.services s on s.name = r.service and s.business_id = 'b0000000-0000-4000-8000-000000000001'
+join public.products p on p.sku = r.sku and p.business_id = s.business_id;

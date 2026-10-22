@@ -171,17 +171,23 @@ isOneToOne: false
                   ]
                 },"client_formulas": {
                   Row: {
-                    "business_id": string,"client_id": string,"created_at": string,"formula": string,"id": string,"notes": string | null,"staff_id": string,"visit_date": string
+                    "appointment_item_id": string | null,"business_id": string,"client_id": string,"created_at": string,"formula": string,"id": string,"notes": string | null,"staff_id": string,"visit_date": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"client_id": string,"created_at"?: string,"formula": string,"id"?: string,"notes"?: string | null,"staff_id": string,"visit_date"?: string
+                    "appointment_item_id"?: string | null,"business_id": string,"client_id": string,"created_at"?: string,"formula": string,"id"?: string,"notes"?: string | null,"staff_id": string,"visit_date"?: string
                   }
                   Update: {
-                    "business_id"?: string,"client_id"?: string,"created_at"?: string,"formula"?: string,"id"?: string,"notes"?: string | null,"staff_id"?: string,"visit_date"?: string
+                    "appointment_item_id"?: string | null,"business_id"?: string,"client_id"?: string,"created_at"?: string,"formula"?: string,"id"?: string,"notes"?: string | null,"staff_id"?: string,"visit_date"?: string
                   }
                   Relationships: [
                     {
+      foreignKeyName: "client_formulas_appointment_item_id_fkey"
+      columns: ["appointment_item_id"]
+isOneToOne: false
+      referencedRelation: "appointment_items"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "client_formulas_business_id_fkey"
       columns: ["business_id"]
 isOneToOne: false
@@ -224,6 +230,38 @@ isOneToOne: false
       columns: ["preferred_staff_id","business_id"]
 isOneToOne: false
       referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"formula_products": {
+                  Row: {
+                    "amount": number,"business_id": string,"formula_id": string,"id": string,"position": number,"product_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"business_id": string,"formula_id": string,"id"?: string,"position"?: number,"product_id": string
+                  }
+                  Update: {
+                    "amount"?: number,"business_id"?: string,"formula_id"?: string,"id"?: string,"position"?: number,"product_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "formula_products_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "formula_products_formula_id_fkey"
+      columns: ["formula_id"]
+isOneToOne: false
+      referencedRelation: "client_formulas"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "formula_products_product_id_business_id_fkey"
+      columns: ["product_id","business_id"]
+isOneToOne: false
+      referencedRelation: "products"
       referencedColumns: ["id","business_id"]
     }
                   ]
@@ -449,6 +487,38 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "staff_time_off"
       referencedColumns: ["id"]
+    }
+                  ]
+                },"service_products": {
+                  Row: {
+                    "amount": number,"business_id": string,"id": string,"product_id": string,"service_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"business_id": string,"id"?: string,"product_id": string,"service_id": string
+                  }
+                  Update: {
+                    "amount"?: number,"business_id"?: string,"id"?: string,"product_id"?: string,"service_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "service_products_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "service_products_product_id_business_id_fkey"
+      columns: ["product_id","business_id"]
+isOneToOne: false
+      referencedRelation: "products"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "service_products_service_id_business_id_fkey"
+      columns: ["service_id","business_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["id","business_id"]
     }
                   ]
                 },"services": {
@@ -729,7 +799,10 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "adjust_stock":
+            "add_formula":
+{ Args: { "p_appointment_item_id": string,"p_client_id": string,"p_formula": string,"p_lines": Json,"p_notes": string,"p_visit_date": string }; Returns: string
+                           },
+"adjust_stock":
 { Args: { "p_change": number,"p_location_id": string,"p_note": string,"p_product_id": string,"p_reason": Database["public"]['Enums']["stock_reason"] }; Returns: number
                            },
 "apply_ai_action":
@@ -761,6 +834,9 @@ isOneToOne: false
                            },
 "set_location_hours":
 { Args: { "p_business_id": string,"p_hours": Json,"p_location_id": string }; Returns: undefined
+                           },
+"set_service_recipe":
+{ Args: { "p_lines": Json,"p_service_id": string }; Returns: undefined
                            },
 "set_staff_day_override":
 { Args: { "p_business_id": string,"p_hours": Json,"p_on_date": string,"p_staff_id": string }; Returns: undefined

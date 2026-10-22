@@ -5,10 +5,12 @@ import { ACTION_LABELS, canBook, cancelReason, MAX_NOTES, type AppointmentAction
 import { getCurrentStaff } from "@/lib/auth";
 import { searchClients } from "@/lib/client-search";
 import { normalizePhone } from "@/lib/clients";
+import { describeUsage, parseUsageLines } from "@/lib/color-usage";
 import { isUuid } from "@/lib/ids";
+import { loadBackBarProducts } from "@/lib/inventory-load";
 import { changeStatus, moveItem, saveBooking, saveNotes, type BookingItemInput, type SaveResult } from "@/lib/scheduling/book";
 import { describeProblem } from "@/lib/scheduling/booking";
-import { fromLocal, isLocalDate, MINUTES_PER_DAY, type LocalDate } from "@/lib/scheduling/time";
+import { fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn, type LocalDate } from "@/lib/scheduling/time";
 import { fullName } from "@/lib/staff";
 
 export type ClientOption = { id: string; name: string; phone: string | null; allergies: string | null };
@@ -192,5 +194,41 @@ export async function saveVisitNotes(appointmentId: string, notes: string): Prom
   const result = await saveNotes(supabase, appointmentId, notes);
   if (!result.ok) return { ok: false, message: "You can only edit notes on your own appointments." };
   refresh();
+  return { ok: true };
+}
+
+// A formula for a service on this visit, with the products used. If the
+// visit is already checked out, stock is put right straight away.
+export async function addVisitFormula(input: { itemId: string; date: LocalDate; formula: string; notes: string; lines: string }): Promise<ActionResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me) return { ok: false, message: "Sign in again." };
+  if (!isUuid(input.itemId) || !isLocalDate(input.date)) return { ok: false, message: "That service is no longer on the visit." };
+  if (input.date > todayIn(me.location.timezone)) return { ok: false, message: "Record the formula on the day of the visit." };
+
+  const { data: item, error: itemError } = await supabase.from("appointment_items").select("staff_id, appointment:appointments(client_id)").eq("id", input.itemId).maybeSingle();
+  if (itemError) throw itemError;
+  if (!item?.appointment.client_id) return { ok: false, message: "Formulas are kept on a client's record; this visit has no client." };
+
+  const products = new Map((await loadBackBarProducts(supabase)).map((p) => [p.id, p]));
+  const lines = parseUsageLines(input.lines, products);
+  if (!lines.ok) return { ok: false, message: lines.error };
+  const text = input.formula.trim() || describeUsage(lines.lines, products);
+  if (!text) return { ok: false, message: "Add the products used, or write the formula." };
+  if (text.length > 2000 || input.notes.length > 500) return { ok: false, message: "Keep the formula under 2,000 characters." };
+
+  const { error } = await supabase.rpc("add_formula", {
+    p_client_id: item.appointment.client_id,
+    p_appointment_item_id: input.itemId,
+    p_visit_date: input.date,
+    p_formula: text,
+    p_notes: input.notes,
+    p_lines: lines.lines.map((l) => ({ product_id: l.productId, amount: l.amount })),
+  });
+  if (error?.code === "42501") return { ok: false, message: "You don't have permission to add formulas." };
+  if (error?.code === "22023") return { ok: false, message: "Formulas use back-bar products." };
+  if (error) throw error;
+  refresh();
+  revalidatePath("/inventory", "layout");
+  revalidatePath(`/clients/${item.appointment.client_id}`);
   return { ok: true };
 }

@@ -605,6 +605,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               onEdit={() => select({ kind: "edit", appointmentId: selection.appointmentId })}
               onClose={closeDetails}
               onReported={onReported}
+              products={data.menu.products}
             />
           ) : selection.kind === "book" ? (
             <BookingPanel data={data} start={selection.start} onClose={closeDetails} onSaved={(id) => select({ kind: "detail", appointmentId: id })} />

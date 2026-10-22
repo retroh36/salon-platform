@@ -2,6 +2,7 @@
 // since midnight on the day shown, at the location.
 
 import type { AppointmentStatus } from "@/lib/appointments";
+import type { PickerProduct } from "@/lib/inventory-load";
 import type { ServiceFamily } from "@/lib/calendar";
 import type { StaffRole } from "@/lib/staff";
 import type { SegmentKind } from "@/lib/scheduling/booking";
@@ -47,6 +48,17 @@ export type ItemDetail = Interval & {
   priceCents: number;
 };
 
+// A formula recorded for a service on the visit.
+export type VisitFormula = {
+  id: string;
+  itemId: string;
+  author: string;
+  text: string;
+  // "30 g Goldwell Topchic 7N + 30 ml …", or "" without products.
+  products: string;
+  notes: string | null;
+};
+
 export type AppointmentDetail = {
   id: string;
   status: AppointmentStatus;
@@ -57,6 +69,7 @@ export type AppointmentDetail = {
   bookedBy: string;
   // "Last changed by …", if anyone has changed it since.
   changedBy: string | null;
+  formulas: VisitFormula[];
 };
 
 export type MenuService = {
@@ -74,6 +87,8 @@ export type Menu = {
   // Staff id -> service id -> the stylist's price (null: the menu price).
   offers: Record<string, Record<string, number | null>>;
   resources: { id: string; name: string }[];
+  // Back-bar products, for formulas.
+  products: PickerProduct[];
 };
 
 export type BoardData = {

@@ -4,6 +4,8 @@ import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { canBook, type AppointmentStatus } from "@/lib/appointments";
 import { getCurrentStaff } from "@/lib/auth";
 import { gridRange, offHours, serviceFamily } from "@/lib/calendar";
+import { formatAmount, productName } from "@/lib/inventory";
+import { loadBackBarProducts } from "@/lib/inventory-load";
 import { formatDay, formatIntervals } from "@/lib/schedule-format";
 import { LEVEL_LABELS, REASON_LABELS, type TimeOffReason } from "@/lib/schedule-forms";
 import { dayView } from "@/lib/scheduling/availability";
@@ -59,6 +61,17 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   if (resourcesResult.error) throw resourcesResult.error;
 
   const items = itemsResult.data;
+  const [formulaResult, products] = await Promise.all([
+    items.length
+      ? supabase
+          .from("client_formulas")
+          .select("id, appointment_item_id, formula, notes, created_at, author:staff(first_name), formula_products(amount, position, product:products(brand, line, name, unit))")
+          .in("appointment_item_id", items.map((i) => i.id))
+          .order("created_at")
+      : Promise.resolve({ data: [], error: null }),
+    loadBackBarProducts(supabase),
+  ]);
+  if (formulaResult.error) throw formulaResult.error;
   const team = staffResult.data.filter((s) => s.is_active && s.location_id === me.location.id);
   const teamIds = team.map((s) => s.id);
   const [offers, schedules] = await Promise.all([loadOffers(supabase, teamIds), loadStaffSchedules(supabase, teamIds, date, date)]);
@@ -126,6 +139,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       items: [],
       bookedBy: bookedLine(a),
       changedBy: changedLine(a),
+      formulas: [],
     };
     const staffMember = staffById.get(row.staff_id);
     appointments[a.id].items.push({
@@ -138,6 +152,22 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       resourceId: row.resource_id,
       resourceName: row.resource?.name ?? null,
       priceCents: row.price_cents,
+    });
+  }
+
+  const appointmentOfItem = new Map(items.map((i) => [i.id, i.appointment_id]));
+  for (const f of formulaResult.data) {
+    const visit = appointments[appointmentOfItem.get(f.appointment_item_id!) ?? ""];
+    visit?.formulas.push({
+      id: f.id,
+      itemId: f.appointment_item_id!,
+      author: f.author?.first_name ?? "Former staff",
+      text: f.formula,
+      products: [...f.formula_products]
+        .sort((a, b) => a.position - b.position)
+        .map((fp) => `${formatAmount(fp.amount, fp.product.unit)} ${productName(fp.product)}`)
+        .join(" + "),
+      notes: f.notes,
     });
   }
 
@@ -188,6 +218,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       })),
       offers: Object.fromEntries([...offers].map(([staffId, prices]) => [staffId, Object.fromEntries(prices)])),
       resources: resourcesResult.data,
+      products,
     },
     me: { staffId: me.id, role: me.role, canBook: canBook(me.role) },
   };
