@@ -75,6 +75,8 @@ export type AppointmentDetail = {
   formulas: VisitFormula[];
   // Part of a recurring series: its place, how many, how often.
   series: { id: string; index: number; count: number; intervalWeeks: number } | null;
+  // Patch test problems and forms still to sign, before the visit.
+  warnings: { patch: string[]; patchBlocks: boolean; forms: { templateId: string; name: string }[] } | null;
 };
 
 export type MenuService = {

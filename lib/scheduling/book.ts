@@ -11,6 +11,7 @@ import type { Database } from "@/lib/database.types";
 import { allowedActions, ACTION_STATUS, isEditable, type AppointmentAction, type AppointmentStatus } from "../appointments.ts";
 import { checkItem, pickResource, type BookedItem, type BookingProblem, type ServiceTiming } from "./booking.ts";
 import { loadBookingContext } from "./load.ts";
+import { patchTestState, type PatchSettings } from "./patch-tests.ts";
 import { toLocal } from "./time.ts";
 
 type Supabase = SupabaseClient<Database>;
@@ -135,6 +136,10 @@ export async function saveBooking(supabase: Supabase, location: Location, input:
 
     if (problems.some((p) => p.length > 0)) return { ok: false, error: "invalid", problems };
 
+    // Patch tests, when the salon makes them a hard requirement.
+    const patch = await patchTestProblems(supabase, location, input.clientId, input.items.filter((_, n) => changed[n]));
+    if (patch.size) return { ok: false, error: "invalid", problems: input.items.map((i, n) => (changed[n] && patch.has(i) ? [patch.get(i)!] : [])) };
+
     const { data, error } = await supabase.rpc("save_appointment", {
       p_location_id: location.id,
       p_appointment_id: input.appointmentId ?? null!,
@@ -214,4 +219,38 @@ export async function saveNotes(supabase: Supabase, appointmentId: string, notes
   if (error?.code === "42501") return { ok: false };
   if (error) throw error;
   return { ok: true };
+}
+
+// Items whose service needs a patch test the client doesn't have, when the
+// salon blocks those bookings (otherwise it's a warning, shown elsewhere).
+async function patchTestProblems(
+  supabase: Supabase,
+  location: Location,
+  clientId: string | null,
+  items: readonly BookingItemInput[],
+): Promise<Map<BookingItemInput, BookingProblem>> {
+  const found = new Map<BookingItemInput, BookingProblem>();
+  if (!clientId || !items.length) return found;
+  const { data: loc, error } = await supabase
+    .from("locations")
+    .select("business:businesses(patch_test_valid_days, patch_test_min_hours, patch_test_enforcement)")
+    .eq("id", location.id)
+    .single();
+  if (error) throw error;
+  if (loc.business.patch_test_enforcement !== "block") return found;
+  const settings: PatchSettings = { validDays: loc.business.patch_test_valid_days, minHours: loc.business.patch_test_min_hours, enforcement: "block" };
+  const [{ data: services, error: serviceError }, { data: tests, error: testError }] = await Promise.all([
+    supabase.from("services").select("id").in("id", [...new Set(items.map((i) => i.serviceId))]).eq("requires_patch_test", true),
+    supabase.from("client_patch_tests").select("tested_at, result").eq("client_id", clientId),
+  ]);
+  if (serviceError) throw serviceError;
+  if (testError) throw testError;
+  const needs = new Set(services.map((s) => s.id));
+  const history = tests.map((t) => ({ testedAt: new Date(t.tested_at), result: t.result }));
+  for (const item of items) {
+    if (!needs.has(item.serviceId)) continue;
+    const state = patchTestState(history, item.start, settings);
+    if (state !== "ok") found.set(item, { code: "patch_test", state });
+  }
+  return found;
 }

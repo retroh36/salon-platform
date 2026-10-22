@@ -16,6 +16,7 @@ export type ServiceFormFields = {
   processing_minutes: string;
   finishing_minutes: string;
   price: string;
+  requires_patch_test: boolean;
   // Staff id -> custom price input ("" = default), for staff who offer it.
   staff: Record<string, string>;
 };
@@ -43,7 +44,7 @@ export async function saveService(_prev: SaveServiceState, formData: FormData): 
   }
 
   const input = parsed.value;
-  const { error } = await supabase.rpc("save_service", {
+  const { data: savedId, error } = await supabase.rpc("save_service", {
     p_business_id: me.business_id,
     // Null creates a new service. The generated types don't mark function
     // arguments as nullable.
@@ -70,6 +71,8 @@ export async function saveService(_prev: SaveServiceState, formData: FormData): 
     }
     throw error;
   }
+  const { error: flagError } = await supabase.from("services").update({ requires_patch_test: fields.requires_patch_test }).eq("id", savedId);
+  if (flagError) throw flagError;
 
   invalidateServicePages();
   redirect("/services");
@@ -113,6 +116,7 @@ function readFields(formData: FormData): ServiceFormFields {
     processing_minutes: get("processing_minutes"),
     finishing_minutes: get("finishing_minutes"),
     price: get("price"),
+    requires_patch_test: formData.get("requires_patch_test") !== null,
     staff,
   };
 }

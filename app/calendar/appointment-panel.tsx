@@ -157,6 +157,29 @@ export function AppointmentPanel({
 
       <NotesForm key={appointment.notes} appointmentId={appointment.id} initial={appointment.notes} editable={notesEditable} />
 
+      {appointment.warnings && client && (
+        <section aria-label="Before this visit" className="flex flex-col gap-2 rounded-lg border border-status-late-ink/25 bg-status-late-bg px-3 py-2.5 text-status-late-ink">
+          <p className="font-semibold">{status === "checked_in" ? "Still to do for this visit" : "Before check-in"}</p>
+          {appointment.warnings.patch.map((m) => (
+            <p key={m}>
+              {m}
+              {appointment.warnings!.patchBlocks ? " The salon requires one for this service." : ""}
+            </p>
+          ))}
+          {appointment.warnings.forms.map((f) => (
+            <p key={f.templateId} className="flex flex-wrap items-center justify-between gap-2">
+              <span>{f.name} isn&apos;t signed yet.</span>
+              <Link
+                href={`/clients/${client.id}/forms/new?template=${f.templateId}&back=${encodeURIComponent(`/calendar?date=${date}`)}`}
+                className="font-semibold underline underline-offset-2"
+              >
+                Fill it in now
+              </Link>
+            </p>
+          ))}
+        </section>
+      )}
+
       {(actions.length > 0 || (me.canBook && isEditable(status)) || canReportLate) && (
         <section aria-label="Actions" className="flex flex-col gap-2">
           {primaryAction && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, IconButton } from "@/components/ui/button";
 import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
@@ -12,7 +12,7 @@ import { formatMinute, minuteToTime, parseTime } from "@/lib/scheduling/time";
 import { formatMinutes, formatPrice, sortCategories } from "@/lib/services";
 import { DeniseFace } from "@/components/denise";
 import type { Scope } from "@/lib/scheduling/series";
-import { findClients, previewSeries, quickAddClient, saveSeries, saveVisit, saveVisitScoped, type ClientOption, type SeriesPreviewVisit, type VisitInput } from "./actions";
+import { patchTestWarnings, findClients, previewSeries, quickAddClient, saveSeries, saveVisit, saveVisitScoped, type ClientOption, type SeriesPreviewVisit, type VisitInput } from "./actions";
 import type { AppointmentDetail, BoardData } from "./types";
 
 export type BookingStart = { staffId: string; startMinute: number };
@@ -166,6 +166,24 @@ export function BookingPanel({
 
   const booking = preview?.filter((v) => choices[v.date] !== "skip").length ?? 0;
 
+  // Patch tests: warn as soon as the client and a service that needs one
+  // are chosen.
+  const patchKey = JSON.stringify([client?.id, lines.map((l) => [l.serviceId, l.startMinute])]);
+  const [patch, setPatch] = useState<{ key: string; messages: string[]; blocks: boolean } | null>(null);
+  useEffect(() => {
+    if (!client) return;
+    let live = true;
+    patchTestWarnings(client.id, data.date, lines.filter((l) => l.serviceId && l.startMinute != null).map((l) => ({ serviceId: l.serviceId, startMinute: l.startMinute! }))).then(
+      (r) => live && setPatch({ key: patchKey, ...r }),
+    );
+    return () => {
+      live = false;
+    };
+    // patchKey covers the client and lines.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patchKey]);
+  const patchNow = client && patch?.key === patchKey ? patch : null;
+
   return (
       <form onSubmit={submit} className="flex flex-col gap-5 py-2 text-sm" aria-label={appointment ? "Edit booking" : "New booking"}>
         <div className="flex items-start justify-between gap-2">
@@ -190,6 +208,13 @@ export function BookingPanel({
         )}
 
         <ClientPicker client={client} onChange={setClient} />
+
+        {patchNow && patchNow.messages.length > 0 && (
+          <p role="alert" data-testid="patch-warning" className={`rounded-md border px-3 py-2 ${patchNow.blocks ? "border-danger/30 bg-danger-soft text-danger" : "border-status-late-ink/25 bg-status-late-bg text-status-late-ink"}`}>
+            <strong className="font-semibold">Patch test:</strong> {patchNow.messages.join(" ")}{" "}
+            {patchNow.blocks ? "The salon requires a valid patch test, so this can't be booked yet." : "You can still book; check with the client."}
+          </p>
+        )}
 
         {lines.map((l, n) => {
           const info = lineInfo(l);

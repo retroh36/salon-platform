@@ -21,6 +21,7 @@ const EMPTY: ServiceFormFields = {
   processing_minutes: "0",
   finishing_minutes: "0",
   price: "",
+  requires_patch_test: false,
   staff: {},
 };
 
@@ -40,7 +41,7 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
         ? supabase
             .from("services")
             .select(
-              "id, name, category, description, active_minutes, processing_minutes, finishing_minutes, price_cents, archived_at, staff_services(staff_id, price_cents)",
+              "id, name, category, description, active_minutes, processing_minutes, finishing_minutes, price_cents, requires_patch_test, archived_at, staff_services(staff_id, price_cents)",
             )
             .eq("id", serviceId)
             .maybeSingle()
@@ -51,8 +52,11 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
       loadBackBarProducts(supabase),
     ]);
   if (recipeResult?.error) throw recipeResult.error;
-  const recipe = (recipeResult?.data ?? []).map((r) => ({ productId: r.product_id, amount: r.amount }));
   const productMap = new Map(products.map((p) => [p.id, p]));
+  // By product name: the table has no order of its own.
+  const recipe = (recipeResult?.data ?? [])
+    .map((r) => ({ productId: r.product_id, amount: r.amount }))
+    .sort((a, b) => (productMap.get(a.productId)?.name ?? "").localeCompare(productMap.get(b.productId)?.name ?? ""));
   if (staffError) throw staffError;
   if (categoryError) throw categoryError;
   if (serviceResult?.error) throw serviceResult.error;
@@ -69,6 +73,7 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
         processing_minutes: String(service.processing_minutes),
         finishing_minutes: String(service.finishing_minutes),
         price: centsToInput(service.price_cents),
+        requires_patch_test: service.requires_patch_test,
         staff: Object.fromEntries(service.staff_services.map((ss) => [ss.staff_id, centsToInput(ss.price_cents)])),
       }
     : EMPTY;

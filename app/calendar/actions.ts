@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { ACTION_LABELS, canBook, cancelReason, MAX_NOTES, type AppointmentAction } from "@/lib/appointments";
 import { getCurrentStaff } from "@/lib/auth";
+import { visitWarnings } from "@/lib/client-checks";
 import { searchClients } from "@/lib/client-search";
 import { normalizePhone } from "@/lib/clients";
 import { describeUsage, parseUsageLines } from "@/lib/color-usage";
@@ -380,4 +381,18 @@ export async function changeVisitStatusScoped(appointmentId: string, action: App
   refresh();
   const done = results.filter((r) => r.result.ok).length;
   return done ? { ok: true, message: `${done} visit${done === 1 ? "" : "s"} ${action === "cancel" ? "canceled" : "updated"}.` } : { ok: false, message: "No visits could be changed." };
+}
+
+// Patch test warnings for a booking being made: which services need one the
+// client doesn't have, and whether the salon blocks the booking.
+export async function patchTestWarnings(clientId: string, date: LocalDate, lines: { serviceId: string; startMinute: number }[]): Promise<{ messages: string[]; blocks: boolean }> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !isUuid(clientId) || !isLocalDate(date)) return { messages: [], blocks: false };
+  const items = lines.flatMap((l) => {
+    const start = isUuid(l.serviceId) ? fromLocal(date, l.startMinute, me.location.timezone) : null;
+    return start ? [{ serviceId: l.serviceId, start }] : [];
+  });
+  if (!items.length) return { messages: [], blocks: false };
+  const warnings = (await visitWarnings(supabase, me.business_id, [{ appointmentId: "new", clientId, start: items[0].start, items }])).get("new");
+  return { messages: warnings?.patch ?? [], blocks: warnings?.patchBlocks ?? false };
 }

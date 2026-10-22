@@ -17,6 +17,12 @@ import type { ClientFormFields } from "../actions";
 import { ClientForm } from "../client-form";
 import { FormulaForm, type VisitOption } from "../formula-form";
 import { stylistOptions } from "../stylist-options";
+import { PatchTestForm } from "../patch-test-form";
+import Link from "next/link";
+import { buttonClass } from "@/components/ui/button";
+import { Badge } from "@/components/ui/page";
+import { patchSettings } from "@/lib/client-checks";
+import { patchTestMessage, patchTestState } from "@/lib/scheduling/patch-tests";
 
 export const metadata: Metadata = { title: "Client · Salon Platform" };
 
@@ -61,6 +67,15 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
       .limit(20),
     loadBackBarProducts(supabase),
   ]);
+  const [{ data: patchTests, error: patchError }, { data: forms, error: formsError }, { data: team, error: teamError }, settings] = await Promise.all([
+    supabase.from("client_patch_tests").select("id, tested_at, products, result, notes, staff(first_name, last_name)").eq("client_id", id).order("tested_at", { ascending: false }),
+    supabase.from("client_forms").select("id, template_name, signed_at").eq("client_id", id).order("signed_at", { ascending: false }),
+    supabase.from("staff").select("id, first_name, last_name").eq("is_active", true).order("first_name"),
+    patchSettings(supabase, me.business_id),
+  ]);
+  if (patchError) throw patchError;
+  if (formsError) throw formsError;
+  if (teamError) throw teamError;
   if (error) throw error;
   if (formulaError) throw formulaError;
   if (itemError) throw itemError;
@@ -100,6 +115,64 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
           </div>
         </div>
       )}
+
+      <Card
+        titleId="patch-heading"
+        title="Patch tests"
+        description={(() => {
+          const state = patchTestState(
+            patchTests.map((t) => ({ testedAt: new Date(t.tested_at), result: t.result })),
+            new Date(),
+            { ...settings, minHours: 0 },
+          );
+          return state === "ok" ? "Valid today for services that need one." : patchTestMessage(state, settings).replace(" before this visit", " ago");
+        })()}
+        flush
+      >
+        <PatchTestForm clientId={client.id} today={today} me={me.id} staff={team.map((s) => ({ id: s.id, name: fullName(s) }))} />
+        {patchTests.length === 0 ? (
+          <EmptyState>No patch tests recorded.</EmptyState>
+        ) : (
+          <ol className={listClass} aria-label="Patch test history">
+            {patchTests.map((t) => (
+              <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5">
+                <span>
+                  <span className="font-semibold text-ink">{formatDate(toLocal(new Date(t.tested_at), tz).date)}</span>
+                  <span className="text-ink-muted"> · {t.products} · {fullName(t.staff)}</span>
+                  {t.notes && <span className="block text-sm text-ink-muted">{t.notes}</span>}
+                </span>
+                <Badge tone={t.result === "reaction" ? "red" : "green"}>{t.result === "reaction" ? "Reaction" : "No reaction"}</Badge>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Card>
+
+      <Card
+        titleId="forms-heading"
+        title="Signed forms"
+        actions={
+          <Link href={`/clients/${client.id}/forms/new`} className={buttonClass("secondary", "sm")}>
+            Fill in a form
+          </Link>
+        }
+        flush
+      >
+        {forms.length === 0 ? (
+          <EmptyState>No signed forms.</EmptyState>
+        ) : (
+          <ul className={listClass} aria-label="Signed forms">
+            {forms.map((f) => (
+              <li key={f.id}>
+                <Link href={`/clients/${client.id}/forms/${f.id}`} className="flex justify-between gap-2 px-5 py-3.5 transition-colors duration-(--motion-fast) hover:bg-sunken/60">
+                  <span className="font-semibold text-ink">{f.template_name}</span>
+                  <span className="text-ink-muted">Signed {formatDate(toLocal(new Date(f.signed_at), tz).date)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       <Card
         titleId="formulas-heading"

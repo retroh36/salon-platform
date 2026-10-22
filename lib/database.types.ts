@@ -201,17 +201,55 @@ isOneToOne: false
                   ]
                 },"businesses": {
                   Row: {
-                    "created_at": string,"id": string,"name": string,"plan": string,"settings": NonNullable<Json>,"updated_at": string
+                    "created_at": string,"id": string,"name": string,"patch_test_enforcement": string,"patch_test_min_hours": number,"patch_test_valid_days": number,"plan": string,"settings": NonNullable<Json>,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"id"?: string,"name": string,"plan"?: string,"settings"?: NonNullable<Json>,"updated_at"?: string
+                    "created_at"?: string,"id"?: string,"name": string,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"plan"?: string,"settings"?: NonNullable<Json>,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"id"?: string,"name"?: string,"plan"?: string,"settings"?: NonNullable<Json>,"updated_at"?: string
+                    "created_at"?: string,"id"?: string,"name"?: string,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"plan"?: string,"settings"?: NonNullable<Json>,"updated_at"?: string
                   }
                   Relationships: [
                     
+                  ]
+                },"client_forms": {
+                  Row: {
+                    "answers": NonNullable<Json>,"business_id": string,"client_id": string,"collected_by": string | null,"fields": NonNullable<Json>,"id": string,"signature": string | null,"signed_at": string,"template_id": string | null,"template_name": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "answers": NonNullable<Json>,"business_id": string,"client_id": string,"collected_by"?: string | null,"fields": NonNullable<Json>,"id"?: string,"signature"?: string | null,"signed_at"?: string,"template_id"?: string | null,"template_name": string
+                  }
+                  Update: {
+                    "answers"?: NonNullable<Json>,"business_id"?: string,"client_id"?: string,"collected_by"?: string | null,"fields"?: NonNullable<Json>,"id"?: string,"signature"?: string | null,"signed_at"?: string,"template_id"?: string | null,"template_name"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "client_forms_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_forms_client_id_business_id_fkey"
+      columns: ["client_id","business_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "client_forms_collected_by_business_id_fkey"
+      columns: ["collected_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "client_forms_template_id_business_id_fkey"
+      columns: ["template_id","business_id"]
+isOneToOne: false
+      referencedRelation: "form_templates"
+      referencedColumns: ["id","business_id"]
+    }
                   ]
                 },"client_formulas": {
                   Row: {
@@ -251,6 +289,38 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"client_patch_tests": {
+                  Row: {
+                    "business_id": string,"client_id": string,"created_at": string,"id": string,"notes": string | null,"performed_by": string,"products": string,"result": Database["public"]['Enums']["patch_test_result"],"tested_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"client_id": string,"created_at"?: string,"id"?: string,"notes"?: string | null,"performed_by": string,"products": string,"result": Database["public"]['Enums']["patch_test_result"],"tested_at": string
+                  }
+                  Update: {
+                    "business_id"?: string,"client_id"?: string,"created_at"?: string,"id"?: string,"notes"?: string | null,"performed_by"?: string,"products"?: string,"result"?: Database["public"]['Enums']["patch_test_result"],"tested_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "client_patch_tests_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_patch_tests_client_id_business_id_fkey"
+      columns: ["client_id","business_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "client_patch_tests_performed_by_business_id_fkey"
+      columns: ["performed_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"clients": {
                   Row: {
                     "allergies": string | null,"business_id": string,"consent_signed_on": string | null,"created_at": string,"email": string | null,"email_opt_in": boolean,"first_name": string,"id": string,"last_name": string,"notes": string | null,"phone": string | null,"phone_digits": string | null,"preferences": string | null,"preferred_staff_id": string | null,"search_name": string | null,"sms_opt_in": boolean,"updated_at": string
@@ -275,6 +345,26 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "staff"
       referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"form_templates": {
+                  Row: {
+                    "business_id": string,"created_at": string,"fields": NonNullable<Json>,"id": string,"intro": string | null,"is_active": boolean,"name": string,"required": Database["public"]['Enums']["form_requirement"],"service_ids": (string)[],"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"fields": NonNullable<Json>,"id"?: string,"intro"?: string | null,"is_active"?: boolean,"name": string,"required"?: Database["public"]['Enums']["form_requirement"],"service_ids"?: (string)[],"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"fields"?: NonNullable<Json>,"id"?: string,"intro"?: string | null,"is_active"?: boolean,"name"?: string,"required"?: Database["public"]['Enums']["form_requirement"],"service_ids"?: (string)[],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "form_templates_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
     }
                   ]
                 },"formula_products": {
@@ -649,14 +739,14 @@ isOneToOne: false
                   ]
                 },"services": {
                   Row: {
-                    "active_minutes": number,"archived_at": string | null,"business_id": string,"category": string,"created_at": string,"description": string | null,"duration_minutes": number | null,"finishing_minutes": number,"id": string,"name": string,"price_cents": number,"processing_minutes": number,"updated_at": string
+                    "active_minutes": number,"archived_at": string | null,"business_id": string,"category": string,"created_at": string,"description": string | null,"duration_minutes": number | null,"finishing_minutes": number,"id": string,"name": string,"price_cents": number,"processing_minutes": number,"requires_patch_test": boolean,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "active_minutes": number,"archived_at"?: string | null,"business_id": string,"category": string,"created_at"?: string,"description"?: string | null,"duration_minutes"?: never,"finishing_minutes"?: number,"id"?: string,"name": string,"price_cents": number,"processing_minutes"?: number,"updated_at"?: string
+                    "active_minutes": number,"archived_at"?: string | null,"business_id": string,"category": string,"created_at"?: string,"description"?: string | null,"duration_minutes"?: never,"finishing_minutes"?: number,"id"?: string,"name": string,"price_cents": number,"processing_minutes"?: number,"requires_patch_test"?: boolean,"updated_at"?: string
                   }
                   Update: {
-                    "active_minutes"?: number,"archived_at"?: string | null,"business_id"?: string,"category"?: string,"created_at"?: string,"description"?: string | null,"duration_minutes"?: never,"finishing_minutes"?: number,"id"?: string,"name"?: string,"price_cents"?: number,"processing_minutes"?: number,"updated_at"?: string
+                    "active_minutes"?: number,"archived_at"?: string | null,"business_id"?: string,"category"?: string,"created_at"?: string,"description"?: string | null,"duration_minutes"?: never,"finishing_minutes"?: number,"id"?: string,"name"?: string,"price_cents"?: number,"processing_minutes"?: number,"requires_patch_test"?: boolean,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -1163,7 +1253,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","disruption_kind": "overrun"|"client_late"|"call_out","notification_status": "pending"|"sent"|"canceled","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","staff_level": "junior"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined"
+            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","disruption_kind": "overrun"|"client_late"|"call_out","form_requirement": "none"|"first_visit"|"services","notification_status": "pending"|"sent"|"canceled","patch_test_result": "no_reaction"|"reaction","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","staff_level": "junior"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -1283,7 +1373,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"disruption_kind": ["overrun", "client_late", "call_out"],"notification_status": ["pending", "sent", "canceled"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"staff_level": ["junior", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"]
+            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"disruption_kind": ["overrun", "client_late", "call_out"],"form_requirement": ["none", "first_visit", "services"],"notification_status": ["pending", "sent", "canceled"],"patch_test_result": ["no_reaction", "reaction"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"staff_level": ["junior", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"]
           }
         }
 } as const

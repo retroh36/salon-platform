@@ -19,6 +19,7 @@
 
 import { isAvailable, type LocationSchedule, type StaffSchedule, type Unavailable } from "./availability.ts";
 import type { TimeBlockKind } from "./blocks.ts";
+import type { PatchState } from "./patch-tests.ts";
 import { toLocal } from "./time.ts";
 
 const MINUTE_MS = 60_000;
@@ -128,7 +129,9 @@ export type BookingProblem =
   | { code: "resource_inactive" }
   | { code: "resource_in_use"; conflictWith?: string }
   | { code: "no_free_resource" }
-  | { code: "not_booked" };
+  | { code: "not_booked" }
+  // The salon requires a valid patch test for this service.
+  | { code: "patch_test"; state: Exclude<PatchState, "ok"> };
 
 export type ItemCheck = { valid: true; item: BookedItem } | { valid: false; problems: BookingProblem[] };
 
@@ -298,6 +301,13 @@ const BLOCKED_MESSAGES: Record<TimeBlockKind, string> = {
   personal: "The stylist has blocked out that time.",
 };
 
+const PATCH_MESSAGES: Record<Exclude<PatchState, "ok">, string> = {
+  missing: "This service needs a patch test, and the client has none on record.",
+  expired: "This service needs a patch test, and the client's last one has expired.",
+  too_recent: "This service needs a patch test done further ahead: the client's is too recent.",
+  reaction: "The client's last patch test showed a reaction.",
+};
+
 // A sentence for the front desk.
 export function describeProblem(problem: BookingProblem): string {
   switch (problem.code) {
@@ -329,6 +339,8 @@ export function describeProblem(problem: BookingProblem): string {
       return "Every chair is in use then.";
     case "not_booked":
       return "That appointment is no longer on the calendar.";
+    case "patch_test":
+      return PATCH_MESSAGES[problem.state];
   }
 }
 

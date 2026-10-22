@@ -13,7 +13,8 @@ import { itemEnd, itemSegments, type BookedItem } from "@/lib/scheduling/booking
 import { intersectIntervals, type Interval } from "@/lib/scheduling/intervals";
 import { occurrences } from "@/lib/scheduling/blocks";
 import { loadBlocks, loadLocationSchedule, loadOffers, loadStaffSchedules, startOfLocalDay, toBookedItem } from "@/lib/scheduling/load";
-import { addDays, formatMinute, isLocalDate, MINUTES_PER_DAY, todayIn, toLocal, WEEKDAYS } from "@/lib/scheduling/time";
+import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn, toLocal, WEEKDAYS } from "@/lib/scheduling/time";
+import { visitWarnings } from "@/lib/client-checks";
 import { fullName, roleLabel, sortStaff } from "@/lib/staff";
 import { CalendarBoard } from "./board";
 import type { AppointmentDetail, BlockData, BoardData, ColumnData } from "./types";
@@ -152,6 +153,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       bookedBy: bookedLine(a),
       changedBy: changedLine(a),
       formulas: [],
+      warnings: null,
       series: a.series_id ? { id: a.series_id, index: a.series_index!, count: seriesCounts.get(a.series_id) ?? 1, intervalWeeks: a.series?.interval_weeks ?? 1 } : null,
     };
     const staffMember = staffById.get(row.staff_id);
@@ -183,6 +185,17 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       notes: f.notes,
     });
   }
+
+  // What to check before each upcoming visit.
+  const toCheck = Object.values(appointments)
+    .filter((a) => a.status === "booked" || a.status === "confirmed" || a.status === "checked_in")
+    .map((a) => ({
+      appointmentId: a.id,
+      clientId: a.client?.id ?? null,
+      start: fromLocal(date, Math.min(...a.items.map((i) => i.start)), tz) ?? dayStart,
+      items: a.items.map((i) => ({ serviceId: i.serviceId, start: fromLocal(date, i.start, tz) ?? dayStart })),
+    }));
+  for (const [id, w] of await visitWarnings(supabase, me.business_id, toCheck)) appointments[id].warnings = w;
 
   const open = dayView({ weekly: {}, overrides: {}, timeOff: [] }, location, date).open;
   const weekHours = WEEKDAYS.flatMap((d) => location.weekly[d] ?? []);

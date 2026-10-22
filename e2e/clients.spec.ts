@@ -177,7 +177,7 @@ test.describe("stylists", () => {
     await expect(ui(page).getByText("Enter the formula.")).toBeVisible();
 
     await ui(page).getByLabel("Formula", { exact: true }).fill("Roots: Shades EQ 6N + 6NB (1:1), 20 vol, 35 min");
-    await ui(page).getByLabel("Notes (optional)").fill("Lifted fast; check at 30.");
+    await ui(page).getByRole("form", { name: "Add formula" }).getByLabel("Notes (optional)").fill("Lifted fast; check at 30.");
     await ui(page).getByRole("button", { name: "Add formula entry" }).click();
 
     await expect(ui(page).getByRole("status")).toHaveText("Saved.");

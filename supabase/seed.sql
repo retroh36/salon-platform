@@ -1024,3 +1024,51 @@ where not exists (
     and i.starts_at < (x.d + time '13:00')::timestamp at time zone 'America/Chicago'
     and i.ends_at > (x.d + time '12:00')::timestamp at time zone 'America/Chicago'
 );
+
+-- Services that need a patch test: color, lightener and toner.
+update public.services set requires_patch_test = true
+where business_id = 'b0000000-0000-4000-8000-000000000001'
+  and (category ~* '(colou?r|highlight|balayage)' or name ~* '(colou?r|gloss|toner|bleach)')
+  and name <> 'Color Consultation';
+
+-- Patch tests for most color clients (those with a formula): recent ones
+-- that pass, a few older than six months, and one reaction.
+insert into public.client_patch_tests (business_id, client_id, tested_at, products, result, performed_by, notes)
+select f.business_id, f.client_id,
+       now() - make_interval(days => case when abs(hashtext('pt' || f.client_id)) % 10 < 7 then 30 + abs(hashtext('pt' || f.client_id)) % 60 else 200 + abs(hashtext('pt' || f.client_id)) % 100 end),
+       'Goldwell Topchic 6N + 20 vol behind the ear',
+       case when abs(hashtext('ptr' || f.client_id)) % 40 = 0 then 'reaction' else 'no_reaction' end::public.patch_test_result,
+       f.staff_id, null
+from (select distinct on (client_id) client_id, business_id, staff_id from public.client_formulas order by client_id, visit_date desc) f
+where abs(hashtext('has-pt' || f.client_id)) % 100 < 85;
+
+-- Forms: a consultation before a client's first visit, and color consent
+-- before color services.
+insert into public.form_templates (id, business_id, name, intro, fields, required, service_ids)
+values
+  ('e3000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'New client consultation',
+   'Welcome! A few questions so your stylist knows your hair and any sensitivities.',
+   '[{"id": "history", "type": "text", "label": "What has been done to your hair in the last year?", "required": false},
+     {"id": "sensitive", "type": "yes_no", "label": "Do you have a sensitive scalp or skin allergies?", "required": true},
+     {"id": "pregnant", "type": "yes_no", "label": "Are you pregnant or breastfeeding?", "required": true},
+     {"id": "photos", "type": "checkbox", "label": "The salon may take before and after photos of my hair.", "required": false},
+     {"id": "sign", "type": "signature", "label": "Signature", "required": true}]',
+   'first_visit', '{}'),
+  ('e3000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'Color consent',
+   'Hair color can cause allergic reactions. Please read and sign before your color service.',
+   '[{"id": "patch", "type": "yes_no", "label": "Have you had a patch test in the last six months?", "required": true},
+     {"id": "reaction", "type": "yes_no", "label": "Have you ever reacted to hair dye?", "required": true},
+     {"id": "understand", "type": "checkbox", "label": "I understand that color results can vary and that I should tell my stylist about any itching or burning.", "required": true},
+     {"id": "sign", "type": "signature", "label": "Signature", "required": true}]',
+   'services',
+   (select array_agg(id) from public.services where business_id = 'b0000000-0000-4000-8000-000000000001' and requires_patch_test));
+
+-- Most returning clients signed the consultation on their first visit.
+insert into public.client_forms (business_id, client_id, template_id, template_name, fields, answers, signature, signed_at, collected_by)
+select c.business_id, c.id, t.id, t.name, t.fields,
+       '{"history": "", "sensitive": "no", "pregnant": "no", "photos": true, "sign": true}',
+       'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+       c.created_at, 'd0000000-0000-4000-8000-000000000003'
+from public.clients c, public.form_templates t
+where t.id = 'e3000000-0000-4000-8000-000000000001' and c.business_id = t.business_id
+  and abs(hashtext('form' || c.id)) % 100 < 80;

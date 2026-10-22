@@ -2,10 +2,10 @@ import Link from "next/link";
 import { logout } from "@/app/login/actions";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
-import { BoxIcon, CalendarIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, TeamIcon, UserIcon } from "@/components/ui/icons";
+import { BoxIcon, CalendarIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, TeamIcon, UserIcon } from "@/components/ui/icons";
 import { roleLabel, type StaffRole } from "@/lib/staff";
 
-export type Section = "dashboard" | "calendar" | "clients" | "schedule" | "services" | "inventory";
+export type Section = "dashboard" | "calendar" | "clients" | "schedule" | "services" | "inventory" | "forms";
 
 const NAV: { section: Section; href: string; label: string; Icon: (p: { className?: string }) => React.ReactNode }[] = [
   { section: "dashboard", href: "/dashboard", label: "Dashboard", Icon: HomeIcon },
@@ -14,6 +14,7 @@ const NAV: { section: Section; href: string; label: string; Icon: (p: { classNam
   { section: "schedule", href: "/schedule", label: "Team schedule", Icon: TeamIcon },
   { section: "services", href: "/services", label: "Services", Icon: ScissorsIcon },
   { section: "inventory", href: "/inventory", label: "Inventory", Icon: BoxIcon },
+  { section: "forms", href: "/forms", label: "Forms", Icon: ClipboardIcon },
 ];
 
 // The salon's mark: its initial in a soft plum leaf, until salons can

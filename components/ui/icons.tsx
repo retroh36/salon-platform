@@ -124,3 +124,9 @@ export const BoxIcon = (p: IconProps) => (
     <path d="m4 7.5 8 4 8-4M12 11.5v9" />
   </Icon>
 );
+export const ClipboardIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="5" y="4.5" width="14" height="16" rx="2" />
+    <path d="M9 4.5V3.5h6v1M8.5 10h7M8.5 13.5h7M8.5 17h4" />
+  </Icon>
+);

@@ -70,6 +70,13 @@ export function ServiceForm({
           <Field label="Description (optional)" className="sm:col-span-2">
             <textarea name="description" defaultValue={fields.description} rows={2} className={inputClass} />
           </Field>
+          <label className="flex items-start gap-3 text-sm sm:col-span-2">
+            <input type="checkbox" name="requires_patch_test" defaultChecked={fields.requires_patch_test} className={`${checkboxClass} mt-0.5`} />
+            <span>
+              <span className="font-medium text-ink">Needs a patch test</span>
+              <span className="block text-ink-muted">Warn (or block, in Forms settings) when the client has no valid patch test before this service.</span>
+            </span>
+          </label>
         </section>
 
         <section className={`p-5 ${cardClass}`}>
