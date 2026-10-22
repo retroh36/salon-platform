@@ -7,6 +7,7 @@ import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { Eyebrow, fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { CalendarIcon, ClockIcon, CloseIcon, HourglassIcon } from "@/components/ui/icons";
 import { StatusChip } from "@/components/ui/status-chip";
+import { ServiceTimer } from "@/components/service-timer";
 import { ACTION_LABELS, allowedActions, CANCEL_REASONS, canEditNotes, isEditable, MAX_NOTES, type AppointmentAction } from "@/lib/appointments";
 import type { DeniseState } from "@/lib/denise/types";
 import { formatLongDay } from "@/lib/schedule-format";
@@ -157,15 +158,27 @@ export function AppointmentPanel({
         <Eyebrow>{items.length > 1 ? "Services" : "Service"}</Eyebrow>
         <ul className="flex flex-col gap-3">
           {items.map((i) => (
-            <li key={i.id} className="flex items-start justify-between gap-3">
-              <div>
-                <div className="font-semibold">{i.serviceName}</div>
-                <div className="text-ink-muted">
-                  With {i.staffName} · {formatMinute(i.start)}–{formatMinute(i.end)}
-                  {i.resourceName && ` · ${i.resourceName}`}
+            <li key={i.id} className="flex flex-col gap-2" data-item-id={i.id}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-semibold">{i.serviceName}</div>
+                  <div className="text-ink-muted">
+                    With {i.staffName} · {formatMinute(i.start)}–{formatMinute(i.end)}
+                    {i.resourceName && ` · ${i.resourceName}`}
+                  </div>
                 </div>
+                <span className="tabular-nums">{formatPrice(i.priceCents)}</span>
               </div>
-              <span className="tabular-nums">{formatPrice(i.priceCents)}</span>
+              {/* Actual times, on the day: the stylist doing it or the front desk. */}
+              {date === today && status !== "canceled" && status !== "no_show" && (
+                <ServiceTimer
+                  itemId={i.id}
+                  times={i.times}
+                  hasProcessing={i.processingMinutes > 0}
+                  bookedMinutes={i.bookedMinutes}
+                  canRecord={(me.canBook || i.staffId === me.staffId) && (status !== "completed" || i.times.startedAt !== null)}
+                />
+              )}
             </li>
           ))}
         </ul>

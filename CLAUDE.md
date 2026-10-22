@@ -33,9 +33,9 @@ Business → Location → Staff, Resource; Service, StaffService; Client; Appoin
 - `npm run dev` — local app
 - `npm run lint` / `npm run typecheck` / `npm test` — unit tests, no database needed
 - `npm run test:db` — RLS and database tests; needs local Supabase running with the demo data (`npm run seed:demo`)
-- `npm run test:e2e` — Playwright UI tests in `e2e/`; needs local Supabase with the demo data, and uses the running dev server (or starts one). Fails on any browser console error, which includes Next.js dev overlay errors. First time: `npx playwright install chromium`
+- `npm run test:e2e` — Playwright UI tests in `e2e/`; needs local Supabase with the demo data. Runs its own dev server on port 3100 (build folder `.next-e2e`) with `ANTHROPIC_API_KEY` blanked, so tests never call the real Claude API; it's reused while it runs. Fails on any browser console error, which includes Next.js dev overlay errors. First time: `npx playwright install chromium`
 - `npx supabase db reset` — rebuild local database from migrations + the default seed (clear calendar)
-- `npm run seed:demo` — reset, then add the busy demo month (`supabase/seed-demo.sql`, loaded with `psql` in the database container); the tests need it
+- `npm run seed:demo` — reset, then add the busy demo history (16 weeks back, nine days ahead, with actual times and retail sales) (`supabase/seed-demo.sql`, loaded with `psql` in the database container); the tests need it
 - `npm run db:types` — regenerate `lib/database.types.ts` after a migration
 - `npm run import:phorest:dry-run` — calls the **real** Phorest API (GET only) with the `PHOREST_*` credentials in `.env.local`, maps everything and prints only record counts and mapping issues; saves nothing. Ask the user before running it. `-- --months-back=N --months-ahead=N` sets the appointment range (default 24 and 12)
 
@@ -52,6 +52,10 @@ Business → Location → Staff, Resource; Service, StaffService; Client; Appoin
 - Tokens (colors, fonts, radius, shadows, motion) live in `app/globals.css` under `@theme`. Every text/background pair must pass WCAG AA: add new pairs to `tests/unit/design-tokens.test.ts`.
 - Shared components are in `components/ui/`: Button, fields (`fieldClass`, `selectClass`, `checkboxClass`), page blocks (`PageHeader`, `Card`, `Badge`, `Alert`), Avatar, StatusChip, Tabs, Segmented, Listbox, DatePicker, FitText (text that shortens instead of being cut off), icons and the AppFrame layout. Every page uses `AppShell` (`components/app-shell.tsx`), which wraps AppFrame. Use only token colors, not Tailwind's palette (`neutral-*` and so on).
 - Motion is CSS only, with no animation library: transitions use `duration-(--motion-fast|base|slow)` (150-250ms), and day changes use React `<ViewTransition>`. `prefers-reduced-motion` turns all of it off (see the end of `globals.css`).
+
+## Actual times
+- Each service on a visit records when it really started, went into processing, came back to the chair and finished (`appointment_items.started_at`, `processing_started_at`, `processing_ended_at`, `finished_at`), and visits record `checked_in_at` / `checked_out_at`. One tap at a time through `record_item_time` (the stylist doing it or the front of house; starting checks the client in; "undo" takes back the last tap). The UI is `components/service-timer.tsx` (pure state in `lib/visit-times.ts`), in booking details on the day and on **My day** (`/my-day`, stylists' phone view).
+- The demo data gives each stylist their own pace on some services, a few late, no-show-prone and retail-buying clients, and clients on their own visit cycles, so there's real history to learn from.
 
 ## Team, levels and prices
 - Stylists have a level: Artisan, Senior or Master (`staff.level`, `STAFF_LEVELS` in `lib/schedule-forms.ts`). It's set in staff settings (Schedule page); on the calendar it shows as color (gold, berry, emerald: the `level-*` tokens) and a badge (star, two dots, one dot): a ring and badge on the avatar (`Avatar level`, `components/ui/level.tsx`) and a bar along the top of the column, with a legend entry. No level text on the calendar; the header line under a stylist's name is their day at a glance (`bookedSummary`).

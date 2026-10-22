@@ -5,6 +5,7 @@ import type { AppointmentStatus } from "@/lib/appointments";
 import type { PickerProduct } from "@/lib/inventory-load";
 import type { ServiceFamily } from "@/lib/calendar";
 import type { StaffLevel } from "@/lib/schedule-forms";
+import type { ItemTimes } from "@/lib/visit-times";
 import type { StaffRole } from "@/lib/staff";
 import type { SegmentKind } from "@/lib/scheduling/booking";
 import type { Interval } from "@/lib/scheduling/intervals";
@@ -56,6 +57,10 @@ export type ItemDetail = Interval & {
   resourceId: string | null;
   resourceName: string | null;
   priceCents: number;
+  // Booked length and processing gap, and the actual times tapped in.
+  bookedMinutes: number;
+  processingMinutes: number;
+  times: ItemTimes;
 };
 
 // A formula recorded for a service on the visit.

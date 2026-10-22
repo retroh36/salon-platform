@@ -2,16 +2,17 @@ import Link from "next/link";
 import { logout } from "@/app/login/actions";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
-import { BoxIcon, CalendarIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, UserIcon } from "@/components/ui/icons";
+import { BoxIcon, CalendarIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, UserIcon } from "@/components/ui/icons";
 import { SalonMark } from "@/components/ui/salon-mark";
 import { roleLabel, type StaffRole } from "@/lib/staff";
 
-export type Section = "dashboard" | "calendar" | "clients" | "schedule" | "services" | "inventory" | "forms" | "settings";
+export type Section = "dashboard" | "my-day" | "calendar" | "clients" | "schedule" | "services" | "durations" | "inventory" | "forms" | "settings";
 
-type NavItem = { section: Section; href: string; label: string; Icon: (p: { className?: string }) => React.ReactNode; ownersOnly?: boolean };
+type NavItem = { section: Section; href: string; label: string; Icon: (p: { className?: string }) => React.ReactNode; ownersOnly?: boolean; stylistsOnly?: boolean };
 
 const NAV: NavItem[] = [
   { section: "dashboard", href: "/dashboard", label: "Dashboard", Icon: HomeIcon },
+  { section: "my-day", href: "/my-day", label: "My day", Icon: ClockIcon, stylistsOnly: true },
   { section: "calendar", href: "/calendar", label: "Calendar", Icon: CalendarIcon },
   { section: "clients", href: "/clients", label: "Clients", Icon: UserIcon },
   { section: "schedule", href: "/schedule", label: "Team schedule", Icon: TeamIcon },
@@ -20,6 +21,10 @@ const NAV: NavItem[] = [
   { section: "forms", href: "/forms", label: "Forms", Icon: ClipboardIcon },
   { section: "settings", href: "/settings", label: "Settings", Icon: SettingsIcon, ownersOnly: true },
 ];
+
+function shown(item: NavItem, role: StaffRole): boolean {
+  return (!item.ownersOnly || role === "owner") && (!item.stylistsOnly || role === "stylist");
+}
 
 // "Powered by Maestra", small, at the foot of the sidebar.
 function PoweredBy() {
@@ -64,7 +69,7 @@ export function AppFrame({
         </div>
         {/* Scrolls on short screens, so it never runs into the footer. */}
         <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 pb-3">
-          {NAV.filter((n) => !n.ownersOnly || user.role === "owner").map(({ section: s, href, label, Icon }) => {
+          {NAV.filter((n) => shown(n, user.role)).map(({ section: s, href, label, Icon }) => {
             const current = s === section;
             return (
               <Link
@@ -122,7 +127,7 @@ export function AppFrame({
           </form>
         </header>
         <nav aria-label="Main" className="flex gap-1 overflow-x-auto border-b border-line px-4 py-2 lg:hidden">
-          {NAV.filter((n) => !n.ownersOnly || user.role === "owner").map(({ section: s, href, label }) => (
+          {NAV.filter((n) => shown(n, user.role)).map(({ section: s, href, label }) => (
             <Link
               key={href}
               href={href}

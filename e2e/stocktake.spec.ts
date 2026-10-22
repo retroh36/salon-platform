@@ -55,7 +55,7 @@ test.describe("on an iPad", () => {
     // Retail, by unit.
     await shelves.getByRole("button", { name: /Styling shelf/ }).tap();
     const dryspun = ui(page).getByRole("form", { name: "Bumble and bumble Thickening Dryspun Finish 150 ml" });
-    await dryspun.getByLabel("Units").fill("1");
+    await dryspun.getByLabel("Units").fill(String(before.dryspun));
     await dryspun.getByRole("button", { name: "Save count" }).tap();
     await expect(dryspun.getByTestId("count-result")).toContainText("Matches");
     await expect(ui(page).getByTestId("count-progress")).toHaveText("3 of 47 counted");

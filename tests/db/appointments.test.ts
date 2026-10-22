@@ -153,7 +153,8 @@ describe("seed data", () => {
     }
   });
 
-  it("fills about 70% of the stylists' bookable time", () => {
+  // Clients come back on their own cycles, so the salon isn't full.
+  it("fills about 60% of the stylists' bookable time", () => {
     let available = 0;
     let booked = 0;
     for (const staffId of STYLISTS) {
@@ -171,8 +172,8 @@ describe("seed data", () => {
       }
     }
     const utilization = booked / available;
-    expect(utilization).toBeGreaterThan(0.62);
-    expect(utilization).toBeLessThan(0.78);
+    expect(utilization).toBeGreaterThan(0.5);
+    expect(utilization).toBeLessThan(0.72);
   });
 
   it("includes visits with several stylists, and clients booked into processing gaps", () => {

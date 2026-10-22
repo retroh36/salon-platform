@@ -44,3 +44,4 @@ yarn-error.log*
 /playwright-report/
 /blob-report/
 /e2e/.auth/
+/.next-e2e/

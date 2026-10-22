@@ -19,6 +19,7 @@ import { MAX_GUESTS } from "@/lib/scheduling/groups";
 import { formatDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn, type LocalDate } from "@/lib/scheduling/time";
 import { fullName } from "@/lib/staff";
+import type { TimeEvent } from "@/lib/visit-times";
 
 export type ClientOption = { id: string; name: string; phone: string | null; allergies: string | null };
 
@@ -474,4 +475,21 @@ export async function calendarStamp(): Promise<string | null> {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return null;
   return loadCalendarStamp(supabase, me.location.id);
+}
+
+const TIME_EVENTS: readonly TimeEvent[] = ["start", "processing", "rinse", "finish", "undo"];
+
+// One tap on a service: started, processing, back in the chair, finished
+// (or undo the last). The stylist doing it or the front of house.
+export async function recordItemTime(itemId: string, event: TimeEvent): Promise<ActionResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(itemId) || !TIME_EVENTS.includes(event)) return { ok: false, message: "That service no longer exists." };
+  const { error } = await supabase.rpc("record_item_time", { p_item_id: itemId, p_event: event });
+  if (error?.code === "42501") return { ok: false, message: "Only the stylist doing this service or the front desk can record its times." };
+  if (error?.code === "55000") return { ok: false, message: error.message.endsWith(".") ? error.message : `${error.message}.` };
+  if (error) throw error;
+  refresh();
+  revalidatePath("/my-day");
+  return { ok: true };
 }

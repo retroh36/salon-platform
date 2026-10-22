@@ -1,6 +1,7 @@
--- The busy demo month, added on top of supabase/seed.sql by
--- `npm run seed:demo` (which resets the database first): time off, a
--- month of appointments, blocked time and a waitlist. The database and
+-- The busy demo data, added on top of supabase/seed.sql by
+-- `npm run seed:demo` (which resets the database first): time off, 16
+-- weeks of history and the next nine days of appointments with actual
+-- times, retail sales, blocked time and a waitlist. The database and
 -- browser tests (npm run test:db, npm run test:e2e) expect this data.
 -- All people are made up.
 
@@ -44,8 +45,9 @@ select 'b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-00000000
        12 * 60, 20 * 60;
 
 -- ---------------------------------------------------------------------------
--- A month of appointments: three weeks back to nine days ahead, about 70%
--- of the stylists' bookable time. Deterministic for a given reset date.
+-- Appointments: 16 weeks back to nine days ahead, about 60% of the
+-- stylists' bookable time (clients come on their own cycles).
+-- Deterministic for a given reset date.
 --
 -- Built greedily, stylist by stylist, following the booking rules in
 -- lib/scheduling/booking.ts (tests/db/appointments.test.ts checks every
@@ -144,34 +146,50 @@ language sql as $$
   )
   select sv.business_id, 'c0000000-0000-4000-8000-000000000001', p_appointment, sv.id, p_staff, p_resource, s,
          s + make_interval(mins => sv.duration_minutes),
-         sv.active_minutes, sv.processing_minutes, sv.finishing_minutes, coalesce(ss.price_cents, sv.price_cents)
+         sv.active_minutes, sv.processing_minutes, sv.finishing_minutes, private.stylist_price(p_staff, sv.id)
   from public.services sv
   join public.staff_services ss on ss.service_id = sv.id and ss.staff_id = p_staff
   where sv.id = p_service
 $$;
 
--- A client with no other appointment that day, favoring the stylist's regulars.
-create function pg_temp.pick_client(p_staff uuid, d date, key text) returns uuid
-language plpgsql stable as $$
+-- Each client's habits, so there's something real to learn: how often
+-- they come (every 3 to 7 weeks), the weekday and time of day they like,
+-- and for about one in ten, visits drifting further apart (churning).
+-- last_visit is kept up to date as visits are added.
+create temp table rhythm as
+select c.id, c.preferred_staff_id,
+       21 + (pg_temp.rnd('cycle' || c.id) % 5) * 7 as cycle_days,
+       2 + pg_temp.rnd('dow' || c.id) % 5 as weekday,
+       pg_temp.rnd('ampm' || c.id) % 2 = 0 as mornings,
+       pg_temp.rnd('drift' || c.id) % 100 < 10 as drifting,
+       null::date as last_visit
+from public.clients c
+where c.business_id = 'b0000000-0000-4000-8000-000000000001';
+
+-- The client most due for a visit, among the stylist's regulars (and
+-- clients without a favorite): close to their usual gap since their last
+-- visit, on their day and time of day, and not already in that day.
+create function pg_temp.pick_client(p_staff uuid, d date, key text, p_minute int) returns uuid
+language plpgsql as $$
 declare
   v_client uuid;
 begin
-  for attempt in 0..9 loop
-    select c.id into v_client
-    from public.clients c
-    where c.business_id = 'b0000000-0000-4000-8000-000000000001'
-      and (c.preferred_staff_id = p_staff or c.preferred_staff_id is null)
-    order by c.id
-    offset pg_temp.rnd(key || ':' || attempt) % 250
-    limit 1;
-    if v_client is not null and not exists (
-      select 1 from public.appointments a
-      where a.client_id = v_client and a.starts_at >= pg_temp.at_local(d, 0) and a.starts_at < pg_temp.at_local(d + 1, 0)
-    ) then
-      return v_client;
-    end if;
-  end loop;
-  return null;
+  select r.id into v_client
+  from rhythm r
+  where (r.preferred_staff_id = p_staff or r.preferred_staff_id is null)
+    and r.last_visit is distinct from d
+    -- Drifting clients' gaps grow by a week each visit.
+    and (r.last_visit is null or d - r.last_visit >= (r.cycle_days * 0.6)::int + case when r.drifting then (d - (current_date - 112)) / 3 else 0 end)
+  order by
+    case when r.last_visit is null then 20 + pg_temp.rnd(key || r.id) % 60 else abs(d - r.last_visit - r.cycle_days) end
+    + case when extract(isodow from d) = r.weekday then 0 else 25 end
+    + case when (p_minute < 12 * 60) = r.mornings then 0 else 15 end
+    + pg_temp.rnd(key || ':' || r.id) % 12
+  limit 1;
+  if v_client is not null then
+    update rhythm set last_visit = d where id = v_client;
+  end if;
+  return v_client;
 end;
 $$;
 
@@ -214,7 +232,7 @@ declare
   v_resource uuid;
   v_appointment uuid;
 begin
-  for d in select generate_series(v_today - 21, v_today + 9, interval '1 day')::date loop
+  for d in select generate_series(v_today - 112, v_today + 9, interval '1 day')::date loop
     -- Colorists first, so their follow-ups are in place before the others' days fill up.
     for st in
       select * from (values
@@ -272,7 +290,7 @@ begin
             cur := cur + 15;
             continue;
           end if;
-          v_client := pg_temp.pick_client(st.staff_id, d, key);
+          v_client := pg_temp.pick_client(st.staff_id, d, key, cur);
           if v_client is null then
             cur := cur + 15;
             continue;
@@ -316,7 +334,7 @@ begin
             order by pg_temp.rnd(key || ':fill' || sv.id)
             limit 1;
             if found then
-              v_client := pg_temp.pick_client(st.staff_id, d, key || ':fill');
+              v_client := pg_temp.pick_client(st.staff_id, d, key || ':fill', cur);
               if v_client is not null then
                 v_start := v_start + make_interval(mins => svc.active_minutes);
                 perform pg_temp.add_item(
@@ -362,9 +380,10 @@ set status = x.status,
       else a.created_at
     end
 from (
+  -- A few clients cancel or miss appointments much more than most.
   select id, case
-      when pg_temp.rnd(id::text || ':cancel') % 100 < 5 then 'canceled'
-      when ends_at <= now() and pg_temp.rnd(id::text || ':noshow') % 100 < 4 then 'no_show'
+      when pg_temp.rnd(id::text || ':cancel') % 100 < case when pg_temp.rnd('cx' || client_id) % 100 < 8 then 20 else 4 end then 'canceled'
+      when ends_at <= now() and pg_temp.rnd(id::text || ':noshow') % 100 < case when pg_temp.rnd('ns' || client_id) % 100 < 6 then 30 else 2 end then 'no_show'
       when ends_at <= now() then 'completed'
       when starts_at <= now() then 'checked_in'
       when pg_temp.rnd(id::text || ':confirm') % 100 < 60 then 'confirmed'
@@ -377,6 +396,109 @@ where a.id = x.id;
 
 -- Canceled bookings made the day before can be after they were booked.
 update public.appointments set updated_at = greatest(updated_at, created_at) where business_id = 'b0000000-0000-4000-8000-000000000001';
+
+-- ---------------------------------------------------------------------------
+-- Actual times for visits that have happened (and today's so far), so
+-- Denise has something to learn from. Each stylist has their own pace on
+-- some services (pg_temp.pace), with day-to-day noise and the odd visit
+-- that runs long. A few clients are usually late.
+-- ---------------------------------------------------------------------------
+
+-- How long a stylist takes compared with the menu: Bridget runs long on
+-- lightening, Gil on color, Shae is quick on short cuts but slow on
+-- blowouts and getting faster on women's cuts, Nola is brisk, Hannah runs
+-- long on styling, Lois on smoothing treatments. days_ago is how long ago
+-- the visit was (for Shae's improvement).
+create function pg_temp.pace(p_staff uuid, p_category text, p_name text, days_ago int) returns numeric
+language sql immutable as $$
+  select case
+    when p_staff = 'd0000000-0000-4000-8000-000000000004' and p_category in ('Balayage', 'Highlights') then 1.18
+    when p_staff = 'd0000000-0000-4000-8000-000000000005' and p_category = 'Color' then 1.15
+    when p_staff = 'd0000000-0000-4000-8000-000000000009' and p_name in ('Men''s Cut', 'Kids'' Cut (12 & under)') then 0.8
+    when p_staff = 'd0000000-0000-4000-8000-000000000009' and p_name like 'Blowout%' then 1.2
+    when p_staff = 'd0000000-0000-4000-8000-000000000009' and p_name = 'Women''s Cut & Style' then 0.95 + least(days_ago, 112) / 112.0 * 0.3
+    when p_staff = 'd0000000-0000-4000-8000-000000000007' then 0.88
+    when p_staff = 'd0000000-0000-4000-8000-000000000006' and p_category = 'Blowouts & Styling' then 1.15
+    when p_staff = 'd0000000-0000-4000-8000-000000000010' and p_name in ('Keratin Smoothing', 'Brazilian Blowout') then 1.12
+    else 1.0
+  end
+$$;
+
+-- Minutes after the booked start the client arrives: a few clients are
+-- usually 10 to 20 minutes late; most are on time.
+create function pg_temp.arrival(p_client uuid, p_appointment uuid) returns int
+language sql immutable as $$
+  select case
+    when pg_temp.rnd('late' || p_client) % 100 < 12 and pg_temp.rnd('l' || p_appointment) % 100 < 75 then 10 + pg_temp.rnd('lm' || p_appointment) % 11
+    else pg_temp.rnd('lm' || p_appointment) % 4
+  end
+$$;
+
+with timed as (
+  select i.id, i.appointment_id, i.starts_at, i.active_minutes, i.processing_minutes, i.finishing_minutes,
+         a.status,
+         i.starts_at + make_interval(mins => pg_temp.arrival(a.client_id, a.id)) as started,
+         -- Pace, noise of about 8% either way, and one visit in 25 running half again as long.
+         pg_temp.pace(i.staff_id, sv.category, sv.name, (current_date - (i.starts_at at time zone 'America/Chicago')::date))
+           * (0.92 + (pg_temp.rnd(i.id || ':n') % 17) / 100.0)
+           * case when pg_temp.rnd(i.id || ':o') % 25 = 0 then 1.5 else 1 end as factor
+  from public.appointment_items i
+  join public.appointments a on a.id = i.appointment_id
+  join public.services sv on sv.id = i.service_id
+  where a.business_id = 'b0000000-0000-4000-8000-000000000001' and a.status in ('completed', 'checked_in')
+),
+times as (
+  select t.*,
+         t.started + make_interval(mins => round(t.active_minutes * t.factor)::int) as proc_start,
+         t.started + make_interval(mins => round(t.active_minutes * t.factor)::int + t.processing_minutes + (pg_temp.rnd(t.id || ':p') % 7) - 2) as proc_end,
+         t.started + make_interval(mins => greatest(
+           round((t.active_minutes + t.processing_minutes + t.finishing_minutes) * t.factor)::int,
+           round(t.active_minutes * t.factor)::int + t.processing_minutes + 5 + round(t.finishing_minutes * t.factor * 0.5)::int)) as finished
+  from timed t
+)
+update public.appointment_items i set
+  started_at = case when x.started <= now() then x.started end,
+  processing_started_at = case when x.processing_minutes > 0 and x.proc_start <= now() then x.proc_start end,
+  processing_ended_at = case when x.processing_minutes > 0 and x.proc_end <= now() then x.proc_end end,
+  finished_at = case when x.finished <= now() and (x.status = 'completed' or x.finished <= now()) then x.finished end
+from times x
+where i.id = x.id;
+
+-- Checked in when they arrived, out a few minutes after the last service.
+update public.appointments a set
+  checked_in_at = least(x.first_start - interval '1 minute', now()),
+  checked_out_at = case when a.status = 'completed' then x.last_finish + make_interval(mins => 3 + pg_temp.rnd(a.id || ':out') % 8) end
+from (
+  select appointment_id, min(started_at) as first_start, max(finished_at) as last_finish
+  from public.appointment_items group by appointment_id
+) x
+where x.appointment_id = a.id and a.status in ('completed', 'checked_in') and x.first_start is not null;
+
+-- Retail sales at checkout: some clients often buy a product, most rarely.
+-- A delivery at the start of the history covers them, so stock stays right.
+select private.move_stock('c0000000-0000-4000-8000-000000000001', p.id, 40, 'order_received', 'Opening delivery')
+from public.products p
+where p.business_id = 'b0000000-0000-4000-8000-000000000001' and p.type = 'retail';
+update public.stock_movements set created_at = now() - interval '113 days', created_by = 'd0000000-0000-4000-8000-000000000002'
+where reason = 'order_received' and note = 'Opening delivery';
+
+with retail as (
+  select array_agg(id order by sku) as ids from public.products
+  where business_id = 'b0000000-0000-4000-8000-000000000001' and type = 'retail'
+),
+buyers as (
+  select a.id, a.checked_out_at,
+         (select ids[1 + pg_temp.rnd('prod' || a.client_id || a.id) % array_length(ids, 1)] from retail) as product_id
+  from public.appointments a
+  where a.business_id = 'b0000000-0000-4000-8000-000000000001' and a.status = 'completed'
+    and pg_temp.rnd('buy' || a.id) % 100 < case when pg_temp.rnd('retail' || a.client_id) % 100 < 20 then 60 else 5 end
+  order by a.checked_out_at
+)
+select private.move_stock('c0000000-0000-4000-8000-000000000001', b.product_id, -1, 'sale', null, b.id)
+from buyers b;
+update public.stock_movements m set created_at = a.checked_out_at, created_by = 'd0000000-0000-4000-8000-000000000003'
+from public.appointments a
+where m.reason = 'sale' and m.appointment_id = a.id;
 
 alter table public.appointments enable trigger appointments_set_updated_at;
 

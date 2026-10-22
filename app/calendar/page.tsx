@@ -49,7 +49,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     supabase
       .from("appointment_items")
       .select(
-        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, price_cents, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, created_at, updated_at, created_by, updated_by, series_id, series_index, series:appointment_series(interval_weeks), group:appointment_groups(id, label), client:clients(id, first_name, last_name, phone, email, allergies, preferences))",
+        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, price_cents, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, created_at, updated_at, created_by, updated_by, series_id, series_index, series:appointment_series(interval_weeks), group:appointment_groups(id, label), client:clients(id, first_name, last_name, phone, email, allergies, preferences))",
       )
       .eq("location_id", me.location.id)
       .lt("starts_at", dayEnd.toISOString())
@@ -177,6 +177,9 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       resourceId: row.resource_id,
       resourceName: row.resource?.name ?? null,
       priceCents: row.price_cents,
+      bookedMinutes: row.active_minutes + row.processing_minutes + row.finishing_minutes,
+      processingMinutes: row.processing_minutes,
+      times: { startedAt: row.started_at, processingStartedAt: row.processing_started_at, processingEndedAt: row.processing_ended_at, finishedAt: row.finished_at },
     });
   }
 

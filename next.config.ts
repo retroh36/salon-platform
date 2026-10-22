@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // The browser tests run their own dev server with its own build folder
+  // (playwright.config.ts).
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   cacheComponents: true,
   experimental: {
     // Salon logos are uploaded through a server action (up to 2 MB).

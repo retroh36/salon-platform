@@ -6,8 +6,12 @@ try {
 } catch {
   // Rely on the environment instead (e.g. CI).
 }
+// Tests never call the real Claude API: Denise runs on template wording.
+delete process.env.ANTHROPIC_API_KEY;
 
-const PORT = 3000;
+// Its own server, apart from `npm run dev` on 3000 (which may have the API
+// key), with its own build folder.
+const PORT = 3100;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -29,11 +33,13 @@ export default defineConfig({
       dependencies: ["setup"],
     },
   ],
-  // Uses a running `npm run dev` if there is one, otherwise starts it.
+  // Reuses the test server if one is already running on its port.
   webServer: {
-    command: "npm run dev",
+    command: `next dev --port ${PORT}`,
     url: `http://localhost:${PORT}/login`,
     reuseExistingServer: true,
-    timeout: 120_000,
+    timeout: 180_000,
+    // Set but empty, so .env.local's key isn't loaded.
+    env: { ANTHROPIC_API_KEY: "", NEXT_DIST_DIR: ".next-e2e", NEXT_PUBLIC_SITE_URL: `http://localhost:${PORT}` },
   },
 });

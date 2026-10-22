@@ -106,7 +106,8 @@ test.describe("front desk", () => {
     // waiting, so her badge shows them.
     await expect(page.getByRole("complementary", { name: "Assistant and booking details" })).toBeHidden();
     const badge = page.getByTestId("denise-launcher-badge");
-    await expect(badge).toHaveText("3");
+    await expect(badge).toHaveText(/^\d+$/);
+    const waiting = Number(await badge.innerText());
     // Something new: a gentle bounce.
     await expect(badge).toHaveAttribute("data-bounce", "true");
     expect(await badge.evaluate((el) => getComputedStyle(el).animationName)).toBe("soft-bounce");
@@ -118,6 +119,8 @@ test.describe("front desk", () => {
     await expect(denisePanel(page).getByTestId("denise-says")).toHaveText("The calendar's clear. A few things about stock:");
     await expect(denisePanel(page).locator("[data-pose]")).toHaveAttribute("data-pose", "wave");
     await expect(denisePanel(page).getByTestId("denise-reorder").first()).toContainText("I've put together an order for");
+    // The badge counts exactly the orders she has waiting.
+    await expect(denisePanel(page).getByTestId("denise-reorder")).toHaveCount(waiting);
   });
 
   test("finds a fix for an overrun, applies it, and undoes it", async ({ page }) => {
@@ -135,8 +138,10 @@ test.describe("front desk", () => {
 
     // Denise's panel slides in with her fix, pointing.
     await expect(deniseTab(page)).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByTestId("denise-badge")).toHaveText(/4/); // the fix and 3 reorders
     const panel = denisePanel(page);
+    // The fix and the reorders waiting.
+    const reorders = await panel.getByTestId("denise-reorder").count();
+    await expect(page.getByTestId("denise-badge")).toHaveText(new RegExp(String(1 + reorders)));
     await expect(panel.locator("[data-pose]")).toHaveAttribute("data-pose", "point");
     await expect(panel.getByTestId("denise-message")).toHaveText(
       `Bridget's running 20 minutes late. I found a fix that only moves one client: ${PREFIX}Grace Lewis 11:00 → 11:20. Want me to apply it?`,
