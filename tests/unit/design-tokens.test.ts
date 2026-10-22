@@ -50,6 +50,10 @@ const PAIRS: [string, string][] = [
   ["white", "danger"],
   ["danger", "danger-soft"],
   ["white", "now"],
+  // Denise's messages and badge.
+  ...["ink", "ink-muted", "denise-700", "denise-900"].flatMap((t) => ["denise-50", "denise-100"].map((b): [string, string] => [t, b])),
+  ["denise-700", "surface"],
+  ["white", "denise-600"],
 ];
 
 describe("design tokens", () => {
@@ -75,7 +79,7 @@ describe("design tokens", () => {
   });
 
   it("gives family accents and the current-time line 3:1 against the page (non-text)", () => {
-    for (const accent of ["peach-accent", "lavender-accent", "sage-accent", "sky-accent", "now"]) {
+    for (const accent of ["peach-accent", "lavender-accent", "sage-accent", "sky-accent", "now", "denise-500"]) {
       expect(contrast(color(accent), color("surface"))).toBeGreaterThanOrEqual(3);
     }
   });

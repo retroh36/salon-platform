@@ -2,22 +2,25 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { startTransition, useOptimistic, useRef, useState, ViewTransition } from "react";
+import { startTransition, useCallback, useEffect, useOptimistic, useRef, useState, ViewTransition } from "react";
+import { DeniseFace } from "@/components/denise";
 import { Avatar, initials } from "@/components/ui/avatar";
-import { buttonClass, IconButton } from "@/components/ui/button";
+import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { FitText } from "@/components/ui/fit-text";
-import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, PlusIcon, SendIcon, SparkleIcon } from "@/components/ui/icons";
+import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, MoreIcon, PlusIcon, SendIcon } from "@/components/ui/icons";
 import { Listbox } from "@/components/ui/listbox";
 import { Segmented } from "@/components/ui/segmented";
 import { Tabs } from "@/components/ui/tabs";
 import { isEditable, STATUS_LABELS } from "@/lib/appointments";
+import type { ChatMessage, ConflictView, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
 import { FAMILIES, FAMILY_LABELS, hourMarks, laneBox, layoutColumn, type ServiceFamily } from "@/lib/calendar";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, toLocal } from "@/lib/scheduling/time";
 import { moveVisitItem } from "./actions";
-import { AiAssist } from "./ai-assist";
 import { AppointmentPanel } from "./appointment-panel";
+import { approveDeniseFix, askDenise, rejectDeniseFix, reportOut, scanDenise, undoDeniseFix } from "./denise-actions";
+import { DenisePanel, type Outcome, type Preview } from "./denise-panel";
 import { BookingPanel, type BookingStart } from "./booking-panel";
 import { NowLine, useNow } from "./now-line";
 import type { BlockData, BoardData, ColumnData } from "./types";
@@ -35,9 +38,12 @@ type Selection =
   | { kind: "edit"; appointmentId: string }
   | { kind: "detail"; appointmentId: string };
 
-type Tab = "ai" | "details";
+type Tab = "denise" | "details";
 
 type Move = { itemId: string; staffId: string; start: number };
+
+// A block in a column, or a preview of where Denise's fix would put one.
+type Placed = BlockData & { ghost?: boolean; move?: FixMove };
 
 type Drag = Move & {
   pointerId: number;
@@ -63,16 +69,28 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const [shownDate, setShownDate] = useState(data.date);
   const [selection, setSelection] = useState<Selection>({ kind: "none" });
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  // Denise: her view of the day (for the board's data she last looked at),
+  // and what she's doing.
+  const [denise, setDenise] = useState<{ state: DeniseState; for: BoardData } | null>(null);
+  const [deciding, setDeciding] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const [chat, setChat] = useState<ChatMessage[]>([]);
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [toast, setToast] = useState<ConflictView | null>(null);
+  // Conflicts with nothing to approve, dismissed for now.
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
   if (shownDate !== data.date) {
     setShownDate(data.date);
     setSelection({ kind: "none" });
     setExpanded(new Set());
+    setOutcome(null);
+    setPreview(null);
   }
-  const [tab, setTab] = useState<Tab>("ai");
+  const [tab, setTab] = useState<Tab>("denise");
   // Below 1600px the panel slides over the calendar when opened.
   const [panelOpen, setPanelOpen] = useState(false);
 
-  const [questions, setQuestions] = useState<string[]>([]);
   const [department, setDepartment] = useState<"all" | ServiceFamily>("all");
   const [notice, setNotice] = useState<string | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -94,11 +112,82 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     setTab("details");
     setPanelOpen(true);
   };
-  const ask = (question: string) => {
-    setQuestions((q) => [...q, question]);
-    setTab("ai");
+
+  // Shows Denise's latest view. A conflict she hasn't shown before pops up
+  // a notice and opens her panel at it.
+  const seen = useRef(new Set<string>());
+  const showDenise = useCallback((state: DeniseState, forData: BoardData) => {
+    setDenise({ state, for: forData });
+    const fresh = state.conflicts.filter((c) => !seen.current.has(c.subject));
+    for (const c of state.conflicts) seen.current.add(c.subject);
+    if (fresh.length) {
+      setToast(fresh[0]);
+      setTab("denise");
+      setPanelOpen(true);
+    }
+  }, []);
+
+  // Denise looks again whenever the calendar changes.
+  const scans = useRef(0);
+  useEffect(() => {
+    const id = ++scans.current;
+    scanDenise(data.date).then((state) => {
+      if (state && id === scans.current) showDenise(state, data);
+    });
+  }, [data, showDenise]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 8000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  const deniseState = denise && denise.state.date === data.date ? denise.state : null;
+  const conflicts = (deniseState?.conflicts ?? []).filter((c) => !dismissed.has(c.subject));
+  const scanning = denise?.for !== data;
+
+  async function decide(run: () => Promise<FixResult>, undoActionId: string | null) {
+    setDeciding(true);
+    setOutcome(null);
+    setPreview(null);
+    const result = await run();
+    setDeciding(false);
+    if (result.state) showDenise(result.state, data);
+    setOutcome({ message: result.message, error: !result.ok, undoActionId: result.ok ? undoActionId : null });
+  }
+  const approve = (o: FixView) => decide(() => approveDeniseFix(o.actionId!, data.date), o.actionId);
+  const reject = (o: FixView) => decide(() => rejectDeniseFix(o.actionId!, data.date), null);
+  const undo = (actionId: string) => decide(() => undoDeniseFix(actionId, data.date), null);
+
+  async function ask(question: string) {
+    const history: ChatMessage[] = [...chat, { role: "user", text: question }];
+    setChat(history);
+    setTab("denise");
     setPanelOpen(true);
+    setAsking(true);
+    const reply = await askDenise(history, data.date);
+    setAsking(false);
+    setChat([...history, reply]);
+  }
+  const onReported = (state: DeniseState) => {
+    seen.current.clear();
+    showDenise(state, data);
   };
+
+  // The fix shown on the calendar: the one hovered in Denise's panel, or her
+  // first suggestion. Blocks it's about glow; where they'd go shows dashed.
+  const previewConflict = (preview && conflicts.find((c) => c.subject === preview.subject)) || conflicts[0] || null;
+  const previewOption = previewConflict?.options[preview && previewConflict.subject === preview.subject ? preview.index : 0] ?? null;
+  const highlighted = new Set(previewConflict?.itemIds ?? []);
+  // Copies of the moved blocks at their new places, laid out with the
+  // column's blocks so nothing overlaps.
+  const fixGhosts = (staffId: string): Placed[] =>
+    (previewOption?.moves ?? []).flatMap((m) => {
+      const b = blocks.find((x) => x.itemId === m.itemId);
+      if (!b || m.to.staffId !== staffId) return [];
+      const shift = m.to.minute - b.start;
+      return [{ ...b, itemId: `ghost:${b.itemId}`, staffId, start: b.start + shift, end: b.end + shift, segments: [], ghost: true, move: m }];
+    });
 
   // Stylists who do any service in the chosen department.
   const offersFamily = (c: ColumnData, f: ServiceFamily) =>
@@ -223,7 +312,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           )}
         </div>
 
-        <AskAiBar onAsk={ask} />
+        <AskDeniseBar onAsk={ask} />
 
         <div className="flex flex-wrap items-center gap-2">
           <nav aria-label="Date" className="flex flex-wrap items-center gap-2">
@@ -269,9 +358,17 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                 { value: "week", label: "Week", disabled: true, title: "Week view is coming soon" },
               ]}
             />
-            <button type="button" className={buttonClass("secondary", "md", "min-[100rem]:hidden")} onClick={() => setPanelOpen(true)}>
-              <SparkleIcon className="size-4 text-plum-700" />
-              AI Assist
+            <button
+              type="button"
+              className={buttonClass("secondary", "md", "min-[100rem]:hidden")}
+              onClick={() => {
+                setTab("denise");
+                setPanelOpen(true);
+              }}
+            >
+              <DeniseFace size={22} />
+              Denise
+              <DeniseBadge count={conflicts.length} />
             </button>
           </div>
         </div>
@@ -309,10 +406,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         <ChevronRightIcon className="size-3.5" />
                       </button>
                     ) : (
-                      <div key={c.staffId} className="flex min-w-0 animate-fade-in items-center gap-2.5 border-l border-line px-3 py-3">
+                      <div key={c.staffId} className="relative flex min-w-0 animate-fade-in items-center gap-2.5 border-l border-line px-3 py-3">
                         <Avatar name={c.name} color={c.color} />
                         <div className="min-w-0 flex-1">
-                          <FitText variants={[c.name, `${c.firstName} ${c.name.split(" ").at(-1)![0]}.`, c.firstName]} className="font-semibold" />
+                          <FitText variants={[c.name, `${c.firstName} ${c.name.split(" ").at(-1)![0]}.`, c.firstName]} className="pr-6 font-semibold" />
                           <div className="truncate text-sm text-ink-muted">{c.title}</div>
                           <div className="text-xs leading-4 text-ink-muted">{c.hoursLabel}</div>
                         </div>
@@ -320,6 +417,11 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                           <IconButton label={`Hide ${c.name}`} size="sm" onClick={() => toggle(c.staffId, false)}>
                             <ChevronLeftIcon className="size-4" />
                           </IconButton>
+                        )}
+                        {c.working && data.date >= data.today && (me.canBook || me.staffId === c.staffId) && (
+                          <div className="absolute top-1.5 right-1">
+                            <OutMenu column={c} date={data.date} today={data.today} onReported={onReported} />
+                          </div>
                         )}
                       </div>
                     ),
@@ -397,8 +499,12 @@ export function CalendarBoard({ data }: { data: BoardData }) {
 
                         {drag?.moved && drag.staffId === c.staffId && <DragGhost block={blocks.find((b) => b.itemId === drag.itemId)!} start={drag.start} y={y} />}
 
+
                         <ul aria-label={`${c.name}'s appointments`}>
-                          {layoutColumn(blocks.filter((b) => b.staffId === c.staffId)).map((b) => (
+                          {layoutColumn<Placed>([...blocks.filter((b) => b.staffId === c.staffId), ...fixGhosts(c.staffId)]).map((b) =>
+                            b.ghost ? (
+                              <FixGhost key={b.itemId} block={b} y={y} />
+                            ) : (
                             <AppointmentBlock
                               key={b.itemId}
                               block={b}
@@ -407,6 +513,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                               draggable={canMove(b)}
                               dragging={drag?.moved === true && drag.itemId === b.itemId}
                               selected={b.appointmentId === selectedAppointment}
+                              highlight={highlighted.has(b.itemId)}
                               settling={settling === b.itemId}
                               onSettled={() => setSettling(null)}
                               onPointerDown={(e) => onPointerDown(e, b)}
@@ -421,7 +528,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                                 else select({ kind: "detail", appointmentId: b.appointmentId });
                               }}
                             />
-                          ))}
+                            ),
+                          )}
                         </ul>
                       </section>
                     ),
@@ -465,19 +573,36 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           onChange={setTab}
           panelKey={`${tab}-${selection.kind}-${"appointmentId" in selection ? selection.appointmentId : ""}`}
           tabs={[
-            { value: "ai", label: "AI Assist", icon: <SparkleIcon className="size-4" /> },
+            { value: "denise", label: "Denise", icon: <DeniseFace size={20} />, badge: <DeniseBadge count={conflicts.length} /> },
             { value: "details", label: "Booking details", icon: <CalendarIcon className="size-4" /> },
           ]}
         >
-          {tab === "ai" ? (
-            <AiAssist data={data} questions={questions} onAsk={ask} onOpen={(appointmentId) => select({ kind: "detail", appointmentId })} />
+          {tab === "denise" ? (
+            <DenisePanel
+              data={data}
+              state={deniseState && { ...deniseState, conflicts }}
+              working={deciding || asking || (scanning && !deniseState)}
+              outcome={outcome}
+              chat={chat}
+              preview={preview}
+              onApprove={approve}
+              onReject={reject}
+              onUndo={undo}
+              onDismiss={(subject) => setDismissed((all) => new Set(all).add(subject))}
+              onPreview={setPreview}
+              onAsk={ask}
+              onOpen={(appointmentId) => select({ kind: "detail", appointmentId })}
+            />
           ) : selection.kind === "detail" && data.appointments[selection.appointmentId] ? (
             <AppointmentPanel
               date={data.date}
+              today={data.today}
+              timeZone={data.timeZone}
               appointment={data.appointments[selection.appointmentId]}
               me={me}
               onEdit={() => select({ kind: "edit", appointmentId: selection.appointmentId })}
               onClose={closeDetails}
+              onReported={onReported}
             />
           ) : selection.kind === "book" ? (
             <BookingPanel data={data} start={selection.start} onClose={closeDetails} onSaved={(id) => select({ kind: "detail", appointmentId: id })} />
@@ -496,16 +621,30 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           )}
         </Tabs>
       </aside>
+
+      {toast && (
+        <DeniseToast
+          conflict={toast}
+          // Below 1600px the open panel already shows it; don't cover it.
+          hidden={panelOpen}
+          onShow={() => {
+            setToast(null);
+            setTab("denise");
+            setPanelOpen(true);
+          }}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }
 
-function AskAiBar({ onAsk }: { onAsk: (question: string) => void }) {
+function AskDeniseBar({ onAsk }: { onAsk: (question: string) => void }) {
   const [question, setQuestion] = useState("");
   return (
     <form
-      aria-label="Ask AI"
-      className="flex items-center gap-3 rounded-xl border border-plum-200 bg-surface p-2 pl-3 shadow-card transition-[border-color,box-shadow] duration-(--motion-fast) focus-within:border-plum-700 focus-within:ring-2 focus-within:ring-plum-200"
+      aria-label="Ask Denise"
+      className="flex items-center gap-3 rounded-xl border border-denise-200 bg-surface p-2 pl-2.5 shadow-card transition-[border-color,box-shadow] duration-(--motion-fast) focus-within:border-denise-500 focus-within:ring-2 focus-within:ring-denise-200"
       onSubmit={(e) => {
         e.preventDefault();
         if (!question.trim()) return;
@@ -513,11 +652,9 @@ function AskAiBar({ onAsk }: { onAsk: (question: string) => void }) {
         setQuestion("");
       }}
     >
-      <span aria-hidden className="flex size-9 items-center justify-center rounded-lg bg-plum-100 text-plum-700">
-        <SparkleIcon className="size-5" />
-      </span>
+      <DeniseFace size={36} />
       <label className="flex min-w-0 flex-1 flex-col">
-        <span className="text-xs font-semibold text-plum-700">Ask AI</span>
+        <span className="text-xs font-semibold text-denise-700">Ask Denise</span>
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
@@ -529,6 +666,128 @@ function AskAiBar({ onAsk }: { onAsk: (question: string) => void }) {
         <SendIcon className="size-5" />
       </IconButton>
     </form>
+  );
+}
+
+// How many things Denise wants looked at, on her tab and button.
+function DeniseBadge({ count }: { count: number }) {
+  if (!count) return null;
+  return (
+    <span data-testid="denise-badge" className="inline-flex h-5 min-w-5 animate-pop-in items-center justify-center rounded-full bg-denise-600 px-1.5 text-xs font-semibold text-white">
+      <span className="sr-only">, </span>
+      {count}
+      <span className="sr-only"> to look at</span>
+    </span>
+  );
+}
+
+// A small notice when Denise spots a new conflict.
+function DeniseToast({ conflict, hidden, onShow, onClose }: { conflict: ConflictView; hidden: boolean; onShow: () => void; onClose: () => void }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      data-testid="denise-toast"
+      className={`fixed right-4 bottom-4 z-[60] flex w-80 min-[100rem]:right-[25rem] ${hidden ? "max-[100rem]:hidden" : ""} max-w-[calc(100vw-2rem)] animate-toast-in items-start gap-3 rounded-xl border border-denise-200 bg-surface p-3 shadow-lift`}
+    >
+      <DeniseFace size={36} />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-semibold text-denise-700">Denise</p>
+        <p className="text-sm text-ink">{conflict.headline}</p>
+        <button type="button" className={buttonClass("secondary", "sm", "mt-2")} onClick={onShow}>
+          {conflict.options.length ? "See my fix" : "Take a look"}
+        </button>
+      </div>
+      <IconButton label="Dismiss notification" size="sm" onClick={onClose}>
+        <CloseIcon className="size-4" />
+      </IconButton>
+    </div>
+  );
+}
+
+// "Out for the day" on a stylist's column.
+function OutMenu({ column, date, today, onReported }: { column: ColumnData; date: string; today: string; onReported: (state: DeniseState) => void }) {
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const restOfDay = date === today;
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
+
+  async function markOut() {
+    setPending(true);
+    setError(null);
+    const result = await reportOut(column.staffId, date);
+    setPending(false);
+    if (!result.ok) return setError(result.message);
+    setOpen(false);
+    onReported(result.state);
+  }
+
+  return (
+    <div ref={root} className="relative" onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
+      <IconButton label={`More for ${column.name}`} size="sm" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <MoreIcon className="size-4" />
+      </IconButton>
+      {open && (
+        <div role="dialog" aria-label={`${column.firstName}'s day`} className="absolute top-full right-0 z-50 mt-1 flex w-64 origin-top-right animate-pop-in flex-col gap-3 rounded-xl border border-line bg-surface p-3 text-sm shadow-lift">
+          <p className="text-ink">
+            Mark {column.firstName} out {restOfDay ? "for the rest of the day" : "for the day"}? Denise will find new places for {column.firstName}&apos;s clients.
+          </p>
+          {error && (
+            <p role="alert" className="text-danger">
+              {error}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <Button variant="primary" size="sm" disabled={pending} onClick={markOut}>
+              {restOfDay ? "Out for the rest of the day" : "Out for the day"}
+            </Button>
+            <Button size="sm" disabled={pending} onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Where Denise's fix would put a block: a dashed periwinkle outline in its
+// own lane.
+function FixGhost({ block, y }: { block: Placed & { lane: number; lanes: number }; y: (minute: number) => number }) {
+  const box = laneBox(block.lane, block.lanes);
+  const [first, ...rest] = block.clientName.split(" ");
+  const length = block.end - block.start;
+  return (
+    <li aria-hidden className="contents">
+      <div
+        data-fix-ghost
+        className="pointer-events-none absolute z-30 animate-fade-in overflow-hidden rounded-md border-2 border-dashed border-denise-500 bg-denise-50 px-1.5 py-0.5"
+        style={{
+          top: y(block.start),
+          height: length * PX_PER_MINUTE,
+          left: `calc(${box.left}% + ${block.lane > 0 ? 1 : 3}px)`,
+          width: `calc(${box.width}% - ${block.lanes > 1 ? 4 : 6}px)`,
+        }}
+      >
+        {length * PX_PER_MINUTE >= 40 && (
+          <FitText variants={[block.clientName, ...(rest.length ? [first] : [])]} className="text-sm leading-[18px] font-semibold text-denise-900" />
+        )}
+        <FitText
+          variants={[`→ ${formatMinute(block.start)}–${formatMinute(block.end)}`, `→ ${formatMinute(block.start)}`]}
+          className="text-[13px] leading-[17px] text-denise-700"
+        />
+      </div>
+    </li>
   );
 }
 
@@ -614,6 +873,7 @@ function AppointmentBlock({
   draggable,
   dragging,
   selected,
+  highlight,
   settling,
   onSettled,
   onOpen,
@@ -625,6 +885,8 @@ function AppointmentBlock({
   draggable: boolean;
   dragging: boolean;
   selected: boolean;
+  // Denise is talking about it.
+  highlight: boolean;
   settling: boolean;
   onSettled: () => void;
   onOpen: () => void;
@@ -694,6 +956,7 @@ function AppointmentBlock({
         data-block
         data-family={block.family}
         data-faded={faded || undefined}
+        data-denise-highlight={highlight || undefined}
         onClick={onOpen}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -705,7 +968,7 @@ function AppointmentBlock({
         {...pointer}
         className={`absolute block touch-none overflow-hidden rounded-md border-l-4 bg-surface text-left select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-plum-700 ${
           faded ? "text-ink-muted" : "text-ink shadow-card"
-        } ${selected ? "ring-2 ring-plum-900" : "ring-1 ring-surface"} ${draggable ? "cursor-grab" : "cursor-pointer"} ${
+        } ${selected ? "ring-2 ring-plum-900" : highlight ? "animate-glow ring-2 ring-denise-500" : "ring-1 ring-surface"} ${draggable ? "cursor-grab" : "cursor-pointer"} ${
           dragging ? "opacity-40 shadow-none outline-2 outline-ink-subtle outline-dashed" : ""
         } ${settling ? "animate-settle" : ""}`}
         style={{

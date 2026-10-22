@@ -26,6 +26,16 @@
   --color-plum-200: #e4d3e7;
   --color-plum-100: #f1e7f2;
 
+  /* Denise (the AI assistant): periwinkle, only for her messages,
+     suggestions and badge */
+  --color-denise-50: #f4f5ff;
+  --color-denise-100: #e8eafd;
+  --color-denise-200: #cfd4fa;
+  --color-denise-500: #6c78e0;
+  --color-denise-600: #4e59c9;
+  --color-denise-700: #3f49b0;
+  --color-denise-900: #272d75;
+
   /* Service families: a soft fill behind text and a stronger accent edge */
   --color-peach-fill: #fbdfcf;
   --color-peach-accent: #e2733d;
@@ -78,6 +88,8 @@
   --animate-fade-in: fade-in 150ms var(--ease-out) both;
   --animate-settle: settle 250ms var(--ease-settle) both;
   --animate-pop-in: pop-in 150ms var(--ease-out) both;
+  --animate-toast-in: toast-in 250ms var(--ease-out) both;
+  --animate-glow: glow 1.6s ease-in-out infinite;
 
   @keyframes panel-in {
     from {
@@ -95,6 +107,18 @@
     from {
       opacity: 0;
       transform: scale(0.96) translateY(-4px);
+    }
+  }
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+  }
+  /* A soft periwinkle pulse on blocks Denise is talking about. */
+  @keyframes glow {
+    50% {
+      box-shadow: 0 0 0 4px rgb(108 120 224 / 0.28);
     }
   }
   @keyframes settle {

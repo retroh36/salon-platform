@@ -5,27 +5,38 @@ import { useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { Eyebrow, fieldClass, labelClass, selectClass } from "@/components/ui/field";
-import { CalendarIcon, ClockIcon, CloseIcon } from "@/components/ui/icons";
+import { CalendarIcon, ClockIcon, CloseIcon, HourglassIcon } from "@/components/ui/icons";
 import { StatusChip } from "@/components/ui/status-chip";
 import { ACTION_LABELS, allowedActions, CANCEL_REASONS, canEditNotes, isEditable, MAX_NOTES, type AppointmentAction } from "@/lib/appointments";
+import type { DeniseState } from "@/lib/denise/types";
 import { formatLongDay } from "@/lib/schedule-format";
-import { formatMinute, type LocalDate } from "@/lib/scheduling/time";
+import { LATE_MINUTES } from "@/lib/scheduling/disruptions";
+import { formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { formatMinutes, formatPrice } from "@/lib/services";
 import { changeVisitStatus, saveVisitNotes } from "./actions";
+import { reportLate } from "./denise-actions";
+import { useNow } from "./now-line";
 import type { AppointmentDetail, BoardData } from "./types";
 
 export function AppointmentPanel({
   date,
+  today,
+  timeZone,
   appointment,
   me,
   onEdit,
   onClose,
+  onReported,
 }: {
   date: LocalDate;
+  today: LocalDate;
+  timeZone: string;
   appointment: AppointmentDetail;
   me: BoardData["me"];
   onEdit: () => void;
   onClose: () => void;
+  // Denise's view after a delay is reported.
+  onReported: (state: DeniseState) => void;
 }) {
   const { client, items, status } = appointment;
   const [pending, startTransition] = useTransition();
@@ -38,6 +49,9 @@ export function AppointmentPanel({
   const notesEditable = canEditNotes(me.role, me.staffId, items.map((i) => i.staffId));
   const actions = me.canBook ? allowedActions(status) : [];
   const primaryAction = actions.find((a) => a === "check_in" || a === "check_out");
+  // The front of house, or a stylist on the visit, can say it's running late.
+  const canReportLate = date >= today && isEditable(status) && (me.canBook || items.some((i) => i.staffId === me.staffId));
+  const [reportingLate, setReportingLate] = useState(false);
 
   function run(action: AppointmentAction, reason = "", detail = "") {
     setMessage(null);
@@ -124,13 +138,31 @@ export function AppointmentPanel({
 
       <NotesForm key={appointment.notes} appointmentId={appointment.id} initial={appointment.notes} editable={notesEditable} />
 
-      {(actions.length > 0 || (me.canBook && isEditable(status))) && (
+      {(actions.length > 0 || (me.canBook && isEditable(status)) || canReportLate) && (
         <section aria-label="Actions" className="flex flex-col gap-2">
           {primaryAction && (
             <Button variant="primary" size="lg" disabled={pending} onClick={() => run(primaryAction)}>
               {ACTION_LABELS[primaryAction]}
             </Button>
           )}
+          {canReportLate &&
+            (reportingLate ? (
+              <RunningLateForm
+                appointment={appointment}
+                date={date}
+                timeZone={timeZone}
+                onReported={(state) => {
+                  setReportingLate(false);
+                  onReported(state);
+                }}
+                onCancel={() => setReportingLate(false)}
+              />
+            ) : (
+              <Button size="lg" disabled={pending} onClick={() => setReportingLate(true)}>
+                <HourglassIcon className="size-4 text-ink-muted" />
+                Running late
+              </Button>
+            ))}
           {me.canBook && isEditable(status) && (
             <Button size="lg" disabled={pending} onClick={onEdit}>
               Edit booking
@@ -257,6 +289,91 @@ function CancelForm({ pending, onCancel, onKeep }: { pending: boolean; onCancel:
         </button>
         <Button onClick={onKeep} disabled={pending}>
           Keep it
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// "Running late": for a client who's checked in, the visit is running over
+// (and the stylist is behind); otherwise, the client is late. Denise then
+// works out what that means for the rest of the day.
+function RunningLateForm({
+  appointment,
+  date,
+  timeZone,
+  onReported,
+  onCancel,
+}: {
+  appointment: AppointmentDetail;
+  date: LocalDate;
+  timeZone: string;
+  onReported: (state: DeniseState) => void;
+  onCancel: () => void;
+}) {
+  const now = useNow();
+  const checkedIn = appointment.status === "checked_in";
+  const items = [...appointment.items].sort((a, b) => a.start - b.start);
+  // Running over: the service under way (or the last one started).
+  const nowMinute = now !== null && toLocal(new Date(now), timeZone).date === date ? toLocal(new Date(now), timeZone).minute : null;
+  const current = nowMinute === null ? items[0] : (items.filter((i) => i.start <= nowMinute).at(-1) ?? items[0]);
+  const [itemId, setItemId] = useState(current.id);
+  const [minutes, setMinutes] = useState<number | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const firstName = appointment.client?.name.split(" ")[0] ?? "the client";
+
+  return (
+    <form
+      aria-label="Running late"
+      className="flex animate-fade-in flex-col gap-3 rounded-lg border border-line-strong bg-sunken/60 p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!minutes) return;
+        setError(null);
+        startTransition(async () => {
+          const result = await reportLate(checkedIn ? itemId : items[0].id, minutes, date);
+          if (result.ok) onReported(result.state);
+          else setError(result.message);
+        });
+      }}
+    >
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-2 font-semibold text-ink">{checkedIn ? "How far over is this running?" : `How late is ${firstName}?`}</legend>
+        <div className="flex flex-wrap gap-1.5">
+          {LATE_MINUTES.map((m) => (
+            <label key={m} className="cursor-pointer">
+              <input type="radio" name="late-minutes" value={m} checked={minutes === m} onChange={() => setMinutes(m)} className="peer sr-only" />
+              <span className="inline-flex h-8 items-center rounded-full border border-line-strong bg-surface px-3 text-sm transition-colors duration-(--motion-fast) peer-checked:border-plum-900 peer-checked:bg-plum-900 peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-plum-700 hover:bg-sunken peer-checked:hover:bg-plum-800">
+                {m} min
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      {checkedIn && items.length > 1 && (
+        <label className={labelClass}>
+          Which service is running over?
+          <select value={itemId} onChange={(e) => setItemId(e.target.value)} className={selectClass}>
+            {items.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.serviceName} with {i.staffName.split(" ")[0]}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {error && (
+        <p role="alert" className="text-danger">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <Button type="submit" variant="primary" disabled={!minutes || pending}>
+          {pending ? "Telling Denise…" : "Tell Denise"}
+        </Button>
+        <Button onClick={onCancel} disabled={pending}>
+          Cancel
         </Button>
       </div>
     </form>

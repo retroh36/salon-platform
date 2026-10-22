@@ -323,20 +323,6 @@ test.describe("design", () => {
     await expect(view.getByRole("radio", { name: "Week" })).toBeDisabled();
   });
 
-  test("answers Ask AI with a placeholder, without changing anything", async ({ page }) => {
-    await openDay(page, QUIET_TUESDAY);
-    await waitForHydration(page, "form[aria-label='Ask AI'] input");
-    const ask = ui(page).getByRole("form", { name: "Ask AI" });
-    await ask.getByRole("textbox").fill("Find a haircut with Priya after 1 PM");
-    await ask.getByRole("button", { name: "Ask" }).click();
-
-    const assistant = page.getByRole("tabpanel", { name: "AI Assist" });
-    await expect(page.getByRole("tab", { name: "AI Assist" })).toHaveAttribute("aria-selected", "true");
-    await expect(assistant).toContainText("Find a haircut with Priya after 1 PM");
-    await expect(assistant).toContainText("Once AI Assist is connected");
-    await expect(assistant).toContainText("isn't connected yet");
-  });
-
   test("animates quickly, and not at all with reduce motion", async ({ page }) => {
     await openDay(page, QUIET_TUESDAY);
     const block = column(page, "Priya Shah").getByRole("button", { name: /Ava Test/ });
@@ -356,7 +342,7 @@ test.describe("design", () => {
     await expect(aside).toBeHidden();
 
     await waitForHydration(page, "[data-block]");
-    await ui(page).getByRole("button", { name: "AI Assist" }).click();
+    await ui(page).getByRole("button", { name: /^Denise/ }).click();
     await expect(aside).toBeVisible();
     await aside.getByRole("button", { name: "Close panel" }).click();
     await expect(aside).toBeHidden();

@@ -53,3 +53,19 @@ export type DeniseState = {
 
 // After approving, rejecting or undoing.
 export type FixResult = { ok: true; message: string; state: DeniseState } | { ok: false; message: string; state?: DeniseState };
+
+// A booking Denise suggests from "Ask Denise", for staff to approve.
+export type BookingSuggestion = {
+  // The proposal in the AI action log; null when the viewer can't approve.
+  actionId: string | null;
+  date: string;
+  staffId: string;
+  staffName: string;
+  serviceName: string;
+  startMinute: number;
+  endMinute: number;
+  // The name staff mentioned, to start the client search with.
+  clientHint: string | null;
+};
+
+export type ChatMessage = { role: "user" | "denise"; text: string; suggestions?: BookingSuggestion[] };

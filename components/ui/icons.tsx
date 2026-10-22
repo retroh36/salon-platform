@@ -100,3 +100,21 @@ export const LogOutIcon = (p: IconProps) => (
     <path d="M14.5 4.5h3a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h9" />
   </Icon>
 );
+export const UndoIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M9 14 4.5 9.5 9 5" />
+    <path d="M4.5 9.5h9.75a5.25 5.25 0 0 1 0 10.5H11" />
+  </Icon>
+);
+export const MoreIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="6" cy="12" r="1" />
+    <circle cx="12" cy="12" r="1" />
+    <circle cx="18" cy="12" r="1" />
+  </Icon>
+);
+export const HourglassIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M7 3.5h10M7 20.5h10M8 3.5c0 4.5 8 4.5 8 8.5s-8 4-8 8.5M16 3.5c0 4.5-8 4.5-8 8.5s8 4 8 8.5" />
+  </Icon>
+);

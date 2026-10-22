@@ -13,7 +13,7 @@ export function Tabs<T extends string>({
   children,
 }: {
   label: string;
-  tabs: { value: T; label: string; icon?: React.ReactNode }[];
+  tabs: { value: T; label: string; icon?: React.ReactNode; badge?: React.ReactNode }[];
   value: T;
   onChange: (value: T) => void;
   panelKey?: string;
@@ -52,6 +52,7 @@ export function Tabs<T extends string>({
             >
               {t.icon}
               {t.label}
+              {t.badge}
             </button>
           );
         })}
