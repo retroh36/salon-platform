@@ -10,7 +10,11 @@ import { isUuid } from "@/lib/ids";
 import { loadBackBarProducts } from "@/lib/inventory-load";
 import { changeStatus, moveItem, saveBooking, saveNotes, type BookingItemInput, type SaveResult } from "@/lib/scheduling/book";
 import { describeProblem } from "@/lib/scheduling/booking";
-import { fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn, type LocalDate } from "@/lib/scheduling/time";
+import { loadBookingContext } from "@/lib/scheduling/load";
+import { MAX_VISITS, planSeries, seriesDates, type Scope, type SeriesEnd } from "@/lib/scheduling/series";
+import { bookSeries, changeSeries, changeSeriesStatus, moveSeriesItem, type VisitResult } from "@/lib/scheduling/series-book";
+import { formatDay } from "@/lib/schedule-format";
+import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn, type LocalDate } from "@/lib/scheduling/time";
 import { fullName } from "@/lib/staff";
 
 export type ClientOption = { id: string; name: string; phone: string | null; allergies: string | null };
@@ -231,4 +235,149 @@ export async function addVisitFormula(input: { itemId: string; date: LocalDate; 
   revalidatePath("/inventory", "layout");
   revalidatePath(`/clients/${item.appointment.client_id}`);
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Recurring appointments
+// ---------------------------------------------------------------------------
+
+export type RepeatInput = { intervalWeeks: number; end: SeriesEnd };
+
+export type SeriesPreviewVisit = {
+  date: LocalDate;
+  label: string;
+  ok: boolean;
+  problems: string[];
+  // Denise's suggestions for a visit that doesn't fit.
+  alternatives: { label: string; date: LocalDate; lines: VisitLineInput[] }[];
+};
+
+function readRepeat(repeat: RepeatInput, first: LocalDate): string | null {
+  if (!Number.isInteger(repeat.intervalWeeks) || repeat.intervalWeeks < 1 || repeat.intervalWeeks > 52) return "Repeat every 1 to 52 weeks.";
+  if (repeat.end.kind === "count" && (!Number.isInteger(repeat.end.count) || repeat.end.count < 2 || repeat.end.count > MAX_VISITS)) return `A series has 2 to ${MAX_VISITS} visits.`;
+  if (repeat.end.kind === "until" && (!isLocalDate(repeat.end.until) || repeat.end.until <= first)) return "End after the first visit.";
+  return null;
+}
+
+const toLines = (lines: VisitLineInput[]) => lines.map(({ serviceId, staffId, startMinute, resource }) => ({ serviceId, staffId, startMinute, resource }));
+
+// Every visit of a series, checked against the booking rules, with
+// suggestions for the ones that don't fit. Nothing is saved.
+export async function previewSeries(input: VisitInput, repeat: RepeatInput): Promise<{ ok: true; visits: SeriesPreviewVisit[] } | { ok: false; message: string }> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isLocalDate(input.date) || !input.lines.length) return { ok: false, message: "Add at least one service." };
+  const bad = readRepeat(repeat, input.date);
+  if (bad) return { ok: false, message: bad };
+
+  const dates = seriesDates(input.date, repeat.intervalWeeks, repeat.end);
+  const ctx = await loadBookingContext(supabase, me.location, addDays(dates[0], -3), addDays(dates.at(-1)!, 3));
+  const lines = toLines(input.lines);
+  const { data: staff } = await supabase.from("staff").select("id, first_name");
+  const staffName = new Map((staff ?? []).map((s) => [s.id, s.first_name]));
+  const firstStart = Math.min(...lines.map((l) => l.startMinute));
+
+  const visits = planSeries(ctx, lines, dates).map((v): SeriesPreviewVisit => ({
+    date: v.date,
+    label: formatDay(v.date),
+    ok: v.check.ok,
+    problems: [...new Set(v.check.problems.flat().map(describeProblem))],
+    alternatives: v.alternatives.map((a) => {
+      const start = formatMinute(Math.min(...a.lines.map((l) => l.startMinute)));
+      const label =
+        a.kind === "time"
+          ? `Same day at ${start} (${a.shift > 0 ? `${a.shift} min later` : `${-a.shift} min earlier`})`
+          : a.kind === "stylist"
+            ? `With ${[...new Set(a.lines.filter((l, i) => l.staffId !== lines[i].staffId).map((l) => staffName.get(l.staffId)))].join(" and ")} at ${formatMinute(firstStart)}`
+            : `${formatDay(a.date)} at ${formatMinute(firstStart)}`;
+      return { label, date: a.date, lines: a.lines.map((l) => ({ ...l })) };
+    }),
+  }));
+  return { ok: true, visits };
+}
+
+export type SeriesSaveResult = { ok: true; appointmentId: string; message: string } | { ok: false; message: string };
+
+// Books the series: each visit as staff chose (as planned, an alternative,
+// or skipped), each checked again as it's saved.
+export async function saveSeries(input: VisitInput, repeat: RepeatInput, visits: { date: LocalDate; lines: VisitLineInput[] }[]): Promise<SeriesSaveResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!input.clientId || !isUuid(input.clientId)) return { ok: false, message: "Choose a client, or add a new one." };
+  const bad = readRepeat(repeat, input.date);
+  if (bad) return { ok: false, message: bad };
+  if (!visits.length || visits.length > MAX_VISITS || visits.some((v) => !isLocalDate(v.date) || !v.lines.length)) return { ok: false, message: "Choose at least one visit." };
+  if (visits.some((v) => v.lines.some((l) => !isUuid(l.serviceId) || !isUuid(l.staffId) || !Number.isInteger(l.startMinute)))) return { ok: false, message: "Fill in each service." };
+
+  const { results } = await bookSeries(supabase, { ...me.location, businessId: me.business_id }, {
+    clientId: input.clientId,
+    notes: input.notes.trim() || null,
+    intervalWeeks: repeat.intervalWeeks,
+    end: repeat.end,
+    visits: visits.map((v) => ({ date: v.date, lines: toLines(v.lines) })),
+  });
+  const saved = results.filter((r) => r.ok);
+  const failed = results.filter((r) => !r.ok);
+  if (!saved.length) return { ok: false, message: failed[0] && "error" in failed[0] && failed[0].error === "forbidden" ? NOT_ALLOWED : "None of the visits could be booked. Check the times and try again." };
+  refresh();
+  const first = saved.find((r) => r.ok && r.date === input.date) ?? saved[0];
+  return {
+    ok: true,
+    appointmentId: (first as { appointmentId: string }).appointmentId,
+    message: `Booked ${saved.length} visit${saved.length === 1 ? "" : "s"}.${failed.length ? ` ${failed.length} couldn't be booked (${failed.map((f) => formatDay(f.date)).join(", ")}): the calendar changed.` : ""}`,
+  };
+}
+
+function scopeSummary(results: VisitResult[], what: string): SaveVisitResult & { message?: string } {
+  const ok = results.filter((r) => r.ok);
+  const failed = results.filter((r): r is Extract<VisitResult, { ok: false }> => !r.ok);
+  if (!ok.length) return { ok: false, message: failed[0]?.problems ? [...new Set(failed[0].problems.flat().map(describeProblem))].join(" ") : `Couldn't ${what} any visits.` };
+  const note = failed.length
+    ? ` ${failed.length} didn't fit and kept their old time: ${failed
+        .map((f) => `${formatDay(f.date)}${f.problems ? ` (${[...new Set(f.problems.flat().map(describeProblem))].join(" ")})` : ""}`)
+        .join("; ")}`
+    : "";
+  return { ok: true, appointmentId: (ok[0] as { appointmentId: string }).appointmentId, message: `Changed ${ok.length} visit${ok.length === 1 ? "" : "s"}.${note}` };
+}
+
+// Saves an edit to a series visit: this visit, this and following, or all.
+export async function saveVisitScoped(input: VisitInput, scope: Scope): Promise<SaveVisitResult & { message?: string }> {
+  if (scope === "this" || !input.appointmentId) return saveVisit(input);
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(input.appointmentId) || !input.clientId || !isUuid(input.clientId)) return { ok: false, message: "Choose a client." };
+  const results = await changeSeries(supabase, me.location, input.appointmentId, scope, { clientId: input.clientId, notes: input.notes.trim() || null, lines: toLines(input.lines) });
+  refresh();
+  return scopeSummary(results, "change");
+}
+
+// Drag-moves a series visit's service: this visit, this and following, or all.
+export async function moveVisitItemScoped(input: { itemId: string; staffId: string; date: LocalDate; startMinute: number }, scope: Scope): Promise<MoveResult & { message?: string }> {
+  if (scope === "this") return moveVisitItem(input);
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(input.itemId) || !isUuid(input.staffId) || !isLocalDate(input.date)) return { ok: false, message: "That move isn't possible." };
+  const start = fromLocal(input.date, input.startMinute, me.location.timezone);
+  if (!start) return { ok: false, message: "That time doesn't exist." };
+  const results = await moveSeriesItem(supabase, me.location, { itemId: input.itemId, staffId: input.staffId, start }, scope);
+  refresh();
+  const summary = scopeSummary(results, "move");
+  return summary.ok ? { ok: true, message: summary.message } : { ok: false, message: summary.message };
+}
+
+// Cancels or marks a series visit: this one, this and following, or all.
+export async function changeVisitStatusScoped(appointmentId: string, action: AppointmentAction, scope: Scope, reason = "", detail = ""): Promise<ActionResult & { message?: string }> {
+  if (scope === "this") return changeVisitStatus(appointmentId, action, reason, detail);
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(appointmentId) || !(action in ACTION_LABELS)) return { ok: false, message: "That appointment no longer exists." };
+  let why: string | null = null;
+  if (action === "cancel") {
+    why = cancelReason(reason, detail);
+    if (!why) return { ok: false, message: reason === "Other" ? "Say why it was canceled." : "Choose a reason." };
+  }
+  const results = await changeSeriesStatus(supabase, appointmentId, scope, action, why, me.location.timezone);
+  refresh();
+  const done = results.filter((r) => r.result.ok).length;
+  return done ? { ok: true, message: `${done} visit${done === 1 ? "" : "s"} ${action === "cancel" ? "canceled" : "updated"}.` } : { ok: false, message: "No visits could be changed." };
 }

@@ -36,6 +36,8 @@ export type BlockData = Interval & {
   // First names of the visit's other stylists.
   with: string[];
   status: AppointmentStatus;
+  // Part of a recurring series (shows a repeat icon).
+  series: boolean;
 };
 
 export type ItemDetail = Interval & {
@@ -71,6 +73,8 @@ export type AppointmentDetail = {
   // "Last changed by …", if anyone has changed it since.
   changedBy: string | null;
   formulas: VisitFormula[];
+  // Part of a recurring series: its place, how many, how often.
+  series: { id: string; index: number; count: number; intervalWeeks: number } | null;
 };
 
 export type MenuService = {

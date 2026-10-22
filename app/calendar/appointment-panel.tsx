@@ -15,7 +15,8 @@ import { formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { formatMinutes, formatPrice } from "@/lib/services";
 import { UsageLinesEditor, toUsageJson, type DraftLine } from "@/components/usage-lines";
 import type { PickerProduct } from "@/lib/inventory-load";
-import { addVisitFormula, changeVisitStatus, saveVisitNotes } from "./actions";
+import { addVisitFormula, changeVisitStatus, changeVisitStatusScoped, saveVisitNotes } from "./actions";
+import type { Scope } from "@/lib/scheduling/series";
 import { reportLate } from "./denise-actions";
 import { useNow } from "./now-line";
 import type { AppointmentDetail, BoardData } from "./types";
@@ -59,10 +60,10 @@ export function AppointmentPanel({
   // On the day (or after): the front of house, or a stylist on the visit.
   const canRecordFormula = date <= today && status !== "canceled" && status !== "no_show" && (me.canBook || items.some((i) => i.staffId === me.staffId));
 
-  function run(action: AppointmentAction, reason = "", detail = "") {
+  function run(action: AppointmentAction, reason = "", detail = "", scope: Scope = "this") {
     setMessage(null);
     startTransition(async () => {
-      const result = await changeVisitStatus(appointment.id, action, reason, detail);
+      const result = scope === "this" ? await changeVisitStatus(appointment.id, action, reason, detail) : await changeVisitStatusScoped(appointment.id, action, scope, reason, detail);
       if (!result.ok) setMessage(result.message);
       else if (action === "cancel") onClose(); // canceled visits leave the calendar
       else setCanceling(false);
@@ -86,6 +87,14 @@ export function AppointmentPanel({
           </h3>
           {client?.phone && <p className="text-ink-muted">{client.phone}</p>}
           <StatusChip status={status} className="mt-1.5" />
+          {appointment.series && (
+            <p className="mt-1.5 flex items-center gap-1.5 text-ink-muted" data-testid="series-info">
+              <svg aria-hidden viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M4 12a8 8 0 0 1 13.7-5.6L20 8M20 4v4h-4M20 12a8 8 0 0 1-13.7 5.6L4 16M4 20v-4h4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Visit {appointment.series.index} of {appointment.series.count} · every {appointment.series.intervalWeeks === 1 ? "week" : `${appointment.series.intervalWeeks} weeks`}
+            </p>
+          )}
         </div>
       </div>
 
@@ -190,7 +199,9 @@ export function AppointmentPanel({
               </Button>
             )}
           </div>
-          {canceling && <CancelForm pending={pending} onCancel={(reason, detail) => run("cancel", reason, detail)} onKeep={() => setCanceling(false)} />}
+          {canceling && (
+            <CancelForm pending={pending} series={Boolean(appointment.series)} onCancel={(reason, detail, scope) => run("cancel", reason, detail, scope)} onKeep={() => setCanceling(false)} />
+          )}
         </section>
       )}
 
@@ -266,16 +277,27 @@ function NotesForm({ appointmentId, initial, editable }: { appointmentId: string
   );
 }
 
-function CancelForm({ pending, onCancel, onKeep }: { pending: boolean; onCancel: (reason: string, detail: string) => void; onKeep: () => void }) {
+function CancelForm({
+  pending,
+  series,
+  onCancel,
+  onKeep,
+}: {
+  pending: boolean;
+  series: boolean;
+  onCancel: (reason: string, detail: string, scope: Scope) => void;
+  onKeep: () => void;
+}) {
   const [reason, setReason] = useState("");
   const [detail, setDetail] = useState("");
+  const [scope, setScope] = useState<Scope>("this");
   return (
     <form
       aria-label="Cancel booking"
       className="flex animate-fade-in flex-col gap-3 rounded-lg border border-danger/30 bg-danger-soft/60 p-3"
       onSubmit={(e) => {
         e.preventDefault();
-        onCancel(reason, detail);
+        onCancel(reason, detail, scope);
       }}
     >
       <label className={labelClass}>
@@ -293,6 +315,23 @@ function CancelForm({ pending, onCancel, onKeep }: { pending: boolean; onCancel:
         </span>
         <input value={detail} onChange={(e) => setDetail(e.target.value)} maxLength={300} className={fieldClass} />
       </label>
+      {series && (
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="mb-1 text-sm font-medium text-ink">Cancel</legend>
+          {(
+            [
+              ["this", "This visit only"],
+              ["following", "This and following visits"],
+              ["all", "All visits in the series"],
+            ] as const
+          ).map(([v, label]) => (
+            <label key={v} className="flex items-center gap-2">
+              <input type="radio" name="cancel-scope" checked={scope === v} onChange={() => setScope(v)} />
+              {label}
+            </label>
+          ))}
+        </fieldset>
+      )}
       <div className="flex gap-2">
         <button type="submit" className={buttonClass("danger", "md")} disabled={pending}>
           Cancel booking

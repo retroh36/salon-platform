@@ -183,6 +183,12 @@ body {
   color: var(--color-ink);
 }
 
+/* Native radios and checkboxes in the app's plum. */
+input[type="radio"],
+input[type="checkbox"] {
+  accent-color: var(--color-plum-900);
+}
+
 /* ---------------------------------------------------------------------------
    Day-to-day slides (React <ViewTransition> with nav-forward / nav-back).
    --------------------------------------------------------------------------- */

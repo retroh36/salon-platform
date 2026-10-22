@@ -111,16 +111,54 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
-                },"appointments": {
+                },"appointment_series": {
                   Row: {
-                    "business_id": string,"cancel_reason": string | null,"canceled_at": string | null,"client_id": string | null,"created_at": string,"created_by": string | null,"deposit_cents": number,"ends_at": string,"id": string,"location_id": string,"notes": string | null,"source": Database["public"]['Enums']["appointment_source"],"starts_at": string,"status": Database["public"]['Enums']["appointment_status"],"updated_at": string,"updated_by": string | null
+                    "business_id": string,"client_id": string | null,"created_at": string,"created_by": string | null,"ends_on": string | null,"id": string,"interval_weeks": number,"location_id": string,"occurrences": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"ends_at": string,"id"?: string,"location_id": string,"notes"?: string | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at": string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
+                    "business_id": string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"ends_on"?: string | null,"id"?: string,"interval_weeks": number,"location_id": string,"occurrences"?: number | null
                   }
                   Update: {
-                    "business_id"?: string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"ends_at"?: string,"id"?: string,"location_id"?: string,"notes"?: string | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at"?: string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
+                    "business_id"?: string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"ends_on"?: string | null,"id"?: string,"interval_weeks"?: number,"location_id"?: string,"occurrences"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "appointment_series_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "appointment_series_client_id_business_id_fkey"
+      columns: ["client_id","business_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "appointment_series_created_by_business_id_fkey"
+      columns: ["created_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "appointment_series_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"appointments": {
+                  Row: {
+                    "business_id": string,"cancel_reason": string | null,"canceled_at": string | null,"client_id": string | null,"created_at": string,"created_by": string | null,"deposit_cents": number,"ends_at": string,"id": string,"location_id": string,"notes": string | null,"series_id": string | null,"series_index": number | null,"source": Database["public"]['Enums']["appointment_source"],"starts_at": string,"status": Database["public"]['Enums']["appointment_status"],"updated_at": string,"updated_by": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"ends_at": string,"id"?: string,"location_id": string,"notes"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at": string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "business_id"?: string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"ends_at"?: string,"id"?: string,"location_id"?: string,"notes"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at"?: string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
                   }
                   Relationships: [
                     {
@@ -146,6 +184,12 @@ isOneToOne: false
       columns: ["location_id","business_id"]
 isOneToOne: false
       referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "appointments_series_id_business_id_fkey"
+      columns: ["series_id","business_id"]
+isOneToOne: false
+      referencedRelation: "appointment_series"
       referencedColumns: ["id","business_id"]
     },{
       foreignKeyName: "appointments_updated_by_business_id_fkey"
@@ -1086,6 +1130,9 @@ isOneToOne: false
                            },
 "set_appointment_notes":
 { Args: { "p_appointment_id": string,"p_notes": string }; Returns: undefined
+                           },
+"set_appointment_series":
+{ Args: { "p_appointment_id": string,"p_index": number,"p_series_id": string }; Returns: undefined
                            },
 "set_appointment_status":
 { Args: { "p_appointment_id": string,"p_reason": string,"p_status": Database["public"]['Enums']["appointment_status"] }; Returns: undefined

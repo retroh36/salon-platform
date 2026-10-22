@@ -44,7 +44,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     supabase
       .from("appointment_items")
       .select(
-        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, price_cents, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, created_at, updated_at, created_by, updated_by, client:clients(id, first_name, last_name, phone, email, allergies, preferences))",
+        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, price_cents, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, created_at, updated_at, created_by, updated_by, series_id, series_index, series:appointment_series(interval_weeks), client:clients(id, first_name, last_name, phone, email, allergies, preferences))",
       )
       .eq("location_id", me.location.id)
       .lt("starts_at", dayEnd.toISOString())
@@ -74,6 +74,15 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     loadBlocks(supabase, me.location.id),
   ]);
   if (formulaResult.error) throw formulaResult.error;
+
+  // How many visits each series on the day has.
+  const seriesIds = [...new Set(items.map((i) => i.appointment.series_id).filter((id): id is string => !!id))];
+  const seriesCounts = new Map<string, number>();
+  if (seriesIds.length) {
+    const { data, error } = await supabase.from("appointments").select("series_id").in("series_id", seriesIds).neq("status", "canceled");
+    if (error) throw error;
+    for (const r of data) seriesCounts.set(r.series_id!, (seriesCounts.get(r.series_id!) ?? 0) + 1);
+  }
   const team = staffResult.data.filter((s) => s.is_active && s.location_id === me.location.id);
   const teamIds = team.map((s) => s.id);
   const [offers, schedules] = await Promise.all([loadOffers(supabase, teamIds), loadStaffSchedules(supabase, teamIds, date, date)]);
@@ -130,6 +139,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
         .filter((id) => id !== row.staff_id)
         .map((id) => staffById.get(id)?.first_name ?? "another stylist"),
       status: a.status as AppointmentStatus,
+      series: Boolean(a.series_id),
     });
     appointments[a.id] ??= {
       id: a.id,
@@ -142,6 +152,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       bookedBy: bookedLine(a),
       changedBy: changedLine(a),
       formulas: [],
+      series: a.series_id ? { id: a.series_id, index: a.series_index!, count: seriesCounts.get(a.series_id) ?? 1, intervalWeeks: a.series?.interval_weeks ?? 1 } : null,
     };
     const staffMember = staffById.get(row.staff_id);
     appointments[a.id].items.push({

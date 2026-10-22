@@ -18,7 +18,8 @@ import { FAMILIES, FAMILY_LABELS, hourMarks, laneBox, layoutColumn, type Service
 import { BLOCK_LABELS } from "@/lib/scheduling/blocks";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, toLocal } from "@/lib/scheduling/time";
-import { moveVisitItem } from "./actions";
+import { moveVisitItem, moveVisitItemScoped } from "./actions";
+import type { Scope } from "@/lib/scheduling/series";
 import { moveBlock } from "./block-actions";
 import { BlockPanel, repeatLabel } from "./block-panel";
 import { AppointmentPanel } from "./appointment-panel";
@@ -104,6 +105,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const [department, setDepartment] = useState<"all" | ServiceFamily>("all");
   const [notice, setNotice] = useState<string | null>(null);
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
+  // A drag of a repeating visit, waiting for "this / following / all".
+  const [pendingMove, setPendingMove] = useState<{ move: Move; block: BlockData } | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   // Blocked time being dragged or resized, and where moved blocks now are
   // until the calendar reloads.
@@ -293,12 +296,22 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     justDragged.current = true;
     if (d.staffId === d.fromStaffId && d.start === d.fromStart) return;
     const move = { itemId: d.itemId, staffId: d.staffId, start: d.start };
+    // A repeating visit asks which visits to move first.
+    if (b.series) return setPendingMove({ move, block: b });
+    runMove(move, b, "this");
+  }
+
+  function runMove(move: Move, b: BlockData, scope: Scope) {
     setNotice(null);
-    setSettling(d.itemId);
+    setSettling(move.itemId);
     startTransition(async () => {
       addMove(move);
-      const result = await moveVisitItem({ itemId: move.itemId, staffId: move.staffId, date: data.date, startMinute: move.start });
+      const result =
+        scope === "this"
+          ? await moveVisitItem({ itemId: move.itemId, staffId: move.staffId, date: data.date, startMinute: move.start })
+          : await moveVisitItemScoped({ itemId: move.itemId, staffId: move.staffId, date: data.date, startMinute: move.start }, scope);
       if (!result.ok) setNotice(`Couldn't move ${b.clientName}'s ${b.service}: ${result.message}`);
+      else if ((result as { message?: string }).message) setDoneMessage((result as { message?: string }).message!);
     });
   }
 
@@ -720,7 +733,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               data={data}
               start={selection.start}
               onClose={closeDetails}
-              onSaved={(id) => select({ kind: "detail", appointmentId: id })}
+              onSaved={(id, message) => {
+                select({ kind: "detail", appointmentId: id });
+                if (message) setDoneMessage(message);
+              }}
               onBlockInstead={blockStaff.includes(selection.start.staffId) ? () => select({ kind: "new-block", start: selection.start }) : undefined}
             />
           ) : selection.kind === "new-block" || (selection.kind === "block" && data.timeBlocks.some((b) => b.blockId === selection.blockId)) ? (
@@ -745,7 +761,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               data={data}
               appointment={data.appointments[selection.appointmentId]}
               onClose={() => select({ kind: "detail", appointmentId: selection.appointmentId })}
-              onSaved={() => select({ kind: "detail", appointmentId: selection.appointmentId })}
+              onSaved={(_, message) => {
+                select({ kind: "detail", appointmentId: selection.appointmentId });
+                if (message) setDoneMessage(message);
+              }}
             />
           ) : (
             <div className="flex flex-col gap-3 py-6 text-sm text-ink-muted">
@@ -755,6 +774,18 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           )}
         </Tabs>
       </aside>
+
+      {pendingMove && (
+        <ScopeDialog
+          title={`Move ${pendingMove.block.clientName}'s repeating visit`}
+          onPick={(scope) => {
+            const p = pendingMove;
+            setPendingMove(null);
+            runMove(p.move, p.block, scope);
+          }}
+          onCancel={() => setPendingMove(null)}
+        />
+      )}
 
       {!panelOpen && (
         <DeniseLauncher
@@ -818,6 +849,43 @@ function DeniseBadge({ count }: { count: number }) {
       {count}
       <span className="sr-only"> to look at</span>
     </span>
+  );
+}
+
+// The repeat icon on visits that are part of a series.
+function RepeatIcon({ className = "size-4", label }: { className?: string; label?: string }) {
+  return (
+    <svg aria-hidden={label ? undefined : true} role={label ? "img" : undefined} aria-label={label} viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2}>
+      <path d="M4 12a8 8 0 0 1 13.7-5.6L20 8M20 4v4h-4M20 12a8 8 0 0 1-13.7 5.6L4 16M4 20v-4h4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// "This visit, this and following, or all?" for a change to a repeating
+// visit.
+function ScopeDialog({ title, onPick, onCancel }: { title: string; onPick: (scope: Scope) => void; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/30 p-4" onClick={onCancel}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.key === "Escape" && onCancel()}
+        className="flex w-full max-w-sm animate-pop-in flex-col gap-3 rounded-xl border border-line bg-surface p-5 shadow-lift"
+      >
+        <h2 className="font-serif text-xl font-semibold text-plum-900">{title}</h2>
+        <p className="text-sm text-ink-muted">This visit is part of a series.</p>
+        <Button variant="primary" autoFocus onClick={() => onPick("this")}>
+          This visit only
+        </Button>
+        <Button onClick={() => onPick("following")}>This and following visits</Button>
+        <Button onClick={() => onPick("all")}>All visits in the series</Button>
+        <Button variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -1165,6 +1233,7 @@ function AppointmentBlock({
     processing && `processing ${formatMinute(processing.start)}–${formatMinute(processing.end)}`,
     block.with.length > 0 && `with ${block.with.join(" and ")}`,
     block.resource,
+    block.series && "repeating",
     STATUS_LABELS[block.status],
     late && "running late",
   ]
@@ -1217,6 +1286,7 @@ function AppointmentBlock({
         ))}
         {show.name && (
           <span aria-hidden className={`relative flex items-center gap-1.5 pt-1 ${narrow ? "px-1.5" : "px-2"}`}>
+            {block.series && <RepeatIcon className="size-3 shrink-0" label="Repeating" />}
             <FitText variants={names} className="flex-1 text-sm leading-[18px] font-semibold" />
             {attention && !show.chipLine && <span data-attention={attention} title={ATTENTION[attention].label} className={`size-2.5 shrink-0 rounded-full ${ATTENTION[attention].className}`} style={{ backgroundColor: "currentColor" }} />}
           </span>

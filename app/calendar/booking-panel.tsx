@@ -3,14 +3,16 @@
 import { useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, IconButton } from "@/components/ui/button";
-import { fieldClass, labelClass, selectClass } from "@/components/ui/field";
+import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { CloseIcon, PlusIcon } from "@/components/ui/icons";
 import { MAX_NOTES, priceFor, visitSummary } from "@/lib/appointments";
 import { parseClientSearch } from "@/lib/clients";
 import { formatLongDay } from "@/lib/schedule-format";
 import { formatMinute, minuteToTime, parseTime } from "@/lib/scheduling/time";
 import { formatMinutes, formatPrice, sortCategories } from "@/lib/services";
-import { findClients, quickAddClient, saveVisit, type ClientOption } from "./actions";
+import { DeniseFace } from "@/components/denise";
+import type { Scope } from "@/lib/scheduling/series";
+import { findClients, previewSeries, quickAddClient, saveSeries, saveVisit, saveVisitScoped, type ClientOption, type SeriesPreviewVisit, type VisitInput } from "./actions";
 import type { AppointmentDetail, BoardData } from "./types";
 
 export type BookingStart = { staffId: string; startMinute: number };
@@ -39,7 +41,7 @@ export function BookingPanel({
   start?: BookingStart;
   appointment?: AppointmentDetail;
   onClose: () => void;
-  onSaved: (appointmentId: string) => void;
+  onSaved: (appointmentId: string, message?: string) => void;
   // Switch to blocking this time (lunch, a meeting…) instead.
   onBlockInstead?: () => void;
 }) {
@@ -62,6 +64,12 @@ export function BookingPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [lineErrors, setLineErrors] = useState<string[][]>([]);
   const [pending, startTransition] = useTransition();
+  // Repeating (new bookings), and the series' visits once checked; or, when
+  // editing a series visit, which visits the change is for.
+  const [repeat, setRepeat] = useState({ on: false, weeks: "4", endKind: "count" as "count" | "until", count: "6", until: "" });
+  const [preview, setPreview] = useState<SeriesPreviewVisit[] | null>(null);
+  const [choices, setChoices] = useState<Record<string, string>>({});
+  const [scope, setScope] = useState<Scope>("this");
 
   // Time and price for a line: an item that keeps its service keeps its
   // booked length, and its price unless the stylist changes.
@@ -83,7 +91,14 @@ export function BookingPanel({
     }),
   );
 
-  const update = (key: number, change: Partial<Line>) => setLines((all) => all.map((l) => (l.key === key ? { ...l, ...change } : l)));
+  const update = (key: number, change: Partial<Line>) => {
+    setPreview(null);
+    setLines((all) => all.map((l) => (l.key === key ? { ...l, ...change } : l)));
+  };
+  const changeRepeat = (change: Partial<typeof repeat>) => {
+    setPreview(null);
+    setRepeat((r) => ({ ...r, ...change }));
+  };
 
   function addLine() {
     const last = lines.at(-1)!;
@@ -101,25 +116,55 @@ export function BookingPanel({
     ]);
   }
 
+  const repeatInput = () => ({
+    intervalWeeks: Number(repeat.weeks),
+    end: repeat.endKind === "count" ? { kind: "count" as const, count: Number(repeat.count) } : { kind: "until" as const, until: repeat.until },
+  });
+
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setMessage(null);
     setLineErrors([]);
+    const input: VisitInput = {
+      appointmentId: appointment?.id,
+      date: data.date,
+      clientId: client?.id ?? null,
+      notes,
+      lines: lines.map((l) => ({ id: l.id, serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute ?? -1, resource: l.resource })),
+    };
     startTransition(async () => {
-      const result = await saveVisit({
-        appointmentId: appointment?.id,
-        date: data.date,
-        clientId: client?.id ?? null,
-        notes,
-        lines: lines.map((l) => ({ id: l.id, serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute ?? -1, resource: l.resource })),
-      });
-      if (result.ok) onSaved(result.appointmentId);
+      // A new series: check every visit first, then book what staff chose.
+      if (!appointment && repeat.on) {
+        if (!preview) {
+          if (!client) return setMessage("Choose a client, or add a new one.");
+          const r = await previewSeries(input, repeatInput());
+          if (!r.ok) return setMessage(r.message);
+          setPreview(r.visits);
+          setChoices(Object.fromEntries(r.visits.map((v) => [v.date, v.ok ? "planned" : v.alternatives.length ? "0" : "skip"])));
+          return;
+        }
+        const visits = preview.flatMap((v) => {
+          const c = choices[v.date];
+          if (c === "skip") return [];
+          if (c === "planned") return [{ date: v.date, lines: input.lines }];
+          const alt = v.alternatives[Number(c)];
+          return [{ date: alt.date, lines: alt.lines }];
+        });
+        const r = await saveSeries(input, repeatInput(), visits);
+        if (r.ok) onSaved(r.appointmentId, r.message);
+        else setMessage(r.message);
+        return;
+      }
+      const result = appointment?.series && scope !== "this" ? await saveVisitScoped(input, scope) : await saveVisit(input);
+      if (result.ok) onSaved(result.appointmentId, (result as { message?: string }).message);
       else {
         setMessage(result.message);
         setLineErrors(result.lineErrors ?? []);
       }
     });
   }
+
+  const booking = preview?.filter((v) => choices[v.date] !== "skip").length ?? 0;
 
   return (
       <form onSubmit={submit} className="flex flex-col gap-5 py-2 text-sm" aria-label={appointment ? "Edit booking" : "New booking"}>
@@ -248,9 +293,112 @@ export function BookingPanel({
           )}
         </div>
 
+        {!appointment && (
+          <fieldset className="flex flex-col gap-3 rounded-lg border border-line p-3">
+            <legend className="sr-only">Repeat</legend>
+            <label className="flex items-center gap-2 font-medium text-ink">
+              <input type="checkbox" className={checkboxClass} checked={repeat.on} onChange={(e) => changeRepeat({ on: e.target.checked })} />
+              Repeat this visit
+            </label>
+            {repeat.on && (
+              <div className="flex animate-fade-in flex-col gap-3">
+                <label className="flex items-center gap-2">
+                  Every
+                  <input type="number" min={1} max={52} value={repeat.weeks} onChange={(e) => changeRepeat({ weeks: e.target.value })} className={`${fieldClass} w-20!`} aria-label="Weeks between visits" />
+                  weeks, same stylist and services
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-2">
+                    <input type="radio" name="series-end" checked={repeat.endKind === "count"} onChange={() => changeRepeat({ endKind: "count" })} />
+                    For
+                  </label>
+                  <input
+                    type="number"
+                    min={2}
+                    max={52}
+                    value={repeat.count}
+                    onChange={(e) => changeRepeat({ count: e.target.value, endKind: "count" })}
+                    className={`${fieldClass} w-20!`}
+                    aria-label="Number of visits"
+                  />
+                  <span>visits</span>
+                  <label className="ml-2 flex items-center gap-2">
+                    <input type="radio" name="series-end" checked={repeat.endKind === "until"} onChange={() => changeRepeat({ endKind: "until" })} />
+                    Until
+                  </label>
+                  <input
+                    type="date"
+                    value={repeat.until}
+                    min={data.date}
+                    onChange={(e) => changeRepeat({ until: e.target.value, endKind: "until" })}
+                    className={`${fieldClass} w-40!`}
+                    aria-label="Last date"
+                  />
+                </div>
+              </div>
+            )}
+          </fieldset>
+        )}
+
+        {preview && (
+          <section aria-label="Visits in the series" className="flex animate-fade-in flex-col gap-2">
+            <p className="font-medium text-ink" data-testid="series-summary">
+              {preview.filter((v) => v.ok).length} of {preview.length} visits fit as planned.
+              {preview.some((v) => !v.ok) && " For the others, choose one of Denise's suggestions or skip that date."}
+            </p>
+            <ul className="flex flex-col gap-2">
+              {preview.map((v) => (
+                <li key={v.date} data-fits={v.ok || undefined} className={`rounded-lg border p-3 ${v.ok ? "border-line" : "border-denise-200 bg-denise-50"}`}>
+                  <p className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-ink">{v.label}</span>
+                    <span className={v.ok ? "text-status-confirmed-ink" : "text-danger"}>{v.ok ? "Fits" : "Doesn't fit"}</span>
+                  </p>
+                  {!v.ok && (
+                    <div className="mt-2 flex flex-col gap-1.5">
+                      <p className="text-ink-muted">{v.problems.join(" ")}</p>
+                      <p className="flex items-center gap-1.5 text-xs font-semibold text-denise-700">
+                        <DeniseFace size={18} />
+                        {v.alternatives.length ? "Denise suggests:" : "Denise couldn't find another time nearby."}
+                      </p>
+                      {v.alternatives.map((a, i) => (
+                        <label key={i} className="flex items-center gap-2">
+                          <input type="radio" name={`alt-${v.date}`} checked={choices[v.date] === String(i)} onChange={() => setChoices({ ...choices, [v.date]: String(i) })} />
+                          {a.label}
+                        </label>
+                      ))}
+                      <label className="flex items-center gap-2">
+                        <input type="radio" name={`alt-${v.date}`} checked={choices[v.date] === "skip"} onChange={() => setChoices({ ...choices, [v.date]: "skip" })} />
+                        Skip this date
+                      </label>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {appointment?.series && (
+          <fieldset className="flex flex-col gap-1.5 rounded-lg border border-line p-3">
+            <legend className="px-1 font-medium text-ink">Change</legend>
+            {(
+              [
+                ["this", "This visit only"],
+                ["following", "This and following visits"],
+                ["all", "All visits in the series"],
+              ] as const
+            ).map(([v, label]) => (
+              <label key={v} className="flex items-center gap-2">
+                <input type="radio" name="edit-scope" checked={scope === v} onChange={() => setScope(v)} />
+                {label}
+              </label>
+            ))}
+          </fieldset>
+        )}
+
         <div className="flex gap-2">
-          <Button type="submit" variant="primary" size="lg" className="flex-1" disabled={pending}>
-            {pending ? "Saving…" : appointment ? "Save changes" : "Create booking"}
+          <Button type="submit" variant="primary" size="lg" className="flex-1" disabled={pending || (preview !== null && booking === 0)}>
+            {pending ? "Saving…" : appointment ? "Save changes" : repeat.on ? (preview ? `Book ${booking} visit${booking === 1 ? "" : "s"}` : "Check dates") : "Create booking"}
           </Button>
           <Button size="lg" onClick={onClose}>
             Cancel
