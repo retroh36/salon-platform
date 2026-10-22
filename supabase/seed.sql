@@ -1072,3 +1072,18 @@ select c.business_id, c.id, t.id, t.name, t.fields,
 from public.clients c, public.form_templates t
 where t.id = 'e3000000-0000-4000-8000-000000000001' and c.business_id = t.business_id
   and abs(hashtext('form' || c.id)) % 100 < 80;
+
+-- The waitlist: a few clients hoping for a spot in the next few weeks.
+insert into public.waitlist_entries (business_id, location_id, client_id, service_ids, staff_ids, from_date, to_date, windows, notes, created_by, created_at)
+select 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', c.id,
+       (select array_agg(s.id order by array_position(w.services, s.name)) from public.services s where s.business_id = 'b0000000-0000-4000-8000-000000000001' and s.name = any (w.services)),
+       w.staff, current_date + w.from_days, current_date + w.to_days, w.windows, w.notes,
+       'd0000000-0000-4000-8000-000000000003', now() - make_interval(days => w.waiting_days)
+from (values
+  (10, array['Women''s Cut & Style'], array['d0000000-0000-4000-8000-000000000005']::uuid[], 0, 14, array['afternoon'], 'Prefers Marcus', 6),
+  (20, array['Balayage'], '{}'::uuid[], 0, 21, '{}'::text[], null, 9),
+  (30, array['Blowout'], '{}'::uuid[], 0, 7, array['morning'], 'Event on Saturday', 2),
+  (40, array['Root Touch-Up', 'Blowout'], array['d0000000-0000-4000-8000-000000000004']::uuid[], 1, 14, '{}'::text[], null, 4),
+  (50, array['Men''s Cut'], '{}'::uuid[], 0, 10, array['evening'], null, 1)
+) as w(client_offset, services, staff, from_days, to_days, windows, notes, waiting_days)
+cross join lateral (select id from public.clients where business_id = 'b0000000-0000-4000-8000-000000000001' order by id offset w.client_offset limit 1) c;

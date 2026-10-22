@@ -6,7 +6,7 @@ import { DeniseFace, DenisePose, type Pose } from "@/components/denise";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/field";
 import { CheckCircleIcon, ChevronDownIcon, ClockIcon, SendIcon, UndoIcon } from "@/components/ui/icons";
-import type { BookingSuggestion, ChatMessage, ConflictView, DeniseState, FixView } from "@/lib/denise/types";
+import type { BookingSuggestion, ChatMessage, ConflictView, DeniseState, FixView, OpeningMatch, WaitlistOpening } from "@/lib/denise/types";
 import { formatLongDay } from "@/lib/schedule-format";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
@@ -47,6 +47,7 @@ export function DenisePanel({
   onOpen,
   onBook,
   onRejectSuggestion,
+  onBookWaitlist,
 }: {
   data: BoardData;
   state: DeniseState | null;
@@ -66,9 +67,12 @@ export function DenisePanel({
   // Approve a booking Denise suggested, for this client.
   onBook: (actionId: string, clientId: string) => void;
   onRejectSuggestion: (actionId: string) => void;
+  // Book a waitlist client into time that opened up.
+  onBookWaitlist: (opening: WaitlistOpening, match: OpeningMatch) => void;
 }) {
   const conflicts = state?.conflicts ?? [];
   const notices = state?.notices ?? [];
+  const openings = state?.openings ?? [];
   const pose: Pose = working ? "think" : conflicts.length ? "point" : "wave";
   const isToday = data.date === data.today;
 
@@ -76,6 +80,7 @@ export function DenisePanel({
   if (!state) says = "Give me a second, I'm looking over the day…";
   else if (conflicts.length) says = conflicts.length === 1 ? "I spotted something." : `I spotted ${conflicts.length} things.`;
   else if (notices.length) says = "Nothing's clashing, but keep an eye on this:";
+  else if (openings.length) says = "Some time opened up, and your waitlist could use it:";
   else if (state.reorders.length) says = state.reorders.length === 1 ? "The calendar's clear. One thing about stock:" : "The calendar's clear. A few things about stock:";
   else says = isToday ? "All clear today!" : "All clear for this day!";
 
@@ -132,6 +137,40 @@ export function DenisePanel({
         </section>
       )}
 
+      {openings.length > 0 && (
+        <section aria-label="Waitlist" className="flex flex-col gap-2">
+          {openings.map((o) => (
+            <div key={o.key} data-testid="denise-opening" className="flex animate-fade-in gap-2.5 rounded-xl border border-denise-200 bg-denise-50 p-3">
+              <DeniseFace size={24} className="mt-0.5" />
+              <div className="flex flex-1 flex-col gap-2">
+                <p className="font-semibold text-denise-900">{o.headline}</p>
+                <ol className="flex flex-col gap-1.5" aria-label={`Waitlist matches for ${o.staffName} at ${formatMinute(o.startMinute)}`}>
+                  {o.matches.map((m, i) => (
+                    <li key={m.entryId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface px-2.5 py-2">
+                      <span>
+                        <span className="font-medium text-ink">
+                          {i + 1}. {m.clientName}
+                        </span>
+                        <span className="block text-xs text-ink-muted">
+                          {m.services} · {formatMinute(m.startMinute)}–{formatMinute(m.endMinute)}
+                          {m.preferred ? ` · asked for ${o.staffName}` : ""}
+                        </span>
+                      </span>
+                      {data.me.canBook && (
+                        <Button size="sm" disabled={working} onClick={() => onBookWaitlist(o, m)}>
+                          Book
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+                <p className="text-xs text-ink-muted">You pick who to book; get in touch with them yourself.</p>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
       {(state?.reorders.length ?? 0) > 0 && (
         <section aria-label="Stock" className="flex flex-col gap-2">
           {state!.reorders.map((r) => (
@@ -151,7 +190,7 @@ export function DenisePanel({
         </section>
       )}
 
-      {!conflicts.length && !notices.length && state && <UpNext data={data} onOpen={onOpen} />}
+      {!conflicts.length && !notices.length && !openings.length && state && <UpNext data={data} onOpen={onOpen} />}
 
       {chat.length > 0 && (
         <section aria-label="Conversation with Denise" className="flex flex-col gap-3">

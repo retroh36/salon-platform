@@ -16,7 +16,10 @@ import type { BookingContext } from "@/lib/scheduling/booking";
 import { LATE_MINUTES, reportCallOut, reportRunningLate } from "@/lib/scheduling/disruptions";
 import { loadBookingContext, loadOffers, startOfLocalDay } from "@/lib/scheduling/load";
 import { LEVEL_LABELS } from "@/lib/schedule-forms";
-import { isLocalDate, todayIn } from "@/lib/scheduling/time";
+import { isLocalDate, todayIn, toLocal } from "@/lib/scheduling/time";
+import type { WaitlistOpening } from "@/lib/denise/types";
+import { freedOn, loadWaitlist, waitlistOpenings } from "@/lib/waitlist-load";
+import { bookWaitlistEntry } from "@/lib/waitlist-book";
 
 const NOT_SIGNED_IN = "Sign in again.";
 
@@ -50,10 +53,40 @@ async function look(s: Session, date: string): Promise<DeniseState> {
       }))
     : [];
   // Past days can't be changed, so there's nothing to fix.
-  if (date < s.today) return { date, conflicts: [], notices: [], reorders, connected };
+  if (date < s.today) return { date, conflicts: [], notices: [], reorders, openings: [], connected };
   const client = claudeClient();
-  const state = await scanDay(s.supabase, s.viewer, date, { explain: client ? (facts) => explainFixes(client, facts) : null });
-  return { ...state, reorders, connected };
+  const [state, openings] = await Promise.all([
+    scanDay(s.supabase, s.viewer, date, { explain: client ? (facts) => explainFixes(client, facts) : null }),
+    s.viewer.canBook ? openingsOn(s, date) : Promise.resolve([]),
+  ]);
+  return { ...state, reorders, openings, connected };
+}
+
+// Time that opened up on the day, matched to the waitlist.
+async function openingsOn(s: Session, date: string): Promise<WaitlistOpening[]> {
+  const tz = s.viewer.location.timezone;
+  const entries = (await loadWaitlist(s.supabase, s.viewer.location.id, date)).filter((e) => e.fromDate <= date);
+  if (!entries.length) return [];
+  const [freed, ctx, { data: staff, error }] = await Promise.all([
+    freedOn(s.supabase, s.viewer.location.id, date, tz),
+    loadBookingContext(s.supabase, s.viewer.location, date, date),
+    s.supabase.from("staff").select("id, first_name"),
+  ]);
+  if (error) throw error;
+  const notBefore = date === s.today ? toLocal(new Date(), tz).minute : 0;
+  return waitlistOpenings(ctx, date, freed, entries, new Map(staff.map((x) => [x.id, x.first_name])), notBefore);
+}
+
+// Books a waitlist client into an opening Denise found (staff choose and
+// tell the client; Denise doesn't contact them).
+export async function bookFromWaitlist(entryId: string, staffId: string, date: string, startMinute: number): Promise<FixResult> {
+  const s = await session();
+  if (!s) return { ok: false, message: NOT_SIGNED_IN };
+  if (!s.viewer.canBook) return { ok: false, message: "Only the front desk, managers and owners can book." };
+  if (!isUuid(entryId) || !isUuid(staffId) || !isLocalDate(date)) return { ok: false, message: "That opening isn't there any more." };
+  const result = await bookWaitlistEntry(s.supabase, s.viewer.location, entryId, staffId, date, startMinute);
+  refresh();
+  return { ...result, state: await look(s, date) };
 }
 
 // Denise looks over the day: conflicts, her fixes, and notices.

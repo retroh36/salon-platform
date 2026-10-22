@@ -1155,6 +1155,100 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"waitlist_entries": {
+                  Row: {
+                    "appointment_id": string | null,"business_id": string,"client_id": string,"created_at": string,"created_by": string | null,"from_date": string,"id": string,"location_id": string,"notes": string | null,"service_ids": (string)[],"staff_ids": (string)[],"status": Database["public"]['Enums']["waitlist_status"],"to_date": string,"updated_at": string,"windows": (string)[]
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "appointment_id"?: string | null,"business_id": string,"client_id": string,"created_at"?: string,"created_by"?: string | null,"from_date": string,"id"?: string,"location_id": string,"notes"?: string | null,"service_ids": (string)[],"staff_ids"?: (string)[],"status"?: Database["public"]['Enums']["waitlist_status"],"to_date": string,"updated_at"?: string,"windows"?: (string)[]
+                  }
+                  Update: {
+                    "appointment_id"?: string | null,"business_id"?: string,"client_id"?: string,"created_at"?: string,"created_by"?: string | null,"from_date"?: string,"id"?: string,"location_id"?: string,"notes"?: string | null,"service_ids"?: (string)[],"staff_ids"?: (string)[],"status"?: Database["public"]['Enums']["waitlist_status"],"to_date"?: string,"updated_at"?: string,"windows"?: (string)[]
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "waitlist_entries_appointment_id_business_id_location_id_fkey"
+      columns: ["appointment_id","business_id","location_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id","business_id","location_id"]
+    },{
+      foreignKeyName: "waitlist_entries_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "waitlist_entries_client_id_business_id_fkey"
+      columns: ["client_id","business_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "waitlist_entries_created_by_business_id_fkey"
+      columns: ["created_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "waitlist_entries_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"walk_ins": {
+                  Row: {
+                    "appointment_id": string | null,"arrived_at": string,"business_id": string,"client_id": string | null,"created_by": string | null,"id": string,"location_id": string,"name": string,"phone": string | null,"service_id": string,"status": Database["public"]['Enums']["walk_in_status"],"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "appointment_id"?: string | null,"arrived_at"?: string,"business_id": string,"client_id"?: string | null,"created_by"?: string | null,"id"?: string,"location_id": string,"name": string,"phone"?: string | null,"service_id": string,"status"?: Database["public"]['Enums']["walk_in_status"],"updated_at"?: string
+                  }
+                  Update: {
+                    "appointment_id"?: string | null,"arrived_at"?: string,"business_id"?: string,"client_id"?: string | null,"created_by"?: string | null,"id"?: string,"location_id"?: string,"name"?: string,"phone"?: string | null,"service_id"?: string,"status"?: Database["public"]['Enums']["walk_in_status"],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "walk_ins_appointment_id_business_id_location_id_fkey"
+      columns: ["appointment_id","business_id","location_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id","business_id","location_id"]
+    },{
+      foreignKeyName: "walk_ins_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "walk_ins_client_id_business_id_fkey"
+      columns: ["client_id","business_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "walk_ins_created_by_business_id_fkey"
+      columns: ["created_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "walk_ins_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "walk_ins_service_id_business_id_fkey"
+      columns: ["service_id","business_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -1253,7 +1347,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","disruption_kind": "overrun"|"client_late"|"call_out","form_requirement": "none"|"first_visit"|"services","notification_status": "pending"|"sent"|"canceled","patch_test_result": "no_reaction"|"reaction","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","staff_level": "junior"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined"
+            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","disruption_kind": "overrun"|"client_late"|"call_out","form_requirement": "none"|"first_visit"|"services","notification_status": "pending"|"sent"|"canceled","patch_test_result": "no_reaction"|"reaction","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","staff_level": "junior"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -1373,7 +1467,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"disruption_kind": ["overrun", "client_late", "call_out"],"form_requirement": ["none", "first_visit", "services"],"notification_status": ["pending", "sent", "canceled"],"patch_test_result": ["no_reaction", "reaction"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"staff_level": ["junior", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"]
+            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"disruption_kind": ["overrun", "client_late", "call_out"],"form_requirement": ["none", "first_visit", "services"],"notification_status": ["pending", "sent", "canceled"],"patch_test_result": ["no_reaction", "reaction"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"staff_level": ["junior", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
           }
         }
 } as const

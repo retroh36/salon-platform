@@ -46,11 +46,16 @@ export type DeniseNotice = { id: string; appointmentId: string; itemId: string; 
 // A reorder Denise has drafted on the Inventory page.
 export type ReorderNotice = { supplierId: string; supplier: string; headline: string; lines: number; totalCents: number };
 
+// Time that opened up, with waitlist clients who'd fit it, best first.
+export type OpeningMatch = { entryId: string; clientName: string; services: string; startMinute: number; endMinute: number; preferred: boolean; waitingSince: string };
+export type WaitlistOpening = { key: string; staffId: string; staffName: string; startMinute: number; endMinute: number; headline: string; matches: OpeningMatch[] };
+
 export type DeniseState = {
   date: string;
   conflicts: ConflictView[];
   notices: DeniseNotice[];
   reorders: ReorderNotice[];
+  openings: WaitlistOpening[];
   // Whether Claude is connected (ANTHROPIC_API_KEY is set).
   connected: boolean;
 };

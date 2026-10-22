@@ -23,9 +23,10 @@ import type { Scope } from "@/lib/scheduling/series";
 import { moveBlock } from "./block-actions";
 import { BlockPanel, repeatLabel } from "./block-panel";
 import { AppointmentPanel } from "./appointment-panel";
-import { approveDeniseFix, askDenise, rejectDeniseFix, reportOut, scanDenise, undoDeniseFix } from "./denise-actions";
+import { approveDeniseFix, askDenise, bookFromWaitlist, rejectDeniseFix, reportOut, scanDenise, undoDeniseFix } from "./denise-actions";
 import { DenisePanel, type Outcome, type Preview } from "./denise-panel";
 import { BookingPanel, type BookingStart } from "./booking-panel";
+import { WalkInPanel } from "./walk-in-panel";
 import { NowLine, useNow } from "./now-line";
 import type { BlockData, BoardData, ColumnData, TimeBlockData } from "./types";
 
@@ -42,7 +43,8 @@ type Selection =
   | { kind: "new-block"; start: { staffId: string; startMinute: number } }
   | { kind: "book"; start: BookingStart }
   | { kind: "edit"; appointmentId: string }
-  | { kind: "detail"; appointmentId: string };
+  | { kind: "detail"; appointmentId: string }
+  | { kind: "walk-ins" };
 
 type Tab = "denise" | "details";
 
@@ -133,8 +135,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
 
   // Shows Denise's latest view. A conflict or reorder she hasn't shown
   // before opens her panel at it; anything else new makes her badge bounce.
-  // Reorders already waiting when the calendar opens just make her badge
-  // bounce; one drafted while it's open opens her panel.
+  // Reorders and waitlist openings already there when the calendar opens
+  // just make her badge bounce; new ones while it's open open her panel.
   const seen = useRef(new Set<string>());
   const looked = useRef(false);
   const showDenise = useCallback((state: DeniseState, forData: BoardData) => {
@@ -145,7 +147,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     const first = !looked.current;
     looked.current = true;
     if (fresh.length) setUnseen((all) => new Set([...all, ...fresh]));
-    if (fresh.some((k) => k.startsWith("conflict:") || (!first && k.startsWith("reorder:")))) {
+    if (fresh.some((k) => k.startsWith("conflict:") || (!first && (k.startsWith("reorder:") || k.startsWith("opening:"))))) {
       setTab("denise");
       setPanelOpen(true);
     }
@@ -178,7 +180,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const deniseState = denise && denise.state.date === data.date ? denise.state : null;
   const conflicts = (deniseState?.conflicts ?? []).filter((c) => !dismissed.has(c.subject));
   // How many things Denise wants looked at.
-  const attention = conflicts.length + (deniseState?.notices.length ?? 0) + (deniseState?.reorders.length ?? 0);
+  const attention = conflicts.length + (deniseState?.notices.length ?? 0) + (deniseState?.reorders.length ?? 0) + (deniseState?.openings.length ?? 0);
   const scanning = denise?.for !== data;
 
   async function decide(run: () => Promise<FixResult>, undoActionId: string | null) {
@@ -397,6 +399,14 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             </ViewTransition>
           </div>
           <div className="flex flex-wrap gap-2">
+          <Link href="/calendar/waitlist" className={buttonClass("ghost", "lg")}>
+            Waitlist
+          </Link>
+          {me.canBook && (
+            <button type="button" className={buttonClass("secondary", "lg")} onClick={() => select({ kind: "walk-ins" })}>
+              Walk-ins
+            </button>
+          )}
           {blockStaff.length > 0 && (
             <button
               type="button"
@@ -715,6 +725,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               onOpen={(appointmentId) => select({ kind: "detail", appointmentId })}
               onBook={(actionId, clientId) => decide(() => approveDeniseFix(actionId, data.date, clientId), actionId)}
               onRejectSuggestion={(actionId) => decide(() => rejectDeniseFix(actionId, data.date), null)}
+              onBookWaitlist={(o, m) => decide(() => bookFromWaitlist(m.entryId, o.staffId, data.date, m.startMinute), null)}
             />
           ) : selection.kind === "detail" && data.appointments[selection.appointmentId] ? (
             <AppointmentPanel
@@ -727,6 +738,16 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               onClose={closeDetails}
               onReported={onReported}
               products={data.menu.products}
+            />
+          ) : selection.kind === "walk-ins" ? (
+            <WalkInPanel
+              data={data}
+              onClose={closeDetails}
+              onBooked={(id, message) => {
+                setDoneMessage(message);
+                if (data.date === data.today) select({ kind: "detail", appointmentId: id });
+                else closeDetails();
+              }}
             />
           ) : selection.kind === "book" ? (
             <BookingPanel
@@ -807,6 +828,7 @@ function deniseKeys(state: DeniseState): string[] {
     ...state.conflicts.map((c) => `conflict:${c.subject}`),
     ...state.notices.map((n) => `notice:${n.id}`),
     ...state.reorders.map((r) => `reorder:${r.supplierId}:${r.headline}`),
+    ...state.openings.map((o) => `opening:${o.key}:${o.matches.length}`),
   ];
 }
 
