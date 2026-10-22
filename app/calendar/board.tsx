@@ -564,7 +564,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         data-collapsed
                         onClick={() => toggle(c.staffId, true)}
                         className="cursor-pointer border-l border-line bg-sunken/80"
-                        style={{ height, backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, rgb(43 33 48 / 0.04) 6px 12px)" }}
+                        style={{ height, backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, rgb(23 39 59 / 0.04) 6px 12px)" }}
                       />
                     ) : (
                       <section
@@ -595,7 +595,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                             style={{
                               top: y(o.start),
                               height: (o.end - o.start) * PX_PER_MINUTE,
-                              backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, rgb(43 33 48 / 0.04) 6px 12px)",
+                              backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, rgb(23 39 59 / 0.04) 6px 12px)",
                             }}
                           />
                         ))}
@@ -1083,7 +1083,7 @@ function Legend() {
         <span
           aria-hidden
           className="h-3.5 w-5 rounded-[3px] border border-line-strong"
-          style={{ backgroundImage: "repeating-linear-gradient(135deg, transparent 0 3px, rgb(43 33 48 / 0.18) 3px 6px)" }}
+          style={{ backgroundImage: "repeating-linear-gradient(135deg, transparent 0 3px, rgb(23 39 59 / 0.18) 3px 6px)" }}
         />
         Processing (stylist free)
       </li>
@@ -1167,7 +1167,7 @@ function TimeBlockBox({
         top: y(block.start),
         height,
         backgroundColor: "var(--color-sunken)",
-        backgroundImage: "repeating-linear-gradient(45deg, transparent 0 5px, rgb(43 33 48 / 0.05) 5px 10px)",
+        backgroundImage: "repeating-linear-gradient(45deg, transparent 0 5px, rgb(23 39 59 / 0.05) 5px 10px)",
       }}
     >
       {height >= 18 && (
