@@ -90,6 +90,7 @@
   --animate-pop-in: pop-in 150ms var(--ease-out) both;
   --animate-toast-in: toast-in 250ms var(--ease-out) both;
   --animate-glow: glow 1.6s ease-in-out infinite;
+  --animate-soft-bounce: soft-bounce 900ms var(--ease-out) 3;
 
   @keyframes panel-in {
     from {
@@ -113,6 +114,17 @@
     from {
       opacity: 0;
       transform: translateY(12px) scale(0.98);
+    }
+  }
+  /* Denise's badge when she has something new: a small hop, three times. */
+  @keyframes soft-bounce {
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+    }
+    30% {
+      transform: translateY(-5px);
     }
   }
   /* A soft periwinkle pulse on blocks Denise is talking about. */

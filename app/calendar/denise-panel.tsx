@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { DeniseFace, DenisePose, type Pose } from "@/components/denise";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { CheckCircleIcon, ChevronDownIcon, ClockIcon, SendIcon, UndoIcon } from 
 import type { BookingSuggestion, ChatMessage, ConflictView, DeniseState, FixView } from "@/lib/denise/types";
 import { formatLongDay } from "@/lib/schedule-format";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
+import { formatPrice } from "@/lib/services";
 import type { ClientOption } from "./actions";
 import { ClientPicker } from "./booking-panel";
 import { useNow } from "./now-line";
@@ -74,6 +76,7 @@ export function DenisePanel({
   if (!state) says = "Give me a second, I'm looking over the day…";
   else if (conflicts.length) says = conflicts.length === 1 ? "I spotted something." : `I spotted ${conflicts.length} things.`;
   else if (notices.length) says = "Nothing's clashing, but keep an eye on this:";
+  else if (state.reorders.length) says = state.reorders.length === 1 ? "The calendar's clear. One thing about stock:" : "The calendar's clear. A few things about stock:";
   else says = isToday ? "All clear today!" : "All clear for this day!";
 
   return (
@@ -123,6 +126,25 @@ export function DenisePanel({
                 <button type="button" className={buttonClass("secondary", "sm")} onClick={() => onOpen(n.appointmentId)}>
                   Open booking
                 </button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {(state?.reorders.length ?? 0) > 0 && (
+        <section aria-label="Stock" className="flex flex-col gap-2">
+          {state!.reorders.map((r) => (
+            <div key={r.supplierId} data-testid="denise-reorder" className="flex animate-fade-in gap-2.5 rounded-xl border border-denise-200 bg-denise-50 p-3">
+              <DeniseFace size={24} className="mt-0.5" />
+              <div className="flex flex-1 flex-col items-start gap-2">
+                <p className="text-ink">
+                  <strong className="font-semibold text-denise-900">{r.headline}</strong> I&apos;ve put together an order for {r.supplier} ({r.lines}{" "}
+                  {r.lines === 1 ? "product" : "products"}, {formatPrice(r.totalCents)}).
+                </p>
+                <Link href="/inventory" className={buttonClass("secondary", "sm")}>
+                  Review on Inventory
+                </Link>
               </div>
             </div>
           ))}

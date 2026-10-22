@@ -176,7 +176,7 @@ export async function scanDay(
     for (const subject of gone) await recordProposals(supabase, viewer.location.id, { feature: FEATURE, subject, options: [] });
   }
 
-  return { date, conflicts: views, notices: lateNotices(day, lookup, date, conflicts), connected: false };
+  return { date, conflicts: views, notices: lateNotices(day, lookup, date, conflicts), reorders: [], connected: false };
 }
 
 // Clients due a little while ago who haven't checked in, today only.

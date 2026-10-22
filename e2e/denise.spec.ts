@@ -80,6 +80,12 @@ async function openDay(page: Page) {
   await waitForHydration(page, "section[data-staff-id]");
 }
 
+// Denise's panel is closed until something opens it; her face opens it.
+async function openDenise(page: Page) {
+  await page.getByTestId("denise-launcher").click();
+  await expect(denisePanel(page)).toBeVisible();
+}
+
 const block = (page: Page, client: string) => ui(page).getByRole("button", { name: new RegExp(`${PREFIX}${client} Lewis`) });
 const deniseTab = (page: Page) => page.getByRole("tab", { name: /Denise/ });
 const denisePanel = (page: Page) => page.getByRole("tabpanel", { name: /Denise/ });
@@ -94,11 +100,24 @@ test.use({ viewport: { width: 1920, height: 1500 } });
 test.describe("front desk", () => {
   test.use({ storageState: AUTH.frontDesk });
 
-  test("waves when the day is clear", async ({ page }) => {
+  test("waves when the day is clear, and mentions stock that needs ordering", async ({ page }) => {
     await openDay(page);
-    await expect(denisePanel(page).getByTestId("denise-says")).toHaveText("All clear for this day!");
+    // Nothing on the calendar, so her panel stays closed; she has reorders
+    // waiting, so her badge shows them.
+    await expect(page.getByRole("complementary", { name: "Assistant and booking details" })).toBeHidden();
+    const badge = page.getByTestId("denise-launcher-badge");
+    await expect(badge).toHaveText("3");
+    // Something new: a gentle bounce.
+    await expect(badge).toHaveAttribute("data-bounce", "true");
+    expect(await badge.evaluate((el) => getComputedStyle(el).animationName)).toBe("soft-bounce");
+    await openDenise(page);
+    // Seen now: no more bouncing once she's closed again.
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("denise-launcher-badge")).not.toHaveAttribute("data-bounce");
+    await openDenise(page);
+    await expect(denisePanel(page).getByTestId("denise-says")).toHaveText("The calendar's clear. A few things about stock:");
     await expect(denisePanel(page).locator("[data-pose]")).toHaveAttribute("data-pose", "wave");
-    await expect(page.getByTestId("denise-badge")).toHaveCount(0);
+    await expect(denisePanel(page).getByTestId("denise-reorder").first()).toContainText("I've put together an order for");
   });
 
   test("finds a fix for an overrun, applies it, and undoes it", async ({ page }) => {
@@ -114,10 +133,9 @@ test.describe("front desk", () => {
     await form.getByText("20 min").click();
     await form.getByRole("button", { name: "Tell Denise" }).click();
 
-    // Denise pops up with her fix, pointing.
-    await expect(page.getByTestId("denise-toast")).toContainText("Priya's running 20 minutes late.");
+    // Denise's panel slides in with her fix, pointing.
     await expect(deniseTab(page)).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByTestId("denise-badge").first()).toHaveText(/1/);
+    await expect(page.getByTestId("denise-badge")).toHaveText(/4/); // the fix and 3 reorders
     const panel = denisePanel(page);
     await expect(panel.locator("[data-pose]")).toHaveAttribute("data-pose", "point");
     await expect(panel.getByTestId("denise-message")).toHaveText(
@@ -134,7 +152,7 @@ test.describe("front desk", () => {
     await expect(panel.getByRole("status")).toContainText(`Done — ${PREFIX}Grace has been moved and notified.`);
     expect(await startOf(grace)).toEqual({ start: at(11, 20).getTime(), staffId: PRIYA });
     await expect(block(page, "Grace")).toHaveAccessibleName(/^11:20am–12:20pm/);
-    await expect(page.getByTestId("denise-badge")).toHaveCount(0);
+    await expect(panel.getByTestId("denise-message")).toHaveCount(0);
     await expect(panel.locator("[data-pose]")).toHaveAttribute("data-pose", "wave");
 
     // Logged and notified.
@@ -164,11 +182,11 @@ test.describe("front desk", () => {
     await panel.getByRole("button", { name: "Dismiss" }).click();
     await expect(panel.getByRole("status")).toContainText("Okay, I'll leave that one.");
     await expect(panel.getByTestId("denise-message")).toHaveCount(0);
-    await expect(page.getByTestId("denise-badge")).toHaveCount(0);
 
     // It stays dismissed after a reload.
     await openDay(page);
-    await expect(denisePanel(page).getByTestId("denise-says")).toHaveText("All clear for this day!");
+    await openDenise(page);
+    await expect(denisePanel(page).getByTestId("denise-message")).toHaveCount(0);
   });
 
   test("hands a stylist's clients to others when they're out for the day", async ({ page }) => {
@@ -242,8 +260,14 @@ test.describe("stylist", () => {
 test.describe("reduced motion", () => {
   test.use({ storageState: AUTH.frontDesk, reducedMotion: "reduce" });
 
-  test("changes Denise's pose instantly", async ({ page }) => {
+  test("changes Denise's pose instantly, and her badge doesn't bounce", async ({ page }) => {
     await openDay(page);
+    const badge = page.getByTestId("denise-launcher-badge");
+    await expect(badge).toHaveAttribute("data-bounce", "true");
+    expect(parseFloat(await badge.evaluate((el) => getComputedStyle(el).animationDuration))).toBeLessThan(0.001);
+    const aside = page.locator("aside[aria-label='Assistant and booking details']");
+    expect(parseFloat(await aside.evaluate((el) => getComputedStyle(el).transitionDuration))).toBeLessThan(0.001);
+    await openDenise(page);
     const image = denisePanel(page).locator("[data-pose] img").first();
     await expect(image).toBeVisible();
     const seconds = parseFloat(await image.evaluate((el) => getComputedStyle(el).transitionDuration));

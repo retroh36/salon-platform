@@ -13,7 +13,7 @@ import { Listbox } from "@/components/ui/listbox";
 import { Segmented } from "@/components/ui/segmented";
 import { Tabs } from "@/components/ui/tabs";
 import { isEditable, STATUS_LABELS } from "@/lib/appointments";
-import type { ChatMessage, ConflictView, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
+import type { ChatMessage, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
 import { FAMILIES, FAMILY_LABELS, hourMarks, laneBox, layoutColumn, type ServiceFamily } from "@/lib/calendar";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, toLocal } from "@/lib/scheduling/time";
@@ -77,7 +77,6 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [preview, setPreview] = useState<Preview | null>(null);
-  const [toast, setToast] = useState<ConflictView | null>(null);
   // Conflicts with nothing to approve, dismissed for now.
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
   if (shownDate !== data.date) {
@@ -88,8 +87,11 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     setPreview(null);
   }
   const [tab, setTab] = useState<Tab>("denise");
-  // Below 1600px the panel slides over the calendar when opened.
+  // The panel is closed until something opens it: a booking, a new
+  // booking, Denise spotting something, or a question for her.
   const [panelOpen, setPanelOpen] = useState(false);
+  // What Denise has that hasn't been looked at in her panel yet.
+  const [unseen, setUnseen] = useState<ReadonlySet<string>>(new Set());
 
   const [department, setDepartment] = useState<"all" | ServiceFamily>("all");
   const [notice, setNotice] = useState<string | null>(null);
@@ -113,15 +115,21 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     setPanelOpen(true);
   };
 
-  // Shows Denise's latest view. A conflict she hasn't shown before pops up
-  // a notice and opens her panel at it.
+  // Shows Denise's latest view. A conflict or reorder she hasn't shown
+  // before opens her panel at it; anything else new makes her badge bounce.
+  // Reorders already waiting when the calendar opens just make her badge
+  // bounce; one drafted while it's open opens her panel.
   const seen = useRef(new Set<string>());
+  const looked = useRef(false);
   const showDenise = useCallback((state: DeniseState, forData: BoardData) => {
     setDenise({ state, for: forData });
-    const fresh = state.conflicts.filter((c) => !seen.current.has(c.subject));
-    for (const c of state.conflicts) seen.current.add(c.subject);
-    if (fresh.length) {
-      setToast(fresh[0]);
+    const keys = deniseKeys(state);
+    const fresh = keys.filter((k) => !seen.current.has(k));
+    for (const k of keys) seen.current.add(k);
+    const first = !looked.current;
+    looked.current = true;
+    if (fresh.length) setUnseen((all) => new Set([...all, ...fresh]));
+    if (fresh.some((k) => k.startsWith("conflict:") || (!first && k.startsWith("reorder:")))) {
       setTab("denise");
       setPanelOpen(true);
     }
@@ -136,14 +144,25 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     });
   }, [data, showDenise]);
 
+  // Escape closes the panel (unless a menu or picker inside it is open).
   useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 8000);
-    return () => clearTimeout(timer);
-  }, [toast]);
+    if (!panelOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if ((e.target as HTMLElement | null)?.closest?.("[role=dialog], [role=listbox]")) return;
+      setPanelOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [panelOpen]);
+
+  // Looking at Denise's panel clears what was new.
+  if (panelOpen && tab === "denise" && unseen.size) setUnseen(new Set());
 
   const deniseState = denise && denise.state.date === data.date ? denise.state : null;
   const conflicts = (deniseState?.conflicts ?? []).filter((c) => !dismissed.has(c.subject));
+  // How many things Denise wants looked at.
+  const attention = conflicts.length + (deniseState?.notices.length ?? 0) + (deniseState?.reorders.length ?? 0);
   const scanning = denise?.for !== data;
 
   async function decide(run: () => Promise<FixResult>, undoActionId: string | null) {
@@ -170,7 +189,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     setChat([...history, reply]);
   }
   const onReported = (state: DeniseState) => {
-    seen.current.clear();
+    for (const k of [...seen.current]) if (k.startsWith("conflict:")) seen.current.delete(k);
     showDenise(state, data);
   };
 
@@ -270,8 +289,12 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     });
   }
 
+  // A click on empty calendar space closes the panel (and does nothing
+  // else); with it closed, it starts a booking there.
   function onSlotClick(e: React.MouseEvent<HTMLElement>, column: ColumnData) {
-    if (!me.canBook || (e.target as HTMLElement).closest("[data-block]")) return;
+    if ((e.target as HTMLElement).closest("[data-block]")) return;
+    if (panelOpen) return setPanelOpen(false);
+    if (!me.canBook) return;
     const top = e.currentTarget.getBoundingClientRect().top;
     const minute = range.start + Math.floor((e.clientY - top) / PX_PER_MINUTE / SLOT_STEP) * SLOT_STEP;
     select({ kind: "book", start: { staffId: column.staffId, startMinute: Math.min(minute, range.end - SLOT_STEP) } });
@@ -358,18 +381,6 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                 { value: "week", label: "Week", disabled: true, title: "Week view is coming soon" },
               ]}
             />
-            <button
-              type="button"
-              className={buttonClass("secondary", "md", "min-[100rem]:hidden")}
-              onClick={() => {
-                setTab("denise");
-                setPanelOpen(true);
-              }}
-            >
-              <DeniseFace size={22} />
-              Denise
-              <DeniseBadge count={conflicts.length} />
-            </button>
           </div>
         </div>
 
@@ -547,22 +558,17 @@ export function CalendarBoard({ data }: { data: BoardData }) {
         <Legend />
       </div>
 
-      {/* The assistant and booking details: a column on wide screens (1600px
-          and up), a panel that slides over the calendar on narrower ones. */}
-      <div
-        aria-hidden
-        onClick={() => setPanelOpen(false)}
-        className={`fixed inset-0 z-40 bg-ink/20 transition-opacity duration-(--motion-base) min-[100rem]:hidden ${panelOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-      />
+      {/* Denise and booking details: a panel that slides over the calendar
+          when something opens it. */}
       <aside
         aria-label="Assistant and booking details"
-        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col gap-4 border-l border-line bg-surface p-4 shadow-panel transition-[transform,visibility] duration-(--motion-slow) ease-out min-[100rem]:visible min-[100rem]:static min-[100rem]:z-auto min-[100rem]:w-96 min-[100rem]:max-w-none min-[100rem]:translate-x-0 min-[100rem]:shadow-none ${
+        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col gap-4 border-l border-line bg-surface p-4 shadow-panel transition-[transform,visibility] duration-(--motion-slow) ease-out sm:w-96 ${
           // Closed, it's hidden once it has slid away, so keyboard focus skips it.
           panelOpen ? "visible translate-x-0" : "invisible translate-x-full"
         }`}
       >
-        <div className="flex items-center gap-2 min-[100rem]:hidden">
-          <span className="font-serif text-lg font-semibold text-plum-900">Assistant</span>
+        <div className="flex items-center gap-2">
+          <span className="font-serif text-lg font-semibold text-plum-900">{tab === "denise" ? "Denise" : "Booking details"}</span>
           <IconButton label="Close panel" className="ml-auto" onClick={() => setPanelOpen(false)}>
             <CloseIcon />
           </IconButton>
@@ -573,7 +579,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           onChange={setTab}
           panelKey={`${tab}-${selection.kind}-${"appointmentId" in selection ? selection.appointmentId : ""}`}
           tabs={[
-            { value: "denise", label: "Denise", icon: <DeniseFace size={20} />, badge: <DeniseBadge count={conflicts.length} /> },
+            { value: "denise", label: "Denise", icon: <DeniseFace size={20} />, badge: <DeniseBadge count={attention} /> },
             { value: "details", label: "Booking details", icon: <CalendarIcon className="size-4" /> },
           ]}
         >
@@ -625,21 +631,27 @@ export function CalendarBoard({ data }: { data: BoardData }) {
         </Tabs>
       </aside>
 
-      {toast && (
-        <DeniseToast
-          conflict={toast}
-          // Below 1600px the open panel already shows it; don't cover it.
-          hidden={panelOpen}
-          onShow={() => {
-            setToast(null);
+      {!panelOpen && (
+        <DeniseLauncher
+          count={attention}
+          bounce={unseen.size > 0}
+          onOpen={() => {
             setTab("denise");
             setPanelOpen(true);
           }}
-          onClose={() => setToast(null)}
         />
       )}
     </div>
   );
+}
+
+// Everything Denise is showing, as stable keys, for spotting what's new.
+function deniseKeys(state: DeniseState): string[] {
+  return [
+    ...state.conflicts.map((c) => `conflict:${c.subject}`),
+    ...state.notices.map((n) => `notice:${n.id}`),
+    ...state.reorders.map((r) => `reorder:${r.supplierId}:${r.headline}`),
+  ];
 }
 
 function AskDeniseBar({ onAsk }: { onAsk: (question: string) => void }) {
@@ -684,27 +696,29 @@ function DeniseBadge({ count }: { count: number }) {
   );
 }
 
-// A small notice when Denise spots a new conflict.
-function DeniseToast({ conflict, hidden, onShow, onClose }: { conflict: ConflictView; hidden: boolean; onShow: () => void; onClose: () => void }) {
+// Denise's face in the corner while her panel is closed. Her badge counts
+// what she wants looked at, and bounces gently when something is new.
+function DeniseLauncher({ count, bounce, onOpen }: { count: number; bounce: boolean; onOpen: () => void }) {
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      data-testid="denise-toast"
-      className={`fixed right-4 bottom-4 z-[60] flex w-80 min-[100rem]:right-[25rem] ${hidden ? "max-[100rem]:hidden" : ""} max-w-[calc(100vw-2rem)] animate-toast-in items-start gap-3 rounded-xl border border-denise-200 bg-surface p-3 shadow-lift`}
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={count ? `Open Denise (${count} to look at)` : "Open Denise"}
+      data-testid="denise-launcher"
+      className="fixed right-5 bottom-5 z-40 flex size-14 animate-pop-in items-center justify-center rounded-full bg-surface shadow-lift ring-1 ring-denise-200 transition-transform duration-(--motion-fast) hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-plum-700 active:scale-95"
     >
-      <DeniseFace size={36} />
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-semibold text-denise-700">Denise</p>
-        <p className="text-sm text-ink">{conflict.headline}</p>
-        <button type="button" className={buttonClass("secondary", "sm", "mt-2")} onClick={onShow}>
-          {conflict.options.length ? "See my fix" : "Take a look"}
-        </button>
-      </div>
-      <IconButton label="Dismiss notification" size="sm" onClick={onClose}>
-        <CloseIcon className="size-4" />
-      </IconButton>
-    </div>
+      <DeniseFace size={48} />
+      {count > 0 && (
+        <span
+          data-testid="denise-launcher-badge"
+          data-bounce={bounce || undefined}
+          aria-hidden
+          className={`absolute -top-1 -right-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-denise-600 px-1.5 text-xs font-semibold text-white ring-2 ring-surface ${bounce ? "animate-soft-bounce" : ""}`}
+        >
+          {count}
+        </span>
+      )}
+    </button>
   );
 }
 

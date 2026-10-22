@@ -335,22 +335,39 @@ test.describe("design", () => {
     expect(await duration()).toBeLessThan(0.001);
   });
 
-  test("slides the panel over the calendar on narrower screens", async ({ page }) => {
-    await page.setViewportSize({ width: 1100, height: 800 });
-    await openDay(page, QUIET_TUESDAY);
-    const aside = page.getByRole("complementary", { name: "Assistant and booking details" });
-    await expect(aside).toBeHidden();
+  for (const width of [1100, 1920]) {
+    test(`keeps the panel closed until something opens it (${width}px)`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await openDay(page, QUIET_TUESDAY);
+      const aside = page.getByRole("complementary", { name: "Assistant and booking details" });
+      await expect(aside).toBeHidden();
+      // The calendar uses the full width.
+      const grid = await ui(page).getByTestId("calendar-grid").boundingBox();
+      expect(grid!.x + grid!.width).toBeGreaterThan(width - 40);
 
-    await waitForHydration(page, "[data-block]");
-    await ui(page).getByRole("button", { name: /^Denise/ }).click();
-    await expect(aside).toBeVisible();
-    await aside.getByRole("button", { name: "Close panel" }).click();
-    await expect(aside).toBeHidden();
+      // Denise's face opens her panel; the X and Escape close it.
+      await waitForHydration(page, "[data-block]");
+      await page.getByTestId("denise-launcher").click();
+      await expect(aside).toBeVisible();
+      await expect(aside.getByRole("tab", { name: /Denise/ })).toHaveAttribute("aria-selected", "true");
+      await expect(page.getByTestId("denise-launcher")).toHaveCount(0);
+      await aside.getByRole("button", { name: "Close panel" }).click();
+      await expect(aside).toBeHidden();
+      await page.getByTestId("denise-launcher").click();
+      await expect(aside).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(aside).toBeHidden();
 
-    // Opening a booking slides it in on the details tab.
-    await column(page, "Priya Shah").getByRole("button", { name: /Ava Test/ }).click({ position: { x: 10, y: 5 } });
-    await expect(aside.getByRole("tabpanel", { name: "Booking details" })).toContainText("All-Over Color");
-  });
+      // An appointment opens its details; empty calendar space closes them
+      // without starting a booking.
+      await column(page, "Priya Shah").getByRole("button", { name: /Ava Test/ }).click({ position: { x: 10, y: 5 } });
+      await expect(aside.getByRole("tabpanel", { name: "Booking details" })).toContainText("All-Over Color");
+      const box = (await column(page, "Ethan Brooks").boundingBox())!;
+      await column(page, "Ethan Brooks").click({ position: { x: 20, y: box.height - 20 } });
+      await expect(aside).toBeHidden();
+      await expect(aside.getByRole("form", { name: "New booking" })).toHaveCount(0);
+    });
+  }
 });
 
 test.describe("stylists", () => {

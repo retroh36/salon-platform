@@ -8,7 +8,9 @@ import { claudeClient, explainFixes, isConnected } from "@/lib/denise/claude";
 import { approveFix, rejectFix, undoFix } from "@/lib/denise/fixes";
 import { scanDay, type Viewer } from "@/lib/denise/scan";
 import type { ChatMessage, DeniseState, FixResult } from "@/lib/denise/types";
+import { suggestReorders } from "@/lib/denise/reorder";
 import { isUuid } from "@/lib/ids";
+import { canReceiveOrders } from "@/lib/inventory";
 import { recordProposals } from "@/lib/scheduling/ai-actions";
 import type { BookingContext } from "@/lib/scheduling/booking";
 import { LATE_MINUTES, reportCallOut, reportRunningLate } from "@/lib/scheduling/disruptions";
@@ -36,12 +38,22 @@ async function session() {
 type Session = NonNullable<Awaited<ReturnType<typeof session>>>;
 
 async function look(s: Session, date: string): Promise<DeniseState> {
-  // Past days can't be changed, so there's nothing to fix.
   const connected = isConnected();
-  if (date < s.today) return { date, conflicts: [], notices: [], connected };
+  // Reorders she's drafted on the Inventory page, for those who order.
+  const reorders = canReceiveOrders(s.me.role)
+    ? (await suggestReorders(s.supabase, { location: s.viewer.location, canManage: false })).map((r) => ({
+        supplierId: r.supplierId,
+        supplier: r.supplier,
+        headline: r.headline,
+        lines: r.lines.length,
+        totalCents: r.totalCents,
+      }))
+    : [];
+  // Past days can't be changed, so there's nothing to fix.
+  if (date < s.today) return { date, conflicts: [], notices: [], reorders, connected };
   const client = claudeClient();
   const state = await scanDay(s.supabase, s.viewer, date, { explain: client ? (facts) => explainFixes(client, facts) : null });
-  return { ...state, connected };
+  return { ...state, reorders, connected };
 }
 
 // Denise looks over the day: conflicts, her fixes, and notices.

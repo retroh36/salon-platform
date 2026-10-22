@@ -43,10 +43,14 @@ export type ConflictView = {
 
 export type DeniseNotice = { id: string; appointmentId: string; itemId: string; text: string };
 
+// A reorder Denise has drafted on the Inventory page.
+export type ReorderNotice = { supplierId: string; supplier: string; headline: string; lines: number; totalCents: number };
+
 export type DeniseState = {
   date: string;
   conflicts: ConflictView[];
   notices: DeniseNotice[];
+  reorders: ReorderNotice[];
   // Whether Claude is connected (ANTHROPIC_API_KEY is set).
   connected: boolean;
 };
