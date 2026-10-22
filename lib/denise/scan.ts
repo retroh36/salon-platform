@@ -37,7 +37,7 @@ export async function loadDay(supabase: Supabase, viewer: Viewer, date: LocalDat
   const appointmentIds = [...new Set(ctx.booked.map((b) => b.appointmentId!))];
   const [visits, staff, services, resources, disruptions] = await Promise.all([
     appointmentIds.length
-      ? supabase.from("appointments").select("id, status, client:clients(id, first_name, last_name)").in("id", appointmentIds)
+      ? supabase.from("appointments").select("id, status, group_id, group:appointment_groups(id, label), client:clients(id, first_name, last_name)").in("id", appointmentIds)
       : Promise.resolve({ data: [], error: null }),
     supabase.from("staff").select("id, first_name"),
     supabase.from("services").select("id, name"),
@@ -52,11 +52,17 @@ export async function loadDay(supabase: Supabase, viewer: Viewer, date: LocalDat
   const visitMap = new Map<string, Visit>(
     visits.data.map((v) => [
       v.id,
-      { status: v.status, client: v.client ? { id: v.client.id, firstName: v.client.first_name, fullName: fullName(v.client) } : null },
+      { status: v.status, client: v.client ? { id: v.client.id, firstName: v.client.first_name, fullName: fullName(v.client) } : null, group: v.group },
     ]),
   );
   return {
-    day: { ctx, statuses: new Map(visits.data.map((v) => [v.id, v.status])), disruptions, now },
+    day: {
+      ctx,
+      statuses: new Map(visits.data.map((v) => [v.id, v.status])),
+      disruptions,
+      now,
+      groups: new Map(visits.data.flatMap((v) => (v.group_id ? [[v.id, v.group_id] as const] : []))),
+    },
     lookup: {
       timeZone: viewer.location.timezone,
       salon: viewer.salon,

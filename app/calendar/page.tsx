@@ -45,7 +45,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     supabase
       .from("appointment_items")
       .select(
-        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, price_cents, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, created_at, updated_at, created_by, updated_by, series_id, series_index, series:appointment_series(interval_weeks), client:clients(id, first_name, last_name, phone, email, allergies, preferences))",
+        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, price_cents, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, created_at, updated_at, created_by, updated_by, series_id, series_index, series:appointment_series(interval_weeks), group:appointment_groups(id, label), client:clients(id, first_name, last_name, phone, email, allergies, preferences))",
       )
       .eq("location_id", me.location.id)
       .lt("starts_at", dayEnd.toISOString())
@@ -133,7 +133,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       staffId: row.staff_id,
       segments: itemSegments(item).map((s) => ({ kind: s.kind, start: toMinute(s.start), end: toMinute(s.end) })),
       family: serviceFamily(row.service.category, row.service.name),
-      clientName: client ? fullName(client) : "Walk-in",
+      clientName: client ? fullName(client) : a.group ? `${a.group.label} guest` : "Walk-in",
       service: row.service.name,
       resource: row.resource?.name ?? null,
       with: [...staffByAppointment.get(row.appointment_id)!]
@@ -141,6 +141,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
         .map((id) => staffById.get(id)?.first_name ?? "another stylist"),
       status: a.status as AppointmentStatus,
       series: Boolean(a.series_id),
+      group: a.group,
     });
     appointments[a.id] ??= {
       id: a.id,
@@ -154,6 +155,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       changedBy: changedLine(a),
       formulas: [],
       warnings: null,
+      group: a.group ? { ...a.group, members: [] } : null,
       series: a.series_id ? { id: a.series_id, index: a.series_index!, count: seriesCounts.get(a.series_id) ?? 1, intervalWeeks: a.series?.interval_weeks ?? 1 } : null,
     };
     const staffMember = staffById.get(row.staff_id);
@@ -168,6 +170,21 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       resourceName: row.resource?.name ?? null,
       priceCents: row.price_cents,
     });
+  }
+
+  // Each group's guests that day, in start order.
+  const visits = Object.values(appointments);
+  for (const v of visits) {
+    if (!v.group) continue;
+    v.group.members = visits
+      .filter((o) => o.group?.id === v.group!.id)
+      .map((o) => ({
+        appointmentId: o.id,
+        clientName: o.client?.name ?? `${o.group!.label} guest`,
+        staffName: o.items[0]?.staffName ?? "",
+        start: Math.min(...o.items.map((i) => i.start)),
+      }))
+      .sort((x, y) => x.start - y.start);
   }
 
   const appointmentOfItem = new Map(items.map((i) => [i.id, i.appointment_id]));

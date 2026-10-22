@@ -19,6 +19,10 @@
 //   3. the smallest total delay, counting a move to another stylist as
 //      STYLIST_CHANGE_MINUTES of delay (so the same stylist a little later
 //      beats another stylist straight away, but not a long wait).
+// Group bookings stay together when they can: splitting a group (moving
+// some guests and not others, or by different amounts) costs as much as
+// moving every guest plus GROUP_SPLIT_MINUTES each, so the whole party
+// moves by the same amount if it fits within about that much.
 // Each candidate place is checked with the booking rules, so processing
 // gaps are used where a client fits in them. Moving a client later can push
 // the same stylist's next client along (and so on). Every option is checked
@@ -54,6 +58,9 @@ export type BlockMove = { blockId: string; date: string; staffId: string; kind: 
 // Moving a lunch or break counts like this many minutes of delay, plus the
 // minutes it moves.
 export const BLOCK_MOVE_MINUTES = 10;
+// Per guest, for splitting a group booking (on top of a client moved for
+// each guest but one).
+export const GROUP_SPLIT_MINUTES = 60;
 
 export type FixOption = {
   moves: ItemChange[];
@@ -92,6 +99,8 @@ export type Day = {
   statuses: ReadonlyMap<string, AppointmentStatus>;
   disruptions: readonly Disruption[];
   now: Date;
+  // Appointment id -> its group booking.
+  groups?: ReadonlyMap<string, string>;
 };
 
 export function isMovable(status: AppointmentStatus | undefined): boolean {
@@ -447,6 +456,9 @@ function expand(s: Search, state: State): State[] {
     }
   }
 
+  const together = partyMove(s, state, first, anchor, latest);
+  if (together) candidates.push(together);
+
   const states = candidates.map((c) => {
     const placed = new Map(state.placed);
     for (const [id, place] of c.moves) placed.set(id, place);
@@ -461,6 +473,29 @@ function expand(s: Search, state: State): State[] {
   // Leaving it where it is (unsolved) is always possible, and always last.
   states.push(withScores(s, { placed: state.placed, blockMoves: state.blockMoves, pending: rest, unresolved: [...state.unresolved, first.itemId], estimate: 0, score: 0 }));
   return states;
+}
+
+// The anchor's whole group booking moved by the same amount, at the
+// earliest time every guest fits with their own stylist: keeping the party
+// together. Null if it isn't in a group, or a guest can't move.
+function partyMove(s: Search, state: State, first: Pending, anchor: BookedItem, latest: number): Candidate | null {
+  const groupId = s.day.groups?.get(anchor.appointmentId!);
+  if (!groupId) return null;
+  const party = s.eff.booked
+    .filter((b): b is BookedItem & { id: string } => !!b.id && s.day.groups!.get(b.appointmentId!) === groupId)
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+  if (party.some((b) => state.placed.has(b.id) || s.pinned.has(b.id) || !isMovable(s.day.statuses.get(b.appointmentId!)))) return null;
+  if (new Set(party.map((b) => b.appointmentId)).size < 2) return null;
+  const off = new Set(party.map((b) => b.id));
+  // From where each guest is booked, so a late guest's party moves with them.
+  const booked = (b: BookedItem & { id: string }) => s.real.get(b.id)!.start.getTime();
+  for (let t = first.earliest; t <= latest; t += STEP * MINUTE) {
+    const delta = t - booked(anchor as BookedItem & { id: string });
+    if (delta === 0 || party.some((b) => booked(b) + delta < s.earliestStart)) continue;
+    const moves = new Map<string, Placement>(party.map((b) => [b.id, { staffId: b.staffId, resourceId: b.resourceId ?? null, start: new Date(booked(b) + delta) }]));
+    if (!tryPlace(s, state, party, moves, off).length) return { moves, bumped: [] };
+  }
+  return null;
 }
 
 // Problems with putting the group in its new places.
@@ -563,8 +598,30 @@ function measure(s: Search, state: State) {
   const shiftMinutes = [...shiftByVisit.values()].reduce((sum, m) => sum + m, 0);
   const clientsMoved = shiftByVisit.size;
   const blockMinutes = [...state.blockMoves.values()].reduce((sum, m) => sum + BLOCK_MOVE_MINUTES + Math.abs(m.to.start.getTime() - m.from.start.getTime()) / MINUTE, 0);
-  const score = state.unresolved.length * 100_000 + clientsMoved * 1000 + shiftMinutes + stylistChanges * STYLIST_CHANGE_MINUTES + blockMinutes;
+  const score = state.unresolved.length * 100_000 + clientsMoved * 1000 + shiftMinutes + stylistChanges * STYLIST_CHANGE_MINUTES + blockMinutes + splitCost(s, state);
   return { clientsMoved, shiftMinutes, stylistChanges, score };
+}
+
+// What splitting group bookings up costs: about what moving every guest an
+// hour later would, so keeping the party together wins when it fits.
+function splitCost(s: Search, state: State): number {
+  if (!s.day.groups?.size || !state.placed.size) return 0;
+  const shifts = new Map<string, Map<string, number>>();
+  // A visit's shift is its first service's.
+  const inOrder = [...s.real.values()].sort((a, b) => a.start.getTime() - b.start.getTime());
+  for (const b of inOrder) {
+    const groupId = s.day.groups.get(b.appointmentId!);
+    if (!groupId) continue;
+    const visits = shifts.get(groupId) ?? new Map<string, number>();
+    if (!visits.has(b.appointmentId!)) {
+      const to = state.placed.get(b.id);
+      visits.set(b.appointmentId!, to ? to.start.getTime() - b.start.getTime() : 0);
+    }
+    shifts.set(groupId, visits);
+  }
+  let cost = 0;
+  for (const visits of shifts.values()) if (new Set(visits.values()).size > 1) cost += (visits.size - 1) * 1000 + visits.size * GROUP_SPLIT_MINUTES;
+  return cost;
 }
 
 // A finished plan as an option, if it passes the booking rules as a whole.

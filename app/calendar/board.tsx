@@ -18,7 +18,7 @@ import { FAMILIES, FAMILY_LABELS, hourMarks, laneBox, layoutColumn, type Service
 import { BLOCK_LABELS } from "@/lib/scheduling/blocks";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, toLocal } from "@/lib/scheduling/time";
-import { moveVisitItem, moveVisitItemScoped } from "./actions";
+import { moveGroupVisit, moveVisitItem, moveVisitItemScoped } from "./actions";
 import type { Scope } from "@/lib/scheduling/series";
 import { moveBlock } from "./block-actions";
 import { BlockPanel, repeatLabel } from "./block-panel";
@@ -27,6 +27,7 @@ import { approveDeniseFix, askDenise, bookFromWaitlist, rejectDeniseFix, reportO
 import { DenisePanel, type Outcome, type Preview } from "./denise-panel";
 import { BookingPanel, type BookingStart } from "./booking-panel";
 import { WalkInPanel } from "./walk-in-panel";
+import { GroupPanel } from "./group-panel";
 import { NowLine, useNow } from "./now-line";
 import type { BlockData, BoardData, ColumnData, TimeBlockData } from "./types";
 
@@ -44,7 +45,8 @@ type Selection =
   | { kind: "book"; start: BookingStart }
   | { kind: "edit"; appointmentId: string }
   | { kind: "detail"; appointmentId: string }
-  | { kind: "walk-ins" };
+  | { kind: "walk-ins" }
+  | { kind: "group"; start: BookingStart };
 
 type Tab = "denise" | "details";
 
@@ -241,6 +243,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const blocks = data.blocks.map(placed);
   const canMove = (b: BlockData) => me.canBook && isEditable(b.status);
   const selectedAppointment = selection.kind === "detail" || selection.kind === "edit" ? selection.appointmentId : null;
+  const selectedGroup = selectedAppointment ? (data.appointments[selectedAppointment]?.group?.id ?? null) : null;
 
   // Off-duty stylists with nothing booked fold to a thin column.
   const collapsed = (c: ColumnData) => !c.working && !expanded.has(c.staffId) && !blocks.some((b) => b.staffId === c.staffId);
@@ -298,20 +301,18 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     justDragged.current = true;
     if (d.staffId === d.fromStaffId && d.start === d.fromStart) return;
     const move = { itemId: d.itemId, staffId: d.staffId, start: d.start };
-    // A repeating visit asks which visits to move first.
-    if (b.series) return setPendingMove({ move, block: b });
+    // A repeating or group visit asks which visits to move first.
+    if (b.series || b.group) return setPendingMove({ move, block: b });
     runMove(move, b, "this");
   }
 
-  function runMove(move: Move, b: BlockData, scope: Scope) {
+  function runMove(move: Move, b: BlockData, scope: Scope | "group") {
     setNotice(null);
     setSettling(move.itemId);
     startTransition(async () => {
       addMove(move);
-      const result =
-        scope === "this"
-          ? await moveVisitItem({ itemId: move.itemId, staffId: move.staffId, date: data.date, startMinute: move.start })
-          : await moveVisitItemScoped({ itemId: move.itemId, staffId: move.staffId, date: data.date, startMinute: move.start }, scope);
+      const input = { itemId: move.itemId, staffId: move.staffId, date: data.date, startMinute: move.start };
+      const result = scope === "this" ? await moveVisitItem(input) : scope === "group" ? await moveGroupVisit(input) : await moveVisitItemScoped(input, scope);
       if (!result.ok) setNotice(`Couldn't move ${b.clientName}'s ${b.service}: ${result.message}`);
       else if ((result as { message?: string }).message) setDoneMessage((result as { message?: string }).message!);
     });
@@ -650,6 +651,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                               dragging={drag?.moved === true && drag.itemId === b.itemId}
                               selected={b.appointmentId === selectedAppointment}
                               highlight={highlighted.has(b.itemId)}
+                              grouped={!!selectedGroup && b.group?.id === selectedGroup && b.appointmentId !== selectedAppointment}
                               settling={settling === b.itemId}
                               onSettled={() => setSettling(null)}
                               onPointerDown={(e) => onPointerDown(e, b)}
@@ -737,6 +739,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               onEdit={() => select({ kind: "edit", appointmentId: selection.appointmentId })}
               onClose={closeDetails}
               onReported={onReported}
+              onOpenVisit={(appointmentId) => select({ kind: "detail", appointmentId })}
               products={data.menu.products}
             />
           ) : selection.kind === "walk-ins" ? (
@@ -759,6 +762,17 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                 if (message) setDoneMessage(message);
               }}
               onBlockInstead={blockStaff.includes(selection.start.staffId) ? () => select({ kind: "new-block", start: selection.start }) : undefined}
+              onGroupInstead={() => select({ kind: "group", start: selection.start })}
+            />
+          ) : selection.kind === "group" ? (
+            <GroupPanel
+              data={data}
+              start={selection.start}
+              onClose={closeDetails}
+              onSaved={(id, message) => {
+                select({ kind: "detail", appointmentId: id });
+                setDoneMessage(message);
+              }}
             />
           ) : selection.kind === "new-block" || (selection.kind === "block" && data.timeBlocks.some((b) => b.blockId === selection.blockId)) ? (
             <BlockPanel
@@ -798,7 +812,18 @@ export function CalendarBoard({ data }: { data: BoardData }) {
 
       {pendingMove && (
         <ScopeDialog
-          title={`Move ${pendingMove.block.clientName}'s repeating visit`}
+          title={`Move ${pendingMove.block.clientName}'s ${pendingMove.block.group ? "group" : "repeating"} visit`}
+          note={pendingMove.block.group ? `This visit is part of ${pendingMove.block.group.label}.` : "This visit is part of a series."}
+          options={[
+            ["this", "This visit only"],
+            ...(pendingMove.block.group ? [["group", "The whole group"] as const] : []),
+            ...(pendingMove.block.series
+              ? [
+                  ["following", "This and following visits"] as const,
+                  ["all", "All visits in the series"] as const,
+                ]
+              : []),
+          ]}
           onPick={(scope) => {
             const p = pendingMove;
             setPendingMove(null);
@@ -874,6 +899,16 @@ function DeniseBadge({ count }: { count: number }) {
   );
 }
 
+// The icon on visits that are part of a group booking.
+function GroupIcon({ className = "size-4" }: { className?: string }) {
+  return (
+    <svg role="img" aria-label="Group booking" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14a6.5 6.5 0 0 1 3.5 6" />
+    </svg>
+  );
+}
+
 // The repeat icon on visits that are part of a series.
 function RepeatIcon({ className = "size-4", label }: { className?: string; label?: string }) {
   return (
@@ -883,9 +918,21 @@ function RepeatIcon({ className = "size-4", label }: { className?: string; label
   );
 }
 
-// "This visit, this and following, or all?" for a change to a repeating
-// visit.
-function ScopeDialog({ title, onPick, onCancel }: { title: string; onPick: (scope: Scope) => void; onCancel: () => void }) {
+// "This visit, the whole group, this and following, or all?" for a change
+// to a repeating or group visit.
+function ScopeDialog({
+  title,
+  note,
+  options,
+  onPick,
+  onCancel,
+}: {
+  title: string;
+  note: string;
+  options: (readonly [Scope | "group", string])[];
+  onPick: (scope: Scope | "group") => void;
+  onCancel: () => void;
+}) {
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/30 p-4" onClick={onCancel}>
       <div
@@ -897,12 +944,12 @@ function ScopeDialog({ title, onPick, onCancel }: { title: string; onPick: (scop
         className="flex w-full max-w-sm animate-pop-in flex-col gap-3 rounded-xl border border-line bg-surface p-5 shadow-lift"
       >
         <h2 className="font-serif text-xl font-semibold text-plum-900">{title}</h2>
-        <p className="text-sm text-ink-muted">This visit is part of a series.</p>
-        <Button variant="primary" autoFocus onClick={() => onPick("this")}>
-          This visit only
-        </Button>
-        <Button onClick={() => onPick("following")}>This and following visits</Button>
-        <Button onClick={() => onPick("all")}>All visits in the series</Button>
+        <p className="text-sm text-ink-muted">{note}</p>
+        {options.map(([value, label], i) => (
+          <Button key={value} variant={i === 0 ? "primary" : "secondary"} autoFocus={i === 0} onClick={() => onPick(value)}>
+            {label}
+          </Button>
+        ))}
         <Button variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
@@ -1190,6 +1237,7 @@ function AppointmentBlock({
   dragging,
   selected,
   highlight,
+  grouped,
   settling,
   onSettled,
   onOpen,
@@ -1203,6 +1251,8 @@ function AppointmentBlock({
   selected: boolean;
   // Denise is talking about it.
   highlight: boolean;
+  // In the same group booking as the selected visit.
+  grouped: boolean;
   settling: boolean;
   onSettled: () => void;
   onOpen: () => void;
@@ -1245,7 +1295,14 @@ function AppointmentBlock({
   const [first, ...rest] = block.clientName.split(" ");
   const names = [block.clientName, ...(rest.length ? [`${first} ${rest.at(-1)![0]}.`, first] : []), initials(block.clientName)];
   const plainService = block.service.replace(/\s*\([^)]*\)/g, "");
-  const services = [...new Set([...(block.with.length ? [`${block.service} · with ${block.with.join(", ")}`] : []), block.service, plainService])];
+  const services = [
+    ...new Set([
+      ...(block.group ? [`${block.service} · ${block.group.label}`] : []),
+      ...(block.with.length ? [`${block.service} · with ${block.with.join(", ")}`] : []),
+      block.service,
+      plainService,
+    ]),
+  ];
   const times = [time, formatMinute(block.start)];
 
   const label = [
@@ -1256,6 +1313,7 @@ function AppointmentBlock({
     block.with.length > 0 && `with ${block.with.join(" and ")}`,
     block.resource,
     block.series && "repeating",
+    block.group && `group: ${block.group.label}`,
     STATUS_LABELS[block.status],
     late && "running late",
   ]
@@ -1274,6 +1332,7 @@ function AppointmentBlock({
         data-family={block.family}
         data-faded={faded || undefined}
         data-denise-highlight={highlight || undefined}
+        data-group-highlight={grouped || undefined}
         onClick={onOpen}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -1285,7 +1344,7 @@ function AppointmentBlock({
         {...pointer}
         className={`absolute block touch-none overflow-hidden rounded-md border-l-4 bg-surface text-left select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-plum-700 ${
           faded ? "text-ink-muted" : "text-ink shadow-card"
-        } ${selected ? "ring-2 ring-plum-900" : highlight ? "animate-glow ring-2 ring-denise-500" : "ring-1 ring-surface"} ${draggable ? "cursor-grab" : "cursor-pointer"} ${
+        } ${selected ? "ring-2 ring-plum-900" : highlight ? "animate-glow ring-2 ring-denise-500" : grouped ? "ring-2 ring-plum-700/60" : "ring-1 ring-surface"} ${draggable ? "cursor-grab" : "cursor-pointer"} ${
           dragging ? "opacity-40 shadow-none outline-2 outline-ink-subtle outline-dashed" : ""
         } ${settling ? "animate-settle" : ""}`}
         style={{
@@ -1308,6 +1367,7 @@ function AppointmentBlock({
         ))}
         {show.name && (
           <span aria-hidden className={`relative flex items-center gap-1.5 pt-1 ${narrow ? "px-1.5" : "px-2"}`}>
+            {block.group && <GroupIcon className="size-3.5 shrink-0" />}
             {block.series && <RepeatIcon className="size-3 shrink-0" label="Repeating" />}
             <FitText variants={names} className="flex-1 text-sm leading-[18px] font-semibold" />
             {attention && !show.chipLine && <span data-attention={attention} title={ATTENTION[attention].label} className={`size-2.5 shrink-0 rounded-full ${ATTENTION[attention].className}`} style={{ backgroundColor: "currentColor" }} />}

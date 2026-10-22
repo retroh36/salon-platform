@@ -14,6 +14,8 @@ import { describeProblem } from "@/lib/scheduling/booking";
 import { loadBookingContext } from "@/lib/scheduling/load";
 import { MAX_VISITS, planSeries, seriesDates, type Scope, type SeriesEnd } from "@/lib/scheduling/series";
 import { bookSeries, changeSeries, changeSeriesStatus, moveSeriesItem, type VisitResult } from "@/lib/scheduling/series-book";
+import { bookGroup, changeGroupStatus, moveGroupItem } from "@/lib/scheduling/group-book";
+import { MAX_GUESTS } from "@/lib/scheduling/groups";
 import { formatDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn, type LocalDate } from "@/lib/scheduling/time";
 import { fullName } from "@/lib/staff";
@@ -395,4 +397,72 @@ export async function patchTestWarnings(clientId: string, date: LocalDate, lines
   if (!items.length) return { messages: [], blocks: false };
   const warnings = (await visitWarnings(supabase, me.business_id, [{ appointmentId: "new", clientId, start: items[0].start, items }])).get("new");
   return { messages: warnings?.patch ?? [], blocks: warnings?.patchBlocks ?? false };
+}
+
+export type GroupInput = { label: string; date: LocalDate; notes: string; guests: { clientId: string | null; lines: VisitLineInput[] }[] };
+export type GroupSaveResult = { ok: true; appointmentId: string; message: string } | { ok: false; message: string; guestErrors?: string[][] };
+
+// Books a group: every guest's visit, or none if they don't all fit.
+export async function saveGroup(input: GroupInput): Promise<GroupSaveResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
+  const label = input.label.trim();
+  if (!label || label.length > 80) return { ok: false, message: "Give the group a name, like \"Ava's bridal party\"." };
+  if (!isLocalDate(input.date)) return { ok: false, message: "Choose a date." };
+  if (input.guests.length < 2 || input.guests.length > MAX_GUESTS) return { ok: false, message: `A group is 2 to ${MAX_GUESTS} people.` };
+  if (input.guests.some((g) => (g.clientId && !isUuid(g.clientId)) || !g.lines.length || g.lines.some((l) => !isUuid(l.serviceId) || !isUuid(l.staffId) || l.startMinute < 0))) {
+    return { ok: false, message: "Choose a service, stylist and time for each guest." };
+  }
+  const result = await bookGroup(supabase, { ...me.location, businessId: me.business_id }, {
+    label,
+    date: input.date,
+    notes: input.notes.trim().slice(0, MAX_NOTES) || null,
+    guests: input.guests.map((g) => ({ clientId: g.clientId, lines: g.lines.map((l) => ({ serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute, resource: l.resource })) })),
+  });
+  if (result.ok) {
+    refresh();
+    return { ok: true, appointmentId: result.appointmentIds[0], message: `Booked ${input.guests.length} guests for ${label}.` };
+  }
+  if (result.error === "invalid") {
+    return { ok: false, message: "Not everyone fits as planned. Change the highlighted guests.", guestErrors: result.problems.map((g) => g.map((line) => line.map(describeProblem)).flat()).map((g) => [...new Set(g)]) };
+  }
+  if (result.error === "partial") {
+    refresh();
+    return { ok: false, message: `Someone booked a slot at the same moment: ${result.appointmentIds?.length ?? 0} of ${input.guests.length} guests are booked. Book the rest separately.` };
+  }
+  return { ok: false, message: NOT_ALLOWED };
+}
+
+// Moves the whole group by the same amount as a dragged service.
+export async function moveGroupVisit(input: { itemId: string; staffId: string; date: LocalDate; startMinute: number }): Promise<MoveResult & { message?: string }> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(input.itemId) || !isUuid(input.staffId) || !isLocalDate(input.date)) return { ok: false, message: "That move isn't possible." };
+  const start = fromLocal(input.date, input.startMinute, me.location.timezone);
+  if (!start) return { ok: false, message: "That time doesn't exist." };
+  const result = await moveGroupItem(supabase, me.location, { itemId: input.itemId, staffId: input.staffId, start });
+  refresh();
+  if (result.ok) return { ok: true, message: `Moved the whole group (${result.moved} guest${result.moved === 1 ? "" : "s"}).` };
+  if (result.error === "invalid") {
+    const problem = result.problems?.flat()[0];
+    return { ok: false, message: `the whole group doesn't fit there${problem ? ` (${describeProblem(problem).replace(/\.$/, "").toLowerCase()})` : ""}. Nothing was moved.` };
+  }
+  if (result.error === "partial") return { ok: false, message: `someone changed the calendar at the same moment; ${result.moved} guests moved. Check the group.` };
+  return { ok: false, message: "that visit is no longer in a group." };
+}
+
+// Cancels (or marks) every guest in the group.
+export async function changeGroupVisitStatus(appointmentId: string, action: AppointmentAction, reason = "", detail = ""): Promise<ActionResult & { message?: string }> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(appointmentId) || !(action in ACTION_LABELS)) return { ok: false, message: "That appointment no longer exists." };
+  let why: string | null = null;
+  if (action === "cancel") {
+    why = cancelReason(reason, detail);
+    if (!why) return { ok: false, message: reason === "Other" ? "Say why it was canceled." : "Choose a reason." };
+  }
+  const results = await changeGroupStatus(supabase, appointmentId, action, why);
+  refresh();
+  const done = results.filter((r) => r.result.ok).length;
+  return done ? { ok: true, message: `${done} guest${done === 1 ? "" : "s"} ${action === "cancel" ? "canceled" : "updated"}.` } : { ok: false, message: "No visits could be changed." };
 }

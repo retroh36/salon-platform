@@ -36,6 +36,7 @@ export function BookingPanel({
   onClose,
   onSaved,
   onBlockInstead,
+  onGroupInstead,
 }: {
   data: BoardData;
   start?: BookingStart;
@@ -44,6 +45,8 @@ export function BookingPanel({
   onSaved: (appointmentId: string, message?: string) => void;
   // Switch to blocking this time (lunch, a meeting…) instead.
   onBlockInstead?: () => void;
+  // Switch to booking several people as a group.
+  onGroupInstead?: () => void;
 }) {
   const { menu, columns } = data;
   const services = new Map(menu.services.map((s) => [s.id, s]));
@@ -190,10 +193,19 @@ export function BookingPanel({
           <div>
             <h2 className="font-serif text-2xl font-semibold text-plum-900">{appointment ? "Edit booking" : "New booking"}</h2>
             <p className="text-ink-muted">{formatLongDay(data.date)}</p>
-            {!appointment && onBlockInstead && (
-              <button type="button" onClick={onBlockInstead} className="mt-1 text-sm font-medium text-plum-900 underline underline-offset-2 hover:text-plum-700">
-                Block this time instead
-              </button>
+            {!appointment && (onBlockInstead || onGroupInstead) && (
+              <p className="mt-1 flex flex-wrap gap-x-4">
+                {onGroupInstead && (
+                  <button type="button" onClick={onGroupInstead} className="text-sm font-medium text-plum-900 underline underline-offset-2 hover:text-plum-700">
+                    Book a group instead
+                  </button>
+                )}
+                {onBlockInstead && (
+                  <button type="button" onClick={onBlockInstead} className="text-sm font-medium text-plum-900 underline underline-offset-2 hover:text-plum-700">
+                    Block this time instead
+                  </button>
+                )}
+              </p>
             )}
           </div>
           <IconButton label="Close" onClick={onClose}>

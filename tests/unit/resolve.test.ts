@@ -445,3 +445,40 @@ describe("a busy Saturday", () => {
     }
   });
 });
+
+describe("group bookings", () => {
+  // Priya's 10:00 runs 30 minutes over. Ava (Priya, 11) and Bea (Ethan, 11)
+  // are one party.
+  const party = () => [item("ava", CUT, "priya", "11:00"), item("bea", CUT, "ethan", "11:00")];
+  const groups = new Map([
+    ["appt-ava", "bridal"],
+    ["appt-bea", "bridal"],
+  ]);
+  const overrun: Disruption = { id: "o1", kind: "overrun", itemId: "first", minutes: 30 };
+
+  it("moves the whole party together when there's room", () => {
+    const d = { ...day([item("first", CUT, "priya", "10:00"), ...party()], [overrun], { staff: [PRIYA, ETHAN], now: "10:30", statuses: checkedIn("first") }), groups };
+    const conflicts = findConflicts(d);
+    const c = only(conflicts);
+    expect(describe_(c.options[0])).toEqual(["ava: priya 11:30", "bea: ethan 11:30"]);
+    expect(c.options[0]).toMatchObject({ clientsMoved: 2, shiftMinutes: 60 });
+    expectValid(d, conflicts);
+
+    // Without the group, only Ava would move.
+    const alone = only(findConflicts({ ...d, groups: undefined }));
+    expect(describe_(alone.options[0])).toEqual(["ava: priya 11:30"]);
+  });
+
+  it("splits the party only when it can't stay together within about an hour", () => {
+    // Ethan has someone at 12, and Priya lunches at 1: the party could only
+    // move together to 2pm.
+    const d = {
+      ...day([item("first", CUT, "priya", "10:00"), ...party(), item("later", CUT, "ethan", "12:00")], [overrun], { staff: [PRIYA, ETHAN], now: "10:30", statuses: checkedIn("first") }),
+      groups,
+    };
+    const conflicts = findConflicts(d);
+    const c = only(conflicts);
+    expect(describe_(c.options[0])).toEqual(["ava: priya 11:30"]);
+    expectValid(d, conflicts);
+  });
+});

@@ -11,7 +11,22 @@ import { toLocal } from "@/lib/scheduling/time";
 import type { VisitChange } from "@/lib/notifications";
 import type { FixMove } from "./types";
 
-export type Visit = { status: string; client: { id: string; firstName: string; fullName: string } | null };
+export type Visit = { status: string; client: { id: string; firstName: string; fullName: string } | null; group?: { id: string; label: string } | null };
+
+// Group bookings an option moves every guest of, together.
+function groupsKept(option: FixOption, l: Lookup): string[] {
+  const moved = new Map<string, number>();
+  for (const id of new Set(option.moves.map((m) => m.appointmentId))) {
+    const g = l.visits.get(id)?.group;
+    if (g) moved.set(g.id, (moved.get(g.id) ?? 0) + 1);
+  }
+  const labels: string[] = [];
+  for (const [groupId, count] of moved) {
+    const members = [...l.visits.values()].filter((v) => v.group?.id === groupId);
+    if (count >= 2 && count === members.length) labels.push(members[0].group!.label);
+  }
+  return labels;
+}
 
 // Names and details for the day being looked at.
 export type Lookup = {
@@ -154,6 +169,7 @@ export function templateReason(c: Conflict, option: FixOption, l: Lookup): strin
   for (const b of option.blockMoves) {
     clauses.push(`${staffName(l, b.staffId)} takes ${b.kind} at ${clock(minuteOf(l, b.to.start))} instead of ${clock(minuteOf(l, b.from.start))}.`);
   }
+  for (const label of groupsKept(option, l)) clauses.push(`The ${label} group stays together.`);
   const left = unresolvedNames(option, l);
   if (left.length) clauses.push(`No one free today can take ${list(left)}.`);
   else if (option.clientsMoved <= 1 && c.kind !== "call_out") clauses.push("Nothing else on the calendar changes.");
@@ -170,6 +186,7 @@ export function factsFor(c: Conflict, option: FixOption, l: Lookup) {
       from: `${clock(v.from.minute)} with ${v.from.staffFirstName}`,
       to: `${clock(v.to.minute)} with ${v.to.staffFirstName}`,
     })),
+    groupsKeptTogether: groupsKept(option, l),
     breaksMoved: option.blockMoves.map((b) => `${staffName(l, b.staffId)}'s ${b.kind}: ${clock(minuteOf(l, b.from.start))} → ${clock(minuteOf(l, b.to.start))}`),
     clientsMoved: option.clientsMoved,
     couldNotPlace: option.unresolved.map((id) => firstName(l, l.items.get(id)?.appointmentId ?? "")),

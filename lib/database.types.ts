@@ -67,6 +67,38 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"appointment_groups": {
+                  Row: {
+                    "business_id": string,"created_at": string,"created_by": string | null,"id": string,"label": string,"location_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"label": string,"location_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"label"?: string,"location_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "appointment_groups_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "appointment_groups_created_by_business_id_fkey"
+      columns: ["created_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "appointment_groups_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"appointment_items": {
                   Row: {
                     "active_minutes": number,"appointment_id": string,"business_id": string,"created_at": string,"ends_at": string,"finishing_minutes": number,"id": string,"location_id": string,"price_cents": number,"processing_minutes": number,"resource_id": string | null,"service_id": string,"staff_id": string,"starts_at": string,"updated_at": string
@@ -151,14 +183,14 @@ isOneToOne: false
                   ]
                 },"appointments": {
                   Row: {
-                    "business_id": string,"cancel_reason": string | null,"canceled_at": string | null,"client_id": string | null,"created_at": string,"created_by": string | null,"deposit_cents": number,"ends_at": string,"id": string,"location_id": string,"notes": string | null,"series_id": string | null,"series_index": number | null,"source": Database["public"]['Enums']["appointment_source"],"starts_at": string,"status": Database["public"]['Enums']["appointment_status"],"updated_at": string,"updated_by": string | null
+                    "business_id": string,"cancel_reason": string | null,"canceled_at": string | null,"client_id": string | null,"created_at": string,"created_by": string | null,"deposit_cents": number,"ends_at": string,"group_id": string | null,"id": string,"location_id": string,"notes": string | null,"series_id": string | null,"series_index": number | null,"source": Database["public"]['Enums']["appointment_source"],"starts_at": string,"status": Database["public"]['Enums']["appointment_status"],"updated_at": string,"updated_by": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"ends_at": string,"id"?: string,"location_id": string,"notes"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at": string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
+                    "business_id": string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"ends_at": string,"group_id"?: string | null,"id"?: string,"location_id": string,"notes"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at": string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
                   }
                   Update: {
-                    "business_id"?: string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"ends_at"?: string,"id"?: string,"location_id"?: string,"notes"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at"?: string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
+                    "business_id"?: string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"ends_at"?: string,"group_id"?: string | null,"id"?: string,"location_id"?: string,"notes"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at"?: string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
                   }
                   Relationships: [
                     {
@@ -178,6 +210,12 @@ isOneToOne: false
       columns: ["created_by","business_id"]
 isOneToOne: false
       referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "appointments_group_id_business_id_fkey"
+      columns: ["group_id","business_id"]
+isOneToOne: false
+      referencedRelation: "appointment_groups"
       referencedColumns: ["id","business_id"]
     },{
       foreignKeyName: "appointments_location_id_business_id_fkey"
@@ -1311,6 +1349,9 @@ isOneToOne: false
                            },
 "send_purchase_order":
 { Args: { "p_order_id": string }; Returns: undefined
+                           },
+"set_appointment_group":
+{ Args: { "p_appointment_id": string,"p_group_id": string }; Returns: undefined
                            },
 "set_appointment_notes":
 { Args: { "p_appointment_id": string,"p_notes": string }; Returns: undefined

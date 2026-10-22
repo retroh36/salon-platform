@@ -15,7 +15,7 @@ import { formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { formatMinutes, formatPrice } from "@/lib/services";
 import { UsageLinesEditor, toUsageJson, type DraftLine } from "@/components/usage-lines";
 import type { PickerProduct } from "@/lib/inventory-load";
-import { addVisitFormula, changeVisitStatus, changeVisitStatusScoped, saveVisitNotes } from "./actions";
+import { addVisitFormula, changeGroupVisitStatus, changeVisitStatus, changeVisitStatusScoped, saveVisitNotes } from "./actions";
 import type { Scope } from "@/lib/scheduling/series";
 import { reportLate } from "./denise-actions";
 import { useNow } from "./now-line";
@@ -30,6 +30,7 @@ export function AppointmentPanel({
   onEdit,
   onClose,
   onReported,
+  onOpenVisit,
   products,
 }: {
   date: LocalDate;
@@ -42,6 +43,8 @@ export function AppointmentPanel({
   onClose: () => void;
   // Denise's view after a delay is reported.
   onReported: (state: DeniseState) => void;
+  // Open another guest's visit in the same group.
+  onOpenVisit: (appointmentId: string) => void;
 }) {
   const { client, items, status } = appointment;
   const [pending, startTransition] = useTransition();
@@ -60,10 +63,15 @@ export function AppointmentPanel({
   // On the day (or after): the front of house, or a stylist on the visit.
   const canRecordFormula = date <= today && status !== "canceled" && status !== "no_show" && (me.canBook || items.some((i) => i.staffId === me.staffId));
 
-  function run(action: AppointmentAction, reason = "", detail = "", scope: Scope = "this") {
+  function run(action: AppointmentAction, reason = "", detail = "", scope: Scope | "group" = "this") {
     setMessage(null);
     startTransition(async () => {
-      const result = scope === "this" ? await changeVisitStatus(appointment.id, action, reason, detail) : await changeVisitStatusScoped(appointment.id, action, scope, reason, detail);
+      const result =
+        scope === "this"
+          ? await changeVisitStatus(appointment.id, action, reason, detail)
+          : scope === "group"
+            ? await changeGroupVisitStatus(appointment.id, action, reason, detail)
+            : await changeVisitStatusScoped(appointment.id, action, scope, reason, detail);
       if (!result.ok) setMessage(result.message);
       else if (action === "cancel") onClose(); // canceled visits leave the calendar
       else setCanceling(false);
@@ -80,10 +88,10 @@ export function AppointmentPanel({
       </div>
 
       <div className="flex items-center gap-4">
-        <Avatar name={client?.name ?? "Walk in"} size="lg" />
+        <Avatar name={client?.name ?? appointment.group?.label ?? "Walk in"} size="lg" />
         <div className="min-w-0">
           <h3 className="truncate font-serif text-xl font-semibold" data-testid="client-name">
-            {client?.name ?? "Walk-in"}
+            {client?.name ?? (appointment.group ? `${appointment.group.label} guest` : "Walk-in")}
           </h3>
           {client?.phone && <p className="text-ink-muted">{client.phone}</p>}
           <StatusChip status={status} className="mt-1.5" />
@@ -97,6 +105,29 @@ export function AppointmentPanel({
           )}
         </div>
       </div>
+
+      {appointment.group && (
+        <div className="rounded-lg border border-plum-200 bg-plum-100/40 px-2.5 py-2" data-testid="group-info">
+          <p className="font-semibold text-plum-900">
+            {appointment.group.label} · {appointment.group.members.length} guest{appointment.group.members.length === 1 ? "" : "s"}
+          </p>
+          <ul className="mt-1 flex flex-col gap-0.5" aria-label="Guests in this group">
+            {appointment.group.members.map((m) => (
+              <li key={m.appointmentId}>
+                {m.appointmentId === appointment.id ? (
+                  <span className="text-ink">
+                    {m.clientName} · {m.staffName} · {formatMinute(m.start)} (this visit)
+                  </span>
+                ) : (
+                  <button type="button" className="text-left text-plum-900 underline-offset-2 hover:underline" onClick={() => onOpenVisit(m.appointmentId)}>
+                    {m.clientName} · {m.staffName} · {formatMinute(m.start)}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {message && (
         <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-danger">
@@ -223,7 +254,13 @@ export function AppointmentPanel({
             )}
           </div>
           {canceling && (
-            <CancelForm pending={pending} series={Boolean(appointment.series)} onCancel={(reason, detail, scope) => run("cancel", reason, detail, scope)} onKeep={() => setCanceling(false)} />
+            <CancelForm
+              pending={pending}
+              series={Boolean(appointment.series)}
+              group={Boolean(appointment.group)}
+              onCancel={(reason, detail, scope) => run("cancel", reason, detail, scope)}
+              onKeep={() => setCanceling(false)}
+            />
           )}
         </section>
       )}
@@ -303,17 +340,19 @@ function NotesForm({ appointmentId, initial, editable }: { appointmentId: string
 function CancelForm({
   pending,
   series,
+  group,
   onCancel,
   onKeep,
 }: {
   pending: boolean;
   series: boolean;
-  onCancel: (reason: string, detail: string, scope: Scope) => void;
+  group: boolean;
+  onCancel: (reason: string, detail: string, scope: Scope | "group") => void;
   onKeep: () => void;
 }) {
   const [reason, setReason] = useState("");
   const [detail, setDetail] = useState("");
-  const [scope, setScope] = useState<Scope>("this");
+  const [scope, setScope] = useState<Scope | "group">("this");
   return (
     <form
       aria-label="Cancel booking"
@@ -338,14 +377,19 @@ function CancelForm({
         </span>
         <input value={detail} onChange={(e) => setDetail(e.target.value)} maxLength={300} className={fieldClass} />
       </label>
-      {series && (
+      {(series || group) && (
         <fieldset className="flex flex-col gap-1.5">
           <legend className="mb-1 text-sm font-medium text-ink">Cancel</legend>
           {(
             [
               ["this", "This visit only"],
-              ["following", "This and following visits"],
-              ["all", "All visits in the series"],
+              ...(group ? [["group", "The whole group"] as const] : []),
+              ...(series
+                ? [
+                    ["following", "This and following visits"] as const,
+                    ["all", "All visits in the series"] as const,
+                  ]
+                : []),
             ] as const
           ).map(([v, label]) => (
             <label key={v} className="flex items-center gap-2">

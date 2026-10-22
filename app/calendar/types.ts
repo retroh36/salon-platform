@@ -38,6 +38,8 @@ export type BlockData = Interval & {
   status: AppointmentStatus;
   // Part of a recurring series (shows a repeat icon).
   series: boolean;
+  // Part of a group booking.
+  group: { id: string; label: string } | null;
 };
 
 export type ItemDetail = Interval & {
@@ -75,6 +77,8 @@ export type AppointmentDetail = {
   formulas: VisitFormula[];
   // Part of a recurring series: its place, how many, how often.
   series: { id: string; index: number; count: number; intervalWeeks: number } | null;
+  // Part of a group booking: its label and the other guests that day.
+  group: { id: string; label: string; members: { appointmentId: string; clientName: string; staffName: string; start: number }[] } | null;
   // Patch test problems and forms still to sign, before the visit.
   warnings: { patch: string[]; patchBlocks: boolean; forms: { templateId: string; name: string }[] } | null;
 };
