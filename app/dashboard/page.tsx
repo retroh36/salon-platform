@@ -3,7 +3,10 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge, listClass, PageHeader, rowClass, type Tone } from "@/components/ui/page";
+import Link from "next/link";
 import { getCurrentStaff } from "@/lib/auth";
+import { isLow, productName } from "@/lib/inventory";
+import { loadInventory } from "@/lib/inventory-load";
 import { fullName, roleLabel, sortStaff, type StaffRole } from "@/lib/staff";
 
 export const metadata: Metadata = { title: "Dashboard · Salon Platform" };
@@ -25,12 +28,13 @@ async function Dashboard() {
   if (!me) return <NotLinked />;
 
   const location = me.location;
-  const { data: staff, error } = await supabase
-    .from("staff")
-    .select("id, first_name, last_name, email, phone, role, color, is_active")
-    .eq("location_id", location.id);
+  const [{ data: staff, error }, stock] = await Promise.all([
+    supabase.from("staff").select("id, first_name, last_name, email, phone, role, color, is_active").eq("location_id", location.id),
+    loadInventory(supabase, location.id),
+  ]);
 
   if (error) throw error;
+  const low = stock.filter((p) => isLow(p.on_hand, p.reorder_point));
 
   return (
     <AppShell section="dashboard" me={me}>
@@ -42,6 +46,20 @@ async function Dashboard() {
           </>
         }
       />
+
+      {low.length > 0 && (
+        <Link
+          href="/inventory?low=1"
+          data-testid="low-stock-alert"
+          className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-status-late-ink/25 bg-status-late-bg px-4 py-3 text-sm text-status-late-ink transition-[filter] duration-(--motion-fast) hover:brightness-[0.98]"
+        >
+          <span>
+            <strong className="font-semibold">Low stock:</strong> {low.slice(0, 3).map(productName).join(", ")}
+            {low.length > 3 ? ` and ${low.length - 3} more` : ""} {low.length === 1 ? "is" : "are"} below the reorder point.
+          </span>
+          <span className="shrink-0 font-semibold underline underline-offset-2">Review stock</span>
+        </Link>
+      )}
 
       <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
         <h2 className="border-b border-line px-5 py-3.5 font-serif text-lg font-semibold text-ink">

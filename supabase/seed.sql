@@ -974,3 +974,16 @@ select s.business_id, s.id, p.id, r.amount
 from recipes r
 join public.services s on s.name = r.service and s.business_id = 'b0000000-0000-4000-8000-000000000001'
 join public.products p on p.sku = r.sku and p.business_id = s.business_id;
+
+-- An order from Lakeshore sent two days ago, on its way.
+with po as (
+  insert into public.purchase_orders (business_id, location_id, supplier_id, status, notes, created_by, sent_by, sent_at, created_at)
+  values ('b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', 'e1000000-0000-4000-8000-000000000003',
+          'sent', 'Toner restock', 'd0000000-0000-4000-8000-000000000002', 'd0000000-0000-4000-8000-000000000002',
+          now() - interval '2 days', now() - interval '2 days')
+  returning id
+)
+insert into public.purchase_order_lines (business_id, purchase_order_id, product_id, quantity, unit_cost_cents)
+select 'b0000000-0000-4000-8000-000000000001', po.id, p.id, l.quantity, p.cost_cents
+from po, (values ('WE-CC-T11', 4), ('WE-CC-T18', 6), ('RK-AS-SH-1L', 2)) as l (sku, quantity)
+join public.products p on p.sku = l.sku;

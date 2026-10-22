@@ -6,9 +6,10 @@ import { buttonClass } from "@/components/ui/button";
 import { PlusIcon } from "@/components/ui/icons";
 import { Badge, Card, EmptyState, listClass, PageHeader, rowLinkClass } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
-import { canManageInventory, describeStock, filterInventory, formatAmount, isLow, productName, readFilter, stockValueCents, TYPE_LABELS } from "@/lib/inventory";
+import { canManageInventory, canReceiveOrders, describeStock, filterInventory, formatAmount, isLow, productName, readFilter, stockValueCents, TYPE_LABELS } from "@/lib/inventory";
 import { loadInventory } from "@/lib/inventory-load";
 import { formatPrice } from "@/lib/services";
+import { DeniseReorders } from "./denise-reorders";
 import { InventoryFilters } from "./inventory-filters";
 
 export const metadata: Metadata = { title: "Inventory · Salon Platform" };
@@ -45,6 +46,11 @@ async function Inventory({ searchParams }: Pick<PageProps<"/inventory">, "search
         }
         actions={
           <>
+            {canReceiveOrders(me.role) && (
+              <Link href="/inventory/orders" className={buttonClass("secondary", "md")}>
+                Orders
+              </Link>
+            )}
             <Link href="/inventory/suppliers" className={buttonClass("secondary", "md")}>
               Suppliers
             </Link>
@@ -57,6 +63,8 @@ async function Inventory({ searchParams }: Pick<PageProps<"/inventory">, "search
           </>
         }
       />
+
+      {!filter.q && !filter.brand && !filter.type && !filter.low && <DeniseReorders canManage={manage} />}
 
       {low.length > 0 && !filter.low && (
         <Link
