@@ -3,9 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv } from "./env";
 
 const PUBLIC_PATHS = ["/login"];
-// Open to everyone, signed in or not: salons' booking sites, and the dev
-// outbox (which shows nothing in production).
-const OPEN_PATHS = ["/book", "/dev/outbox"];
+// Open to everyone, signed in or not: salons' booking sites, the dev
+// outbox (which shows nothing in production), and scheduled jobs (which
+// check their own secret).
+const OPEN_PATHS = ["/book", "/dev/outbox", "/api/cron"];
 
 // Refreshes the auth session cookie on every request and sends signed-out
 // users to /login (and signed-in users away from it).

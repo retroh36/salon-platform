@@ -11,7 +11,8 @@
     "test": "vitest run --project unit",
     "test:db": "vitest run --project db",
     "db:reset": "supabase db reset",
-    "seed:demo": "supabase db reset && docker exec -i supabase_db_salon-platform psql -q -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/seed-demo.sql",
+    "seed:demo": "supabase db reset && docker exec -i supabase_db_salon-platform psql -q -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/seed-demo.sql && npm run insights",
+    "insights": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/insights.ts",
     "db:types": "supabase gen types typescript --local > lib/database.types.ts",
     "test:e2e": "playwright test",
     "import:phorest:dry-run": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/phorest-dry-run.ts"

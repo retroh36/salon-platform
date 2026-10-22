@@ -1,6 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { recomputeForVisit } from "@/lib/insights/compute";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTION_LABELS, canBook, cancelReason, MAX_NOTES, type AppointmentAction } from "@/lib/appointments";
 import { getCurrentStaff } from "@/lib/auth";
 import { visitWarnings } from "@/lib/client-checks";
@@ -189,6 +192,8 @@ export async function changeVisitStatus(
     };
     return { ok: false, message: messages[result.error] };
   }
+  // Denise learns from the visit once the response has gone.
+  if (action === "check_out") after(() => recomputeForVisit(createAdminClient(), appointmentId));
   refresh();
   return { ok: true };
 }

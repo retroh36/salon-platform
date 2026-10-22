@@ -457,6 +457,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"insights": {
+                  Row: {
+                    "business_id": string,"computed_at": string,"data": NonNullable<Json>,"key": string,"kind": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"computed_at"?: string,"data": NonNullable<Json>,"key": string,"kind": string
+                  }
+                  Update: {
+                    "business_id"?: string,"computed_at"?: string,"data"?: NonNullable<Json>,"key"?: string,"kind"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "insights_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"location_hours": {
                   Row: {
                     "business_id": string,"end_minute": number,"id": string,"location_id": string,"start_minute": number,"weekday": number
