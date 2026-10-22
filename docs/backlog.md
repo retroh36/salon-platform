@@ -29,6 +29,15 @@ Known gaps to pick up later. Move an item into a task when it's scheduled.
 - [ ] **AI action log page.** Owners can't browse the log yet (it's in `ai_actions`).
 - [ ] **Run scans in the background.** Denise looks over the day when the calendar loads or changes; with no one on the calendar, nothing watches it.
 
+## Inventory
+
+- [ ] **Sales through the point of sale.** "Record sale" only takes retail out of stock; payments, prices and receipts come with the point of sale (phase 4).
+- [ ] **Send orders to suppliers.** "Mark as sent" records that an order went out; emailing it to the supplier comes with email.
+- [ ] **Barcode scanning.** Products have barcodes, but counting and receiving are by hand; a camera scanner would speed up both on an iPad.
+- [ ] **Who counts.** Stocktakes are owners and managers only, per the permissions; salons may want the front desk to count without finishing.
+- [ ] **Usage history in forecasts.** Denise forecasts from upcoming bookings (formulas and recipes); walk-ins, retail sales trends and waste aren't in it yet.
+- [ ] **Several locations.** Stock is per location, but there are no transfers between locations.
+
 ## Phorest import
 
 - [ ] **Blocked: dry run gets 401 (paused 2026-10-21).** `npm run import:phorest:dry-run` is rejected with 401 on the first request (`GET /api/business/{businessId}/branch`), both times it was tried: first with no `global/` username prefix against the docs host, then with the prefix against the US API gateway. Waiting on Phorest to confirm the username format, which API server the account is on, and the password. Once confirmed, update `.env.local` and run the dry run again (`-- --months-back=6 --months-ahead=3`).
