@@ -7,7 +7,7 @@ import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
-// A Tuesday clear of the other tests' days: Priya works 9-1.
+// A Tuesday clear of the other tests' days: Bridget works 9-1.
 const DAY = addDays(startOfWeek(todayIn(TZ)), 141);
 const at = (hour: number, minute = 0) => fromLocal(DAY, hour * 60 + minute, TZ)!;
 const PREFIX = `Cl${Date.now().toString(36)}`;
@@ -25,7 +25,7 @@ async function book(first: string, service: string, hour: number, minute: number
   const { data: s } = await admin.from("services").select("id").eq("business_id", B).eq("name", service).single();
   const start = at(hour, minute), end = new Date(start.getTime() + minutes * 60_000);
   const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: c!.id, starts_at: start.toISOString(), ends_at: end.toISOString() }).select("id").single();
-  const { error } = await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: s!.id, staff_id: SEED.staff.priya, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: minutes, price_cents: 0 });
+  const { error } = await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: s!.id, staff_id: SEED.staff.bridget, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: minutes, price_cents: 0 });
   expect(error).toBeNull();
 }
 
@@ -42,9 +42,9 @@ test("short visits show name and time on one line, with the details on hover", a
   await book("Tiny", "Bang Trim", 10, 0, 15);
   await book("Next", "Women's Cut & Style", 10, 15, 60);
   await openDay(page);
-  const priya = ui(page).getByRole("region", { name: "Priya Shah", exact: true });
-  const short = priya.getByRole("button", { name: new RegExp(`${PREFIX}Tiny`) });
-  const next = priya.getByRole("button", { name: new RegExp(`${PREFIX}Next`) });
+  const bridget = ui(page).getByRole("region", { name: "Bridget Callahan", exact: true });
+  const short = bridget.getByRole("button", { name: new RegExp(`${PREFIX}Tiny`) });
+  const next = bridget.getByRole("button", { name: new RegExp(`${PREFIX}Next`) });
 
   // One line: the name (shortened if need be) and the time.
   await expect(short).toHaveText(new RegExp(`${PREFIX}Tiny.* · 10am`));
@@ -54,7 +54,7 @@ test("short visits show name and time on one line, with the details on hover", a
   await short.hover();
   const hint = page.getByRole("tooltip");
   await expect(hint).toBeVisible();
-  await expect(hint.locator("p")).toHaveText([`${PREFIX}Tiny Long-Surname`, "Bang Trim", "10am–10:15am · Priya Shah", "Booked"]);
+  await expect(hint.locator("p")).toHaveText([`${PREFIX}Tiny Long-Surname`, "Bang Trim", "10am–10:15am · Bridget Callahan", "Booked"]);
   await page.mouse.move(5, 5);
   await expect(hint).toBeHidden();
 
@@ -95,4 +95,26 @@ test("Denise sits in the legend bar, not on top of the calendar", async ({ page 
   await launcher.click();
   await expect(page.locator("aside[aria-label]").first()).toBeVisible();
   await expect(launcher).toBeHidden();
+});
+
+test("shows each stylist's level as color only: a ring, a bar and the legend", async ({ page }) => {
+  await openDay(page);
+  const levelColor = (level: string) => page.evaluate((l) => getComputedStyle(document.documentElement).getPropertyValue(`--color-level-${l}`).trim(), level);
+  const header = (name: string) => ui(page).locator("[data-level]").filter({ hasText: name }).first();
+  for (const [name, level] of [["Bridget Callahan", "master"], ["Nola Brennan", "senior"], ["Shae Morgan", "artisan"]] as const) {
+    await expect(header(name)).toHaveAttribute("data-level", level);
+    // The bar along the top of the column, in the level's color.
+    const bar = header(name).getByTestId("level-bar");
+    const rgb = await bar.evaluate((el) => getComputedStyle(el).backgroundColor);
+    const hex = await levelColor(level);
+    expect(rgb).toBe(`rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(", ")})`);
+    // The ring around the avatar.
+    await expect(header(name).locator(`span[data-level=${level}]`)).toBeVisible();
+  }
+  // No level text on the calendar, only in the legend.
+  await expect(ui(page).getByTestId("calendar-grid")).not.toContainText(/Master|Senior|Artisan/);
+  const legend = ui(page).getByTestId("level-legend");
+  await expect(legend).toContainText("Master");
+  await expect(legend).toContainText("Senior");
+  await expect(legend).toContainText("Artisan");
 });

@@ -7,6 +7,7 @@ import { describeUsage } from "@/lib/color-usage";
 import { loadBackBarProducts } from "@/lib/inventory-load";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
+import { LEVEL_LABELS } from "@/lib/schedule-forms";
 import { centsToInput, sortCategories } from "@/lib/services";
 import { fullName, roleLabel, sortStaff } from "@/lib/staff";
 import { setServiceArchived, type ServiceFormFields } from "./actions";
@@ -21,6 +22,7 @@ const EMPTY: ServiceFormFields = {
   processing_minutes: "0",
   finishing_minutes: "0",
   price: "",
+  level_prices: { artisan: "", senior: "", master: "" },
   requires_patch_test: false,
   staff: {},
 };
@@ -41,12 +43,12 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
         ? supabase
             .from("services")
             .select(
-              "id, name, category, description, active_minutes, processing_minutes, finishing_minutes, price_cents, requires_patch_test, archived_at, staff_services(staff_id, price_cents)",
+              "id, name, category, description, active_minutes, processing_minutes, finishing_minutes, price_cents, requires_patch_test, archived_at, staff_services(staff_id, price_cents), service_level_prices(level, price_cents)",
             )
             .eq("id", serviceId)
             .maybeSingle()
         : Promise.resolve(null),
-      supabase.from("staff").select("id, first_name, last_name, role, color, is_active"),
+      supabase.from("staff").select("id, first_name, last_name, role, level, color, is_active"),
       supabase.from("services").select("category"),
       serviceId ? supabase.from("service_products").select("product_id, amount").eq("service_id", serviceId) : Promise.resolve(null),
       loadBackBarProducts(supabase),
@@ -73,6 +75,11 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
         processing_minutes: String(service.processing_minutes),
         finishing_minutes: String(service.finishing_minutes),
         price: centsToInput(service.price_cents),
+        level_prices: {
+          artisan: centsToInput(service.service_level_prices.find((p) => p.level === "artisan")?.price_cents),
+          senior: centsToInput(service.service_level_prices.find((p) => p.level === "senior")?.price_cents),
+          master: centsToInput(service.service_level_prices.find((p) => p.level === "master")?.price_cents),
+        },
         requires_patch_test: service.requires_patch_test,
         staff: Object.fromEntries(service.staff_services.map((ss) => [ss.staff_id, centsToInput(ss.price_cents)])),
       }
@@ -82,7 +89,8 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
   const staffOptions = sortStaff(staff.filter((s) => s.is_active || initial.staff[s.id] !== undefined)).map((s) => ({
     id: s.id,
     name: fullName(s),
-    role: roleLabel(s.role),
+    role: s.level ? `${LEVEL_LABELS[s.level]} stylist` : roleLabel(s.role),
+    level: s.level,
     color: s.color,
     isActive: s.is_active,
   }));

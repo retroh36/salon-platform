@@ -60,8 +60,8 @@ describe("branches", () => {
 describe("staff", () => {
   it.each([
     ["Senior Stylist", "stylist", "senior"],
-    ["Junior Stylist", "stylist", "junior"],
-    ["Graduate Colourist", "stylist", "junior"],
+    ["Junior Stylist", "stylist", "artisan"],
+    ["Graduate Colourist", "stylist", "artisan"],
     ["Creative Director", "stylist", "master"],
     ["Salon Manager", "manager", null],
     ["Reception", "front_desk", null],
@@ -76,7 +76,7 @@ describe("staff", () => {
     const log = new IssueLog();
     const [ana, ben] = makeDataset(TODAY).staff[BRANCH];
     expect(mapStaff(ana, BRANCH, log)).toMatchObject({ first_name: "Ana", phone: "(312) 555-0101", role: "stylist", level: "senior", is_active: true });
-    expect(mapStaff(ben, BRANCH, log)).toMatchObject({ phone: "+44 7700 900123", level: "junior" });
+    expect(mapStaff(ben, BRANCH, log)).toMatchObject({ phone: "+44 7700 900123", level: "artisan" });
     expect(issues(log)).toEqual(["1 staff.phone review: not a 10-digit US number; kept as written"]);
   });
 

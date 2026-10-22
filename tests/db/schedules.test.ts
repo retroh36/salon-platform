@@ -5,14 +5,14 @@ import type { Json } from "@/lib/database.types";
 import { admin, createOtherSalon, SEED, signIn, type Client } from "./helpers";
 
 const B = SEED.business;
-const { owner: OWNER, manager: MANAGER, priya: PRIYA, marcus: MARCUS, hannah: HANNAH, ethan: ETHAN, sofia: SOFIA } = SEED.staff;
+const { owner: OWNER, manager: MANAGER, bridget: BRIDGET, gil: GIL, hannah: HANNAH, shae: SHAE, sandra: SANDRA } = SEED.staff;
 const h = (hours: number, minutes = 0) => hours * 60 + minutes;
 
 let other: Awaited<ReturnType<typeof createOtherSalon>>;
 let manager: Client;
 let frontDesk: Client;
-let priya: Client;
-let marcus: Client;
+let bridget: Client;
+let gil: Client;
 let otherOwner: Client;
 
 // Time off created by a test, removed afterwards.
@@ -34,11 +34,11 @@ function futureDate(days: number) {
 
 beforeAll(async () => {
   other = await createOtherSalon();
-  [manager, frontDesk, priya, marcus, otherOwner] = await Promise.all([
+  [manager, frontDesk, bridget, gil, otherOwner] = await Promise.all([
     signIn("manager@mapleandash.test"),
     signIn("frontdesk@mapleandash.test"),
-    signIn("priya@mapleandash.test"),
-    signIn("marcus@mapleandash.test"),
+    signIn("bridget@mapleandash.test"),
+    signIn("gil@mapleandash.test"),
     signIn(other.email),
   ]);
 });
@@ -56,14 +56,14 @@ describe("seed data", () => {
     const { count } = await admin.from("location_hours").select("id", { count: "exact", head: true }).eq("location_id", SEED.location);
     expect(count).toBe(5); // closed Sunday and Monday
 
-    const tuesday = (await weeklyHours(PRIYA)).filter((r) => r.weekday === 2);
+    const tuesday = (await weeklyHours(BRIDGET)).filter((r) => r.weekday === 2);
     expect(tuesday).toEqual([
       { weekday: 2, start_minute: h(9), end_minute: h(13) },
       { weekday: 2, start_minute: h(14), end_minute: h(18) },
     ]);
 
-    const { data } = await admin.from("staff").select("level").eq("id", ETHAN).single();
-    expect(data!.level).toBe("junior");
+    const { data } = await admin.from("staff").select("level").eq("id", SHAE).single();
+    expect(data!.level).toBe("artisan");
   });
 });
 
@@ -71,12 +71,12 @@ describe("hours constraints", () => {
   it("rejects overlapping shifts on the same day, but allows touching ones", async () => {
     const overlap = await admin
       .from("staff_working_hours")
-      .insert({ business_id: B, staff_id: PRIYA, weekday: 2, start_minute: h(12), end_minute: h(15) });
+      .insert({ business_id: B, staff_id: BRIDGET, weekday: 2, start_minute: h(12), end_minute: h(15) });
     expect(overlap.error?.code).toBe("23P01"); // exclusion violation
 
     const touching = await admin
       .from("staff_working_hours")
-      .insert({ business_id: B, staff_id: PRIYA, weekday: 2, start_minute: h(13), end_minute: h(14) })
+      .insert({ business_id: B, staff_id: BRIDGET, weekday: 2, start_minute: h(13), end_minute: h(14) })
       .select("id")
       .single();
     expect(touching.error).toBeNull();
@@ -90,7 +90,7 @@ describe("hours constraints", () => {
       { weekday: 8, start_minute: h(9), end_minute: h(17) },
       { weekday: 1, start_minute: h(9), end_minute: h(24, 5) },
     ]) {
-      const { error } = await admin.from("staff_working_hours").insert({ business_id: B, staff_id: PRIYA, ...row });
+      const { error } = await admin.from("staff_working_hours").insert({ business_id: B, staff_id: BRIDGET, ...row });
       expect(error?.code).toBe("23514");
     }
   });
@@ -98,7 +98,7 @@ describe("hours constraints", () => {
 
 describe("weekly hours", () => {
   it("everyone can see working hours", async () => {
-    const { data } = await priya.from("staff_working_hours").select("id").eq("staff_id", SOFIA);
+    const { data } = await bridget.from("staff_working_hours").select("id").eq("staff_id", SANDRA);
     expect(data!.length).toBeGreaterThan(0);
   });
 
@@ -137,32 +137,32 @@ describe("weekly hours", () => {
   });
 
   it("stylists and front desk can't change anyone's hours, including their own", async () => {
-    const before = await weeklyHours(PRIYA);
-    for (const client of [priya, frontDesk]) {
+    const before = await weeklyHours(BRIDGET);
+    for (const client of [bridget, frontDesk]) {
       const rpc = await client.rpc("set_staff_weekly_hours", {
         p_business_id: B,
-        p_staff_id: PRIYA,
+        p_staff_id: BRIDGET,
         p_hours: [{ weekday: 1, start_minute: h(9), end_minute: h(17) }] as Json,
       });
       expect(rpc.error?.code).toBe("42501");
 
-      const del = await client.from("staff_working_hours").delete().eq("staff_id", PRIYA).select();
+      const del = await client.from("staff_working_hours").delete().eq("staff_id", BRIDGET).select();
       expect(del.data).toEqual([]);
     }
-    expect(await weeklyHours(PRIYA)).toEqual(before);
+    expect(await weeklyHours(BRIDGET)).toEqual(before);
   });
 });
 
 describe("opening hours and one-off changes", () => {
   it("only owners and managers change opening hours", async () => {
-    const rpc = await priya.rpc("set_location_hours", { p_business_id: B, p_location_id: SEED.location, p_hours: [] as Json });
+    const rpc = await bridget.rpc("set_location_hours", { p_business_id: B, p_location_id: SEED.location, p_hours: [] as Json });
     // A stylist's delete matches no rows and there's nothing to insert, so
     // this is a no-op rather than an error. The hours must be untouched.
     expect(rpc.error).toBeNull();
     const { count } = await admin.from("location_hours").select("id", { count: "exact", head: true }).eq("location_id", SEED.location);
     expect(count).toBe(5);
 
-    const insert = await priya.rpc("set_location_hours", {
+    const insert = await bridget.rpc("set_location_hours", {
       p_business_id: B,
       p_location_id: SEED.location,
       p_hours: [{ weekday: 1, start_minute: h(9), end_minute: h(17) }] as Json,
@@ -174,25 +174,25 @@ describe("opening hours and one-off changes", () => {
     const date = futureDate(30);
     const set = await manager.rpc("set_staff_day_override", {
       p_business_id: B,
-      p_staff_id: PRIYA,
+      p_staff_id: BRIDGET,
       p_on_date: date,
       p_hours: [{ start_minute: h(12), end_minute: h(20) }] as Json,
     });
     expect(set.error).toBeNull();
 
-    const byStylist = await priya.rpc("set_staff_day_override", {
+    const byStylist = await bridget.rpc("set_staff_day_override", {
       p_business_id: B,
-      p_staff_id: PRIYA,
+      p_staff_id: BRIDGET,
       p_on_date: date,
       p_hours: [{ start_minute: h(6), end_minute: h(22) }] as Json,
     });
     expect(byStylist.error?.code).toBe("42501");
 
-    const { data } = await admin.from("staff_schedule_overrides").select("start_minute, end_minute").eq("staff_id", PRIYA).eq("on_date", date);
+    const { data } = await admin.from("staff_schedule_overrides").select("start_minute, end_minute").eq("staff_id", BRIDGET).eq("on_date", date);
     expect(data).toEqual([{ start_minute: h(12), end_minute: h(20) }]);
 
-    await manager.rpc("set_staff_day_override", { p_business_id: B, p_staff_id: PRIYA, p_on_date: date, p_hours: [] as Json });
-    const { data: after } = await admin.from("staff_schedule_overrides").select("id").eq("staff_id", PRIYA).eq("on_date", date);
+    await manager.rpc("set_staff_day_override", { p_business_id: B, p_staff_id: BRIDGET, p_on_date: date, p_hours: [] as Json });
+    const { data: after } = await admin.from("staff_schedule_overrides").select("id").eq("staff_id", BRIDGET).eq("on_date", date);
     expect(after).toEqual([]);
   });
 });
@@ -209,38 +209,38 @@ describe("time off requests", () => {
   });
 
   it("a stylist can request time off for themselves", async () => {
-    const { data, error } = await priya.from("staff_time_off").insert(request(PRIYA)).select("id, status").single();
+    const { data, error } = await bridget.from("staff_time_off").insert(request(BRIDGET)).select("id, status").single();
     expect(error).toBeNull();
     expect(data!.status).toBe("requested");
     created.push(data!.id);
   });
 
   it("a stylist can't approve their own time off or request it for someone else", async () => {
-    const approved = await priya
+    const approved = await bridget
       .from("staff_time_off")
-      .insert(request(PRIYA, { status: "approved", decided_by: PRIYA, decided_at: new Date().toISOString() }));
+      .insert(request(BRIDGET, { status: "approved", decided_by: BRIDGET, decided_at: new Date().toISOString() }));
     expect(approved.error?.code).toBe("42501");
 
-    const forOther = await priya.from("staff_time_off").insert(request(SOFIA));
+    const forOther = await bridget.from("staff_time_off").insert(request(SANDRA));
     expect(forOther.error?.code).toBe("42501");
 
-    const asOther = await priya.from("staff_time_off").insert(request(PRIYA, { requested_by: SOFIA }));
+    const asOther = await bridget.from("staff_time_off").insert(request(BRIDGET, { requested_by: SANDRA }));
     expect(asOther.error?.code).toBe("42501");
   });
 
   it("a stylist can't approve a pending request by editing it", async () => {
-    const { data } = await priya.from("staff_time_off").insert(request(PRIYA)).select("id").single();
+    const { data } = await bridget.from("staff_time_off").insert(request(BRIDGET)).select("id").single();
     created.push(data!.id);
-    const update = await priya
+    const update = await bridget
       .from("staff_time_off")
-      .update({ status: "approved", decided_by: PRIYA, decided_at: new Date().toISOString() })
+      .update({ status: "approved", decided_by: BRIDGET, decided_at: new Date().toISOString() })
       .eq("id", data!.id)
       .select();
     expect(update.data).toEqual([]);
   });
 
   it("managers approve requests, recording themselves as the decider", async () => {
-    const { data } = await priya.from("staff_time_off").insert(request(PRIYA)).select("id").single();
+    const { data } = await bridget.from("staff_time_off").insert(request(BRIDGET)).select("id").single();
     created.push(data!.id);
 
     const forged = await manager
@@ -260,7 +260,7 @@ describe("time off requests", () => {
   it("managers add approved time off directly, but only as themselves", async () => {
     const ok = await manager
       .from("staff_time_off")
-      .insert(request(SOFIA, { requested_by: MANAGER, status: "approved", decided_by: MANAGER, decided_at: new Date().toISOString() }))
+      .insert(request(SANDRA, { requested_by: MANAGER, status: "approved", decided_by: MANAGER, decided_at: new Date().toISOString() }))
       .select("id")
       .single();
     expect(ok.error).toBeNull();
@@ -268,17 +268,17 @@ describe("time off requests", () => {
 
     const forged = await manager
       .from("staff_time_off")
-      .insert(request(SOFIA, { requested_by: MANAGER, status: "approved", decided_by: OWNER, decided_at: new Date().toISOString() }));
+      .insert(request(SANDRA, { requested_by: MANAGER, status: "approved", decided_by: OWNER, decided_at: new Date().toISOString() }));
     expect(forged.error?.code).toBe("42501");
   });
 
   it("a decision must record who made it and when", async () => {
-    const { error } = await admin.from("staff_time_off").insert(request(PRIYA, { status: "approved" }));
+    const { error } = await admin.from("staff_time_off").insert(request(BRIDGET, { status: "approved" }));
     expect(error?.code).toBe("23514");
   });
 
   it("part-day time off must be a single day", async () => {
-    const { error } = await admin.from("staff_time_off").insert(request(PRIYA, { start_minute: h(9), end_minute: h(12) }));
+    const { error } = await admin.from("staff_time_off").insert(request(BRIDGET, { start_minute: h(9), end_minute: h(12) }));
     expect(error?.code).toBe("23514");
   });
 });
@@ -290,35 +290,35 @@ describe("time off visibility", () => {
       return data!.map((r) => r.status).sort();
     };
 
-    // Sofia's vacation is approved.
-    expect(await statuses(marcus, SOFIA)).toEqual(["approved"]);
-    expect(await statuses(frontDesk, SOFIA)).toEqual(["approved"]);
-    // Ethan's request is pending: hidden from other staff, visible to managers.
-    expect(await statuses(marcus, ETHAN)).toEqual([]);
-    expect(await statuses(frontDesk, ETHAN)).toEqual([]);
-    expect(await statuses(manager, ETHAN)).toEqual(["requested"]);
-    // Priya sees her own declined request; Marcus doesn't.
-    expect(await statuses(priya, PRIYA)).toEqual(["declined"]);
-    expect(await statuses(marcus, PRIYA)).toEqual([]);
+    // Sandra's vacation is approved.
+    expect(await statuses(gil, SANDRA)).toEqual(["approved"]);
+    expect(await statuses(frontDesk, SANDRA)).toEqual(["approved"]);
+    // Shae's request is pending: hidden from other staff, visible to managers.
+    expect(await statuses(gil, SHAE)).toEqual([]);
+    expect(await statuses(frontDesk, SHAE)).toEqual([]);
+    expect(await statuses(manager, SHAE)).toEqual(["requested"]);
+    // Bridget sees their own declined request; Gil doesn't.
+    expect(await statuses(bridget, BRIDGET)).toEqual(["declined"]);
+    expect(await statuses(gil, BRIDGET)).toEqual([]);
   });
 });
 
 describe("withdrawing and removing time off", () => {
   it("staff can withdraw their own pending request, not approved time off or others' requests", async () => {
-    const { data: mine } = await priya
+    const { data: mine } = await bridget
       .from("staff_time_off")
-      .insert({ business_id: B, staff_id: PRIYA, requested_by: PRIYA, starts_on: futureDate(50), ends_on: futureDate(50), reason: "personal" })
+      .insert({ business_id: B, staff_id: BRIDGET, requested_by: BRIDGET, starts_on: futureDate(50), ends_on: futureDate(50), reason: "personal" })
       .select("id")
       .single();
-    const withdrawn = await priya.from("staff_time_off").delete().eq("id", mine!.id).select("id");
+    const withdrawn = await bridget.from("staff_time_off").delete().eq("id", mine!.id).select("id");
     expect(withdrawn.data).toEqual([{ id: mine!.id }]);
 
-    // Marcus's sick day (approved) can't be removed by Marcus.
-    const ownApproved = await marcus.from("staff_time_off").delete().eq("staff_id", MARCUS).select();
+    // Gil's sick day (approved) can't be removed by Gil.
+    const ownApproved = await gil.from("staff_time_off").delete().eq("staff_id", GIL).select();
     expect(ownApproved.data).toEqual([]);
 
-    // Ethan's pending request can't be removed by Priya.
-    const others = await priya.from("staff_time_off").delete().eq("staff_id", ETHAN).select();
+    // Shae's pending request can't be removed by Bridget.
+    const others = await bridget.from("staff_time_off").delete().eq("staff_id", SHAE).select();
     expect(others.data).toEqual([]);
   });
 });
@@ -329,30 +329,30 @@ describe("commission", () => {
       const { data } = await client.from("staff_compensation").select("staff_id");
       return data!.map((r) => r.staff_id);
     };
-    expect(await ids(priya)).toEqual([PRIYA]);
-    expect(await ids(marcus)).toEqual([MARCUS]);
+    expect(await ids(bridget)).toEqual([BRIDGET]);
+    expect(await ids(gil)).toEqual([GIL]);
     expect(await ids(frontDesk)).toEqual([]);
-    expect(await ids(manager)).toHaveLength(6);
+    expect(await ids(manager)).toHaveLength(7); // the stylists
   });
 
   it("only owners and managers change it", async () => {
-    const own = await priya.from("staff_compensation").update({ service_commission_pct: 90 }).eq("staff_id", PRIYA).select();
+    const own = await bridget.from("staff_compensation").update({ service_commission_pct: 90 }).eq("staff_id", BRIDGET).select();
     expect(own.data).toEqual([]);
 
-    const level = await priya.from("staff").update({ level: "master" }).eq("id", ETHAN).select();
+    const level = await bridget.from("staff").update({ level: "master" }).eq("id", SHAE).select();
     expect(level.data).toEqual([]);
 
     const byManager = await manager
       .from("staff_compensation")
       .update({ retail_commission_pct: 12.5 })
-      .eq("staff_id", ETHAN)
+      .eq("staff_id", SHAE)
       .select("retail_commission_pct");
     expect(byManager.data).toEqual([{ retail_commission_pct: 12.5 }]);
-    await admin.from("staff_compensation").update({ retail_commission_pct: 10 }).eq("staff_id", ETHAN);
+    await admin.from("staff_compensation").update({ retail_commission_pct: 10 }).eq("staff_id", SHAE);
   });
 
   it("rejects percentages over 100", async () => {
-    const { error } = await admin.from("staff_compensation").update({ service_commission_pct: 101 }).eq("staff_id", ETHAN);
+    const { error } = await admin.from("staff_compensation").update({ service_commission_pct: 101 }).eq("staff_id", SHAE);
     expect(error?.code).toBe("23514");
   });
 });
@@ -366,25 +366,25 @@ describe("tenant isolation", () => {
   });
 
   it("another salon can't change this salon's hours or add its time off", async () => {
-    const before = await weeklyHours(PRIYA);
+    const before = await weeklyHours(BRIDGET);
     const asThisBusiness = await otherOwner.rpc("set_staff_weekly_hours", {
       p_business_id: B,
-      p_staff_id: PRIYA,
+      p_staff_id: BRIDGET,
       p_hours: [{ weekday: 1, start_minute: h(9), end_minute: h(17) }] as Json,
     });
     expect(asThisBusiness.error?.code).toBe("42501");
 
     const asOwnBusiness = await otherOwner.rpc("set_staff_weekly_hours", {
       p_business_id: other.businessId,
-      p_staff_id: PRIYA,
+      p_staff_id: BRIDGET,
       p_hours: [{ weekday: 1, start_minute: h(9), end_minute: h(17) }] as Json,
     });
     expect(asOwnBusiness.error?.code).toBe("23503");
-    expect(await weeklyHours(PRIYA)).toEqual(before);
+    expect(await weeklyHours(BRIDGET)).toEqual(before);
 
     const timeOff = await otherOwner.from("staff_time_off").insert({
       business_id: B,
-      staff_id: PRIYA,
+      staff_id: BRIDGET,
       requested_by: other.staffId,
       starts_on: futureDate(10),
       ends_on: futureDate(10),

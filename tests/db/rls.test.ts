@@ -19,7 +19,7 @@ beforeAll(async () => {
   [owner, manager, stylist, otherOwner] = await Promise.all([
     signIn("owner@mapleandash.test"),
     signIn("manager@mapleandash.test"),
-    signIn("priya@mapleandash.test"),
+    signIn("bridget@mapleandash.test"),
     signIn(other.email),
   ]);
 });

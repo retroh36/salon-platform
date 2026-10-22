@@ -7,8 +7,8 @@ import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
-const { jamal: JAMAL } = SEED.staff;
-// A Tuesday clear of the other tests' days: Jamal works 9-5, lunch at noon.
+const { nola: NOLA } = SEED.staff;
+// A Tuesday clear of the other tests' days: Nola works 9-5, lunch at noon.
 const DAY = addDays(startOfWeek(todayIn(TZ)), 127);
 const at = (hour: number, minute = 0) => fromLocal(DAY, hour * 60 + minute, TZ)!;
 const PREFIX = `Wl${Date.now().toString(36)}`;
@@ -42,7 +42,7 @@ async function book(clientId: string, serviceId: string, hour: number, minute = 
   const start = at(hour, minute);
   const end = new Date(start.getTime() + 30 * 60_000);
   const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: clientId, starts_at: start.toISOString(), ends_at: end.toISOString() }).select("id").single();
-  const { error } = await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: serviceId, staff_id: JAMAL, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: 30, price_cents: 0 });
+  const { error } = await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: serviceId, staff_id: NOLA, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: 30, price_cents: 0 });
   expect(error).toBeNull();
   return a!.id;
 }
@@ -61,14 +61,14 @@ test("adds clients to the waitlist and removes them", async ({ page }) => {
   await form.getByLabel("Find a client").fill(`${PREFIX}lena`);
   await form.getByRole("list", { name: "Matching clients" }).getByRole("button", { name: new RegExp(`${PREFIX}Lena Test`) }).click();
   await form.getByLabel("Service", { exact: true }).selectOption({ label: "Balayage" });
-  await form.getByLabel("Priya Shah").check();
+  await form.getByLabel("Bridget Callahan").check();
   await form.getByLabel("Afternoons").check();
   await form.getByLabel("Notes (optional)").fill("Can come at short notice");
   await form.getByRole("button", { name: "Add to waitlist" }).click();
   await expect(form.getByRole("status")).toHaveText(`Added ${PREFIX}Lena Test to the waitlist.`);
 
   const row = page.getByRole("region", { name: /^Waiting/ }).getByRole("listitem").filter({ hasText: `${PREFIX}Lena Test` });
-  await expect(row).toContainText("Balayage · Priya");
+  await expect(row).toContainText("Balayage · Bridget");
   await expect(row).toContainText("Afternoons · Can come at short notice");
   await row.getByRole("button", { name: `Remove ${PREFIX}Lena Test from the waitlist` }).click();
   await expect(row).toHaveCount(0);
@@ -92,10 +92,10 @@ test("when a visit is canceled, Denise suggests who on the waitlist fits, and st
     to_date: addDays(DAY, 3),
     created_at: new Date(Date.now() - daysAgo * 86_400_000).toISOString(),
   });
-  expect((await admin.from("waitlist_entries").insert([entry(eli, [], 5), entry(sam, [JAMAL], 1)])).error).toBeNull();
+  expect((await admin.from("waitlist_entries").insert([entry(eli, [], 5), entry(sam, [NOLA], 1)])).error).toBeNull();
 
   await openDay(page);
-  await ui(page).getByRole("region", { name: "Jamal Carter", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Gone Test`) }).click();
+  await ui(page).getByRole("region", { name: "Nola Brennan", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Gone Test`) }).click();
   const panel = page.getByRole("tabpanel", { name: "Booking details" });
   await panel.getByRole("button", { name: "Cancel booking" }).click();
   const cancel = panel.getByRole("form", { name: "Cancel booking" });
@@ -104,11 +104,11 @@ test("when a visit is canceled, Denise suggests who on the waitlist fits, and st
 
   // Denise opens her panel with the opening and who fits, best first.
   const opening = page.getByTestId("denise-opening");
-  await expect(opening).toContainText("A 90-minute opening with Jamal at 12:30pm fits 2 people on your waitlist.");
+  await expect(opening).toContainText("A 90-minute opening with Nola at 12:30pm fits 2 people on your waitlist.");
   const matches = opening.getByRole("listitem");
-  await expect(matches).toHaveText([new RegExp(`1\\. ${PREFIX}Sam Test.*asked for Jamal`), new RegExp(`2\\. ${PREFIX}Eli Test`)]);
+  await expect(matches).toHaveText([new RegExp(`1\\. ${PREFIX}Sam Test.*asked for Nola`), new RegExp(`2\\. ${PREFIX}Eli Test`)]);
   await matches.first().getByRole("button", { name: "Book" }).click();
-  await expect(page.getByRole("status").filter({ hasText: `Booked ${PREFIX}Sam Test with Jamal at 12:30pm. Let ${PREFIX}Sam know.` })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: `Booked ${PREFIX}Sam Test with Nola at 12:30pm. Let ${PREFIX}Sam know.` })).toBeVisible();
 
   const { data: booked } = await admin.from("appointments").select("starts_at, status").eq("client_id", sam);
   expect(booked).toEqual([{ starts_at: expect.any(String), status: "booked" }]);

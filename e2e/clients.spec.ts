@@ -105,7 +105,7 @@ test.describe("front desk", () => {
     await form.getByLabel("Phone", { exact: true }).fill("555");
     await form.getByLabel("Email", { exact: true }).fill("rosa@example");
     await form.getByLabel("Allergies and sensitivities").fill("Fragrance sensitivity");
-    await form.getByLabel("Preferred stylist").selectOption({ label: "Sofia Moreno" });
+    await form.getByLabel("Preferred stylist").selectOption({ label: "Sandra Whitfield" });
     await expect(form.getByLabel("Signed on")).toBeDisabled();
     await form.getByLabel("Consent form signed").check();
     await expect(form.getByLabel("Signed on")).toBeEnabled();
@@ -116,7 +116,7 @@ test.describe("front desk", () => {
     await expect(form.getByText("Enter a 10-digit phone number.")).toBeVisible();
     await expect(form.getByText("Enter a valid email address.")).toBeVisible();
     await expect(form.getByLabel("First name")).toHaveValue(`${PREFIX} Rosa`);
-    await expect(form.getByLabel("Preferred stylist")).toHaveValue(SEED.staff.sofia);
+    await expect(form.getByLabel("Preferred stylist")).toHaveValue(SEED.staff.sandra);
     await expect(form.getByLabel("Consent form signed")).toBeChecked();
     await expect(form.getByLabel("Signed on")).toHaveValue("2026-01-15");
 
@@ -183,7 +183,7 @@ test.describe("stylists", () => {
     await expect(ui(page).getByRole("status")).toHaveText("Saved.");
     await expect(ui(page).getByRole("heading", { name: "Color formulas (1)" })).toBeVisible();
     const entry = ui(page).getByRole("list", { name: "Formula history" }).getByRole("listitem").first();
-    await expect(entry).toContainText("Priya Shah");
+    await expect(entry).toContainText("Bridget Callahan");
     await expect(entry).toContainText("Roots: Shades EQ 6N + 6NB (1:1), 20 vol, 35 min");
     await expect(entry).toContainText("Lifted fast; check at 30.");
     // The form is cleared for the next entry.

@@ -22,7 +22,7 @@ test("a wrong password shows an error and keeps the email", async ({ page }) => 
 test("signing in shows the location's staff, and signing out ends the session", async ({ page }) => {
   await signIn(page, "owner@mapleandash.test");
   await expect(ui(page).getByRole("heading", { name: "Maple & Ash Downtown" })).toBeVisible();
-  await expect(ui(page).getByRole("heading", { name: "Staff (9)" })).toBeVisible();
+  await expect(ui(page).getByRole("heading", { name: "Staff (10)" })).toBeVisible();
   await expect(ui(page).getByText("Olivia Bennett(you)")).toBeVisible();
 
   await page.getByRole("button", { name: "Sign out" }).click();

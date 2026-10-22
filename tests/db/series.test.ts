@@ -11,19 +11,19 @@ import { admin, SEED, signIn, type Client } from "./helpers";
 const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
-const { priya: PRIYA, ethan: ETHAN } = SEED.staff;
+const { bridget: BRIDGET, shae: SHAE } = SEED.staff;
 const location = { id: L, timezone: TZ, businessId: B };
-// Tuesdays far from the seeded month; Priya works 9-1 and 2-6.
+// Tuesdays far from the seeded month; Bridget works 9-1 and 2-6.
 const FIRST = "2031-08-05";
 const DATES = seriesDates(FIRST, 2, { kind: "count", count: 4 }); // Aug 5, 19, Sep 2, 16
 
 let frontDesk: Client;
-let priya: Client;
+let bridget: Client;
 let cut: string;
 let clientId: string;
 let otherClient: string;
 
-const lines = (staffId = PRIYA, startMinute = 10 * 60): VisitLine[] => [{ serviceId: cut, staffId, startMinute, resource: "none" }];
+const lines = (staffId = BRIDGET, startMinute = 10 * 60): VisitLine[] => [{ serviceId: cut, staffId, startMinute, resource: "none" }];
 const at = (date: string, hour: number, minute = 0) => fromLocal(date, hour * 60 + minute, TZ)!;
 
 async function clear() {
@@ -32,7 +32,7 @@ async function clear() {
 }
 
 beforeAll(async () => {
-  [frontDesk, priya] = await Promise.all([signIn("frontdesk@mapleandash.test"), signIn("priya@mapleandash.test")]);
+  [frontDesk, bridget] = await Promise.all([signIn("frontdesk@mapleandash.test"), signIn("bridget@mapleandash.test")]);
   const { data: s } = await admin.from("services").select("id").eq("business_id", B).eq("name", "Women's Cut & Style").single();
   cut = s!.id;
   const { data: c } = await admin.from("clients").select("id").eq("business_id", B).order("id").limit(2);
@@ -48,8 +48,8 @@ async function book() {
 
 describe("booking a series", () => {
   it("books each visit through the rules, linked in order, and reports any that don't fit", async () => {
-    // Someone else has Priya at 10 on the third date.
-    const clash = await saveBooking(frontDesk, location, { clientId: otherClient, notes: null, items: [{ serviceId: cut, staffId: PRIYA, start: at(DATES[2], 10), resource: { kind: "none" } }] });
+    // Someone else has Bridget at 10 on the third date.
+    const clash = await saveBooking(frontDesk, location, { clientId: otherClient, notes: null, items: [{ serviceId: cut, staffId: BRIDGET, start: at(DATES[2], 10), resource: { kind: "none" } }] });
     expect(clash.ok).toBe(true);
 
     const { seriesId, results } = await book();
@@ -72,10 +72,10 @@ describe("booking a series", () => {
   });
 
   it("is front of house only, one client per series", async () => {
-    const { results } = await bookSeries(priya, location, { clientId, notes: null, intervalWeeks: 2, end: { kind: "count", count: 2 }, visits: [{ date: FIRST, lines: lines() }] });
+    const { results } = await bookSeries(bridget, location, { clientId, notes: null, intervalWeeks: 2, end: { kind: "count", count: 2 }, visits: [{ date: FIRST, lines: lines() }] });
     expect(results).toEqual([{ date: FIRST, ok: false, error: "forbidden" }]);
     const { seriesId } = await book();
-    const other = await saveBooking(frontDesk, location, { clientId: otherClient, notes: null, items: [{ serviceId: cut, staffId: ETHAN, start: at(FIRST, 15), resource: { kind: "none" } }] });
+    const other = await saveBooking(frontDesk, location, { clientId: otherClient, notes: null, items: [{ serviceId: cut, staffId: SHAE, start: at(FIRST, 15), resource: { kind: "none" } }] });
     const { error } = await frontDesk.rpc("set_appointment_series", { p_appointment_id: other.ok ? other.appointmentId : "", p_series_id: seriesId!, p_index: 9 });
     expect(error?.code).toBe("22023");
   });
@@ -85,7 +85,7 @@ describe("changing a series", () => {
   it("changes this and following visits, leaving earlier ones", async () => {
     const { seriesId, results } = await book();
     const second = results[1].ok ? results[1].appointmentId : "";
-    const changed = await changeSeries(frontDesk, location, second, "following", { clientId, notes: "Shorter layers", lines: lines(PRIYA, 11 * 60) });
+    const changed = await changeSeries(frontDesk, location, second, "following", { clientId, notes: "Shorter layers", lines: lines(BRIDGET, 11 * 60) });
     expect(changed.every((r) => r.ok)).toBe(true);
     expect(changed.map((r) => r.date)).toEqual(DATES.slice(1));
     const visits = await seriesVisits(admin, seriesId!, TZ);
@@ -100,17 +100,17 @@ describe("changing a series", () => {
   it("moves a service on all visits by the same amount, reporting ones that don't fit", async () => {
     const { seriesId } = await book();
     let visits = await seriesVisits(admin, seriesId!, TZ);
-    // Priya has someone at 12:00 on the last date.
-    await saveBooking(frontDesk, location, { clientId: otherClient, notes: null, items: [{ serviceId: cut, staffId: PRIYA, start: at(DATES[3], 12), resource: { kind: "none" } }] });
-    const results = await moveSeriesItem(frontDesk, location, { itemId: visits[0].items[0].id, staffId: PRIYA, start: at(FIRST, 11, 30) }, "all");
+    // Bridget has someone at 12:00 on the last date.
+    await saveBooking(frontDesk, location, { clientId: otherClient, notes: null, items: [{ serviceId: cut, staffId: BRIDGET, start: at(DATES[3], 12), resource: { kind: "none" } }] });
+    const results = await moveSeriesItem(frontDesk, location, { itemId: visits[0].items[0].id, staffId: BRIDGET, start: at(FIRST, 11, 30) }, "all");
     expect(results.map((r) => r.ok)).toEqual([true, true, true, false]);
     visits = await seriesVisits(admin, seriesId!, TZ);
     expect(visits.map((v) => v.items[0].startMinute)).toEqual([690, 690, 690, 600]);
 
     // To another stylist for this visit only.
-    await moveSeriesItem(frontDesk, location, { itemId: visits[1].items[0].id, staffId: ETHAN, start: at(DATES[1], 11, 30) }, "this");
+    await moveSeriesItem(frontDesk, location, { itemId: visits[1].items[0].id, staffId: SHAE, start: at(DATES[1], 11, 30) }, "this");
     visits = await seriesVisits(admin, seriesId!, TZ);
-    expect(visits.map((v) => v.items[0].staffId)).toEqual([PRIYA, ETHAN, PRIYA, PRIYA]);
+    expect(visits.map((v) => v.items[0].staffId)).toEqual([BRIDGET, SHAE, BRIDGET, BRIDGET]);
   });
 
   it("cancels this and following, or all", async () => {

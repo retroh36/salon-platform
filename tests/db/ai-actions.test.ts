@@ -10,15 +10,15 @@ import { admin, createOtherSalon, SEED, signIn, type Client } from "./helpers";
 const B = SEED.business;
 const TZ = "America/Chicago";
 const location = { id: SEED.location, timezone: TZ };
-const { priya: PRIYA, ethan: ETHAN, frontDesk: FRONT_DESK } = SEED.staff;
-// A Tuesday far from the seeded month. Priya works 9-1 and 2-6, Ethan 9-1
+const { bridget: BRIDGET, shae: SHAE, frontDesk: FRONT_DESK } = SEED.staff;
+// A Tuesday far from the seeded month. Bridget works 9-1 and 2-6, Shae 9-1
 // and 1:30-5:30.
 const DAY = "2031-06-10";
 const at = (hour: number, minute = 0) => fromLocal(DAY, hour * 60 + minute, TZ)!;
 
 let other: Awaited<ReturnType<typeof createOtherSalon>>;
 let frontDesk: Client;
-let priya: Client;
+let bridget: Client;
 let otherOwner: Client;
 let services: Map<string, string>;
 let clientId: string;
@@ -78,9 +78,9 @@ async function propose(client: Client, subject: string | null, options: Proposal
 
 beforeAll(async () => {
   other = await createOtherSalon();
-  [frontDesk, priya, otherOwner] = await Promise.all([
+  [frontDesk, bridget, otherOwner] = await Promise.all([
     signIn("frontdesk@mapleandash.test"),
-    signIn("priya@mapleandash.test"),
+    signIn("bridget@mapleandash.test"),
     signIn(other.email),
   ]);
   const { data } = await admin.from("services").select("id, name").eq("business_id", B);
@@ -103,20 +103,20 @@ afterAll(async () => {
 
 describe("recording proposals", () => {
   it("keeps one set of options per problem, updated in place", async () => {
-    const [cut] = await book([item("Women's Cut & Style", PRIYA, at(10))]);
+    const [cut] = await book([item("Women's Cut & Style", BRIDGET, at(10))]);
     const subject = newSubject();
 
     const first = await propose(frontDesk, subject, [
-      option("Move to 10:20", move(cut, PRIYA, at(10, 20))),
-      option("Move to Ethan", move(cut, ETHAN, at(10))),
-      option("Move to 11:00", move(cut, PRIYA, at(11))),
+      option("Move to 10:20", move(cut, BRIDGET, at(10, 20))),
+      option("Move to Shae", move(cut, SHAE, at(10))),
+      option("Move to 11:00", move(cut, BRIDGET, at(11))),
     ]);
     expect(first).toHaveLength(3);
     const top = await action(first[0]);
     expect(top).toMatchObject({ status: "proposed", rank: 1, summary: "Move to 10:20", proposed_by: FRONT_DESK, feature: "conflict_resolver" });
 
     // The calendar changed: two options now, the first one different.
-    const second = await propose(frontDesk, subject, [option("Move to 10:30", move(cut, PRIYA, at(10, 30))), option("Move to Ethan", move(cut, ETHAN, at(10)))]);
+    const second = await propose(frontDesk, subject, [option("Move to 10:30", move(cut, BRIDGET, at(10, 30))), option("Move to Shae", move(cut, SHAE, at(10)))]);
     expect(second).toEqual(first.slice(0, 2));
     expect((await action(first[0]))!.summary).toBe("Move to 10:30");
     expect(await action(first[2])).toBeNull();
@@ -128,31 +128,31 @@ describe("recording proposals", () => {
   });
 
   it("doesn't propose again once rejected", async () => {
-    const [cut] = await book([item("Women's Cut & Style", PRIYA, at(10))]);
+    const [cut] = await book([item("Women's Cut & Style", BRIDGET, at(10))]);
     const subject = newSubject();
-    const ids = await propose(frontDesk, subject, [option("Move to 10:20", move(cut, PRIYA, at(10, 20))), option("Move to Ethan", move(cut, ETHAN, at(10)))]);
+    const ids = await propose(frontDesk, subject, [option("Move to 10:20", move(cut, BRIDGET, at(10, 20))), option("Move to Shae", move(cut, SHAE, at(10)))]);
 
     expect(await rejectAction(frontDesk, ids[1])).toEqual({ ok: true });
     for (const id of ids) expect(await action(id)).toMatchObject({ status: "rejected", decided_by: FRONT_DESK });
-    expect(await propose(frontDesk, subject, [option("Move to 10:20", move(cut, PRIYA, at(10, 20)))])).toEqual([]);
+    expect(await propose(frontDesk, subject, [option("Move to 10:20", move(cut, BRIDGET, at(10, 20)))])).toEqual([]);
     expect(await rejectAction(frontDesk, ids[0])).toEqual({ ok: false, error: "decided" });
   });
 });
 
 describe("applying and undoing", () => {
   it("moves the items, records what they were, and undoes exactly", async () => {
-    const [cut] = await book([item("Women's Cut & Style", PRIYA, at(10))]);
+    const [cut] = await book([item("Women's Cut & Style", BRIDGET, at(10))]);
     const before = await itemRow(cut.id);
     const ids = await propose(frontDesk, newSubject(), [
-      option("Move to Ethan", move(cut, ETHAN, at(10, 15))),
-      option("Move to 11:00", move(cut, PRIYA, at(11))),
+      option("Move to Shae", move(cut, SHAE, at(10, 15))),
+      option("Move to 11:00", move(cut, BRIDGET, at(11))),
     ]);
 
     expect(await applyAction(frontDesk, location, ids[0])).toEqual({ ok: true });
     const moved = await itemRow(cut.id);
-    expect(moved.staff_id).toBe(ETHAN);
+    expect(moved.staff_id).toBe(SHAE);
     expect(new Date(moved.starts_at)).toEqual(at(10, 15));
-    // Ethan charges his own (junior) price.
+    // Shae charges the Artisan price.
     expect(moved.price_cents).toBeLessThan(before.price_cents);
 
     const applied = await action(ids[0]);
@@ -178,10 +178,10 @@ describe("applying and undoing", () => {
   });
 
   it("moves two clients together, each checked against the other", async () => {
-    const [first] = await book([item("Women's Cut & Style", PRIYA, at(10))]);
-    const [second] = await book([item("Women's Cut & Style", PRIYA, at(11))]);
+    const [first] = await book([item("Women's Cut & Style", BRIDGET, at(10))]);
+    const [second] = await book([item("Women's Cut & Style", BRIDGET, at(11))]);
     // Shifting both by an hour: the first lands where the second was.
-    const both: Proposal = { changes: [...move(first, PRIYA, at(11)).changes, ...move(second, PRIYA, at(12)).changes] };
+    const both: Proposal = { changes: [...move(first, BRIDGET, at(11)).changes, ...move(second, BRIDGET, at(12)).changes] };
     const [id] = await propose(frontDesk, newSubject(), [option("Shift both", both)]);
     expect(await applyAction(frontDesk, location, id)).toEqual({ ok: true });
     expect(new Date((await itemRow(first.id)).starts_at)).toEqual(at(11));
@@ -192,51 +192,51 @@ describe("applying and undoing", () => {
     expect(new Date((await itemRow(second.id)).starts_at)).toEqual(at(11));
 
     // Overlapping moves fail the rules.
-    const clash: Proposal = { changes: [...move(first, PRIYA, at(11)).changes, ...move(second, PRIYA, at(11, 30)).changes] };
+    const clash: Proposal = { changes: [...move(first, BRIDGET, at(11)).changes, ...move(second, BRIDGET, at(11, 30)).changes] };
     const [bad] = await propose(frontDesk, newSubject(), [option("Clash", clash)]);
     expect(await applyAction(frontDesk, location, bad)).toEqual({ ok: false, error: "invalid", problems: [{ code: "staff_double_booked", conflictWith: first.id }] });
   });
 
   it("checks the booking rules again when applying", async () => {
-    const [cut] = await book([item("Women's Cut & Style", PRIYA, at(10))]);
-    const [id] = await propose(frontDesk, newSubject(), [option("Move to 12:00", move(cut, PRIYA, at(12)))]);
-    // Someone books Priya at 12 in the meantime.
-    await book([item("Women's Cut & Style", PRIYA, at(12))]);
+    const [cut] = await book([item("Women's Cut & Style", BRIDGET, at(10))]);
+    const [id] = await propose(frontDesk, newSubject(), [option("Move to 12:00", move(cut, BRIDGET, at(12)))]);
+    // Someone books Bridget at 12 in the meantime.
+    await book([item("Women's Cut & Style", BRIDGET, at(12))]);
 
     const result = await applyAction(frontDesk, location, id);
     expect(result).toMatchObject({ ok: false, error: "invalid", problems: [{ code: "staff_double_booked" }] });
     expect(new Date((await itemRow(cut.id)).starts_at)).toEqual(at(10));
     expect((await action(id))!.status).toBe("proposed");
 
-    // And the rules for the stylist: Priya's lunch is 1-2.
-    const [lunch] = await propose(frontDesk, newSubject(), [option("Move to 1:00", move(cut, PRIYA, at(13)))]);
+    // And the rules for the stylist: Bridget's lunch is 1-2.
+    const [lunch] = await propose(frontDesk, newSubject(), [option("Move to 1:00", move(cut, BRIDGET, at(13)))]);
     expect(await applyAction(frontDesk, location, lunch)).toEqual({ ok: false, error: "invalid", problems: [{ code: "staff_unavailable", reason: "not_working" }] });
   });
 
   it("refuses a proposal when the visit moved or the client checked in since", async () => {
-    const [cut] = await book([item("Women's Cut & Style", PRIYA, at(10))]);
-    const movedSince = await propose(frontDesk, newSubject(), [option("Move to 11:00", move(cut, PRIYA, at(11)))]);
+    const [cut] = await book([item("Women's Cut & Style", BRIDGET, at(10))]);
+    const movedSince = await propose(frontDesk, newSubject(), [option("Move to 11:00", move(cut, BRIDGET, at(11)))]);
 
-    expect(await moveItem(frontDesk, location, { itemId: cut.id, staffId: PRIYA, start: at(10, 30) })).toMatchObject({ ok: true });
+    expect(await moveItem(frontDesk, location, { itemId: cut.id, staffId: BRIDGET, start: at(10, 30) })).toMatchObject({ ok: true });
     expect(await applyAction(frontDesk, location, movedSince[0])).toEqual({ ok: false, error: "stale" });
 
     // Proposed again from where it is now, but the client has checked in.
-    const [fresh] = await propose(frontDesk, newSubject(), [option("Move to Ethan", move({ ...cut, starts_at: at(10, 30).toISOString() }, ETHAN, at(10, 30)))]);
+    const [fresh] = await propose(frontDesk, newSubject(), [option("Move to Shae", move({ ...cut, starts_at: at(10, 30).toISOString() }, SHAE, at(10, 30)))]);
     expect(await changeStatus(frontDesk, cut.appointment_id, "check_in")).toEqual({ ok: true });
     expect(await applyAction(frontDesk, location, fresh)).toEqual({ ok: false, error: "stale" });
-    expect((await itemRow(cut.id)).staff_id).toBe(PRIYA);
+    expect((await itemRow(cut.id)).staff_id).toBe(BRIDGET);
   });
 
   it("undo checks the old place is still free, and that nothing changed since", async () => {
-    const [cut] = await book([item("Women's Cut & Style", PRIYA, at(10))]);
+    const [cut] = await book([item("Women's Cut & Style", BRIDGET, at(10))]);
     const [first, second] = await Promise.all([
-      propose(frontDesk, newSubject(), [option("Move to 11:00", move(cut, PRIYA, at(11)))]),
-      propose(frontDesk, newSubject(), [option("Move to 15:00", move({ ...cut, starts_at: at(11).toISOString() }, PRIYA, at(15)))]),
+      propose(frontDesk, newSubject(), [option("Move to 11:00", move(cut, BRIDGET, at(11)))]),
+      propose(frontDesk, newSubject(), [option("Move to 15:00", move({ ...cut, starts_at: at(11).toISOString() }, BRIDGET, at(15)))]),
     ]);
     expect(await applyAction(frontDesk, location, first[0])).toEqual({ ok: true });
 
-    // Someone takes 10:00 with Priya: undo would double-book her.
-    const [taken] = await book([item("Women's Cut & Style", PRIYA, at(10))]);
+    // Someone takes 10:00 with Bridget: undo would double-book Bridget.
+    const [taken] = await book([item("Women's Cut & Style", BRIDGET, at(10))]);
     expect(await undoAction(frontDesk, location, first[0])).toMatchObject({ ok: false, error: "invalid", problems: [{ code: "staff_double_booked" }] });
     await admin.from("appointments").delete().eq("id", taken.appointment_id);
 
@@ -254,9 +254,9 @@ describe("applying and undoing", () => {
   it("books a new visit once a client is chosen, and undo removes it", async () => {
     const proposal: Proposal = {
       changes: [],
-      book: { clientId: null, items: [{ serviceId: services.get("Women's Cut & Style")!, staffId: PRIYA, resourceId: null, start: at(14) }] },
+      book: { clientId: null, items: [{ serviceId: services.get("Women's Cut & Style")!, staffId: BRIDGET, resourceId: null, start: at(14) }] },
     };
-    const [id] = await recordProposals(frontDesk, SEED.location, { feature: "ask_denise", subject: null, options: [option("Cut with Priya at 2", proposal)] });
+    const [id] = await recordProposals(frontDesk, SEED.location, { feature: "ask_denise", subject: null, options: [option("Cut with Bridget at 2", proposal)] });
     oneOffs.push(id);
 
     expect(await applyAction(frontDesk, location, id)).toEqual({ ok: false, error: "needs_client" });
@@ -265,7 +265,7 @@ describe("applying and undoing", () => {
     const created = (applied!.previous_state as { created_appointment_id: string }).created_appointment_id;
     appointments.push(created);
     const { data: appt } = await admin.from("appointments").select("client_id, created_by, appointment_items(staff_id, starts_at)").eq("id", created).single();
-    expect(appt).toMatchObject({ client_id: clientId, created_by: FRONT_DESK, appointment_items: [{ staff_id: PRIYA }] });
+    expect(appt).toMatchObject({ client_id: clientId, created_by: FRONT_DESK, appointment_items: [{ staff_id: BRIDGET }] });
 
     expect(await undoAction(frontDesk, location, id)).toEqual({ ok: true });
     const { data: gone } = await admin.from("appointments").select("id").eq("id", created).maybeSingle();
@@ -275,7 +275,7 @@ describe("applying and undoing", () => {
   it("won't undo a booking once the client has checked in", async () => {
     const proposal: Proposal = {
       changes: [],
-      book: { clientId, items: [{ serviceId: services.get("Women's Cut & Style")!, staffId: PRIYA, resourceId: null, start: at(15) }] },
+      book: { clientId, items: [{ serviceId: services.get("Women's Cut & Style")!, staffId: BRIDGET, resourceId: null, start: at(15) }] },
     };
     const [id] = await recordProposals(frontDesk, SEED.location, { feature: "ask_denise", subject: null, options: [option("Cut", proposal)] });
     oneOffs.push(id);
@@ -287,8 +287,8 @@ describe("applying and undoing", () => {
   });
 
   it("refuses a save made against an out-of-date calendar", async () => {
-    const [cut] = await book([item("Women's Cut & Style", PRIYA, at(10))]);
-    const [id] = await propose(frontDesk, newSubject(), [option("Move to 11:00", move(cut, PRIYA, at(11)))]);
+    const [cut] = await book([item("Women's Cut & Style", BRIDGET, at(10))]);
+    const [id] = await propose(frontDesk, newSubject(), [option("Move to 11:00", move(cut, BRIDGET, at(11)))]);
     const { data: loc } = await admin.from("locations").select("calendar_version").eq("id", SEED.location).single();
     const { error } = await frontDesk.rpc("apply_ai_action", { p_action_id: id, p_expected_version: loc!.calendar_version - 1, p_client_id: null! });
     expect(error?.code).toBe("40001");
@@ -298,13 +298,13 @@ describe("applying and undoing", () => {
 
 describe("who can see and approve", () => {
   it("lets only the front of house record, approve, reject and read proposals", async () => {
-    const [cut] = await book([item("Women's Cut & Style", PRIYA, at(10))]);
-    const [id] = await propose(frontDesk, newSubject(), [option("Move to 11:00", move(cut, PRIYA, at(11)))]);
+    const [cut] = await book([item("Women's Cut & Style", BRIDGET, at(10))]);
+    const [id] = await propose(frontDesk, newSubject(), [option("Move to 11:00", move(cut, BRIDGET, at(11)))]);
 
-    await expect(propose(priya, newSubject(), [option("Move", move(cut, PRIYA, at(11)))])).rejects.toMatchObject({ code: "42501" });
-    expect(await applyAction(priya, location, id)).toEqual({ ok: false, error: "not_found" }); // can't even see it
-    expect(await rejectAction(priya, id)).toEqual({ ok: false, error: "not_found" });
-    const { data: seen } = await priya.from("ai_actions").select("id").eq("id", id);
+    await expect(propose(bridget, newSubject(), [option("Move", move(cut, BRIDGET, at(11)))])).rejects.toMatchObject({ code: "42501" });
+    expect(await applyAction(bridget, location, id)).toEqual({ ok: false, error: "not_found" }); // can't even see it
+    expect(await rejectAction(bridget, id)).toEqual({ ok: false, error: "not_found" });
+    const { data: seen } = await bridget.from("ai_actions").select("id").eq("id", id);
     expect(seen).toEqual([]);
 
     // Another salon sees nothing and can't act on it.
@@ -319,8 +319,8 @@ describe("who can see and approve", () => {
   });
 
   it("refuses direct writes to the log", async () => {
-    const [cut] = await book([item("Women's Cut & Style", PRIYA, at(10))]);
-    const [id] = await propose(frontDesk, newSubject(), [option("Move to 11:00", move(cut, PRIYA, at(11)))]);
+    const [cut] = await book([item("Women's Cut & Style", BRIDGET, at(10))]);
+    const [id] = await propose(frontDesk, newSubject(), [option("Move to 11:00", move(cut, BRIDGET, at(11)))]);
 
     const insert = await frontDesk.from("ai_actions").insert({ business_id: B, location_id: SEED.location, feature: "x", summary: "x", reason: "", proposal: {} });
     expect(insert.error?.code).toBe("42501");

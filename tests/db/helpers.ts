@@ -13,7 +13,8 @@ export type Client = SupabaseClient<Database>;
 
 export const PASSWORD = "password123";
 
-// IDs from supabase/seed.sql.
+// IDs from supabase/seed.sql. The tests also expect the demo month from
+// supabase/seed-demo.sql (npm run seed:demo).
 export const SEED = {
   business: "b0000000-0000-4000-8000-000000000001",
   location: "c0000000-0000-4000-8000-000000000001",
@@ -21,14 +22,15 @@ export const SEED = {
     owner: "d0000000-0000-4000-8000-000000000001",
     manager: "d0000000-0000-4000-8000-000000000002",
     frontDesk: "d0000000-0000-4000-8000-000000000003",
-    priya: "d0000000-0000-4000-8000-000000000004",
-    marcus: "d0000000-0000-4000-8000-000000000005",
-    hannah: "d0000000-0000-4000-8000-000000000006", // stylist, no login
-    jamal: "d0000000-0000-4000-8000-000000000007",
-    sofia: "d0000000-0000-4000-8000-000000000008",
-    ethan: "d0000000-0000-4000-8000-000000000009",
+    bridget: "d0000000-0000-4000-8000-000000000004",
+    gil: "d0000000-0000-4000-8000-000000000005",
+    hannah: "d0000000-0000-4000-8000-000000000006",
+    nola: "d0000000-0000-4000-8000-000000000007",
+    sandra: "d0000000-0000-4000-8000-000000000008",
+    shae: "d0000000-0000-4000-8000-000000000009",
+    lois: "d0000000-0000-4000-8000-000000000010",
   },
-  staffCount: 9,
+  staffCount: 10,
 };
 
 const options = { auth: { persistSession: false, autoRefreshToken: false } };
@@ -88,4 +90,11 @@ export async function createOtherSalon() {
       await admin.auth.admin.deleteUser(user.user.id);
     },
   };
+}
+
+// The default seed has a clear calendar; the tests need the demo month.
+export async function requireDemoData() {
+  const { count, error } = await admin.from("appointments").select("id", { count: "exact", head: true }).eq("business_id", SEED.business);
+  if (error) throw error;
+  if (!count) throw new Error("These tests need the demo data. Run `npm run seed:demo` first.");
 }

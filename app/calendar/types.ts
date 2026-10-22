@@ -4,6 +4,7 @@
 import type { AppointmentStatus } from "@/lib/appointments";
 import type { PickerProduct } from "@/lib/inventory-load";
 import type { ServiceFamily } from "@/lib/calendar";
+import type { StaffLevel } from "@/lib/schedule-forms";
 import type { StaffRole } from "@/lib/staff";
 import type { SegmentKind } from "@/lib/scheduling/booking";
 import type { Interval } from "@/lib/scheduling/intervals";
@@ -14,8 +15,10 @@ export type ColumnData = {
   staffId: string;
   name: string;
   firstName: string;
-  // "Master stylist", or their role.
+  // Their role ("Stylist"). The level shows only as color: a ring around
+  // the avatar and a bar along the top of the column.
   title: string;
+  level: StaffLevel | null;
   color: string | null;
   // On shift and the salon is open; others collapse to a thin column.
   working: boolean;

@@ -3,10 +3,12 @@ import {
   centsToInput,
   formatMinutes,
   formatPrice,
+  formatPriceRange,
   formatServiceTime,
   groupByCategory,
   parsePrice,
   parseServiceForm,
+  stylistPrice,
 } from "@/lib/services";
 
 const STAFF_A = "d0000000-0000-4000-8000-00000000000a";
@@ -91,6 +93,25 @@ describe("groupByCategory", () => {
   });
 });
 
+describe("stylistPrice", () => {
+  const service = { price_cents: 9500, levelPrices: { artisan: 7500, master: 11000 } };
+
+  it("uses the stylist's own price first, then their level's, then the menu price", () => {
+    expect(stylistPrice(service, { level: "master", customCents: 9000 })).toBe(9000);
+    expect(stylistPrice(service, { level: "master", customCents: null })).toBe(11000);
+    expect(stylistPrice(service, { level: "artisan", customCents: null })).toBe(7500);
+    expect(stylistPrice(service, { level: "senior", customCents: null })).toBe(9500);
+    expect(stylistPrice(service, { level: null, customCents: null })).toBe(9500);
+    expect(stylistPrice({ price_cents: 4000 }, { level: "master", customCents: null })).toBe(4000);
+  });
+
+  it("formats a range of prices", () => {
+    expect(formatPriceRange([7500, 11000, 9500])).toBe("$75–$110");
+    expect(formatPriceRange([5000, 5000])).toBe("$50");
+    expect(formatPriceRange([])).toBe("");
+  });
+});
+
 describe("parseServiceForm", () => {
   it("parses a valid form", () => {
     const result = parseServiceForm(
@@ -106,6 +127,7 @@ describe("parseServiceForm", () => {
         processing_minutes: 35,
         finishing_minutes: 20,
         price_cents: 9500,
+        level_prices: { artisan: null, senior: null, master: null },
         staff: [
           { staff_id: STAFF_A, price_cents: 11000 },
           { staff_id: STAFF_B, price_cents: null },
@@ -119,9 +141,16 @@ describe("parseServiceForm", () => {
     expect(result.ok && [result.value.processing_minutes, result.value.finishing_minutes]).toEqual([0, 0]);
   });
 
-  it("stores a stylist price equal to the default as the default", () => {
+  it("keeps a stylist's own price as typed, even if it matches the default (their level may charge more)", () => {
     const result = parseServiceForm(form({ ...valid, staff: STAFF_A, [`price_${STAFF_A}`]: "95.00" }));
-    expect(result.ok && result.value.staff).toEqual([{ staff_id: STAFF_A, price_cents: null }]);
+    expect(result.ok && result.value.staff).toEqual([{ staff_id: STAFF_A, price_cents: 9500 }]);
+  });
+
+  it("parses prices by level, blank meaning the default", () => {
+    const result = parseServiceForm(form({ ...valid, level_price_artisan: "75", level_price_senior: "", level_price_master: "$110.50" }));
+    expect(result.ok && result.value.level_prices).toEqual({ artisan: 7500, senior: null, master: 11050 });
+    const bad = parseServiceForm(form({ ...valid, level_price_master: "lots" }));
+    expect(!bad.ok && bad.errors.level_prices).toEqual({ master: "Enter a price like 85, or leave blank." });
   });
 
   it("ignores duplicate staff ids", () => {

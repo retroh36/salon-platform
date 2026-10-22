@@ -7,7 +7,7 @@
 import type { LocalDate, Weekday } from "../../scheduling/time.ts";
 
 export type StaffRole = "owner" | "manager" | "front_desk" | "stylist";
-export type StaffLevel = "junior" | "senior" | "master";
+export type StaffLevel = "artisan" | "senior" | "master";
 
 export type LocationRecord = {
   externalId: string;

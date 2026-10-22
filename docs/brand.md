@@ -129,6 +129,20 @@ check this).
 | Treatments | `#D5EFEB` soft teal | `#3B9B93` |
 | Other | `#EDE5DD` sand | `#A08870` |
 
+### Stylist levels
+
+| Level | Token | Hex |
+| --- | --- | --- |
+| Master | `level-master` | `#A67C12` gold |
+| Senior | `level-senior` | `#7C8896` silver |
+| Artisan | `level-artisan` | `#9A5A2B` bronze |
+
+Levels show as color only: a ring around the stylist's avatar and a thin bar
+along the top of their calendar column, explained by the legend. They're
+graphics, so they meet 3:1 against the page, and they're kept clearly apart
+from the service colors and Denise's periwinkle (the token tests check
+both). The level's name appears in staff settings, not on the calendar.
+
 Status chips have their own pairs (booked, confirmed, checked in, completed,
 running late, no-show) in `globals.css`.
 

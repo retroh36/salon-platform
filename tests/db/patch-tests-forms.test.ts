@@ -15,7 +15,7 @@ const DAY = "2031-09-09";
 const at = (h: number) => fromLocal(DAY, h * 60, TZ)!;
 const SIG = "data:image/png;base64,iVBORw0KGgo=";
 
-let owner: Client, frontDesk: Client, priya: Client;
+let owner: Client, frontDesk: Client, bridget: Client;
 let other: Awaited<ReturnType<typeof createOtherSalon>>;
 let otherOwner: Client;
 let clientId: string;
@@ -23,7 +23,7 @@ let gloss: string;
 let cut: string;
 
 beforeAll(async () => {
-  [owner, frontDesk, priya] = await Promise.all([signIn("owner@mapleandash.test"), signIn("frontdesk@mapleandash.test"), signIn("priya@mapleandash.test")]);
+  [owner, frontDesk, bridget] = await Promise.all([signIn("owner@mapleandash.test"), signIn("frontdesk@mapleandash.test"), signIn("bridget@mapleandash.test")]);
   other = await createOtherSalon();
   otherOwner = await signIn(other.email);
   const { data: c } = await admin.from("clients").insert({ business_id: B, first_name: "Patchy", last_name: "Test" }).select("id").single();
@@ -45,7 +45,7 @@ afterAll(async () => {
 
 describe("patch tests", () => {
   it("any staff member records one; everyone in the salon sees them, no one else; no edits", async () => {
-    const { error } = await priya.from("client_patch_tests").insert({ business_id: B, client_id: clientId, tested_at: new Date(Date.now() - 3_600_000).toISOString(), products: "6N + 20 vol", result: "no_reaction", performed_by: SEED.staff.priya });
+    const { error } = await bridget.from("client_patch_tests").insert({ business_id: B, client_id: clientId, tested_at: new Date(Date.now() - 3_600_000).toISOString(), products: "6N + 20 vol", result: "no_reaction", performed_by: SEED.staff.bridget });
     expect(error).toBeNull();
     expect((await frontDesk.from("client_patch_tests").select("id").eq("client_id", clientId)).data).toHaveLength(1);
     expect((await otherOwner.from("client_patch_tests").select("id").eq("client_id", clientId)).data).toHaveLength(0);
@@ -57,7 +57,7 @@ describe("patch tests", () => {
 
   it("blocks a booking that needs one only when the salon says so", async () => {
     // The test above is years before DAY, so it has expired.
-    const book = () => saveBooking(frontDesk, location, { clientId, notes: null, items: [{ serviceId: gloss, staffId: SEED.staff.priya, start: at(10), resource: { kind: "none" } }] });
+    const book = () => saveBooking(frontDesk, location, { clientId, notes: null, items: [{ serviceId: gloss, staffId: SEED.staff.bridget, start: at(10), resource: { kind: "none" } }] });
     const warned = await book();
     expect(warned.ok).toBe(true);
     await admin.from("appointments").delete().eq("client_id", clientId);
@@ -66,11 +66,11 @@ describe("patch tests", () => {
     const blocked = await book();
     expect(blocked).toEqual({ ok: false, error: "invalid", problems: [[{ code: "patch_test", state: "expired" }]] });
     // A cut doesn't need one.
-    const ok = await saveBooking(frontDesk, location, { clientId, notes: null, items: [{ serviceId: cut, staffId: SEED.staff.priya, start: at(10), resource: { kind: "none" } }] });
+    const ok = await saveBooking(frontDesk, location, { clientId, notes: null, items: [{ serviceId: cut, staffId: SEED.staff.bridget, start: at(10), resource: { kind: "none" } }] });
     expect(ok.ok).toBe(true);
     // A recent enough test lets it through.
-    await admin.from("client_patch_tests").insert({ business_id: B, client_id: clientId, tested_at: fromLocal("2031-09-01", 600, TZ)!.toISOString(), products: "6N", result: "no_reaction", performed_by: SEED.staff.priya });
-    expect((await saveBooking(frontDesk, location, { clientId, notes: null, items: [{ serviceId: gloss, staffId: SEED.staff.priya, start: at(14), resource: { kind: "none" } }] })).ok).toBe(true);
+    await admin.from("client_patch_tests").insert({ business_id: B, client_id: clientId, tested_at: fromLocal("2031-09-01", 600, TZ)!.toISOString(), products: "6N", result: "no_reaction", performed_by: SEED.staff.bridget });
+    expect((await saveBooking(frontDesk, location, { clientId, notes: null, items: [{ serviceId: gloss, staffId: SEED.staff.bridget, start: at(14), resource: { kind: "none" } }] })).ok).toBe(true);
     await admin.from("businesses").update({ patch_test_enforcement: "warn" }).eq("id", B);
   });
 
@@ -85,7 +85,7 @@ describe("forms", () => {
     const row = { business_id: B, name: "Test form A", fields: [{ id: "s", type: "signature", label: "Sign", required: true }], required: "none" as const };
     expect((await frontDesk.from("form_templates").insert(row)).error?.code).toBe("42501");
     expect((await owner.from("form_templates").insert(row)).error).toBeNull();
-    expect((await priya.from("form_templates").select("id").eq("name", "Test form A")).data).toHaveLength(1);
+    expect((await bridget.from("form_templates").select("id").eq("name", "Test form A")).data).toHaveLength(1);
     expect((await otherOwner.from("form_templates").select("id").eq("business_id", B)).data).toHaveLength(0);
     // "Before some services" needs services.
     expect((await owner.from("form_templates").insert({ ...row, name: "Test form B", required: "services" })).error?.code).toBe("23514");
@@ -94,7 +94,7 @@ describe("forms", () => {
   it("staff collect signed forms as themselves; signed forms can't be changed", async () => {
     const { data: t } = await admin.from("form_templates").select("id, name, fields").eq("name", "Test form A").single();
     const form = { business_id: B, client_id: clientId, template_id: t!.id, template_name: t!.name, fields: t!.fields, answers: { s: true }, signature: SIG };
-    expect((await frontDesk.from("client_forms").insert({ ...form, collected_by: SEED.staff.priya })).error?.code).toBe("42501");
+    expect((await frontDesk.from("client_forms").insert({ ...form, collected_by: SEED.staff.bridget })).error?.code).toBe("42501");
     expect((await frontDesk.from("client_forms").insert({ ...form, collected_by: SEED.staff.frontDesk })).error).toBeNull();
     expect((await frontDesk.from("client_forms").insert({ ...form, signature: "javascript:alert(1)", collected_by: SEED.staff.frontDesk })).error?.code).toBe("23514");
     expect((await owner.from("client_forms").update({ answers: {} }).eq("client_id", clientId).select("id")).data).toHaveLength(0);

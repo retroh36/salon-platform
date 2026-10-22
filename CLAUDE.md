@@ -23,7 +23,7 @@ Business → Location → Staff, Resource; Service, StaffService; Client; Appoin
 ## How to work
 - Build in thin slices: one feature per task, working end to end (database → API → UI).
 - Write automated tests for every scheduling rule (no double-booking, processing gaps, staff hours, resource conflicts).
-- Use the seed script (`supabase/seed.sql` or `scripts/seed.ts`) for realistic fake data: 1 business, 1 location, 6 stylists, ~40 services, ~500 clients, a month of appointments. Never use real client data in development.
+- Use the seed for realistic fake data. `supabase/seed.sql` (the default, loaded by `npx supabase db reset`): 1 business, 1 location, the team (owner, manager, front desk and seven stylists, each with a login), ~40 services with level prices, ~500 clients, products, forms and settings, and a clear calendar. `supabase/seed-demo.sql` (`npm run seed:demo`) adds a busy month on top: appointments, time off, blocked time and a waitlist. Never use real client data in development.
 - After each slice: run the linter, type check and tests, then summarize what changed and how to try it.
 - Prefer simple, readable code over clever code. Ask before adding a new dependency.
 
@@ -32,9 +32,10 @@ Business → Location → Staff, Resource; Service, StaffService; Client; Appoin
 - `npx supabase start` — start local Supabase (database, auth, Studio at http://127.0.0.1:54323)
 - `npm run dev` — local app
 - `npm run lint` / `npm run typecheck` / `npm test` — unit tests, no database needed
-- `npm run test:db` — RLS and database tests; needs local Supabase running with the seed loaded
-- `npm run test:e2e` — Playwright UI tests in `e2e/`; needs local Supabase with the seed, and uses the running dev server (or starts one). Fails on any browser console error, which includes Next.js dev overlay errors. First time: `npx playwright install chromium`
-- `npx supabase db reset` — rebuild local database from migrations + seed
+- `npm run test:db` — RLS and database tests; needs local Supabase running with the demo data (`npm run seed:demo`)
+- `npm run test:e2e` — Playwright UI tests in `e2e/`; needs local Supabase with the demo data, and uses the running dev server (or starts one). Fails on any browser console error, which includes Next.js dev overlay errors. First time: `npx playwright install chromium`
+- `npx supabase db reset` — rebuild local database from migrations + the default seed (clear calendar)
+- `npm run seed:demo` — reset, then add the busy demo month (`supabase/seed-demo.sql`, loaded with `psql` in the database container); the tests need it
 - `npm run db:types` — regenerate `lib/database.types.ts` after a migration
 - `npm run import:phorest:dry-run` — calls the **real** Phorest API (GET only) with the `PHOREST_*` credentials in `.env.local`, maps everything and prints only record counts and mapping issues; saves nothing. Ask the user before running it. `-- --months-back=N --months-ahead=N` sets the appointment range (default 24 and 12)
 
@@ -51,6 +52,10 @@ Business → Location → Staff, Resource; Service, StaffService; Client; Appoin
 - Tokens (colors, fonts, radius, shadows, motion) live in `app/globals.css` under `@theme`. Every text/background pair must pass WCAG AA: add new pairs to `tests/unit/design-tokens.test.ts`.
 - Shared components are in `components/ui/`: Button, fields (`fieldClass`, `selectClass`, `checkboxClass`), page blocks (`PageHeader`, `Card`, `Badge`, `Alert`), Avatar, StatusChip, Tabs, Segmented, Listbox, DatePicker, FitText (text that shortens instead of being cut off), icons and the AppFrame layout. Every page uses `AppShell` (`components/app-shell.tsx`), which wraps AppFrame. Use only token colors, not Tailwind's palette (`neutral-*` and so on).
 - Motion is CSS only, with no animation library: transitions use `duration-(--motion-fast|base|slow)` (150-250ms), and day changes use React `<ViewTransition>`. `prefers-reduced-motion` turns all of it off (see the end of `globals.css`).
+
+## Team, levels and prices
+- Stylists have a level: Artisan, Senior or Master (`staff.level`, `STAFF_LEVELS` in `lib/schedule-forms.ts`). It's set in staff settings (Schedule page); on the calendar it shows only as color (gold, silver, bronze: the `level-*` tokens), as a ring around the avatar (`Avatar level`) and a bar along the top of the column, with a legend entry. No level text on the calendar.
+- A stylist's price for a service is their own (`staff_services.price_cents`), else their level's (`service_level_prices`, set with `set_service_level_prices`), else the menu price. `stylistPrice` in `lib/services.ts` and `private.stylist_price` in the database work it out the same way; booking and Denise's fixes use the database one.
 
 ## Scheduling (`lib/scheduling/`)
 - `availability.ts`: when a staff member can work (opening hours, shifts, one-off changes, approved time off).

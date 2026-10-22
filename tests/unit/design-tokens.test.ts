@@ -34,7 +34,27 @@ function overWhite(hex: string, alpha: number): string {
   return `#${[1, 3, 5].map((i) => channel(i).toString(16).padStart(2, "0")).join("")}`;
 }
 
+// How different two colors look: CIE76 distance in Lab (about 2.3 is
+// just noticeable; 20+ is clearly a different color).
+function lab(hex: string): [number, number, number] {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  const x = f((r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047);
+  const y = f(r * 0.2126 + g * 0.7152 + b * 0.0722);
+  const z = f((r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+}
+
+function deltaE(a: string, b: string): number {
+  const [p, q] = [lab(a), lab(b)];
+  return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+}
+
 const SURFACES = ["canvas", "surface", "sunken"];
+const LEVELS = ["level-master", "level-senior", "level-artisan"];
 const FILLS = ["peach-fill", "lavender-fill", "sage-fill", "teal-fill", "sand-fill"];
 const STATUSES = ["booked", "confirmed", "checked-in", "completed", "late", "no-show"];
 
@@ -103,6 +123,23 @@ describe("design tokens", () => {
       return h * 60;
     };
     expect(Math.abs(hue(color("denise-500")) - hue(color("link")))).toBeGreaterThan(15);
+  });
+
+  it("shows level colors (gold, silver, bronze) at 3:1 against the page (non-text)", () => {
+    for (const level of LEVELS) for (const s of SURFACES) expect(contrast(color(level), color(s))).toBeGreaterThanOrEqual(3);
+  });
+
+  it("keeps level colors clearly apart from the service colors, Denise and each other", () => {
+    const others = [
+      ...FILLS,
+      ...FILLS.map((f) => f.replace("-fill", "-accent")),
+      "denise-100", "denise-200", "denise-500", "denise-600", "denise-700",
+    ];
+    for (const level of LEVELS) {
+      for (const other of [...others, ...LEVELS.filter((l) => l !== level)]) {
+        expect(deltaE(color(level), color(other)), `${level} vs ${other}`).toBeGreaterThanOrEqual(20);
+      }
+    }
   });
 
   it("no longer has the old plum", () => {

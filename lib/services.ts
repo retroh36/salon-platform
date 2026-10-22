@@ -1,4 +1,5 @@
 import type { Tables } from "@/lib/database.types";
+import { STAFF_LEVELS, type StaffLevel } from "@/lib/schedule-forms";
 
 type ServiceTimes = Pick<Tables<"services">, "active_minutes" | "processing_minutes" | "finishing_minutes">;
 
@@ -28,6 +29,34 @@ export function parsePrice(input: string): number | null {
   if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
   const [dollars, fraction = ""] = cleaned.split(".");
   return Number(dollars) * 100 + Number(fraction.padEnd(2, "0"));
+}
+
+// A service's price for each stylist level; a missing level uses the menu
+// price.
+export type LevelPrices = Partial<Record<StaffLevel, number>>;
+
+// What a stylist charges for a service: their own price, else their level's,
+// else the menu price. The database works it out the same way when booking
+// (private.stylist_price).
+export function stylistPrice(
+  service: { price_cents: number; levelPrices?: LevelPrices },
+  stylist: { level: StaffLevel | null; customCents: number | null },
+): number {
+  if (stylist.customCents != null) return stylist.customCents;
+  const byLevel = stylist.level ? service.levelPrices?.[stylist.level] : undefined;
+  return byLevel ?? service.price_cents;
+}
+
+export function levelPricesFrom(rows: readonly { level: StaffLevel; price_cents: number }[]): LevelPrices {
+  return Object.fromEntries(rows.map((r) => [r.level, r.price_cents]));
+}
+
+// "$85" or "$70–$110".
+export function formatPriceRange(prices: readonly number[]): string {
+  if (prices.length === 0) return "";
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  return min === max ? formatPrice(min) : `${formatPrice(min)}–${formatPrice(max)}`;
 }
 
 // 75 -> "1h 15m", 45 -> "45m", 120 -> "2h".
@@ -75,13 +104,15 @@ export type ServiceInput = {
   processing_minutes: number;
   finishing_minutes: number;
   price_cents: number;
+  // Price per stylist level; null means the default price.
+  level_prices: Record<StaffLevel, number | null>;
   // Staff who offer the service; price_cents null means the default price.
   staff: { staff_id: string; price_cents: number | null }[];
 };
 
 export type ServiceFormErrors = Partial<
   Record<"name" | "category" | "active_minutes" | "processing_minutes" | "finishing_minutes" | "price_cents", string>
-> & { staff?: Record<string, string> };
+> & { staff?: Record<string, string>; level_prices?: Partial<Record<StaffLevel, string>> };
 
 type FormLike = { get(name: string): FormDataEntryValue | null; getAll(name: string): FormDataEntryValue[] };
 
@@ -97,8 +128,9 @@ function parseMinutes(value: string, { min }: { min: number }): number | string 
 }
 
 // Form fields: name, category, description, active_minutes,
-// processing_minutes, finishing_minutes, price, staff (repeated staff ids),
-// price_<staffId> (blank = default price).
+// processing_minutes, finishing_minutes, price, level_price_<level> (blank =
+// default price), staff (repeated staff ids), price_<staffId> (blank = their
+// level's price, or the default).
 export function parseServiceForm(
   form: FormLike,
 ): { ok: true; value: ServiceInput } | { ok: false; errors: ServiceFormErrors } {
@@ -133,6 +165,14 @@ export function parseServiceForm(
   const price = parsePrice(text(form, "price"));
   if (price === null) errors.price_cents = "Enter a price like 85 or 85.50.";
 
+  const levelPrices = {} as Record<StaffLevel, number | null>;
+  for (const level of STAFF_LEVELS) {
+    const raw = text(form, `level_price_${level}`);
+    const cents = raw ? parsePrice(raw) : null;
+    if (raw && cents === null) errors.level_prices = { ...errors.level_prices, [level]: "Enter a price like 85, or leave blank." };
+    levelPrices[level] = cents;
+  }
+
   const staffIds = [...new Set(form.getAll("staff").map(String))];
   const staff: ServiceInput["staff"] = [];
   for (const staffId of staffIds) {
@@ -145,8 +185,7 @@ export function parseServiceForm(
     if (custom === null) {
       errors.staff = { ...errors.staff, [staffId]: "Enter a price like 85 or 85.50, or leave blank." };
     } else {
-      // Same as the default price is stored as "default", so it follows later changes.
-      staff.push({ staff_id: staffId, price_cents: custom === price ? null : custom });
+      staff.push({ staff_id: staffId, price_cents: custom });
     }
   }
 
@@ -162,6 +201,7 @@ export function parseServiceForm(
       processing_minutes: processing as number,
       finishing_minutes: finishing as number,
       price_cents: price as number,
+      level_prices: levelPrices,
       staff,
     },
   };

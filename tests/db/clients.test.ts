@@ -8,7 +8,7 @@ const PREFIX = `Test${crypto.randomUUID().slice(0, 8)}`;
 let other: Awaited<ReturnType<typeof createOtherSalon>>;
 let owner: Client;
 let frontDesk: Client;
-let stylist: Client; // Priya
+let stylist: Client; // Bridget
 let otherOwner: Client;
 let clientId: string; // a seeded client
 
@@ -27,7 +27,7 @@ beforeAll(async () => {
   [owner, frontDesk, stylist, otherOwner] = await Promise.all([
     signIn("owner@mapleandash.test"),
     signIn("frontdesk@mapleandash.test"),
-    signIn("priya@mapleandash.test"),
+    signIn("bridget@mapleandash.test"),
     signIn(other.email),
   ]);
   const { data } = await admin.from("clients").select("id").eq("business_id", SEED.business).limit(1).single();
@@ -107,13 +107,13 @@ describe("formulas", () => {
     const { error } = await stylist.from("client_formulas").insert({
       business_id: SEED.business,
       client_id: id,
-      staff_id: SEED.staff.priya,
+      staff_id: SEED.staff.bridget,
       formula: "6N + 6NB, 20 vol, 35 min",
     });
     expect(error).toBeNull();
 
     const { data } = await admin.from("client_formulas").select("staff_id, formula").eq("client_id", id);
-    expect(data).toEqual([{ staff_id: SEED.staff.priya, formula: "6N + 6NB, 20 vol, 35 min" }]);
+    expect(data).toEqual([{ staff_id: SEED.staff.bridget, formula: "6N + 6NB, 20 vol, 35 min" }]);
   });
 
   it("nobody can write an entry in someone else's name", async () => {
@@ -129,7 +129,7 @@ describe("formulas", () => {
     const ownerForging = await owner.from("client_formulas").insert({
       business_id: SEED.business,
       client_id: id,
-      staff_id: SEED.staff.priya,
+      staff_id: SEED.staff.bridget,
       formula: "forged",
     });
     expect(ownerForging.error?.code).toBe("42501");
@@ -139,7 +139,7 @@ describe("formulas", () => {
     const id = await newClient();
     const { data: entry } = await stylist
       .from("client_formulas")
-      .insert({ business_id: SEED.business, client_id: id, staff_id: SEED.staff.priya, formula: "original" })
+      .insert({ business_id: SEED.business, client_id: id, staff_id: SEED.staff.bridget, formula: "original" })
       .select("id")
       .single();
 
@@ -160,7 +160,7 @@ describe("formulas", () => {
     const { error } = await stylist.from("client_formulas").insert({
       business_id: SEED.business,
       client_id: id,
-      staff_id: SEED.staff.priya,
+      staff_id: SEED.staff.bridget,
       formula: "later",
       visit_date: future,
     });
@@ -169,17 +169,17 @@ describe("formulas", () => {
 
   it("inactive staff can't add entries", async () => {
     const id = await newClient();
-    await admin.from("staff").update({ is_active: false }).eq("id", SEED.staff.priya);
+    await admin.from("staff").update({ is_active: false }).eq("id", SEED.staff.bridget);
     try {
       const { error } = await stylist.from("client_formulas").insert({
         business_id: SEED.business,
         client_id: id,
-        staff_id: SEED.staff.priya,
+        staff_id: SEED.staff.bridget,
         formula: "after leaving",
       });
       expect(error?.code).toBe("42501");
     } finally {
-      await admin.from("staff").update({ is_active: true }).eq("id", SEED.staff.priya);
+      await admin.from("staff").update({ is_active: true }).eq("id", SEED.staff.bridget);
     }
   });
 });
@@ -223,7 +223,7 @@ describe("tenant isolation", () => {
   it("a client's preferred stylist must work at the same salon", async () => {
     const { error } = await otherOwner
       .from("clients")
-      .insert({ business_id: other.businessId, first_name: `${PREFIX} Poach`, preferred_staff_id: SEED.staff.priya });
+      .insert({ business_id: other.businessId, first_name: `${PREFIX} Poach`, preferred_staff_id: SEED.staff.bridget });
     expect(error?.code).toBe("23503");
   });
 });

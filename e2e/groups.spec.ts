@@ -8,7 +8,7 @@ const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
 const PX_PER_MINUTE = 2;
-// A Tuesday clear of the other tests' days: Priya and Ethan work 9-1.
+// A Tuesday clear of the other tests' days: Bridget and Shae work 9-1.
 const DAY = addDays(startOfWeek(todayIn(TZ)), 134);
 const at = (hour: number, minute = 0) => fromLocal(DAY, hour * 60 + minute, TZ)!;
 const PREFIX = `Gp${Date.now().toString(36)}`;
@@ -44,7 +44,7 @@ test("books a group, shows it together, and moves and cancels the whole group", 
   const label = `${PREFIX} bridal party`;
 
   await openDay(page);
-  await clickSlot(page, "Priya Shah", 10);
+  await clickSlot(page, "Bridget Callahan", 10);
   await page.getByRole("form", { name: "New booking" }).getByRole("button", { name: "Book a group instead" }).click();
   const form = page.getByRole("form", { name: "Group booking" });
   await form.getByLabel("Group name").fill(label);
@@ -54,7 +54,7 @@ test("books a group, shows it together, and moves and cancels the whole group", 
   await ava.getByLabel("Service").selectOption({ label: "Women's Cut & Style" });
   const guest = form.getByRole("group", { name: "Guest 2" });
   await guest.getByLabel("Service").selectOption({ label: "Women's Cut & Style" });
-  await guest.getByLabel("Stylist").selectOption({ label: "Ethan Brooks" });
+  await guest.getByLabel("Stylist").selectOption({ label: "Shae Morgan" });
   await form.getByLabel("Staggered, every").check();
   await form.getByLabel("Minutes between guests").fill("15");
   await expect(guest).toContainText("10:15am");
@@ -62,14 +62,14 @@ test("books a group, shows it together, and moves and cancels the whole group", 
   await expect(ui(page).getByRole("status").filter({ hasText: `Booked 2 guests for ${label}.` })).toBeVisible();
 
   // Both show the group, and opening one lists and highlights the other.
-  const avaBlock = column(page, "Priya Shah").getByRole("button", { name: new RegExp(`${PREFIX}Ava Test.*group: ${label}`) });
-  const guestBlock = column(page, "Ethan Brooks").getByRole("button", { name: new RegExp(`${label} guest.*group: ${label}`) });
+  const avaBlock = column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Ava Test.*group: ${label}`) });
+  const guestBlock = column(page, "Shae Morgan").getByRole("button", { name: new RegExp(`${label} guest.*group: ${label}`) });
   await expect(avaBlock).toBeVisible();
   await expect(guestBlock).toBeVisible();
   await avaBlock.click();
   const info = page.getByTestId("group-info");
   await expect(info).toContainText(`${label} · 2 guests`);
-  await expect(info.getByRole("listitem")).toHaveText([`${PREFIX}Ava Test · Priya Shah · 10am (this visit)`, `${label} guest · Ethan Brooks · 10:15am`]);
+  await expect(info.getByRole("listitem")).toHaveText([`${PREFIX}Ava Test · Bridget Callahan · 10am (this visit)`, `${label} guest · Shae Morgan · 10:15am`]);
   await expect(guestBlock).toHaveAttribute("data-group-highlight", "true");
 
   // Drag Ava 30 minutes later: the whole group moves.
@@ -86,7 +86,7 @@ test("books a group, shows it together, and moves and cancels the whole group", 
 
   // Cancel the whole group.
   await openDay(page);
-  await column(page, "Priya Shah").getByRole("button", { name: new RegExp(`${PREFIX}Ava Test`) }).click();
+  await column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Ava Test`) }).click();
   const panel = page.getByRole("tabpanel", { name: "Booking details" });
   await panel.getByRole("button", { name: "Cancel booking" }).click();
   const cancel = panel.getByRole("form", { name: "Cancel booking" });
@@ -98,14 +98,14 @@ test("books a group, shows it together, and moves and cancels the whole group", 
 
 test("won't book a group that doesn't all fit", async ({ page }) => {
   await openDay(page);
-  await clickSlot(page, "Priya Shah", 10);
+  await clickSlot(page, "Bridget Callahan", 10);
   await page.getByRole("form", { name: "New booking" }).getByRole("button", { name: "Book a group instead" }).click();
   const form = page.getByRole("form", { name: "Group booking" });
   await form.getByLabel("Group name").fill(`${PREFIX} clash`);
   for (const n of [1, 2]) {
     const g = form.getByRole("group", { name: `Guest ${n}` });
     await g.getByLabel("Service").selectOption({ label: "Women's Cut & Style" });
-    await g.getByLabel("Stylist").selectOption({ label: "Priya Shah" });
+    await g.getByLabel("Stylist").selectOption({ label: "Bridget Callahan" });
   }
   await form.getByRole("button", { name: "Book 2 guests" }).click();
   await expect(form.getByRole("alert")).toContainText("Not everyone fits as planned.");

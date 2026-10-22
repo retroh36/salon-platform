@@ -54,7 +54,7 @@ beforeAll(async () => {
   [owner, manager, stylist, otherOwner] = await Promise.all([
     signIn("owner@mapleandash.test"),
     signIn("manager@mapleandash.test"),
-    signIn("priya@mapleandash.test"),
+    signIn("bridget@mapleandash.test"),
     signIn(other.email),
   ]);
 });
@@ -78,7 +78,7 @@ describe("seed data", () => {
   it("assigns services to every seeded stylist", async () => {
     const { data } = await admin.from("staff_services").select("staff_id").eq("business_id", SEED.business);
     const stylists = new Set(data!.map((r) => r.staff_id));
-    for (const id of [SEED.staff.priya, SEED.staff.hannah, SEED.staff.jamal, SEED.staff.ethan]) {
+    for (const id of [SEED.staff.bridget, SEED.staff.hannah, SEED.staff.nola, SEED.staff.shae]) {
       expect(stylists.has(id)).toBe(true);
     }
   });
@@ -112,7 +112,7 @@ describe("stylists", () => {
     const { data: service } = await admin.from("services").select("id").eq("business_id", SEED.business).eq("name", "Balayage").single();
     const insert = await stylist
       .from("staff_services")
-      .insert({ business_id: SEED.business, staff_id: SEED.staff.jamal, service_id: service!.id });
+      .insert({ business_id: SEED.business, staff_id: SEED.staff.nola, service_id: service!.id });
     expect(insert.error?.code).toBe("42501");
 
     const remove = await stylist.from("staff_services").delete().eq("service_id", service!.id).select();
@@ -129,8 +129,8 @@ describe("owners and managers", () => {
       finishing: 10,
       price: 6000,
       staff: [
-        { staff_id: SEED.staff.priya, price_cents: 7000 },
-        { staff_id: SEED.staff.ethan, price_cents: null },
+        { staff_id: SEED.staff.bridget, price_cents: 7000 },
+        { staff_id: SEED.staff.shae, price_cents: null },
       ],
     });
     expect(error).toBeNull();
@@ -139,8 +139,8 @@ describe("owners and managers", () => {
     expect(service).toEqual({ duration_minutes: 45, price_cents: 6000 });
     expect(await assignments(id!)).toEqual(
       [
-        { staff_id: SEED.staff.priya, price_cents: 7000 },
-        { staff_id: SEED.staff.ethan, price_cents: null },
+        { staff_id: SEED.staff.bridget, price_cents: 7000 },
+        { staff_id: SEED.staff.shae, price_cents: null },
       ].sort((a, b) => a.staff_id.localeCompare(b.staff_id)),
     );
   });
@@ -149,8 +149,8 @@ describe("owners and managers", () => {
     const { data: id } = await save(owner, {
       name: `${PREFIX} Trim`,
       staff: [
-        { staff_id: SEED.staff.priya, price_cents: null },
-        { staff_id: SEED.staff.jamal, price_cents: null },
+        { staff_id: SEED.staff.bridget, price_cents: null },
+        { staff_id: SEED.staff.nola, price_cents: null },
       ],
     });
 
@@ -159,7 +159,7 @@ describe("owners and managers", () => {
       name: `${PREFIX} Trim (renamed)`,
       price: 5500,
       staff: [
-        { staff_id: SEED.staff.jamal, price_cents: 4000 },
+        { staff_id: SEED.staff.nola, price_cents: 4000 },
         { staff_id: SEED.staff.hannah, price_cents: null },
       ],
     });
@@ -169,7 +169,7 @@ describe("owners and managers", () => {
     expect(service).toEqual({ name: `${PREFIX} Trim (renamed)`, price_cents: 5500 });
     expect(await assignments(id!)).toEqual(
       [
-        { staff_id: SEED.staff.jamal, price_cents: 4000 },
+        { staff_id: SEED.staff.nola, price_cents: 4000 },
         { staff_id: SEED.staff.hannah, price_cents: null },
       ].sort((a, b) => a.staff_id.localeCompare(b.staff_id)),
     );
@@ -178,7 +178,7 @@ describe("owners and managers", () => {
   it("an empty staff list removes everyone", async () => {
     const { data: id } = await save(owner, {
       name: `${PREFIX} Nobody`,
-      staff: [{ staff_id: SEED.staff.priya, price_cents: null }],
+      staff: [{ staff_id: SEED.staff.bridget, price_cents: null }],
     });
     await save(owner, { serviceId: id!, name: `${PREFIX} Nobody`, staff: [] });
     expect(await assignments(id!)).toEqual([]);
@@ -209,7 +209,7 @@ describe("save_service is all-or-nothing", () => {
     const { error } = await save(owner, {
       name,
       staff: [
-        { staff_id: SEED.staff.priya, price_cents: null },
+        { staff_id: SEED.staff.bridget, price_cents: null },
         { staff_id: crypto.randomUUID(), price_cents: null },
       ],
     });
@@ -223,7 +223,7 @@ describe("save_service is all-or-nothing", () => {
     const { data: id } = await save(owner, {
       name: `${PREFIX} Stable`,
       price: 5000,
-      staff: [{ staff_id: SEED.staff.priya, price_cents: null }],
+      staff: [{ staff_id: SEED.staff.bridget, price_cents: null }],
     });
 
     const { error } = await save(owner, {
@@ -236,7 +236,7 @@ describe("save_service is all-or-nothing", () => {
 
     const { data } = await admin.from("services").select("price_cents").eq("id", id!).single();
     expect(data!.price_cents).toBe(5000);
-    expect(await assignments(id!)).toEqual([{ staff_id: SEED.staff.priya, price_cents: null }]);
+    expect(await assignments(id!)).toEqual([{ staff_id: SEED.staff.bridget, price_cents: null }]);
   });
 });
 
@@ -267,7 +267,7 @@ describe("tenant isolation", () => {
     const { error } = await save(otherOwner, {
       businessId: other.businessId,
       name: `${PREFIX} Poach`,
-      staff: [{ staff_id: SEED.staff.priya, price_cents: null }],
+      staff: [{ staff_id: SEED.staff.bridget, price_cents: null }],
     });
     expect(error?.code).toBe("23503");
 
@@ -301,5 +301,38 @@ describe("constraints", () => {
   it("rejects negative prices", async () => {
     const { error } = await save(owner, { name: `${PREFIX} Negative`, price: -100 });
     expect(error?.code).toBe("23514");
+  });
+});
+
+describe("prices by level", () => {
+  it("are seeded: Artisans charge less, Masters more, and a stylist's own price wins", async () => {
+    const { data: cut } = await admin.from("services").select("id, price_cents, service_level_prices(level, price_cents)").eq("business_id", SEED.business).eq("name", "Women's Cut & Style").single();
+    const byLevel = Object.fromEntries(cut!.service_level_prices.map((p) => [p.level, p.price_cents]));
+    expect(byLevel).toEqual({ artisan: 7000, senior: 8500, master: 10000 });
+    const { data: fade } = await admin.from("services").select("id").eq("business_id", SEED.business).eq("name", "Skin Fade").single();
+    const { data: custom } = await admin.from("staff_services").select("price_cents").eq("staff_id", SEED.staff.gil).eq("service_id", fade!.id).single();
+    expect(custom!.price_cents).toBe(5500);
+  });
+
+  it("owners and managers set them; a blank level uses the menu price", async () => {
+    const { data: id } = await save(manager, { name: `${PREFIX} Level priced`, price: 5000, staff: [{ staff_id: SEED.staff.shae, price_cents: null }] });
+    const prices = async () => {
+      const { data } = await admin.from("service_level_prices").select("level, price_cents").eq("service_id", id!).order("level");
+      return data;
+    };
+    expect((await manager.rpc("set_service_level_prices", { p_service_id: id!, p_prices: { artisan: 4000, senior: null, master: 6500 } })).error).toBeNull();
+    expect(await prices()).toEqual([
+      { level: "artisan", price_cents: 4000 },
+      { level: "master", price_cents: 6500 },
+    ]);
+    // Replaces them all.
+    await manager.rpc("set_service_level_prices", { p_service_id: id!, p_prices: { master: 7000 } });
+    expect(await prices()).toEqual([{ level: "master", price_cents: 7000 }]);
+
+    // Stylists and other salons can't.
+    await stylist.rpc("set_service_level_prices", { p_service_id: id!, p_prices: { master: 1 } });
+    await otherOwner.rpc("set_service_level_prices", { p_service_id: id!, p_prices: { master: 1 } });
+    expect(await prices()).toEqual([{ level: "master", price_cents: 7000 }]);
+    expect((await otherOwner.from("service_level_prices").select("service_id").eq("service_id", id!)).data).toEqual([]);
   });
 });

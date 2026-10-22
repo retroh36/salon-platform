@@ -40,20 +40,20 @@ test.describe("managers", () => {
   test.use({ storageState: AUTH.owner });
 
   test("see a stylist's week with split shifts, one-off changes and time off", async ({ page }) => {
-    await openSchedule(page, "Priya");
-    // Priya works split shifts on Tuesdays.
+    await openSchedule(page, "Bridget");
+    // Bridget works split shifts on Tuesdays.
     await expect(day(page, addDays(thisMonday, 1))).toContainText("9am–1pm, 2pm–6pm");
     await expect(day(page, thisMonday)).toContainText("Off");
     await expect(day(page, thisMonday)).toContainText("Salon closed");
 
-    // Jamal covers a late Friday next week.
-    await pickStaff(page, "Jamal");
+    // Nola covers a late Friday next week.
+    await pickStaff(page, "Nola");
     await nextWeek(page, nextMonday);
     await expect(day(page, addDays(nextMonday, 4))).toContainText("noon–8pm");
     await expect(day(page, addDays(nextMonday, 4))).toContainText("Changed hours");
 
-    // Sofia is on vacation the week after.
-    await pickStaff(page, "Sofia");
+    // Sandra is on vacation the week after.
+    await pickStaff(page, "Sandra");
     await nextWeek(page, nextMonday);
     await nextWeek(page, addDays(nextMonday, 7));
     const tuesday = day(page, addDays(nextMonday, 8));
@@ -92,9 +92,9 @@ test.describe("managers", () => {
   });
 
   test("add and remove a one-off change", async ({ page }) => {
-    const date = addDays(nextMonday, 2); // Marcus normally works 10-7 on Wednesdays
+    const date = addDays(nextMonday, 2); // Gil normally works 10-7 on Wednesdays
     try {
-      await openSchedule(page, "Marcus");
+      await openSchedule(page, "Gil");
       await waitForHydration(page, "form[aria-label='Change hours for one day'] button");
       const form = ui(page).getByRole("form", { name: "Change hours for one day" });
       await form.getByLabel("Date").fill(date);
@@ -110,21 +110,21 @@ test.describe("managers", () => {
       await changes.getByRole("button", { name: `Remove change on ${formatDay(date)}` }).click();
       await expect(ui(page).getByText("No upcoming changes.")).toBeVisible();
     } finally {
-      await admin.from("staff_schedule_overrides").delete().eq("staff_id", SEED.staff.marcus).eq("on_date", date);
+      await admin.from("staff_schedule_overrides").delete().eq("staff_id", SEED.staff.gil).eq("on_date", date);
     }
   });
 
   test("approve a pending time off request", async ({ page }) => {
-    const { data: request } = await admin.from("staff_time_off").select("id").eq("staff_id", SEED.staff.ethan).eq("status", "requested").single();
+    const { data: request } = await admin.from("staff_time_off").select("id").eq("staff_id", SEED.staff.shae).eq("status", "requested").single();
     try {
       await page.goto("/schedule");
       const requests = ui(page).getByRole("region", { name: /Time off requests/ });
-      await expect(requests).toContainText("Ethan Brooks");
+      await expect(requests).toContainText("Shae Morgan");
       await expect(requests).toContainText("Sister's graduation");
       await requests.getByRole("button", { name: "Approve" }).click();
       await expect(ui(page).getByRole("region", { name: /Time off requests/ })).toHaveCount(0);
 
-      await pickStaff(page, "Ethan");
+      await pickStaff(page, "Shae");
       const entry = ui(page).getByRole("list", { name: "Time off" }).getByRole("listitem").filter({ hasText: "Sister's graduation" });
       await expect(entry).toContainText("Approved");
     } finally {
@@ -133,9 +133,9 @@ test.describe("managers", () => {
   });
 
   test("add part-day time off for a stylist, then remove it", async ({ page }) => {
-    const date = addDays(nextMonday, 1); // Priya works Tuesdays
+    const date = addDays(nextMonday, 1); // Bridget works Tuesdays
     try {
-      await openSchedule(page, "Priya");
+      await openSchedule(page, "Bridget");
       await waitForHydration(page, "form[aria-label='Add time off'] input[name=part_day]");
       const form = ui(page).getByRole("form", { name: "Add time off" });
       await form.getByLabel("First day").fill(date);
@@ -157,13 +157,13 @@ test.describe("managers", () => {
       await entry.getByRole("button", { name: "Remove" }).click();
       await expect(ui(page).getByText("Parent-teacher meeting")).toHaveCount(0);
     } finally {
-      await admin.from("staff_time_off").delete().eq("staff_id", SEED.staff.priya).eq("note", "Parent-teacher meeting");
+      await admin.from("staff_time_off").delete().eq("staff_id", SEED.staff.bridget).eq("note", "Parent-teacher meeting");
     }
   });
 
   test("change a stylist's level and commission", async ({ page }) => {
     try {
-      await openSchedule(page, "Ethan");
+      await openSchedule(page, "Shae");
       await waitForHydration(page, "form[aria-label='Level and commission'] select");
       const form = ui(page).getByRole("form", { name: "Level and commission" });
       await expect(form.getByLabel("Service commission (%)")).toHaveValue("35");
@@ -181,8 +181,8 @@ test.describe("managers", () => {
       await page.reload();
       await expect(ui(page).getByRole("form", { name: "Level and commission" }).getByLabel("Service commission (%)")).toHaveValue("42.5");
     } finally {
-      await admin.from("staff").update({ level: "junior" }).eq("id", SEED.staff.ethan);
-      await admin.from("staff_compensation").update({ service_commission_pct: 35 }).eq("staff_id", SEED.staff.ethan);
+      await admin.from("staff").update({ level: "artisan" }).eq("id", SEED.staff.shae);
+      await admin.from("staff_compensation").update({ service_commission_pct: 35 }).eq("staff_id", SEED.staff.shae);
     }
   });
 
@@ -211,9 +211,9 @@ test.describe("stylists", () => {
   test.use({ storageState: AUTH.stylist });
 
   test("see only their own schedule, read-only, with their own commission", async ({ page }) => {
-    await page.goto(`/schedule?staff=${SEED.staff.sofia}`);
+    await page.goto(`/schedule?staff=${SEED.staff.sandra}`);
     // Asking for someone else's schedule still shows their own.
-    await expect(ui(page).getByRole("heading", { level: 2 })).toHaveText("Priya Shah(you)");
+    await expect(ui(page).getByRole("heading", { level: 2 })).toHaveText("Bridget Callahan(you)");
     await expect(ui(page).getByRole("navigation", { name: "Team" })).toHaveCount(0);
     await expect(ui(page).getByRole("button", { name: "Save hours" })).toHaveCount(0);
     await expect(ui(page).getByRole("region", { name: "Weekly hours" })).toContainText("Tuesday9am–1pm, 2pm–6pm");
@@ -247,7 +247,7 @@ test.describe("stylists", () => {
       await entry.getByRole("button", { name: "Withdraw" }).click();
       await expect(ui(page).getByText("Moving house")).toHaveCount(0);
     } finally {
-      await admin.from("staff_time_off").delete().eq("staff_id", SEED.staff.priya).eq("note", "Moving house");
+      await admin.from("staff_time_off").delete().eq("staff_id", SEED.staff.bridget).eq("note", "Moving house");
     }
   });
 

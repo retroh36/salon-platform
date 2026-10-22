@@ -150,7 +150,7 @@ describe("saving an import", () => {
   it("touches nothing outside the target business", async () => {
     expect(await count("clients", SEED.business)).toBe(500);
     expect(await count("services", SEED.business)).toBe(41);
-    expect(await count("staff", SEED.business)).toBe(9);
+    expect(await count("staff", SEED.business)).toBe(SEED.staffCount);
   });
 
   it("keeps the id mapping out of the API", async () => {

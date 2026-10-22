@@ -54,6 +54,12 @@
   --color-sand-fill: #ede5dd;
   --color-sand-accent: #a08870;
 
+  /* Stylist levels: a ring around the avatar and a bar along the top of
+     their calendar column (graphics, so 3:1 against the page) */
+  --color-level-master: #a67c12;
+  --color-level-senior: #7c8896;
+  --color-level-artisan: #9a5a2b;
+
   /* Status chips */
   --color-status-booked-bg: #efe9e3;
   --color-status-booked-ink: #574a40;

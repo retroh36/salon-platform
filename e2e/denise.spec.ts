@@ -7,10 +7,10 @@ import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
-const { priya: PRIYA, ethan: ETHAN, frontDesk: FRONT_DESK } = SEED.staff;
+const { bridget: BRIDGET, shae: SHAE, frontDesk: FRONT_DESK } = SEED.staff;
 
-// A Tuesday clear of the seeded month and of the other tests' days. Priya
-// works 9-1 and 2-6, Ethan 9-1 and 1:30-5:30.
+// A Tuesday clear of the seeded month and of the other tests' days. Bridget
+// works 9-1 and 2-6, Shae 9-1 and 1:30-5:30.
 const DAY = addDays(startOfWeek(todayIn(TZ)), 50);
 const at = (hour: number, minute = 0) => fromLocal(DAY, hour * 60 + minute, TZ)!;
 
@@ -65,12 +65,12 @@ async function seedCut(clientId: string, staffId: string, start: Date, status: "
   return item!.id;
 }
 
-// Priya's 10:00 client is in the chair; Grace is next at 11:00. Ethan is
-// booked all morning, so Denise has to keep Grace with Priya.
+// Bridget's 10:00 client is in the chair; Grace is next at 11:00. Shae is
+// booked all morning, so Denise has to keep Grace with Bridget.
 async function overrunMorning() {
-  await seedCut(await newClient("Mia"), PRIYA, at(10), "checked_in");
-  const grace = await seedCut(await newClient("Grace"), PRIYA, at(11));
-  for (const hour of [9, 10, 11, 12]) await seedCut(await newClient(`E${hour}`), ETHAN, at(hour));
+  await seedCut(await newClient("Mia"), BRIDGET, at(10), "checked_in");
+  const grace = await seedCut(await newClient("Grace"), BRIDGET, at(11));
+  for (const hour of [9, 10, 11, 12]) await seedCut(await newClient(`E${hour}`), SHAE, at(hour));
   return grace;
 }
 
@@ -124,7 +124,7 @@ test.describe("front desk", () => {
     const grace = await overrunMorning();
     await openDay(page);
 
-    // Report that Priya's 10:00 is running 20 minutes over.
+    // Report that Bridget's 10:00 is running 20 minutes over.
     await block(page, "Mia").click();
     const details = page.getByRole("tabpanel", { name: "Booking details" });
     await details.getByRole("button", { name: "Running late" }).click();
@@ -139,7 +139,7 @@ test.describe("front desk", () => {
     const panel = denisePanel(page);
     await expect(panel.locator("[data-pose]")).toHaveAttribute("data-pose", "point");
     await expect(panel.getByTestId("denise-message")).toHaveText(
-      `Priya's running 20 minutes late. I found a fix that only moves one client: ${PREFIX}Grace Lewis 11:00 → 11:20. Want me to apply it?`,
+      `Bridget's running 20 minutes late. I found a fix that only moves one client: ${PREFIX}Grace Lewis 11:00 → 11:20. Want me to apply it?`,
     );
     await expect(panel).toContainText("Why it works:");
 
@@ -150,7 +150,7 @@ test.describe("front desk", () => {
 
     await panel.getByRole("button", { name: "Apply fix" }).click();
     await expect(panel.getByRole("status")).toContainText(`Done — ${PREFIX}Grace has been moved and notified.`);
-    expect(await startOf(grace)).toEqual({ start: at(11, 20).getTime(), staffId: PRIYA });
+    expect(await startOf(grace)).toEqual({ start: at(11, 20).getTime(), staffId: BRIDGET });
     await expect(block(page, "Grace")).toHaveAccessibleName(/^11:20am–12:20pm/);
     await expect(panel.getByTestId("denise-message")).toHaveCount(0);
     await expect(panel.locator("[data-pose]")).toHaveAttribute("data-pose", "wave");
@@ -164,9 +164,9 @@ test.describe("front desk", () => {
     // Undo, right there.
     await panel.getByRole("button", { name: "Undo" }).click();
     await expect(panel.getByRole("status")).toContainText(`Undone — ${PREFIX}Grace is back at 11:00.`);
-    expect(await startOf(grace)).toEqual({ start: at(11).getTime(), staffId: PRIYA });
+    expect(await startOf(grace)).toEqual({ start: at(11).getTime(), staffId: BRIDGET });
     // The problem is back, so Denise offers the fix again.
-    await expect(panel.getByTestId("denise-message")).toContainText("Priya's running 20 minutes late.");
+    await expect(panel.getByTestId("denise-message")).toContainText("Bridget's running 20 minutes late.");
   });
 
   test("dismisses a fix", async ({ page }) => {
@@ -178,7 +178,7 @@ test.describe("front desk", () => {
     await page.getByRole("button", { name: "Tell Denise" }).click();
 
     const panel = denisePanel(page);
-    await expect(panel.getByTestId("denise-message")).toContainText("Priya's running 30 minutes late.");
+    await expect(panel.getByTestId("denise-message")).toContainText("Bridget's running 30 minutes late.");
     await panel.getByRole("button", { name: "Dismiss" }).click();
     await expect(panel.getByRole("status")).toContainText("Okay, I'll leave that one.");
     await expect(panel.getByTestId("denise-message")).toHaveCount(0);
@@ -190,26 +190,26 @@ test.describe("front desk", () => {
   });
 
   test("hands a stylist's clients to others when they're out for the day", async ({ page }) => {
-    const grace = await seedCut(await newClient("Grace"), PRIYA, at(10));
+    const grace = await seedCut(await newClient("Grace"), BRIDGET, at(10));
     await openDay(page);
-    await ui(page).getByRole("button", { name: "More for Priya Shah" }).click();
-    await page.getByRole("dialog", { name: "Priya's day" }).getByRole("button", { name: "Out for the day" }).click();
+    await ui(page).getByRole("button", { name: "More for Bridget Callahan" }).click();
+    await page.getByRole("dialog", { name: "Bridget's day" }).getByRole("button", { name: "Out for the day" }).click();
 
     const panel = denisePanel(page);
     await expect(panel.getByTestId("denise-message")).toHaveText(
-      `Priya is out for the rest of the day. I found a fix that only moves one client: ${PREFIX}Grace Lewis → Ethan at 10:00. Want me to apply it?`,
+      `Bridget is out for the rest of the day. I found a fix that only moves one client: ${PREFIX}Grace Lewis → Shae at 10:00. Want me to apply it?`,
     );
     await panel.getByRole("button", { name: "Apply fix" }).click();
     await expect(panel.getByRole("status")).toContainText("has been moved and notified");
-    expect(await startOf(grace)).toEqual({ start: at(10).getTime(), staffId: ETHAN });
-    // Priya's column shows the time off.
-    await expect(ui(page).getByRole("region", { name: "Priya Shah" }).locator("[data-time-off]")).toContainText("Out for the rest of the day");
+    expect(await startOf(grace)).toEqual({ start: at(10).getTime(), staffId: SHAE });
+    // Bridget's column shows the time off.
+    await expect(ui(page).getByRole("region", { name: "Bridget Callahan" }).locator("[data-time-off]")).toContainText("Out for the rest of the day");
   });
 
   test("shows other options, previews them, and applies one", async ({ page }) => {
-    // Ethan is free, so moving Grace to him is another option.
-    await seedCut(await newClient("Mia"), PRIYA, at(10), "checked_in");
-    const grace = await seedCut(await newClient("Grace"), PRIYA, at(11));
+    // Shae is free, so moving Grace to Shae is another option.
+    await seedCut(await newClient("Mia"), BRIDGET, at(10), "checked_in");
+    const grace = await seedCut(await newClient("Grace"), BRIDGET, at(11));
     await openDay(page);
     await block(page, "Mia").click();
     await page.getByRole("button", { name: "Running late" }).click();
@@ -220,12 +220,12 @@ test.describe("front desk", () => {
     await expect(panel.getByTestId("denise-message")).toContainText("11:00 → 11:20");
     // Shown under the top fix.
     await expect(panel.getByRole("button", { name: "Other options (1)" })).toHaveAttribute("aria-expanded", "true");
-    const other = panel.getByRole("listitem").filter({ hasText: "→ Ethan at 11:00" });
+    const other = panel.getByRole("listitem").filter({ hasText: "→ Shae at 11:00" });
     await other.hover();
-    await expect(ui(page).getByRole("region", { name: "Ethan Brooks" }).locator("[data-fix-ghost]")).toBeVisible();
+    await expect(ui(page).getByRole("region", { name: "Shae Morgan" }).locator("[data-fix-ghost]")).toBeVisible();
     await other.getByRole("button", { name: "Use this instead" }).click();
     await expect(panel.getByRole("status")).toContainText("has been moved and notified");
-    expect(await startOf(grace)).toEqual({ start: at(11).getTime(), staffId: ETHAN });
+    expect(await startOf(grace)).toEqual({ start: at(11).getTime(), staffId: SHAE });
   });
 
   test("is not connected for questions without an API key", async ({ page }) => {
@@ -251,7 +251,7 @@ test.describe("stylist", () => {
     await page.getByRole("button", { name: "Tell Denise" }).click();
 
     const panel = denisePanel(page);
-    await expect(panel.getByTestId("denise-message")).toContainText("Priya's running 15 minutes late.");
+    await expect(panel.getByTestId("denise-message")).toContainText("Bridget's running 15 minutes late.");
     await expect(panel.getByRole("button", { name: "Apply fix" })).toHaveCount(0);
     await expect(panel).toContainText("The front desk can apply this.");
   });

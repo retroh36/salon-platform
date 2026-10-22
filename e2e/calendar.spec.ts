@@ -7,7 +7,7 @@ import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
-const { priya: PRIYA, ethan: ETHAN } = SEED.staff;
+const { bridget: BRIDGET, shae: SHAE } = SEED.staff;
 const CHAIR_1 = "f0000000-0000-4000-8000-000000000001";
 const CHAIR_6 = "f0000000-0000-4000-8000-000000000006";
 
@@ -94,15 +94,15 @@ async function openDay(page: Page, date: string) {
 
 test.beforeAll(async () => {
   const [ava, ben, cara] = await Promise.all([client("Ava"), client("Ben"), client("Cara")]);
-  // Ava: color with Priya, then a blowout with Ethan.
+  // Ava: color with Bridget, then a blowout with Shae.
   await book(ava, [
-    { service: "All-Over Color", staff: PRIYA, start: at(QUIET_TUESDAY, 10), resource: CHAIR_1 },
-    { service: "Blowout", staff: ETHAN, start: at(QUIET_TUESDAY, 11, 45), resource: CHAIR_1 },
+    { service: "All-Over Color", staff: BRIDGET, start: at(QUIET_TUESDAY, 10), resource: CHAIR_1 },
+    { service: "Blowout", staff: SHAE, start: at(QUIET_TUESDAY, 11, 45), resource: CHAIR_1 },
   ]);
   // Ben: a bang trim while Ava's color processes.
-  await book(ben, [{ service: "Bang Trim", staff: PRIYA, start: at(QUIET_TUESDAY, 10, 45), resource: CHAIR_6 }]);
+  await book(ben, [{ service: "Bang Trim", staff: BRIDGET, start: at(QUIET_TUESDAY, 10, 45), resource: CHAIR_6 }]);
   // Cara canceled; she shouldn't show.
-  await book(cara, [{ service: "Men's Cut", staff: ETHAN, start: at(QUIET_TUESDAY, 14) }], "canceled");
+  await book(cara, [{ service: "Men's Cut", staff: SHAE, start: at(QUIET_TUESDAY, 14) }], "canceled");
 });
 
 test.afterAll(async () => {
@@ -115,21 +115,21 @@ test.describe("front desk", () => {
 
   test("sees a column per stylist with their hours", async ({ page }) => {
     await openDay(page, QUIET_TUESDAY);
-    const headers = ["Ethan Brooks", "Hannah Novak", "Jamal Carter", "Marcus Lee", "Priya Shah", "Sofia Moreno"];
+    const headers = ["Shae Morgan", "Hannah Novak", "Nola Brennan", "Gil Navarro", "Bridget Callahan", "Sandra Whitfield", "Lois Park"];
     for (const name of headers) await expect(column(page, name)).toBeVisible();
     // Owner, manager and front desk don't take clients.
     await expect(column(page, "Olivia Bennett")).toHaveCount(0);
     await expect(column(page, "Sam Rivera")).toHaveCount(0);
-    await expect(ui(page).getByText("9am–1pm, 2pm–6pm")).toBeVisible(); // Priya's split shift
+    await expect(ui(page).getByText("9am–1pm, 2pm–6pm")).toBeVisible(); // Bridget's split shift
     await expect(ui(page).getByText("Open 9am–7pm")).toBeVisible();
   });
 
   test("shows appointments as blocks with the processing gap lighter", async ({ page }) => {
     await openDay(page, QUIET_TUESDAY);
-    const priya = column(page, "Priya Shah");
+    const bridget = column(page, "Bridget Callahan");
 
-    const color = priya.getByRole("button", { name: new RegExp(`^10am–11:45am, ${PREFIX}Ava Test, All-Over Color`) });
-    await expect(color).toHaveAccessibleName(/processing 10:45am–11:20am, with Ethan, Chair 1, Booked$/);
+    const color = bridget.getByRole("button", { name: new RegExp(`^10am–11:45am, ${PREFIX}Ava Test, All-Over Color`) });
+    await expect(color).toHaveAccessibleName(/processing 10:45am–11:20am, with Shae, Chair 1, Booked$/);
     // (Test names are long, so the block may show a shorter form; the full
     // name is in its label.)
     await expect(color).toHaveAttribute("data-family", "color");
@@ -162,7 +162,7 @@ test.describe("front desk", () => {
       .locator("span")
       .evaluate((el) => getComputedStyle(el).borderLeftColor);
     expect(await color.evaluate((el) => getComputedStyle(el).borderLeftColor)).toBe(legendColor);
-    const trim = priya.getByRole("button", { name: new RegExp(`^10:45am–11am, ${PREFIX}Ben Test, Bang Trim`) });
+    const trim = bridget.getByRole("button", { name: new RegExp(`^10:45am–11am, ${PREFIX}Ben Test, Bang Trim`) });
     expect(await trim.evaluate((el) => getComputedStyle(el).borderLeftColor)).not.toBe(legendColor);
 
     // Ben's trim sits in Ava's processing gap, in its own lane on the right:
@@ -175,7 +175,7 @@ test.describe("front desk", () => {
     expect(await trim.evaluate((el) => [...el.querySelectorAll(".truncate")].every((t) => t.scrollWidth <= t.clientWidth + 0.5))).toBe(true);
 
     // The second stylist on Ava's visit.
-    await expect(column(page, "Ethan Brooks").getByRole("button", { name: /^11:45am–12:30pm, .*Ava Test, Blowout, with Priya/ })).toBeVisible();
+    await expect(column(page, "Shae Morgan").getByRole("button", { name: /^11:45am–12:30pm, .*Ava Test, Blowout, with Bridget/ })).toBeVisible();
     // Canceled visits aren't shown.
     await expect(ui(page).getByText(`${PREFIX}Cara`)).toHaveCount(0);
 
@@ -193,9 +193,9 @@ test.describe("front desk", () => {
 
   test("greys out off hours and time off", async ({ page }) => {
     await openDay(page, QUIET_TUESDAY);
-    // Priya: 1-2pm lunch and after 6pm, in a 9am-7pm day.
-    await expect(column(page, "Priya Shah").locator("[data-off-hours]")).toHaveCount(2);
-    // Hannah doesn't work Tuesdays: her column folds to her initials until opened.
+    // Bridget: 1-2pm lunch and after 6pm, in a 9am-7pm day.
+    await expect(column(page, "Bridget Callahan").locator("[data-off-hours]")).toHaveCount(2);
+    // Hannah doesn't work Tuesdays: the column folds to initials until opened.
     await expect(column(page, "Hannah Novak")).toHaveAttribute("data-collapsed");
     await waitForHydration(page, "[data-block]");
     await ui(page).getByRole("button", { name: "Show Hannah Novak (not working)" }).click();
@@ -211,7 +211,7 @@ test.describe("front desk", () => {
     // Mondays the salon is closed.
     await openDay(page, nextMonday);
     await expect(ui(page).getByText("Salon closed")).toBeVisible();
-    await expect(ui(page).getByRole("button", { name: /^Show .* \(not working\)$/ })).toHaveCount(6);
+    await expect(ui(page).getByRole("button", { name: /^Show .* \(not working\)$/ })).toHaveCount(7);
   });
 
   test("moves between days", async ({ page }) => {
@@ -271,15 +271,15 @@ test.describe("design", () => {
     await department.click();
     await ui(page).getByRole("listbox", { name: "Department" }).getByRole("option", { name: "Color" }).click();
     await expect(department).toHaveAccessibleName("Department Color");
-    for (const name of ["Jamal Carter", "Marcus Lee", "Priya Shah", "Sofia Moreno"]) await expect(column(page, name)).toBeVisible();
+    for (const name of ["Nola Brennan", "Gil Navarro", "Bridget Callahan", "Sandra Whitfield", "Lois Park"]) await expect(column(page, name)).toBeVisible();
     await expect(column(page, "Hannah Novak")).toHaveCount(0);
-    await expect(column(page, "Ethan Brooks")).toHaveCount(0);
+    await expect(column(page, "Shae Morgan")).toHaveCount(0);
     // By keyboard too.
     await department.press("ArrowDown");
     await page.keyboard.press("Home");
     await page.keyboard.press("Enter");
     await expect(department).toHaveAccessibleName("Department All departments");
-    await expect(column(page, "Ethan Brooks")).toBeVisible();
+    await expect(column(page, "Shae Morgan")).toBeVisible();
   });
 
   test("fits every working stylist on screen at 1440px", async ({ page }) => {
@@ -289,8 +289,8 @@ test.describe("design", () => {
     expect(await grid.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
     // The header row and time column stay put when the grid scrolls.
     await grid.evaluate((el) => (el.scrollTop = 400));
-    await expect(column(page, "Priya Shah")).toBeVisible();
-    const headerTop = await ui(page).getByText("Master stylist").evaluate((el) => el.getBoundingClientRect().top);
+    await expect(column(page, "Bridget Callahan")).toBeVisible();
+    const headerTop = await ui(page).locator("[data-level]").filter({ hasText: "Bridget Callahan" }).first().evaluate((el) => el.getBoundingClientRect().top);
     const gridTop = await grid.evaluate((el) => el.getBoundingClientRect().top);
     expect(headerTop - gridTop).toBeLessThan(40);
   });
@@ -300,14 +300,14 @@ test.describe("design", () => {
     // hasn't checked in is running late.
     await page.clock.setFixedTime(at(QUIET_TUESDAY, 10, 30));
     const [late, done, ready, here] = await Promise.all(["Lou", "Dot", "Rey", "Ida"].map(client));
-    await book(late, [{ service: "Men's Cut", staff: SEED.staff.jamal, start: at(QUIET_TUESDAY, 10) }]);
-    await book(done, [{ service: "Men's Cut", staff: SEED.staff.jamal, start: at(QUIET_TUESDAY, 9) }], "completed");
-    await book(ready, [{ service: "Men's Cut", staff: SEED.staff.jamal, start: at(QUIET_TUESDAY, 13) }], "confirmed");
-    await book(here, [{ service: "Skin Fade", staff: SEED.staff.jamal, start: at(QUIET_TUESDAY, 15) }], "checked_in");
+    await book(late, [{ service: "Men's Cut", staff: SEED.staff.nola, start: at(QUIET_TUESDAY, 10) }]);
+    await book(done, [{ service: "Men's Cut", staff: SEED.staff.nola, start: at(QUIET_TUESDAY, 9) }], "completed");
+    await book(ready, [{ service: "Men's Cut", staff: SEED.staff.nola, start: at(QUIET_TUESDAY, 13) }], "confirmed");
+    await book(here, [{ service: "Skin Fade", staff: SEED.staff.nola, start: at(QUIET_TUESDAY, 15) }], "checked_in");
 
     await openDay(page, QUIET_TUESDAY);
-    const jamal = column(page, "Jamal Carter");
-    const block = (name: string) => jamal.getByRole("button", { name: new RegExp(`${PREFIX}${name}`) });
+    const nola = column(page, "Nola Brennan");
+    const block = (name: string) => nola.getByRole("button", { name: new RegExp(`${PREFIX}${name}`) });
     await expect(block("Lou").locator("[data-attention]")).toHaveAttribute("data-attention", "late");
     await expect(block("Lou")).toHaveAccessibleName(/running late$/);
     await expect(block("Rey").locator("[data-attention]")).toHaveAttribute("data-attention", "confirmed");
@@ -325,7 +325,7 @@ test.describe("design", () => {
 
   test("animates quickly, and not at all with reduce motion", async ({ page }) => {
     await openDay(page, QUIET_TUESDAY);
-    const block = column(page, "Priya Shah").getByRole("button", { name: /Ava Test/ });
+    const block = column(page, "Bridget Callahan").getByRole("button", { name: /Ava Test/ });
     const duration = () => block.evaluate((el) => parseFloat(getComputedStyle(el).transitionDuration));
     const seconds = await duration();
     expect(seconds).toBeGreaterThanOrEqual(0.15);
@@ -360,10 +360,10 @@ test.describe("design", () => {
 
       // An appointment opens its details; empty calendar space closes them
       // without starting a booking.
-      await column(page, "Priya Shah").getByRole("button", { name: /Ava Test/ }).click({ position: { x: 10, y: 5 } });
+      await column(page, "Bridget Callahan").getByRole("button", { name: /Ava Test/ }).click({ position: { x: 10, y: 5 } });
       await expect(aside.getByRole("tabpanel", { name: "Booking details" })).toContainText("All-Over Color");
-      const box = (await column(page, "Ethan Brooks").boundingBox())!;
-      await column(page, "Ethan Brooks").click({ position: { x: 20, y: box.height - 20 } });
+      const box = (await column(page, "Nola Brennan").boundingBox())!;
+      await column(page, "Nola Brennan").click({ position: { x: 20, y: box.height - 20 } });
       await expect(aside).toBeHidden();
       await expect(aside.getByRole("form", { name: "New booking" })).toHaveCount(0);
     });
@@ -375,7 +375,7 @@ test.describe("stylists", () => {
 
   test("see the whole team's day", async ({ page }) => {
     await openDay(page, QUIET_TUESDAY);
-    await expect(column(page, "Ethan Brooks").getByRole("button", { name: /Ava Test, Blowout/ })).toBeVisible();
-    await expect(column(page, "Priya Shah").getByRole("button", { name: /Ava Test, All-Over Color/ })).toBeVisible();
+    await expect(column(page, "Shae Morgan").getByRole("button", { name: /Ava Test, Blowout/ })).toBeVisible();
+    await expect(column(page, "Bridget Callahan").getByRole("button", { name: /Ava Test, All-Over Color/ })).toBeVisible();
   });
 });

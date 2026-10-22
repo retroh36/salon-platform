@@ -20,9 +20,9 @@ const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
 const location = { id: L, timezone: TZ };
-const { priya: PRIYA, ethan: ETHAN } = SEED.staff;
+const { bridget: BRIDGET, shae: SHAE } = SEED.staff;
 const CHAIR_1 = "f0000000-0000-4000-8000-000000000001";
-const STYLISTS = [SEED.staff.priya, SEED.staff.marcus, SEED.staff.hannah, SEED.staff.jamal, SEED.staff.sofia, ETHAN];
+const STYLISTS = [SEED.staff.bridget, SEED.staff.gil, SEED.staff.hannah, SEED.staff.nola, SEED.staff.sandra, SHAE];
 
 // The seeded month, found from the data: it's relative to the last reset,
 // which may not be today.
@@ -32,7 +32,7 @@ let seedTo: string;
 let other: Awaited<ReturnType<typeof createOtherSalon>>;
 let manager: Client;
 let frontDesk: Client;
-let priya: Client;
+let bridget: Client;
 let otherOwner: Client;
 
 // Appointments created by a test, removed afterwards.
@@ -91,10 +91,10 @@ async function newAppointment(start = farFuture(10), minutes = 60) {
 
 beforeAll(async () => {
   other = await createOtherSalon();
-  [manager, frontDesk, priya, otherOwner] = await Promise.all([
+  [manager, frontDesk, bridget, otherOwner] = await Promise.all([
     signIn("manager@mapleandash.test"),
     signIn("frontdesk@mapleandash.test"),
-    signIn("priya@mapleandash.test"),
+    signIn("bridget@mapleandash.test"),
     signIn(other.email),
   ]);
 });
@@ -217,9 +217,9 @@ describe("seed data", () => {
 describe("appointment span", () => {
   it("follows items as they're added, moved and removed", async () => {
     const id = await newAppointment(farFuture(10), 15);
-    const color = await itemRow(id, "All-Over Color", PRIYA, farFuture(10), CHAIR_1);
+    const color = await itemRow(id, "All-Over Color", BRIDGET, farFuture(10), CHAIR_1);
     const { data: first } = await admin.from("appointment_items").insert(color).select("id").single();
-    const blowout = await itemRow(id, "Blowout", ETHAN, farFuture(11, 45));
+    const blowout = await itemRow(id, "Blowout", SHAE, farFuture(11, 45));
     const { data: second } = await admin.from("appointment_items").insert(blowout).select("id").single();
 
     const span = async () => (await admin.from("appointments").select("starts_at, ends_at").eq("id", id).single()).data!;
@@ -240,7 +240,7 @@ describe("appointment span", () => {
 describe("constraints", () => {
   it("requires an item's end to match its timing", async () => {
     const id = await newAppointment();
-    const row = await itemRow(id, "Women's Cut & Style", PRIYA, farFuture(10));
+    const row = await itemRow(id, "Women's Cut & Style", BRIDGET, farFuture(10));
     const { error } = await admin.from("appointment_items").insert({ ...row, ends_at: farFuture(10, 45).toISOString() });
     expect(error?.code).toBe("23514");
   });
@@ -252,7 +252,7 @@ describe("constraints", () => {
       .select("id")
       .single();
     const id = await newAppointment();
-    const row = await itemRow(id, "Women's Cut & Style", PRIYA, farFuture(10), room!.id);
+    const row = await itemRow(id, "Women's Cut & Style", BRIDGET, farFuture(10), room!.id);
     const { error } = await admin.from("appointment_items").insert(row);
     expect(error?.code).toBe("23503");
   });
@@ -263,7 +263,7 @@ describe("constraints", () => {
     expect(clientError?.code).toBe("23503");
 
     const id = await newAppointment();
-    const row = await itemRow(id, "Women's Cut & Style", PRIYA, farFuture(10));
+    const row = await itemRow(id, "Women's Cut & Style", BRIDGET, farFuture(10));
     const { error: staffError } = await admin.from("appointment_items").insert({ ...row, staff_id: other.staffId });
     expect(staffError?.code).toBe("23503");
   });
@@ -279,7 +279,7 @@ describe("constraints", () => {
 
 describe("row level security", () => {
   it("lets every member read the calendar", async () => {
-    for (const client of [priya, frontDesk, manager]) {
+    for (const client of [bridget, frontDesk, manager]) {
       const appointments = await client.from("appointments").select("id", { count: "exact", head: true });
       const items = await client.from("appointment_items").select("id", { count: "exact", head: true });
       const resources = await client.from("resources").select("id", { count: "exact", head: true });
@@ -300,8 +300,8 @@ describe("row level security", () => {
 
   it("refuses direct writes from everyone: changes go through the booking functions", async () => {
     const id = await newAppointment();
-    const row = await itemRow(id, "Women's Cut & Style", PRIYA, farFuture(10), CHAIR_1);
-    for (const client of [frontDesk, manager, priya, otherOwner]) {
+    const row = await itemRow(id, "Women's Cut & Style", BRIDGET, farFuture(10), CHAIR_1);
+    for (const client of [frontDesk, manager, bridget, otherOwner]) {
       const { error } = await client.from("appointments").insert(appointmentRow(farFuture(10), 60));
       expect(error?.code).toBe("42501");
       const { error: itemError } = await client.from("appointment_items").insert(row);

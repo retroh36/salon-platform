@@ -20,7 +20,7 @@ async function onHand(sku: string) {
   return data!.on_hand;
 }
 
-// A color visit with Priya today, before opening so it doesn't clash.
+// A color visit with Bridget today, before opening so it doesn't clash.
 async function colorVisit(status: "booked" | "checked_in") {
   const { data: client } = await admin.from("clients").insert({ business_id: B, first_name: `${PREFIX}Rose`, last_name: "Test" }).select("id").single();
   const { data: s } = await admin.from("services").select("id, duration_minutes, active_minutes, processing_minutes, finishing_minutes, price_cents").eq("business_id", B).eq("name", "All-Over Color").single();
@@ -36,7 +36,7 @@ async function colorVisit(status: "booked" | "checked_in") {
     location_id: L,
     appointment_id: a!.id,
     service_id: s!.id,
-    staff_id: SEED.staff.priya,
+    staff_id: SEED.staff.bridget,
     starts_at: start.toISOString(),
     ends_at: end.toISOString(),
     active_minutes: s!.active_minutes,

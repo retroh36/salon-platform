@@ -13,9 +13,9 @@ const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
 const location = { id: L, timezone: TZ };
-const { priya: PRIYA, ethan: ETHAN, marcus: MARCUS, frontDesk: FRONT_DESK } = SEED.staff;
-// A Tuesday far from the seeded month: Priya works 9-1 and 2-6, Ethan 9-1
-// and 1:30-5:30, Marcus doesn't work Tuesdays.
+const { bridget: BRIDGET, shae: SHAE, gil: GIL, frontDesk: FRONT_DESK } = SEED.staff;
+// A Tuesday far from the seeded month: Bridget works 9-1 and 2-6, Shae 9-1
+// and 1:30-5:30, Gil doesn't work Tuesdays.
 const DAY = "2031-06-17";
 const at = (hour: number, minute = 0) => fromLocal(DAY, hour * 60 + minute, TZ)!;
 const NOW = at(9);
@@ -25,8 +25,8 @@ const stylistView: Viewer = { ...desk, canBook: false };
 
 let other: Awaited<ReturnType<typeof createOtherSalon>>;
 let frontDesk: Client;
-let priya: Client;
-let marcus: Client;
+let bridget: Client;
+let gil: Client;
 let otherOwner: Client;
 let services: Map<string, string>;
 let clients: { id: string; first_name: string; last_name: string }[];
@@ -56,22 +56,22 @@ async function startOf(itemId: string) {
   return { start: new Date(data!.starts_at), staffId: data!.staff_id };
 }
 
-// Priya's 10:00 client is in the chair; client 1 is next at 11:00. Ethan
+// Bridget's 10:00 client is in the chair; client 1 is next at 11:00. Shae
 // is booked 9-1 so he can't help.
 async function overrunMorning() {
-  const current = await book(0, [item("Women's Cut & Style", PRIYA, at(10))]);
+  const current = await book(0, [item("Women's Cut & Style", BRIDGET, at(10))]);
   await changeStatus(frontDesk, current.appointment_id, "check_in");
-  const next = await book(1, [item("Women's Cut & Style", PRIYA, at(11))]);
-  for (const [i, hour] of [9, 10, 11, 12].entries()) await book(2 + i, [item("Women's Cut & Style", ETHAN, at(hour))]);
+  const next = await book(1, [item("Women's Cut & Style", BRIDGET, at(11))]);
+  for (const [i, hour] of [9, 10, 11, 12].entries()) await book(2 + i, [item("Women's Cut & Style", SHAE, at(hour))]);
   return { current, next };
 }
 
 beforeAll(async () => {
   other = await createOtherSalon();
-  [frontDesk, priya, marcus, otherOwner] = await Promise.all([
+  [frontDesk, bridget, gil, otherOwner] = await Promise.all([
     signIn("frontdesk@mapleandash.test"),
-    signIn("priya@mapleandash.test"),
-    signIn("marcus@mapleandash.test"),
+    signIn("bridget@mapleandash.test"),
+    signIn("gil@mapleandash.test"),
     signIn(other.email),
   ]);
   const { data } = await admin.from("services").select("id, name").eq("business_id", B);
@@ -93,7 +93,7 @@ describe("reporting", () => {
   it("records an overrun for a client who's checked in, and a late client otherwise", async () => {
     const { current, next } = await overrunMorning();
 
-    const over = await reportRunningLate(priya, current.id, 20); // Priya, on her own visit
+    const over = await reportRunningLate(bridget, current.id, 20); // Bridget, on their own visit
     expect(over.ok).toBe(true);
     const late = await reportRunningLate(frontDesk, next.id, 10);
     expect(late.ok).toBe(true);
@@ -101,7 +101,7 @@ describe("reporting", () => {
     const { data } = await admin.from("schedule_disruptions").select("kind, minutes, item_id, appointment_id, on_date, reported_by").order("kind");
     const mine = data!.filter((d) => d.on_date === DAY);
     expect(mine).toEqual([
-      { kind: "overrun", minutes: 20, item_id: current.id, appointment_id: current.appointment_id, on_date: DAY, reported_by: PRIYA },
+      { kind: "overrun", minutes: 20, item_id: current.id, appointment_id: current.appointment_id, on_date: DAY, reported_by: BRIDGET },
       { kind: "client_late", minutes: 10, item_id: null, appointment_id: next.appointment_id, on_date: DAY, reported_by: FRONT_DESK },
     ]);
 
@@ -114,7 +114,7 @@ describe("reporting", () => {
 
   it("only lets the front of house, or a stylist on the visit, report it", async () => {
     const { current } = await overrunMorning();
-    expect(await reportRunningLate(marcus, current.id, 20)).toEqual({ ok: false, error: "forbidden" });
+    expect(await reportRunningLate(gil, current.id, 20)).toEqual({ ok: false, error: "forbidden" });
     expect(await reportRunningLate(otherOwner, current.id, 20)).toEqual({ ok: false, error: "forbidden" });
     expect(await reportRunningLate(frontDesk, current.id, 7)).toEqual({ ok: false, error: "invalid" });
     await changeStatus(frontDesk, current.appointment_id, "check_out");
@@ -123,19 +123,19 @@ describe("reporting", () => {
 
   it("records a call-out as approved time off for the rest of the day", async () => {
     const { data: before } = await admin.from("locations").select("calendar_version").eq("id", L).single();
-    const result = await reportCallOut(frontDesk, PRIYA, at(11, 42));
+    const result = await reportCallOut(frontDesk, BRIDGET, at(11, 42));
     expect(result.ok).toBe(true);
 
-    const { data: off } = await admin.from("staff_time_off").select("start_minute, end_minute, status, starts_on, ends_on, decided_by").eq("staff_id", PRIYA).eq("starts_on", DAY).single();
+    const { data: off } = await admin.from("staff_time_off").select("start_minute, end_minute, status, starts_on, ends_on, decided_by").eq("staff_id", BRIDGET).eq("starts_on", DAY).single();
     expect(off).toEqual({ start_minute: 11 * 60 + 40, end_minute: 1440, status: "approved", starts_on: DAY, ends_on: DAY, decided_by: FRONT_DESK });
     const { data: after } = await admin.from("locations").select("calendar_version").eq("id", L).single();
     expect(after!.calendar_version).toBeGreaterThan(before!.calendar_version);
 
     // Reported twice: still one.
-    expect(await reportCallOut(frontDesk, PRIYA, at(12))).toEqual(result);
+    expect(await reportCallOut(frontDesk, BRIDGET, at(12))).toEqual(result);
     // Stylists can report themselves, not others.
-    expect(await reportCallOut(priya, ETHAN, at(12))).toEqual({ ok: false, error: "forbidden" });
-    expect((await reportCallOut(marcus, MARCUS, at(12))).ok).toBe(true);
+    expect(await reportCallOut(bridget, SHAE, at(12))).toEqual({ ok: false, error: "forbidden" });
+    expect((await reportCallOut(gil, GIL, at(12))).ok).toBe(true);
   });
 });
 
@@ -147,12 +147,12 @@ describe("Denise's fixes", () => {
     const state = await scanDay(frontDesk, desk, DAY, { now: NOW });
     expect(state.conflicts).toHaveLength(1);
     const [conflict] = state.conflicts;
-    expect(conflict.headline).toBe("Priya's running 20 minutes late.");
+    expect(conflict.headline).toBe("Bridget's running 20 minutes late.");
     expect(conflict.itemIds).toEqual([current.id, next.id]);
     const [top] = conflict.options;
     expect(top.summary).toBe(`${name(1)} 11:00 → 11:20`);
     expect(top.intro).toBe(`I found a fix that only moves one client: ${name(1)} 11:00 → 11:20. Want me to apply it?`);
-    expect(top.reason).toBe(`${clients[1].first_name} starts 20 minutes later and stays with Priya. Nothing else on the calendar changes.`);
+    expect(top.reason).toBe(`${clients[1].first_name} starts 20 minutes later and stays with Bridget. Nothing else on the calendar changes.`);
     expect(top.actionId).toBeTruthy();
 
     // Logged as a proposal, with what it would send.
@@ -165,7 +165,7 @@ describe("Denise's fixes", () => {
 
     const approved = await approveFix(frontDesk, desk, top.actionId!, { now: NOW });
     expect(approved).toEqual({ ok: true, date: DAY, message: `Done — ${clients[1].first_name} has been moved and notified.` });
-    expect(await startOf(next.id)).toEqual({ start: at(11, 20), staffId: PRIYA });
+    expect(await startOf(next.id)).toEqual({ start: at(11, 20), staffId: BRIDGET });
 
     const { data: sent } = await admin.from("notifications").select("client_id, staff_id, template, body, status, appointment_id").eq("ai_action_id", top.actionId!);
     expect(sent).toHaveLength(2);
@@ -175,17 +175,17 @@ describe("Denise's fixes", () => {
         template: "time_change",
         status: "pending",
         appointment_id: next.appointment_id,
-        body: `Hi ${clients[1].first_name}, it's Maple & Ash Hair Studio. Your appointment today has moved from 11am to 11:20am, still with Priya. Reply or call us if that doesn't work. See you soon!`,
+        body: `Hi ${clients[1].first_name}, it's Maple & Ash Hair Studio. Your appointment today has moved from 11am to 11:20am, still with Bridget. Reply or call us if that doesn't work. See you soon!`,
       }),
     );
-    expect(sent).toContainEqual(expect.objectContaining({ staff_id: PRIYA, template: "staff_schedule_change", body: `${name(1)}'s Women's Cut & Style has moved from 11am to 11:20am.` }));
+    expect(sent).toContainEqual(expect.objectContaining({ staff_id: BRIDGET, template: "staff_schedule_change", body: `${name(1)}'s Women's Cut & Style has moved from 11am to 11:20am.` }));
 
     // All clear now.
     expect((await scanDay(frontDesk, desk, DAY, { now: NOW })).conflicts).toEqual([]);
 
     // Undo: back exactly, the unsent notices canceled, and the conflict back.
     expect(await undoFix(frontDesk, desk, top.actionId!, NOW)).toEqual({ ok: true, date: DAY, message: `Undone — ${clients[1].first_name} is back at 11:00.` });
-    expect(await startOf(next.id)).toEqual({ start: at(11), staffId: PRIYA });
+    expect(await startOf(next.id)).toEqual({ start: at(11), staffId: BRIDGET });
     const { data: canceled } = await admin.from("notifications").select("status").eq("ai_action_id", top.actionId!);
     expect(canceled!.map((n) => n.status)).toEqual(["canceled", "canceled"]);
     const after = await scanDay(frontDesk, desk, DAY, { now: NOW });
@@ -211,11 +211,11 @@ describe("Denise's fixes", () => {
       ]),
     );
     expect(data).toHaveLength(3);
-    expect(data!.find((n) => n.template === "time_change_undone")!.body).toContain("back at 11am with Priya");
+    expect(data!.find((n) => n.template === "time_change_undone")!.body).toContain("back at 11am with Bridget");
   });
 
   it("moves a late client's visit and marks the report resolved, until undone", async () => {
-    const visit = await book(1, [item("Women's Cut & Style", PRIYA, at(11))]);
+    const visit = await book(1, [item("Women's Cut & Style", BRIDGET, at(11))]);
     const late = await reportRunningLate(frontDesk, visit.id, 15);
     const state = await scanDay(frontDesk, desk, DAY, { now: NOW });
     const [conflict] = state.conflicts;
@@ -235,13 +235,13 @@ describe("Denise's fixes", () => {
   });
 
   it("hands a stylist's clients to others when they're out", async () => {
-    const cut = await book(1, [item("Women's Cut & Style", PRIYA, at(12))]);
-    await reportCallOut(frontDesk, PRIYA, at(11));
+    const cut = await book(1, [item("Women's Cut & Style", BRIDGET, at(12))]);
+    await reportCallOut(frontDesk, BRIDGET, at(11));
     const [conflict] = (await scanDay(frontDesk, desk, DAY, { now: at(11) })).conflicts;
-    expect(conflict.headline).toBe("Priya is out for the rest of the day.");
-    expect(conflict.options[0].summary).toBe(`${name(1)} → Ethan at 12:00`);
+    expect(conflict.headline).toBe("Bridget is out for the rest of the day.");
+    expect(conflict.options[0].summary).toBe(`${name(1)} → Shae at 12:00`);
     expect((await approveFix(frontDesk, desk, conflict.options[0].actionId!, { now: at(11) })).ok).toBe(true);
-    expect(await startOf(cut.id)).toEqual({ start: at(12), staffId: ETHAN });
+    expect(await startOf(cut.id)).toEqual({ start: at(12), staffId: SHAE });
   });
 
   it("re-checks the rules when approving, and doesn't propose a rejected fix again", async () => {
@@ -249,8 +249,8 @@ describe("Denise's fixes", () => {
     await reportRunningLate(frontDesk, current.id, 20);
     const [conflict] = (await scanDay(frontDesk, desk, DAY, { now: NOW })).conflicts;
 
-    // Someone books Priya at 12:05 in the meantime, where the fix needs her.
-    await book(6, [item("Bang Trim", PRIYA, at(12, 5))]);
+    // Someone books Bridget at 12:05 in the meantime, where the fix needs Bridget.
+    await book(6, [item("Bang Trim", BRIDGET, at(12, 5))]);
     const result = await approveFix(frontDesk, desk, conflict.options[0].actionId!, { now: NOW });
     expect(result).toEqual({ ok: false, message: "That doesn't work any more: The stylist already has a client then. I'll look again." });
 
@@ -263,7 +263,7 @@ describe("Denise's fixes", () => {
   it("shows stylists the same conflicts without recording or approving anything", async () => {
     const { current } = await overrunMorning();
     await reportRunningLate(frontDesk, current.id, 20);
-    const state = await scanDay(priya, stylistView, DAY, { now: NOW });
+    const state = await scanDay(bridget, stylistView, DAY, { now: NOW });
     expect(state.conflicts).toHaveLength(1);
     expect(state.conflicts[0].options.every((o) => o.actionId === null)).toBe(true);
     const { count } = await admin.from("ai_actions").select("id", { count: "exact", head: true }).like("subject", `${DAY}:%`);
@@ -298,9 +298,9 @@ describe("who can see reports and notifications", () => {
     const [top] = (await scanDay(frontDesk, desk, DAY, { now: NOW })).conflicts[0].options;
     await approveFix(frontDesk, desk, top.actionId!, { now: NOW });
 
-    const { data: seenByStylist } = await marcus.from("schedule_disruptions").select("id").eq("on_date", DAY);
+    const { data: seenByStylist } = await gil.from("schedule_disruptions").select("id").eq("on_date", DAY);
     expect(seenByStylist).toHaveLength(1);
-    const { data: notesByStylist } = await marcus.from("notifications").select("id").eq("ai_action_id", top.actionId!);
+    const { data: notesByStylist } = await gil.from("notifications").select("id").eq("ai_action_id", top.actionId!);
     expect(notesByStylist).toEqual([]);
     const { data: notesByDesk } = await frontDesk.from("notifications").select("id").eq("ai_action_id", top.actionId!);
     expect(notesByDesk).toHaveLength(2);
@@ -311,9 +311,9 @@ describe("who can see reports and notifications", () => {
     expect(theirNotes).toEqual([]);
 
     // No direct writes.
-    const insert = await frontDesk.from("schedule_disruptions").insert({ business_id: B, location_id: L, kind: "call_out", on_date: DAY, staff_id: ETHAN, starts_at: at(12).toISOString() });
+    const insert = await frontDesk.from("schedule_disruptions").insert({ business_id: B, location_id: L, kind: "call_out", on_date: DAY, staff_id: SHAE, starts_at: at(12).toISOString() });
     expect(insert.error?.code).toBe("42501");
-    const note = await frontDesk.from("notifications").insert({ business_id: B, location_id: L, staff_id: ETHAN, template: "x", body: "x" });
+    const note = await frontDesk.from("notifications").insert({ business_id: B, location_id: L, staff_id: SHAE, template: "x", body: "x" });
     expect(note.error?.code).toBe("42501");
   });
 });

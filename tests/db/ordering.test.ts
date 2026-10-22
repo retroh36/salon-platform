@@ -37,7 +37,7 @@ beforeAll(async () => {
   [manager, frontDesk, stylist, otherOwner] = await Promise.all([
     signIn("manager@mapleandash.test"),
     signIn("frontdesk@mapleandash.test"),
-    signIn("priya@mapleandash.test"),
+    signIn("bridget@mapleandash.test"),
     signIn(other.email),
   ]);
   const { data: s } = await admin.from("suppliers").insert({ business_id: B, name: `${RUN} Supply`, lead_time_days: 2 }).select("id").single();
@@ -128,7 +128,8 @@ describe("Denise's reorders", () => {
   // using 30 g of the test 7N (one tube, 60 g, on hand).
   async function colorWeek() {
     const today = todayIn(TZ);
-    const { data: client } = await admin.from("clients").select("id").eq("business_id", B).order("id").limit(1).single();
+    // A new client, so no other visits of theirs count.
+    const { data: client } = await admin.from("clients").insert({ business_id: B, first_name: `${RUN} Client` }).select("id").single();
     const { data: service } = await admin.from("services").select("id, active_minutes, processing_minutes, finishing_minutes, duration_minutes").eq("business_id", B).eq("name", "All-Over Color").single();
     await admin.from("stock_movements").insert({ business_id: B, location_id: L, product_id: tube, change: 60, on_hand_after: 60, reason: "count" });
     await admin.from("stock_levels").upsert({ business_id: B, location_id: L, product_id: tube, on_hand: 60, reorder_point: 60, reorder_quantity: 4 }, { onConflict: "location_id,product_id" });
@@ -139,10 +140,10 @@ describe("Denise's reorders", () => {
       const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: client!.id, starts_at: start.toISOString(), ends_at: end.toISOString(), status: "confirmed" }).select("id").single();
       const { data: it } = await admin
         .from("appointment_items")
-        .insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: service!.id, staff_id: SEED.staff.priya, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: service!.active_minutes, processing_minutes: service!.processing_minutes, finishing_minutes: service!.finishing_minutes, price_cents: 0 })
+        .insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: service!.id, staff_id: SEED.staff.bridget, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: service!.active_minutes, processing_minutes: service!.processing_minutes, finishing_minutes: service!.finishing_minutes, price_cents: 0 })
         .select("id")
         .single();
-      const { data: f } = await admin.from("client_formulas").insert({ business_id: B, client_id: client!.id, staff_id: SEED.staff.priya, formula: `${RUN} formula`, appointment_item_id: it!.id }).select("id").single();
+      const { data: f } = await admin.from("client_formulas").insert({ business_id: B, client_id: client!.id, staff_id: SEED.staff.bridget, formula: `${RUN} formula`, appointment_item_id: it!.id }).select("id").single();
       await admin.from("formula_products").insert({ business_id: B, formula_id: f!.id, product_id: tube, amount: 30 });
       ids.push(a!.id);
     }
@@ -152,6 +153,7 @@ describe("Denise's reorders", () => {
   async function cleanWeek(ids: string[]) {
     await admin.from("client_formulas").delete().eq("formula", `${RUN} formula`);
     await admin.from("appointments").delete().in("id", ids);
+    await admin.from("clients").delete().eq("first_name", `${RUN} Client`);
     await admin.from("stock_movements").delete().eq("product_id", tube);
     await admin.from("stock_levels").delete().eq("product_id", tube);
   }

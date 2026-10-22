@@ -12,12 +12,12 @@ const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
 const location = { id: L, timezone: TZ, businessId: B };
-// A Tuesday far from the seeded month: Priya and Ethan work 9-1, Jamal 9-5.
+// A Tuesday far from the seeded month: Bridget and Shae work 9-1, Nola 9-5.
 const DAY = "2031-11-04";
 const at = (h: number, m = 0) => fromLocal(DAY, h * 60 + m, TZ)!;
-const { priya: PRIYA, ethan: ETHAN, jamal: JAMAL } = SEED.staff;
+const { bridget: BRIDGET, shae: SHAE, nola: NOLA } = SEED.staff;
 
-let frontDesk: Client, priya: Client;
+let frontDesk: Client, bridget: Client;
 let cut: string, mensCut: string;
 const clients: string[] = [];
 
@@ -27,7 +27,7 @@ async function clear() {
 }
 
 beforeAll(async () => {
-  [frontDesk, priya] = await Promise.all([signIn("frontdesk@mapleandash.test"), signIn("priya@mapleandash.test")]);
+  [frontDesk, bridget] = await Promise.all([signIn("frontdesk@mapleandash.test"), signIn("bridget@mapleandash.test")]);
   const { data: s } = await admin.from("services").select("id, name").eq("business_id", B).in("name", ["Women's Cut & Style", "Men's Cut"]);
   cut = s!.find((x) => x.name === "Women's Cut & Style")!.id;
   mensCut = s!.find((x) => x.name === "Men's Cut")!.id;
@@ -44,9 +44,9 @@ afterAll(async () => {
 });
 
 const party = (start = 10 * 60) => [
-  { clientId: clients[0], lines: [{ serviceId: cut, staffId: PRIYA, startMinute: start, resource: "any" }] },
-  { clientId: clients[1], lines: [{ serviceId: cut, staffId: ETHAN, startMinute: start, resource: "any" }] },
-  { clientId: null, lines: [{ serviceId: mensCut, staffId: JAMAL, startMinute: start + 30, resource: "any" }] },
+  { clientId: clients[0], lines: [{ serviceId: cut, staffId: BRIDGET, startMinute: start, resource: "any" }] },
+  { clientId: clients[1], lines: [{ serviceId: cut, staffId: SHAE, startMinute: start, resource: "any" }] },
+  { clientId: null, lines: [{ serviceId: mensCut, staffId: NOLA, startMinute: start + 30, resource: "any" }] },
 ];
 
 describe("booking a group", () => {
@@ -54,16 +54,21 @@ describe("booking a group", () => {
     const r = await bookGroup(frontDesk, location, { label: "Test bridal party", date: DAY, notes: "Champagne", guests: party() });
     expect(r.ok).toBe(true);
     const { data } = await admin.from("appointments").select("client_id, notes, starts_at, group:appointment_groups(label)").in("id", r.ok ? r.appointmentIds : []).order("starts_at");
-    expect(data!.map((a) => [a.client_id, a.notes, a.group?.label])).toEqual([
-      [clients[0], "Champagne", "Test bridal party"],
-      [clients[1], "Champagne", "Test bridal party"],
-      [null, "Champagne", "Test bridal party"],
-    ]);
+    // The first two start together, so in either order.
+    const rows = data!.map((a) => [a.client_id, a.notes, a.group?.label]);
+    expect(rows).toHaveLength(3);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        [clients[0], "Champagne", "Test bridal party"],
+        [clients[1], "Champagne", "Test bridal party"],
+      ]),
+    );
+    expect(rows[2]).toEqual([null, "Champagne", "Test bridal party"]);
   });
 
   it("books no one if the guests don't all fit together", async () => {
     const clash = party();
-    clash[1].lines[0].staffId = PRIYA; // two guests with Priya at once
+    clash[1].lines[0].staffId = BRIDGET; // two guests with Bridget at once
     const r = await bookGroup(frontDesk, location, { label: "Test clash", date: DAY, notes: null, guests: clash });
     expect(r).toMatchObject({ ok: false, error: "invalid", problems: [[[]], [[{ code: "staff_double_booked" }]], [[]]] });
     expect((await admin.from("appointment_groups").select("id").eq("label", "Test clash")).data).toEqual([]);
@@ -71,9 +76,9 @@ describe("booking a group", () => {
   });
 
   it("is front of house only", async () => {
-    expect(await bookGroup(priya, location, { label: "Test nope", date: DAY, notes: null, guests: party() })).toEqual({ ok: false, error: "forbidden" });
+    expect(await bookGroup(bridget, location, { label: "Test nope", date: DAY, notes: null, guests: party() })).toEqual({ ok: false, error: "forbidden" });
     const own = await bookGroup(frontDesk, location, { label: "Test own", date: DAY, notes: null, guests: party() });
-    const { error } = await priya.rpc("set_appointment_group", { p_appointment_id: own.ok ? own.appointmentIds[0] : "", p_group_id: null as unknown as string });
+    const { error } = await bridget.rpc("set_appointment_group", { p_appointment_id: own.ok ? own.appointmentIds[0] : "", p_group_id: null as unknown as string });
     expect(error?.code).toBe("42501");
   });
 });
@@ -85,16 +90,16 @@ describe("changing a group", () => {
     const { data: avaItem } = await admin.from("appointment_items").select("id").eq("appointment_id", ids[0]).single();
     const starts = async () => (await admin.from("appointment_items").select("starts_at, appointment_id").in("appointment_id", ids)).data!.map((i) => [ids.indexOf(i.appointment_id), new Date(i.starts_at).getTime()]).sort();
 
-    expect(await moveGroupItem(frontDesk, location, { itemId: avaItem!.id, staffId: PRIYA, start: at(11) })).toEqual({ ok: true, moved: 3 });
+    expect(await moveGroupItem(frontDesk, location, { itemId: avaItem!.id, staffId: BRIDGET, start: at(11) })).toEqual({ ok: true, moved: 3 });
     expect(await starts()).toEqual([
       [0, at(11).getTime()],
       [1, at(11).getTime()],
       [2, at(11, 30).getTime()],
     ]);
 
-    // Ethan has someone at 9:30, so the group can't move to 9:15.
-    await saveBooking(frontDesk, location, { clientId: null, notes: null, items: [{ serviceId: mensCut, staffId: ETHAN, start: at(9, 30), resource: { kind: "none" } }] });
-    expect(await moveGroupItem(frontDesk, location, { itemId: avaItem!.id, staffId: PRIYA, start: at(9, 15) })).toMatchObject({ ok: false, error: "invalid" });
+    // Shae has someone at 9:30, so the group can't move to 9:15.
+    await saveBooking(frontDesk, location, { clientId: null, notes: null, items: [{ serviceId: mensCut, staffId: SHAE, start: at(9, 30), resource: { kind: "none" } }] });
+    expect(await moveGroupItem(frontDesk, location, { itemId: avaItem!.id, staffId: BRIDGET, start: at(9, 15) })).toMatchObject({ ok: false, error: "invalid" });
     expect((await starts())[0]).toEqual([0, at(11).getTime()]);
   });
 

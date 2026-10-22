@@ -7,7 +7,8 @@ import { gridRange, offHours, serviceFamily } from "@/lib/calendar";
 import { formatAmount, productName } from "@/lib/inventory";
 import { loadBackBarProducts } from "@/lib/inventory-load";
 import { formatDay, formatIntervals } from "@/lib/schedule-format";
-import { LEVEL_LABELS, REASON_LABELS, type TimeOffReason } from "@/lib/schedule-forms";
+import { REASON_LABELS, type TimeOffReason } from "@/lib/schedule-forms";
+import { levelPricesFrom, stylistPrice } from "@/lib/services";
 import { dayView } from "@/lib/scheduling/availability";
 import { itemEnd, itemSegments, type BookedItem } from "@/lib/scheduling/booking";
 import { intersectIntervals, type Interval } from "@/lib/scheduling/intervals";
@@ -53,7 +54,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       // Canceled visits are off the calendar; no-shows stay, marked.
       .neq("appointment.status", "canceled")
       .order("starts_at"),
-    supabase.from("services").select("id, name, category, duration_minutes, price_cents, archived_at").order("name"),
+    supabase.from("services").select("id, name, category, duration_minutes, price_cents, archived_at, service_level_prices(level, price_cents)").order("name"),
     supabase.from("resources").select("id, name").eq("location_id", me.location.id).eq("is_active", true).order("sort_order"),
     loadLocationSchedule(supabase, me.location),
   ]);
@@ -92,6 +93,9 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   const busyToday = new Set(items.map((i) => i.staff_id));
   const columnStaff = sortStaff(team.filter((s) => (offers.get(s.id)?.size ?? 0) > 0 || busyToday.has(s.id)));
   const staffById = new Map(staffResult.data.map((s) => [s.id, s]));
+  const servicesById = new Map(
+    servicesResult.data.map((s) => [s.id, { price_cents: s.price_cents, levelPrices: levelPricesFrom(s.service_level_prices) }]),
+  );
 
   const staffByAppointment = new Map<string, Set<string>>();
   for (const i of items) staffByAppointment.set(i.appointment_id, (staffByAppointment.get(i.appointment_id) ?? new Set()).add(i.staff_id));
@@ -225,7 +229,8 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       staffId: s.id,
       name: fullName(s),
       firstName: s.first_name,
-      title: s.level ? `${LEVEL_LABELS[s.level]} stylist` : roleLabel(s.role),
+      title: roleLabel(s.role),
+      level: s.level,
       color: s.color,
       working: !approved.some((t) => t.startMinute == null) && intersectIntervals(day.hours, day.open).length > 0,
       hoursLabel: approved.some((t) => t.startMinute == null) ? "Time off" : day.hours.length ? formatIntervals(day.hours) : "Not working",
@@ -272,7 +277,19 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
         priceCents: s.price_cents,
         archived: s.archived_at !== null,
       })),
-      offers: Object.fromEntries([...offers].map(([staffId, prices]) => [staffId, Object.fromEntries(prices)])),
+      // Each stylist's price for what they offer: their own, else their level's, else the menu's.
+      offers: Object.fromEntries(
+        [...offers].map(([staffId, prices]) => [
+          staffId,
+          Object.fromEntries(
+            [...prices].map(([serviceId, custom]) => {
+              const service = servicesById.get(serviceId);
+              const level = staffById.get(staffId)?.level ?? null;
+              return [serviceId, service ? stylistPrice(service, { level, customCents: custom }) : custom];
+            }),
+          ),
+        ]),
+      ),
       resources: resourcesResult.data,
       products,
     },

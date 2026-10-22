@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { startTransition, useCallback, useEffect, useOptimistic, useRef, useState, ViewTransition } from "react";
 import { DeniseFace } from "@/components/denise";
 import { Avatar, initials } from "@/components/ui/avatar";
+import { LEVEL_BG, LEVEL_BORDER } from "@/components/ui/level";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { FitText } from "@/components/ui/fit-text";
@@ -15,6 +16,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { isEditable, STATUS_LABELS } from "@/lib/appointments";
 import type { ChatMessage, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
 import { FAMILIES, FAMILY_LABELS, hourMarks, laneBox, layoutColumn, type ServiceFamily } from "@/lib/calendar";
+import { LEVEL_LABELS, STAFF_LEVELS } from "@/lib/schedule-forms";
 import { BLOCK_LABELS } from "@/lib/scheduling/blocks";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, toLocal } from "@/lib/scheduling/time";
@@ -523,8 +525,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         <ChevronRightIcon className="size-3.5" />
                       </button>
                     ) : (
-                      <div key={c.staffId} className="relative flex min-w-0 animate-fade-in items-center gap-2.5 border-l border-line px-3 py-3">
-                        <Avatar name={c.name} color={c.color} />
+                      <div key={c.staffId} className="relative flex min-w-0 animate-fade-in items-center gap-2.5 border-l border-line px-3 py-3" data-level={c.level ?? undefined}>
+                        {c.level && <span aria-hidden data-testid="level-bar" className={`absolute inset-x-0 top-0 h-[3px] ${LEVEL_BG[c.level]}`} />}
+                        <Avatar name={c.name} color={c.color} level={c.level} />
                         <div className="min-w-0 flex-1">
                           <FitText variants={[c.name, `${c.firstName} ${c.name.split(" ").at(-1)![0]}.`, c.firstName]} className="pr-6 font-semibold" />
                           <div className="truncate text-sm text-ink-muted">{c.title}</div>
@@ -1127,6 +1130,17 @@ function Legend() {
       <li className="flex items-center gap-2">
         <span aria-hidden data-family="cut" className="h-3.5 w-5 rounded-[3px] border-l-[3px]" style={{ backgroundColor: "color-mix(in srgb, var(--fam-fill) 40%, white)", borderColor: "color-mix(in srgb, var(--fam-accent) 45%, white)" }} />
         Checked out
+      </li>
+      {/* Stylist levels: the ring around each avatar and the bar on top of
+          their column. */}
+      <li className="flex items-center gap-2" data-testid="level-legend">
+        <span className="sr-only">Stylist levels:</span>
+        {[...STAFF_LEVELS].reverse().map((l) => (
+          <span key={l} className="flex items-center gap-1.5">
+            <span aria-hidden className={`size-3 rounded-full border-2 ${LEVEL_BORDER[l]}`} />
+            {LEVEL_LABELS[l]}
+          </span>
+        ))}
       </li>
     </ul>
   );

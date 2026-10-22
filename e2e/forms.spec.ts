@@ -94,7 +94,7 @@ test.describe("front desk", () => {
       location_id: L,
       appointment_id: a!.id,
       service_id: gloss,
-      staff_id: SEED.staff.priya,
+      staff_id: SEED.staff.bridget,
       starts_at: at(10).toISOString(),
       ends_at: new Date(at(10).getTime() + 50 * 60_000).toISOString(),
       active_minutes: 15,
@@ -107,7 +107,7 @@ test.describe("front desk", () => {
     await page.goto(`/calendar?date=${DAY}`);
     await expect(ui(page).getByTestId("calendar-date")).toContainText(formatLongDay(DAY));
     await waitForHydration(page, "section[data-staff-id]");
-    await ui(page).getByRole("region", { name: "Priya Shah", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Nova Test`) }).click();
+    await ui(page).getByRole("region", { name: "Bridget Callahan", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Nova Test`) }).click();
     const before = page.getByRole("region", { name: "Before this visit" });
     await expect(before).toContainText("Before check-in");
     await expect(before).toContainText("No patch test on record for this client.");
@@ -134,7 +134,7 @@ test.describe("front desk", () => {
     expect(signed!.collected_by).toBe(SEED.staff.frontDesk);
 
     await waitForHydration(page, "section[data-staff-id]");
-    await ui(page).getByRole("region", { name: "Priya Shah", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Nova Test`) }).click();
+    await ui(page).getByRole("region", { name: "Bridget Callahan", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Nova Test`) }).click();
     await expect(page.getByRole("region", { name: "Before this visit" })).not.toContainText("New client consultation");
 
     // The signed form is on the client's profile.
@@ -151,7 +151,7 @@ test.describe("front desk", () => {
 
     await page.goto(`/calendar?date=${DAY}`);
     await waitForHydration(page, "section[data-staff-id]");
-    const column = (await ui(page).getByRole("region", { name: "Priya Shah", exact: true }).boundingBox())!;
+    const column = (await ui(page).getByRole("region", { name: "Bridget Callahan", exact: true }).boundingBox())!;
     const start = Number(await ui(page).locator("[data-range-start]").getAttribute("data-range-start"));
     await page.mouse.click(column.x + column.width - 15, column.y + (14 * 60 - start) * 2 + 3);
     const form = page.getByRole("form", { name: "New booking" });

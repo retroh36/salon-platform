@@ -743,6 +743,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"service_level_prices": {
+                  Row: {
+                    "business_id": string,"level": Database["public"]['Enums']["staff_level"],"price_cents": number,"service_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"level": Database["public"]['Enums']["staff_level"],"price_cents": number,"service_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"level"?: Database["public"]['Enums']["staff_level"],"price_cents"?: number,"service_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "service_level_prices_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "service_level_prices_service_id_business_id_fkey"
+      columns: ["service_id","business_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"service_products": {
                   Row: {
                     "amount": number,"business_id": string,"id": string,"product_id": string,"service_id": string
@@ -1365,6 +1391,9 @@ isOneToOne: false
 "set_location_hours":
 { Args: { "p_business_id": string,"p_hours": Json,"p_location_id": string }; Returns: undefined
                            },
+"set_service_level_prices":
+{ Args: { "p_prices": Json,"p_service_id": string }; Returns: undefined
+                           },
 "set_service_recipe":
 { Args: { "p_lines": Json,"p_service_id": string }; Returns: undefined
                            },
@@ -1388,7 +1417,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","disruption_kind": "overrun"|"client_late"|"call_out","form_requirement": "none"|"first_visit"|"services","notification_status": "pending"|"sent"|"canceled","patch_test_result": "no_reaction"|"reaction","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","staff_level": "junior"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
+            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","disruption_kind": "overrun"|"client_late"|"call_out","form_requirement": "none"|"first_visit"|"services","notification_status": "pending"|"sent"|"canceled","patch_test_result": "no_reaction"|"reaction","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","staff_level": "artisan"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -1508,7 +1537,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"disruption_kind": ["overrun", "client_late", "call_out"],"form_requirement": ["none", "first_visit", "services"],"notification_status": ["pending", "sent", "canceled"],"patch_test_result": ["no_reaction", "reaction"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"staff_level": ["junior", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
+            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"disruption_kind": ["overrun", "client_late", "call_out"],"form_requirement": ["none", "first_visit", "services"],"notification_status": ["pending", "sent", "canceled"],"patch_test_result": ["no_reaction", "reaction"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"staff_level": ["artisan", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
           }
         }
 } as const

@@ -134,10 +134,13 @@ export function parseTimeOffForm(
   return { ok: true, value: { starts_on, ends_on, start_minute, end_minute, reason, note: note || null } };
 }
 
-export const STAFF_LEVELS = ["junior", "senior", "master"] as const;
+// Stylist levels, from newest to most experienced. Each has its own color
+// (gold, silver, bronze: the --color-level-* tokens) and can have its own
+// price for a service.
+export const STAFF_LEVELS = ["artisan", "senior", "master"] as const;
 export type StaffLevel = (typeof STAFF_LEVELS)[number];
 
-export const LEVEL_LABELS: Record<StaffLevel, string> = { junior: "Junior", senior: "Senior", master: "Master" };
+export const LEVEL_LABELS: Record<StaffLevel, string> = { artisan: "Artisan", senior: "Senior", master: "Master" };
 
 export type CompensationInput = { level: StaffLevel | null; service_commission_pct: number; retail_commission_pct: number };
 export type CompensationErrors = Partial<Record<"level" | "service_commission_pct" | "retail_commission_pct", string>>;

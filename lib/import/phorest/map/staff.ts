@@ -14,7 +14,7 @@ export function roleFromCategory(category: string | null): StaffRole {
 
 export function levelFromCategory(category: string | null): StaffLevel | null {
   const c = (category ?? "").toLowerCase();
-  if (/junior|graduate|apprentice|assistant|trainee/.test(c)) return "junior";
+  if (/artisan|junior|graduate|apprentice|assistant|trainee/.test(c)) return "artisan";
   if (/master|director|creative|educator|artistic/.test(c)) return "master";
   if (/senior/.test(c)) return "senior";
   return null;

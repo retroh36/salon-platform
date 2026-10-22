@@ -5,10 +5,12 @@ import { useActionState, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
 import { checkboxClass, fieldClass } from "@/components/ui/field";
+import { LEVEL_BG } from "@/components/ui/level";
 import { Alert } from "@/components/ui/page";
+import { LEVEL_LABELS, STAFF_LEVELS, type StaffLevel } from "@/lib/schedule-forms";
 import { saveService, type ServiceFormFields } from "./actions";
 
-export type StaffOption = { id: string; name: string; role: string; color: string | null; isActive: boolean };
+export type StaffOption = { id: string; name: string; role: string; level: StaffLevel | null; color: string | null; isActive: boolean };
 
 const inputClass = fieldClass;
 const cardClass = "rounded-xl border border-line bg-surface shadow-card";
@@ -35,6 +37,22 @@ export function ServiceForm({
   // a failed save it still matches: the reset restores the submitted choices.
   const [offered, setOffered] = useState(() => new Set(Object.keys(initial.staff)));
 
+  // The default and level prices as typed, for the stylists' placeholders.
+  // Starts again from the fields after each save attempt (the form resets).
+  const [typed, setTyped] = useState({ fields, prices: { default: fields.price, ...fields.level_prices } });
+  if (typed.fields !== fields) setTyped({ fields, prices: { default: fields.price, ...fields.level_prices } });
+  const readPrices = (form: HTMLFormElement) => {
+    const value = (name: string) => String(new FormData(form).get(name) ?? "").trim();
+    setTyped({ fields, prices: { default: value("price"), ...Object.fromEntries(STAFF_LEVELS.map((l) => [l, value(`level_price_${l}`)])) } as typeof typed.prices });
+  };
+
+  // What a stylist charges without their own price: their level's, else the default.
+  const placeholderFor = (level: StaffLevel | null) => {
+    const byLevel = level ? typed.prices[level] : "";
+    const price = byLevel || typed.prices.default;
+    return price ? `${byLevel ? LEVEL_LABELS[level!] : "Default"} $${price}` : "Default";
+  };
+
   const toggle = (id: string, on: boolean) =>
     setOffered((prev) => {
       const next = new Set(prev);
@@ -44,7 +62,7 @@ export function ServiceForm({
     });
 
   return (
-    <form action={action} className="flex flex-col gap-6" noValidate>
+    <form action={action} onInput={(e) => readPrices(e.currentTarget)} className="flex flex-col gap-6" noValidate>
       {serviceId && <input type="hidden" name="service_id" value={serviceId} />}
 
       {state?.message && (
@@ -79,6 +97,29 @@ export function ServiceForm({
           </label>
         </section>
 
+        <section className={`p-5 ${cardClass}`} aria-labelledby="level-prices-heading">
+          <h2 id="level-prices-heading" className={cardTitle}>
+            Prices by level
+          </h2>
+          <p className="mb-4 text-sm text-ink-muted">What each level of stylist charges. Leave blank to use the default price.</p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {STAFF_LEVELS.map((level) => (
+              <Field key={level} label={`${LEVEL_LABELS[level]} ($)`} error={errors.level_prices?.[level]}>
+                <span className="relative flex items-center">
+                  <span aria-hidden className={`absolute left-3 size-2.5 rounded-full ${LEVEL_BG[level]}`} />
+                  <input
+                    name={`level_price_${level}`}
+                    defaultValue={fields.level_prices[level]}
+                    inputMode="decimal"
+                    placeholder={fields.price ? `Default $${fields.price}` : "Default"}
+                    className={`${inputClass} pl-8`}
+                  />
+                </span>
+              </Field>
+            ))}
+          </div>
+        </section>
+
         <section className={`p-5 ${cardClass}`}>
           <h2 className={cardTitle}>Time</h2>
           <p className="mb-4 text-sm text-ink-muted">
@@ -102,7 +143,7 @@ export function ServiceForm({
             <h2 className={cardTitle}>
               Who offers this <span className="font-sans text-sm font-medium text-ink-muted">({offered.size})</span>
             </h2>
-            <p className="text-sm text-ink-muted">Leave a price blank to use the default price.</p>
+            <p className="text-sm text-ink-muted">A stylist&rsquo;s own price overrides their level&rsquo;s. Leave it blank to use their level&rsquo;s price.</p>
           </div>
           <ul className="divide-y divide-line">
             {staffOptions.map((s) => {
@@ -124,7 +165,7 @@ export function ServiceForm({
                       onChange={(e) => toggle(s.id, e.target.checked)}
                       className={checkboxClass}
                     />
-                    <Avatar name={s.name} color={s.color} size="sm" />
+                    <Avatar name={s.name} color={s.color} level={s.level} size="sm" />
                     <span className="font-semibold text-ink">{s.name}</span>
                     <span className="text-sm text-ink-muted">
                       {s.role}
@@ -137,7 +178,7 @@ export function ServiceForm({
                       name={`price_${s.id}`}
                       defaultValue={fields.staff[s.id] ?? ""}
                       disabled={!checked}
-                      placeholder={fields.price ? `Default $${fields.price}` : "Default"}
+                      placeholder={placeholderFor(s.level)}
                       inputMode="decimal"
                       aria-label={`${s.name} price`}
                       className={`${inputClass} w-32! py-1.5`}

@@ -6,6 +6,7 @@ import { canManage, getCurrentStaff } from "@/lib/auth";
 import { parseUsageLines } from "@/lib/color-usage";
 import { isUuid } from "@/lib/ids";
 import { loadBackBarProducts } from "@/lib/inventory-load";
+import { STAFF_LEVELS, type StaffLevel } from "@/lib/schedule-forms";
 import { parseServiceForm, type ServiceFormErrors } from "@/lib/services";
 
 export type ServiceFormFields = {
@@ -16,6 +17,8 @@ export type ServiceFormFields = {
   processing_minutes: string;
   finishing_minutes: string;
   price: string;
+  // Level -> price input ("" = default).
+  level_prices: Record<StaffLevel, string>;
   requires_patch_test: boolean;
   // Staff id -> custom price input ("" = default), for staff who offer it.
   staff: Record<string, string>;
@@ -71,8 +74,12 @@ export async function saveService(_prev: SaveServiceState, formData: FormData): 
     }
     throw error;
   }
-  const { error: flagError } = await supabase.from("services").update({ requires_patch_test: fields.requires_patch_test }).eq("id", savedId);
+  const [{ error: flagError }, { error: levelError }] = await Promise.all([
+    supabase.from("services").update({ requires_patch_test: fields.requires_patch_test }).eq("id", savedId),
+    supabase.rpc("set_service_level_prices", { p_service_id: savedId, p_prices: input.level_prices }),
+  ]);
   if (flagError) throw flagError;
+  if (levelError) throw levelError;
 
   invalidateServicePages();
   redirect("/services");
@@ -116,6 +123,7 @@ function readFields(formData: FormData): ServiceFormFields {
     processing_minutes: get("processing_minutes"),
     finishing_minutes: get("finishing_minutes"),
     price: get("price"),
+    level_prices: Object.fromEntries(STAFF_LEVELS.map((l) => [l, get(`level_price_${l}`)])) as Record<StaffLevel, string>,
     requires_patch_test: formData.get("requires_patch_test") !== null,
     staff,
   };

@@ -7,7 +7,7 @@ import { ChevronRightIcon, PlusIcon } from "@/components/ui/icons";
 import { listClass, PageHeader, rowLinkClass } from "@/components/ui/page";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import { serviceFamily } from "@/lib/calendar";
-import { formatPrice, formatServiceTime, groupByCategory } from "@/lib/services";
+import { formatPriceRange, formatServiceTime, groupByCategory, levelPricesFrom, stylistPrice } from "@/lib/services";
 
 export const metadata: Metadata = { title: "Services" };
 
@@ -27,9 +27,9 @@ async function Services() {
     supabase
       .from("services")
       .select(
-        "id, name, category, active_minutes, processing_minutes, finishing_minutes, price_cents, archived_at, staff_services(staff_id, price_cents)",
+        "id, name, category, active_minutes, processing_minutes, finishing_minutes, price_cents, archived_at, staff_services(staff_id, price_cents), service_level_prices(level, price_cents)",
       ),
-    supabase.from("staff").select("id, first_name, last_name, is_active"),
+    supabase.from("staff").select("id, first_name, last_name, level, is_active"),
   ]);
   if (error) throw error;
   if (staffError) throw staffError;
@@ -74,9 +74,11 @@ async function Services() {
                   .map((ss) => ({ ...ss, staff: staffById.get(ss.staff_id) }))
                   .filter((ss) => ss.staff?.is_active)
                   .sort((a, b) => a.staff!.first_name.localeCompare(b.staff!.first_name));
-                const prices = [service.price_cents, ...offeredBy.map((ss) => ss.price_cents ?? service.price_cents)];
-                const min = Math.min(...prices);
-                const max = Math.max(...prices);
+                // What the stylists who offer it charge (or the menu price).
+                const priced = { price_cents: service.price_cents, levelPrices: levelPricesFrom(service.service_level_prices) };
+                const prices = offeredBy.length
+                  ? offeredBy.map((ss) => stylistPrice(priced, { level: ss.staff!.level, customCents: ss.price_cents }))
+                  : [service.price_cents];
 
                 return (
                   <li key={service.id}>
@@ -84,7 +86,7 @@ async function Services() {
                       <span className="min-w-52 flex-1 font-semibold text-ink">{service.name}</span>
                       <span className="w-48 text-sm text-ink-muted">{formatServiceTime(service)}</span>
                       <span className="w-28 text-sm font-medium text-ink tabular-nums">
-                        {min === max ? formatPrice(min) : `${formatPrice(min)}–${formatPrice(max)}`}
+                        {formatPriceRange(prices)}
                       </span>
                       <span className="w-full text-sm text-ink-muted sm:w-auto sm:min-w-48">
                         {offeredBy.length === 0

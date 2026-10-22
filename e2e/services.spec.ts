@@ -60,8 +60,8 @@ test.describe("owners", () => {
       "Treatments (6)",
     ]);
     await expect(serviceRow(page, "Root Touch-Up")).toContainText("1h 25m · 35m processing");
-    // Priya and Sofia charge senior prices for balayage.
-    await expect(serviceRow(page, "Balayage")).toContainText("$250–$290");
+    // Masters (Bridget, Gil, Sandra) charge more for a root touch-up than Lois, a Senior.
+    await expect(serviceRow(page, "Root Touch-Up")).toContainText("$95–$110");
     await expect(ui(page).getByText("Archived (1)")).toBeVisible();
   });
 
@@ -69,13 +69,13 @@ test.describe("owners", () => {
     const name = `${PREFIX} Glow Gloss`;
     await openNewServiceForm(page);
 
-    const priya = ui(page).getByRole("checkbox", { name: /Priya Shah/ });
-    const priyaPrice = ui(page).getByLabel("Priya Shah price");
-    await expect(priyaPrice).toBeDisabled();
-    await priya.check();
-    await expect(priyaPrice).toBeEnabled();
+    const bridget = ui(page).getByRole("checkbox", { name: /Bridget Callahan/ });
+    const bridgetPrice = ui(page).getByLabel("Bridget Callahan price");
+    await expect(bridgetPrice).toBeDisabled();
+    await bridget.check();
+    await expect(bridgetPrice).toBeEnabled();
     await expect(ui(page).getByRole("heading", { name: "Who offers this (1)" })).toBeVisible();
-    await priyaPrice.fill("70");
+    await bridgetPrice.fill("70");
 
     // Finishing time without a processing gap, and a bad price.
     await fillService(page, { name, category: "Color", active: "15", processing: "0", finishing: "10", price: "abc" });
@@ -87,8 +87,8 @@ test.describe("owners", () => {
     // React resets the form after each submit; everything typed must survive.
     await expect(ui(page).getByLabel("Name", { exact: true })).toHaveValue(name);
     await expect(ui(page).getByLabel("Finishing time (min)")).toHaveValue("10");
-    await expect(priya).toBeChecked();
-    await expect(priyaPrice).toHaveValue("70");
+    await expect(bridget).toBeChecked();
+    await expect(bridgetPrice).toHaveValue("70");
 
     await ui(page).getByLabel("Processing gap (min)").fill("20");
     await ui(page).getByLabel("Default price ($)").fill("60");
@@ -96,8 +96,32 @@ test.describe("owners", () => {
 
     await expect(page).toHaveURL("/services");
     await expect(serviceRow(page, name)).toContainText("45m · 20m processing");
-    await expect(serviceRow(page, name)).toContainText("$60–$70");
-    await expect(serviceRow(page, name)).toContainText("Priya");
+    await expect(serviceRow(page, name)).toContainText("$70");
+    await expect(serviceRow(page, name)).toContainText("Bridget");
+  });
+
+  test("set prices by level, which each stylist charges unless they have their own", async ({ page }) => {
+    const name = `${PREFIX} Level cut`;
+    await openNewServiceForm(page);
+    await fillService(page, { name, category: "Cuts", active: "45", processing: "0", finishing: "0", price: "50" });
+    await ui(page).getByLabel("Artisan ($)").fill("40");
+    await ui(page).getByLabel("Master ($)").fill("70");
+    for (const stylist of ["Bridget Callahan", "Nola Brennan", "Shae Morgan"]) await ui(page).getByRole("checkbox", { name: new RegExp(stylist) }).check();
+    // Each stylist's price input shows what they'd charge without their own.
+    await expect(ui(page).getByLabel("Bridget Callahan price")).toHaveAttribute("placeholder", "Master $70");
+    await expect(ui(page).getByLabel("Nola Brennan price")).toHaveAttribute("placeholder", "Default $50");
+    await ui(page).getByRole("button", { name: "Add service" }).click();
+    // Shae (Artisan) $40, Nola (Senior, the default) $50, Bridget (Master) $70.
+    await expect(serviceRow(page, name)).toContainText("$40–$70");
+
+    await serviceRow(page, name).getByRole("link").click();
+    await waitForHydration(page, "input[name=staff]");
+    await expect(ui(page).getByLabel("Master ($)")).toHaveValue("70");
+    await expect(ui(page).getByLabel("Senior ($)")).toHaveValue("");
+    // Bridget's own price beats the Master price.
+    await ui(page).getByLabel("Bridget Callahan price").fill("90");
+    await ui(page).getByRole("button", { name: "Save changes" }).click();
+    await expect(serviceRow(page, name)).toContainText("$40–$90");
   });
 
   test("reject a duplicate name", async ({ page }) => {
@@ -111,23 +135,24 @@ test.describe("owners", () => {
     const name = `${PREFIX} Trim`;
     await openNewServiceForm(page);
     await fillService(page, { name, category: "Cuts", active: "30", processing: "0", finishing: "0", price: "40" });
-    await ui(page).getByRole("checkbox", { name: /Jamal Carter/ }).check();
-    await ui(page).getByRole("checkbox", { name: /Ethan Brooks/ }).check();
-    await ui(page).getByLabel("Ethan Brooks price").fill("30");
+    await ui(page).getByRole("checkbox", { name: /Nola Brennan/ }).check();
+    await ui(page).getByRole("checkbox", { name: /Shae Morgan/ }).check();
+    await ui(page).getByLabel("Shae Morgan price").fill("30");
     await ui(page).getByRole("button", { name: "Add service" }).click();
     await expect(serviceRow(page, name)).toContainText("$30–$40");
-    await expect(serviceRow(page, name)).toContainText("Ethan, Jamal");
+    await expect(serviceRow(page, name)).toContainText("Nola, Shae");
 
     await serviceRow(page, name).getByRole("link").click();
     await waitForHydration(page, "input[name=staff]");
-    await expect(ui(page).getByLabel("Ethan Brooks price")).toHaveValue("30");
-    await ui(page).getByRole("checkbox", { name: /Ethan Brooks/ }).uncheck();
-    await ui(page).getByLabel("Jamal Carter price").fill("45");
+    await expect(ui(page).getByLabel("Shae Morgan price")).toHaveValue("30");
+    await ui(page).getByRole("checkbox", { name: /Shae Morgan/ }).uncheck();
+    await ui(page).getByLabel("Nola Brennan price").fill("45");
     await ui(page).getByRole("button", { name: "Save changes" }).click();
 
     await expect(page).toHaveURL("/services");
-    await expect(serviceRow(page, name)).toContainText("$40–$45");
-    await expect(serviceRow(page, name)).not.toContainText("Ethan");
+    // Only Nola offers it now, at their own price.
+    await expect(serviceRow(page, name)).toContainText("$45");
+    await expect(serviceRow(page, name)).not.toContainText("Shae");
   });
 
   test("archive and restore a service", async ({ page }) => {
