@@ -14,17 +14,23 @@
   --color-line: #ebe4dd;
   --color-line-strong: #d9cfc5;
 
-  /* Text */
-  --color-ink: #2b2130;
-  --color-ink-muted: #625662;
-  --color-ink-subtle: #75696f;
+  /* Text: navy-tinted neutrals */
+  --color-ink: #1d2532;
+  --color-ink-muted: #565e6b;
+  --color-ink-subtle: #666e7c;
 
-  /* Primary: deep plum */
-  --color-plum-900: #3d1f42;
-  --color-plum-800: #552c5b;
-  --color-plum-700: #5a2d61;
-  --color-plum-200: #e4d3e7;
-  --color-plum-100: #f1e7f2;
+  /* Primary: deep navy, the Maestra logo's #17273b (buttons, selected
+     states, the active nav item, headings) */
+  --color-navy-900: #17273b;
+  --color-navy-800: #233a57;
+  --color-navy-700: #2d4a6e;
+  --color-navy-200: #cfd8e5;
+  --color-navy-100: #e8edf4;
+
+  /* Links and focus rings: a brighter blue on the navy's hue */
+  --color-link: #1d64c4;
+  --color-link-hover: #174f9c;
+  --color-focus: #1d64c4;
 
   /* Denise (the AI assistant): periwinkle, only for her messages,
      suggestions and badge */
@@ -43,8 +49,8 @@
   --color-lavender-accent: #8a68d6;
   --color-sage-fill: #dcecdf;
   --color-sage-accent: #5a9969;
-  --color-sky-fill: #dae9f4;
-  --color-sky-accent: #4c8bb6;
+  --color-teal-fill: #d5efeb;
+  --color-teal-accent: #3b9b93;
   --color-sand-fill: #ede5dd;
   --color-sand-accent: #a08870;
 
@@ -55,8 +61,8 @@
   --color-status-confirmed-ink: #1e5730;
   --color-status-checked-in-bg: #dbe8f6;
   --color-status-checked-in-ink: #1d4a7a;
-  --color-status-completed-bg: #ece2ee;
-  --color-status-completed-ink: #5a2d61;
+  --color-status-completed-bg: #e7e9ed;
+  --color-status-completed-ink: #3a4352;
   --color-status-late-bg: #fbecc8;
   --color-status-late-ink: #7a4a05;
   --color-status-no-show-bg: #fae1dd;
@@ -77,9 +83,9 @@
   --radius-xl: 20px;
 
   /* Shadows */
-  --shadow-card: 0 1px 2px rgb(43 33 48 / 0.06);
-  --shadow-lift: 0 6px 16px -4px rgb(43 33 48 / 0.18), 0 2px 4px rgb(43 33 48 / 0.08);
-  --shadow-panel: -8px 0 24px -12px rgb(43 33 48 / 0.2);
+  --shadow-card: 0 1px 2px rgb(23 39 59 / 0.06);
+  --shadow-lift: 0 6px 16px -4px rgb(23 39 59 / 0.18), 0 2px 4px rgb(23 39 59 / 0.08);
+  --shadow-panel: -8px 0 24px -12px rgb(23 39 59 / 0.2);
 
   /* Motion: quick, so nothing feels slow */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -162,8 +168,8 @@
   --fam-accent: var(--color-sage-accent);
 }
 [data-family="treatment"] {
-  --fam-fill: var(--color-sky-fill);
-  --fam-accent: var(--color-sky-accent);
+  --fam-fill: var(--color-teal-fill);
+  --fam-accent: var(--color-teal-accent);
 }
 [data-family="other"] {
   --fam-fill: var(--color-sand-fill);
@@ -172,7 +178,7 @@
 
 /* The arrow on styled native selects (selectClass). */
 .select-chevron {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23625662' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23565e6b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
   background-position: right 0.75rem center;
   background-repeat: no-repeat;
   background-size: 1rem;
@@ -183,10 +189,10 @@ body {
   color: var(--color-ink);
 }
 
-/* Native radios and checkboxes in the app's plum. */
+/* Native radios and checkboxes in the app's navy. */
 input[type="radio"],
 input[type="checkbox"] {
-  accent-color: var(--color-plum-900);
+  accent-color: var(--color-navy-900);
 }
 
 /* ---------------------------------------------------------------------------

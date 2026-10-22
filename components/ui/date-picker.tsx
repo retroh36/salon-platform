@@ -108,7 +108,7 @@ export function DatePicker({
         onClick={() => (open ? setOpen(false) : show())}
         className={buttonClass("secondary", "md", "min-w-44 justify-start")}
       >
-        <CalendarIcon className="size-4 text-plum-700" />
+        <CalendarIcon className="size-4 text-navy-700" />
         {formatLongDay(value, false).replace(/^(\w{3})\w*,/, "$1,")}
       </button>
 
@@ -124,7 +124,7 @@ export function DatePicker({
             <IconButton label="Previous month" size="sm" onClick={() => setMonth(addMonths(month, -1))}>
               <ChevronLeftIcon className="size-4" />
             </IconButton>
-            <span className="font-serif font-semibold text-plum-900" aria-live="polite">
+            <span className="font-serif font-semibold text-navy-900" aria-live="polite">
               {monthLabel(month)}
             </span>
             <IconButton label="Next month" size="sm" onClick={() => setMonth(addMonths(month, 1))}>
@@ -162,11 +162,11 @@ export function DatePicker({
                               pick(d);
                             }
                           }}
-                          className={`size-9 rounded-md transition-[background-color,color,transform] duration-(--motion-fast) active:scale-90 focus-visible:outline-2 focus-visible:outline-plum-700 ${
+                          className={`size-9 rounded-md transition-[background-color,color,transform] duration-(--motion-fast) active:scale-90 focus-visible:outline-2 focus-visible:outline-focus ${
                             selected
-                              ? "bg-plum-900 font-semibold text-white"
+                              ? "bg-navy-900 font-semibold text-white"
                               : d === today
-                                ? "font-semibold text-plum-900 ring-1 ring-plum-200 hover:bg-plum-100"
+                                ? "font-semibold text-navy-900 ring-1 ring-navy-200 hover:bg-navy-100"
                                 : inMonth
                                   ? "text-ink hover:bg-sunken"
                                   : "text-ink-subtle hover:bg-sunken"

@@ -10,7 +10,7 @@ export function SalonMark({ name, logoUrl, size = "md" }: { name: string; logoUr
     );
   }
   return (
-    <span aria-hidden data-testid="salon-initial" className={`${box} inline-flex shrink-0 items-center justify-center bg-plum-900 font-serif text-white`}>
+    <span aria-hidden data-testid="salon-initial" className={`${box} inline-flex shrink-0 items-center justify-center bg-navy-900 font-serif text-white`}>
       {salonInitial(name)}
     </span>
   );

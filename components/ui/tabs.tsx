@@ -46,8 +46,8 @@ export function Tabs<T extends string>({
               aria-controls={`${id}-panel`}
               tabIndex={selected ? 0 : -1}
               onClick={() => onChange(t.value)}
-              className={`flex h-9 flex-1 items-center justify-center gap-2 rounded-md text-sm font-medium transition-[background-color,color,box-shadow,transform] duration-(--motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-plum-700 ${
-                selected ? "bg-surface text-plum-900 shadow-card" : "text-ink-muted hover:text-ink"
+              className={`flex h-9 flex-1 items-center justify-center gap-2 rounded-md text-sm font-medium transition-[background-color,color,box-shadow,transform] duration-(--motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-focus ${
+                selected ? "bg-surface text-navy-900 shadow-card" : "text-ink-muted hover:text-ink"
               }`}
             >
               {t.icon}

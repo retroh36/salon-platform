@@ -35,18 +35,20 @@ function overWhite(hex: string, alpha: number): string {
 }
 
 const SURFACES = ["canvas", "surface", "sunken"];
-const FILLS = ["peach-fill", "lavender-fill", "sage-fill", "sky-fill", "sand-fill"];
+const FILLS = ["peach-fill", "lavender-fill", "sage-fill", "teal-fill", "sand-fill"];
 const STATUSES = ["booked", "confirmed", "checked-in", "completed", "late", "no-show"];
 
 // [text, background]: normal-size text needs 4.5:1.
 const PAIRS: [string, string][] = [
-  ...["ink", "ink-muted", "ink-subtle", "plum-900", "plum-700", "danger"].flatMap((t) => SURFACES.map((s): [string, string] => [t, s])),
+  ...["ink", "ink-muted", "ink-subtle", "navy-900", "navy-700", "link", "link-hover", "danger"].flatMap((t) => SURFACES.map((s): [string, string] => [t, s])),
   ...["ink", "ink-muted"].flatMap((t) => FILLS.map((f): [string, string] => [t, f])),
   ...STATUSES.map((s): [string, string] => [`status-${s}-ink`, `status-${s}-bg`]),
-  ["white", "plum-900"],
-  ["white", "plum-800"],
-  ["plum-700", "plum-100"],
-  ["plum-900", "plum-100"],
+  ["white", "navy-900"],
+  ["white", "navy-800"],
+  ["navy-700", "navy-100"],
+  ["navy-900", "navy-100"],
+  ["ink-muted", "navy-100"],
+  ["link", "navy-100"],
   ["white", "danger"],
   ["danger", "danger-soft"],
   ["white", "now"],
@@ -79,9 +81,30 @@ describe("design tokens", () => {
   });
 
   it("gives family accents and the current-time line 3:1 against the page (non-text)", () => {
-    for (const accent of ["peach-accent", "lavender-accent", "sage-accent", "sky-accent", "now", "denise-500"]) {
+    for (const accent of ["peach-accent", "lavender-accent", "sage-accent", "teal-accent", "now", "denise-500"]) {
       expect(contrast(color(accent), color("surface"))).toBeGreaterThanOrEqual(3);
     }
+  });
+
+  it("shows focus rings at 3:1 against every surface (non-text)", () => {
+    for (const s of [...SURFACES, "navy-100"]) expect(contrast(color("focus"), color(s))).toBeGreaterThanOrEqual(3);
+  });
+
+  it("keeps Denise's periwinkle clearly apart from the navy", () => {
+    // Her accent against the navy, and a different hue from the link blue.
+    expect(contrast(color("denise-500"), color("navy-900"))).toBeGreaterThanOrEqual(3);
+    const hue = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+      const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+      const h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return h * 60;
+    };
+    expect(Math.abs(hue(color("denise-500")) - hue(color("link")))).toBeGreaterThan(15);
+  });
+
+  it("no longer has the old plum", () => {
+    expect(css).not.toMatch(/plum/i);
+    expect(css).not.toMatch(/#(3d1f42|552c5b|5a2d61|e4d3e7|f1e7f2)/i);
   });
 
   it("calculates contrast like WCAG", () => {

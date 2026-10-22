@@ -3,7 +3,7 @@ export const fieldClass = [
   "w-full rounded-md border border-line-strong bg-surface px-3 py-2 text-sm text-ink",
   "transition-[border-color,box-shadow] duration-(--motion-fast)",
   "placeholder:text-ink-subtle hover:border-ink-subtle",
-  "focus:border-plum-700 focus:ring-2 focus:ring-plum-200 focus:outline-none",
+  "focus:border-focus focus:ring-2 focus:ring-focus/25 focus:outline-none",
   "disabled:bg-sunken disabled:text-ink-muted aria-invalid:border-danger",
 ].join(" ");
 
@@ -19,4 +19,4 @@ export function Eyebrow({ children, className = "" }: { children: React.ReactNod
 export const selectClass = `${fieldClass} select-chevron appearance-none pr-9`;
 
 export const checkboxClass =
-  "size-4 shrink-0 cursor-pointer rounded border-line-strong accent-plum-900 transition-transform duration-(--motion-fast) active:scale-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-plum-700";
+  "size-4 shrink-0 cursor-pointer rounded border-line-strong accent-navy-900 transition-transform duration-(--motion-fast) active:scale-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";

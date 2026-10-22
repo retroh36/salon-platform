@@ -96,7 +96,7 @@ export function BlockPanel({
   const header = (
     <div className="flex items-start justify-between gap-3">
       <div>
-        <h2 className="font-serif text-2xl font-semibold text-plum-900">{block ? BLOCK_LABELS[block.kind] : "Block time"}</h2>
+        <h2 className="font-serif text-2xl font-semibold text-navy-900">{block ? BLOCK_LABELS[block.kind] : "Block time"}</h2>
         <p className="text-ink-muted">{formatLongDay(date)}</p>
       </div>
     </div>
@@ -227,7 +227,7 @@ export function BlockPanel({
                       checked={weekdays.includes(d)}
                       onChange={(e) => setWeekdays(e.target.checked ? [...weekdays, d] : weekdays.filter((w) => w !== d))}
                     />
-                    <span className="inline-flex h-9 min-w-11 items-center justify-center rounded-full border border-line-strong px-3 text-sm peer-checked:border-plum-900 peer-checked:bg-plum-900 peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:outline-plum-700">
+                    <span className="inline-flex h-9 min-w-11 items-center justify-center rounded-full border border-line-strong px-3 text-sm peer-checked:border-navy-900 peer-checked:bg-navy-900 peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:outline-focus">
                       {label}
                     </span>
                   </label>

@@ -16,7 +16,7 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="font-serif text-4xl font-semibold tracking-tight text-plum-900">{title}</h1>
+        <h1 className="font-serif text-4xl font-semibold tracking-tight text-navy-900">{title}</h1>
         {description && <div className="mt-1 text-ink-muted">{description}</div>}
         {children}
       </div>
@@ -65,11 +65,11 @@ export function Card({
   );
 }
 
-export type Tone = "neutral" | "plum" | "green" | "blue" | "amber" | "red";
+export type Tone = "neutral" | "navy" | "green" | "blue" | "amber" | "red";
 
 const TONES: Record<Tone, string> = {
   neutral: "bg-status-booked-bg text-status-booked-ink",
-  plum: "bg-status-completed-bg text-status-completed-ink",
+  navy: "bg-status-completed-bg text-status-completed-ink",
   green: "bg-status-confirmed-bg text-status-confirmed-ink",
   blue: "bg-status-checked-in-bg text-status-checked-in-ink",
   amber: "bg-status-late-bg text-status-late-ink",
@@ -83,7 +83,7 @@ export function Badge({ tone = "neutral", className = "", children }: { tone?: T
 const ALERTS = {
   error: "border-danger/30 bg-danger-soft text-danger",
   success: "border-status-confirmed-ink/25 bg-status-confirmed-bg text-status-confirmed-ink",
-  info: "border-plum-200 bg-plum-100 text-plum-900",
+  info: "border-navy-200 bg-navy-100 text-navy-900",
 };
 
 // A message box. Errors are announced (role="alert"); others are polite.
@@ -107,7 +107,7 @@ export const rowLinkClass =
 
 // A pill link for picking one of several (e.g. a team member).
 export function pillClass(selected: boolean) {
-  return `inline-flex h-8 items-center rounded-full border px-3.5 text-sm font-medium transition-[background-color,color,border-color,transform] duration-(--motion-fast) active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-plum-700 ${
-    selected ? "border-plum-900 bg-plum-900 text-white" : "border-line-strong bg-surface text-ink hover:bg-sunken"
+  return `inline-flex h-8 items-center rounded-full border px-3.5 text-sm font-medium transition-[background-color,color,border-color,transform] duration-(--motion-fast) active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+    selected ? "border-navy-900 bg-navy-900 text-white" : "border-line-strong bg-surface text-ink hover:bg-sunken"
   }`;
 }

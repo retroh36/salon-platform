@@ -77,7 +77,7 @@ export function InventoryFilters({ filter, brands }: { filter: InventoryFilter; 
         type="button"
         aria-pressed={filter.low}
         onClick={() => go({ low: !filter.low })}
-        className={`inline-flex h-9 items-center rounded-full border px-3.5 text-sm font-medium transition-[background-color,color,border-color] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-plum-700 ${
+        className={`inline-flex h-9 items-center rounded-full border px-3.5 text-sm font-medium transition-[background-color,color,border-color] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
           filter.low ? "border-status-late-ink bg-status-late-bg text-status-late-ink" : "border-line-strong bg-surface text-ink hover:bg-sunken"
         }`}
       >
@@ -85,7 +85,7 @@ export function InventoryFilters({ filter, brands }: { filter: InventoryFilter; 
       </button>
       {pending && (
         <span className="flex animate-fade-in items-center gap-2 text-sm text-ink-muted" aria-live="polite">
-          <span aria-hidden className="size-3.5 animate-spin rounded-full border-2 border-plum-200 border-t-plum-900" />
+          <span aria-hidden className="size-3.5 animate-spin rounded-full border-2 border-navy-200 border-t-navy-900" />
           Updating…
         </span>
       )}

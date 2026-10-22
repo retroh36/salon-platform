@@ -161,7 +161,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
             <Link key={s.id} href={link({ staff: s.id })} aria-current={s.id === target.id ? "page" : undefined} className={`${pillClass(s.id === target.id)} gap-2 pl-1`}>
               <span
                 aria-hidden
-                className={`inline-flex size-6 items-center justify-center rounded-full text-[10px] font-semibold ${s.id === target.id ? "bg-white/20 text-white" : "bg-plum-100 text-plum-900"}`}
+                className={`inline-flex size-6 items-center justify-center rounded-full text-[10px] font-semibold ${s.id === target.id ? "bg-white/20 text-white" : "bg-navy-100 text-navy-900"}`}
               >
                 {initials(fullName(s))}
               </span>
@@ -207,11 +207,11 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
             <li
               key={day.date}
               aria-label={formatDay(day.date)}
-              className={`${rowClass} flex flex-wrap gap-x-4 gap-y-1 ${day.date === today ? "bg-plum-100/60" : "hover:bg-sunken/60"}`}
+              className={`${rowClass} flex flex-wrap gap-x-4 gap-y-1 ${day.date === today ? "bg-navy-100/60" : "hover:bg-sunken/60"}`}
             >
               <span className="w-28 text-sm font-semibold">
                 {formatDay(day.date)}
-                {day.date === today && <span className="block text-xs font-medium text-plum-700">Today</span>}
+                {day.date === today && <span className="block text-xs font-medium text-navy-700">Today</span>}
               </span>
               <div className="flex flex-1 flex-col gap-1 text-sm">
                 <span className="flex flex-wrap items-center gap-2">

@@ -58,7 +58,7 @@ export function AppFrame({
         <div className="flex items-center gap-3 px-5 pt-6 pb-5">
           <SalonMark name={businessName} logoUrl={logoUrl} />
           <div className="min-w-0">
-            <div className="font-serif text-lg leading-tight font-semibold text-plum-900">{businessName}</div>
+            <div className="font-serif text-lg leading-tight font-semibold text-navy-900">{businessName}</div>
             <div className="mt-0.5 text-sm leading-tight text-ink-muted">{locationName}</div>
           </div>
         </div>
@@ -70,8 +70,8 @@ export function AppFrame({
                 key={href}
                 href={href}
                 aria-current={current ? "page" : undefined}
-                className={`flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-[background-color,color,transform] duration-(--motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-plum-700 ${
-                  current ? "bg-plum-100 text-plum-900" : "text-ink-muted hover:bg-surface hover:text-ink"
+                className={`flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-[background-color,color,transform] duration-(--motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-focus ${
+                  current ? "bg-navy-100 text-navy-900" : "text-ink-muted hover:bg-surface hover:text-ink"
                 }`}
               >
                 <Icon className="size-5" />
@@ -100,7 +100,7 @@ export function AppFrame({
           {/* Compact header for screens without the sidebar. */}
           <div className="flex items-center gap-2 lg:hidden">
             <SalonMark name={businessName} logoUrl={logoUrl} />
-            <span className="font-serif font-semibold text-plum-900">{businessName}</span>
+            <span className="font-serif font-semibold text-navy-900">{businessName}</span>
           </div>
           <form action="/clients" role="search" className="relative ml-auto w-full max-w-xl min-w-0 lg:ml-0">
             <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-muted" />
@@ -109,7 +109,7 @@ export function AppFrame({
               name="q"
               aria-label="Search clients"
               placeholder="Search clients by name or phone"
-              className="h-10 w-full rounded-md border border-line bg-surface pr-3 pl-9 text-sm placeholder:text-ink-subtle focus:border-plum-700 focus:ring-2 focus:ring-plum-200 focus:outline-none"
+              className="h-10 w-full rounded-md border border-line bg-surface pr-3 pl-9 text-sm placeholder:text-ink-subtle focus:border-focus focus:ring-2 focus:ring-focus/25 focus:outline-none"
             />
           </form>
           <form action={logout} className="lg:hidden">
@@ -124,7 +124,7 @@ export function AppFrame({
               key={href}
               href={href}
               aria-current={s === section ? "page" : undefined}
-              className={`rounded-md px-3 py-1.5 text-sm whitespace-nowrap ${s === section ? "bg-plum-100 font-medium text-plum-900" : "text-ink-muted"}`}
+              className={`rounded-md px-3 py-1.5 text-sm whitespace-nowrap ${s === section ? "bg-navy-100 font-medium text-navy-900" : "text-ink-muted"}`}
             >
               {label}
             </Link>

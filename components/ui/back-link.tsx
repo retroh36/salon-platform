@@ -6,7 +6,7 @@ export function BackLink({ href, children }: { href: string; children: React.Rea
   return (
     <Link
       href={href}
-      className="mb-3 inline-flex items-center gap-1 rounded-md text-sm font-medium text-ink-muted transition-colors duration-(--motion-fast) hover:text-plum-900 focus-visible:outline-2 focus-visible:outline-plum-700"
+      className="mb-3 inline-flex items-center gap-1 rounded-md text-sm font-medium text-ink-muted transition-colors duration-(--motion-fast) hover:text-navy-900 focus-visible:outline-2 focus-visible:outline-focus"
     >
       <ChevronLeftIcon className="size-4" />
       {children}

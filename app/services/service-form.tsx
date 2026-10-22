@@ -111,7 +111,7 @@ export function ServiceForm({
               return (
                 <li
                   key={s.id}
-                  className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 transition-colors duration-(--motion-fast) ${checked ? "bg-plum-100/40" : ""}`}
+                  className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 transition-colors duration-(--motion-fast) ${checked ? "bg-navy-100/40" : ""}`}
                 >
                   <label className="flex min-w-56 flex-1 cursor-pointer items-center gap-3">
                     {/* Uncontrolled like the other fields: React resets the form

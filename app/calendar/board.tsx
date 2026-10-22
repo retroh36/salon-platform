@@ -388,7 +388,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
       <div className="flex min-w-0 flex-1 flex-col gap-4 px-4 pt-6 pb-4 sm:px-6 lg:min-h-0">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="font-serif text-4xl font-semibold tracking-tight text-plum-900">Appointments</h1>
+            <h1 className="font-serif text-4xl font-semibold tracking-tight text-navy-900">Appointments</h1>
             <ViewTransition key={data.date} enter={DAY_SLIDE} exit="none" default="none">
               <p className="mt-1 text-lg text-ink-muted" data-testid="calendar-date">
                 {formatLongDay(data.date)}
@@ -515,7 +515,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         aria-label={`Show ${c.name} (${c.hoursLabel.toLowerCase()})`}
                         title={`${c.name} · ${c.hoursLabel}`}
                         onClick={() => toggle(c.staffId, true)}
-                        className="flex flex-col items-center justify-center gap-1 border-l border-line bg-sunken/60 py-3 text-xs font-semibold text-ink-muted transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-plum-700"
+                        className="flex flex-col items-center justify-center gap-1 border-l border-line bg-sunken/60 py-3 text-xs font-semibold text-ink-muted transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
                       >
                         {initials(c.name)}
                         <ChevronRightIcon className="size-3.5" />
@@ -577,7 +577,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         data-staff-id={c.staffId}
                         onClick={(e) => onSlotClick(e, c)}
                         className={`relative min-w-0 border-l border-line transition-colors duration-(--motion-fast) ${me.canBook ? "cursor-cell" : ""} ${
-                          drag?.moved && drag.staffId === c.staffId ? "bg-plum-100/40" : ""
+                          drag?.moved && drag.staffId === c.staffId ? "bg-navy-100/40" : ""
                         }`}
                         style={{
                           height,
@@ -695,7 +695,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
         }`}
       >
         <div className="flex items-center gap-2">
-          <span className="font-serif text-lg font-semibold text-plum-900">{tab === "denise" ? "Denise" : "Booking details"}</span>
+          <span className="font-serif text-lg font-semibold text-navy-900">{tab === "denise" ? "Denise" : "Booking details"}</span>
           <IconButton label="Close panel" className="ml-auto" onClick={() => setPanelOpen(false)}>
             <CloseIcon />
           </IconButton>
@@ -943,7 +943,7 @@ function ScopeDialog({
         onKeyDown={(e) => e.key === "Escape" && onCancel()}
         className="flex w-full max-w-sm animate-pop-in flex-col gap-3 rounded-xl border border-line bg-surface p-5 shadow-lift"
       >
-        <h2 className="font-serif text-xl font-semibold text-plum-900">{title}</h2>
+        <h2 className="font-serif text-xl font-semibold text-navy-900">{title}</h2>
         <p className="text-sm text-ink-muted">{note}</p>
         {options.map(([value, label], i) => (
           <Button key={value} variant={i === 0 ? "primary" : "secondary"} autoFocus={i === 0} onClick={() => onPick(value)}>
@@ -967,7 +967,7 @@ function DeniseLauncher({ count, bounce, onOpen }: { count: number; bounce: bool
       onClick={onOpen}
       aria-label={count ? `Open Denise (${count} to look at)` : "Open Denise"}
       data-testid="denise-launcher"
-      className="fixed right-5 bottom-5 z-40 flex size-14 animate-pop-in items-center justify-center rounded-full bg-surface shadow-lift ring-1 ring-denise-200 transition-transform duration-(--motion-fast) hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-plum-700 active:scale-95"
+      className="fixed right-5 bottom-5 z-40 flex size-14 animate-pop-in items-center justify-center rounded-full bg-surface shadow-lift ring-1 ring-denise-200 transition-transform duration-(--motion-fast) hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:scale-95"
     >
       <DeniseFace size={48} />
       {count > 0 && (
@@ -1160,9 +1160,9 @@ function TimeBlockBox({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      className={`absolute inset-x-1 z-[5] touch-none overflow-hidden rounded-md border border-dashed border-line-strong px-2 py-1 text-xs text-ink-muted select-none transition-[box-shadow] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-plum-700 ${
+      className={`absolute inset-x-1 z-[5] touch-none overflow-hidden rounded-md border border-dashed border-line-strong px-2 py-1 text-xs text-ink-muted select-none transition-[box-shadow] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-focus ${
         editable ? "cursor-grab" : "cursor-pointer"
-      } ${selected ? "ring-2 ring-plum-900" : ""} ${dragging ? "z-40 shadow-lift" : ""}`}
+      } ${selected ? "ring-2 ring-navy-900" : ""} ${dragging ? "z-40 shadow-lift" : ""}`}
       style={{
         top: y(block.start),
         height,
@@ -1342,9 +1342,9 @@ function AppointmentBlock({
         }}
         onAnimationEnd={settling ? onSettled : undefined}
         {...pointer}
-        className={`absolute block touch-none overflow-hidden rounded-md border-l-4 bg-surface text-left select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-plum-700 ${
+        className={`absolute block touch-none overflow-hidden rounded-md border-l-4 bg-surface text-left select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus ${
           faded ? "text-ink-muted" : "text-ink shadow-card"
-        } ${selected ? "ring-2 ring-plum-900" : highlight ? "animate-glow ring-2 ring-denise-500" : grouped ? "ring-2 ring-plum-700/60" : "ring-1 ring-surface"} ${draggable ? "cursor-grab" : "cursor-pointer"} ${
+        } ${selected ? "ring-2 ring-navy-900" : highlight ? "animate-glow ring-2 ring-denise-500" : grouped ? "ring-2 ring-navy-700/50" : "ring-1 ring-surface"} ${draggable ? "cursor-grab" : "cursor-pointer"} ${
           dragging ? "opacity-40 shadow-none outline-2 outline-ink-subtle outline-dashed" : ""
         } ${settling ? "animate-settle" : ""}`}
         style={{

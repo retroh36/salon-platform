@@ -81,7 +81,7 @@ export function AppointmentPanel({
   return (
     <div className="flex flex-col gap-5 py-2 text-sm">
       <div className="flex items-center justify-between">
-        <h2 className="font-serif text-2xl font-semibold text-plum-900">Booking details</h2>
+        <h2 className="font-serif text-2xl font-semibold text-navy-900">Booking details</h2>
         <IconButton label="Close booking details" onClick={onClose}>
           <CloseIcon />
         </IconButton>
@@ -107,8 +107,8 @@ export function AppointmentPanel({
       </div>
 
       {appointment.group && (
-        <div className="rounded-lg border border-plum-200 bg-plum-100/40 px-2.5 py-2" data-testid="group-info">
-          <p className="font-semibold text-plum-900">
+        <div className="rounded-lg border border-navy-200 bg-navy-100/40 px-2.5 py-2" data-testid="group-info">
+          <p className="font-semibold text-navy-900">
             {appointment.group.label} · {appointment.group.members.length} guest{appointment.group.members.length === 1 ? "" : "s"}
           </p>
           <ul className="mt-1 flex flex-col gap-0.5" aria-label="Guests in this group">
@@ -119,7 +119,7 @@ export function AppointmentPanel({
                     {m.clientName} · {m.staffName} · {formatMinute(m.start)} (this visit)
                   </span>
                 ) : (
-                  <button type="button" className="text-left text-plum-900 underline-offset-2 hover:underline" onClick={() => onOpenVisit(m.appointmentId)}>
+                  <button type="button" className="text-left text-link underline-offset-2 hover:underline" onClick={() => onOpenVisit(m.appointmentId)}>
                     {m.clientName} · {m.staffName} · {formatMinute(m.start)}
                   </button>
                 )}
@@ -266,7 +266,7 @@ export function AppointmentPanel({
       )}
 
       {client && (
-        <Link href={`/clients/${client.id}`} className="self-center font-medium text-plum-900 underline underline-offset-2 hover:text-plum-700">
+        <Link href={`/clients/${client.id}`} className="self-center font-medium text-link underline underline-offset-2 hover:text-link-hover">
           View client profile
         </Link>
       )}
@@ -460,7 +460,7 @@ function RunningLateForm({
           {LATE_MINUTES.map((m) => (
             <label key={m} className="cursor-pointer">
               <input type="radio" name="late-minutes" value={m} checked={minutes === m} onChange={() => setMinutes(m)} className="peer sr-only" />
-              <span className="inline-flex h-8 items-center rounded-full border border-line-strong bg-surface px-3 text-sm transition-colors duration-(--motion-fast) peer-checked:border-plum-900 peer-checked:bg-plum-900 peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-plum-700 hover:bg-sunken peer-checked:hover:bg-plum-800">
+              <span className="inline-flex h-8 items-center rounded-full border border-line-strong bg-surface px-3 text-sm transition-colors duration-(--motion-fast) peer-checked:border-navy-900 peer-checked:bg-navy-900 peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-focus hover:bg-sunken peer-checked:hover:bg-navy-800">
                 {m} min
               </span>
             </label>

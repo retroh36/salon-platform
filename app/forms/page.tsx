@@ -61,7 +61,7 @@ async function Forms() {
                     </span>
                   </span>
                   <span className="flex gap-2">
-                    <Badge tone={t.required === "none" ? "neutral" : "plum"}>{REQUIRED_LABELS[t.required]}</Badge>
+                    <Badge tone={t.required === "none" ? "neutral" : "navy"}>{REQUIRED_LABELS[t.required]}</Badge>
                     {!t.isActive && <Badge>Off</Badge>}
                   </span>
                 </Link>

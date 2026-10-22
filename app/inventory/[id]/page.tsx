@@ -28,8 +28,8 @@ import { AdjustForm, SellForm, SettingsForm } from "./stock-actions";
 
 export const metadata: Metadata = { title: "Product" };
 
-const REASON_TONES: Record<StockReason, "neutral" | "plum" | "green" | "blue" | "amber"> = {
-  service_use: "plum",
+const REASON_TONES: Record<StockReason, "neutral" | "navy" | "green" | "blue" | "amber"> = {
+  service_use: "navy",
   sale: "blue",
   count: "neutral",
   order_received: "green",
@@ -86,7 +86,7 @@ async function Product({ params }: Pick<PageProps<"/inventory/[id]">, "params">)
         title={productName(product)}
         description={
           <span className="flex flex-wrap items-center gap-2">
-            <Badge tone={product.type === "retail" ? "blue" : "plum"}>{TYPE_LABELS[product.type]}</Badge>
+            <Badge tone={product.type === "retail" ? "blue" : "navy"}>{TYPE_LABELS[product.type]}</Badge>
             {!product.is_active && <Badge>Not in use</Badge>}
             {low && <Badge tone="amber">Low stock</Badge>}
             <span>{[product.sku, product.supplier?.name, product.shelf].filter(Boolean).join(" · ")}</span>
@@ -105,7 +105,7 @@ async function Product({ params }: Pick<PageProps<"/inventory/[id]">, "params">)
         <dl className="grid gap-4 sm:grid-cols-4">
           <div>
             <dt className="text-sm text-ink-muted">On hand</dt>
-            <dd className={`font-serif text-3xl font-semibold ${onHand < 0 ? "text-danger" : "text-plum-900"}`} data-testid="on-hand">
+            <dd className={`font-serif text-3xl font-semibold ${onHand < 0 ? "text-danger" : "text-navy-900"}`} data-testid="on-hand">
               {stock.main}
             </dd>
             {stock.containers && <dd className="text-sm text-ink-muted">{stock.containers}</dd>}

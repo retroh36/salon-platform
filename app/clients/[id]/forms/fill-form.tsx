@@ -38,7 +38,7 @@ export function FillForm({
   if (done) {
     return (
       <div className="flex animate-fade-in flex-col items-center gap-4 rounded-2xl border border-line bg-surface p-10 text-center shadow-card">
-        <p className="font-serif text-3xl font-semibold text-plum-900">Thank you, {clientName.split(" ")[0]}!</p>
+        <p className="font-serif text-3xl font-semibold text-navy-900">Thank you, {clientName.split(" ")[0]}!</p>
         <p className="text-lg text-ink-muted">Please hand the iPad back to the front desk.</p>
         <Button variant="primary" size="lg" onClick={() => router.push(back)}>
           Done
@@ -85,7 +85,7 @@ export function FillForm({
                 {(["yes", "no"] as const).map((v) => (
                   <label
                     key={v}
-                    className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-2 py-3 font-semibold transition-colors duration-(--motion-fast) ${answers[f.id] === v ? "border-plum-900 bg-plum-100 text-plum-900" : "border-line text-ink"}`}
+                    className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-2 py-3 font-semibold transition-colors duration-(--motion-fast) ${answers[f.id] === v ? "border-navy-900 bg-navy-100 text-navy-900" : "border-line text-ink"}`}
                   >
                     <input type="radio" name={f.id} value={v} className="sr-only" checked={answers[f.id] === v} onChange={() => set(f.id, v)} />
                     {v === "yes" ? "Yes" : "No"}

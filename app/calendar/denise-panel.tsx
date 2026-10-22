@@ -196,7 +196,7 @@ export function DenisePanel({
         <section aria-label="Conversation with Denise" className="flex flex-col gap-3">
           {chat.map((m, i) =>
             m.role === "user" ? (
-              <p key={i} className="max-w-[85%] animate-fade-in self-end rounded-xl rounded-br-sm bg-plum-900 px-3 py-2 text-white">
+              <p key={i} className="max-w-[85%] animate-fade-in self-end rounded-xl rounded-br-sm bg-navy-900 px-3 py-2 text-white">
                 {m.text}
               </p>
             ) : (
@@ -304,7 +304,7 @@ function ConflictCard({
             type="button"
             aria-expanded={open}
             onClick={() => setOpen(!open)}
-            className="flex items-center gap-1 self-start text-xs font-semibold tracking-wider text-denise-700 uppercase hover:text-denise-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-plum-700"
+            className="flex items-center gap-1 self-start text-xs font-semibold tracking-wider text-denise-700 uppercase hover:text-denise-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
             Other options ({others.length})
             <ChevronDownIcon className={`size-3.5 transition-transform duration-(--motion-fast) ${open ? "rotate-180" : ""}`} />

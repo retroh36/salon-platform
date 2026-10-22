@@ -25,8 +25,8 @@ export function Segmented<T extends string>({
             disabled={o.disabled}
             title={o.title}
             onClick={() => onChange(o.value)}
-            className={`h-8 min-w-16 rounded-[7px] px-3 text-sm font-medium transition-[background-color,color,transform] duration-(--motion-fast) active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-plum-700 disabled:cursor-not-allowed disabled:text-ink-subtle ${
-              selected ? "bg-plum-900 text-white" : "text-ink-muted hover:text-ink"
+            className={`h-8 min-w-16 rounded-[7px] px-3 text-sm font-medium transition-[background-color,color,transform] duration-(--motion-fast) active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus disabled:cursor-not-allowed disabled:text-ink-subtle ${
+              selected ? "bg-navy-900 text-white" : "text-ink-muted hover:text-ink"
             }`}
           >
             {o.label}

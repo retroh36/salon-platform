@@ -51,7 +51,7 @@ export function ClientSearch({ initialQuery }: { initialQuery: string }) {
       />
       {pending && (
         <span className="absolute top-1/2 right-4 flex -translate-y-1/2 animate-fade-in items-center gap-2 text-sm text-ink-muted" aria-live="polite">
-          <span aria-hidden className="size-3.5 animate-spin rounded-full border-2 border-plum-200 border-t-plum-900" />
+          <span aria-hidden className="size-3.5 animate-spin rounded-full border-2 border-navy-200 border-t-navy-900" />
           Searching…
         </span>
       )}

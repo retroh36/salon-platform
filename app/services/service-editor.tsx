@@ -94,14 +94,14 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
     <AppShell section="services" me={me}>
       <Link
         href="/services"
-        className="inline-flex items-center gap-1 text-sm font-medium text-ink-muted transition-colors duration-(--motion-fast) hover:text-plum-900"
+        className="inline-flex items-center gap-1 text-sm font-medium text-ink-muted transition-colors duration-(--motion-fast) hover:text-navy-900"
       >
         ← Services
       </Link>
       <div className="mt-3 mb-6 flex flex-wrap items-center gap-3">
-        <h1 className="font-serif text-4xl font-semibold tracking-tight text-plum-900">{title}</h1>
+        <h1 className="font-serif text-4xl font-semibold tracking-tight text-navy-900">{title}</h1>
         {archived && <Badge tone="neutral">Archived</Badge>}
-        {!manage && <Badge tone="plum">View only</Badge>}
+        {!manage && <Badge tone="navy">View only</Badge>}
       </div>
 
       {error === "name-taken" && (

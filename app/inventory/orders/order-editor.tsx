@@ -130,7 +130,7 @@ export function OrderEditor({
           <button
             type="button"
             onClick={() => setLines([...lines, { productId: "", quantity: "1", cost: "" }])}
-            className="inline-flex items-center gap-1.5 self-start rounded-md text-sm font-medium text-plum-900 hover:text-plum-700 disabled:text-ink-subtle"
+            className="inline-flex items-center gap-1.5 self-start rounded-md text-sm font-medium text-navy-900 hover:text-navy-700 disabled:text-ink-subtle"
           >
             <PlusIcon className="size-4" />
             Add a product

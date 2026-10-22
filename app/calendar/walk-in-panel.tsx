@@ -51,7 +51,7 @@ export function WalkInPanel({ data, onClose, onBooked }: { data: BoardData; onCl
     <div className="flex flex-col gap-4 py-2 text-sm">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h2 className="font-serif text-2xl font-semibold text-plum-900">Walk-ins</h2>
+          <h2 className="font-serif text-2xl font-semibold text-navy-900">Walk-ins</h2>
           <p className="text-ink-muted">Today{data.date !== data.today ? " (bookings go on today's calendar)" : ""}</p>
         </div>
         <Button size="sm" variant="ghost" onClick={onClose}>

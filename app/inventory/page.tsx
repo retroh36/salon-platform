@@ -113,7 +113,7 @@ async function Inventory({ searchParams }: Pick<PageProps<"/inventory">, "search
                       <span className="min-w-0 flex-1 basis-full md:basis-0">
                         <span className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold text-ink">{productName(p)}</span>
-                          <Badge tone={p.type === "retail" ? "blue" : "plum"}>{TYPE_LABELS[p.type]}</Badge>
+                          <Badge tone={p.type === "retail" ? "blue" : "navy"}>{TYPE_LABELS[p.type]}</Badge>
                           {lowStock && <Badge tone="amber">Low stock</Badge>}
                         </span>
                         <span className="block text-sm text-ink-muted">

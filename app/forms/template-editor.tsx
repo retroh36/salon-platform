@@ -59,7 +59,7 @@ export function TemplateEditor({ initial, services, readOnly }: { initial: Templ
         </section>
 
         <section aria-label="Questions" className="flex flex-col gap-3">
-          <h2 className="font-serif text-xl font-semibold text-plum-900">Questions</h2>
+          <h2 className="font-serif text-xl font-semibold text-navy-900">Questions</h2>
           {fields.map((f, i) => (
             <div key={f.key} role="group" aria-label={`Question ${i + 1}`} className="flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface p-4 shadow-card">
               <label className="flex min-w-60 flex-1 flex-col gap-1.5 text-sm font-medium text-ink">

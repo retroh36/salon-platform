@@ -118,12 +118,12 @@ export function Listbox<T extends string>({
                 onPointerMove={() => setActive(i)}
                 className={`flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm whitespace-nowrap transition-colors duration-(--motion-fast) ${
                   i === active ? "bg-sunken" : ""
-                } ${selected ? "font-semibold text-plum-900" : "text-ink"}`}
+                } ${selected ? "font-semibold text-navy-900" : "text-ink"}`}
               >
                 {o.icon}
                 <span className="flex-1">{o.label}</span>
                 {selected && (
-                  <svg aria-hidden viewBox="0 0 24 24" className="size-4 text-plum-700" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <svg aria-hidden viewBox="0 0 24 24" className="size-4 text-navy-700" fill="none" stroke="currentColor" strokeWidth={2}>
                     <path d="m5 12.5 4.5 4.5L19 7.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 )}

@@ -191,17 +191,17 @@ export function BookingPanel({
       <form onSubmit={submit} className="flex flex-col gap-5 py-2 text-sm" aria-label={appointment ? "Edit booking" : "New booking"}>
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h2 className="font-serif text-2xl font-semibold text-plum-900">{appointment ? "Edit booking" : "New booking"}</h2>
+            <h2 className="font-serif text-2xl font-semibold text-navy-900">{appointment ? "Edit booking" : "New booking"}</h2>
             <p className="text-ink-muted">{formatLongDay(data.date)}</p>
             {!appointment && (onBlockInstead || onGroupInstead) && (
               <p className="mt-1 flex flex-wrap gap-x-4">
                 {onGroupInstead && (
-                  <button type="button" onClick={onGroupInstead} className="text-sm font-medium text-plum-900 underline underline-offset-2 hover:text-plum-700">
+                  <button type="button" onClick={onGroupInstead} className="text-sm font-medium text-link underline underline-offset-2 hover:text-link-hover">
                     Book a group instead
                   </button>
                 )}
                 {onBlockInstead && (
-                  <button type="button" onClick={onBlockInstead} className="text-sm font-medium text-plum-900 underline underline-offset-2 hover:text-plum-700">
+                  <button type="button" onClick={onBlockInstead} className="text-sm font-medium text-link underline underline-offset-2 hover:text-link-hover">
                     Block this time instead
                   </button>
                 )}
@@ -317,7 +317,7 @@ export function BookingPanel({
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} maxLength={MAX_NOTES} className={fieldClass} />
         </label>
 
-        <div className="flex items-center justify-between rounded-lg bg-plum-100 px-3 py-2.5 font-semibold text-plum-900" aria-live="polite" data-testid="visit-total">
+        <div className="flex items-center justify-between rounded-lg bg-navy-100 px-3 py-2.5 font-semibold text-navy-900" aria-live="polite" data-testid="visit-total">
           {summary ? (
             <>
               <span>
@@ -479,7 +479,7 @@ export function ClientPicker({ client, onChange }: { client: ClientOption | null
             <div className="truncate font-semibold">{client.name}</div>
             {client.phone && <div className="text-ink-muted">{client.phone}</div>}
           </div>
-          <button type="button" className="shrink-0 font-medium text-plum-900 underline underline-offset-2 hover:text-plum-700" onClick={() => onChange(null)}>
+          <button type="button" className="shrink-0 font-medium text-link underline underline-offset-2 hover:text-link-hover" onClick={() => onChange(null)}>
             Change client
           </button>
         </div>
@@ -567,7 +567,7 @@ export function ClientPicker({ client, onChange }: { client: ClientOption | null
           {results.length === 0 && <li className="px-3 py-2 text-ink-muted">No clients match.</li>}
           {results.map((c) => (
             <li key={c.id}>
-              <button type="button" className="flex w-full justify-between gap-3 px-3 py-2 text-left transition-colors duration-(--motion-fast) hover:bg-sunken active:bg-plum-100" onClick={() => onChange(c)}>
+              <button type="button" className="flex w-full justify-between gap-3 px-3 py-2 text-left transition-colors duration-(--motion-fast) hover:bg-sunken active:bg-navy-100" onClick={() => onChange(c)}>
                 <span className="font-semibold">{c.name}</span>
                 <span className="text-ink-muted">{c.phone}</span>
               </button>
@@ -577,7 +577,7 @@ export function ClientPicker({ client, onChange }: { client: ClientOption | null
       )}
       <button
         type="button"
-        className="self-start font-medium text-plum-900 underline underline-offset-2 hover:text-plum-700"
+        className="self-start font-medium text-link underline underline-offset-2 hover:text-link-hover"
         onClick={() => {
           // Start the form from what was searched for: a phone number or a name.
           const isPhone = parseClientSearch(query).kind === "phone";

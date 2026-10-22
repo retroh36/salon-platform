@@ -33,7 +33,7 @@ async function OpeningHours() {
 
   return (
     <AppShell section="schedule" me={me}>
-      <Link href="/schedule" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-ink-muted transition-colors duration-(--motion-fast) hover:text-plum-900">
+      <Link href="/schedule" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-ink-muted transition-colors duration-(--motion-fast) hover:text-navy-900">
         <ChevronLeftIcon className="size-4" />
         Schedule
       </Link>

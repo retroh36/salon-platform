@@ -9,7 +9,7 @@ export function Avatar({ name, color, size = "md" }: { name: string; color?: str
   return (
     <span
       aria-hidden
-      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-plum-100 font-semibold text-plum-900 ring-2 ring-surface ${sizes[size]}`}
+      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-navy-100 font-semibold text-navy-900 ring-2 ring-surface ${sizes[size]}`}
       style={color ? { backgroundColor: `color-mix(in srgb, ${color} 18%, white)`, boxShadow: `inset 0 0 0 1.5px color-mix(in srgb, ${color} 45%, white)` } : undefined}
     >
       {initials(name)}

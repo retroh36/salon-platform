@@ -44,7 +44,7 @@ export function CountMode({ stocktakeId, products, initial }: { stocktakeId: str
           ].map(([label, value]) => (
             <div key={label} className="rounded-xl border border-line bg-surface p-4 shadow-card">
               <p className="text-sm text-ink-muted">{label}</p>
-              <p className="font-serif text-2xl font-semibold text-plum-900">{value}</p>
+              <p className="font-serif text-2xl font-semibold text-navy-900">{value}</p>
             </div>
           ))}
         </div>
@@ -118,8 +118,8 @@ export function CountMode({ stocktakeId, products, initial }: { stocktakeId: str
             type="button"
             aria-current={s === shelf ? "true" : undefined}
             onClick={() => setShelf(s)}
-            className={`flex h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-[background-color,color] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-plum-700 ${
-              s === shelf ? "border-plum-900 bg-plum-900 text-white" : "border-line-strong bg-surface text-ink hover:bg-sunken"
+            className={`flex h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-[background-color,color] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+              s === shelf ? "border-navy-900 bg-navy-900 text-white" : "border-line-strong bg-surface text-ink hover:bg-sunken"
             }`}
           >
             {s}
@@ -253,7 +253,7 @@ function CountCard({ product, stocktakeId, saved, onSaved }: { product: CountPro
           {flagged && <Badge tone="red">Possible shrinkage</Badge>}
           <button
             type="button"
-            className="ml-auto text-xs font-medium text-plum-900 underline underline-offset-2"
+            className="ml-auto text-xs font-medium text-link underline underline-offset-2"
             onClick={() =>
               startSave(async () => {
                 await clearCount(stocktakeId, product.id);

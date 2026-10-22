@@ -66,7 +66,7 @@ async function Stocktake({ params }: Pick<PageProps<"/inventory/count/[id]">, "p
         ].map(([label, value]) => (
           <div key={label} className="rounded-xl border border-line bg-surface p-4 shadow-card">
             <p className="text-sm text-ink-muted">{label}</p>
-            <p className="font-serif text-2xl font-semibold text-plum-900">{value}</p>
+            <p className="font-serif text-2xl font-semibold text-navy-900">{value}</p>
           </div>
         ))}
       </div>

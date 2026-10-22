@@ -84,7 +84,7 @@ export function GroupPanel({ data, start, onClose, onSaved }: { data: BoardData;
     <form onSubmit={submit} aria-label="Group booking" className="flex flex-col gap-5 py-2 text-sm">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h2 className="font-serif text-2xl font-semibold text-plum-900">Group booking</h2>
+          <h2 className="font-serif text-2xl font-semibold text-navy-900">Group booking</h2>
           <p className="text-ink-muted">{formatLongDay(data.date)}</p>
         </div>
         <Button size="sm" variant="ghost" onClick={onClose}>

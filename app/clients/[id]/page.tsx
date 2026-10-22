@@ -95,7 +95,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
       <div className="mb-6 flex flex-wrap items-center gap-4">
         <Avatar name={fullName(client)} size="lg" />
         <div className="min-w-0">
-          <h1 className="font-serif text-4xl font-semibold tracking-tight text-plum-900">{fullName(client)}</h1>
+          <h1 className="font-serif text-4xl font-semibold tracking-tight text-navy-900">{fullName(client)}</h1>
           <p className="mt-1 text-ink-muted">{contact || "No contact details"}</p>
         </div>
       </div>
@@ -214,7 +214,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
         )}
       </Card>
 
-      <h2 className="mb-3 font-serif text-2xl font-semibold text-plum-900">Details</h2>
+      <h2 className="mb-3 font-serif text-2xl font-semibold text-navy-900">Details</h2>
       {editable ? (
         <ClientForm
           key={client.updated_at}

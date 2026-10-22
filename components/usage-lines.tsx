@@ -86,7 +86,7 @@ export function UsageLinesEditor({
         <button
           type="button"
           onClick={() => onChange([...lines, { productId: "", amount: "" }])}
-          className="inline-flex items-center gap-1.5 self-start rounded-md text-sm font-medium text-plum-900 hover:text-plum-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-plum-700"
+          className="inline-flex items-center gap-1.5 self-start rounded-md text-sm font-medium text-navy-900 hover:text-navy-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           <PlusIcon className="size-4" />
           Add a product
