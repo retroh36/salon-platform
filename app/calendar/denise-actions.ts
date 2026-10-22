@@ -3,12 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { canBook } from "@/lib/appointments";
 import { getCurrentStaff } from "@/lib/auth";
+import { answer, type AssistantContext } from "@/lib/denise/assistant";
+import { claudeClient, explainFixes, isConnected } from "@/lib/denise/claude";
 import { approveFix, rejectFix, undoFix } from "@/lib/denise/fixes";
 import { scanDay, type Viewer } from "@/lib/denise/scan";
 import type { ChatMessage, DeniseState, FixResult } from "@/lib/denise/types";
 import { isUuid } from "@/lib/ids";
+import { recordProposals } from "@/lib/scheduling/ai-actions";
+import type { BookingContext } from "@/lib/scheduling/booking";
 import { LATE_MINUTES, reportCallOut, reportRunningLate } from "@/lib/scheduling/disruptions";
-import { startOfLocalDay } from "@/lib/scheduling/load";
+import { loadBookingContext, loadOffers, startOfLocalDay } from "@/lib/scheduling/load";
+import { LEVEL_LABELS } from "@/lib/schedule-forms";
 import { isLocalDate, todayIn } from "@/lib/scheduling/time";
 
 const NOT_SIGNED_IN = "Sign in again.";
@@ -32,8 +37,11 @@ type Session = NonNullable<Awaited<ReturnType<typeof session>>>;
 
 async function look(s: Session, date: string): Promise<DeniseState> {
   // Past days can't be changed, so there's nothing to fix.
-  if (date < s.today) return { date, conflicts: [], notices: [], connected: false };
-  return scanDay(s.supabase, s.viewer, date);
+  const connected = isConnected();
+  if (date < s.today) return { date, conflicts: [], notices: [], connected };
+  const client = claudeClient();
+  const state = await scanDay(s.supabase, s.viewer, date, { explain: client ? (facts) => explainFixes(client, facts) : null });
+  return { ...state, connected };
 }
 
 // Denise looks over the day: conflicts, her fixes, and notices.
@@ -103,10 +111,62 @@ export async function rejectDeniseFix(actionId: string, date: string): Promise<F
 const NOT_CONNECTED =
   "I'm not connected yet, so I can't answer questions. Once I am, ask me things like “Who's free for a color at 3?” In the meantime I'm still watching the calendar for clashes.";
 
-// Ask Denise about the calendar.
+const NOT_REACHED = "I couldn't think that through just now. Try again in a moment.";
+
+// Ask Denise about the calendar. Claude answers using tools that call the
+// scheduling functions; bookings it suggests become proposals to approve.
 export async function askDenise(history: ChatMessage[], date: string): Promise<ChatMessage> {
   const s = await session();
   if (!s) return { role: "denise", text: NOT_SIGNED_IN };
   if (!isLocalDate(date) || !history.length) return { role: "denise", text: "What would you like to know?" };
-  return { role: "denise", text: NOT_CONNECTED };
+  const client = claudeClient();
+  if (!client) return { role: "denise", text: NOT_CONNECTED };
+
+  const [services, staff] = await Promise.all([
+    s.supabase.from("services").select("id, name, category, duration_minutes").is("archived_at", null).order("name"),
+    s.supabase.from("staff").select("id, first_name, role, level").eq("location_id", s.viewer.location.id).eq("is_active", true),
+  ]);
+  if (services.error) throw services.error;
+  if (staff.error) throw staff.error;
+  const offers = await loadOffers(s.supabase, staff.data.map((m) => m.id));
+
+  const calendars = new Map<string, Promise<BookingContext>>();
+  const context: AssistantContext = {
+    salon: s.viewer.salon,
+    timeZone: s.viewer.location.timezone,
+    today: s.today,
+    date,
+    now: new Date(),
+    services: services.data.map((sv) => ({ id: sv.id, name: sv.name, category: sv.category, minutes: sv.duration_minutes ?? 0 })),
+    staff: staff.data
+      .filter((m) => (offers.get(m.id)?.size ?? 0) > 0)
+      .map((m) => ({ id: m.id, firstName: m.first_name, title: m.level ? `${LEVEL_LABELS[m.level]} stylist` : m.role })),
+    calendar: (day) => {
+      if (!calendars.has(day)) calendars.set(day, loadBookingContext(s.supabase, s.viewer.location, day, day));
+      return calendars.get(day)!;
+    },
+    propose: async (b) => {
+      if (!s.viewer.canBook) return null;
+      const [id] = await recordProposals(s.supabase, s.viewer.location.id, {
+        feature: "ask_denise",
+        subject: null,
+        options: [{ summary: b.summary, reason: b.reason, proposal: { changes: [], book: { clientId: null, items: [{ serviceId: b.serviceId, staffId: b.staffId, resourceId: b.resourceId, start: b.start }] } } }],
+      });
+      return id ?? null;
+    },
+  };
+
+  // Text only, starting with the staff member's question.
+  const turns = history
+    .slice(-12)
+    .map((m) => ({ role: m.role === "user" ? ("user" as const) : ("assistant" as const), text: m.text.slice(0, 1000) }));
+  while (turns.length && turns[0].role !== "user") turns.shift();
+
+  try {
+    const reply = await answer(client, context, turns);
+    return { role: "denise", text: reply.text, suggestions: reply.suggestions };
+  } catch {
+    // No details: errors from the API aren't logged or shown.
+    return { role: "denise", text: NOT_REACHED };
+  }
 }

@@ -20,6 +20,15 @@ Known gaps to pick up later. Move an item into a task when it's scheduled.
 - [ ] **Client double-booking.** The booking rules check stylists and resources, not clients; the same client could be booked in two places at once.
 - [ ] **Pending time off on the calendar.** Only approved time off is shown; pending requests could be shown faintly so the front desk knows.
 
+## Denise (AI assistant)
+
+- [ ] **Send notifications.** Fixes record client and stylist messages in `notifications` (status `pending`); nothing is sent until texts and email arrive (phase 3).
+- [ ] **Ask Denise in the browser tests.** Without an API key the e2e tests only cover "I'm not connected yet"; the tool loop and suggestions are unit-tested with a fake client. A browser test of the suggestion card (pick a client, book, undo) needs a stubbed Claude endpoint.
+- [ ] **Clients in two places.** The resolver keeps a visit's services together when it moves them, but like the booking rules it doesn't check a client against their other visits.
+- [ ] **Undo a call-out.** "Out for the day" adds approved time off; taking it back means deleting that time off on the team schedule.
+- [ ] **AI action log page.** Owners can't browse the log yet (it's in `ai_actions`).
+- [ ] **Run scans in the background.** Denise looks over the day when the calendar loads or changes; with no one on the calendar, nothing watches it.
+
 ## Phorest import
 
 - [ ] **Blocked: dry run gets 401 (paused 2026-10-21).** `npm run import:phorest:dry-run` is rejected with 401 on the first request (`GET /api/business/{businessId}/branch`), both times it was tried: first with no `global/` username prefix against the docs host, then with the prefix against the US API gateway. Waiting on Phorest to confirm the username format, which API server the account is on, and the password. Once confirmed, update `.env.local` and run the dry run again (`-- --months-back=6 --months-ahead=3`).

@@ -16,6 +16,7 @@
     "import:phorest:dry-run": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/phorest-dry-run.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.1.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "next": "16.4.2",

@@ -267,7 +267,7 @@ const SEARCH_DELAY_MS = 200;
 
 // Find an existing client by name or phone, or add a new one with just a
 // name and phone.
-function ClientPicker({ client, onChange }: { client: ClientOption | null; onChange: (c: ClientOption | null) => void }) {
+export function ClientPicker({ client, onChange }: { client: ClientOption | null; onChange: (c: ClientOption | null) => void }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ClientOption[] | null>(null);
   const [adding, setAdding] = useState(false);

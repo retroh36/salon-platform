@@ -5,8 +5,11 @@ import { DeniseFace, DenisePose, type Pose } from "@/components/denise";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/field";
 import { CheckCircleIcon, ChevronDownIcon, ClockIcon, SendIcon, UndoIcon } from "@/components/ui/icons";
-import type { ChatMessage, ConflictView, DeniseState, FixView } from "@/lib/denise/types";
+import type { BookingSuggestion, ChatMessage, ConflictView, DeniseState, FixView } from "@/lib/denise/types";
+import { formatLongDay } from "@/lib/schedule-format";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
+import type { ClientOption } from "./actions";
+import { ClientPicker } from "./booking-panel";
 import { useNow } from "./now-line";
 import type { BoardData } from "./types";
 
@@ -40,6 +43,8 @@ export function DenisePanel({
   onPreview,
   onAsk,
   onOpen,
+  onBook,
+  onRejectSuggestion,
 }: {
   data: BoardData;
   state: DeniseState | null;
@@ -56,6 +61,9 @@ export function DenisePanel({
   onPreview: (preview: Preview | null) => void;
   onAsk: (question: string) => void;
   onOpen: (appointmentId: string) => void;
+  // Approve a booking Denise suggested, for this client.
+  onBook: (actionId: string, clientId: string) => void;
+  onRejectSuggestion: (actionId: string) => void;
 }) {
   const conflicts = state?.conflicts ?? [];
   const notices = state?.notices ?? [];
@@ -133,7 +141,20 @@ export function DenisePanel({
             ) : (
               <div key={i} className="flex max-w-[92%] animate-fade-in gap-2">
                 <DeniseFace size={24} className="mt-1" />
-                <p className="rounded-xl rounded-tl-sm border border-denise-200 bg-denise-50 px-3 py-2 whitespace-pre-line text-ink">{m.text}</p>
+                <div className="flex min-w-0 flex-col gap-2">
+                  <p className="rounded-xl rounded-tl-sm border border-denise-200 bg-denise-50 px-3 py-2 whitespace-pre-line text-ink">{m.text}</p>
+                  {m.suggestions?.map((sg, j) => (
+                    <SuggestionCard
+                      key={sg.actionId ?? j}
+                      suggestion={sg}
+                      today={data.today}
+                      canBook={data.me.canBook}
+                      working={working}
+                      onBook={onBook}
+                      onReject={onRejectSuggestion}
+                    />
+                  ))}
+                </div>
               </div>
             ),
           )}
@@ -309,5 +330,73 @@ function AskForm({ onAsk, disabled }: { onAsk: (question: string) => void; disab
         <SendIcon className="size-4" />
       </IconButton>
     </form>
+  );
+}
+
+// A booking Denise suggested from a question: staff choose the client and
+// book it, or dismiss it.
+function SuggestionCard({
+  suggestion,
+  today,
+  canBook,
+  working,
+  onBook,
+  onReject,
+}: {
+  suggestion: BookingSuggestion;
+  today: string;
+  canBook: boolean;
+  working: boolean;
+  onBook: (actionId: string, clientId: string) => void;
+  onReject: (actionId: string) => void;
+}) {
+  const [client, setClient] = useState<ClientOption | null>(null);
+  const [done, setDone] = useState<"booked" | "dismissed" | null>(null);
+  const day = suggestion.date === today ? "Today" : formatLongDay(suggestion.date, false);
+  return (
+    <section aria-label="Suggested booking" data-testid="denise-suggestion" className="flex animate-fade-in flex-col gap-3 rounded-xl border border-denise-200 bg-surface p-3 shadow-card">
+      <div>
+        <p className="font-semibold text-ink">
+          {suggestion.serviceName} with {suggestion.staffName}
+        </p>
+        <p className="text-ink-muted">
+          {day}, {formatMinute(suggestion.startMinute)}–{formatMinute(suggestion.endMinute)}
+        </p>
+        {suggestion.clientHint && !client && !done && <p className="mt-1 text-xs text-denise-700">For {suggestion.clientHint}? Find them below.</p>}
+      </div>
+      {done ? (
+        <p className="text-sm font-medium text-denise-700">{done === "booked" ? "Booked." : "Dismissed."}</p>
+      ) : canBook && suggestion.actionId ? (
+        <>
+          <ClientPicker client={client} onChange={setClient} />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={!client || working}
+              onClick={() => {
+                onBook(suggestion.actionId!, client!.id);
+                setDone("booked");
+              }}
+            >
+              Book it
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={working}
+              onClick={() => {
+                onReject(suggestion.actionId!);
+                setDone("dismissed");
+              }}
+            >
+              Dismiss
+            </Button>
+          </div>
+        </>
+      ) : (
+        <p className="text-xs text-ink-muted">The front desk can book this.</p>
+      )}
+    </section>
   );
 }

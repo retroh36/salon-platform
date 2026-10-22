@@ -592,6 +592,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               onPreview={setPreview}
               onAsk={ask}
               onOpen={(appointmentId) => select({ kind: "detail", appointmentId })}
+              onBook={(actionId, clientId) => decide(() => approveDeniseFix(actionId, data.date, clientId), actionId)}
+              onRejectSuggestion={(actionId) => decide(() => rejectDeniseFix(actionId, data.date), null)}
             />
           ) : selection.kind === "detail" && data.appointments[selection.appointmentId] ? (
             <AppointmentPanel
