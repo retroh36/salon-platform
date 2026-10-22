@@ -13,7 +13,7 @@ import { dayView } from "@/lib/scheduling/availability";
 import { itemEnd, itemSegments, type BookedItem } from "@/lib/scheduling/booking";
 import { intersectIntervals, type Interval } from "@/lib/scheduling/intervals";
 import { occurrences } from "@/lib/scheduling/blocks";
-import { loadBlocks, loadLocationSchedule, loadOffers, loadStaffSchedules, startOfLocalDay, toBookedItem } from "@/lib/scheduling/load";
+import { loadBlocks, loadCalendarStamp, loadLocationSchedule, loadOffers, loadStaffSchedules, startOfLocalDay, toBookedItem } from "@/lib/scheduling/load";
 import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn, toLocal, WEEKDAYS } from "@/lib/scheduling/time";
 import { visitWarnings } from "@/lib/client-checks";
 import { fullName, roleLabel, sortStaff } from "@/lib/staff";
@@ -40,6 +40,9 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   const dayStart = startOfLocalDay(date, tz);
   const dayEnd = startOfLocalDay(addDays(date, 1), tz);
 
+  // Read before the calendar, so a change made while it loads still shows
+  // as new.
+  const stamp = await loadCalendarStamp(supabase, me.location.id);
   const [staffResult, itemsResult, servicesResult, resourcesResult, location] = await Promise.all([
     // Everyone in the business, for "booked by" names; columns are this location's.
     supabase.from("staff").select("id, first_name, last_name, role, level, color, is_active, location_id"),
@@ -146,6 +149,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       status: a.status as AppointmentStatus,
       series: Boolean(a.series_id),
       group: a.group,
+      online: a.source === "online",
     });
     appointments[a.id] ??= {
       id: a.id,
@@ -246,6 +250,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   });
 
   const data: BoardData = {
+    stamp,
     date,
     today,
     openLabel: open.length > 0 ? `Open ${formatIntervals(open)}` : "Salon closed",

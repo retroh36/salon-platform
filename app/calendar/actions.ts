@@ -11,7 +11,7 @@ import { isUuid } from "@/lib/ids";
 import { loadBackBarProducts } from "@/lib/inventory-load";
 import { changeStatus, moveItem, saveBooking, saveNotes, type BookingItemInput, type SaveResult } from "@/lib/scheduling/book";
 import { describeProblem } from "@/lib/scheduling/booking";
-import { loadBookingContext } from "@/lib/scheduling/load";
+import { loadBookingContext, loadCalendarStamp } from "@/lib/scheduling/load";
 import { MAX_VISITS, planSeries, seriesDates, type Scope, type SeriesEnd } from "@/lib/scheduling/series";
 import { bookSeries, changeSeries, changeSeriesStatus, moveSeriesItem, type VisitResult } from "@/lib/scheduling/series-book";
 import { bookGroup, changeGroupStatus, moveGroupItem } from "@/lib/scheduling/group-book";
@@ -465,4 +465,13 @@ export async function changeGroupVisitStatus(appointmentId: string, action: Appo
   refresh();
   const done = results.filter((r) => r.result.ok).length;
   return done ? { ok: true, message: `${done} guest${done === 1 ? "" : "s"} ${action === "cancel" ? "canceled" : "updated"}.` } : { ok: false, message: "No visits could be changed." };
+}
+
+// Changes whenever the location's calendar does (a booking saved anywhere,
+// including online, or a visit's status or notes changed), so an open
+// calendar can tell when to load again.
+export async function calendarStamp(): Promise<string | null> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me) return null;
+  return loadCalendarStamp(supabase, me.location.id);
 }

@@ -104,6 +104,7 @@
   --animate-glow: glow 1.6s ease-in-out infinite;
   --animate-soft-bounce: soft-bounce 900ms var(--ease-out) 3;
   --animate-breathe: breathe 1.4s ease-in-out infinite alternate;
+  --animate-step-in: step-in 250ms var(--ease-out) both;
 
   @keyframes panel-in {
     from {
@@ -111,6 +112,14 @@
       transform: translateX(12px);
     }
   }
+  /* The booking site's steps slide in from the side they come from. */
+  @keyframes step-in {
+    from {
+      opacity: 0;
+      transform: translateX(var(--step-from, 16px));
+    }
+  }
+
   @keyframes fade-in {
     from {
       opacity: 0;

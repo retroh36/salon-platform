@@ -43,6 +43,8 @@ export type BlockData = Interval & {
   series: boolean;
   // Part of a group booking.
   group: { id: string; label: string } | null;
+  // Booked by the client on the salon's booking site.
+  online: boolean;
 };
 
 export type ItemDetail = Interval & {
@@ -132,4 +134,6 @@ export type BoardData = {
   appointments: Record<string, AppointmentDetail>;
   menu: Menu;
   me: { staffId: string; role: StaffRole; canBook: boolean };
+  // See loadCalendarStamp: the board reloads when it changes.
+  stamp: string;
 };

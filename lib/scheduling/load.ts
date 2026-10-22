@@ -169,9 +169,13 @@ export async function loadBookingContext(
   from: LocalDate,
   to: LocalDate,
 ): Promise<BookingContext> {
+  // The location's business: RLS limits staff to their own salon, but the
+  // booking site reads with the service role.
+  const business = await supabase.from("locations").select("business_id").eq("id", location.id).single();
+  if (business.error) throw business.error;
   const [staff, services, resources] = await Promise.all([
     supabase.from("staff").select("id, is_active").eq("location_id", location.id),
-    supabase.from("services").select("id, active_minutes, processing_minutes, finishing_minutes, archived_at"),
+    supabase.from("services").select("id, active_minutes, processing_minutes, finishing_minutes, archived_at").eq("business_id", business.data.business_id),
     supabase.from("resources").select("id, is_active, kind, sort_order").eq("location_id", location.id),
   ]);
   if (staff.error) throw staff.error;
@@ -216,6 +220,19 @@ export async function loadBookingContext(
     booked,
     blocks: blockedTimes(blocks, location.timezone),
   };
+}
+
+// A short string that changes whenever the location's calendar does: its
+// calendar version (bumped by every booking save) and the latest change to
+// any of its appointments (status, notes, cancellations).
+export async function loadCalendarStamp(supabase: Supabase, locationId: string): Promise<string> {
+  const [version, latest] = await Promise.all([
+    supabase.from("locations").select("calendar_version").eq("id", locationId).single(),
+    supabase.from("appointments").select("updated_at").eq("location_id", locationId).order("updated_at", { ascending: false }).limit(1),
+  ]);
+  if (version.error) throw version.error;
+  if (latest.error) throw latest.error;
+  return `${version.data.calendar_version}:${latest.data[0]?.updated_at ?? ""}`;
 }
 
 // Blocks at a location (all of them: a location has a handful).

@@ -26,6 +26,12 @@ export function salonLogoUrl(path: string | null | undefined): string | null {
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${LOGO_BUCKET}/${path}`;
 }
 
+// Stylist photos (for the booking site): the public `staff-photos` bucket.
+export function staffPhotoUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/staff-photos/${path}`;
+}
+
 // The fallback mark: the salon name's first letter.
 export function salonInitial(name: string): string {
   return name.trim()[0]?.toUpperCase() ?? "S";

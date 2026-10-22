@@ -7,6 +7,7 @@ import { buttonClass } from "@/components/ui/button";
 import { ClockIcon } from "@/components/ui/icons";
 import { Badge, listClass, PageHeader, pillClass, rowClass, type Tone } from "@/components/ui/page";
 import { canManage, getCurrentStaff } from "@/lib/auth";
+import { staffPhotoUrl } from "@/lib/branding";
 import { isUuid } from "@/lib/ids";
 import { describeTimeOff, formatDay, formatIntervals, STATUS_LABELS } from "@/lib/schedule-format";
 import { LEVEL_LABELS, WEEKDAY_NAMES } from "@/lib/schedule-forms";
@@ -18,7 +19,9 @@ import { decideTimeOff, deleteTimeOff, removeDayChange, saveWeeklyHours } from "
 import { CompensationForm } from "./compensation-form";
 import { DayChangeForm } from "./day-change-form";
 import { HoursEditor, type HoursRows } from "./hours-editor";
+import { StaffPhotoForm } from "./staff-photo";
 import { TimeOffForm } from "./time-off-form";
+
 
 export const metadata: Metadata = { title: "Schedule" };
 
@@ -49,7 +52,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
 
   const { data: allStaff, error: staffError } = await supabase
     .from("staff")
-    .select("id, first_name, last_name, role, level, is_active, location_id");
+    .select("id, first_name, last_name, role, level, color, photo_path, is_active, location_id");
   if (staffError) throw staffError;
   const team = sortStaff(allStaff.filter((s) => s.is_active && s.location_id === me.location.id));
 
@@ -171,8 +174,8 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
         </nav>
       )}
 
-      <div className="mb-5 flex items-center gap-4">
-        <Avatar name={fullName(target)} size="lg" />
+      <div className="mb-5 flex flex-wrap items-center gap-4">
+        <Avatar name={fullName(target)} color={target.color} level={target.level} photoUrl={staffPhotoUrl(target.photo_path)} size="lg" />
         <div>
           <h2 className="font-serif text-2xl font-semibold text-ink">
             {fullName(target)}
@@ -183,6 +186,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
             {target.level && ` · ${LEVEL_LABELS[target.level]}`}
           </p>
         </div>
+        {manager && target.role === "stylist" && <StaffPhotoForm key={target.id} staffId={target.id} hasPhoto={Boolean(target.photo_path)} />}
       </div>
 
       <section aria-labelledby="week-heading" className={cardClass}>

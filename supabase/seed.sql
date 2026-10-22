@@ -698,3 +698,35 @@ from public.clients c, public.form_templates t
 where t.id = 'e3000000-0000-4000-8000-000000000001' and c.business_id = t.business_id
   and abs(hashtext('form' || c.id)) % 100 < 80;
 
+
+-- ---------------------------------------------------------------------------
+-- Online booking: the salon's site at /book/maple-and-ash. Color
+-- corrections and vivids need a consultation first (which books the Color
+-- Consultation); bang trims are for existing clients between cuts, so not
+-- online. Longer lightening and smoothing services take a deposit.
+-- ---------------------------------------------------------------------------
+
+update public.businesses set slug = 'maple-and-ash' where id = 'b0000000-0000-4000-8000-000000000001';
+
+insert into public.online_booking_settings (
+  business_id, enabled, window_days, notice_minutes, allow_new_clients, cancel_cutoff_hours,
+  cancellation_policy, consultation_service_id, accent_color, welcome
+)
+select 'b0000000-0000-4000-8000-000000000001', true, 60, 120, true, 24,
+       'Plans change, we understand. Please cancel or reschedule at least 24 hours ahead, online or by phone. '
+       || 'Late cancellations and missed appointments may be charged 50% of the service.',
+       (select id from public.services where business_id = 'b0000000-0000-4000-8000-000000000001' and name = 'Color Consultation'),
+       '#6b3f2a', 'Book your next visit with our team. We can''t wait to see you.';
+
+update public.services set online_booking = 'consultation'
+where business_id = 'b0000000-0000-4000-8000-000000000001' and name in ('Color Correction', 'Vivid / Fashion Color');
+
+update public.services set online_booking = 'off'
+where business_id = 'b0000000-0000-4000-8000-000000000001' and name = 'Bang Trim';
+
+update public.services set deposit_kind = 'percent', deposit_amount = 25
+where business_id = 'b0000000-0000-4000-8000-000000000001'
+  and name in ('Balayage', 'Foilayage', 'Lived-In Color', 'Babylights', 'Keratin Smoothing', 'Brazilian Blowout');
+
+update public.services set deposit_kind = 'fixed', deposit_amount = 5000
+where business_id = 'b0000000-0000-4000-8000-000000000001' and name in ('Bridal Trial', 'Double Process (Bleach & Tone)');

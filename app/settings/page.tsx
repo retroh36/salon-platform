@@ -6,6 +6,7 @@ import { Card, PageHeader } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { salonLogoUrl } from "@/lib/branding";
 import { SalonSettings } from "./salon-settings";
+import { SettingsNav } from "./settings-nav";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -26,6 +27,7 @@ async function Settings() {
   return (
     <AppShell section="settings" me={me}>
       <PageHeader title="Settings" description="Your salon's name and logo, shown to your team and on messages to your clients." />
+      <SettingsNav current="salon" />
       <Card title="Your salon" titleId="salon-heading">
         <SalonSettings name={business?.name ?? ""} logoUrl={salonLogoUrl(business?.logo_path)} />
       </Card>

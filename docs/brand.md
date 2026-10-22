@@ -23,10 +23,15 @@ Maestra is the platform. Each salon has its own brand, and the two never mix.
 | Maestra (the product) | The salon (e.g. Maple & Ash) |
 | --- | --- |
 | Login screen, loading screen | Top of the sidebar: its logo (or initial) and name |
-| Browser tab, app icon, home-screen icon | Messages to its clients (texts, emails, confirmations) |
+| Browser tab, app icon, home-screen icon | Messages to its clients (texts, emails, confirmations) and its booking site |
 | Link previews (social image) | |
 | Emails from the platform (sign-in, invites, password reset) | |
 | "Powered by Maestra", small, at the foot of the sidebar | |
+
+The salon's booking site (`/book/<salon>`) is the salon's: its logo or
+initial, its name and its own color lead, in Maestra's type, layout and
+calm feel, with "Powered by Maestra" small at the foot. A salon's color
+must pass WCAG AA with white text on it (Settings checks this).
 
 Salon owners set their salon's name and logo on the Settings page. Without
 a logo, the salon's initial shows in a navy leaf shape. Never put the

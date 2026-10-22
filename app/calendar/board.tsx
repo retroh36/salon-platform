@@ -20,7 +20,7 @@ import { LEVEL_LABELS, STAFF_LEVELS } from "@/lib/schedule-forms";
 import { BLOCK_LABELS } from "@/lib/scheduling/blocks";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, toLocal } from "@/lib/scheduling/time";
-import { moveGroupVisit, moveVisitItem, moveVisitItemScoped } from "./actions";
+import { calendarStamp, moveGroupVisit, moveVisitItem, moveVisitItemScoped } from "./actions";
 import type { Scope } from "@/lib/scheduling/series";
 import { moveBlock } from "./block-actions";
 import { BlockPanel, repeatLabel } from "./block-panel";
@@ -69,6 +69,8 @@ type Drag = Move & {
   length: number;
   moved: boolean;
 };
+
+const LIVE_CHECK_MS = 20_000;
 
 // Day changes slide forward or back; other updates don't animate.
 const DAY_SLIDE = { "nav-forward": "day-forward", "nav-back": "day-back", default: "none" };
@@ -122,6 +124,25 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const [blockMoves, setBlockMoves] = useState<Record<string, { start: number; end: number }>>({});
   const [settling, setSettling] = useState<string | null>(null);
   const dragRef = useRef<Drag | null>(null);
+
+  // Loads the day again when the calendar changes elsewhere (another desk,
+  // or a client booking online): checks every 20 seconds while the tab is
+  // in view, and when it comes back into view. Never mid-drag.
+  useEffect(() => {
+    let stopped = false;
+    const check = async () => {
+      if (document.visibilityState !== "visible" || dragRef.current) return;
+      const now = await calendarStamp();
+      if (!stopped && now && now !== data.stamp) router.refresh();
+    };
+    const timer = window.setInterval(check, LIVE_CHECK_MS);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [data.stamp, router]);
   // A drag ends with a click on the block; this stops it opening the panel.
   const justDragged = useRef(false);
   const columnRefs = useRef(new Map<string, HTMLElement>());
@@ -924,6 +945,16 @@ function GroupIcon({ className = "size-4" }: { className?: string }) {
   );
 }
 
+// The icon on visits the client booked online.
+function OnlineIcon({ className = "size-4" }: { className?: string }) {
+  return (
+    <svg role="img" aria-label="Online" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+    </svg>
+  );
+}
+
 // The repeat icon on visits that are part of a series.
 function RepeatIcon({ className = "size-4", label }: { className?: string; label?: string }) {
   return (
@@ -1361,7 +1392,7 @@ function AppointmentBlock({
     block.clientName,
     [block.service, block.with.length > 0 && `with ${block.with.join(" and ")}`].filter(Boolean).join(" · "),
     `${time} · ${stylist}`,
-    [STATUS_LABELS[block.status], late && "running late", block.group && block.group.label, block.series && "repeating"].filter(Boolean).join(" · "),
+    [STATUS_LABELS[block.status], late && "running late", block.group && block.group.label, block.series && "repeating", block.online && "booked online"].filter(Boolean).join(" · "),
   ];
   const plainService = block.service.replace(/\s*\([^)]*\)/g, "");
   const services = [
@@ -1383,6 +1414,7 @@ function AppointmentBlock({
     block.resource,
     block.series && "repeating",
     block.group && `group: ${block.group.label}`,
+    block.online && "booked online",
     STATUS_LABELS[block.status],
     late && "running late",
   ]
@@ -1451,6 +1483,11 @@ function AppointmentBlock({
           <span aria-hidden className={`relative flex items-center gap-1.5 pt-1 ${narrow ? "px-1.5" : "px-2"}`}>
             {block.group && <GroupIcon className="size-3.5 shrink-0" />}
             {block.series && <RepeatIcon className="size-3 shrink-0" label="Repeating" />}
+            {block.online && (
+              <span data-testid="online-badge" title="Booked online" className="shrink-0">
+                <OnlineIcon className="size-3" />
+              </span>
+            )}
             <FitText variants={names} className="flex-1 text-sm leading-[18px] font-semibold" />
             {attention && !show.chipLine && <span data-attention={attention} title={ATTENTION[attention].label} className={`size-2.5 shrink-0 rounded-full ${ATTENTION[attention].className}`} style={{ backgroundColor: "currentColor" }} />}
           </span>

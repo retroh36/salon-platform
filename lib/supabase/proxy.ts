@@ -3,10 +3,16 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv } from "./env";
 
 const PUBLIC_PATHS = ["/login"];
+// Open to everyone, signed in or not: salons' booking sites, and the dev
+// outbox (which shows nothing in production).
+const OPEN_PATHS = ["/book", "/dev/outbox"];
 
 // Refreshes the auth session cookie on every request and sends signed-out
 // users to /login (and signed-in users away from it).
 export async function updateSession(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  if (OPEN_PATHS.some((p) => path === p || path.startsWith(`${p}/`))) return NextResponse.next({ request });
+
   let response = NextResponse.next({ request });
   const { url, publishableKey } = getSupabaseEnv();
 
@@ -30,7 +36,6 @@ export async function updateSession(request: NextRequest) {
   // the token and triggers the cookie refresh above.
   const { data } = await supabase.auth.getClaims();
   const isSignedIn = Boolean(data?.claims);
-  const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
 
   if (!isSignedIn && !isPublic) {
