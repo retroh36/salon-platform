@@ -8,7 +8,7 @@
 //
 // Pure, over a BookingContext from ./load.ts.
 
-import { checkItem, itemEnd, pickResource, type BookedItem, type BookingContext, type CheckOptions } from "./booking.ts";
+import { checkItem, itemEnd, pickResource, timingFor, type BookedItem, type BookingContext, type CheckOptions } from "./booking.ts";
 import { fromLocal, MINUTES_PER_DAY, type LocalDate } from "./time.ts";
 
 export type VisitRequest = {
@@ -51,7 +51,7 @@ export function planVisitAt(ctx: BookingContext, request: VisitRequest, start: D
     for (const staffId of candidates) {
       const staff = ctx.staff.get(staffId);
       if (!staff?.isActive || !staff.serviceIds.has(serviceId)) continue;
-      const draft: BookedItem = { ...service, serviceId, staffId, start: at };
+      const draft: BookedItem = { ...timingFor(ctx, staffId, serviceId)!, serviceId, staffId, start: at };
       const resourceId = pickResource(ctx, draft, null, accepted, options);
       if (!resourceId && hasChairs) continue;
       const check = checkItem(ctx, { serviceId, staffId, resourceId, start: at }, accepted, options);

@@ -9,7 +9,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { allowedActions, ACTION_STATUS, isEditable, type AppointmentAction, type AppointmentStatus } from "../appointments.ts";
-import { checkItem, pickResource, type BookedItem, type BookingProblem, type ServiceTiming } from "./booking.ts";
+import { checkItem, durationMinutes, pickResource, stretchTiming, timingFor, type BookedItem, type BookingProblem, type ServiceTiming } from "./booking.ts";
 import { loadBookingContext } from "./load.ts";
 import { patchTestState, type PatchSettings } from "./patch-tests.ts";
 import { toLocal } from "./time.ts";
@@ -29,6 +29,11 @@ export type BookingItemInput = {
   staffId: string;
   resource: ResourceChoice;
   start: Date;
+  // This booking's own length (e.g. the stylist's usual time), as a
+  // timing or in minutes (stretched from the stylist's timing); otherwise a
+  // new service takes the stylist's length and a kept one keeps its own.
+  timing?: ServiceTiming;
+  minutes?: number;
 };
 
 export type BookingInput = {
@@ -78,6 +83,8 @@ async function loadAppointment(supabase: Supabase, appointmentId: string) {
 // An existing item that the input leaves as it was.
 function unchanged(input: BookingItemInput, old: ExistingItem): boolean {
   if (input.serviceId !== old.serviceId || input.staffId !== old.staffId || input.start.getTime() !== old.start.getTime()) return false;
+  if (input.timing && durationMinutes(input.timing) !== durationMinutes(old)) return false;
+  if (input.minutes && input.minutes !== durationMinutes(old)) return false;
   const r = input.resource;
   if (r.kind === "none") return old.resourceId == null;
   if (r.kind === "exact") return old.resourceId === r.id;
@@ -109,6 +116,13 @@ export async function saveBooking(supabase: Supabase, location: Location, input:
     const freed = new Set((existing?.items ?? []).filter((i) => !kept.has(i.id)).map((i) => i.id));
     const calendar = { ...ctx, booked: ctx.booked.filter((b) => !b.id || !freed.has(b.id)) };
 
+    // Lengths given for this booking, as timings.
+    const own: (ServiceTiming | undefined)[] = input.items.map((i) => {
+      if (i.timing) return i.timing;
+      const base = i.minutes ? timingFor(calendar, i.staffId, i.serviceId) : undefined;
+      return base && i.minutes ? stretchTiming(base, i.minutes) : undefined;
+    });
+
     const problems: BookingProblem[][] = input.items.map(() => []);
     const resources: (string | null)[] = input.items.map((i) => (i.id ? (oldById.get(i.id)!.resourceId ?? null) : null));
     const accepted: BookedItem[] = [];
@@ -117,12 +131,13 @@ export async function saveBooking(supabase: Supabase, location: Location, input:
       if (!changed[n]) return;
       const old = item.id ? oldById.get(item.id) : undefined;
       const service = calendar.services.get(item.serviceId);
-      // An item that keeps its service keeps its booked timing.
-      const timing: ServiceTiming | undefined = old && old.serviceId === item.serviceId ? old : undefined;
+      // A length given for this booking; else an item that keeps its
+      // service keeps its booked timing; else the stylist's (in checkItem).
+      const timing: ServiceTiming | undefined = own[n] ?? (old && old.serviceId === item.serviceId ? old : undefined);
 
       let resourceId: string | null = item.resource.kind === "exact" ? item.resource.id : null;
       if (item.resource.kind === "any" && (service || timing)) {
-        const t = timing ?? service!;
+        const t = timing ?? timingFor(calendar, item.staffId, item.serviceId)!;
         const draft: BookedItem = { ...t, id: item.id, serviceId: item.serviceId, staffId: item.staffId, start: item.start };
         resourceId = pickResource(calendar, draft, item.resource.prefer ?? null, accepted);
         if (!resourceId) problems[n].push({ code: "no_free_resource" });
@@ -151,6 +166,7 @@ export async function saveBooking(supabase: Supabase, location: Location, input:
         staff_id: item.staffId,
         resource_id: resources[n],
         starts_at: item.start.toISOString(),
+        timing: own[n] ? { active: own[n]!.activeMinutes, processing: own[n]!.processingMinutes, finishing: own[n]!.finishingMinutes } : null,
       })),
       p_expected_version: version.data.calendar_version,
     });

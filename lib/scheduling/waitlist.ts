@@ -5,7 +5,7 @@
 // ./booking.ts) like any booking.
 
 import { dayView } from "./availability.ts";
-import { durationMinutes, staffBusySpans, type BookedItem, type BookingContext } from "./booking.ts";
+import { durationMinutes, staffBusySpans, timingFor, type BookedItem, type BookingContext } from "./booking.ts";
 import { subtractIntervals, type Interval } from "./intervals.ts";
 import { checkVisitOn, type VisitLine } from "./series.ts";
 import { fromLocal, toLocal, type LocalDate } from "./time.ts";
@@ -77,7 +77,7 @@ export function chainLines(ctx: BookingContext, serviceIds: readonly string[], s
     const service = ctx.services.get(id);
     if (!service || service.archived) return null;
     lines.push({ serviceId: id, staffId, startMinute: at, resource });
-    at += durationMinutes(service);
+    at += durationMinutes(timingFor(ctx, staffId, id)!);
   }
   return lines;
 }
@@ -141,7 +141,7 @@ export function walkInQueue(ctx: BookingContext, queue: readonly WalkIn[], date:
     const next = nextFree(ctx, w.serviceId, date, now, placed);
     const service = ctx.services.get(w.serviceId);
     if (!next || !service) return { id: w.id, staffId: null };
-    placed.push({ ...service, id: `walk-in:${w.id}`, appointmentId: `walk-in:${w.id}`, serviceId: w.serviceId, staffId: next.staffId, resourceId: next.resource, start: fromLocal(date, next.start, ctx.location.timeZone)! });
+    placed.push({ ...timingFor(ctx, next.staffId, w.serviceId)!, id: `walk-in:${w.id}`, appointmentId: `walk-in:${w.id}`, serviceId: w.serviceId, staffId: next.staffId, resourceId: next.resource, start: fromLocal(date, next.start, ctx.location.timeZone)! });
     return { id: w.id, staffId: next.staffId, start: next.start, wait: Math.max(0, next.start - now), lines: next.lines };
   });
 }

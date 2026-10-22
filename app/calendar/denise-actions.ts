@@ -9,6 +9,7 @@ import { approveFix, rejectFix, undoFix } from "@/lib/denise/fixes";
 import { scanDay, type Viewer } from "@/lib/denise/scan";
 import type { ChatMessage, DeniseState, FixResult } from "@/lib/denise/types";
 import { suggestReorders } from "@/lib/denise/reorder";
+import { briefFacts, briefTemplate, type Brief } from "@/lib/denise/brief";
 import { isUuid } from "@/lib/ids";
 import { canReceiveOrders } from "@/lib/inventory";
 import { recordProposals } from "@/lib/scheduling/ai-actions";
@@ -53,13 +54,19 @@ async function look(s: Session, date: string): Promise<DeniseState> {
       }))
     : [];
   // Past days can't be changed, so there's nothing to fix.
-  if (date < s.today) return { date, conflicts: [], notices: [], reorders, openings: [], connected };
+  if (date < s.today) return { date, conflicts: [], notices: [], reorders, openings: [], brief: null, connected };
   const client = claudeClient();
   const [state, openings] = await Promise.all([
     scanDay(s.supabase, s.viewer, date, { explain: client ? (facts) => explainFixes(client, facts) : null }),
     s.viewer.canBook ? openingsOn(s, date) : Promise.resolve([]),
   ]);
-  return { ...state, reorders, openings, connected };
+  // The morning brief: today, for the front of house.
+  let brief: Brief | null = null;
+  if (date === s.today && s.viewer.canBook) {
+    const facts = await briefFacts(s.supabase, { businessId: s.me.business_id, location: s.viewer.location }, date, { conflicts: state.conflicts, openings });
+    brief = { facts, text: briefTemplate(facts), writtenBy: "template" };
+  }
+  return { ...state, reorders, openings, brief, connected };
 }
 
 // Time that opened up on the day, matched to the waitlist.

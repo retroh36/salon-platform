@@ -182,12 +182,15 @@ function rpcError(code: string | undefined): ActionError | null {
 // Records the current options for a problem, best first, replacing the
 // ones recorded before. Returns their ids; none if staff rejected this
 // problem's options before.
+// asSystem: recorded by the server itself (the morning risk check), with
+// the service role; otherwise as the front-of-house staff member.
 export async function recordProposals(
   supabase: Supabase,
   locationId: string,
   input: { feature: string; subject: string | null; options: ProposalOption[] },
+  { asSystem = false }: { asSystem?: boolean } = {},
 ): Promise<string[]> {
-  const { data, error } = await supabase.rpc("record_ai_proposals", {
+  const { data, error } = await supabase.rpc(asSystem ? "record_ai_proposals_as_system" : "record_ai_proposals", {
     p_location_id: locationId,
     p_feature: input.feature,
     p_subject: input.subject!,

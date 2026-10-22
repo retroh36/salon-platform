@@ -83,7 +83,14 @@ function overlaps(a: Span, b: Span): boolean {
 }
 
 export type BookingService = ServiceTiming & { id: string; archived: boolean };
-export type BookingStaff = { id: string; isActive: boolean; schedule: StaffSchedule; serviceIds: ReadonlySet<string> };
+export type BookingStaff = {
+  id: string;
+  isActive: boolean;
+  schedule: StaffSchedule;
+  serviceIds: ReadonlySet<string>;
+  // The stylist's own length for a service, where it differs from the menu.
+  timings?: ReadonlyMap<string, ServiceTiming>;
+};
 export type ResourceKind = "chair" | "room" | "station";
 export type BookingResource = { id: string; isActive: boolean; kind?: ResourceKind; sortOrder?: number };
 
@@ -172,7 +179,7 @@ export function checkItem(
   // Without the service there's no timing to check against.
   if (!service) return { valid: false, problems };
 
-  const timing = request.timing ?? service;
+  const timing = request.timing ?? staff?.timings?.get(service.id) ?? service;
   const item: BookedItem = {
     id: request.id,
     serviceId: service.id,
@@ -207,6 +214,35 @@ export function checkItem(
   }
 
   return problems.length ? { valid: false, problems } : { valid: true, item };
+}
+
+// How long a service takes with this stylist: their own length, else the
+// menu's. Undefined for an unknown service.
+export function timingFor(ctx: BookingContext, staffId: string, serviceId: string): ServiceTiming | undefined {
+  const service = ctx.services.get(serviceId);
+  if (!service) return undefined;
+  const own = ctx.staff.get(staffId)?.timings?.get(serviceId);
+  const t = own ?? service;
+  return { activeMinutes: t.activeMinutes, processingMinutes: t.processingMinutes, finishingMinutes: t.finishingMinutes };
+}
+
+// The same service made `minutes` long, in 5-minute steps: longer adds to
+// the finishing part after a processing gap (or the service time without
+// one); shorter takes from finishing, then service time (at least 5).
+export function stretchTiming(timing: ServiceTiming, minutes: number): ServiceTiming {
+  const target = Math.max(5, Math.round(minutes / 5) * 5);
+  let { activeMinutes, finishingMinutes } = timing;
+  const { processingMinutes } = timing;
+  const diff = target - durationMinutes(timing);
+  if (diff >= 0) {
+    if (processingMinutes > 0) finishingMinutes += diff;
+    else activeMinutes += diff;
+  } else {
+    const fromFinishing = Math.min(finishingMinutes, -diff);
+    finishingMinutes -= fromFinishing;
+    activeMinutes = Math.max(5, activeMinutes - (-diff - fromFinishing));
+  }
+  return { activeMinutes, processingMinutes, finishingMinutes };
 }
 
 // Everything an item must not clash with: the calendar (minus the item's own

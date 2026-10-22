@@ -18,9 +18,14 @@ test.beforeEach(async () => {
   await admin.from("rate_limits").delete().neq("key", "");
 });
 
+// Everyone this run added (named Ob<run>…), even if a test stopped early.
 test.afterAll(async () => {
-  await admin.from("appointments").delete().eq("business_id", B).in("client_id", created);
-  if (created.length) await admin.from("clients").delete().in("id", created).like("first_name", `Ob${RUN}%`);
+  const { data } = await admin.from("clients").select("id").eq("business_id", B).like("first_name", `Ob${RUN}%`);
+  const ids = [...new Set([...created, ...(data ?? []).map((c) => c.id)])];
+  if (ids.length) {
+    await admin.from("appointments").delete().eq("business_id", B).in("client_id", ids);
+    await admin.from("clients").delete().in("id", ids);
+  }
   await admin.from("appointments").delete().eq("business_id", B).eq("source", "online").like("notes", `%${RUN}%`);
 });
 

@@ -2,6 +2,7 @@
 // and gentle notices. Plain data, from the server to the calendar.
 
 import type { ConflictKind } from "@/lib/scheduling/resolve";
+import type { Brief } from "./brief";
 
 export type FixMove = {
   itemId: string;
@@ -56,6 +57,8 @@ export type DeniseState = {
   notices: DeniseNotice[];
   reorders: ReorderNotice[];
   openings: WaitlistOpening[];
+  // The morning brief, for today and the front of house.
+  brief: Brief | null;
   // Whether Claude is connected (ANTHROPIC_API_KEY is set).
   connected: boolean;
 };

@@ -13,7 +13,9 @@ import { dayView } from "@/lib/scheduling/availability";
 import { itemEnd, itemSegments, type BookedItem } from "@/lib/scheduling/booking";
 import { intersectIntervals, type Interval } from "@/lib/scheduling/intervals";
 import { occurrences } from "@/lib/scheduling/blocks";
-import { loadBlocks, loadCalendarStamp, loadLocationSchedule, loadOffers, loadStaffSchedules, startOfLocalDay, toBookedItem } from "@/lib/scheduling/load";
+import { loadBlocks, loadCalendarStamp, loadLocationSchedule, loadOffers, loadStaffSchedules, loadStaffTimings, startOfLocalDay, toBookedItem } from "@/lib/scheduling/load";
+import { describeClient } from "@/lib/insights/describe";
+import { loadClientInsights, loadDurations } from "@/lib/insights/read";
 import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn, toLocal, WEEKDAYS } from "@/lib/scheduling/time";
 import { visitWarnings } from "@/lib/client-checks";
 import { fullName, sortStaff } from "@/lib/staff";
@@ -90,7 +92,12 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   }
   const team = staffResult.data.filter((s) => s.is_active && s.location_id === me.location.id);
   const teamIds = team.map((s) => s.id);
-  const [offers, schedules] = await Promise.all([loadOffers(supabase, teamIds), loadStaffSchedules(supabase, teamIds, date, date)]);
+  const [offers, schedules, timings, learned] = await Promise.all([
+    loadOffers(supabase, teamIds),
+    loadStaffSchedules(supabase, teamIds, date, date),
+    loadStaffTimings(supabase, teamIds),
+    loadDurations(supabase, me.business_id, teamIds),
+  ]);
 
   // A column for everyone who takes clients, or has any that day.
   const busyToday = new Set(items.map((i) => i.staff_id));
@@ -162,6 +169,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       bookedBy: bookedLine(a),
       changedBy: changedLine(a),
       formulas: [],
+      insight: null,
       warnings: null,
       group: a.group ? { ...a.group, members: [] } : null,
       series: a.series_id ? { id: a.series_id, index: a.series_index!, count: seriesCounts.get(a.series_id) ?? 1, intervalWeeks: a.series?.interval_weeks ?? 1 } : null,
@@ -224,6 +232,15 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       items: a.items.map((i) => ({ serviceId: i.serviceId, start: fromLocal(date, i.start, tz) ?? dayStart })),
     }));
   for (const [id, w] of await visitWarnings(supabase, me.business_id, toCheck)) appointments[id].warnings = w;
+
+  // What Denise knows about each client.
+  const clientIds = [...new Set(Object.values(appointments).flatMap((a) => (a.client ? [a.client.id] : [])))];
+  const insights = await loadClientInsights(supabase, me.business_id, clientIds);
+  const dayOf = (iso: string) => formatDay(toLocal(new Date(iso), tz).date);
+  for (const a of Object.values(appointments)) {
+    const known = a.client ? insights.get(a.client.id) : undefined;
+    if (known) a.insight = describeClient(known.habits, known.spend, { staff: (id) => staffById.get(id)?.first_name ?? null, dayOf }, new Date());
+  }
 
   const open = dayView({ weekly: {}, overrides: {}, timeOff: [] }, location, date).open;
   const weekHours = WEEKDAYS.flatMap((d) => location.weekly[d] ?? []);
@@ -302,6 +319,8 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
           ),
         ]),
       ),
+      timings: Object.fromEntries([...timings].map(([staffId, m]) => [staffId, Object.fromEntries([...m].map(([serviceId, t]) => [serviceId, t.activeMinutes + t.processingMinutes + t.finishingMinutes]))])),
+      learned: Object.fromEntries([...learned].filter(([, d]) => d.trusted).map(([key, d]) => [key, { medianMinutes: d.medianMinutes, visits: d.visits }])),
       resources: resourcesResult.data,
       products,
     },

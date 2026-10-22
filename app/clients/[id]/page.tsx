@@ -5,6 +5,9 @@ import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Avatar } from "@/components/ui/avatar";
 import { Card, EmptyState, listClass } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
+import { ClientInsightCard } from "@/components/client-insight";
+import { describeClient } from "@/lib/insights/describe";
+import { loadClientInsights } from "@/lib/insights/read";
 import { canEditClients, formatDate } from "@/lib/clients";
 import { isUuid } from "@/lib/ids";
 import { BackLink } from "@/components/ui/back-link";
@@ -67,11 +70,12 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
       .limit(20),
     loadBackBarProducts(supabase),
   ]);
-  const [{ data: patchTests, error: patchError }, { data: forms, error: formsError }, { data: team, error: teamError }, settings] = await Promise.all([
+  const [{ data: patchTests, error: patchError }, { data: forms, error: formsError }, { data: team, error: teamError }, settings, insights] = await Promise.all([
     supabase.from("client_patch_tests").select("id, tested_at, products, result, notes, staff(first_name, last_name)").eq("client_id", id).order("tested_at", { ascending: false }),
     supabase.from("client_forms").select("id, template_name, signed_at").eq("client_id", id).order("signed_at", { ascending: false }),
     supabase.from("staff").select("id, first_name, last_name").eq("is_active", true).order("first_name"),
     patchSettings(supabase, me.business_id),
+    loadClientInsights(supabase, me.business_id, [id]),
   ]);
   if (patchError) throw patchError;
   if (formsError) throw formsError;
@@ -87,6 +91,11 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
   });
 
   const editable = canEditClients(me.role);
+  const known = insights.get(id);
+  const names = new Map(team.map((t) => [t.id, t.first_name]));
+  const insight = known
+    ? describeClient(known.habits, known.spend, { staff: (s) => names.get(s) ?? null, dayOf: (iso) => formatDate(toLocal(new Date(iso), tz).date) }, new Date())
+    : null;
   const contact = [client.phone, client.email].filter(Boolean).join(" · ");
 
   return (
@@ -99,6 +108,12 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
           <p className="mt-1 text-ink-muted">{contact || "No contact details"}</p>
         </div>
       </div>
+
+      {insight && (
+        <div className="mb-6">
+          <ClientInsightCard insight={insight} />
+        </div>
+      )}
 
       {client.allergies && (
         <div

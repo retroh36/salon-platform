@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
-import { admin, SEED } from "../tests/db/helpers";
+import { admin, restoreLearnedDurations, SEED, setAsideLearnedDurations } from "../tests/db/helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
@@ -24,7 +24,10 @@ async function clearDay() {
 }
 
 test.beforeEach(clearDay);
+// Only reported problems here, not the risk check's predictions.
+test.beforeAll(setAsideLearnedDurations);
 test.afterAll(async () => {
+  await restoreLearnedDurations();
   await clearDay();
   await admin.from("clients").delete().like("first_name", `${PREFIX}%`);
 });

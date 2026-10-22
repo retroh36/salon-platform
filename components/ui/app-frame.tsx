@@ -8,7 +8,7 @@ import { roleLabel, type StaffRole } from "@/lib/staff";
 
 export type Section = "dashboard" | "my-day" | "calendar" | "clients" | "schedule" | "services" | "durations" | "inventory" | "forms" | "settings";
 
-type NavItem = { section: Section; href: string; label: string; Icon: (p: { className?: string }) => React.ReactNode; ownersOnly?: boolean; stylistsOnly?: boolean };
+type NavItem = { section: Section; href: string; label: string; Icon: (p: { className?: string }) => React.ReactNode; ownersOnly?: boolean; managersOnly?: boolean; stylistsOnly?: boolean };
 
 const NAV: NavItem[] = [
   { section: "dashboard", href: "/dashboard", label: "Dashboard", Icon: HomeIcon },
@@ -17,13 +17,14 @@ const NAV: NavItem[] = [
   { section: "clients", href: "/clients", label: "Clients", Icon: UserIcon },
   { section: "schedule", href: "/schedule", label: "Team schedule", Icon: TeamIcon },
   { section: "services", href: "/services", label: "Services", Icon: ScissorsIcon },
+  { section: "durations", href: "/durations", label: "Durations", Icon: ClockIcon, managersOnly: true },
   { section: "inventory", href: "/inventory", label: "Inventory", Icon: BoxIcon },
   { section: "forms", href: "/forms", label: "Forms", Icon: ClipboardIcon },
   { section: "settings", href: "/settings", label: "Settings", Icon: SettingsIcon, ownersOnly: true },
 ];
 
 function shown(item: NavItem, role: StaffRole): boolean {
-  return (!item.ownersOnly || role === "owner") && (!item.stylistsOnly || role === "stylist");
+  return (!item.ownersOnly || role === "owner") && (!item.managersOnly || role === "owner" || role === "manager") && (!item.stylistsOnly || role === "stylist");
 }
 
 // "Powered by Maestra", small, at the foot of the sidebar.

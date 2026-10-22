@@ -1021,14 +1021,14 @@ isOneToOne: false
                   ]
                 },"staff_services": {
                   Row: {
-                    "business_id": string,"created_at": string,"price_cents": number | null,"service_id": string,"staff_id": string,"updated_at": string
+                    "active_minutes": number | null,"business_id": string,"created_at": string,"finishing_minutes": number | null,"price_cents": number | null,"processing_minutes": number | null,"service_id": string,"staff_id": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"created_at"?: string,"price_cents"?: number | null,"service_id": string,"staff_id": string,"updated_at"?: string
+                    "active_minutes"?: number | null,"business_id": string,"created_at"?: string,"finishing_minutes"?: number | null,"price_cents"?: number | null,"processing_minutes"?: number | null,"service_id": string,"staff_id": string,"updated_at"?: string
                   }
                   Update: {
-                    "business_id"?: string,"created_at"?: string,"price_cents"?: number | null,"service_id"?: string,"staff_id"?: string,"updated_at"?: string
+                    "active_minutes"?: number | null,"business_id"?: string,"created_at"?: string,"finishing_minutes"?: number | null,"price_cents"?: number | null,"processing_minutes"?: number | null,"service_id"?: string,"staff_id"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -1460,6 +1460,9 @@ isOneToOne: false
 "apply_ai_action":
 { Args: { "p_action_id": string,"p_client_id"?: string,"p_expected_version": number }; Returns: undefined
                            },
+"apply_duration_action":
+{ Args: { "p_action_id": string }; Returns: undefined
+                           },
 "apply_reorder_draft":
 { Args: { "p_action_id": string }; Returns: string
                            },
@@ -1491,6 +1494,9 @@ isOneToOne: false
 { Args: { "p_lines": Json,"p_order_id": string }; Returns: Database["public"]['Enums']["purchase_order_status"]
                            },
 "record_ai_proposals":
+{ Args: { "p_feature": string,"p_location_id": string,"p_options": Json,"p_subject": string }; Returns: (string)[]
+                           },
+"record_ai_proposals_as_system":
 { Args: { "p_feature": string,"p_location_id": string,"p_options": Json,"p_subject": string }; Returns: (string)[]
                            },
 "record_count":
@@ -1558,6 +1564,9 @@ isOneToOne: false
                            },
 "undo_ai_action":
 { Args: { "p_action_id": string,"p_expected_version": number }; Returns: undefined
+                           },
+"undo_duration_action":
+{ Args: { "p_action_id": string }; Returns: undefined
                            },
 "undo_reorder_draft":
 { Args: { "p_action_id": string }; Returns: undefined

@@ -8,7 +8,7 @@
 // data at all.
 
 import type Anthropic from "@anthropic-ai/sdk";
-import { checkAppointment, describeProblem, pickResource, type BookingContext } from "@/lib/scheduling/booking";
+import { checkAppointment, describeProblem, pickResource, timingFor, type BookingContext } from "@/lib/scheduling/booking";
 import { findOpenings } from "@/lib/scheduling/openings";
 import { formatMinute, fromLocal, isLocalDate, parseTime, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { converse, VOICE, type ClaudeClient, type ToolRunner } from "./claude";
@@ -156,7 +156,7 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
 
         // The same rules as any booking, with a free chair.
         const ctx = await c.calendar(date);
-        const timing = ctx.services.get(service.id);
+        const timing = timingFor(ctx, stylist.id, service.id);
         const resourceId = timing ? pickResource(ctx, { ...timing, serviceId: service.id, staffId: stylist.id, start }) : null;
         const check = checkAppointment(ctx, [{ serviceId: service.id, staffId: stylist.id, resourceId, start }]);
         if (!check.valid) {

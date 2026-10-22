@@ -3,7 +3,7 @@
 // chair. Used by Denise's "Ask Denise" to answer "who's free for a color at
 // 3?". Pure, over a BookingContext from ./load.ts.
 
-import { checkItem, pickResource, type BookedItem, type BookingContext } from "./booking.ts";
+import { checkItem, pickResource, timingFor, type BookedItem, type BookingContext } from "./booking.ts";
 import { fromLocal, type LocalDate } from "./time.ts";
 
 export type OpeningQuery = {
@@ -39,7 +39,7 @@ export function findOpenings(ctx: BookingContext, q: OpeningQuery): Opening[] {
     if (!start || (q.notBefore && start < q.notBefore)) continue;
     for (const staff of stylists) {
       if (openings.length >= limit) break;
-      const draft: BookedItem = { ...service, serviceId: service.id, staffId: staff.id, start };
+      const draft: BookedItem = { ...timingFor(ctx, staff.id, service.id)!, serviceId: service.id, staffId: staff.id, start };
       const resourceId = pickResource(ctx, draft);
       if (!resourceId && [...ctx.resources.values()].some((r) => r.kind === "chair" && r.isActive)) continue;
       if (checkItem(ctx, { serviceId: service.id, staffId: staff.id, resourceId, start }).valid) {

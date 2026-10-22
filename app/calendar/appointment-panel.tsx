@@ -7,6 +7,7 @@ import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { Eyebrow, fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { CalendarIcon, ClockIcon, CloseIcon, HourglassIcon } from "@/components/ui/icons";
 import { StatusChip } from "@/components/ui/status-chip";
+import { ClientInsightCard } from "@/components/client-insight";
 import { ServiceTimer } from "@/components/service-timer";
 import { ACTION_LABELS, allowedActions, CANCEL_REASONS, canEditNotes, isEditable, MAX_NOTES, type AppointmentAction } from "@/lib/appointments";
 import type { DeniseState } from "@/lib/denise/types";
@@ -106,6 +107,8 @@ export function AppointmentPanel({
           )}
         </div>
       </div>
+
+      {appointment.insight && <ClientInsightCard insight={appointment.insight} />}
 
       {appointment.group && (
         <div className="rounded-lg border border-navy-200 bg-navy-100/40 px-2.5 py-2" data-testid="group-info">

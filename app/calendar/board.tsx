@@ -180,7 +180,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     const first = !looked.current;
     looked.current = true;
     if (fresh.length) setUnseen((all) => new Set([...all, ...fresh]));
-    if (fresh.some((k) => k.startsWith("conflict:") || (!first && (k.startsWith("reorder:") || k.startsWith("opening:"))))) {
+    // Risks she expects (likely overruns) wait in her badge and brief: they
+    // aren't urgent enough to take over the panel.
+    const urgent = (k: string) => k.startsWith("conflict:") && !k.includes(":likely:");
+    if (fresh.some((k) => urgent(k) || (!first && (k.startsWith("reorder:") || k.startsWith("opening:"))))) {
       setTab("denise");
       setPanelOpen(true);
     }

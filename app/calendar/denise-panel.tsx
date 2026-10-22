@@ -6,6 +6,7 @@ import { DeniseFace, DenisePose, type Pose } from "@/components/denise";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/field";
 import { CheckCircleIcon, ChevronDownIcon, ClockIcon, SendIcon, UndoIcon } from "@/components/ui/icons";
+import type { Brief } from "@/lib/denise/brief";
 import type { BookingSuggestion, ChatMessage, ConflictView, DeniseState, FixView, OpeningMatch, WaitlistOpening } from "@/lib/denise/types";
 import { formatLongDay } from "@/lib/schedule-format";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
@@ -105,6 +106,8 @@ export function DenisePanel({
           )}
         </div>
       )}
+
+      {state?.brief && <BriefCard brief={state.brief} />}
 
       {conflicts.map((c, i) => (
         <ConflictCard
@@ -459,5 +462,47 @@ function SuggestionCard({
         <p className="text-xs text-ink-muted">The front desk can book this.</p>
       )}
     </section>
+  );
+}
+
+// The morning brief: what today holds, in a sentence or two, with the
+// details underneath.
+function BriefCard({ brief }: { brief: Brief }) {
+  const f = brief.facts;
+  return (
+    <details open className="group rounded-xl border border-denise-200 bg-surface" data-testid="denise-brief">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 font-semibold text-denise-900 [&::-webkit-details-marker]:hidden">
+        Today&rsquo;s brief
+        <span className="text-xs font-normal text-ink-muted">{brief.writtenBy === "claude" ? "Written by Denise" : "From the calendar"}</span>
+      </summary>
+      <div className="flex flex-col gap-3 border-t border-denise-100 px-3 py-3">
+        <p className="text-ink" data-testid="denise-brief-text">
+          {brief.text}
+        </p>
+        {f.likelyNoShows.length > 0 && (
+          <BriefList title="Might not show" items={f.likelyNoShows.map((n) => `${n.client}, ${n.time} · missed ${n.noShowPercent}% of ${n.visits} visits`)} />
+        )}
+        {f.dueNotBooked.top.length > 0 && (
+          <BriefList
+            title={`Due back, nothing booked (${f.dueNotBooked.total})`}
+            items={f.dueNotBooked.top.map((d) => `${d.client}${d.usualWeeks ? ` · every ~${d.usualWeeks} wk` : ""}${d.overdueDays ? ` · ${d.overdueDays} days overdue` : " · due now"}`)}
+          />
+        )}
+        {f.lowStock.length > 0 && <BriefList title="Low for today's services" items={f.lowStock} />}
+      </div>
+    </details>
+  );
+}
+
+function BriefList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold tracking-wide text-ink-muted uppercase">{title}</p>
+      <ul className="mt-1 flex flex-col gap-0.5 text-ink">
+        {items.map((i) => (
+          <li key={i}>{i}</li>
+        ))}
+      </ul>
+    </div>
   );
 }

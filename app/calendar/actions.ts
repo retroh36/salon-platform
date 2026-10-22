@@ -72,6 +72,8 @@ export type VisitLineInput = {
   startMinute: number;
   // "any" for any free chair, "none" for no chair, or a resource id.
   resource: string;
+  // This booking's own length, e.g. the stylist's usual time.
+  minutes?: number;
 };
 
 export type VisitInput = {
@@ -125,7 +127,9 @@ export async function saveVisit(input: VisitInput): Promise<SaveVisitResult> {
     const resource =
       line.resource === "any" ? ({ kind: "any" } as const) : line.resource === "none" ? ({ kind: "none" } as const) : ({ kind: "exact", id: line.resource } as const);
     if (resource.kind === "exact" && !isUuid(resource.id)) lineErrors[n].push("Choose a chair.");
-    if (start) items.push({ id: line.id, serviceId: line.serviceId, staffId: line.staffId, start, resource });
+    const minutes = line.minutes;
+    if (minutes !== undefined && (!Number.isInteger(minutes) || minutes < 5 || minutes > 480 || minutes % 5 !== 0)) lineErrors[n].push("Choose a length in 5-minute steps.");
+    if (start) items.push({ id: line.id, serviceId: line.serviceId, staffId: line.staffId, start, resource, minutes });
   });
   if (lineErrors.some((e) => e.length)) return { ok: false, message: "Fill in each service.", lineErrors };
 

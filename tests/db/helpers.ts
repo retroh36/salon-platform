@@ -98,3 +98,15 @@ export async function requireDemoData() {
   if (error) throw error;
   if (!count) throw new Error("These tests need the demo data. Run `npm run seed:demo` first.");
 }
+
+// Denise's risk check flags visits likely to run over from what she's
+// learned. Tests about reported problems set that aside, then restore it.
+export async function setAsideLearnedDurations() {
+  const { error } = await admin.from("insights").delete().eq("business_id", SEED.business).eq("kind", "duration");
+  if (error) throw error;
+}
+
+export async function restoreLearnedDurations() {
+  const { computeInsights } = await import("@/lib/insights/compute");
+  await computeInsights(admin, SEED.business);
+}

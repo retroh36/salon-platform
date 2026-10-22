@@ -46,6 +46,9 @@ const MAX_BUMPS = 2;
 
 export type Disruption =
   | { id: string; kind: "overrun"; itemId: string; minutes: number }
+  // Not reported: Denise expects it, because the stylist usually takes this
+  // much longer for the service than it's booked for (lib/insights/).
+  | { id: string; kind: "likely_overrun"; itemId: string; minutes: number }
   | { id: string; kind: "client_late"; appointmentId: string; minutes: number }
   | { id: string; kind: "call_out"; staffId: string; from: Date };
 
@@ -117,6 +120,12 @@ export function activeDisruptions(day: Pick<Day, "ctx" | "statuses" | "disruptio
       return appointmentId !== undefined && day.statuses.get(appointmentId!) === "checked_in";
     }
     if (d.kind === "client_late") return isMovable(day.statuses.get(d.appointmentId));
+    // Expected overruns: visits that haven't started (or are just under way).
+    if (d.kind === "likely_overrun") {
+      const appointmentId = appointmentOf.get(d.itemId);
+      const status = appointmentId === undefined ? undefined : day.statuses.get(appointmentId!);
+      return status === "booked" || status === "confirmed" || status === "checked_in";
+    }
     return true;
   });
 }
@@ -131,7 +140,7 @@ export function effectiveCalendar(ctx: BookingContext, disruptions: readonly Dis
   const overruns = new Map<string, number>();
   const late = new Map<string, number>();
   for (const d of disruptions) {
-    if (d.kind === "overrun") overruns.set(d.itemId, d.minutes);
+    if (d.kind === "overrun" || d.kind === "likely_overrun") overruns.set(d.itemId, Math.max(d.minutes, overruns.get(d.itemId) ?? 0));
     if (d.kind === "client_late") late.set(d.appointmentId, d.minutes);
   }
   if (!overruns.size && !late.size) return ctx;
@@ -179,7 +188,7 @@ export function findConflicts(day: Day): Conflict[] {
     const broken = (exclude: Set<string>) =>
       items.filter((b) => !exclude.has(b.id) && plainProblems.get(b.id)!.length === 0 && problemsOf(effOfD, effItems.get(b.id)!).length > 0).map((b) => b.id);
 
-    if (d.kind === "overrun") {
+    if (d.kind === "overrun" || d.kind === "likely_overrun") {
       const cause = byId.get(d.itemId);
       if (!cause) continue;
       const hit = broken(new Set([d.itemId]));
@@ -187,8 +196,8 @@ export function findConflicts(day: Day): Conflict[] {
       hit.forEach((id) => explained.add(id));
       conflicts.push(
         resolveConflict(day, eff, {
-          subject: `overrun:${d.id}`,
-          kind: "overrun",
+          subject: `${d.kind === "overrun" ? "overrun" : "likely"}:${d.id}`,
+          kind: d.kind,
           disruptionId: d.id,
           staffId: cause.staffId,
           minutes: d.minutes,

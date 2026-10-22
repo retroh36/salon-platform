@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { clientInsight, timeOfDay, type ClientVisit } from "@/lib/insights/clients";
+import { describeClient, minutesText, usualTime } from "@/lib/insights/describe";
 import { consistencyOf, kendallTau, MIN_VISITS, stylistDurations, trendOf, type DurationSample } from "@/lib/insights/durations";
 import { salonInsight, type SalonItem } from "@/lib/insights/salon";
 import { ceilTo, median, mode, quantile, withoutOutliers } from "@/lib/insights/stats";
@@ -249,5 +250,35 @@ describe("salon patterns", () => {
       { staffId: "shae", visits: 1, rebookedRate: 0 },
     ]);
     expect(s.rebookedRate).toBe(0.5);
+  });
+});
+
+describe("describing a client", () => {
+  const base = clientInsight([], T0);
+  const names = { staff: (id: string) => ({ nola: "Nola" })[id] ?? null, dayOf: () => "Tue, Nov 3" };
+  const habits = { ...base, visits: 6, intervalDays: 42, preferredStaffId: "nola", preferredWeekday: 6, timeOfDay: "morning" as const, due: "overdue" as const, overdueDays: 4 };
+
+  it("says how often they come, when and with whom, and if they're due", () => {
+    const d = describeClient(habits, { lifetimeSpendCents: 54000, averageVisitCents: 9000, retailRate: 0.1 }, names, T0);
+    expect(d.summary).toBe("Comes every ~6 weeks, usually Saturday mornings with Nola, slightly overdue, rarely buys retail.");
+    expect(d.tags).toEqual([{ label: "$540 over 6 visits", tone: "neutral" }]);
+  });
+
+  it("leaves out spend for stylists, and flags risks", () => {
+    const d = describeClient({ ...habits, due: "booked", nextBooked: daysAfter(5).toISOString(), lateRate: 0.4, noShowRate: 0.2, churnRisk: "high" }, null, names, T0);
+    expect(d.summary).toBe("Comes every ~6 weeks, usually Saturday mornings with Nola, next visit booked for Tue, Nov 3.");
+    expect(d.tags.map((t) => t.label)).toEqual(["Visits getting further apart", "Late 40% of visits", "No-show 20%"]);
+  });
+
+  it("handles new and one-visit clients, and lapsed ones", () => {
+    expect(describeClient(base, null, names, T0).summary).toBe("New client: no visits yet.");
+    expect(describeClient({ ...base, visits: 1, due: "not_due" }, null, names, T0).summary).toBe("One visit so far.");
+    expect(describeClient({ ...base, visits: 3, intervalDays: 30, due: "lapsed", lastVisit: daysAfter(-70).toISOString() }, null, names, T0).summary).toBe("Comes every ~4 weeks, hasn't been in for 10 weeks.");
+  });
+
+  it("words learned times", () => {
+    expect(minutesText(161)).toBe("2h 41m");
+    expect(minutesText(45)).toBe("45m");
+    expect(usualTime("Bridget", { medianMinutes: 181, visits: 9 })).toBe("Bridget usually takes 3h 1m for this (9 visits)");
   });
 });

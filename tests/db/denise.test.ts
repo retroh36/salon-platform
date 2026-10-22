@@ -7,7 +7,7 @@ import { scanDay, type Viewer } from "@/lib/denise/scan";
 import { changeStatus, saveBooking, type BookingItemInput } from "@/lib/scheduling/book";
 import { reportCallOut, reportRunningLate } from "@/lib/scheduling/disruptions";
 import { fromLocal } from "@/lib/scheduling/time";
-import { admin, createOtherSalon, SEED, signIn, type Client } from "./helpers";
+import { admin, createOtherSalon, restoreLearnedDurations, SEED, setAsideLearnedDurations, signIn, type Client } from "./helpers";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -67,6 +67,8 @@ async function overrunMorning() {
 }
 
 beforeAll(async () => {
+  // Only reported problems here, not the risk check's predictions.
+  await setAsideLearnedDurations();
   other = await createOtherSalon();
   [frontDesk, bridget, gil, otherOwner] = await Promise.all([
     signIn("frontdesk@mapleandash.test"),
@@ -76,7 +78,8 @@ beforeAll(async () => {
   ]);
   const { data } = await admin.from("services").select("id, name").eq("business_id", B);
   services = new Map(data!.map((s) => [s.name, s.id]));
-  const { data: c } = await admin.from("clients").select("id, first_name, last_name").eq("business_id", B).order("id").limit(8);
+  // Seeded clients (ids e0000000-…), not ones other tests left behind.
+  const { data: c } = await admin.from("clients").select("id, first_name, last_name").eq("business_id", B).gte("id", "e0000000-0000-4000-8000-000000000000").order("id").limit(8);
   clients = c!;
   await clearDay();
 });
@@ -85,6 +88,7 @@ afterEach(clearDay);
 
 afterAll(async () => {
   await other?.cleanup();
+  await restoreLearnedDurations();
 });
 
 // ---------------------------------------------------------------------------

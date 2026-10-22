@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import type { LocationSchedule, StaffSchedule, TimeOff, WeeklyHours } from "./availability.ts";
 import { occurrences, occurrenceSpan, type BlockOccurrence, type TimeBlock } from "./blocks.ts";
-import type { BlockedTime, BookedItem, BookingContext } from "./booking.ts";
+import type { BlockedTime, BookedItem, BookingContext, ServiceTiming } from "./booking.ts";
 import type { Interval } from "./intervals.ts";
 import { addDays, fromLocal, MINUTES_PER_DAY, type LocalDate, type Weekday } from "./time.ts";
 
@@ -183,12 +183,13 @@ export async function loadBookingContext(
   if (resources.error) throw resources.error;
 
   const staffIds = staff.data.map((s) => s.id);
-  const [locationSchedule, schedules, booked, offers, blocks] = await Promise.all([
+  const [locationSchedule, schedules, booked, offers, blocks, timings] = await Promise.all([
     loadLocationSchedule(supabase, location),
     loadStaffSchedules(supabase, staffIds, from, to),
     loadBookedItems(supabase, location, from, to),
     loadOffers(supabase, staffIds),
     loadBlockOccurrences(supabase, location.id, from, to),
+    loadStaffTimings(supabase, staffIds),
   ]);
 
   return {
@@ -213,6 +214,7 @@ export async function loadBookingContext(
           isActive: s.is_active,
           schedule: schedules.get(s.id)!,
           serviceIds: new Set(offers.get(s.id)?.keys()),
+          timings: timings.get(s.id),
         },
       ]),
     ),
@@ -267,6 +269,23 @@ export function blockedTimes(list: readonly BlockOccurrence[], timeZone: string)
     const span = occurrenceSpan(o, timeZone);
     return span ? [{ blockId: o.blockId, date: o.date, staffId: o.staffId, kind: o.kind, repeating: o.repeating, ...span }] : [];
   });
+}
+
+// Stylists' own lengths for services (where set), by staff id.
+export async function loadStaffTimings(supabase: Supabase, staffIds: string[]): Promise<Map<string, Map<string, ServiceTiming>>> {
+  const timings = new Map<string, Map<string, ServiceTiming>>();
+  if (!staffIds.length) return timings;
+  const { data, error } = await supabase
+    .from("staff_services")
+    .select("staff_id, service_id, active_minutes, processing_minutes, finishing_minutes")
+    .in("staff_id", staffIds)
+    .not("active_minutes", "is", null);
+  if (error) throw error;
+  for (const t of data) {
+    if (!timings.has(t.staff_id)) timings.set(t.staff_id, new Map());
+    timings.get(t.staff_id)!.set(t.service_id, { activeMinutes: t.active_minutes!, processingMinutes: t.processing_minutes!, finishingMinutes: t.finishing_minutes! });
+  }
+  return timings;
 }
 
 // Which services each staff member offers, with their price for each (null

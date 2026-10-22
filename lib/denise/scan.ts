@@ -12,6 +12,7 @@ import { loadBookingContext } from "@/lib/scheduling/load";
 import { activeDisruptions, effectiveCalendar, findConflicts, type Conflict, type Day, type FixOption } from "@/lib/scheduling/resolve";
 import { todayIn, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { fullName } from "@/lib/staff";
+import { likelyOverruns, type LearnedTime } from "./risk";
 import type { ConflictView, DeniseNotice, DeniseState } from "./types";
 import { clock, factsFor, headline, intro, moves, note, summary, templateReason, visitChanges, type Lookup, type Visit } from "./wording";
 
@@ -75,6 +76,21 @@ export async function loadDay(supabase: Supabase, viewer: Viewer, date: LocalDat
   };
 }
 
+// How long each stylist on the day really takes for the services booked.
+async function loadLearnedTimes(supabase: Supabase, ctx: Day["ctx"]): Promise<Map<string, LearnedTime>> {
+  const keys = [...new Set(ctx.booked.map((b) => `${b.staffId}:${b.serviceId}`))];
+  const learned = new Map<string, LearnedTime>();
+  for (let i = 0; i < keys.length; i += 150) {
+    const { data, error } = await supabase.from("insights").select("key, data").eq("kind", "duration").in("key", keys.slice(i, i + 150));
+    if (error) throw error;
+    for (const r of data) {
+      const d = r.data as { medianMinutes: number; trusted: boolean };
+      learned.set(r.key, { medianMinutes: d.medianMinutes, trusted: d.trusted });
+    }
+  }
+  return learned;
+}
+
 // Adjusts a calendar for the day's reports, for checking a fix again before
 // it's applied.
 export function adjustFor(day: Day) {
@@ -88,10 +104,15 @@ export async function scanDay(
   supabase: Supabase,
   viewer: Viewer,
   date: LocalDate,
-  options: { now?: Date; explain?: Explainer | null } = {},
+  // system: the nightly risk check, recording proposals as the server.
+  options: { now?: Date; explain?: Explainer | null; system?: boolean } = {},
 ): Promise<DeniseState> {
   const now = options.now ?? new Date();
-  const { day, lookup } = await loadDay(supabase, viewer, date, now);
+  const loaded = await loadDay(supabase, viewer, date, now);
+  const { lookup } = loaded;
+  // The risk check: visits likely to run over, from what Denise has learned.
+  const learned = await loadLearnedTimes(supabase, loaded.day.ctx);
+  const day = { ...loaded.day, disruptions: [...loaded.day.disruptions, ...likelyOverruns(loaded.day.ctx, loaded.day.statuses, learned, now, loaded.day.disruptions)] };
   const conflicts = findConflicts(day);
   const prefix = `${date}:`;
 
@@ -135,31 +156,36 @@ export async function scanDay(
     const subject = `${prefix}${w.conflict.subject}`;
     let ids: (string | null)[] = w.options.map(() => null);
     if (viewer.canBook) {
-      const recorded = await recordProposals(supabase, viewer.location.id, {
-        feature: FEATURE,
-        subject,
-        options: w.options.map((o): ProposalOption => {
-          const minute = (d: Date) => toLocal(d, lookup.timeZone).minute;
-          const visits = notificationsFor(visitChanges(o.option, lookup));
-          const breaks = blockNotifications(o.option.blockMoves.map((b) => ({ staffId: b.staffId, kind: b.kind, from: minute(b.from.start), to: minute(b.to.start) })));
-          return {
-            summary: o.summary,
-            reason: o.reason,
-            proposal: {
-              changes: o.option.moves,
-              notifications: [...visits.notifications, ...breaks.notifications],
-              undoNotifications: [...visits.undo, ...breaks.undo],
-              resolves: w.conflict.kind === "client_late" && w.conflict.disruptionId ? [w.conflict.disruptionId] : [],
-              blockMoves: o.option.blockMoves.map((b) => ({
-                blockId: b.blockId,
-                date: b.date,
-                from: { start: minute(b.from.start), end: minute(b.from.end) },
-                to: { start: minute(b.to.start), end: minute(b.to.end) },
-              })),
-            },
-          };
-        }),
-      });
+      const recorded = await recordProposals(
+        supabase,
+        viewer.location.id,
+        {
+          feature: FEATURE,
+          subject,
+          options: w.options.map((o): ProposalOption => {
+            const minute = (d: Date) => toLocal(d, lookup.timeZone).minute;
+            const visits = notificationsFor(visitChanges(o.option, lookup));
+            const breaks = blockNotifications(o.option.blockMoves.map((b) => ({ staffId: b.staffId, kind: b.kind, from: minute(b.from.start), to: minute(b.to.start) })));
+            return {
+              summary: o.summary,
+              reason: o.reason,
+              proposal: {
+                changes: o.option.moves,
+                notifications: [...visits.notifications, ...breaks.notifications],
+                undoNotifications: [...visits.undo, ...breaks.undo],
+                resolves: w.conflict.kind === "client_late" && w.conflict.disruptionId ? [w.conflict.disruptionId] : [],
+                blockMoves: o.option.blockMoves.map((b) => ({
+                  blockId: b.blockId,
+                  date: b.date,
+                  from: { start: minute(b.from.start), end: minute(b.from.end) },
+                  to: { start: minute(b.to.start), end: minute(b.to.end) },
+                })),
+              },
+            };
+          }),
+        },
+        { asSystem: options.system },
+      );
       // Staff dismissed this one.
       if (w.options.length && !recorded.length) continue;
       ids = recorded;
@@ -187,10 +213,10 @@ export async function scanDay(
   if (viewer.canBook) {
     const current = new Set(views.map((v) => v.subject));
     const gone = new Set([...existing.keys()].map((k) => k.split("#")[0]).filter((s) => !current.has(s)));
-    for (const subject of gone) await recordProposals(supabase, viewer.location.id, { feature: FEATURE, subject, options: [] });
+    for (const subject of gone) await recordProposals(supabase, viewer.location.id, { feature: FEATURE, subject, options: [] }, { asSystem: options.system });
   }
 
-  return { date, conflicts: views, notices: lateNotices(day, lookup, date, conflicts), reorders: [], openings: [], connected: false };
+  return { date, conflicts: views, notices: lateNotices(day, lookup, date, conflicts), reorders: [], openings: [], brief: null, connected: false };
 }
 
 // Clients due a little while ago who haven't checked in, today only.

@@ -25,6 +25,8 @@ type Line = {
   startMinute: number | null;
   // "any", "none" or a resource id.
   resource: string;
+  // This booking's own length (e.g. the stylist's usual time), if chosen.
+  minutes?: number;
 };
 
 
@@ -81,8 +83,10 @@ export function BookingPanel({
     if (!service) return null;
     const old = l.id ? original.get(l.id) : undefined;
     const keeps = old && old.serviceId === l.serviceId;
+    // The stylist's own length for a new service, if they have one.
+    const usual = menu.timings[l.staffId]?.[l.serviceId] ?? service.minutes;
     return {
-      minutes: keeps ? old.end - old.start : service.minutes,
+      minutes: l.minutes ?? (keeps ? old.end - old.start : usual),
       priceCents: keeps && old.staffId === l.staffId ? old.priceCents : priceFor(service.priceCents, menu.offers[l.staffId]?.[l.serviceId]),
     };
   }
@@ -96,7 +100,9 @@ export function BookingPanel({
 
   const update = (key: number, change: Partial<Line>) => {
     setPreview(null);
-    setLines((all) => all.map((l) => (l.key === key ? { ...l, ...change } : l)));
+    // A different service or stylist starts from their length again.
+    const reset = "serviceId" in change || "staffId" in change ? { minutes: undefined } : {};
+    setLines((all) => all.map((l) => (l.key === key ? { ...l, ...reset, ...change } : l)));
   };
   const changeRepeat = (change: Partial<typeof repeat>) => {
     setPreview(null);
@@ -133,7 +139,7 @@ export function BookingPanel({
       date: data.date,
       clientId: client?.id ?? null,
       notes,
-      lines: lines.map((l) => ({ id: l.id, serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute ?? -1, resource: l.resource })),
+      lines: lines.map((l) => ({ id: l.id, serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute ?? -1, resource: l.resource, minutes: l.minutes })),
     };
     startTransition(async () => {
       // A new series: check every visit first, then book what staff chose.
@@ -296,6 +302,15 @@ export function BookingPanel({
                   </button>
                 )}
               </div>
+              {info && (
+                <UsualLength
+                  learned={menu.learned[`${l.staffId}:${l.serviceId}`]}
+                  stylist={columns.find((c) => c.staffId === l.staffId)?.firstName ?? "This stylist"}
+                  minutes={info.minutes}
+                  chosen={l.minutes !== undefined}
+                  onUse={(minutes) => update(l.key, { minutes })}
+                />
+              )}
               {errors.length > 0 && (
                 <ul className="list-disc pl-5 text-danger">
                   {errors.map((e) => (
@@ -591,3 +606,44 @@ export function ClientPicker({ client, onChange }: { client: ClientOption | null
     </section>
   );
 }
+
+// Denise's note when a service is booked shorter than the stylist usually
+// takes: "Bridget usually takes 3h 1m for this (9 visits). Book 3h 5m?"
+// Facts from what she's learned (lib/insights/); staff decide.
+function UsualLength({
+  learned,
+  stylist,
+  minutes,
+  chosen,
+  onUse,
+}: {
+  learned: { medianMinutes: number; visits: number } | undefined;
+  stylist: string;
+  minutes: number;
+  chosen: boolean;
+  onUse: (minutes: number) => void;
+}) {
+  if (!learned) return null;
+  const suggested = Math.ceil(learned.medianMinutes / 5) * 5;
+  if (learned.medianMinutes <= minutes + SHORT_BY) {
+    return chosen ? (
+      <p className="text-sm text-denise-700" data-testid="usual-length">
+        Booked at {stylist}&rsquo;s usual length.
+      </p>
+    ) : null;
+  }
+  return (
+    <div role="note" className="flex items-start gap-2 rounded-md border border-denise-200 bg-denise-50 px-2.5 py-2 text-sm text-denise-900" data-testid="usual-length">
+      <DeniseFace size={22} />
+      <p className="flex-1">
+        This is shorter than {stylist} usually takes: {formatMinutes(learned.medianMinutes)} for this ({learned.visits} visits).{" "}
+        <button type="button" className="font-semibold text-denise-700 underline underline-offset-2 hover:text-denise-900" onClick={() => onUse(suggested)}>
+          Book {formatMinutes(suggested)}
+        </button>
+      </p>
+    </div>
+  );
+}
+
+// Warn when the booking is this many minutes shorter than usual.
+const SHORT_BY = 5;

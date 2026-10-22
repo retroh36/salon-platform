@@ -89,6 +89,8 @@ export type AppointmentDetail = {
   series: { id: string; index: number; count: number; intervalWeeks: number } | null;
   // Part of a group booking: its label and the other guests that day.
   group: { id: string; label: string; members: { appointmentId: string; clientName: string; staffName: string; start: number }[] } | null;
+  // What Denise knows about the client ("Comes every ~6 weeks…").
+  insight: { summary: string; tags: { label: string; tone: "neutral" | "good" | "warn" }[] } | null;
   // Patch test problems and forms still to sign, before the visit.
   warnings: { patch: string[]; patchBlocks: boolean; forms: { templateId: string; name: string }[] } | null;
 };
@@ -107,6 +109,11 @@ export type Menu = {
   services: MenuService[];
   // Staff id -> service id -> the stylist's price (null: the menu price).
   offers: Record<string, Record<string, number | null>>;
+  // Staff id -> service id -> the stylist's own length in minutes, where
+  // it differs from the menu.
+  timings: Record<string, Record<string, number>>;
+  // "<staff id>:<service id>" -> how long they really take (trusted only).
+  learned: Record<string, { medianMinutes: number; visits: number }>;
   resources: { id: string; name: string }[];
   // Back-bar products, for formulas.
   products: PickerProduct[];

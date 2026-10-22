@@ -8,7 +8,7 @@
 // either way), the same time with another stylist who does the service,
 // then the same time on a nearby day (up to 3 days either way).
 
-import { checkItem, pickResource, type BookedItem, type BookingContext, type BookingProblem } from "./booking.ts";
+import { checkItem, pickResource, timingFor, type BookedItem, type BookingContext, type BookingProblem } from "./booking.ts";
 import { addDays, fromLocal, MINUTES_PER_DAY, type LocalDate } from "./time.ts";
 
 export const MAX_VISITS = 52;
@@ -59,7 +59,7 @@ export function checkVisitOn(ctx: BookingContext, lines: readonly VisitLine[], d
     let resourceId: string | null = line.resource === "none" ? null : line.resource === "any" ? null : line.resource;
     const mine: BookingProblem[] = [];
     if (line.resource === "any") {
-      resourceId = pickResource(calendar, { ...service, serviceId: service.id, staffId: line.staffId, start }, null, accepted);
+      resourceId = pickResource(calendar, { ...timingFor(ctx, line.staffId, service.id)!, serviceId: service.id, staffId: line.staffId, start }, null, accepted);
       if (!resourceId) mine.push({ code: "no_free_resource" });
     }
     const check = checkItem(calendar, { serviceId: line.serviceId, staffId: line.staffId, resourceId, start }, accepted);
