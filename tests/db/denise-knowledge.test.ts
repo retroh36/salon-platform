@@ -30,8 +30,9 @@ const PRIVATE = /@|\(\d{3}\)|\d{3}-\d{4}|allerg|phone|email|"notes"|address/i;
 describe("as a stylist", () => {
   const k = () => knowledgeFor(shae, asker("stylist", SEED.staff.shae));
 
-  it("sees only their own durations, even when asking about someone else", async () => {
-    const mine = (await k().durations({ staffId: SEED.staff.bridget, serviceId: null })) as { rows: { stylist: string }[]; scope: string };
+  it("sees only their own durations, and is told so when asking about someone else", async () => {
+    expect(await k().durations({ staffId: SEED.staff.bridget, serviceId: null })).toEqual({ restricted: "Stylists can see their own times only, not other stylists'." });
+    const mine = (await k().durations({ staffId: null, serviceId: null })) as { rows: { stylist: string }[]; scope: string };
     expect(mine.scope).toBe("your own services");
     expect(mine.rows.length).toBeGreaterThan(0);
     expect(new Set(mine.rows.map((r) => r.stylist))).toEqual(new Set(["Shae"]));
@@ -91,6 +92,9 @@ describe("as the owner", () => {
     const range = salesRange("last_30_days", today);
     expect(out).toMatchObject({ from: range.from, to: range.to });
     expect(out.previous_period.from).toBe(addDays(range.from, -30));
+    // The change is worked out for Claude, not by it.
+    const o = out as unknown as { total_dollars: number; previous_period: { total_dollars: number }; change: { total_dollars: number } };
+    expect(o.change.total_dollars).toBeCloseTo(o.total_dollars - o.previous_period.total_dollars, 2);
 
     // The same sums, worked out independently.
     const start = startOfLocalDay(range.from, TZ).toISOString();

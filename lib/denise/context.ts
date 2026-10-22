@@ -63,6 +63,7 @@ export async function assistantContext(supabase: Supabase, me: Asking, date: Loc
       return id ?? null;
     },
     asker: ROLE_NAMES[me.role],
+    askerName: staff.data.find((m) => m.id === me.staffId)?.first_name,
     knowledge: knowledgeFor(supabase, me),
   };
 }

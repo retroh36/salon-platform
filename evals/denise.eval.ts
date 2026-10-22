@@ -12,6 +12,8 @@
 // Prints a table of results with the tools used and tokens spent. The
 // API key is never printed.
 
+import { writeFileSync } from "node:fs";
+import path from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/database.types";
@@ -72,6 +74,8 @@ type Case = {
   // Tools that must not be called.
   notTools?: string[];
   facts: () => Promise<Facts>;
+  // Every dollar amount in the answer must appear in a tool result.
+  numbersFromTools?: boolean;
   // Null when the answer is right; otherwise why not.
   check: (answer: string, facts: Facts) => string | null;
 };
@@ -244,7 +248,9 @@ const CASES: Case[] = [
       const range = salesRange("last_30_days", today);
       return { from: range.from };
     },
+    // Every dollar figure must be one the tool gave (checked in the run).
     check: (a) => (/\$\s?[\d,]+/.test(a) ? null : "should give dollar figures"),
+    numbersFromTools: true,
   },
   {
     question: "How much did the salon make this week?",
@@ -259,7 +265,11 @@ const CASES: Case[] = [
     as: "stylist",
     tools: ["stylist_durations"],
     facts: async () => ({ bridget: (await duration(STAFF.bridget, "Balayage")).medianMinutes }),
-    check: (a, f) => (has(a, ...mins(f.bridget as number)) ? "a stylist shouldn't see another stylist's times" : null),
+    check: (a, f) => {
+      if (has(a, ...mins(f.bridget as number))) return "a stylist shouldn't see another stylist's times";
+      // Not "she has no timed visits": that isn't true.
+      return /own times|only see|can't see|can only|not other/i.test(a) ? null : "should say stylists see only their own times";
+    },
   },
   {
     question: "Am I getting any faster at women's cuts?",
@@ -311,7 +321,18 @@ const CASES: Case[] = [
   },
 ];
 
-type Result = { n: number; as: Role; question: string; ok: boolean; why: string; tools: string[]; tokens: number };
+type Usage = { input: number; output: number; cacheRead: number };
+type Result = { n: number; as: Role; question: string; ok: boolean; why: string; answer: string; tools: string[]; usage: Record<string, Usage> };
+
+// Per million tokens: [input, output, cache reads] (Claude Haiku 5.5 with
+// prompts of 100K tokens or fewer; Claude Sonnet 5.5).
+const PRICES: Record<string, [number, number, number]> = { "claude-haiku-5-5": [0.1, 0.5, 0.01], "claude-sonnet-5-5": [2, 10, 0.2] };
+const costOf = (usage: Record<string, Usage>) =>
+  Object.entries(usage).reduce((sum, [model, u]) => {
+    const [i, o, c] = PRICES[model] ?? [0, 0, 0];
+    return sum + ((u.input - u.cacheRead) * i + u.cacheRead * c + u.output * o) / 1_000_000;
+  }, 0);
+const tokensOf = (usage: Record<string, Usage>) => Object.values(usage).reduce((sum, u) => sum + u.input + u.output, 0);
 const results: Result[] = [];
 const clients = new Map<Role, Supabase>();
 const contexts = new Map<Role, AssistantContext>();
@@ -328,8 +349,24 @@ beforeAll(async () => {
 
 afterAll(() => {
   const passed = results.filter((r) => r.ok).length;
-  const lines = results.map((r) => `${r.ok ? "PASS" : "FAIL"}  #${String(r.n).padStart(2)} [${r.as}] ${r.question}\n        tools: ${r.tools.join(", ") || "none"}${DRY ? "" : ` · ${r.tokens} tokens`}${r.ok ? "" : `\n        ${r.why}`}`);
-  console.log(`\nAsk Denise eval${DRY ? " (dry run: no API calls)" : ""}: ${passed} of ${results.length} passed${DRY ? "" : `, ${results.reduce((s, r) => s + r.tokens, 0)} tokens`}\n\n${lines.join("\n")}\n`);
+  const total: Record<string, Usage> = {};
+  for (const r of results) {
+    for (const [m, u] of Object.entries(r.usage)) {
+      const t = (total[m] ??= { input: 0, output: 0, cacheRead: 0 });
+      t.input += u.input;
+      t.output += u.output;
+      t.cacheRead += u.cacheRead;
+    }
+  }
+  const lines = results
+    .sort((a, b) => a.n - b.n)
+    .map((r) => `${r.ok ? "PASS" : "FAIL"}  #${String(r.n).padStart(2)} [${r.as}] ${r.question}\n        tools: ${r.tools.join(", ") || "none"}${DRY ? "" : ` · ${Object.keys(r.usage).join(", ")} · ${tokensOf(r.usage)} tokens · $${costOf(r.usage).toFixed(4)}`}\n        answer: ${r.answer}${r.ok ? "" : `\n        why: ${r.why}`}`);
+  const byModel = Object.entries(total).map(([m, u]) => `${m}: ${u.input} in (${u.cacheRead} cached), ${u.output} out`).join("; ");
+  const report = `\nAsk Denise eval${DRY ? " (dry run: no API calls)" : ""}: ${passed} of ${results.length} passed${DRY ? "" : `\nTokens: ${tokensOf(total)} (${byModel}) · cost $${costOf(total).toFixed(4)}`}\n\n${lines.join("\n")}\n`;
+  // Straight to the terminal (Vitest hides console output when tests pass),
+  // and to evals/denise-report.txt (not committed).
+  process.stdout.write(report);
+  writeFileSync(path.join(import.meta.dirname, "denise-report.txt"), report);
 });
 
 describe("Ask Denise", () => {
@@ -345,25 +382,37 @@ describe("Ask Denise", () => {
         const missing = c.tools.filter((t) => !available.includes(t));
         const forbidden = (c.notTools ?? []).filter((t) => available.includes(t));
         const ok = (c.tools.length === 0 || missing.length < c.tools.length) && forbidden.length === 0;
-        results.push({ n: i + 1, as: c.as, question, ok, why: `missing tools ${missing.join(", ")}; offered forbidden ${forbidden.join(", ")}`, tools: [], tokens: 0 });
+        results.push({ n: i + 1, as: c.as, question, ok, why: `missing tools ${missing.join(", ")}; offered forbidden ${forbidden.join(", ")}`, answer: "(dry run)", tools: [], usage: {} });
         expect(ok).toBe(true);
         return;
       }
 
       // Real call: record the tools used and the tokens spent.
       const used: string[] = [];
-      let tokens = 0;
+      const usage: Record<string, Usage> = {};
       const real = claudeClient()!;
       const counting = {
         messages: {
           create: async (...args: Parameters<typeof real.messages.create>) => {
             const r = await real.messages.create(...args);
-            tokens += (r.usage?.input_tokens ?? 0) + (r.usage?.output_tokens ?? 0);
+            const u = (usage[String(args[0].model)] ??= { input: 0, output: 0, cacheRead: 0 });
+            u.input += (r.usage?.input_tokens ?? 0) + (r.usage?.cache_read_input_tokens ?? 0) + (r.usage?.cache_creation_input_tokens ?? 0);
+            u.cacheRead += r.usage?.cache_read_input_tokens ?? 0;
+            u.output += r.usage?.output_tokens ?? 0;
             return r;
           },
         },
       };
-      const watched = { ...runner, run: async (name: string, input: unknown) => (used.push(name), runner.run(name, input)) };
+      const outputs: string[] = [];
+      const watched = {
+        ...runner,
+        run: async (name: string, input: unknown) => {
+          used.push(name);
+          const out = await runner.run(name, input);
+          outputs.push(out);
+          return out;
+        },
+      };
       const answer = await converse(counting, systemPrompt(ctx), [{ role: "user", text: question }], watched, modelFor(question));
 
       const problems: string[] = [];
@@ -371,7 +420,16 @@ describe("Ask Denise", () => {
       for (const t of c.notTools ?? []) if (used.includes(t)) problems.push(`shouldn't call ${t}`);
       const wrong = c.check(answer, facts);
       if (wrong) problems.push(wrong);
-      results.push({ n: i + 1, as: c.as, question, ok: problems.length === 0, why: `${problems.join("; ")}\n        answer: ${answer}`, tools: [...new Set(used)], tokens });
+      // On every answer: plain text, and no guessing anyone's gender.
+      if (/\*\*|^#/m.test(answer)) problems.push("uses markdown");
+      if (c.numbersFromTools) {
+        const given = outputs.join(" ");
+        const amounts = [...answer.matchAll(/\$\s?([\d,]+(?:\.\d+)?)/g)].map((m) => Number(m[1].replace(/,/g, "")));
+        const made = amounts.filter((x) => !given.includes(String(x)) && !given.includes(x.toFixed(2)));
+        if (made.length) problems.push(`dollar figures not from a tool: ${made.join(", ")}`);
+      }
+      if (/\b(he|she|his|her|hers|him)\b/i.test(answer)) problems.push("assumes someone's gender");
+      results.push({ n: i + 1, as: c.as, question, ok: problems.length === 0, why: problems.join("; "), answer: answer.replace(/\s+/g, " "), tools: [...new Set(used)], usage });
       expect(problems, answer).toEqual([]);
     });
   });

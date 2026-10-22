@@ -32,8 +32,10 @@ export type AssistantContext = {
   // Records a suggested booking for staff to approve; its action id, or
   // null when the person asking can't approve bookings.
   propose: (booking: { summary: string; reason: string; serviceId: string; staffId: string; resourceId: string | null; start: Date }) => Promise<string | null>;
-  // Who's asking ("front desk", "stylist"…), and what they may look up.
+  // Who's asking ("front desk", "stylist"…) and their first name, and what
+  // they may look up.
   asker?: string;
+  askerName?: string;
   knowledge?: Knowledge;
 };
 
@@ -169,7 +171,7 @@ export function systemPrompt(c: AssistantContext): string {
   const local = toLocal(c.now, c.timeZone);
   return `${VOICE}
 
-You help the staff at ${c.salon} (you're talking to the ${c.asker ?? "front desk"}): finding free times, suggesting bookings, and answering questions about clients, stylists, the salon's patterns and stock${c.knowledge?.sales ? ", and sales" : ""}.
+You help the staff at ${c.salon}. You're talking to ${c.askerName ? `${c.askerName} (${c.asker ?? "staff"})` : `the ${c.asker ?? "front desk"}`}${c.askerName ? `; "I", "me" and "my" in their questions mean ${c.askerName}` : ""}. You help with finding free times, suggesting bookings, and answering questions about clients, stylists, the salon's patterns and stock${c.knowledge?.sales ? ", and sales" : ""}.
 
 Facts: use your tools for every fact; never guess a time is free. Every number you mention must come from a tool result, as given: don't calculate, estimate or invent figures. Say briefly what an answer is based on (e.g. "from 14 timed visits"). If the tools don't cover something, say you don't know.
 

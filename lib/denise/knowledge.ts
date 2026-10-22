@@ -129,6 +129,8 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
     },
 
     async durations({ staffId, serviceId }) {
+      // Stylists see their own times only, and are told so.
+      if (isStylist && staffId && staffId !== me.staffId) return { restricted: "Stylists can see their own times only, not other stylists'." };
       const only = isStylist ? me.staffId : staffId;
       const all = await loadDurations(supabase, me.businessId, only ? [only] : undefined);
       const { staff, services } = await lookups();
@@ -242,7 +244,21 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
           const range = salesRange(period, me.today);
           const previous = { from: addDays(range.from, -daysIn(range)), to: addDays(range.from, -1) };
           const [now, before] = await Promise.all([salesBetween(supabase, me, range.from, range.to), salesBetween(supabase, me, previous.from, previous.to)]);
-          return { period, from: range.from, to: range.to, ...now, previous_period: { from: previous.from, to: previous.to, ...before } };
+          // The changes, worked out here so Claude doesn't have to.
+          return {
+            period,
+            from: range.from,
+            to: range.to,
+            ...now,
+            previous_period: { from: previous.from, to: previous.to, ...before },
+            change: {
+              total_dollars: dollars(Math.round((now.total_dollars - before.total_dollars) * 100)),
+              total_percent: before.total_dollars ? Math.round(((now.total_dollars - before.total_dollars) / before.total_dollars) * 1000) / 10 : null,
+              visits: now.visits_checked_out - before.visits_checked_out,
+              average_visit_dollars: now.average_visit_dollars !== null && before.average_visit_dollars !== null ? dollars(Math.round((now.average_visit_dollars - before.average_visit_dollars) * 100)) : null,
+              no_shows: now.no_shows - before.no_shows,
+            },
+          };
         }
       : null,
 

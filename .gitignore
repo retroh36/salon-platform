@@ -45,3 +45,4 @@ yarn-error.log*
 /blob-report/
 /e2e/.auth/
 /.next-e2e/
+/evals/denise-report.txt
