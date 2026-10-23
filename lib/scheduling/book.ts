@@ -206,7 +206,12 @@ export async function moveItem(
   });
 }
 
-export type StatusResult = { ok: true } | { ok: false; error: "not_found" | "not_allowed" | "needs_reason" | "forbidden" };
+// "patch_test": the salon blocks visits without a patch test in order, and
+// this one's isn't (message: which services); a manager or owner can
+// override it with a reason (checkInPatchOverride).
+export type StatusResult = { ok: true } | { ok: false; error: "not_found" | "not_allowed" | "needs_reason" | "forbidden" } | { ok: false; error: "patch_test"; message: string };
+
+const isPatchTestBlock = (e: { code?: string; hint?: string } | null) => e?.code === "55000" && e.hint === "patch_test";
 
 export async function changeStatus(
   supabase: Supabase,
@@ -226,7 +231,20 @@ export async function changeStatus(
     p_reason: reason ?? "",
   });
   if (rpcError?.code === "42501") return { ok: false, error: "forbidden" };
+  if (isPatchTestBlock(rpcError)) return { ok: false, error: "patch_test", message: rpcError!.message };
   if (rpcError) throw rpcError;
+  return { ok: true };
+}
+
+// A manager or owner checks a client in without the patch test the salon
+// requires, saying why (logged in appointment_events).
+export async function checkInPatchOverride(supabase: Supabase, appointmentId: string, reason: string): Promise<StatusResult> {
+  if (!reason.trim()) return { ok: false, error: "needs_reason" };
+  const { error } = await supabase.rpc("check_in_patch_override", { p_appointment_id: appointmentId, p_reason: reason.trim().slice(0, 300) });
+  if (error?.code === "42501") return { ok: false, error: "forbidden" };
+  if (error?.code === "22023") return { ok: false, error: "needs_reason" };
+  if (error?.code === "55000") return { ok: false, error: "not_allowed" };
+  if (error) throw error;
   return { ok: true };
 }
 

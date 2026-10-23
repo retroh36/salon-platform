@@ -241,6 +241,48 @@ test.describe("front desk", () => {
   });
 });
 
+test.describe("when the salon requires patch tests", () => {
+  test.use({ viewport: { width: 1180, height: 820 } });
+  test.beforeAll(async () => {
+    await admin.from("businesses").update({ patch_test_enforcement: "block" }).eq("id", B);
+  });
+  test.afterAll(async () => {
+    await admin.from("businesses").update({ patch_test_enforcement: "warn" }).eq("id", B);
+  });
+
+  test("the front desk can't check in without one; an owner can, with a reason, kept in the visit's history", async ({ browser }) => {
+    const id = await book(await client("Gate"), "Gloss / Toner", fromLocal(DAY, 15 * 60, TZ)!);
+    const open = async (storageState: string) => {
+      const page = await browser.newPage({ storageState });
+      await openDay(page);
+      await ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Gate`) }).click();
+      return page;
+    };
+
+    const desk = await open(AUTH.frontDesk);
+    await expect(details(desk).getByRole("listitem").filter({ hasText: "Patch test" })).toContainText("Holds up this visit");
+    await details(desk).getByRole("button", { name: "Check in", exact: true }).click();
+    const refused = details(desk).getByRole("group", { name: "Before checking in" });
+    await expect(refused).toContainText(`${PREFIX}Gate can't be checked in yet: the salon requires a valid patch test first.`);
+    await expect(refused).toContainText("ask a manager or owner");
+    await expect(refused.getByRole("button", { name: /Check in/ })).toHaveCount(0);
+    expect(await status(id)).toBe("booked");
+    await desk.close();
+
+    const owner = await open(AUTH.owner);
+    await details(owner).getByRole("button", { name: "Check in", exact: true }).click();
+    const form = details(owner).getByRole("form", { name: "Check in without the patch test" });
+    await expect(form.getByRole("button", { name: "Check in without the patch test" })).toBeDisabled();
+    await form.getByLabel("Why check in without it?").fill("Tested at another salon on Monday");
+    await form.getByRole("button", { name: "Check in without the patch test" }).click();
+    await expect.poll(() => status(id)).toBe("checked_in");
+    await expect(details(owner).getByTestId("patch-override")).toContainText("“Tested at another salon on Monday”");
+    const { data: events } = await admin.from("appointment_events").select("kind, staff_id, detail").eq("appointment_id", id);
+    expect(events).toEqual([{ kind: "patch_test_override", staff_id: SEED.staff.owner, detail: { reason: "Tested at another salon on Monday", services: ["Gloss / Toner"] } }]);
+    await owner.close();
+  });
+});
+
 test.describe("dashboard brief", () => {
   test.use({ storageState: AUTH.owner, viewport: { width: 1440, height: 1000 } });
 

@@ -18,7 +18,7 @@ import { formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { formatMinutes, formatPrice } from "@/lib/services";
 import { UsageLinesEditor, toUsageJson, type DraftLine } from "@/components/usage-lines";
 import type { PickerProduct } from "@/lib/inventory-load";
-import { addVisitFormula, changeGroupVisitStatus, changeVisitStatus, changeVisitStatusScoped, recordItemTime, saveVisitNotes, undoVisitCheckIn } from "./actions";
+import { addVisitFormula, changeGroupVisitStatus, changeVisitStatus, changeVisitStatusScoped, checkInWithPatchOverride, recordItemTime, saveVisitNotes, undoVisitCheckIn } from "./actions";
 import type { Scope } from "@/lib/scheduling/series";
 import { useNow } from "./now-line";
 import type { AppointmentDetail, BoardData } from "./types";
@@ -121,6 +121,17 @@ export function AppointmentPanel({
     run("check_in");
   }
 
+  // A manager or owner, past a patch test the salon requires.
+  function overrideCheckIn(reason: string) {
+    setMessage(null);
+    startTransition(async () => {
+      const result = await checkInWithPatchOverride(appointment.id, reason);
+      if (!result.ok) return setMessage(result.message);
+      setConfirmingCheckIn(false);
+      onCheckedIn(appointment.id);
+    });
+  }
+
   function primary() {
     if (!step) return;
     if (step.kind === "check_out") return onCheckout();
@@ -170,7 +181,7 @@ export function AppointmentPanel({
       </div>
 
       {/* Everything the visit needs (patch tests, forms), near the top. */}
-      {client && checklist.length > 0 && <VisitChecklist items={checklist} clientId={client.id} date={date} today={today} me={me} team={team} />}
+      {client && checklist.length > 0 && <VisitChecklist items={checklist} override={appointment.patchOverride} clientId={client.id} date={date} today={today} me={me} team={team} />}
 
       {message && (
         <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-danger">
@@ -182,25 +193,15 @@ export function AppointmentPanel({
       {(step || actions.length > 0 || (me.canBook && isEditable(status)) || canReportLate) && (
         <section aria-label="Actions" className="flex flex-col gap-2">
           {confirmingCheckIn ? (
-            <div role="group" aria-label="Before checking in" className="flex animate-fade-in flex-col gap-2 rounded-lg border border-status-late-ink/30 bg-status-late-bg px-3 py-2.5 text-status-late-ink">
-              <p className="font-semibold">Still to do before {client?.name.split(" ")[0] ?? "this visit"} checks in:</p>
-              <ul className="flex list-disc flex-col gap-0.5 pl-5">
-                {outstanding.map((c) => (
-                  <li key={c.key}>
-                    {c.label} — {c.status}
-                    {c.blocks && <span className="font-semibold"> (the salon requires this)</span>}
-                  </li>
-                ))}
-              </ul>
-              <div className="flex flex-wrap gap-2 pt-1">
-                <Button variant="primary" disabled={pending} onClick={checkIn}>
-                  Check in anyway
-                </Button>
-                <Button disabled={pending} onClick={() => setConfirmingCheckIn(false)}>
-                  Not yet
-                </Button>
-              </div>
-            </div>
+            <CheckInWarning
+              firstName={client?.name.split(" ")[0] ?? "This client"}
+              outstanding={outstanding}
+              canOverride={me.role === "owner" || me.role === "manager"}
+              pending={pending}
+              onCheckIn={checkIn}
+              onOverride={overrideCheckIn}
+              onCancel={() => setConfirmingCheckIn(false)}
+            />
           ) : (
             step && (
               <Button variant="primary" size="lg" disabled={pending} onClick={primary} data-testid="primary-action">
@@ -723,6 +724,7 @@ function FormulaSection({ appointment, date, products, canRecord }: { appointmen
 // Done rows show a check and fade; once everything's done, it's one line.
 function VisitChecklist({
   items,
+  override,
   clientId,
   date,
   today,
@@ -730,6 +732,7 @@ function VisitChecklist({
   team,
 }: {
   items: ChecklistItem[];
+  override: AppointmentDetail["patchOverride"];
   clientId: string;
   date: LocalDate;
   today: LocalDate;
@@ -777,7 +780,14 @@ function VisitChecklist({
                 <span className="min-w-0">
                 <span className="font-semibold">{c.label}</span> — {c.status}
                 {c.detail && <span className="block text-xs">{c.detail}</span>}
-                {c.blocks && <span className="block font-semibold">Holds up this visit: the salon requires it first.</span>}
+                {c.blocks &&
+                  (override ? (
+                    <span className="block" data-testid="patch-override">
+                      Checked in without it by {override.by}, {override.at}: &ldquo;{override.reason}&rdquo;
+                    </span>
+                  ) : (
+                    <span className="block font-semibold">Holds up this visit: the salon requires it before check-in.</span>
+                  ))}
                 </span>
               </p>
               {!c.done &&
@@ -801,5 +811,84 @@ function VisitChecklist({
         ))}
       </ul>
     </section>
+  );
+}
+
+// Check in with something still outstanding: one warning listing it all.
+// When the salon requires the patch test, it's a refusal instead, and a
+// manager or owner can check the client in anyway, saying why.
+function CheckInWarning({
+  firstName,
+  outstanding,
+  canOverride,
+  pending,
+  onCheckIn,
+  onOverride,
+  onCancel,
+}: {
+  firstName: string;
+  outstanding: ChecklistItem[];
+  canOverride: boolean;
+  pending: boolean;
+  onCheckIn: () => void;
+  onOverride: (reason: string) => void;
+  onCancel: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const blocked = outstanding.some((c) => c.blocks);
+  return (
+    <div role="group" aria-label="Before checking in" className="flex animate-fade-in flex-col gap-2 rounded-lg border border-status-late-ink/30 bg-status-late-bg px-3 py-2.5 text-status-late-ink">
+      <p className="font-semibold">
+        {blocked ? `${firstName} can't be checked in yet: the salon requires a valid patch test first.` : `Still to do before ${firstName} checks in:`}
+      </p>
+      <ul className="flex list-disc flex-col gap-0.5 pl-5">
+        {outstanding.map((c) => (
+          <li key={c.key}>
+            {c.label} — {c.status}
+            {c.blocks && <span className="font-semibold"> (required)</span>}
+          </li>
+        ))}
+      </ul>
+      {!blocked ? (
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button variant="primary" disabled={pending} onClick={onCheckIn}>
+            Check in anyway
+          </Button>
+          <Button disabled={pending} onClick={onCancel}>
+            Not yet
+          </Button>
+        </div>
+      ) : canOverride ? (
+        <form
+          aria-label="Check in without the patch test"
+          className="flex flex-col gap-2 pt-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (reason.trim()) onOverride(reason);
+          }}
+        >
+          <label className={`${labelClass} text-ink`}>
+            Why check in without it?
+            <input value={reason} onChange={(e) => setReason(e.target.value)} required maxLength={300} placeholder="e.g. Tested at another salon last week" className={fieldClass} />
+          </label>
+          <p className="text-xs">It&apos;s kept in the visit&apos;s history with your name.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" variant="primary" disabled={pending || !reason.trim()}>
+              Check in without the patch test
+            </Button>
+            <Button disabled={pending} onClick={onCancel}>
+              Not yet
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <p className="flex-1 basis-48">Record a patch test first, or ask a manager or owner: they can check {firstName} in with a reason.</p>
+          <Button disabled={pending} onClick={onCancel}>
+            Not yet
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }

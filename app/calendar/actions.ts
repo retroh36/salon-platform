@@ -14,7 +14,7 @@ import { isUuid } from "@/lib/ids";
 import { isZoom, type CalendarZoom } from "@/lib/calendar";
 import { isUsable, loadClientPackages, type ClientPackage } from "@/lib/packages";
 import { loadBackBarProducts } from "@/lib/inventory-load";
-import { changeStatus, moveItem, saveBooking, saveNotes, undoCheckIn, type BookingItemInput, type SaveResult } from "@/lib/scheduling/book";
+import { changeStatus, checkInPatchOverride, moveItem, saveBooking, saveNotes, undoCheckIn, type BookingItemInput, type SaveResult } from "@/lib/scheduling/book";
 import { describeProblem, type BookingProblem } from "@/lib/scheduling/booking";
 import { bookingIdeas, type BookingIdeas } from "@/lib/denise/ideas";
 import { loadBookingContext, loadCalendarStamp } from "@/lib/scheduling/load";
@@ -206,6 +206,7 @@ export async function changeVisitStatus(
 
   const result = await changeStatus(supabase, appointmentId, action, why);
   if (!result.ok) {
+    if (result.error === "patch_test") return { ok: false, message: result.message };
     const messages = {
       not_found: "That appointment no longer exists.",
       not_allowed: `This appointment can't be changed that way any more.`,
@@ -235,11 +236,33 @@ export async function undoVisitCheckIn(appointmentId: string): Promise<ActionRes
   if (!isUuid(appointmentId)) return { ok: false, message: "That appointment no longer exists." };
   const result = await undoCheckIn(supabase, appointmentId);
   if (!result.ok) {
+    if (result.error === "patch_test") return { ok: false, message: result.message };
     const messages = {
       not_found: "That appointment no longer exists.",
       not_allowed: "Only a checked-in visit can go back to booked. After checkout, void the sale instead.",
       needs_reason: "",
       forbidden: NOT_ALLOWED,
+    };
+    return { ok: false, message: messages[result.error] };
+  }
+  refresh();
+  return { ok: true };
+}
+
+// A manager or owner checks a client in without the patch test the salon
+// requires, with a reason (kept in the visit's history).
+export async function checkInWithPatchOverride(appointmentId: string, reason: string): Promise<ActionResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || (me.role !== "owner" && me.role !== "manager")) return { ok: false, message: "Only a manager or owner can check a client in without the patch test." };
+  if (!isUuid(appointmentId)) return { ok: false, message: "That appointment no longer exists." };
+  const result = await checkInPatchOverride(supabase, appointmentId, reason);
+  if (!result.ok) {
+    const messages = {
+      not_found: "That appointment no longer exists.",
+      not_allowed: "This visit is already checked in or over.",
+      needs_reason: "Say why (up to 300 characters).",
+      forbidden: "Only a manager or owner can check a client in without the patch test.",
+      patch_test: "",
     };
     return { ok: false, message: messages[result.error] };
   }

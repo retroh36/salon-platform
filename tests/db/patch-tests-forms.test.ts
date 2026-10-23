@@ -1,9 +1,10 @@
 // Patch tests and forms: who can record and see them, the hard block when
-// the salon requires a valid patch test, and the warnings before a visit.
+// the salon requires a valid patch test (at booking and at check-in, with a
+// manager's override), and the warnings before a visit.
 // Run with `npm run test:db` after `npx supabase db reset`.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { visitWarnings } from "@/lib/client-checks";
-import { saveBooking } from "@/lib/scheduling/book";
+import { changeStatus, checkInPatchOverride, saveBooking } from "@/lib/scheduling/book";
 import { fromLocal } from "@/lib/scheduling/time";
 import { admin, createOtherSalon, SEED, signIn, type Client } from "./helpers";
 
@@ -72,6 +73,62 @@ describe("patch tests", () => {
     await admin.from("client_patch_tests").insert({ business_id: B, client_id: clientId, tested_at: fromLocal("2031-09-01", 600, TZ)!.toISOString(), products: "6N", result: "no_reaction", performed_by: SEED.staff.bridget });
     expect((await saveBooking(frontDesk, location, { clientId, notes: null, items: [{ serviceId: gloss, staffId: SEED.staff.bridget, start: at(14), resource: { kind: "none" } }] })).ok).toBe(true);
     await admin.from("businesses").update({ patch_test_enforcement: "warn" }).eq("id", B);
+  });
+
+  it("refuses check-in without one when the salon blocks, unless a manager or owner overrides with a reason", async () => {
+    const manager = await signIn("manager@mapleandash.test");
+    const { data: c } = await admin.from("clients").insert({ business_id: B, first_name: "Gate", last_name: "Test" }).select("id").single();
+    const visit = async () => {
+      const day = "2031-09-16";
+      const start = fromLocal(day, 600, TZ)!;
+      const end = new Date(start.getTime() + 45 * 60_000);
+      const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: c!.id, starts_at: start.toISOString(), ends_at: end.toISOString() }).select("id").single();
+      const { data: i } = await admin
+        .from("appointment_items")
+        .insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: gloss, staff_id: SEED.staff.bridget, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: 45, price_cents: 0 })
+        .select("id")
+        .single();
+      return { id: a!.id, itemId: i!.id };
+    };
+    const status = async (id: string) => (await admin.from("appointments").select("status").eq("id", id).single()).data!.status;
+    try {
+      // "Warn": checking in goes ahead.
+      const warned = await visit();
+      expect(await changeStatus(frontDesk, warned.id, "check_in")).toEqual({ ok: true });
+
+      await admin.from("businesses").update({ patch_test_enforcement: "block" }).eq("id", B);
+      const v = await visit();
+      expect(await changeStatus(frontDesk, v.id, "check_in")).toEqual({
+        ok: false,
+        error: "patch_test",
+        message: "A valid patch test is needed for Gloss / Toner before this visit. A manager or owner can check them in with a reason.",
+      });
+      // Nor by starting the service, or any other way past booked.
+      expect((await bridget.rpc("record_item_time", { p_item_id: v.itemId, p_event: "start" })).error?.code).toBe("55000");
+      expect((await admin.from("appointments").update({ status: "completed" }).eq("id", v.id)).error?.code).toBe("55000");
+      expect(await status(v.id)).toBe("booked");
+
+      // The override: managers and owners only, with a reason.
+      expect(await checkInPatchOverride(frontDesk, v.id, "Tested elsewhere")).toEqual({ ok: false, error: "forbidden" });
+      expect(await checkInPatchOverride(manager, v.id, "  ")).toEqual({ ok: false, error: "needs_reason" });
+      expect((await manager.rpc("check_in_patch_override", { p_appointment_id: v.id, p_reason: "" })).error?.code).toBe("22023");
+      expect((await otherOwner.rpc("check_in_patch_override", { p_appointment_id: v.id, p_reason: "x" })).error?.code).toBe("42501");
+      expect(await checkInPatchOverride(manager, v.id, "Tested at her old salon last week")).toEqual({ ok: true });
+      expect(await status(v.id)).toBe("checked_in");
+      const { data: events } = await frontDesk.from("appointment_events").select("kind, staff_id, detail").eq("appointment_id", v.id);
+      expect(events).toEqual([{ kind: "patch_test_override", staff_id: SEED.staff.manager, detail: { reason: "Tested at her old salon last week", services: ["Gloss / Toner"] } }]);
+      // Not for a visit already checked in.
+      expect(await checkInPatchOverride(manager, v.id, "Again")).toEqual({ ok: false, error: "not_allowed" });
+
+      // A test in order lets check-in through.
+      await admin.from("client_patch_tests").insert({ business_id: B, client_id: c!.id, tested_at: fromLocal("2031-09-10", 600, TZ)!.toISOString(), products: "6N", result: "no_reaction", performed_by: SEED.staff.bridget });
+      const ok = await visit();
+      expect(await changeStatus(frontDesk, ok.id, "check_in")).toEqual({ ok: true });
+    } finally {
+      await admin.from("businesses").update({ patch_test_enforcement: "warn" }).eq("id", B);
+      await admin.from("appointments").delete().eq("client_id", c!.id);
+      await admin.from("clients").delete().eq("id", c!.id);
+    }
   });
 
   it("only owners change the rules", async () => {

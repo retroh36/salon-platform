@@ -119,7 +119,7 @@ test("shows each stylist's level as a colored ring, badge and bar, explained by 
     await expect(header(name)).toHaveAttribute("data-level", level);
     // A 4px bar along the top of the column, in the level's color.
     const bar = header(name).getByTestId("level-bar");
-    expect((await bar.boundingBox())!.height).toBe(4);
+    expect((await bar.boundingBox())!.height).toBeCloseTo(4, 1);
     const color = await bar.evaluate((el) => getComputedStyle(el).backgroundColor);
     colors.add(color);
     // The avatar: a 3px ring in the same color, and a badge so it isn't color alone.

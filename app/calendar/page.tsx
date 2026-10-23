@@ -183,6 +183,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       insight: null,
       warnings: null,
       saleId: null,
+      patchOverride: null,
       group: a.group ? { ...a.group, members: [] } : null,
       series: a.series_id ? { id: a.series_id, index: a.series_index!, count: seriesCounts.get(a.series_id) ?? 1, intervalWeeks: a.series?.interval_weeks ?? 1 } : null,
     };
@@ -251,6 +252,23 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     const { data: sales, error: salesError } = await supabase.from("sales").select("id, appointment_id").in("appointment_id", checkedOut).neq("status", "voided").order("created_at");
     if (salesError) throw salesError;
     for (const s of sales) if (s.appointment_id) appointments[s.appointment_id].saleId = s.id;
+  }
+
+  // Clients a manager or owner checked in without the patch test the salon
+  // requires, and why (front of house only: RLS).
+  const visitIds = Object.keys(appointments);
+  if (visitIds.length) {
+    const { data: overrides, error: overrideError } = await supabase
+      .from("appointment_events")
+      .select("appointment_id, staff_id, detail, created_at")
+      .eq("kind", "patch_test_override")
+      .in("appointment_id", visitIds)
+      .order("created_at");
+    if (overrideError) throw overrideError;
+    for (const o of overrides) {
+      const detail = o.detail as { reason?: string };
+      appointments[o.appointment_id].patchOverride = { by: staffName(o.staff_id) ?? "A former team member", reason: detail.reason ?? "", at: when(o.created_at) };
+    }
   }
 
   // What Denise knows about each client.

@@ -104,6 +104,9 @@ export type AppointmentDetail = {
   // The sale a checked-out visit was paid on (reversing it means voiding
   // that sale), when the viewer can see sales.
   saleId: string | null;
+  // Checked in without the patch test the salon requires: by whom, why and
+  // when ("Fri, Oct 23, 10:02am").
+  patchOverride: { by: string; reason: string; at: string } | null;
 };
 
 export type MenuService = {

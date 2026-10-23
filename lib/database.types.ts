@@ -2180,6 +2180,9 @@ isOneToOne: false
 "cancel_stocktake":
 { Args: { "p_stocktake_id": string }; Returns: undefined
                            },
+"check_in_patch_override":
+{ Args: { "p_appointment_id": string,"p_reason": string }; Returns: undefined
+                           },
 "clear_count":
 { Args: { "p_product_id": string,"p_stocktake_id": string }; Returns: undefined
                            },
