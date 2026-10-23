@@ -3,6 +3,7 @@ import { briefItemKey, creditText, withoutDismissed, type BriefFacts } from "@/l
 import { likelyOverruns } from "@/lib/denise/risk";
 import { fromLocal, parseTime, type BookedItem, type BookingContext } from "@/lib/scheduling";
 import { findConflicts } from "@/lib/scheduling/resolve";
+import { headline } from "@/lib/denise/wording";
 
 const TZ = "America/Chicago";
 const DAY = "2026-10-27";
@@ -48,6 +49,31 @@ describe("the risk check", () => {
     // Bridget: 181 against 155 booked, rounded up to 30. Gil's cut is only 4
     // over; his balayage figure isn't trusted yet.
     expect(likelyOverruns(ctx(booked), statuses, learned, morning)).toEqual([{ id: "b", kind: "likely_overrun", itemId: "b", minutes: 30 }]);
+  });
+
+  it("needs 15+ minutes when the usual time is from check-in to checkout, and marks it as estimated", () => {
+    const booked = [item("c", CUT, "gil", "9:00"), item("d", CUT, "bridget", "11:00")];
+    const statuses = new Map(booked.map((b) => [b.appointmentId!, "confirmed" as const]));
+    const estimates = new Map([
+      ["gil:cut", { medianMinutes: 72, trusted: true, basis: "check_in_out" as const }],
+      ["bridget:cut", { medianMinutes: 76, trusted: true, basis: "check_in_out" as const }],
+    ]);
+    // Gil's 12 over would do for tapped times, not for an estimate; Bridget's 16 does.
+    expect(likelyOverruns(ctx(booked), statuses, estimates, morning)).toEqual([{ id: "d", kind: "likely_overrun", itemId: "d", minutes: 20, estimated: true }]);
+    // Her headline says what it's based on.
+    const day = { ctx: ctx([...booked, item("e", CUT, "bridget", "12:05")]), statuses: new Map([...statuses, ["a-e", "confirmed" as const]]), now: morning };
+    const [conflict] = findConflicts({ ...day, disruptions: likelyOverruns(day.ctx, day.statuses, estimates, morning) });
+    expect(conflict).toMatchObject({ kind: "likely_overrun", estimated: true });
+    const lookup = {
+      timeZone: TZ,
+      salon: "Maple & Ash",
+      items: new Map(day.ctx.booked.map((b) => [b.id!, b])),
+      visits: new Map(),
+      staff: new Map([["bridget", { firstName: "Bridget" }]]),
+      services: new Map([["cut", "Women's Cut"]]),
+      resources: new Map(),
+    };
+    expect(headline(conflict, lookup)).toBe("Bridget usually takes about 20 minutes longer than booked for Women's Cut (based on check-in to checkout times), so the 11:00 is likely to run into the next client.");
   });
 
   it("skips visits that have started, are over, or were already reported", () => {

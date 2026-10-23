@@ -1,18 +1,38 @@
-// How long each stylist really takes for each service, from the actual
-// times tapped in (start to finish), compared with what's booked and the
-// menu. Pure; runs under plain Node.
+// How long each stylist really takes for each service, compared with
+// what's booked and the menu. Pure; runs under plain Node.
 //
-// A figure is only trusted after MIN_VISITS visits (outliers set aside),
-// and Denise only suggests a new length when it's trusted and differs
-// from the menu by SUGGEST_DIFFERENCE or more.
+// Two kinds of data, never mixed in one figure (`basis`):
+// - "tapped": the service's own start and finish, tapped in by the
+//   stylist on My day. The real thing.
+// - "check_in_out": the visit's check-in to checkout, for visits with one
+//   service and no taps. An estimate (it takes in settling in and paying),
+//   so it counts for less: it needs MIN_ESTIMATED_VISITS visits to be
+//   trusted, never claims a trend, needs a bigger gap before Denise
+//   suggests a new length, and weighs ESTIMATE_WEIGHT in salon-wide rates.
+//
+// Each stylist and service gets the tapped figure when it's trusted,
+// else the estimate when that is, else whichever has more to go on.
+// Denise says which kind a number is based on (BASIS_TEXT).
 
 import { ceilTo, median, quantile, ratio, withoutOutliers } from "./stats.ts";
 
 export const MIN_VISITS = 5;
+export const MIN_ESTIMATED_VISITS = 10;
+// What a check-in to checkout visit counts for, next to a tapped one.
+export const ESTIMATE_WEIGHT = 0.5;
 // A visit "ran over" when it took this much longer than booked.
 export const OVERRUN_MINUTES = 5;
 // Suggest a length when the typical time is this far from the menu's.
 export const SUGGEST_DIFFERENCE = 10;
+export const SUGGEST_DIFFERENCE_ESTIMATED = 15;
+
+export type DurationBasis = "tapped" | "check_in_out";
+
+// For Denise, staff and the AI: what a figure is based on.
+export const BASIS_TEXT: Record<DurationBasis, string> = {
+  tapped: "based on tapped start and finish times",
+  check_in_out: "based on check-in to checkout times",
+};
 // A trend needs this many visits, and a change this big (minutes, or this
 // share of the typical time, whichever is larger).
 const TREND_VISITS = 12;
@@ -30,9 +50,11 @@ const TREND_RECENT_DAYS = 60;
 export type DurationSample = {
   staffId: string;
   serviceId: string;
-  // What was booked, and start to finish as tapped in.
+  // What was booked, and how long it took: start to finish as tapped in,
+  // or check-in to checkout.
   bookedMinutes: number;
   actualMinutes: number;
+  basis: DurationBasis;
   at: Date;
 };
 
@@ -42,6 +64,8 @@ export type Trend = "faster" | "slower" | "steady";
 export type DurationInsight = {
   staffId: string;
   serviceId: string;
+  // What every number here comes from (never a mix).
+  basis: DurationBasis;
   // Visits counted, and those set aside as outliers.
   visits: number;
   outliers: number;
@@ -121,45 +145,66 @@ export function kendallTau(values: readonly number[]): number {
   return pairs ? score / pairs : 0;
 }
 
-// One insight per stylist and service with any timed visits. menuMinutes
+// One insight per stylist and service with any timed visits: from the
+// tapped visits or the check-in to checkout ones (see the top). menuMinutes
 // is each service's length on the menu.
 export function stylistDurations(samples: readonly DurationSample[], menuMinutes: ReadonlyMap<string, number>, asOf = new Date()): DurationInsight[] {
-  const groups = new Map<string, DurationSample[]>();
+  const groups = new Map<string, { tapped: DurationSample[]; check_in_out: DurationSample[] }>();
   for (const s of samples) {
     if (!(s.actualMinutes > 0)) continue;
     const key = `${s.staffId}:${s.serviceId}`;
-    groups.set(key, [...(groups.get(key) ?? []), s]);
+    const group = groups.get(key) ?? { tapped: [], check_in_out: [] };
+    group[s.basis].push(s);
+    groups.set(key, group);
   }
 
   const insights: DurationInsight[] = [];
   for (const group of groups.values()) {
-    const { kept, dropped } = withoutOutliers(group.map((s) => s.actualMinutes));
-    const keptSamples = group.filter((s) => kept.includes(s.actualMinutes));
-    const typical = median(kept)!;
-    const p25 = quantile(kept, 0.25)!;
-    const p75 = quantile(kept, 0.75)!;
-    const menu = menuMinutes.get(group[0].serviceId) ?? median(group.map((s) => s.bookedMinutes))!;
-    const trusted = kept.length >= MIN_VISITS;
-    const suggested = ceilTo(typical, 5);
-    const { trend, minutes } = trendOf(keptSamples, asOf);
-    insights.push({
-      staffId: group[0].staffId,
-      serviceId: group[0].serviceId,
-      visits: kept.length,
-      outliers: dropped.length,
-      trusted,
-      medianMinutes: Math.round(typical),
-      p25Minutes: Math.round(p25),
-      p75Minutes: Math.round(p75),
-      consistency: consistencyOf(p25, p75, typical),
-      trend,
-      trendMinutes: minutes,
-      menuMinutes: menu,
-      bookedMinutes: Math.round(median(group.map((s) => s.bookedMinutes))!),
-      overrunRate: ratio(group.filter((s) => s.actualMinutes > s.bookedMinutes + OVERRUN_MINUTES).length, group.length) ?? 0,
-      suggestedMinutes: trusted && Math.abs(typical - menu) >= SUGGEST_DIFFERENCE ? suggested : null,
-      lastVisit: new Date(Math.max(...group.map((s) => s.at.getTime()))).toISOString(),
-    });
+    const tapped = group.tapped.length ? insightFrom(group.tapped, "tapped", menuMinutes, asOf) : null;
+    const estimated = group.check_in_out.length ? insightFrom(group.check_in_out, "check_in_out", menuMinutes, asOf) : null;
+    insights.push(pick(tapped, estimated));
   }
   return insights.sort((a, b) => a.staffId.localeCompare(b.staffId) || a.serviceId.localeCompare(b.serviceId));
+}
+
+// Tapped when it's trusted, else the estimate when it is, else whichever
+// has more to go on (an estimated visit counting ESTIMATE_WEIGHT).
+function pick(tapped: DurationInsight | null, estimated: DurationInsight | null): DurationInsight {
+  if (!estimated) return tapped!;
+  if (!tapped) return estimated;
+  if (tapped.trusted) return tapped;
+  if (estimated.trusted) return estimated;
+  return tapped.visits >= estimated.visits * ESTIMATE_WEIGHT ? tapped : estimated;
+}
+
+function insightFrom(group: readonly DurationSample[], basis: DurationBasis, menuMinutes: ReadonlyMap<string, number>, asOf: Date): DurationInsight {
+  const { kept, dropped } = withoutOutliers(group.map((s) => s.actualMinutes));
+  const keptSamples = group.filter((s) => kept.includes(s.actualMinutes));
+  const typical = median(kept)!;
+  const p25 = quantile(kept, 0.25)!;
+  const p75 = quantile(kept, 0.75)!;
+  const menu = menuMinutes.get(group[0].serviceId) ?? median(group.map((s) => s.bookedMinutes))!;
+  const trusted = kept.length >= (basis === "tapped" ? MIN_VISITS : MIN_ESTIMATED_VISITS);
+  const suggested = ceilTo(typical, 5);
+  // Estimates are too rough to call a trend.
+  const { trend, minutes } = basis === "tapped" ? trendOf(keptSamples, asOf) : { trend: "steady" as const, minutes: 0 };
+  return {
+    staffId: group[0].staffId,
+    serviceId: group[0].serviceId,
+    basis,
+    visits: kept.length,
+    outliers: dropped.length,
+    trusted,
+    medianMinutes: Math.round(typical),
+    p25Minutes: Math.round(p25),
+    p75Minutes: Math.round(p75),
+    consistency: consistencyOf(p25, p75, typical),
+    trend,
+    trendMinutes: minutes,
+    menuMinutes: menu,
+    bookedMinutes: Math.round(median(group.map((s) => s.bookedMinutes))!),
+    overrunRate: ratio(group.filter((s) => s.actualMinutes > s.bookedMinutes + OVERRUN_MINUTES).length, group.length) ?? 0,
+    suggestedMinutes: trusted && Math.abs(typical - menu) >= (basis === "tapped" ? SUGGEST_DIFFERENCE : SUGGEST_DIFFERENCE_ESTIMATED) ? suggested : null,
+    lastVisit: new Date(Math.max(...group.map((s) => s.at.getTime()))).toISOString(),
+  };
 }

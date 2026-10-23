@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import type { Json } from "@/lib/database.types";
-import { minutesText } from "@/lib/insights/describe";
+import { minutesText, visitsText } from "@/lib/insights/describe";
 import type { DurationInsight } from "@/lib/insights/durations";
 import { isUuid } from "@/lib/ids";
 import { stretchTiming } from "@/lib/scheduling/booking";
@@ -40,7 +40,7 @@ export async function applySuggestedDuration(staffId: string, serviceId: string)
     p_options: [
       {
         summary: `Book ${service.name} with ${stylist.first_name} for ${minutesText(d.suggestedMinutes)}`,
-        reason: `${stylist.first_name} takes ${minutesText(d.medianMinutes)} for ${service.name} (median of ${d.visits} visits); the menu says ${minutesText(d.menuMinutes)}.`,
+        reason: `${stylist.first_name} takes ${minutesText(d.medianMinutes)} for ${service.name} (median of ${visitsText(d)}); the menu says ${minutesText(d.menuMinutes)}.`,
         proposal: { staff_service: { staff_id: staffId, service_id: serviceId, to: { active: to.activeMinutes, processing: to.processingMinutes, finishing: to.finishingMinutes } } } as Json,
       },
     ],

@@ -5,6 +5,7 @@
 // Client names here are for staff on screen only; they're never sent to
 // Claude in full.
 
+import { BASIS_TEXT } from "@/lib/insights/durations";
 import type { BookedItem } from "@/lib/scheduling/booking";
 import type { Conflict, FixOption } from "@/lib/scheduling/resolve";
 import { toLocal } from "@/lib/scheduling/time";
@@ -70,7 +71,9 @@ export function headline(c: Conflict, l: Lookup, firstNames = false): string {
       // No client name: this also goes into the morning brief.
       const item = l.items.get(c.causeItemIds[0])!;
       const service = l.services.get(item.serviceId) ?? "this service";
-      return `${staff} usually takes about ${c.minutes} minutes longer than booked for ${service}, so the ${clock(minuteOf(l, item.start))} is likely to run into the next client.`;
+      // Said when it's an estimate: "(based on check-in to checkout times)".
+      const basis = c.estimated ? ` (${BASIS_TEXT.check_in_out})` : "";
+      return `${staff} usually takes about ${c.minutes} minutes longer than booked for ${service}${basis}, so the ${clock(minuteOf(l, item.start))} is likely to run into the next client.`;
     }
     case "client_late": {
       const visit = l.items.get(c.causeItemIds[0])!.appointmentId!;

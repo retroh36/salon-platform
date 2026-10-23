@@ -436,7 +436,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
         ]),
       ),
       timings: Object.fromEntries([...timings].map(([staffId, m]) => [staffId, Object.fromEntries([...m].map(([serviceId, t]) => [serviceId, t.activeMinutes + t.processingMinutes + t.finishingMinutes]))])),
-      learned: Object.fromEntries([...learned].filter(([, d]) => d.trusted).map(([key, d]) => [key, { medianMinutes: d.medianMinutes, visits: d.visits }])),
+      learned: Object.fromEntries([...learned].filter(([, d]) => d.trusted).map(([key, d]) => [key, { medianMinutes: d.medianMinutes, visits: d.visits, basis: d.basis }])),
       resources: resourcesResult.data,
       products,
     },

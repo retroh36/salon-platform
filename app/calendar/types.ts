@@ -1,6 +1,7 @@
 // What the server page hands the interactive calendar. Times are minutes
 // since midnight on the day shown, at the location.
 
+import type { DurationBasis } from "@/lib/insights/durations";
 import type { AppointmentStatus } from "@/lib/appointments";
 import type { VisitWarnings } from "@/lib/client-checks";
 import type { PickerProduct } from "@/lib/inventory-load";
@@ -136,7 +137,7 @@ export type Menu = {
   // it differs from the menu.
   timings: Record<string, Record<string, number>>;
   // "<staff id>:<service id>" -> how long they really take (trusted only).
-  learned: Record<string, { medianMinutes: number; visits: number }>;
+  learned: Record<string, { medianMinutes: number; visits: number; basis: DurationBasis }>;
   resources: { id: string; name: string }[];
   // Back-bar products, for formulas.
   products: PickerProduct[];

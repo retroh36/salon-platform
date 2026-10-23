@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { clientInsight, timeOfDay, type ClientVisit } from "@/lib/insights/clients";
 import { describeClient, minutesText, usualTime } from "@/lib/insights/describe";
-import { consistencyOf, kendallTau, mannKendallZ, MIN_VISITS, stylistDurations, trendOf, type DurationSample } from "@/lib/insights/durations";
+import { BASIS_TEXT, consistencyOf, ESTIMATE_WEIGHT, kendallTau, mannKendallZ, MIN_ESTIMATED_VISITS, MIN_VISITS, stylistDurations, trendOf, type DurationSample } from "@/lib/insights/durations";
 import { salonInsight, type SalonItem } from "@/lib/insights/salon";
 import { ceilTo, median, mode, quantile, withoutOutliers } from "@/lib/insights/stats";
 
@@ -35,11 +35,12 @@ describe("stats", () => {
 });
 
 describe("stylist durations", () => {
-  const sample = (staffId: string, serviceId: string, actual: number, daysAgo: number, booked = 120): DurationSample => ({
+  const sample = (staffId: string, serviceId: string, actual: number, daysAgo: number, booked = 120, basis: DurationSample["basis"] = "tapped"): DurationSample => ({
     staffId,
     serviceId,
     bookedMinutes: booked,
     actualMinutes: actual,
+    basis,
     at: daysAfter(-daysAgo),
   });
   const menu = new Map([["balayage", 155], ["cut", 60]]);
@@ -58,6 +59,35 @@ describe("stylist durations", () => {
     expect(d.medianMinutes).toBe(183);
     expect(d.suggestedMinutes).toBe(185);
     expect(d.overrunRate).toBe(1);
+  });
+
+  it("learns from check-in to checkout when there are no taps, needing ten visits and never calling a trend", () => {
+    const estimate = (m: number, i: number) => sample("hannah", "blowout", m, 100 - i * 8, 45, "check_in_out");
+    const nine = [55, 56, 54, 57, 55, 58, 56, 55, 57].map(estimate);
+    expect(stylistDurations(nine, menu)[0]).toMatchObject({ basis: "check_in_out", visits: 9, trusted: false, suggestedMinutes: null });
+    // Ten visits, and rising steadily: trusted, but no trend from estimates.
+    const ten = [50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62].map(estimate);
+    const [d] = stylistDurations(ten, menu);
+    expect(d).toMatchObject({ basis: "check_in_out", visits: 13, trusted: true, trend: "steady", medianMinutes: 56 });
+    // 56 against a 45-minute menu is 11 over: enough for tapped times, not for an estimate (15).
+    expect(d.suggestedMinutes).toBeNull();
+    expect(stylistDurations(ten.map((x) => ({ ...x, actualMinutes: x.actualMinutes + 5 })), menu)[0].suggestedMinutes).toBe(65);
+    expect(BASIS_TEXT[d.basis]).toBe("based on check-in to checkout times");
+  });
+
+  it("never mixes tapped times with estimates: tapped wins once trusted, else the trusted estimate, else whichever has more", () => {
+    const tapped = (m: number, i: number) => sample("nola", "cut", m, 50 - i, 60, "tapped");
+    const estimated = (m: number, i: number) => sample("nola", "cut", m, 90 - i, 60, "check_in_out");
+    const twelveEstimates = Array.from({ length: 12 }, (_, i) => estimated(75, i));
+    // Five taps at 50: the tapped figure, untouched by the estimates.
+    const [withTaps] = stylistDurations([...[50, 52, 51, 49, 48].map(tapped), ...twelveEstimates], menu);
+    expect(withTaps).toMatchObject({ basis: "tapped", visits: 5, medianMinutes: 50, trusted: true });
+    // Three taps (not trusted) and a trusted estimate: the estimate.
+    expect(stylistDurations([...[50, 50, 51].map(tapped), ...twelveEstimates], menu)[0]).toMatchObject({ basis: "check_in_out", visits: 12, medianMinutes: 75 });
+    // Neither trusted: three taps outweigh four estimates (worth two).
+    expect(stylistDurations([...[50, 50, 51].map(tapped), ...twelveEstimates.slice(0, 4)], menu)[0]).toMatchObject({ basis: "tapped", visits: 3 });
+    expect(stylistDurations([...[50].map(tapped), ...twelveEstimates.slice(0, 4)], menu)[0]).toMatchObject({ basis: "check_in_out", visits: 4 });
+    expect([MIN_ESTIMATED_VISITS, ESTIMATE_WEIGHT]).toEqual([10, 0.5]);
   });
 
   it("doesn't trust fewer than five visits", () => {
@@ -202,6 +232,7 @@ describe("salon patterns", () => {
       minute: 10 * 60,
       bookedMinutes: 60,
       actualMinutes: 60,
+      basis: "tapped",
       status: "completed",
       createdAt: daysAfter(-7, start),
       checkedOutAt: new Date(start.getTime() + 65 * 60_000),
@@ -224,11 +255,29 @@ describe("salon patterns", () => {
     ];
     const tuesday = Array.from({ length: 6 }, () => item({ weekday: 2, actualMinutes: 61 }));
     const s = salonInsight([...thursday, ...tuesday], open, 4);
-    expect(s.serviceOverruns[0]).toEqual({ serviceId: "color", visits: 6, overrunRate: 1, typicalOverMinutes: 20 });
+    expect(s.serviceOverruns[0]).toEqual({ serviceId: "color", visits: 6, overrunRate: 1, typicalOverMinutes: 20, estimatedShare: 0 });
     const thu = s.weekdays.find((w) => w.weekday === 4)!;
     expect(thu).toMatchObject({ visits: 12, overrunRate: 0.5, worstStaffId: "gil", worstStaffRate: 1, worstServiceIds: ["color"] });
     expect(thu.averageOverMinutes).toBe(9);
     expect(s.weekdays.find((w) => w.weekday === 2)!.overrunRate).toBe(0);
+  });
+
+  it("counts check-in to checkout estimates at half weight, and says how much is estimated", () => {
+    // Two tapped visits on time, two estimated ones over: a third, not half.
+    const list = [
+      item({ weekday: 3, actualMinutes: 60 }),
+      item({ weekday: 3, actualMinutes: 60 }),
+      item({ weekday: 3, actualMinutes: 80, basis: "check_in_out" }),
+      item({ weekday: 3, actualMinutes: 80, basis: "check_in_out" }),
+    ];
+    const s = salonInsight(list, open, 1);
+    expect(s.overrunRate).toBeCloseTo(1 / 3);
+    expect(s.estimatedShare).toBe(0.5);
+    const wed = s.weekdays.find((w) => w.weekday === 3)!;
+    expect(wed).toMatchObject({ visits: 4, estimatedShare: 0.5 });
+    // Average over, weighted: (0 + 0 + 10 + 10) / 3.
+    expect(wed.averageOverMinutes).toBe(7);
+    expect(s.serviceOverruns[0]).toMatchObject({ overrunRate: 1 / 3, typicalOverMinutes: 20, estimatedShare: 0.5 });
   });
 
   it("counts no-shows by day and time of day, per visit", () => {

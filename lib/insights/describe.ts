@@ -2,7 +2,7 @@
 // (no AI): the client insight card, "usually takes" lines. Pure.
 
 import type { ClientInsight } from "./clients.ts";
-import type { DurationInsight } from "./durations.ts";
+import { BASIS_TEXT, type DurationInsight } from "./durations.ts";
 
 const WEEKDAYS = ["", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"];
 const TIMES = { morning: "mornings", afternoon: "afternoons", evening: "evenings" } as const;
@@ -73,7 +73,13 @@ export function describeClient(
   return { summary: `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`, line, tags };
 }
 
-// "Bridget usually takes 3h 1m for this (9 visits)."
-export function usualTime(name: string, d: Pick<DurationInsight, "medianMinutes" | "visits">): string {
-  return `${name} usually takes ${minutesText(d.medianMinutes)} for this (${d.visits} visits)`;
+// "Bridget usually takes 3h 1m for this (9 visits)", and when it's an
+// estimate "(12 visits, based on check-in to checkout times)".
+export function usualTime(name: string, d: Pick<DurationInsight, "medianMinutes" | "visits"> & { basis?: DurationInsight["basis"] }): string {
+  return `${name} usually takes ${minutesText(d.medianMinutes)} for this (${visitsText(d)})`;
+}
+
+// "9 visits", or "12 visits, based on check-in to checkout times".
+export function visitsText(d: { visits: number; basis?: DurationInsight["basis"] }): string {
+  return `${d.visits} ${d.visits === 1 ? "visit" : "visits"}${d.basis === "check_in_out" ? `, ${BASIS_TEXT.check_in_out}` : ""}`;
 }

@@ -92,7 +92,9 @@ export function Tabs<T extends string>({
         id={`${id}-panel`}
         role="tabpanel"
         aria-labelledby={`${id}-tab-${current.value}`}
-        className={quiet ? "animate-panel-in pt-4" : "min-h-0 flex-1 animate-panel-in overflow-y-auto"}
+        // Quiet tabs sit inside a scrolling panel: they fade in rather than
+        // slide, which would push past its edge for a moment.
+        className={quiet ? "animate-fade-in pt-4" : "min-h-0 flex-1 animate-panel-in overflow-y-auto"}
       >
         {children}
       </div>

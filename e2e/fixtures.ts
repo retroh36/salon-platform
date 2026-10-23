@@ -86,22 +86,19 @@ export async function checkIn(panel: Locator) {
   await expect(panel.getByTestId("visit-status")).toHaveText(/^Checked in/);
 }
 
-// Booking details' other actions (Running late, Edit booking, Check out
-// early, Undo check-in, Mark no-show, Cancel booking, a service's other
-// taps) are in the "⋯" menu in its footer.
+// Booking details' other actions (Running late, Edit booking, Undo
+// check-in, Mark no-show, Cancel booking) are in the "⋯" menu in its footer.
 export async function moreAction(panel: Locator, name: string) {
   const more = panel.getByRole("button", { name: "More actions" });
   if ((await more.getAttribute("aria-expanded")) !== "true") await more.click();
   await panel.getByRole("menu", { name: "More actions" }).getByRole("menuitem", { name, exact: true }).click();
 }
 
-// Check out: the main button once every service is finished, else "Check
-// out early" in the menu.
+// Check out: the main button once the client's checked in.
 export async function checkOut(panel: Locator) {
-  await expect(panel.getByTestId("visit-status")).toBeVisible();
   const primary = panel.getByTestId("primary-action");
-  if ((await primary.count()) && (await primary.textContent()) === "Check out") return primary.click();
-  await moreAction(panel, "Check out early");
+  await expect(primary).toHaveText("Check out");
+  await primary.click();
 }
 
 // One of booking details' tabs: Notes, Formula or History.

@@ -286,6 +286,61 @@ test.describe("front desk", () => {
   });
 });
 
+// Nothing in booking details is wider than the panel, in any state: no
+// sideways scroll bar.
+for (const viewport of [
+  { name: "a laptop", width: 1440, height: 900 },
+  { name: "an iPad in landscape", width: 1180, height: 820 },
+  { name: "an iPad in portrait", width: 768, height: 1024 },
+]) {
+  test.describe(`booking details on ${viewport.name}`, () => {
+    test.use({ storageState: AUTH.frontDesk, viewport: { width: viewport.width, height: viewport.height } });
+
+    test("never scrolls sideways", async ({ page }) => {
+      test.setTimeout(60_000);
+      await openDay(page, today);
+      const panel = details(page);
+      const overflow = () =>
+        panel.evaluate((el) => {
+          const box = el.getBoundingClientRect();
+          // What sticks out past the panel's edge, for the failure message.
+          const wide = [...el.querySelectorAll("*")].filter((e) => e.getBoundingClientRect().right > box.right + 0.5).map((e) => e.outerHTML.slice(0, 120));
+          return { scroll: el.scrollWidth - el.clientWidth, wide: wide.slice(0, 3) };
+        });
+      const expectNone = async (state: string) => expect(await overflow(), state).toEqual({ scroll: 0, wide: [] });
+
+      // Visits in every state the demo day has: booked, here, done.
+      for (const visit of ["upcoming", "here", "done"]) {
+        const block = ui(page).locator(`[data-block][data-visit=${visit}]`).first();
+        if (!(await block.count())) continue;
+        await block.evaluate((el: HTMLElement) => el.click());
+        await expect(panel.getByTestId("client-name")).toBeVisible();
+        await expectNone(`${visit}: opened`);
+        const checklist = panel.getByRole("region", { name: "Before this visit" }).getByRole("button", { name: /^Before this visit/ });
+        if (await checklist.count()) {
+          await checklist.click();
+          await expectNone(`${visit}: checklist open`);
+        }
+        const denise = panel.getByTestId("client-insight").getByRole("button");
+        if (await denise.count()) {
+          await denise.click();
+          await expectNone(`${visit}: Denise's line open`);
+        }
+        for (const tab of ["Formula", "History", "Notes"] as const) {
+          await panel.getByRole("tab", { name: tab, exact: true }).click();
+          await expectNone(`${visit}: ${tab}`);
+        }
+        const more = panel.getByRole("button", { name: "More actions" });
+        if (await more.count()) {
+          await more.click();
+          await expectNone(`${visit}: menu open`);
+          await page.keyboard.press("Escape");
+        }
+      }
+    });
+  });
+}
+
 test.describe("when the salon requires patch tests", () => {
   test.use({ viewport: { width: 1180, height: 820 } });
   test.beforeAll(async () => {

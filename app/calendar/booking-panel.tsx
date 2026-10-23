@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import type { DurationBasis } from "@/lib/insights/durations";
+import { visitsText } from "@/lib/insights/describe";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
@@ -652,7 +654,7 @@ function UsualLength({
   chosen,
   onUse,
 }: {
-  learned: { medianMinutes: number; visits: number } | undefined;
+  learned: { medianMinutes: number; visits: number; basis: DurationBasis } | undefined;
   stylist: string;
   minutes: number;
   chosen: boolean;
@@ -671,7 +673,7 @@ function UsualLength({
     <div role="note" className="flex items-start gap-2 rounded-md border border-denise-200 bg-denise-50 px-2.5 py-2 text-sm text-denise-900" data-testid="usual-length">
       <DeniseFace size={22} />
       <p className="flex-1">
-        This is shorter than {stylist} usually takes: {formatMinutes(learned.medianMinutes)} for this ({learned.visits} visits).{" "}
+        This is shorter than {stylist} usually takes: {formatMinutes(learned.medianMinutes)} for this ({visitsText(learned)}).{" "}
         <button type="button" className="font-semibold text-denise-700 underline underline-offset-2 hover:text-denise-900" onClick={() => onUse(suggested)}>
           Book {formatMinutes(suggested)}
         </button>

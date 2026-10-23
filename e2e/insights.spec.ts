@@ -94,6 +94,10 @@ test.describe("owners", () => {
     const row = bridget.getByTestId("duration-row").filter({ has: page.getByRole("rowheader", { name: "Balayage", exact: true }) });
     await expect(row).toContainText(hm(d.medianMinutes));
     await expect(row).toContainText(`${d.visits} visits`);
+    // Bridget taps her times; Hannah doesn't, and her figures say so.
+    await expect(row.getByTestId("duration-basis")).toHaveCount(0);
+    const hannah = ui(page).getByRole("region", { name: "Hannah" }).getByTestId("duration-row").filter({ has: page.getByRole("rowheader", { name: "Blowout", exact: true }) });
+    await expect(hannah.getByTestId("duration-basis")).toHaveText("From check-in to checkout");
     await waitForHydration(page, "[data-testid=duration-row] button");
     await row.getByRole("button", { name: `Use ${hm(d.suggestedMinutes!)}` }).click();
     await expect(row.getByRole("status")).toContainText(`now books for ${hm(d.suggestedMinutes!)}`);

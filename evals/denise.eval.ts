@@ -334,9 +334,15 @@ const CASES: Case[] = [
     tools: ["stylist_durations"],
     facts: async () => {
       const d = await duration(STAFF.hannah, "Blowout");
-      return { typical: d.medianMinutes, suggested: d.suggestedMinutes };
+      return { typical: d.medianMinutes, suggested: d.suggestedMinutes, basis: d.basis };
     },
-    check: (a, f) => (has(a, ...mins(f.typical as number)) ? null : `should give ${f.typical} minutes`),
+    // Hannah doesn't tap her times: the figure is from check-in to checkout, and Denise says so.
+    check: (a, f) =>
+      !has(a, ...mins(f.typical as number))
+        ? `should give ${f.typical} minutes`
+        : f.basis === "check_in_out" && !/check-?in.{0,20}check-?out/i.test(a)
+          ? "should say it's based on check-in to checkout times"
+          : null,
   },
   {
     question: "Who's on the book with Nola today?",

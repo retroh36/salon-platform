@@ -33,6 +33,8 @@ test.describe("a stylist on their phone", () => {
     await waitForHydration(page, "[data-testid=service-timer] button");
     const timer = card.getByTestId("service-timer");
     await expect(timer).toHaveAttribute("data-state", "waiting");
+    // Optional, and said so.
+    await expect(ui(page).getByTestId("taps-optional")).toContainText("Tapping your times is optional");
 
     for (const [tap, state] of [["Start service", "in_chair"], ["Processing", "processing"], ["Back in chair", "finishing"], ["Finish service", "done"]] as const) {
       const button = timer.getByRole("button", { name: tap });
@@ -54,25 +56,22 @@ test.describe("a stylist on their phone", () => {
 test.describe("the front desk", () => {
   test.use({ storageState: AUTH.frontDesk, viewport: { width: 1440, height: 1000 } });
 
-  test("sees the timer in booking details, with the next tap as its one main button", async ({ page }) => {
+  test("only checks in and out in booking details: the timing taps are the stylist's, on My day", async ({ page }) => {
     await page.goto(`/calendar?date=${todayIn("America/Chicago")}`);
     await waitForHydration(page, "section[data-staff-id]");
     await ui(page).getByRole("region", { name: "Bridget Callahan", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Tap`) }).click({ position: { x: 10, y: 5 } });
     const details = page.getByRole("tabpanel", { name: "Booking details" });
-    const timer = details.getByTestId("service-timer");
-    await expect(timer).toBeVisible();
-    // The status in words, apart from the buttons.
-    await expect(details.getByTestId("visit-status")).toHaveText(/^(Confirmed|Checked in at|In service since|Processing since|Back in the chair since|Finished at|Checked out at) \d/);
-    // Each tap in turn is the panel's one main button.
+    // Check in, then Check out: nothing in between.
     if ((await details.getByTestId("primary-action").textContent()) === "Check in") await checkIn(details);
-    for (let i = 0; i < 4 && (await timer.getAttribute("data-state")) !== "done"; i++) {
-      const state = (await timer.getAttribute("data-state"))!;
-      await expect(details.getByTestId("primary-action")).toHaveText(/^(Start service|Processing|Back in chair|Finish service)$/);
-      await details.getByTestId("primary-action").click();
-      await expect(timer).not.toHaveAttribute("data-state", state);
-    }
-    await expect(timer).toHaveAttribute("data-state", "done");
-    // Then checking out is the main button.
     await expect(details.getByTestId("primary-action")).toHaveText("Check out");
+    const taps = /^(Start service|Processing|Back in chair|Finish service|Undo last tap)/;
+    await expect(details.getByRole("button", { name: taps })).toHaveCount(0);
+    await details.getByRole("button", { name: "More actions" }).click();
+    const menu = details.getByRole("menu", { name: "More actions" });
+    await expect(menu.getByRole("menuitem").first()).toBeVisible();
+    await expect(menu.getByRole("menuitem", { name: taps })).toHaveCount(0);
+    await expect(menu.getByRole("menuitem", { name: "Check out early" })).toHaveCount(0);
+    // What the stylist tapped on My day still shows, as words.
+    await expect(details.getByTestId("visit-status")).toHaveText(/^(Checked in at|In service since|Processing since|Back in the chair since|Finished at) \d/);
   });
 });

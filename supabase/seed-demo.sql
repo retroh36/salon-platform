@@ -399,9 +399,11 @@ update public.appointments set updated_at = greatest(updated_at, created_at) whe
 
 -- ---------------------------------------------------------------------------
 -- Actual times for visits that have happened (and today's so far), so
--- Denise has something to learn from. Each stylist has their own pace on
--- some services (pg_temp.pace), with day-to-day noise and the odd visit
--- that runs long. A few clients are usually late.
+-- Denise has something to learn from: check-in and checkout for every
+-- visit, and the services' own taps from the stylists who tap. Each
+-- stylist has their own pace on some services (pg_temp.pace), with
+-- day-to-day noise and the odd visit that runs long. A few clients are
+-- usually late.
 -- ---------------------------------------------------------------------------
 
 -- How long a stylist takes compared with the menu: Bridget runs long on
@@ -474,6 +476,14 @@ from (
   from public.appointment_items group by appointment_id
 ) x
 where x.appointment_id = a.id and a.status in ('completed', 'checked_in') and x.first_start is not null;
+
+-- Tapping times on My day is optional. Bridget, Gil and Shae tap (all but
+-- about one visit in ten); Hannah, Nola, Sandra and Lois never do, so
+-- Denise learns their times from check-in to checkout instead.
+update public.appointment_items i set started_at = null, processing_started_at = null, processing_ended_at = null, finished_at = null
+where i.business_id = 'b0000000-0000-4000-8000-000000000001'
+  and (i.staff_id not in ('d0000000-0000-4000-8000-000000000004', 'd0000000-0000-4000-8000-000000000005', 'd0000000-0000-4000-8000-000000000009')
+       or pg_temp.rnd(i.id || ':tap') % 10 = 0);
 
 -- Retail sales at checkout: some clients often buy a product, most rarely.
 -- A delivery at the start of the history covers them, so stock stays right.

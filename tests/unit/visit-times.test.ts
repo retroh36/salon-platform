@@ -34,27 +34,17 @@ describe("one-tap service times", () => {
 
 describe("a visit's one main action and status", () => {
   const TZ = "UTC";
-  const item = (id: string, start: number, times: Partial<ItemTimes> = {}, canRecord = true) => ({ id, start, times: { ...none, ...times }, hasProcessing: false, canRecord });
-
-  it("goes Check in, Start service, Finish service, then Check out", () => {
-    expect(nextStep("booked", [item("a", 600)], true)).toEqual({ kind: "check_in" });
-    expect(nextStep("confirmed", [item("a", 600)], true)).toEqual({ kind: "check_in" });
-    expect(nextStep("checked_in", [item("a", 600)], true)).toEqual({ kind: "tap", itemId: "a", event: "start" });
-    expect(nextStep("checked_in", [item("a", 600, { startedAt: at("10:00") })], true)).toEqual({ kind: "tap", itemId: "a", event: "finish" });
-    expect(nextStep("checked_in", [item("a", 600, { startedAt: at("10:00"), finishedAt: at("10:40") })], true)).toEqual({ kind: "check_out" });
-    expect(nextStep("completed", [item("a", 600)], true)).toBeNull();
+  it("goes Check in, then Check out, for the front of house", () => {
+    expect(nextStep("booked", true)).toEqual({ kind: "check_in" });
+    expect(nextStep("confirmed", true)).toEqual({ kind: "check_in" });
+    // Whatever's been tapped on My day, checked in means Check out next.
+    expect(nextStep("checked_in", true)).toEqual({ kind: "check_out" });
+    expect(nextStep("completed", true)).toBeNull();
+    expect(nextStep("no_show", true)).toBeNull();
+    // Stylists' taps are on My day, not here.
+    expect(nextStep("booked", false)).toBeNull();
+    expect(nextStep("checked_in", false)).toBeNull();
     expect([EVENT_LABELS.start, EVENT_LABELS.finish]).toEqual(["Start service", "Finish service"]);
-  });
-
-  it("takes the services in order, and a stylist only their own", () => {
-    const visit = [item("cut", 660, {}, false), item("color", 600, { startedAt: at("10:00"), finishedAt: at("10:50") })];
-    // The stylist's color is done; the cut is someone else's.
-    expect(nextStep("checked_in", visit, false)).toBeNull();
-    expect(nextStep("checked_in", visit.map((i) => ({ ...i, canRecord: true })), true)).toEqual({ kind: "tap", itemId: "cut", event: "start" });
-    // A stylist starting their service on a booked visit checks the client in.
-    expect(nextStep("booked", [item("a", 600)], false)).toEqual({ kind: "tap", itemId: "a", event: "start" });
-    // Not on the day: straight to checking out.
-    expect(nextStep("checked_in", [item("a", 600, {}, false)], true)).toEqual({ kind: "check_out" });
   });
 
   it("says where the visit's at in words", () => {

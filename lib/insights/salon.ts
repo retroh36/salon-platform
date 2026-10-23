@@ -2,10 +2,14 @@
 // service and each weekday runs over, no-shows by day and time of day, and
 // how often each stylist's clients rebook before they leave. Pure; runs
 // under plain Node.
+//
+// Running over counts tapped times in full and check-in to checkout
+// estimates at ESTIMATE_WEIGHT (see durations.ts); each figure says how much
+// of it is estimated (`estimatedShare`), so Denise can say so.
 
 import type { VisitStatus } from "./clients.ts";
 import { timeOfDay, type TimeOfDay } from "./clients.ts";
-import { OVERRUN_MINUTES } from "./durations.ts";
+import { ESTIMATE_WEIGHT, OVERRUN_MINUTES, type DurationBasis } from "./durations.ts";
 import { median, ratio } from "./stats.ts";
 
 // One service on one visit. Times are local to the salon.
@@ -19,6 +23,8 @@ export type SalonItem = {
   minute: number;
   bookedMinutes: number;
   actualMinutes: number | null;
+  // How actualMinutes is known (null when it isn't).
+  basis: DurationBasis | null;
   status: VisitStatus;
   // When the visit was booked, and when the client left (if they did).
   createdAt: Date;
@@ -29,7 +35,14 @@ export type SalonItem = {
 export type OpenHours = Partial<Record<number, { start: number; end: number }[]>>;
 
 export type HourLoad = { weekday: number; hour: number; bookedMinutesPerWeek: number };
-export type ServiceOverrun = { serviceId: string; visits: number; overrunRate: number; typicalOverMinutes: number | null };
+export type ServiceOverrun = {
+  serviceId: string;
+  visits: number;
+  overrunRate: number;
+  typicalOverMinutes: number | null;
+  // Share of these visits timed from check-in to checkout (0 to 1).
+  estimatedShare: number;
+};
 export type WeekdayRunning = {
   weekday: number;
   visits: number;
@@ -43,6 +56,7 @@ export type WeekdayRunning = {
   worstStaffRate: number | null;
   // The services that run over most that day.
   worstServiceIds: string[];
+  estimatedShare: number;
 };
 export type RateBy<K> = { key: K; visits: number; rate: number };
 export type StylistRebooking = { staffId: string; visits: number; rebookedRate: number };
@@ -59,6 +73,9 @@ export type SalonInsight = {
   rebooking: StylistRebooking[];
   noShowRate: number | null;
   overrunRate: number | null;
+  // Share of the timed visits behind the running-over figures that are
+  // check-in to checkout estimates.
+  estimatedShare: number | null;
   rebookedRate: number | null;
 };
 
@@ -68,6 +85,12 @@ const REBOOK_WITHIN_DAYS = 1;
 const MIN_WORST_VISITS = 5;
 
 const over = (i: SalonItem) => i.actualMinutes !== null && i.actualMinutes > i.bookedMinutes + OVERRUN_MINUTES;
+// What a timed visit counts for: an estimate less than a tapped time.
+const weight = (i: SalonItem) => (i.basis === "check_in_out" ? ESTIMATE_WEIGHT : 1);
+const weighed = (list: readonly SalonItem[]) => list.reduce((sum, i) => sum + weight(i), 0);
+// Weighted share of the list that ran over.
+const overRate = (list: readonly SalonItem[]) => weighed(list.filter(over)) / weighed(list);
+const estimatedShare = (list: readonly SalonItem[]) => list.filter((i) => i.basis === "check_in_out").length / list.length;
 
 export function salonInsight(items: readonly SalonItem[], open: OpenHours, weeks: number): SalonInsight {
   const held = items.filter((i) => i.status !== "canceled" && i.status !== "no_show");
@@ -94,32 +117,36 @@ export function salonInsight(items: readonly SalonItem[], open: OpenHours, weeks
   const timed = held.filter((i) => i.actualMinutes !== null);
   const serviceOverruns = groupBy(timed, (i) => i.serviceId)
     .map(([serviceId, list]) => {
-      const overs = list.filter(over).map((i) => i.actualMinutes! - i.bookedMinutes);
-      return { serviceId, visits: list.length, overrunRate: overs.length / list.length, typicalOverMinutes: overs.length ? Math.round(median(overs)!) : null };
+      // How far over, from tapped times when there are any.
+      const overList = list.filter(over);
+      const tappedOvers = overList.filter((i) => i.basis !== "check_in_out");
+      const overs = (tappedOvers.length ? tappedOvers : overList).map((i) => i.actualMinutes! - i.bookedMinutes);
+      return { serviceId, visits: list.length, overrunRate: overRate(list), typicalOverMinutes: overs.length ? Math.round(median(overs)!) : null, estimatedShare: estimatedShare(list) };
     })
     .sort((a, b) => b.overrunRate - a.overrunRate || b.visits - a.visits);
 
-  const salonRate = ratio(timed.filter(over).length, timed.length);
+  const salonRate = timed.length ? overRate(timed) : null;
   const weekdays = groupBy(timed, (i) => i.weekday)
     .map(([weekday, list]): WeekdayRunning => {
       const staff = groupBy(list, (i) => i.staffId)
-        .filter(([, l]) => l.length >= MIN_WORST_VISITS)
-        .map(([staffId, l]) => ({ staffId, rate: l.filter(over).length / l.length }))
+        .filter(([, l]) => weighed(l) >= MIN_WORST_VISITS)
+        .map(([staffId, l]) => ({ staffId, rate: overRate(l) }))
         .sort((a, b) => b.rate - a.rate);
       const worst = staff[0] && salonRate !== null && staff[0].rate > salonRate ? staff[0] : null;
       const services = groupBy(list, (i) => i.serviceId)
-        .filter(([, l]) => l.length >= 3)
-        .map(([serviceId, l]) => ({ serviceId, rate: l.filter(over).length / l.length }))
+        .filter(([, l]) => weighed(l) >= 3)
+        .map(([serviceId, l]) => ({ serviceId, rate: overRate(l) }))
         .filter((s) => s.rate > 0)
         .sort((a, b) => b.rate - a.rate);
       return {
         weekday,
         visits: list.length,
-        overrunRate: list.filter(over).length / list.length,
-        averageOverMinutes: Math.round(list.reduce((sum, i) => sum + i.actualMinutes! - i.bookedMinutes, 0) / list.length),
+        overrunRate: overRate(list),
+        averageOverMinutes: Math.round(list.reduce((sum, i) => sum + weight(i) * (i.actualMinutes! - i.bookedMinutes), 0) / weighed(list)),
         worstStaffId: worst?.staffId ?? null,
         worstStaffRate: worst?.rate ?? null,
         worstServiceIds: services.slice(0, 3).map((s) => s.serviceId),
+        estimatedShare: estimatedShare(list),
       };
     })
     .sort((a, b) => a.weekday - b.weekday);
@@ -158,6 +185,7 @@ export function salonInsight(items: readonly SalonItem[], open: OpenHours, weeks
     rebooking,
     noShowRate: settled.length ? noShowRate(settled) : null,
     overrunRate: salonRate,
+    estimatedShare: timed.length ? estimatedShare(timed) : null,
     rebookedRate: ratio(completed.filter(rebooked).length, completed.length),
   };
 }

@@ -47,8 +47,9 @@ const MAX_BUMPS = 2;
 export type Disruption =
   | { id: string; kind: "overrun"; itemId: string; minutes: number }
   // Not reported: Denise expects it, because the stylist usually takes this
-  // much longer for the service than it's booked for (lib/insights/).
-  | { id: string; kind: "likely_overrun"; itemId: string; minutes: number }
+  // much longer for the service than it's booked for (lib/insights/);
+  // `estimated` when that's from check-in to checkout times, not taps.
+  | { id: string; kind: "likely_overrun"; itemId: string; minutes: number; estimated?: boolean }
   | { id: string; kind: "client_late"; appointmentId: string; minutes: number }
   | { id: string; kind: "call_out"; staffId: string; from: Date };
 
@@ -85,6 +86,8 @@ export type Conflict = {
   // client's.
   staffId: string | null;
   minutes: number | null;
+  // A likely overrun known from check-in to checkout times, not taps.
+  estimated?: boolean;
   // What caused it: the overrunning item, the late visit's items, or both
   // double-booked items.
   causeItemIds: string[];
@@ -201,6 +204,7 @@ export function findConflicts(day: Day): Conflict[] {
           disruptionId: d.id,
           staffId: cause.staffId,
           minutes: d.minutes,
+          ...(d.kind === "likely_overrun" && d.estimated ? { estimated: true } : {}),
           causeItemIds: [d.itemId],
           displaced: hit.filter(movable),
           stuck: hit.filter((id) => !movable(id)),

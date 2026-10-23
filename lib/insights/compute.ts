@@ -8,7 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "../database.types.ts";
 import { toLocal } from "../scheduling/time.ts";
 import { clientInsight, type ClientVisit, type VisitStatus } from "./clients.ts";
-import { stylistDurations, type DurationSample } from "./durations.ts";
+import { stylistDurations, type DurationBasis, type DurationSample } from "./durations.ts";
 import { salonInsight, type OpenHours, type SalonItem } from "./salon.ts";
 
 type Admin = SupabaseClient<Database>;
@@ -31,7 +31,16 @@ type ItemRow = {
   price_cents: number;
   started_at: string | null;
   finished_at: string | null;
-  appointment: { client_id: string | null; status: string; created_at: string; checked_in_at: string | null; checked_out_at: string | null; starts_at: string };
+  appointment: {
+    client_id: string | null;
+    status: string;
+    created_at: string;
+    checked_in_at: string | null;
+    checked_out_at: string | null;
+    starts_at: string;
+    // How many services the visit has (all of them, whatever's loaded).
+    items: { count: number }[];
+  };
 };
 
 type History = {
@@ -49,7 +58,7 @@ async function loadHistory(admin: Admin, businessId: string, filter: { clientIds
     let q = admin
       .from("appointment_items")
       .select(
-        "id, appointment_id, location_id, staff_id, service_id, starts_at, active_minutes, processing_minutes, finishing_minutes, price_cents, started_at, finished_at, appointment:appointments!inner(client_id, status, created_at, checked_in_at, checked_out_at, starts_at)",
+        "id, appointment_id, location_id, staff_id, service_id, starts_at, active_minutes, processing_minutes, finishing_minutes, price_cents, started_at, finished_at, appointment:appointments!inner(client_id, status, created_at, checked_in_at, checked_out_at, starts_at, items:appointment_items(count))",
       )
       .eq("business_id", businessId)
       .gte("starts_at", since);
@@ -106,14 +115,30 @@ async function loadHistory(admin: Admin, businessId: string, filter: { clientIds
 }
 
 const booked = (i: ItemRow) => i.active_minutes + i.processing_minutes + i.finishing_minutes;
-const actual = (i: ItemRow) => (i.started_at && i.finished_at ? Math.round((new Date(i.finished_at).getTime() - new Date(i.started_at).getTime()) / 60_000) : null);
+const minutesBetween = (from: string, to: string) => Math.round((new Date(to).getTime() - new Date(from).getTime()) / 60_000);
+// A checkout made this long after the booked length (3× plus an hour) was
+// forgotten, not a visit that long.
+const forgotten = (minutes: number, bookedMinutes: number) => minutes > 3 * bookedMinutes + 60;
+
+// How long a service took, and how we know: tapped start to finish, or, for
+// a checked-out visit with only this service, check-in to checkout.
+function measured(i: ItemRow): { minutes: number; basis: DurationBasis } | null {
+  if (i.started_at && i.finished_at) {
+    const minutes = minutesBetween(i.started_at, i.finished_at);
+    return minutes > 0 ? { minutes, basis: "tapped" } : null;
+  }
+  const a = i.appointment;
+  if (a.status !== "completed" || !a.checked_in_at || !a.checked_out_at || (a.items[0]?.count ?? 0) !== 1) return null;
+  const minutes = minutesBetween(a.checked_in_at, a.checked_out_at);
+  return minutes > 0 && !forgotten(minutes, booked(i)) ? { minutes, basis: "check_in_out" } : null;
+}
 
 function durationSamples(h: History): DurationSample[] {
   return h.items
     .filter((i) => i.appointment.status === "completed" || i.appointment.status === "checked_in")
     .flatMap((i) => {
-      const minutes = actual(i);
-      return minutes ? [{ staffId: i.staff_id, serviceId: i.service_id, bookedMinutes: booked(i), actualMinutes: minutes, at: new Date(i.starts_at) }] : [];
+      const m = measured(i);
+      return m ? [{ staffId: i.staff_id, serviceId: i.service_id, bookedMinutes: booked(i), actualMinutes: m.minutes, basis: m.basis, at: new Date(i.starts_at) }] : [];
     });
 }
 
@@ -153,6 +178,7 @@ function salonItems(h: History, locationId: string): SalonItem[] {
     .filter((i) => i.location_id === locationId && new Date(i.starts_at).getTime() <= Date.now())
     .map((i) => {
       const local = toLocal(new Date(i.starts_at), tz);
+      const m = measured(i);
       return {
         appointmentId: i.appointment_id,
         clientId: i.appointment.client_id,
@@ -162,7 +188,8 @@ function salonItems(h: History, locationId: string): SalonItem[] {
         weekday: isoWeekday(local.date),
         minute: local.minute,
         bookedMinutes: booked(i),
-        actualMinutes: actual(i),
+        actualMinutes: m?.minutes ?? null,
+        basis: m?.basis ?? null,
         status: i.appointment.status as VisitStatus,
         createdAt: new Date(i.appointment.created_at),
         checkedOutAt: i.appointment.checked_out_at ? new Date(i.appointment.checked_out_at) : null,

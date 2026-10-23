@@ -10,6 +10,7 @@
 // Clients appear by first name only (no contact details, allergies or
 // notes), and what each tool returns depends on who's asking (./knowledge.ts).
 
+import { BASIS_TEXT, type DurationBasis } from "@/lib/insights/durations";
 import type Anthropic from "@anthropic-ai/sdk";
 import { checkAppointment, describeProblem, durationMinutes, pickResource, stretchTiming, timingFor, type BookingContext, type ServiceTiming } from "@/lib/scheduling/booking";
 import { findOpenings } from "@/lib/scheduling/openings";
@@ -34,7 +35,7 @@ export type AssistantContext = {
   propose: (booking: { summary: string; reason: string; serviceId: string; staffId: string; resourceId: string | null; start: Date; timing?: ServiceTiming }) => Promise<string | null>;
   // How long a stylist really takes for a service (trusted figures only),
   // from lib/insights/: availability is searched with it.
-  usualTime?: (staffId: string, serviceId: string) => { medianMinutes: number; visits: number } | null;
+  usualTime?: (staffId: string, serviceId: string) => { medianMinutes: number; visits: number; basis?: DurationBasis } | null;
   // Who's asking ("front desk", "stylist"…) and their first name, and what
   // they may look up.
   asker?: string;
@@ -188,7 +189,7 @@ export function systemPrompt(c: AssistantContext): string {
 
 You help the staff at ${c.salon}. You're talking to ${c.askerName ? `${c.askerName} (${c.asker ?? "staff"})` : `the ${c.asker ?? "front desk"}`}${c.askerName ? `; "I", "me" and "my" in their questions mean ${c.askerName}` : ""}. You help with finding free times, suggesting bookings, and answering questions about clients, stylists, the salon's patterns and stock${c.knowledge?.sales ? ", and sales" : ""}.
 
-Facts: look everything up; never guess a time is free. Every number you mention must come from what you looked up, as given: don't calculate, estimate or invent figures. Say briefly what an answer is based on (e.g. "from 14 timed visits"). If you can't find something out, say you don't know. Only mention a stylist getting faster or slower when the figures you looked up include a trend.
+Facts: look everything up; never guess a time is free. Every number you mention must come from what you looked up, as given: don't calculate, estimate or invent figures. Say briefly what an answer is based on (e.g. "from 14 timed visits"). Times are either tapped in by stylists or estimated from check-in to checkout (based_on, estimated_percent): when a figure comes from check-in to checkout, say so ("based on check-in to checkout times"), as it's rougher. If you can't find something out, say you don't know. Only mention a stylist getting faster or slower when the figures you looked up include a trend.
 
 Voice: you speak for yourself. Never mention tools or their names, "the tool", "the system" or "the data": say "I'd suggest booking 180 minutes", "I checked", "I can only see your own times". If something isn't yours to see, say where it is: contact details are on the client's profile, and sales are for owners and managers.
 
@@ -212,7 +213,7 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
     const usual = c.usualTime?.(staffId, serviceId);
     const base = timingFor(ctx, staffId, serviceId);
     if (!usual || !base) return null;
-    return { timing: stretchTiming(base, Math.ceil(usual.medianMinutes / 5) * 5), median: usual.medianMinutes, visits: usual.visits };
+    return { timing: stretchTiming(base, Math.ceil(usual.medianMinutes / 5) * 5), median: usual.medianMinutes, visits: usual.visits, basis: usual.basis ?? "tapped" };
   };
   const dayOf = (date: unknown): LocalDate | null => (date == null ? c.date : typeof date === "string" && isLocalDate(date) ? date : null);
   const minuteOf = (time: unknown) => (typeof time === "string" ? parseTime(time) : null);
@@ -249,7 +250,9 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
         });
         const basis = (staffId: string) => {
           const l = lengths.get(staffId);
-          return l ? `${staff.get(staffId)?.firstName ?? "their"}'s usual time (typically ${l.median} minutes over ${l.visits} visits)` : "the booked length for this stylist (not enough timed visits to know their usual time)";
+          return l
+            ? `${staff.get(staffId)?.firstName ?? "their"}'s usual time (typically ${l.median} minutes over ${l.visits} visits, ${BASIS_TEXT[l.basis]})`
+            : "the booked length for this stylist (not enough timed visits to know their usual time)";
         };
         if (!openings.length) {
           const checked = typeof input.staff_id === "string" ? basis(input.staff_id) : "each stylist's usual time where known";

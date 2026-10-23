@@ -154,12 +154,16 @@ describe("Ask Denise", () => {
     const busy = calendar([
       { id: "x", appointmentId: "a", serviceId: "cut", staffId: "priya", resourceId: null, start: at("13:00"), activeMinutes: 60, processingMinutes: 0, finishingMinutes: 0 },
     ]);
-    const c = context({ calendar: async () => busy, usualTime: (staffId, serviceId) => (staffId === "priya" && serviceId === "cut" ? { medianMinutes: 78, visits: 12 } : null) });
+    const c = context({
+      calendar: async () => busy,
+      usualTime: (staffId, serviceId) =>
+        staffId === "priya" && serviceId === "cut" ? { medianMinutes: 78, visits: 12, basis: "check_in_out" } : null,
+    });
     const runner = assistantTools(c);
     const found = JSON.parse(await runner.run("find_openings", { service_id: "cut", date: DAY, staff_id: null, after: "11:30", before: "12:00", limit: 10 }));
     const priya = found.filter((o: { stylist: string }) => o.stylist === "Priya");
     expect(priya.map((o: { start: string }) => o.start)).toEqual(["11:30am"]);
-    expect(priya[0]).toMatchObject({ length_minutes: 80, length_basis: expect.stringContaining("Priya's usual time (typically 78 minutes over 12 visits)") });
+    expect(priya[0]).toMatchObject({ length_minutes: 80, length_basis: "Priya's usual time (typically 78 minutes over 12 visits, based on check-in to checkout times)" });
     // Ethan has no usual time yet: the booked length.
     expect(found.find((o: { stylist: string }) => o.stylist === "Ethan")).toMatchObject({ length_minutes: 60, length_basis: expect.stringContaining("booked length") });
 

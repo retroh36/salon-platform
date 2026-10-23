@@ -39,6 +39,70 @@ describe("learning from the demo history", () => {
     expect((await get("Women's Cut & Style")).trend).toBe("faster");
   });
 
+  it("learns from taps where stylists tap, and from check-in to checkout where they don't, saying which", async () => {
+    const get = async (staffId: string, name: string) =>
+      (await admin.from("insights").select("data").eq("business_id", B).eq("kind", "duration").eq("key", `${staffId}:${await serviceId(name)}`).single()).data!.data as unknown as DurationInsight;
+    // Bridget taps on My day.
+    expect((await get(SEED.staff.bridget, "Balayage")).basis).toBe("tapped");
+    // Hannah doesn't: her blowouts are from check-in to checkout, trusted
+    // only with ten visits or more, and never a trend.
+    const blowout = await get(SEED.staff.hannah, "Blowout");
+    expect(blowout).toMatchObject({ basis: "check_in_out", trusted: true, trend: "steady" });
+    expect(blowout.visits).toBeGreaterThanOrEqual(10);
+    const { data: rows } = await admin.from("insights").select("data").eq("business_id", B).eq("kind", "duration");
+    const all = rows!.map((r) => r.data as unknown as DurationInsight);
+    expect(all.filter((d) => d.basis === "check_in_out" && d.trusted).every((d) => d.visits >= 10)).toBe(true);
+    // The salon's running-over figures say how much of them is estimated.
+    const salon = (await admin.from("insights").select("data").eq("business_id", B).eq("kind", "salon").eq("key", SEED.location).single()).data!.data as unknown as SalonInsight;
+    expect(salon.estimatedShare).toBeGreaterThan(0);
+    expect(salon.estimatedShare).toBeLessThan(1);
+  });
+
+  it("estimates a visit with one service and no taps from check-in to checkout, and leaves out visits with several", async () => {
+    // A finished one-service visit and a two-service one, both untapped.
+    const blowout = await serviceId("Blowout");
+    const cut = await serviceId("Women's Cut & Style");
+    const day = new Date(Date.now() - 3 * 86_400_000);
+    day.setUTCHours(15, 0, 0, 0);
+    const visit = async (services: string[], minutes: number) => {
+      const end = new Date(day.getTime() + 45 * services.length * 60_000);
+      const { data: a } = await admin
+        .from("appointments")
+        .insert({ business_id: B, location_id: SEED.location, starts_at: day.toISOString(), ends_at: end.toISOString(), status: "completed", checked_in_at: day.toISOString(), checked_out_at: new Date(day.getTime() + minutes * 60_000).toISOString() })
+        .select("id")
+        .single();
+      await admin.from("appointment_items").insert(
+        services.map((service_id, n) => ({
+          business_id: B,
+          location_id: SEED.location,
+          appointment_id: a!.id,
+          service_id,
+          staff_id: SEED.staff.sandra,
+          starts_at: new Date(day.getTime() + n * 45 * 60_000).toISOString(),
+          ends_at: new Date(day.getTime() + (n + 1) * 45 * 60_000).toISOString(),
+          active_minutes: 45,
+          price_cents: 0,
+        })),
+      );
+      return a!.id;
+    };
+    const before = async () => (await admin.from("insights").select("data").eq("business_id", B).eq("kind", "duration").eq("key", `${SEED.staff.sandra}:${blowout}`).maybeSingle()).data?.data as unknown as DurationInsight | undefined;
+    // Every visit counted, outliers included.
+    const total = (d: DurationInsight | undefined) => (d ? d.visits + d.outliers : 0);
+    const was = total(await before());
+    const ids = [await visit([blowout], 50), await visit([blowout, cut], 300)];
+    try {
+      await recomputeForVisit(admin, ids[0]);
+      const now = await before();
+      // One more visit: the single-service one, not the two-service one.
+      expect(now?.basis).toBe("check_in_out");
+      expect(total(now)).toBe(was + 1);
+    } finally {
+      await admin.from("appointments").delete().in("id", ids);
+      await computeInsights(admin, B);
+    }
+  });
+
   it("has every client with visits, and the salon's patterns", async () => {
     const { count } = await admin.from("insights").select("key", { count: "exact", head: true }).eq("business_id", B).eq("kind", "client");
     expect(count).toBeGreaterThan(400);

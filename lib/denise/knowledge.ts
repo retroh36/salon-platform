@@ -146,6 +146,8 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
           stylist: staff.get(d.staffId) ?? "a stylist",
           service: services.get(d.serviceId) ?? "a service",
           typical_minutes: d.medianMinutes,
+          // Tapped times, or a rougher estimate from check-in to checkout.
+          based_on: d.basis === "check_in_out" ? "check-in to checkout times (an estimate)" : "tapped start and finish times",
           middle_half_minutes: `${d.p25Minutes}–${d.p75Minutes}`,
           visits_counted: d.visits,
           outliers_set_aside: d.outliers,
@@ -178,13 +180,17 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
           stylist_running_over_most: mine(w.worstStaffId),
           stylist_ran_over_percent: !isStylist || w.worstStaffId === me.staffId ? pct(w.worstStaffRate) : null,
           services_running_over_most: w.worstServiceIds.map((id) => services.get(id) ?? "a service"),
+          estimated_percent: pct(w.estimatedShare ?? 0),
         })),
-        services_running_over: s.serviceOverruns.slice(0, 6).map((o) => ({ service: services.get(o.serviceId) ?? "a service", timed_visits: o.visits, ran_over_percent: pct(o.overrunRate), typical_minutes_over: o.typicalOverMinutes })),
+        services_running_over: s.serviceOverruns.slice(0, 6).map((o) => ({ service: services.get(o.serviceId) ?? "a service", timed_visits: o.visits, ran_over_percent: pct(o.overrunRate), typical_minutes_over: o.typicalOverMinutes, estimated_percent: pct(o.estimatedShare ?? 0) })),
         no_shows_by_day: s.noShowsByWeekday.map((n) => ({ day: WEEKDAY[n.key], visits: n.visits, no_show_percent: pct(n.rate) })),
         no_shows_by_time_of_day: s.noShowsByTimeOfDay.map((n) => ({ time_of_day: n.key, visits: n.visits, no_show_percent: pct(n.rate) })),
         rebooking_by_stylist: s.rebooking.filter((r) => !isStylist || r.staffId === me.staffId).map((r) => ({ stylist: staff.get(r.staffId) ?? "a stylist", visits: r.visits, rebooked_before_leaving_percent: pct(r.rebookedRate) })),
         salon_no_show_percent: pct(s.noShowRate),
         salon_ran_over_percent: pct(s.overrunRate),
+        // How much of the running-over figures comes from check-in to
+        // checkout estimates (they count half) rather than tapped times.
+        running_over_estimated_percent: pct(s.estimatedShare ?? null),
         salon_rebooked_percent: isStylist ? null : pct(s.rebookedRate),
       };
     },
@@ -217,6 +223,7 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
             status: i.appointment.status,
             booked_minutes: minutes,
             stylist_usually_takes_minutes: usual?.trusted ? usual.medianMinutes : null,
+            ...(usual?.trusted && usual.basis === "check_in_out" ? { usual_time_based_on: "check-in to checkout times (an estimate)" } : {}),
           };
         }),
       };

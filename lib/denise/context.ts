@@ -65,7 +65,7 @@ export async function assistantContext(supabase: Supabase, me: Asking, date: Loc
     },
     usualTime: (staffId, serviceId) => {
       const d = learned.get(`${staffId}:${serviceId}`);
-      return d?.trusted ? { medianMinutes: d.medianMinutes, visits: d.visits } : null;
+      return d?.trusted ? { medianMinutes: d.medianMinutes, visits: d.visits, basis: d.basis } : null;
     },
     asker: ROLE_NAMES[me.role],
     askerName: staff.data.find((m) => m.id === me.staffId)?.first_name,

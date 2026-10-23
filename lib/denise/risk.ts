@@ -7,11 +7,14 @@ import type { BookingContext } from "@/lib/scheduling/booking";
 import { durationMinutes } from "@/lib/scheduling/booking";
 import type { Disruption } from "@/lib/scheduling/resolve";
 import type { AppointmentStatus } from "@/lib/appointments";
+import type { DurationBasis } from "@/lib/insights/durations";
 
-// Only when the stylist usually takes at least this much longer.
+// Only when the stylist usually takes at least this much longer: more when
+// that's from check-in to checkout (an estimate, which runs a little long).
 export const LIKELY_OVERRUN_MINUTES = 10;
+export const LIKELY_OVERRUN_ESTIMATED_MINUTES = 15;
 
-export type LearnedTime = { medianMinutes: number; trusted: boolean };
+export type LearnedTime = { medianMinutes: number; trusted: boolean; basis?: DurationBasis };
 
 export function likelyOverruns(
   ctx: BookingContext,
@@ -29,7 +32,7 @@ export function likelyOverruns(
     const usual = learned.get(`${item.staffId}:${item.serviceId}`);
     if (!usual?.trusted) return [];
     const over = usual.medianMinutes - durationMinutes(item);
-    if (over < LIKELY_OVERRUN_MINUTES) return [];
-    return [{ id: item.id, kind: "likely_overrun", itemId: item.id, minutes: Math.ceil(over / 5) * 5 }];
+    if (over < (usual.basis === "check_in_out" ? LIKELY_OVERRUN_ESTIMATED_MINUTES : LIKELY_OVERRUN_MINUTES)) return [];
+    return [{ id: item.id, kind: "likely_overrun", itemId: item.id, minutes: Math.ceil(over / 5) * 5, ...(usual.basis === "check_in_out" ? { estimated: true } : {}) }];
   });
 }

@@ -83,8 +83,8 @@ async function loadLearnedTimes(supabase: Supabase, ctx: Day["ctx"]): Promise<Ma
     const { data, error } = await supabase.from("insights").select("key, data").eq("kind", "duration").in("key", keys.slice(i, i + 150));
     if (error) throw error;
     for (const r of data) {
-      const d = r.data as { medianMinutes: number; trusted: boolean };
-      learned.set(r.key, { medianMinutes: d.medianMinutes, trusted: d.trusted });
+      const d = r.data as { medianMinutes: number; trusted: boolean; basis?: LearnedTime["basis"] };
+      learned.set(r.key, { medianMinutes: d.medianMinutes, trusted: d.trusted, basis: d.basis });
     }
   }
   return learned;

@@ -90,6 +90,11 @@ async function Durations() {
                       <td className="px-3 py-2.5 text-ink-muted">
                         {d.visits} {d.visits === 1 ? "visit" : "visits"}
                         {d.trusted && `, ${CONSISTENCY[d.consistency]}`}
+                        {d.basis === "check_in_out" && (
+                          <span className="block text-xs" data-testid="duration-basis">
+                            From check-in to checkout
+                          </span>
+                        )}
                       </td>
                       <td className="px-5 py-2.5 text-right">
                         <DurationButton staffId={d.staffId} serviceId={d.serviceId} suggested={d.suggestedMinutes && d.suggestedMinutes !== current ? minutesText(d.suggestedMinutes) : null} undoActionId={actionId} />

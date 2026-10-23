@@ -13,8 +13,10 @@ import type { AppointmentStatus } from "@/lib/appointments";
 
 export const metadata: Metadata = { title: "My day" };
 
-// A stylist's day on their phone: each client in order, with one tap for
-// Started, Processing, Back in chair and Finished.
+// A stylist's day on their phone: each client in order, with optional taps
+// for Start service, Processing, Back in chair and Finish service. The only
+// place times are tapped: the front desk just checks clients in and out.
+// Tapped times are what Denise learns from first.
 export default function MyDayPage() {
   return (
     <Suspense fallback={<LoadingShell />}>
@@ -47,6 +49,9 @@ async function MyDay() {
   return (
     <AppShell section="my-day" me={me}>
       <PageHeader title="My day" description={`${formatLongDay(today, false)} · ${bookedSummary(counted)}`} />
+      <p className="mx-auto mb-4 max-w-xl text-sm text-ink-muted" data-testid="taps-optional">
+        Tapping your times is optional. When you do, Denise learns how long you really take; otherwise she goes by check-in and checkout.
+      </p>
       {visits.length === 0 ? (
         <p className="rounded-xl bg-sunken px-4 py-8 text-center text-ink-muted">Nothing booked for you today.</p>
       ) : (

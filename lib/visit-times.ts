@@ -91,23 +91,17 @@ export function timerStatus(t: ItemTimes, bookedMinutes: number, timeZone: strin
   }
 }
 
-export type VisitItem = { id: string; start: number; times: ItemTimes; hasProcessing: boolean; canRecord: boolean };
+// The one main action on a visit in booking details, by where it's at:
+// Booked → Check in; checked in → Check out. Front of house only; null
+// otherwise. (Stylists tap a service's own times, if they want to, on My
+// day.)
+export type NextStep = { kind: "check_in" } | { kind: "check_out" };
 
-// The one main action on a visit, by where it's at: Booked → Check in;
-// checked in → the next tap on the first service not finished (Start
-// service, Processing, Back in chair, Finish service); every service
-// finished → Check out. Null when there's nothing for this person to do.
-export type NextStep = { kind: "check_in" } | { kind: "check_out" } | { kind: "tap"; itemId: string; event: Exclude<TimeEvent, "undo"> };
-
-export function nextStep(status: AppointmentStatus, items: readonly VisitItem[], canBook: boolean): NextStep | null {
-  const sorted = [...items].sort((a, b) => a.start - b.start);
-  const tap = (): NextStep | null => {
-    const item = sorted.find((i) => i.canRecord && timerState(i.times) !== "done");
-    return item ? { kind: "tap", itemId: item.id, event: nextEvents(item.times, item.hasProcessing)[0] } : null;
-  };
-  if (status === "booked" || status === "confirmed") return canBook ? { kind: "check_in" } : tap();
-  if (status !== "checked_in") return null;
-  return tap() ?? (canBook ? { kind: "check_out" } : null);
+export function nextStep(status: AppointmentStatus, canBook: boolean): NextStep | null {
+  if (!canBook) return null;
+  if (status === "booked" || status === "confirmed") return { kind: "check_in" };
+  if (status === "checked_in") return { kind: "check_out" };
+  return null;
 }
 
 // The visit's status as text, apart from the buttons: "Booked",

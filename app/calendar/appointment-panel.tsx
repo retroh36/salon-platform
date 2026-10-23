@@ -11,14 +11,14 @@ import { PatchTestForm } from "@/app/clients/patch-test-form";
 import { ClientInsightLine } from "@/components/client-insight-line";
 import { ACTION_LABELS, allowedActions, CANCEL_REASONS, canEditNotes, isEditable, MAX_NOTES, STATUS_LABELS, type AppointmentAction } from "@/lib/appointments";
 import type { ChecklistItem } from "@/lib/client-checks";
-import { EVENT_LABELS, nextEvents, nextStep, timerState, timerStatus, visitStatusText, type TimeEvent } from "@/lib/visit-times";
+import { nextStep, timerState, timerStatus, visitStatusText } from "@/lib/visit-times";
 import { formatLongDay } from "@/lib/schedule-format";
 import { LATE_MINUTES } from "@/lib/scheduling/disruptions";
 import { formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { UsageLinesEditor, toUsageJson, type DraftLine } from "@/components/usage-lines";
 import type { PickerProduct } from "@/lib/inventory-load";
-import { addVisitFormula, changeGroupVisitStatus, changeVisitStatus, changeVisitStatusScoped, checkInWithPatchOverride, recordItemTime, saveVisitNotes, undoVisitCheckIn } from "./actions";
+import { addVisitFormula, changeGroupVisitStatus, changeVisitStatus, changeVisitStatusScoped, checkInWithPatchOverride, saveVisitNotes, undoVisitCheckIn } from "./actions";
 import type { Scope } from "@/lib/scheduling/series";
 import { useNow } from "./now-line";
 import type { AppointmentDetail, BoardData } from "./types";
@@ -74,27 +74,12 @@ export function AppointmentPanel({
   const total = items.reduce((sum, i) => sum + i.priceCents, 0);
   const notesEditable = canEditNotes(me.role, me.staffId, items.map((i) => i.staffId));
   const actions = me.canBook ? allowedActions(status) : [];
-  // Times are tapped in on the day, by the front of house or the stylist.
-  const canTap = (staffId: string) => date === today && (me.canBook || staffId === me.staffId);
-  const step = nextStep(
-    status,
-    items.map((i) => ({ id: i.id, start: i.start, times: i.times, hasProcessing: i.processingMinutes > 0, canRecord: canTap(i.staffId) })),
-    me.canBook,
-  );
-  const stepItem = step?.kind === "tap" ? items.find((i) => i.id === step.itemId) : undefined;
+  // Check in, then Check out. (A stylist can tap a service's own times on My day.)
+  const step = nextStep(status, me.canBook);
   // The front of house, or a stylist on the visit, can say it's running late.
   const canReportLate = date >= today && isEditable(status) && (me.canBook || items.some((i) => i.staffId === me.staffId));
   // On the day (or after): the front of house, or a stylist on the visit.
   const canRecordFormula = date <= today && status !== "canceled" && status !== "no_show" && (me.canBook || items.some((i) => i.staffId === me.staffId));
-  // A service's own taps, on the day: the stylist doing it or the front of
-  // house (who checks a client in first; a stylist's Start service does it too).
-  const canRecordItem = (i: (typeof items)[number]) =>
-    date === today &&
-    status !== "canceled" &&
-    status !== "no_show" &&
-    (me.canBook || i.staffId === me.staffId) &&
-    (status !== "completed" || i.times.startedAt !== null) &&
-    !(me.canBook && (status === "booked" || status === "confirmed"));
 
   function run(action: AppointmentAction, reason = "", detail = "", scope: Scope | "group" = "this") {
     setMessage(null);
@@ -132,14 +117,6 @@ export function AppointmentPanel({
     });
   }
 
-  function tap(itemId: string, event: TimeEvent) {
-    setMessage(null);
-    startTransition(async () => {
-      const result = await recordItemTime(itemId, event);
-      if (!result.ok) setMessage(result.message);
-    });
-  }
-
   function undoCheckIn() {
     setMessage(null);
     startTransition(async () => {
@@ -151,31 +128,21 @@ export function AppointmentPanel({
   function primary() {
     if (!step) return;
     if (step.kind === "check_out") return onCheckout();
-    if (step.kind === "check_in") return outstanding.length ? setConfirmingCheckIn(true) : checkIn();
-    tap(step.itemId, step.event);
+    if (outstanding.length) setConfirmingCheckIn(true);
+    else checkIn();
   }
 
-  // Everything but the next step, under "⋯": the services' other taps
-  // first, then the visit's own actions.
+  // Everything but the next step, under "⋯".
   const several = items.length > 1;
-  const taps: MenuAction[] = items.filter(canRecordItem).flatMap((i) => {
-    const suffix = several ? ` · ${i.serviceName}` : "";
-    const events = nextEvents(i.times, i.processingMinutes > 0).filter((e) => !(step?.kind === "tap" && step.itemId === i.id && step.event === e));
-    return [
-      ...events.map((e) => ({ key: `${i.id}:${e}`, label: `${EVENT_LABELS[e]}${suffix}`, onSelect: () => tap(i.id, e) })),
-      ...(timerState(i.times) !== "waiting" ? [{ key: `${i.id}:undo`, label: `Undo last tap${suffix}`, onSelect: () => tap(i.id, "undo") }] : []),
-    ];
-  });
-  const visitActions: MenuAction[] = [
+  const menuActions: MenuAction[] = [
     canReportLate && { key: "late", label: "Running late", onSelect: () => setReportingLate(true) },
     me.canBook && isEditable(status) && { key: "edit", label: "Edit booking", onSelect: onEdit },
-    status === "checked_in" && me.canBook && step?.kind !== "check_out" && { key: "check_out", label: "Check out early", onSelect: onCheckout },
     status === "checked_in" && me.canBook && { key: "undo_check_in", label: "Undo check-in", onSelect: undoCheckIn },
     actions.includes("no_show") && { key: "no_show", label: ACTION_LABELS.no_show, onSelect: () => run("no_show") },
     actions.includes("cancel") && { key: "cancel", label: ACTION_LABELS.cancel, danger: true, onSelect: () => setCanceling(true) },
   ].filter((a): a is MenuAction => Boolean(a));
   const checkedOutNote = status === "completed" && me.canBook;
-  const footer = Boolean(step || taps.length || visitActions.length || checkedOutNote || message);
+  const footer = Boolean(step || menuActions.length || checkedOutNote || message);
 
   return (
     <div className="flex min-h-full flex-col text-sm">
@@ -370,10 +337,7 @@ export function AppointmentPanel({
             <div className="flex items-center gap-2">
               {step ? (
                 <Button variant="primary" size="lg" disabled={pending} onClick={primary} data-testid="primary-action" className="min-w-0 flex-1">
-                  <span className="truncate">
-                    {step.kind === "tap" ? EVENT_LABELS[step.event] : step.kind === "check_in" ? "Check in" : "Check out"}
-                    {stepItem && several && <span className="font-normal opacity-80"> · {stepItem.serviceName}</span>}
-                  </span>
+                  {step.kind === "check_in" ? "Check in" : "Check out"}
                 </Button>
               ) : checkedOutNote ? (
                 // Checked out: there's no undo here; the sale is voided instead.
@@ -395,7 +359,7 @@ export function AppointmentPanel({
               ) : (
                 <span className="flex-1" />
               )}
-              {(taps.length > 0 || visitActions.length > 0) && <ActionsMenu groups={[taps, visitActions]} disabled={pending} />}
+              {menuActions.length > 0 && <ActionsMenu actions={menuActions} disabled={pending} />}
             </div>
           )}
         </footer>
@@ -408,12 +372,11 @@ type MenuAction = { key: string; label: string; onSelect: () => void; danger?: b
 
 // "⋯": the visit's other actions, in a menu that opens upward from the
 // footer. Arrow keys move through it; Escape or a click outside closes it.
-function ActionsMenu({ groups, disabled }: { groups: MenuAction[][]; disabled: boolean }) {
+function ActionsMenu({ actions, disabled }: { actions: MenuAction[]; disabled: boolean }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
-  const shown = groups.filter((g) => g.length > 0);
 
   useEffect(() => {
     if (!open) return;
@@ -452,24 +415,20 @@ function ActionsMenu({ groups, disabled }: { groups: MenuAction[][]; disabled: b
           aria-label="More actions"
           className="absolute right-0 bottom-full z-10 mb-2 flex w-max max-w-[min(18rem,calc(100vw-2rem))] min-w-52 origin-bottom-right animate-pop-in flex-col rounded-xl border border-line bg-surface p-1.5 shadow-lift"
         >
-          {shown.map((group, g) => (
-            <div key={g} role="group" className={g > 0 ? "mt-1.5 border-t border-line pt-1.5" : ""}>
-              {group.map((a) => (
-                <button
-                  key={a.key}
-                  type="button"
-                  role="menuitem"
-                  tabIndex={-1}
-                  onClick={() => {
-                    setOpen(false);
-                    a.onSelect();
-                  }}
-                  className={`flex w-full items-center rounded-lg px-3 py-2 text-left text-sm whitespace-nowrap transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:bg-sunken focus-visible:outline-none ${a.danger ? "text-danger" : "text-ink"}`}
-                >
-                  <span className="truncate">{a.label}</span>
-                </button>
-              ))}
-            </div>
+          {actions.map((a) => (
+            <button
+              key={a.key}
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              onClick={() => {
+                setOpen(false);
+                a.onSelect();
+              }}
+              className={`flex w-full items-center rounded-lg px-3 py-2 text-left text-sm whitespace-nowrap transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:bg-sunken focus-visible:outline-none ${a.danger ? "text-danger" : "text-ink"}`}
+            >
+              <span className="truncate">{a.label}</span>
+            </button>
           ))}
         </div>
       )}
