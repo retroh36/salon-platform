@@ -11,9 +11,10 @@ import { searchClients } from "@/lib/client-search";
 import { normalizePhone } from "@/lib/clients";
 import { describeUsage, parseUsageLines } from "@/lib/color-usage";
 import { isUuid } from "@/lib/ids";
+import { isZoom, type CalendarZoom } from "@/lib/calendar";
 import { isUsable, loadClientPackages, type ClientPackage } from "@/lib/packages";
 import { loadBackBarProducts } from "@/lib/inventory-load";
-import { changeStatus, moveItem, saveBooking, saveNotes, type BookingItemInput, type SaveResult } from "@/lib/scheduling/book";
+import { changeStatus, moveItem, saveBooking, saveNotes, undoCheckIn, type BookingItemInput, type SaveResult } from "@/lib/scheduling/book";
 import { describeProblem, type BookingProblem } from "@/lib/scheduling/booking";
 import { bookingIdeas, type BookingIdeas } from "@/lib/denise/ideas";
 import { loadBookingContext, loadCalendarStamp } from "@/lib/scheduling/load";
@@ -215,6 +216,33 @@ export async function changeVisitStatus(
   }
   // Denise learns from the visit once the response has gone.
   if (action === "check_out") after(() => recomputeForVisit(createAdminClient(), appointmentId));
+  refresh();
+  return { ok: true };
+}
+
+// Remembers how tall this person likes the calendar.
+export async function saveCalendarZoom(zoom: CalendarZoom): Promise<void> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !isZoom(zoom)) return;
+  const { error } = await supabase.rpc("set_calendar_zoom", { p_zoom: zoom });
+  if (error) throw error;
+}
+
+// Takes back a check-in made by mistake (front of house).
+export async function undoVisitCheckIn(appointmentId: string): Promise<ActionResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(appointmentId)) return { ok: false, message: "That appointment no longer exists." };
+  const result = await undoCheckIn(supabase, appointmentId);
+  if (!result.ok) {
+    const messages = {
+      not_found: "That appointment no longer exists.",
+      not_allowed: "Only a checked-in visit can go back to booked. After checkout, void the sale instead.",
+      needs_reason: "",
+      forbidden: NOT_ALLOWED,
+    };
+    return { ok: false, message: messages[result.error] };
+  }
   refresh();
   return { ok: true };
 }

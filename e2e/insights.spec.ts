@@ -3,9 +3,8 @@ import type { DurationInsight } from "@/lib/insights/durations";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, test, ui, waitForHydration, slotAt } from "./fixtures";
 
-const PX_PER_MINUTE = 2; // as in app/calendar/board.tsx
 const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
@@ -33,10 +32,8 @@ test.describe("the front desk", () => {
   test.use({ storageState: AUTH.frontDesk, viewport: { width: 1920, height: 1500 } });
 
   async function clickSlot(page: Page, stylist: string, hour: number) {
-    const column = ui(page).getByRole("region", { name: stylist });
-    const box = (await column.boundingBox())!;
-    const start = Number(await ui(page).locator("[data-range-start]").getAttribute("data-range-start"));
-    await page.mouse.click(box.x + box.width - 15, box.y + (hour * 60 - start) * PX_PER_MINUTE + 3);
+    const { box, y } = await slotAt(page, ui(page).getByRole("region", { name: stylist }), hour * 60);
+    await page.mouse.click(box.x + box.width - 15, y);
   }
 
   test("booking suggests the stylist's usual length when it's longer than the menu's", async ({ page }) => {
@@ -67,14 +64,13 @@ test.describe("the front desk", () => {
     expect(item!.active_minutes + item!.processing_minutes + item!.finishing_minutes).toBe(suggested);
   });
 
-  test("today's brief, and what Denise knows about each client", async ({ page }) => {
+  test("no brief in her calendar panel, and what Denise knows about each client", async ({ page }) => {
     await page.goto("/calendar");
     await waitForHydration(page, "[data-testid=denise-launcher]");
     await page.getByTestId("denise-launcher").click();
-    const brief = page.getByTestId("denise-brief");
-    await expect(brief).toBeVisible();
-    await expect(brief.getByTestId("denise-brief-text")).toContainText(/^\d+ visits? on the book today\./);
-    await expect(brief).toContainText("From the calendar");
+    // The brief is on the Dashboard; her panel is for what to act on now.
+    await expect(page.getByRole("tabpanel", { name: /Denise/ })).toBeVisible();
+    await expect(page.getByText(/Today.s brief/)).toHaveCount(0);
 
     // Booking details for a visit with a client: her card about them.
     const block = ui(page).locator("[data-block]").filter({ hasNotText: /Walk-in|guest/ }).first();

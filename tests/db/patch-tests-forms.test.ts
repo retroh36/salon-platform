@@ -108,6 +108,7 @@ describe("forms", () => {
       const warnings = await visitWarnings(frontDesk, B, [{ appointmentId: "a", clientId: c!.id, start: at(10), items: [{ serviceId: gloss, start: at(10) }] }]);
       expect(warnings.get("a")).toEqual({
         patch: ["No patch test on record for this client."],
+        patchNotices: [{ title: "Patch test missing — required for Gloss / Toner", detail: "None on file for this client." }],
         patchBlocks: false,
         forms: [
           { templateId: "e3000000-0000-4000-8000-000000000002", name: "Color consent" },

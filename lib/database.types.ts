@@ -87,6 +87,38 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"appointment_events": {
+                  Row: {
+                    "appointment_id": string,"business_id": string,"created_at": string,"detail": NonNullable<Json>,"id": string,"kind": string,"staff_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "appointment_id": string,"business_id": string,"created_at"?: string,"detail"?: NonNullable<Json>,"id"?: string,"kind": string,"staff_id"?: string | null
+                  }
+                  Update: {
+                    "appointment_id"?: string,"business_id"?: string,"created_at"?: string,"detail"?: NonNullable<Json>,"id"?: string,"kind"?: string,"staff_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "appointment_events_appointment_id_fkey"
+      columns: ["appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "appointment_events_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "appointment_events_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"appointment_groups": {
                   Row: {
                     "business_id": string,"created_at": string,"created_by": string | null,"id": string,"label": string,"location_id": string
@@ -531,6 +563,38 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "locations"
       referencedColumns: ["id"]
+    }
+                  ]
+                },"denise_dismissals": {
+                  Row: {
+                    "business_id": string,"created_at": string,"day": string,"dismissed_by": string | null,"id": string,"item_key": string,"location_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"day": string,"dismissed_by"?: string | null,"id"?: string,"item_key": string,"location_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"day"?: string,"dismissed_by"?: string | null,"id"?: string,"item_key"?: string,"location_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "denise_dismissals_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "denise_dismissals_dismissed_by_business_id_fkey"
+      columns: ["dismissed_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "denise_dismissals_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
     }
                   ]
                 },"form_templates": {
@@ -1547,14 +1611,14 @@ isOneToOne: false
                   ]
                 },"staff": {
                   Row: {
-                    "business_id": string,"color": string | null,"created_at": string,"email": string | null,"first_name": string,"id": string,"is_active": boolean,"last_name": string,"level": Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone": string | null,"photo_path": string | null,"role": Database["public"]['Enums']["staff_role"],"updated_at": string,"user_id": string | null
+                    "business_id": string,"calendar_zoom": string,"color": string | null,"created_at": string,"email": string | null,"first_name": string,"id": string,"is_active": boolean,"last_name": string,"level": Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone": string | null,"photo_path": string | null,"role": Database["public"]['Enums']["staff_role"],"updated_at": string,"user_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"first_name": string,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone"?: string | null,"photo_path"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
+                    "business_id": string,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"first_name": string,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone"?: string | null,"photo_path"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
                   }
                   Update: {
-                    "business_id"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"first_name"?: string,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id"?: string,"phone"?: string | null,"photo_path"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
+                    "business_id"?: string,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"first_name"?: string,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id"?: string,"phone"?: string | null,"photo_path"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -2125,6 +2189,9 @@ isOneToOne: false
 "delete_purchase_order":
 { Args: { "p_order_id": string }; Returns: undefined
                            },
+"dismiss_denise_item":
+{ Args: { "p_day": string,"p_key": string,"p_location_id": string }; Returns: undefined
+                           },
 "find_online_client":
 { Args: { "p_business_id": string,"p_email": string,"p_first_name": string,"p_last_name": string,"p_phone": string,"p_phone_digits": string }; Returns: string
                            },
@@ -2212,6 +2279,9 @@ isOneToOne: false
 "set_appointment_status":
 { Args: { "p_appointment_id": string,"p_reason": string,"p_status": Database["public"]['Enums']["appointment_status"] }; Returns: undefined
                            },
+"set_calendar_zoom":
+{ Args: { "p_zoom": string }; Returns: undefined
+                           },
 "set_checkout_settings":
 { Args: { "p_business_id": string,"p_settings": Json }; Returns: undefined
                            },
@@ -2241,6 +2311,9 @@ isOneToOne: false
                            },
 "undo_ai_action":
 { Args: { "p_action_id": string,"p_expected_version": number }; Returns: undefined
+                           },
+"undo_check_in":
+{ Args: { "p_appointment_id": string }; Returns: undefined
                            },
 "undo_duration_action":
 { Args: { "p_action_id": string }; Returns: undefined

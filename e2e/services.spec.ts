@@ -46,7 +46,7 @@ test.describe("owners", () => {
 
   test("see the menu grouped by category with times, prices and stylists", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("link", { name: "Services" }).click();
+    await page.getByRole("link", { name: "Services", exact: true }).click();
     await expect(page).toHaveURL("/services");
 
     await expect(ui(page).getByText("40 on the menu")).toBeVisible();

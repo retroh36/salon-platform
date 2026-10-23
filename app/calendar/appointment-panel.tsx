@@ -5,7 +5,8 @@ import { useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Eyebrow, fieldClass, labelClass, selectClass } from "@/components/ui/field";
-import { CalendarIcon, ClockIcon, GlobeIcon, HourglassIcon } from "@/components/ui/icons";
+import { CalendarIcon, ClockIcon, GlobeIcon, HourglassIcon, ReceiptIcon, UndoIcon, WarningIcon } from "@/components/ui/icons";
+import { PatchTestForm } from "@/app/clients/patch-test-form";
 import { StatusChip } from "@/components/ui/status-chip";
 import { ClientInsightCard } from "@/components/client-insight";
 import { ServiceTimer } from "@/components/service-timer";
@@ -16,7 +17,7 @@ import { formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { formatMinutes, formatPrice } from "@/lib/services";
 import { UsageLinesEditor, toUsageJson, type DraftLine } from "@/components/usage-lines";
 import type { PickerProduct } from "@/lib/inventory-load";
-import { addVisitFormula, changeGroupVisitStatus, changeVisitStatus, changeVisitStatusScoped, saveVisitNotes } from "./actions";
+import { addVisitFormula, changeGroupVisitStatus, changeVisitStatus, changeVisitStatusScoped, saveVisitNotes, undoVisitCheckIn } from "./actions";
 import type { Scope } from "@/lib/scheduling/series";
 import { useNow } from "./now-line";
 import type { AppointmentDetail, BoardData } from "./types";
@@ -33,6 +34,8 @@ export function AppointmentPanel({
   onCanceled,
   onCheckout,
   onOpenVisit,
+  onCheckedIn,
+  team,
   products,
 }: {
   date: LocalDate;
@@ -50,11 +53,25 @@ export function AppointmentPanel({
   onCheckout: () => void;
   // Open another guest's visit in the same group.
   onOpenVisit: (appointmentId: string) => void;
+  // Just checked in from here: the calendar offers Undo for a few seconds.
+  onCheckedIn: (appointmentId: string) => void;
+  // Who can be named as doing a patch test.
+  team: { id: string; name: string }[];
 }) {
   const { client, items, status } = appointment;
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [canceling, setCanceling] = useState(false);
+  const [recordingPatch, setRecordingPatch] = useState(false);
+  const patchNotices = appointment.warnings?.patchNotices ?? [];
+
+  function undoCheckIn() {
+    setMessage(null);
+    startTransition(async () => {
+      const result = await undoVisitCheckIn(appointment.id);
+      if (!result.ok) setMessage(result.message);
+    });
+  }
 
   const start = Math.min(...items.map((i) => i.start));
   const end = Math.max(...items.map((i) => i.end));
@@ -78,6 +95,7 @@ export function AppointmentPanel({
             ? await changeGroupVisitStatus(appointment.id, action, reason, detail)
             : await changeVisitStatusScoped(appointment.id, action, scope, reason, detail);
       if (!result.ok) setMessage(result.message);
+      else if (action === "check_in") onCheckedIn(appointment.id);
       else if (action === "cancel") {
         // Canceled visits leave the calendar; Denise looks at the time freed.
         onClose();
@@ -115,6 +133,29 @@ export function AppointmentPanel({
           )}
         </div>
       </div>
+
+      {/* A patch test this visit needs and doesn't have, near the top. */}
+      {patchNotices.length > 0 && client && (
+        <section aria-label="Patch test" data-testid="patch-notice" className="flex flex-col gap-2 rounded-lg border border-status-late-ink/30 bg-status-late-bg px-3 py-2.5 text-status-late-ink">
+          {patchNotices.map((n) => (
+            <div key={n.title} className="flex gap-2">
+              <WarningIcon className="mt-0.5 size-4" />
+              <p>
+                <span className="block font-semibold">{n.title}</span>
+                {n.detail}
+                {appointment.warnings!.patchBlocks ? " The salon requires one before booking." : ""}
+              </p>
+            </div>
+          ))}
+          {recordingPatch ? (
+            <PatchTestForm clientId={client.id} today={today} me={me.staffId} staff={team} compact />
+          ) : (
+            <Button size="sm" className="self-start" onClick={() => setRecordingPatch(true)}>
+              Record a patch test
+            </Button>
+          )}
+        </section>
+      )}
 
       {appointment.insight && <ClientInsightCard insight={appointment.insight} />}
 
@@ -212,15 +253,9 @@ export function AppointmentPanel({
 
       <NotesForm key={appointment.notes} appointmentId={appointment.id} initial={appointment.notes} editable={notesEditable} />
 
-      {appointment.warnings && client && (
+      {appointment.warnings && appointment.warnings.forms.length > 0 && client && (
         <section aria-label="Before this visit" className="flex flex-col gap-2 rounded-lg border border-status-late-ink/25 bg-status-late-bg px-3 py-2.5 text-status-late-ink">
           <p className="font-semibold">{status === "checked_in" ? "Still to do for this visit" : "Before check-in"}</p>
-          {appointment.warnings.patch.map((m) => (
-            <p key={m}>
-              {m}
-              {appointment.warnings!.patchBlocks ? " The salon requires one for this service." : ""}
-            </p>
-          ))}
           {appointment.warnings.forms.map((f) => (
             <p key={f.templateId} className="flex flex-wrap items-center justify-between gap-2">
               <span>{f.name} isn&apos;t signed yet.</span>
@@ -266,6 +301,12 @@ export function AppointmentPanel({
             </Button>
           )}
           <div className="flex flex-wrap justify-center gap-2">
+            {status === "checked_in" && me.canBook && (
+              <Button variant="ghost" size="sm" disabled={pending} onClick={undoCheckIn}>
+                <UndoIcon className="size-4" />
+                Undo check-in
+              </Button>
+            )}
             {actions.includes("no_show") && (
               <Button variant="ghost" size="sm" disabled={pending} onClick={() => run("no_show")}>
                 {ACTION_LABELS.no_show}
@@ -287,6 +328,28 @@ export function AppointmentPanel({
             />
           )}
         </section>
+      )}
+
+      {/* Checked out: there's no undo here; the sale is voided instead. */}
+      {status === "completed" && me.canBook && (
+        <p data-testid="checked-out-note" className="flex gap-2 rounded-lg bg-sunken px-3 py-2.5 text-ink-muted">
+          <ReceiptIcon className="mt-0.5 size-4" />
+          <span>
+            Checked out. To reverse it, a manager or owner voids the sale
+            {appointment.saleId ? (
+              <>
+                {" "}
+                (
+                <Link href={`/sales/${appointment.saleId}`} className="font-medium text-link underline underline-offset-2 hover:text-link-hover">
+                  view the sale
+                </Link>
+                ).
+              </>
+            ) : (
+              "."
+            )}
+          </span>
+        </p>
       )}
 
       {client && (

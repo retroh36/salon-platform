@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { briefTemplate, type BriefFacts } from "@/lib/denise/brief";
+import { briefItemKey, creditText, withoutDismissed, type BriefFacts } from "@/lib/denise/brief";
 import { likelyOverruns } from "@/lib/denise/risk";
 import { fromLocal, parseTime, type BookedItem, type BookingContext } from "@/lib/scheduling";
 import { findConflicts } from "@/lib/scheduling/resolve";
@@ -71,27 +71,35 @@ describe("the risk check", () => {
   });
 });
 
-describe("the morning brief's template", () => {
+describe("the morning brief", () => {
   const facts: BriefFacts = {
     date: DAY,
     visits: 23,
-    risks: ["Bridget usually takes about 30 minutes longer…"],
-    likelyNoShows: [{ client: "Emma S.", time: "2pm", noShowPercent: 33, visits: 6 }],
-    dueNotBooked: { total: 37, top: [{ client: "Liam B.", overdueDays: 21, usualWeeks: 5 }, { client: "Ava K.", overdueDays: 0, usualWeeks: 6 }] },
+    risks: [{ subject: "likely:b", headline: "Bridget usually takes about 30 minutes longer…", appointmentId: "a-b" }],
+    likelyNoShows: [{ appointmentId: "a-e", client: "Emma S.", time: "2pm", noShowPercent: 33, visits: 6 }],
+    dueNotBooked: { total: 37, top: [{ clientId: "c-l", client: "Liam B.", overdueDays: 21, usualWeeks: 5 }, { clientId: "c-a", client: "Ava K.", overdueDays: 0, usualWeeks: 6 }] },
     openings: { count: 2, withMatches: 1 },
-    lowStock: ["Goldwell Topchic 7N"],
-    credits: [{ client: "Mia R.", packages: ["3 Blowouts left"], giftCardCents: 4000 }],
+    lowStock: [{ productId: "p-7n", name: "Goldwell Topchic 7N" }],
+    credits: [{ clientId: "c-m", appointmentId: "a-m", client: "Mia R.", packages: ["3 Blowouts left"], giftCardCents: 4000 }],
   };
 
-  it("says only what the facts say", () => {
-    expect(briefTemplate(facts)).toBe(
-      "23 visits on the book today. 1 visit likely to run over; I've lined up fixes below. Might not show: Emma S. at 2pm (missed 33% of visits). A reminder call could help. 37 regulars due back with nothing booked, most overdue: Liam B. (3 wk overdue), Ava K. 1 opening I could fill from the waitlist. Low for today's services: Goldwell Topchic 7N. Coming in with credit: Mia R. (3 Blowouts left on a package, $40 on a gift card).",
-    );
+  it("leaves out what's been dismissed, in every section", () => {
+    const keys = new Set(["risk:likely:b", "noshow:a-e", "due:c-l", "stock:p-7n", "credit:c-m", "noshow:someone-else"]);
+    const left = withoutDismissed(facts, keys);
+    expect(left.risks).toEqual([]);
+    expect(left.likelyNoShows).toEqual([]);
+    expect(left.dueNotBooked).toEqual({ total: 36, top: [facts.dueNotBooked.top[1]] });
+    expect(left.lowStock).toEqual([]);
+    expect(left.credits).toEqual([]);
+    expect(withoutDismissed(facts, new Set())).toEqual(facts);
   });
 
-  it("is short on a quiet day", () => {
-    expect(briefTemplate({ ...facts, visits: 1, risks: [], likelyNoShows: [], dueNotBooked: { total: 0, top: [] }, openings: { count: 0, withMatches: 0 }, lowStock: [], credits: [] })).toBe(
-      "1 visit on the book today. Nothing looks likely to run over.",
-    );
+  it("keys items by section and what they're about", () => {
+    expect(briefItemKey.noShow(facts.likelyNoShows[0])).toBe("noshow:a-e");
+    expect(briefItemKey.due(facts.dueNotBooked.top[0])).toBe("due:c-l");
+  });
+
+  it("describes credit without the client's name", () => {
+    expect(creditText(facts.credits[0])).toBe("3 Blowouts left on a package, $40 on a gift card");
   });
 });

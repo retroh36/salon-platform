@@ -1,4 +1,4 @@
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
 
 export const PASSWORD = "password123";
 
@@ -57,4 +57,21 @@ export async function signIn(page: Page, email: string) {
   await ui(page).getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL("/dashboard");
+}
+
+// The calendar's scale: px per minute, from the person's zoom.
+export async function pxPerMinute(page: Page): Promise<number> {
+  return Number(await ui(page).getByTestId("calendar-grid").getAttribute("data-px-per-minute"));
+}
+
+// The y of a time in a stylist's column, after scrolling the calendar so
+// it's in view (and the column's box then).
+export async function slotAt(page: Page, column: Locator, minute: number) {
+  const start = Number(await ui(page).locator("[data-range-start]").getAttribute("data-range-start"));
+  const ppm = await pxPerMinute(page);
+  await ui(page)
+    .getByTestId("calendar-grid")
+    .evaluate((el, top) => (el.scrollTop = top), Math.max(0, (minute - start) * ppm - 200));
+  const box = (await column.boundingBox())!;
+  return { box, y: box.y + (minute - start) * ppm + 3, ppm };
 }

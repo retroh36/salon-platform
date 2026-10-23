@@ -120,7 +120,10 @@ test.describe("front desk", () => {
     // Owner, manager and front desk don't take clients.
     await expect(column(page, "Olivia Bennett")).toHaveCount(0);
     await expect(column(page, "Sam Rivera")).toHaveCount(0);
-    await expect(ui(page).getByText("9am–1pm, 2pm–6pm")).toBeVisible(); // Bridget's split shift
+    // Bridget's split shift, on one line, with the full hours on hover.
+    const hours = ui(page).locator("[data-column-header]").filter({ hasText: "Bridget" }).getByTestId("column-hours");
+    await expect(hours).toHaveText("9–1, 2–6");
+    await expect(hours).toHaveAttribute("title", "9am–1pm, 2pm–6pm");
     await expect(ui(page).getByText("Open 9am–7pm")).toBeVisible();
   });
 
@@ -133,11 +136,10 @@ test.describe("front desk", () => {
     // (Test names are long, so the block may show a shorter form; the full
     // name is in its label.)
     await expect(color).toHaveAttribute("data-family", "color");
-    // Not here yet: the service color. Not running late, but a new client
-    // with no patch test on record: a warning icon.
+    // Not here yet: the service color. No icons: a missing patch test is
+    // in booking details, not on the block.
     await expect(color).toHaveAttribute("data-visit", "upcoming");
-    await expect(color.locator("[data-attention=late]")).toHaveCount(0);
-    await expect(color.locator("[data-attention=warning]")).toHaveAttribute("title", /No patch test on record/);
+    await expect(color.locator("[data-attention]")).toHaveCount(0);
 
     // 45 minutes applying, 35 processing, 25 finishing.
     const heights = await Promise.all(
@@ -333,12 +335,12 @@ test.describe("design", () => {
     // A no-show's name is struck through.
     expect(await block("Ned").locator("span.font-semibold").first().evaluate((el) => getComputedStyle(el).textDecorationLine)).toBe("line-through");
 
-    // No status badges. Running late gets a clock with how late; a form
-    // still to sign (these are new clients) a warning icon.
+    // No status badges. Running late gets a clock with how late, and
+    // that's all (forms and patch tests are in booking details).
     await expect(nola.getByText(/^(Confirmed|Checked in|Checked out)$/)).toHaveCount(0);
     await expect(block("Lou").locator("[data-attention=late]")).toHaveText("+30m");
     await expect(block("Lou")).toHaveAccessibleName(/running late(,|$)/);
-    await expect(block("Lou").locator("[data-attention=warning]")).toHaveAttribute("title", /consultation not signed/);
+    await expect(block("Lou").locator("[data-attention]")).toHaveCount(1);
     for (const name of ["Rey", "Ida", "Dot", "Ned"]) await expect(block(name).locator("[data-attention=late]")).toHaveCount(0);
     // Finished visits need nothing more.
     for (const name of ["Dot", "Ned"]) await expect(block(name).locator("[data-attention]")).toHaveCount(0);

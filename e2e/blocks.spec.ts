@@ -2,13 +2,12 @@ import type { Locator, Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, test, ui, waitForHydration, pxPerMinute, slotAt } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
 const { bridget: BRIDGET, shae: SHAE } = SEED.staff;
-const PX_PER_MINUTE = 2;
 // A Tuesday clear of the seeded month and the other tests' days.
 const DAY = addDays(startOfWeek(todayIn(TZ)), 57);
 const at = (hour: number, minute = 0) => fromLocal(DAY, hour * 60 + minute, TZ)!;
@@ -28,7 +27,10 @@ async function openDay(page: Page) {
 
 const column = (page: Page, name: string) => ui(page).getByRole("region", { name, exact: true });
 
-async function dragBy(page: Page, target: Locator, dy: number, x = 20, y = 6) {
+// dy in minutes.
+async function dragBy(page: Page, target: Locator, minutes: number, x = 20, y = 6) {
+  const dy = minutes * (await pxPerMinute(page));
+  await target.scrollIntoViewIfNeeded();
   const box = (await target.boundingBox())!;
   await page.mouse.move(box.x + x, box.y + y);
   await page.mouse.down();
@@ -60,7 +62,7 @@ test.describe("front desk", () => {
     expect(series!.repeat_weekdays).toEqual([1, 2, 3, 4, 5]);
 
     // Drag it 15 minutes later: this day only.
-    await dragBy(page, block, 15 * PX_PER_MINUTE);
+    await dragBy(page, block, 15);
     await expect(ui(page).getByRole("status").filter({ hasText: "Moved for this day only." })).toBeVisible();
     const moved = column(page, "Bridget Callahan").getByRole("button", { name: /^Lunch, 12:15pm–12:45pm/ });
     await expect(moved).toBeVisible();
@@ -69,7 +71,7 @@ test.describe("front desk", () => {
     await openDay(page);
     // Stretch it by 15 minutes from its bottom edge.
     const box = (await moved.boundingBox())!;
-    await dragBy(page, moved, 15 * PX_PER_MINUTE, 40, box.height - 2);
+    await dragBy(page, moved, 15, 40, box.height - 2);
     await expect(column(page, "Bridget Callahan").getByRole("button", { name: /^Lunch, 12:15pm–1pm/ })).toBeVisible();
     await expect
       .poll(async () => (await admin.from("time_blocks").select("start_minute, end_minute").eq("staff_id", BRIDGET).eq("on_date", DAY).single()).data)
@@ -91,7 +93,7 @@ test.describe("front desk", () => {
     const meeting = column(page, "Shae Morgan").getByRole("button", { name: /^Meeting, 10am–11am, Team meeting/ });
     await expect(meeting).toBeVisible();
     const appointment = column(page, "Shae Morgan").locator("[data-block]");
-    await dragBy(page, appointment, 60 * PX_PER_MINUTE);
+    await dragBy(page, appointment, 60);
     await expect(ui(page).getByRole("alert")).toContainText("The stylist is in a meeting then.");
 
     // Clicking the meeting shows it, with ways to change it.
@@ -110,9 +112,8 @@ test.describe("stylist", () => {
   test("blocks their own time from an empty slot, but can't change others'", async ({ page }) => {
     await admin.from("time_blocks").insert({ business_id: B, location_id: L, staff_id: SHAE, kind: "training", start_minute: 900, end_minute: 960, on_date: DAY });
     await openDay(page);
-    const box = (await column(page, "Bridget Callahan").boundingBox())!;
-    const start = Number(await ui(page).locator("[data-range-start]").getAttribute("data-range-start"));
-    await page.mouse.click(box.x + 30, box.y + (16 * 60 - start) * PX_PER_MINUTE + 3);
+    const { box, y } = await slotAt(page, column(page, "Bridget Callahan"), 16 * 60);
+    await page.mouse.click(box.x + 30, y);
     const form = page.getByRole("form", { name: "Block time" });
     await expect(form.getByLabel("Stylist")).toHaveValue(BRIDGET);
     await expect(form.getByLabel("Stylist").locator("option")).toHaveCount(1);

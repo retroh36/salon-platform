@@ -5,8 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { DeniseFace, DenisePose, type Pose } from "@/components/denise";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/field";
-import { CheckCircleIcon, ChevronDownIcon, ClockIcon, SendIcon, UndoIcon } from "@/components/ui/icons";
-import { creditText, type Brief } from "@/lib/denise/brief";
+import { CheckCircleIcon, ChevronDownIcon, ClockIcon, CloseIcon, SendIcon, UndoIcon } from "@/components/ui/icons";
 import { noFixAdvice } from "@/lib/denise/respond";
 import type { BookingSuggestion, ChatMessage, ConflictView, DeniseState, FixView, OpeningMatch, WaitlistOpening } from "@/lib/denise/types";
 import { formatLongDay } from "@/lib/schedule-format";
@@ -48,6 +47,7 @@ export function DenisePanel({
   onPreview,
   onAsk,
   onOpen,
+  onDismissNotice,
   onBook,
   onRejectSuggestion,
   onBookWaitlist,
@@ -71,6 +71,8 @@ export function DenisePanel({
   onPreview: (preview: Preview | null) => void;
   onAsk: (question: string) => void;
   onOpen: (appointmentId: string) => void;
+  // A "hasn't checked in" line dismissed (it stays gone today).
+  onDismissNotice: (id: string) => void;
   // Approve a booking Denise suggested, for this client.
   onBook: (actionId: string, clientId: string) => void;
   onRejectSuggestion: (actionId: string) => void;
@@ -120,8 +122,6 @@ export function DenisePanel({
         </div>
       )}
 
-      {state?.brief && <BriefCard brief={state.brief} />}
-
       {conflicts.map((c, i) => (
         <ConflictCard
           key={c.subject}
@@ -137,19 +137,32 @@ export function DenisePanel({
         />
       ))}
 
+      {/* Clients due who haven't checked in: one card, a line each. */}
       {notices.length > 0 && (
-        <section aria-label="Notices" className="flex flex-col gap-2">
-          {notices.map((n) => (
-            <div key={n.id} className="flex animate-fade-in gap-3 rounded-xl border border-denise-200 bg-denise-50 p-3">
-              <ClockIcon className="mt-0.5 size-4 shrink-0 text-denise-700" />
-              <div className="flex flex-1 flex-col items-start gap-2">
-                <p className="text-ink">{n.text}</p>
-                <button type="button" className={buttonClass("secondary", "sm")} onClick={() => onOpen(n.appointmentId)}>
-                  Open booking
-                </button>
-              </div>
-            </div>
-          ))}
+        <section aria-label="Not checked in yet" data-testid="denise-late" className="flex animate-fade-in flex-col gap-2 rounded-xl border border-denise-200 bg-denise-50 p-3">
+          <p className="flex items-center gap-2 font-semibold text-denise-900">
+            <ClockIcon className="size-4 shrink-0 text-denise-700" />
+            {notices.length === 1 ? "Hasn't checked in yet" : `${notices.length} haven't checked in yet`}
+          </p>
+          <ul className="flex flex-col gap-1.5">
+            {notices.map((n) => (
+              <li key={n.id} className="flex animate-fade-in items-center gap-2 rounded-lg bg-surface px-2.5 py-2">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium text-ink">{n.clientName}</span>
+                  <span className="block text-xs text-ink-muted">Due {formatMinute(n.startMinute)}</span>
+                </span>
+                <Button size="sm" onClick={() => onOpen(n.appointmentId)}>
+                  Open
+                </Button>
+                {data.me.canBook && (
+                  <IconButton label={`Dismiss ${n.clientName}`} size="sm" onClick={() => onDismissNotice(n.id)}>
+                    <CloseIcon className="size-4" />
+                  </IconButton>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-ink-muted">If they&apos;re on the way, open the booking and tell me how late; I&apos;ll rearrange things.</p>
         </section>
       )}
 
@@ -477,49 +490,6 @@ function SuggestionCard({
         <p className="text-xs text-ink-muted">The front desk can book this.</p>
       )}
     </section>
-  );
-}
-
-// The morning brief: what today holds, in a sentence or two, with the
-// details underneath.
-function BriefCard({ brief }: { brief: Brief }) {
-  const f = brief.facts;
-  return (
-    <details open className="group rounded-xl border border-denise-200 bg-surface" data-testid="denise-brief">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 font-semibold text-denise-900 [&::-webkit-details-marker]:hidden">
-        Today&rsquo;s brief
-        <span className="text-xs font-normal text-ink-muted">{brief.writtenBy === "claude" ? "Written by Denise" : "From the calendar"}</span>
-      </summary>
-      <div className="flex flex-col gap-3 border-t border-denise-100 px-3 py-3">
-        <p className="text-ink" data-testid="denise-brief-text">
-          {brief.text}
-        </p>
-        {f.likelyNoShows.length > 0 && (
-          <BriefList title="Might not show" items={f.likelyNoShows.map((n) => `${n.client}, ${n.time} · missed ${n.noShowPercent}% of ${n.visits} visits`)} />
-        )}
-        {f.dueNotBooked.top.length > 0 && (
-          <BriefList
-            title={`Due back, nothing booked (${f.dueNotBooked.total})`}
-            items={f.dueNotBooked.top.map((d) => `${d.client}${d.usualWeeks ? ` · every ~${d.usualWeeks} wk` : ""}${d.overdueDays ? ` · ${d.overdueDays} days overdue` : " · due now"}`)}
-          />
-        )}
-        {f.lowStock.length > 0 && <BriefList title="Low for today's services" items={f.lowStock} />}
-        {f.credits.length > 0 && <BriefList title="Coming in with credit" items={f.credits.map(creditText)} />}
-      </div>
-    </details>
-  );
-}
-
-function BriefList({ title, items }: { title: string; items: string[] }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold tracking-wide text-ink-muted uppercase">{title}</p>
-      <ul className="mt-1 flex flex-col gap-0.5 text-ink">
-        {items.map((i) => (
-          <li key={i}>{i}</li>
-        ))}
-      </ul>
-    </div>
   );
 }
 

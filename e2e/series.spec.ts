@@ -2,13 +2,12 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, test, ui, waitForHydration, pxPerMinute, slotAt } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
 const { bridget: BRIDGET } = SEED.staff;
-const PX_PER_MINUTE = 2;
 // Tuesdays clear of the seeded month and the other tests' days.
 const DAY = addDays(startOfWeek(todayIn(TZ)), 64);
 const DATES = [0, 14, 28, 42].map((d) => addDays(DAY, d));
@@ -39,9 +38,8 @@ async function openDay(page: Page, date = DAY) {
 const column = (page: Page, name: string) => ui(page).getByRole("region", { name, exact: true });
 
 async function clickSlot(page: Page, stylist: string, hour: number) {
-  const box = (await column(page, stylist).boundingBox())!;
-  const start = Number(await ui(page).locator("[data-range-start]").getAttribute("data-range-start"));
-  await page.mouse.click(box.x + box.width - 15, box.y + (hour * 60 - start) * PX_PER_MINUTE + 3);
+  const { box, y } = await slotAt(page, column(page, stylist), hour * 60);
+  await page.mouse.click(box.x + box.width - 15, y);
 }
 
 test.use({ viewport: { width: 1920, height: 1500 }, storageState: AUTH.frontDesk });
@@ -100,10 +98,11 @@ test("moves and cancels this and following visits", async ({ page }) => {
   // Drag the second visit an hour later: this and following.
   await openDay(page, DATES[1]);
   const block = column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Ivy Test`) });
+  await block.scrollIntoViewIfNeeded();
   const box = (await block.boundingBox())!;
   await page.mouse.move(box.x + 20, box.y + 8);
   await page.mouse.down();
-  await page.mouse.move(box.x + 20, box.y + 8 + 60 * PX_PER_MINUTE, { steps: 10 });
+  await page.mouse.move(box.x + 20, box.y + 8 + 60 * (await pxPerMinute(page)), { steps: 10 });
   await page.mouse.up();
   const dialog = page.getByRole("dialog", { name: `Move ${PREFIX}Ivy Test's repeating visit` });
   await dialog.getByRole("button", { name: "This and following visits" }).click();

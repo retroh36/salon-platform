@@ -65,3 +65,13 @@ export async function rejectDeniseFix(actionId: string, date: string): Promise<F
     return result.ok ? { ok: true, message: "Okay, I'll leave that one." } : result;
   });
 }
+
+// Dismisses an item from her brief or panel for the day ("noshow:<id>",
+// "late:<id>", ...). It stays gone, for everyone at the location.
+export async function dismissDeniseItem(key: string, date: string): Promise<{ ok: boolean }> {
+  const s = await session();
+  if (!s || !s.viewer.canBook || !isLocalDate(date) || !/^(risk|noshow|due|stock|credit|late):[\w:.-]{1,180}$/.test(key)) return { ok: false };
+  const { error } = await s.supabase.rpc("dismiss_denise_item", { p_location_id: s.viewer.location.id, p_day: date, p_key: key });
+  if (error) throw error;
+  return { ok: true };
+}

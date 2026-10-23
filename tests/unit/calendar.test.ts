@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bookedSummary, summaryVariants, FAMILIES, FAMILY_LABELS, gridRange, hourMarks, laneBox, layoutColumn, offHours, serviceFamily } from "@/lib/calendar";
+import { bookedSummary, compactHours, quarterMarks, summaryVariants, ZOOM_PX_PER_MINUTE, FAMILIES, FAMILY_LABELS, gridRange, hourMarks, laneBox, layoutColumn, offHours, serviceFamily } from "@/lib/calendar";
 
 const h = (hours: number, minutes = 0) => hours * 60 + minutes;
 const span = (start: number, end: number) => ({ start, end });
@@ -144,6 +144,28 @@ describe("bookedSummary", () => {
       ]),
     ).toBe("2 visits · 3h 30m booked");
     expect(bookedSummary([{ appointmentId: "a", minutes: 120 }])).toBe("1 visit · 2h booked");
+  });
+
+  it("labels every quarter hour, marking the hours", () => {
+    expect(quarterMarks(span(h(9), h(10, 30)))).toEqual([
+      { minute: h(9), hour: true },
+      { minute: h(9, 15), hour: false },
+      { minute: h(9, 30), hour: false },
+      { minute: h(9, 45), hour: false },
+      { minute: h(10), hour: true },
+      { minute: h(10, 15), hour: false },
+    ]);
+  });
+
+  it("draws a quarter hour 30, 40 and 60px tall by zoom", () => {
+    expect([ZOOM_PX_PER_MINUTE.compact, ZOOM_PX_PER_MINUTE.comfortable, ZOOM_PX_PER_MINUTE.detailed].map((p) => Math.round(p * 15))).toEqual([30, 40, 60]);
+  });
+
+  it("puts working hours on one short line", () => {
+    expect(compactHours([span(h(9), h(13)), span(h(14), h(18))])).toBe("9–1, 2–6");
+    expect(compactHours([span(h(10), h(19))])).toBe("10–7");
+    expect(compactHours([span(h(9), h(13)), span(h(13, 30), h(17, 30))])).toBe("9–1, 1:30–5:30");
+    expect(compactHours([span(h(11), h(24))])).toBe("11–12");
   });
 
   it("shortens to fit a narrow header", () => {

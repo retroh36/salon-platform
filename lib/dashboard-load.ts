@@ -217,8 +217,8 @@ export async function loadDashboard(supabase: Supabase, me: DashboardMe, now = n
     loadDisruptions(supabase, me.location.id, today),
     loadAllClientInsights(supabase, me.business_id),
     loadSalonInsight(supabase, me.business_id, me.location.id),
-    // The brief from the cache: loading the Dashboard never waits on Claude.
-    deniseDay({ supabase, role: me.role, businessId: me.business_id, viewer, today }, today, { brief: "cached" }),
+    // With the morning brief, from our own numbers (no Claude call).
+    deniseDay({ supabase, role: me.role, businessId: me.business_id, viewer, today }, today, { brief: true }),
     supabase.from("services").select("id", { count: "exact", head: true }).is("archived_at", null),
   ]);
   const stylistIds = team.map((s) => s.id);

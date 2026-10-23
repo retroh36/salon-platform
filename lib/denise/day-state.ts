@@ -1,11 +1,9 @@
 // Denise's view of a day for one staff member: conflicts and her fixes,
-// notices, waitlist openings, reorder drafts and (today, for the front of
-// house) the morning brief. Shared by the calendar's panel
+// notices (late arrivals), waitlist openings, reorder drafts and (today, for
+// the front of house, on the Dashboard) the morning brief. Shared by the calendar's panel
 // (app/calendar/denise-actions.ts) and the Dashboard.
 
-import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { after } from "next/server";
 import type { Database } from "@/lib/database.types";
 import { canReceiveOrders } from "@/lib/inventory";
 import { loadBookingContext } from "@/lib/scheduling/load";
@@ -13,8 +11,8 @@ import { toLocal, type LocalDate } from "@/lib/scheduling/time";
 import type { StaffRole } from "@/lib/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { freedOn, loadWaitlist, waitlistOpenings } from "@/lib/waitlist-load";
-import { briefFacts, briefTemplate, type Brief, type BriefFacts } from "./brief";
-import { ANALYSIS_MODEL, claudeClient, explainFixes, firstNamesOnly, isConnected, writeBrief, type ClaudeClient } from "./claude";
+import { briefFacts, withoutDismissed, type BriefFacts } from "./brief";
+import { claudeClient, explainFixes, isConnected, type ClaudeClient } from "./claude";
 import { suggestReorders } from "./reorder";
 import { scanDay, type Viewer } from "./scan";
 import type { DeniseState, WaitlistOpening } from "./types";
@@ -37,37 +35,11 @@ export function claudeFor(businessId: string, feature: string): ClaudeClient | n
   return client ? metered(client, createAdminClient(), businessId, feature) : null;
 }
 
-// Claude rewrites the brief at most this often while the facts keep
-// changing; in between, the template (always up to date) shows.
-const BRIEF_REWRITE_MS = 20 * 60_000;
-
-const factsHash = (facts: BriefFacts) => createHash("sha256").update(JSON.stringify(firstNamesOnly(facts))).digest("hex");
-
-// The brief for these facts: Denise's cached words when they're for the
-// same facts, else the template. "write" asks Claude for new words when
-// they're due and waits for them (the calendar); "cached" never waits: it
-// shows what's there and writes new words after the response (the
-// Dashboard), so loading it doesn't call the API each time.
-export async function briefFor(a: DeniseAsker, facts: BriefFacts, mode: "write" | "cached"): Promise<Brief> {
-  const template: Brief = { facts, text: briefTemplate(facts), writtenBy: "template" };
-  const client = claudeFor(a.businessId, "morning_brief");
-  if (!client) return template;
-  const admin = createAdminClient();
-  const hash = factsHash(facts);
-  const { data: cached } = await admin.from("denise_briefs").select("facts_hash, text, created_at").eq("location_id", a.viewer.location.id).eq("day", facts.date).maybeSingle();
-  if (cached?.facts_hash === hash) return { facts, text: cached.text, writtenBy: "claude" };
-  if (cached && Date.now() - new Date(cached.created_at).getTime() < BRIEF_REWRITE_MS) return template;
-  const write = async () => {
-    const text = await writeBrief(client, facts).catch(() => null);
-    if (text) await admin.from("denise_briefs").upsert({ location_id: a.viewer.location.id, day: facts.date, facts_hash: hash, text, model: ANALYSIS_MODEL, created_at: new Date().toISOString() });
-    return text;
-  };
-  if (mode === "cached") {
-    after(write);
-    return template;
-  }
-  const text = await write();
-  return text ? { facts, text, writtenBy: "claude" } : template;
+// What's been dismissed from her brief and panel on the day (it stays gone).
+export async function dismissedOn(supabase: Supabase, locationId: string, date: LocalDate): Promise<Set<string>> {
+  const { data, error } = await supabase.from("denise_dismissals").select("item_key").eq("location_id", locationId).eq("day", date);
+  if (error) throw error;
+  return new Set(data.map((d) => d.item_key));
 }
 
 // Time that opened up on the day, matched to the waitlist.
@@ -85,7 +57,9 @@ export async function openingsOn(a: DeniseAsker, date: LocalDate): Promise<Waitl
   return waitlistOpenings(ctx, date, freed, entries, new Map(staff.map((x) => [x.id, x.first_name])), notBefore);
 }
 
-export async function deniseDay(a: DeniseAsker, date: LocalDate, options: { brief?: "write" | "cached"; onStep?: (text: string) => void } = {}): Promise<DeniseState> {
+// `brief`: also work out the morning brief (today, for the front of house:
+// the Dashboard). The calendar's panel shows only what to act on now.
+export async function deniseDay(a: DeniseAsker, date: LocalDate, options: { brief?: boolean; onStep?: (text: string) => void } = {}): Promise<DeniseState> {
   const connected = isConnected();
   // Reorders she's drafted on the Inventory page, for those who order.
   const reorders = canReceiveOrders(a.role)
@@ -101,15 +75,16 @@ export async function deniseDay(a: DeniseAsker, date: LocalDate, options: { brie
   // Past days can't be changed, so there's nothing to fix.
   if (date < a.today) return { date, conflicts: [], notices: [], reorders, openings: [], brief: null, connected };
   const client = claudeFor(a.businessId, "explain_fixes");
-  const [state, openings] = await Promise.all([
+  const [state, openings, dismissed] = await Promise.all([
     scanDay(a.supabase, a.viewer, date, { explain: client ? (facts) => explainFixes(client, facts) : null, onStep: options.onStep }),
     a.viewer.canBook ? openingsOn(a, date) : Promise.resolve([]),
+    a.viewer.canBook ? dismissedOn(a.supabase, a.viewer.location.id, date) : Promise.resolve(new Set<string>()),
   ]);
+  const notices = state.notices.filter((n) => !dismissed.has(n.id));
   // The morning brief: today, for the front of house.
-  let brief: Brief | null = null;
-  if (date === a.today && a.viewer.canBook) {
-    const facts = await briefFacts(a.supabase, { businessId: a.businessId, location: a.viewer.location }, date, { conflicts: state.conflicts, openings });
-    brief = await briefFor(a, facts, options.brief ?? "write");
+  let brief: BriefFacts | null = null;
+  if (options.brief && date === a.today && a.viewer.canBook) {
+    brief = withoutDismissed(await briefFacts(a.supabase, { businessId: a.businessId, location: a.viewer.location }, date, { conflicts: state.conflicts, openings }), dismissed);
   }
-  return { ...state, reorders, openings, brief, connected };
+  return { ...state, notices, reorders, openings, brief, connected };
 }

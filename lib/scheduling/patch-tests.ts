@@ -38,3 +38,29 @@ export function patchTestMessage(state: Exclude<PatchState, "ok">, settings: Pat
       return "Their last patch test showed a reaction.";
   }
 }
+
+// The notice in booking details for a service whose patch test isn't in
+// order: "Patch test missing — required for Full Highlights", and what's on
+// file. `day` formats a date for the salon.
+export function patchNotice(
+  state: Exclude<PatchState, "ok">,
+  service: string,
+  tests: readonly PatchTest[],
+  settings: PatchSettings,
+  day: (at: Date) => string,
+): { title: string; detail: string } {
+  const last = [...tests].sort((a, b) => b.testedAt.getTime() - a.testedAt.getTime())[0];
+  switch (state) {
+    case "missing":
+      return { title: `Patch test missing — required for ${service}`, detail: "None on file for this client." };
+    case "expired":
+      return {
+        title: `Patch test expired — required for ${service}`,
+        detail: `The last one was ${day(last.testedAt)}; it expired ${day(new Date(last.testedAt.getTime() + settings.validDays * 24 * HOUR))}.`,
+      };
+    case "too_recent":
+      return { title: `Patch test too recent for ${service}`, detail: `Done ${day(last.testedAt)}; it needs ${settings.minHours} hours before the service.` };
+    case "reaction":
+      return { title: `Patch test showed a reaction — ${service}`, detail: `Tested ${day(last.testedAt)}. Check before going ahead.` };
+  }
+}

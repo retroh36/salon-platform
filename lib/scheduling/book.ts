@@ -230,6 +230,21 @@ export async function changeStatus(
   return { ok: true };
 }
 
+// A check-in made by mistake: back to booked, clearing any service times
+// tapped in since (undo_check_in logs who did it). Not once checked out:
+// that's voiding the sale.
+export async function undoCheckIn(supabase: Supabase, appointmentId: string): Promise<StatusResult> {
+  const { data, error } = await supabase.from("appointments").select("status").eq("id", appointmentId).maybeSingle();
+  if (error) throw error;
+  if (!data) return { ok: false, error: "not_found" };
+  if (data.status !== "checked_in") return { ok: false, error: "not_allowed" };
+  const { error: rpcError } = await supabase.rpc("undo_check_in", { p_appointment_id: appointmentId });
+  if (rpcError?.code === "42501") return { ok: false, error: "forbidden" };
+  if (rpcError?.code === "55000") return { ok: false, error: "not_allowed" };
+  if (rpcError) throw rpcError;
+  return { ok: true };
+}
+
 export async function saveNotes(supabase: Supabase, appointmentId: string, notes: string): Promise<{ ok: boolean }> {
   const { error } = await supabase.rpc("set_appointment_notes", { p_appointment_id: appointmentId, p_notes: notes });
   if (error?.code === "42501") return { ok: false };

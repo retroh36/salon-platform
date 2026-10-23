@@ -1,7 +1,7 @@
 // Denise's Claude features with a fake API client: no real API calls.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { answer, assistantTools, type AssistantContext } from "@/lib/denise/assistant";
-import { ANALYSIS_MODEL, CHAT_MODEL, claudeClient, converse, explainFixes, firstNamesOnly, isConnected, modelFor, writeBrief, type ClaudeClient } from "@/lib/denise/claude";
+import { ANALYSIS_MODEL, CHAT_MODEL, claudeClient, converse, explainFixes, isConnected, modelFor, type ClaudeClient } from "@/lib/denise/claude";
 import type { Knowledge } from "@/lib/denise/knowledge";
 import { DailyLimitReached, metered } from "@/lib/denise/usage";
 import { fromLocal, parseTime, type BookedItem, type BookingContext } from "@/lib/scheduling";
@@ -273,38 +273,6 @@ describe("Ask Denise's knowledge", () => {
   it("refuses sales to those who can't see them, even if asked for by name", async () => {
     const runner = assistantTools(context({ knowledge: knowledge({ sales: null }) }));
     expect(await runner.run("sales_summary", { period: "today" })).toBe("Sales figures are for owners and managers.");
-  });
-});
-
-describe("the morning brief in Denise's words", () => {
-  const facts = {
-    date: DAY,
-    visits: 23,
-    risks: ["Bridget usually takes about 30 minutes longer than booked for Balayage, so the 10am is likely to run into the next client."],
-    likelyNoShows: [{ client: "Emma S.", time: "2pm", noShowPercent: 33, visits: 6 }],
-    dueNotBooked: { total: 37, top: [{ client: "Liam B.", overdueDays: 21, usualWeeks: 5 }] },
-    openings: { count: 1, withMatches: 1 },
-    lowStock: [],
-    credits: [{ client: "Mia R.", packages: ["3 Blowouts left"], giftCardCents: 0 }],
-  };
-
-  it("asks the stronger model, with first names only, and returns its text", async () => {
-    const { client, requests } = fakeClient([text(JSON.stringify({ brief: "Busy day: 23 visits. Watch Bridget's 10am balayage." }))]);
-    expect(await writeBrief(client, facts)).toBe("Busy day: 23 visits. Watch Bridget's 10am balayage.");
-    expect(requests[0].model).toBe(ANALYSIS_MODEL);
-    const sent = JSON.stringify(requests[0].messages);
-    expect(sent).toContain("Emma");
-    expect(sent).not.toContain("Emma S.");
-    expect(sent).not.toContain("Liam B.");
-    expect(sent).not.toContain("Mia R.");
-    expect(sent).toContain("3 Blowouts left");
-    expect(String(requests[0].system)).toMatch(/Use only the facts and numbers given/);
-  });
-
-  it("gives up (null) on bad output or a refusal", async () => {
-    expect(await writeBrief(fakeClient([text("not json")]).client, facts)).toBeNull();
-    expect(await writeBrief(fakeClient([{ content: [], stop_reason: "refusal" }]).client, facts)).toBeNull();
-    expect(firstNamesOnly(facts).likelyNoShows[0].client).toBe("Emma");
   });
 });
 

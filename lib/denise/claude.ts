@@ -18,7 +18,6 @@
 // template wording then, or when the API is unreachable.
 
 import Anthropic from "@anthropic-ai/sdk";
-import type { BriefFacts } from "./brief";
 import type { FixFacts } from "./scan";
 
 // A fast model for chat and short explanations.
@@ -179,39 +178,3 @@ export async function converse(
   return "That took me more steps than I expected. Could you ask in a simpler way?";
 }
 
-const BRIEF_SYSTEM = `${VOICE}
-
-Write today's morning brief for the front desk from the facts given, which our scheduling system worked out. Two to four short sentences: what matters most first (risks to the day, clients who might not show, regulars to call back), then anything else worth a moment. Use only the facts and numbers given; don't add, estimate or calculate others. Name clients by first name only. You can't contact clients: suggest what staff might do, and never draft messages to clients.`;
-
-// The brief in Denise's words, from the facts only (first names). Null if
-// it couldn't be written.
-export async function writeBrief(client: ClaudeClient, facts: BriefFacts): Promise<string | null> {
-  const response = await client.messages.create(
-    {
-      model: ANALYSIS_MODEL,
-      max_tokens: 1500,
-      system: BRIEF_SYSTEM,
-      output_config: { effort: "low", format: { type: "json_schema", schema: { type: "object", properties: { brief: { type: "string" } }, required: ["brief"], additionalProperties: false } } },
-      messages: [{ role: "user", content: JSON.stringify(firstNamesOnly(facts)) }],
-    },
-    { ...REQUEST, timeout: 30_000 },
-  );
-  if (response.stop_reason !== "end_turn") return null;
-  try {
-    const text = (JSON.parse(textOf(response.content)) as { brief?: unknown }).brief;
-    return typeof text === "string" && text.trim() ? text.trim().slice(0, 1200) : null;
-  } catch {
-    return null;
-  }
-}
-
-// "Emma S." -> "Emma": Claude gets first names only.
-export function firstNamesOnly(f: BriefFacts): BriefFacts {
-  const first = (name: string) => name.split(" ")[0];
-  return {
-    ...f,
-    likelyNoShows: f.likelyNoShows.map((n) => ({ ...n, client: first(n.client) })),
-    dueNotBooked: { ...f.dueNotBooked, top: f.dueNotBooked.top.map((d) => ({ ...d, client: first(d.client) })) },
-    credits: (f.credits ?? []).map((c) => ({ ...c, client: first(c.client) })),
-  };
-}

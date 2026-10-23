@@ -17,7 +17,7 @@ export const getCurrentStaff = cache(async () => {
   const { data: staff, error } = await supabase
     .from("staff")
     .select(
-      "id, first_name, role, business_id, location:locations(id, name, city, region, timezone, business:businesses(name, logo_path))",
+      "id, first_name, role, business_id, calendar_zoom, location:locations(id, name, city, region, timezone, business:businesses(name, logo_path))",
     )
     .eq("user_id", userId)
     .eq("is_active", true)

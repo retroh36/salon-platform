@@ -82,7 +82,7 @@ describe("the morning brief", () => {
       await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: service!.id, staff_id: SEED.staff.shae, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: 45, price_cents: 4500 });
 
       const facts = await briefFacts(frontDesk, { businessId: B, location: { id: L, timezone: TZ } }, todayIn(TZ, start), { conflicts: [], openings: [] });
-      expect(facts.credits).toContainEqual({ client: "Briefy C.", packages: ["5 Blowouts left"], giftCardCents: 0 });
+      expect(facts.credits).toContainEqual({ clientId: c!.id, appointmentId: a!.id, client: "Briefy C.", packages: ["5 Blowouts left"], giftCardCents: 0 });
     } finally {
       const { data: sales } = await admin.from("client_packages").select("sale_id").eq("client_id", c!.id);
       await admin.from("sales").delete().in("id", (sales ?? []).flatMap((x) => (x.sale_id ? [x.sale_id] : [])));

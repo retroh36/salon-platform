@@ -7,7 +7,8 @@ import { selectClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
 import { recordPatchTest } from "./forms-actions";
 
-export function PatchTestForm({ clientId, today, me, staff }: { clientId: string; today: string; me: string; staff: { id: string; name: string }[] }) {
+// `compact`: two columns, for a side panel (booking details).
+export function PatchTestForm({ clientId, today, me, staff, compact = false }: { clientId: string; today: string; me: string; staff: { id: string; name: string }[]; compact?: boolean }) {
   const [state, action, pending] = useActionState(recordPatchTest.bind(null, clientId), undefined);
   const formRef = useRef<HTMLFormElement>(null);
   useEffect(() => {
@@ -15,8 +16,8 @@ export function PatchTestForm({ clientId, today, me, staff }: { clientId: string
   }, [state]);
 
   return (
-    <form ref={formRef} action={action} onSubmit={submitWithoutReset(action)} aria-label="Record patch test" className="grid gap-4 border-b border-line bg-sunken/40 p-5 sm:grid-cols-4" noValidate>
-      {state && !state.ok && <Alert className="sm:col-span-4">{state.message}</Alert>}
+    <form ref={formRef} action={action} onSubmit={submitWithoutReset(action)} aria-label="Record patch test" className={compact ? "grid grid-cols-2 gap-3 rounded-lg border border-line bg-sunken/40 p-3 [&>*:nth-last-child(-n+3)]:col-span-2" : "grid gap-4 border-b border-line bg-sunken/40 p-5 sm:grid-cols-4"} noValidate>
+      {state && !state.ok && <Alert className={compact ? "col-span-2" : "sm:col-span-4"}>{state.message}</Alert>}
       <Field label="Date">
         <input name="date" type="date" max={today} defaultValue={today} className={inputClass} />
       </Field>

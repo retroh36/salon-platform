@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { canBook, type AppointmentStatus } from "@/lib/appointments";
 import { getCurrentStaff } from "@/lib/auth";
-import { bookedSummary, gridRange, offHours, serviceFamily } from "@/lib/calendar";
+import { bookedSummary, compactHours, gridRange, isZoom, offHours, serviceFamily } from "@/lib/calendar";
 import { formatAmount, productName } from "@/lib/inventory";
 import { loadBackBarProducts } from "@/lib/inventory-load";
 import { formatDay, formatIntervals } from "@/lib/schedule-format";
@@ -174,6 +174,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       formulas: [],
       insight: null,
       warnings: null,
+      saleId: null,
       group: a.group ? { ...a.group, members: [] } : null,
       series: a.series_id ? { id: a.series_id, index: a.series_index!, count: seriesCounts.get(a.series_id) ?? 1, intervalWeeks: a.series?.interval_weeks ?? 1 } : null,
     };
@@ -234,7 +235,15 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       start: fromLocal(date, Math.min(...a.items.map((i) => i.start)), tz) ?? dayStart,
       items: a.items.map((i) => ({ serviceId: i.serviceId, start: fromLocal(date, i.start, tz) ?? dayStart })),
     }));
-  for (const [id, w] of await visitWarnings(supabase, me.business_id, toCheck)) appointments[id].warnings = w;
+  for (const [id, w] of await visitWarnings(supabase, me.business_id, toCheck, tz)) appointments[id].warnings = w;
+
+  // The sale each checked-out visit was paid on (front of house only: RLS).
+  const checkedOut = Object.values(appointments).filter((a) => a.status === "completed").map((a) => a.id);
+  if (checkedOut.length) {
+    const { data: sales, error: salesError } = await supabase.from("sales").select("id, appointment_id").in("appointment_id", checkedOut).neq("status", "voided").order("created_at");
+    if (salesError) throw salesError;
+    for (const s of sales) if (s.appointment_id) appointments[s.appointment_id].saleId = s.id;
+  }
 
   // What Denise knows about each client.
   const clientIds = [...new Set(Object.values(appointments).flatMap((a) => (a.client ? [a.client.id] : [])))];
@@ -267,6 +276,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       color: s.color,
       working: !approved.some((t) => t.startMinute == null) && intersectIntervals(day.hours, day.open).length > 0,
       hoursLabel: approved.some((t) => t.startMinute == null) ? "Time off" : day.hours.length ? formatIntervals(day.hours) : "Not working",
+      hoursShort: approved.some((t) => t.startMinute == null) ? "Time off" : day.hours.length ? compactHours(day.hours) : "Not working",
       offHours: offHours(range, intersectIntervals(day.hours, day.open)),
       timeOff: approved
         .map((t) => ({
@@ -335,7 +345,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       resources: resourcesResult.data,
       products,
     },
-    me: { staffId: me.id, role: me.role, canBook: canBook(me.role) },
+    me: { staffId: me.id, role: me.role, canBook: canBook(me.role), zoom: isZoom(me.calendar_zoom) ? me.calendar_zoom : "comfortable" },
   };
 
   return (

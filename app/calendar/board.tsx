@@ -3,39 +3,46 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
-import { startTransition, useCallback, useEffect, useOptimistic, useRef, useState, ViewTransition } from "react";
+import { createContext, startTransition, useCallback, useContext, useEffect, useLayoutEffect, useOptimistic, useRef, useState, ViewTransition } from "react";
 import { DeniseFace } from "@/components/denise";
 import { Avatar, initials } from "@/components/ui/avatar";
 import { LEVEL_BG, LevelBadge } from "@/components/ui/level";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { FitText } from "@/components/ui/fit-text";
-import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, MoreIcon, PlusIcon, SendIcon, WarningIcon } from "@/components/ui/icons";
+import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, MoreIcon, PlusIcon, SendIcon } from "@/components/ui/icons";
 import { Listbox } from "@/components/ui/listbox";
 import { Segmented } from "@/components/ui/segmented";
 import { Tabs } from "@/components/ui/tabs";
 import { isEditable, STATUS_LABELS } from "@/lib/appointments";
 import type { ChatMessage, DeniseRequest, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
-import { FAMILIES, FAMILY_LABELS, hourMarks, laneBox, layoutColumn, summaryVariants, type ServiceFamily } from "@/lib/calendar";
+import { FAMILIES, FAMILY_LABELS, laneBox, layoutColumn, quarterMarks, summaryVariants, ZOOM_LABELS, ZOOM_PX_PER_MINUTE, ZOOMS, type CalendarZoom, type ServiceFamily } from "@/lib/calendar";
 import { LEVEL_LABELS, STAFF_LEVELS } from "@/lib/schedule-forms";
 import { BLOCK_LABELS } from "@/lib/scheduling/blocks";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, toLocal } from "@/lib/scheduling/time";
-import { calendarStamp, moveGroupVisit, moveVisitItem, moveVisitItemScoped } from "./actions";
+import { calendarStamp, moveGroupVisit, saveCalendarZoom, moveVisitItem, moveVisitItemScoped, undoVisitCheckIn } from "./actions";
 import type { Scope } from "@/lib/scheduling/series";
 import { moveBlock } from "./block-actions";
 import { BlockPanel, repeatLabel } from "./block-panel";
 import { AppointmentPanel } from "./appointment-panel";
-import { approveDeniseFix, bookFromWaitlist, rejectDeniseFix, scanDenise, undoDeniseFix } from "./denise-actions";
+import { approveDeniseFix, bookFromWaitlist, dismissDeniseItem, rejectDeniseFix, scanDenise, undoDeniseFix } from "./denise-actions";
 import { useDeniseRun } from "./use-denise";
 import { DenisePanel, type Outcome, type Preview } from "./denise-panel";
 import { BookingPanel, type BookingStart } from "./booking-panel";
 import { WalkInPanel } from "./walk-in-panel";
 import { GroupPanel } from "./group-panel";
 import { NowLine, useNow } from "./now-line";
-import type { AppointmentDetail, BlockData, BoardData, ColumnData, TimeBlockData } from "./types";
+import type { BlockData, BoardData, ColumnData, TimeBlockData } from "./types";
 
-export const PX_PER_MINUTE = 2;
+// How tall time is drawn (px per minute), from the zoom; blocks read it.
+const ScaleContext = createContext(ZOOM_PX_PER_MINUTE.comfortable);
+const usePpm = () => useContext(ScaleContext);
+// Pinch distance (as a ratio) and ctrl + scroll travel for one zoom step.
+const PINCH_STEP = 1.3;
+const WHEEL_STEP = 60;
+// How long "Undo" stays on the toast after a check-in.
+const CHECK_IN_UNDO_MS = 10_000;
 // Moves snap to 5 minutes; a click on an empty slot to the quarter hour.
 const MOVE_STEP = 5;
 const SLOT_STEP = 15;
@@ -82,8 +89,40 @@ const DAY_SLIDE = { "nav-forward": "day-forward", "nav-back": "day-back", defaul
 export function CalendarBoard({ data }: { data: BoardData }) {
   const { range, me } = data;
   const router = useRouter();
+  // Zoom: Compact, Comfortable (the default) or Detailed, remembered for
+  // this person; pinching the grid on an iPad steps through them.
+  const [zoom, setZoomState] = useState<CalendarZoom>(me.zoom);
+  const PX_PER_MINUTE = ZOOM_PX_PER_MINUTE[zoom];
+  const gridRef = useRef<HTMLDivElement>(null);
+  // The minute to keep in place while zooming (the middle of the view).
+  const zoomAnchor = useRef<number | null>(null);
+  const setZoom = (next: CalendarZoom) => {
+    if (next === zoom) return;
+    const el = gridRef.current;
+    if (el) zoomAnchor.current = range.start + (el.scrollTop + el.clientHeight / 2 - headerHeight(el)) / PX_PER_MINUTE;
+    setZoomState(next);
+    startTransition(() => saveCalendarZoom(next));
+  };
   const height = (range.end - range.start) * PX_PER_MINUTE;
   const y = (minute: number) => (minute - range.start) * PX_PER_MINUTE;
+  usePinchZoom(gridRef, zoom, setZoom);
+  // After a zoom, the same time stays in the middle of the view.
+  useLayoutEffect(() => {
+    const el = gridRef.current;
+    if (!el || zoomAnchor.current === null) return;
+    el.scrollTop = (zoomAnchor.current - range.start) * PX_PER_MINUTE + headerHeight(el) - el.clientHeight / 2;
+    zoomAnchor.current = null;
+  }, [PX_PER_MINUTE, range.start]);
+  // Opening today: now sits about a third of the way down.
+  useLayoutEffect(() => {
+    const el = gridRef.current;
+    if (!el || data.date !== data.today) return;
+    const minute = toLocal(new Date(), data.timeZone).minute;
+    if (minute < range.start || minute >= range.end) return;
+    el.scrollTop = Math.max(0, (minute - range.start) * PX_PER_MINUTE - (el.clientHeight - headerHeight(el)) / 3);
+    // Only when a day opens, not on every zoom or refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.date]);
 
   // What the right panel shows, and which off-duty stylists are expanded.
   // Both reset when the day changes.
@@ -121,6 +160,13 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const [department, setDepartment] = useState<"all" | ServiceFamily>("all");
   const [notice, setNotice] = useState<string | null>(null);
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
+  // Just checked in: a toast with Undo, for CHECK_IN_UNDO_MS.
+  const [checkedIn, setCheckedIn] = useState<{ appointmentId: string; name: string; at: number } | null>(null);
+  useEffect(() => {
+    if (!checkedIn) return;
+    const timer = setTimeout(() => setCheckedIn(null), CHECK_IN_UNDO_MS);
+    return () => clearTimeout(timer);
+  }, [checkedIn]);
   // The tooltip for a short block: its details and where it is.
   const [hint, setHint] = useState<{ id: string; details: string[]; rect: DOMRect } | null>(null);
   // A drag of a repeating visit, waiting for "this / following / all".
@@ -226,8 +272,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
 
   const deniseState = denise && denise.state.date === data.date ? denise.state : null;
   const conflicts = (deniseState?.conflicts ?? []).filter((c) => !dismissed.has(c.subject));
+  const notices = (deniseState?.notices ?? []).filter((n) => !dismissed.has(n.id));
   // How many things Denise wants looked at.
-  const attention = conflicts.length + (deniseState?.notices.length ?? 0) + (deniseState?.reorders.length ?? 0) + (deniseState?.openings.length ?? 0);
+  const attention = conflicts.length + notices.length + (deniseState?.reorders.length ?? 0) + (deniseState?.openings.length ?? 0);
   const scanning = denise?.for !== data;
 
   async function decide(run: () => Promise<FixResult>, undoActionId: string | null) {
@@ -556,7 +603,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               })),
             ]}
           />
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Segmented label="Zoom" value={zoom} onChange={setZoom} options={ZOOMS.map((z) => ({ value: z, label: ZOOM_LABELS[z] }))} />
             <Segmented
               label="View"
               value="day"
@@ -588,13 +636,14 @@ export function CalendarBoard({ data }: { data: BoardData }) {
         )}
 
         <ViewTransition key={data.date} enter={DAY_SLIDE} exit={DAY_SLIDE} default="none">
-          <div className="overflow-auto rounded-xl border border-line bg-surface shadow-card lg:min-h-0 lg:flex-1" data-testid="calendar-grid">
+          <div ref={gridRef} className="overflow-auto rounded-xl border border-line bg-surface shadow-card lg:min-h-0 lg:flex-1" data-testid="calendar-grid" data-zoom={zoom} data-px-per-minute={PX_PER_MINUTE}>
+            <ScaleContext value={PX_PER_MINUTE}>
             {columns.length === 0 ? (
               <p className="p-6 text-ink-muted">No one in this department works here. Choose another department.</p>
             ) : (
               // Columns share the width; below their minimum the grid scrolls.
               <div className="min-w-fit">
-                <div className="sticky top-0 z-30 grid border-b border-line bg-surface" style={gridColumns}>
+                <div data-grid-header className="sticky top-0 z-30 grid border-b border-line-strong bg-surface" style={gridColumns}>
                   <div className="sticky left-0 z-10 bg-surface" />
                   {columns.map((c) =>
                     collapsed(c) ? (
@@ -617,7 +666,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                           <Avatar name={c.name} color={c.color} level={c.level} />
                           <div className="min-w-0 flex-1">
                             <FitText variants={[c.name, `${c.firstName} ${c.name.split(" ").at(-1)![0]}.`, c.firstName]} className="pr-6 font-semibold" />
-                            <div className="text-xs leading-4 text-ink-muted">{c.hoursLabel}</div>
+                            {/* One line, the full hours on hover. */}
+                            <div title={c.hoursLabel} data-testid="column-hours" className="truncate text-xs leading-4 whitespace-nowrap text-ink-muted">
+                              {c.hoursShort}
+                            </div>
                           </div>
                           {!c.working && expanded.has(c.staffId) && (
                             <IconButton label={`Hide ${c.name}`} size="sm" onClick={() => toggle(c.staffId, false)}>
@@ -642,16 +694,18 @@ export function CalendarBoard({ data }: { data: BoardData }) {
 
                 <div className="relative grid" style={gridColumns} data-range-start={range.start}>
                   <div className="sticky left-0 z-20 bg-surface" style={{ height }} aria-hidden>
-                    {hourMarks(range).map((m) => (
+                    {/* Every quarter hour: hours bold ("10am"), quarters small and
+                        light (":15"). The current-time pill takes a label's
+                        place when they'd overlap. */}
+                    {quarterMarks(range).map(({ minute: m, hour }) => (
                       <span
                         key={m}
-                        data-hour-label={m}
-                        // The current-time pill takes the hour label's place when they'd overlap.
+                        {...(hour ? { "data-hour-label": m } : { "data-quarter-label": m })}
                         aria-hidden={nowHides(m) || undefined}
-                        className={`absolute right-2 text-xs font-medium text-ink-muted transition-opacity duration-(--motion-fast) ${m === range.start ? "translate-y-1" : "-translate-y-1/2"} ${nowHides(m) ? "opacity-0" : ""}`}
+                        className={`absolute right-2 transition-opacity duration-(--motion-fast) ${hour ? "text-xs font-semibold text-ink" : "text-[11px] text-ink-subtle"} ${m === range.start ? "translate-y-1" : "-translate-y-1/2"} ${nowHides(m) ? "opacity-0" : ""}`}
                         style={{ top: y(m) }}
                       >
-                        {formatMinute(m)}
+                        {hour ? formatMinute(m) : `:${String(m % 60).padStart(2, "0")}`}
                       </span>
                     ))}
                   </div>
@@ -681,8 +735,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         }`}
                         style={{
                           height,
-                          backgroundImage: `linear-gradient(to bottom, var(--color-line) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, var(--color-line) 50%, transparent) 1px, transparent 1px)`,
-                          backgroundSize: `100% ${60 * PX_PER_MINUTE}px, 100% ${30 * PX_PER_MINUTE}px`,
+                          // Hour lines darker, quarter-hour lines faint.
+                          backgroundImage: `linear-gradient(to bottom, var(--color-line-strong) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, var(--color-line) 60%, transparent) 1px, transparent 1px)`,
+                          backgroundSize: `100% ${60 * PX_PER_MINUTE}px, 100% ${15 * PX_PER_MINUTE}px`,
                         }}
                       >
                         {c.offHours.map((o) => (
@@ -747,7 +802,6 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                               block={b}
                               y={y}
                               lateBy={nowMinute !== null && (b.status === "booked" || b.status === "confirmed") && b.start <= nowMinute ? nowMinute - b.start : null}
-                              warning={warningFor(data.appointments[b.appointmentId])}
                               draggable={canMove(b)}
                               dragging={drag?.moved === true && drag.itemId === b.itemId}
                               selected={b.appointmentId === selectedAppointment}
@@ -785,6 +839,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                 </div>
               </div>
             )}
+            </ScaleContext>
           </div>
         </ViewTransition>
 
@@ -805,6 +860,30 @@ export function CalendarBoard({ data }: { data: BoardData }) {
       </div>
 
       {hint && <BlockHint {...hint} />}
+
+      {checkedIn && (
+        <div
+          role="status"
+          data-testid="check-in-toast"
+          className="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 animate-toast-in items-center gap-4 rounded-xl bg-navy-900 px-5 py-3 text-white shadow-lift"
+        >
+          <span>{checkedIn.name} is checked in.</span>
+          <button
+            type="button"
+            className="font-semibold text-denise-200 underline underline-offset-2 hover:text-white"
+            onClick={() => {
+              const { appointmentId } = checkedIn;
+              setCheckedIn(null);
+              startTransition(async () => {
+                const result = await undoVisitCheckIn(appointmentId);
+                if (!result.ok) setNotice(result.message);
+              });
+            }}
+          >
+            Undo
+          </button>
+        </div>
+      )}
 
       {/* Denise and booking details: a panel that slides over the calendar
           when something opens it. */}
@@ -840,7 +919,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           {tab === "denise" ? (
             <DenisePanel
               data={data}
-              state={deniseState && { ...deniseState, conflicts }}
+              state={deniseState && { ...deniseState, conflicts, notices }}
               working={deciding || deniseRun.working || (scanning && !deniseState)}
               run={deniseRun}
               outcome={outcome}
@@ -853,6 +932,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               onPreview={setPreview}
               onAsk={ask}
               onOpen={(appointmentId) => select({ kind: "detail", appointmentId })}
+              onDismissNotice={(id) => {
+                setDismissed((all) => new Set(all).add(id));
+                startTransition(() => dismissDeniseItem(id, data.date).then(() => {}));
+              }}
               onBook={(actionId, clientId) => decide(() => approveDeniseFix(actionId, data.date, clientId), actionId)}
               onRejectSuggestion={(actionId) => decide(() => rejectDeniseFix(actionId, data.date), null)}
               onBookWaitlist={(o, m) => decide(() => bookFromWaitlist(m.entryId, o.staffId, data.date, m.startMinute), null)}
@@ -872,6 +955,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               // eslint-disable-next-line @next/next/no-location-assign-relative-destination
               onCheckout={() => window.location.assign(`/checkout/new?appointment=${selection.appointmentId}&from=${encodeURIComponent(window.location.pathname + window.location.search)}`)}
               onOpenVisit={(appointmentId) => select({ kind: "detail", appointmentId })}
+              onCheckedIn={(appointmentId) => setCheckedIn({ appointmentId, name: data.appointments[appointmentId]?.client?.name.split(" ")[0] ?? "The client", at: Date.now() })}
+              team={data.columns.map((c) => ({ id: c.staffId, name: c.name }))}
               products={data.menu.products}
             />
           ) : selection.kind === "walk-ins" ? (
@@ -970,6 +1055,65 @@ export function CalendarBoard({ data }: { data: BoardData }) {
 }
 
 // Everything Denise is showing, as stable keys, for spotting what's new.
+// The sticky stylist header at the top of the scrolling grid.
+const headerHeight = (grid: HTMLElement) => (grid.querySelector("[data-grid-header]") as HTMLElement | null)?.offsetHeight ?? 0;
+
+// Pinching the grid (or ctrl + scroll, a trackpad pinch) steps the zoom:
+// far enough apart for the next level, together for the one before.
+function usePinchZoom(grid: React.RefObject<HTMLDivElement | null>, zoom: CalendarZoom, setZoom: (z: CalendarZoom) => void) {
+  const latest = useRef({ zoom, setZoom });
+  useEffect(() => {
+    latest.current = { zoom, setZoom };
+  });
+  useEffect(() => {
+    const el = grid.current;
+    if (!el) return;
+    const step = (by: 1 | -1) => {
+      const { zoom: z, setZoom: set } = latest.current;
+      const next = ZOOMS[ZOOMS.indexOf(z) + by];
+      if (next) set(next);
+    };
+    let start: number | null = null;
+    const apart = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) start = apart(e.touches);
+    };
+    const onMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || start === null) return;
+      // Our zoom, not the browser's.
+      e.preventDefault();
+      const ratio = apart(e.touches) / start;
+      if (ratio > PINCH_STEP || ratio < 1 / PINCH_STEP) {
+        step(ratio > 1 ? 1 : -1);
+        start = apart(e.touches);
+      }
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) start = null;
+    };
+    let wheel = 0;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      wheel += e.deltaY;
+      if (Math.abs(wheel) > WHEEL_STEP) {
+        step(wheel < 0 ? 1 : -1);
+        wheel = 0;
+      }
+    };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("wheel", onWheel);
+    };
+  }, [grid]);
+}
+
 function deniseKeys(state: DeniseState): string[] {
   return [
     ...state.conflicts.map((c) => `conflict:${c.subject}`),
@@ -1197,6 +1341,7 @@ function OutMenu({ column, date, today, onMarkOut }: { column: ColumnData; date:
 // Where Denise's fix would put a block: a dashed periwinkle outline in its
 // own lane.
 function FixGhost({ block, y }: { block: Placed & { lane: number; lanes: number }; y: (minute: number) => number }) {
+  const PX_PER_MINUTE = usePpm();
   const box = laneBox(block.lane, block.lanes);
   const [first, ...rest] = block.clientName.split(" ");
   const length = block.end - block.start;
@@ -1315,6 +1460,7 @@ function TimeBlockBox({
   onPointerUp: (e: React.PointerEvent) => void;
   onPointerCancel: () => void;
 }) {
+  const PX_PER_MINUTE = usePpm();
   const height = (block.end - block.start) * PX_PER_MINUTE;
   const time = `${formatMinute(block.start)}–${formatMinute(block.end)}`;
   const label = [BLOCK_LABELS[block.kind], time, block.note, block.weekdays && repeatLabel(block.weekdays).toLowerCase(), columnName].filter(Boolean).join(", ");
@@ -1374,6 +1520,7 @@ function TimeBlockBox({
 
 // A lifted copy of the block that follows the pointer while dragging.
 function DragGhost({ block, start, y }: { block: BlockData; start: number; y: (minute: number) => number }) {
+  const PX_PER_MINUTE = usePpm();
   const length = block.end - block.start;
   return (
     <div
@@ -1400,15 +1547,6 @@ type Visit = "upcoming" | "here" | "done" | "off";
 const visitOf = (status: BlockData["status"]): Visit =>
   status === "checked_in" ? "here" : status === "completed" ? "done" : status === "no_show" || status === "canceled" ? "off" : "upcoming";
 
-// What needs doing before the visit (a patch test, a form to sign), for
-// the warning icon on its block.
-function warningFor(appointment: AppointmentDetail | undefined): string | null {
-  const w = appointment?.warnings;
-  if (!w) return null;
-  const all = [...w.patch, ...w.forms.map((f) => `${f.name} not signed yet`)];
-  return all.length ? all.join(" · ") : null;
-}
-
 // Line heights in a block, in px.
 const NAME_LINE = 18;
 const LINE = 17;
@@ -1417,7 +1555,6 @@ function AppointmentBlock({
   block,
   y,
   lateBy,
-  warning,
   draggable,
   dragging,
   selected,
@@ -1434,8 +1571,6 @@ function AppointmentBlock({
   y: (minute: number) => number;
   // Minutes past its start with the client not checked in yet.
   lateBy: number | null;
-  // A patch test or form still needed.
-  warning: string | null;
   draggable: boolean;
   dragging: boolean;
   selected: boolean;
@@ -1455,6 +1590,7 @@ function AppointmentBlock({
   onPointerUp: (e: React.PointerEvent) => void;
   onPointerCancel: () => void;
 }) {
+  const PX_PER_MINUTE = usePpm();
   const time = `${formatMinute(block.start)}–${formatMinute(block.end)}`;
   const processing = block.segments.find((s) => s.kind === "processing");
   const height = (block.end - block.start) * PX_PER_MINUTE;
@@ -1496,7 +1632,6 @@ function AppointmentBlock({
     [STATUS_LABELS[block.status], late && (lateBy ? `${lateBy} min late` : "due now"), block.group && block.group.label, block.series && "repeating", block.online && "booked online"]
       .filter(Boolean)
       .join(" · "),
-    warning ?? "",
   ];
   const plainService = block.service.replace(/\s*\([^)]*\)/g, "");
   const services = [
@@ -1521,7 +1656,6 @@ function AppointmentBlock({
     block.online && "booked online",
     STATUS_LABELS[block.status],
     late && "running late",
-    warning,
   ]
     .filter(Boolean)
     .join(", ");
@@ -1589,11 +1723,6 @@ function AppointmentBlock({
               <span data-attention="late" title={lateBy ? `Running ${lateBy} min late` : "Due now, not here yet"} className="flex shrink-0 items-center gap-0.5 text-xs leading-4 font-semibold text-status-late-ink">
                 <ClockIcon className="size-3.5" />
                 {lateBy ? `+${lateBy}m` : null}
-              </span>
-            )}
-            {warning && (
-              <span data-attention="warning" title={warning} className="shrink-0 text-status-late-ink">
-                <WarningIcon className="size-3.5" />
               </span>
             )}
           </span>

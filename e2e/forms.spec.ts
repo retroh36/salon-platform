@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, test, ui, waitForHydration, slotAt } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -108,9 +108,13 @@ test.describe("front desk", () => {
     await expect(ui(page).getByTestId("calendar-date")).toContainText(formatLongDay(DAY));
     await waitForHydration(page, "section[data-staff-id]");
     await ui(page).getByRole("region", { name: "Bridget Callahan", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Nova Test`) }).click();
+    // The patch test near the top, with a way to record one.
+    const patch = page.getByTestId("patch-notice");
+    await expect(patch).toContainText(/Patch test missing — required for .+None on file for this client\./);
+    await expect(patch.getByRole("button", { name: "Record a patch test" })).toBeVisible();
     const before = page.getByRole("region", { name: "Before this visit" });
     await expect(before).toContainText("Before check-in");
-    await expect(before).toContainText("No patch test on record for this client.");
+    await expect(before).not.toContainText("patch test");
     await expect(before).toContainText("Color consent isn't signed yet.");
     await expect(before).toContainText("New client consultation isn't signed yet.");
 
@@ -151,9 +155,8 @@ test.describe("front desk", () => {
 
     await page.goto(`/calendar?date=${DAY}`);
     await waitForHydration(page, "section[data-staff-id]");
-    const column = (await ui(page).getByRole("region", { name: "Bridget Callahan", exact: true }).boundingBox())!;
-    const start = Number(await ui(page).locator("[data-range-start]").getAttribute("data-range-start"));
-    await page.mouse.click(column.x + column.width - 15, column.y + (14 * 60 - start) * 2 + 3);
+    const { box: column, y } = await slotAt(page, ui(page).getByRole("region", { name: "Bridget Callahan", exact: true }), 14 * 60);
+    await page.mouse.click(column.x + column.width - 15, y);
     const form = page.getByRole("form", { name: "New booking" });
     await form.getByLabel("Find a client").fill(`${PREFIX}remy`);
     await form.getByRole("list", { name: "Matching clients" }).getByRole("button", { name: new RegExp(`${PREFIX}Remy Test`) }).click();

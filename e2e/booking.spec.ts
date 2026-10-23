@@ -3,13 +3,12 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { onCheckout } from "./checkout-helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, test, ui, waitForHydration, pxPerMinute, slotAt } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
 const { bridget: BRIDGET, shae: SHAE, frontDesk: FRONT_DESK, sandra: SANDRA } = SEED.staff;
-const PX_PER_MINUTE = 2; // as in app/calendar/board.tsx
 
 // A Tuesday clear of the seeded month and of the calendar tests' day.
 // Bridget works 9-1 and 2-6, Shae 9-1 and 1:30-5:30, Nola 9-5 (no blowouts).
@@ -90,12 +89,13 @@ function column(page: Page, name: string) {
 }
 
 async function clickSlot(page: Page, stylist: string, hour: number, minute = 0) {
-  const box = (await column(page, stylist).boundingBox())!;
-  const start = Number(await ui(page).locator("[data-range-start]").getAttribute("data-range-start"));
-  await page.mouse.click(box.x + box.width - 15, box.y + (hour * 60 + minute - start) * PX_PER_MINUTE + 3);
+  const { box, y } = await slotAt(page, column(page, stylist), hour * 60 + minute);
+  await page.mouse.click(box.x + box.width - 15, y);
 }
 
 async function drag(page: Page, block: Locator, toStylist: string, minutes: number) {
+  const PX_PER_MINUTE = await pxPerMinute(page);
+  await block.scrollIntoViewIfNeeded();
   const from = (await block.boundingBox())!;
   const to = (await column(page, toStylist).boundingBox())!;
   await page.mouse.move(from.x + 15, from.y + 8);

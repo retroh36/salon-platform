@@ -2,12 +2,11 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, test, ui, waitForHydration, pxPerMinute, slotAt } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
-const PX_PER_MINUTE = 2;
 // A Tuesday clear of the other tests' days: Bridget and Shae work 9-1.
 const DAY = addDays(startOfWeek(todayIn(TZ)), 134);
 const at = (hour: number, minute = 0) => fromLocal(DAY, hour * 60 + minute, TZ)!;
@@ -34,9 +33,8 @@ async function openDay(page: Page) {
 }
 
 async function clickSlot(page: Page, stylist: string, hour: number) {
-  const box = (await column(page, stylist).boundingBox())!;
-  const start = Number(await ui(page).locator("[data-range-start]").getAttribute("data-range-start"));
-  await page.mouse.click(box.x + box.width - 15, box.y + (hour * 60 - start) * PX_PER_MINUTE + 3);
+  const { box, y } = await slotAt(page, column(page, stylist), hour * 60);
+  await page.mouse.click(box.x + box.width - 15, y);
 }
 
 test("books a group, shows it together, and moves and cancels the whole group", async ({ page }) => {
@@ -73,10 +71,11 @@ test("books a group, shows it together, and moves and cancels the whole group", 
   await expect(guestBlock).toHaveAttribute("data-group-highlight", "true");
 
   // Drag Ava 30 minutes later: the whole group moves.
+  await avaBlock.scrollIntoViewIfNeeded();
   const box = (await avaBlock.boundingBox())!;
   await page.mouse.move(box.x + 20, box.y + 8);
   await page.mouse.down();
-  await page.mouse.move(box.x + 20, box.y + 8 + 30 * PX_PER_MINUTE, { steps: 10 });
+  await page.mouse.move(box.x + 20, box.y + 8 + 30 * (await pxPerMinute(page)), { steps: 10 });
   await page.mouse.up();
   await page.getByRole("dialog", { name: `Move ${PREFIX}Ava Test's group visit` }).getByRole("button", { name: "The whole group" }).click();
   await expect(ui(page).getByRole("status").filter({ hasText: "Moved the whole group (2 guests)." })).toBeVisible();

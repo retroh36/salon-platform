@@ -119,3 +119,31 @@ export function summaryVariants(summary: string): string[] {
   const short = summary.replace(/ booked$/, "");
   return [...new Set([summary, short, short.replace(/ visits? · /, " · ")])];
 }
+
+// Working hours on one line for a column header: "9–1, 2–6", "10–7",
+// "1:30–5:30" (the full "9am–1pm, 2pm–6pm" is on hover).
+export function compactHours(intervals: readonly Interval[]): string {
+  const at = (minute: number) => {
+    const h = Math.floor(minute / 60) % 12 || 12;
+    const m = minute % 60;
+    return m ? `${h}:${String(m).padStart(2, "0")}` : String(h);
+  };
+  return intervals.map((i) => `${at(i.start)}–${at(i.end)}`).join(", ");
+}
+
+// How tall the calendar draws time, per person (staff.calendar_zoom), in px
+// per minute: Comfortable is 40px a quarter hour, easy to read and tap on an
+// iPad.
+export const ZOOMS = ["compact", "comfortable", "detailed"] as const;
+export type CalendarZoom = (typeof ZOOMS)[number];
+export const ZOOM_PX_PER_MINUTE: Record<CalendarZoom, number> = { compact: 2, comfortable: 40 / 15, detailed: 4 };
+export const ZOOM_LABELS: Record<CalendarZoom, string> = { compact: "Compact", comfortable: "Comfortable", detailed: "Detailed" };
+
+export const isZoom = (z: unknown): z is CalendarZoom => (ZOOMS as readonly unknown[]).includes(z);
+
+// Time-column labels: every quarter hour inside the range, hours marked.
+export function quarterMarks(range: Interval): { minute: number; hour: boolean }[] {
+  const marks: { minute: number; hour: boolean }[] = [];
+  for (let m = Math.ceil(range.start / 15) * 15; m < range.end; m += 15) marks.push({ minute: m, hour: m % 60 === 0 });
+  return marks;
+}

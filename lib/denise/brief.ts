@@ -1,8 +1,9 @@
 // Denise's morning brief: today's risks, likely no-shows, clients due back
-// who aren't booked, openings worth filling from the waitlist, and stock
-// running low for today's services. Every fact is worked out here from the
-// data and what she's learned (lib/insights/); the wording is a template,
-// or Claude's (./claude.ts) from these same facts when she's connected.
+// who aren't booked, openings worth filling from the waitlist, stock running
+// low for today's services, and clients coming in with credit. Every fact is
+// worked out here from the data and what she's learned (lib/insights/); the
+// Dashboard lays it out in sections, each item linking to the client,
+// booking or product (and dismissable: briefItemKey).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
@@ -25,22 +26,38 @@ const DUE_LISTED = 5;
 export type BriefFacts = {
   date: LocalDate;
   visits: number;
-  risks: string[];
-  likelyNoShows: { client: string; time: string; noShowPercent: number; visits: number }[];
-  dueNotBooked: { total: number; top: { client: string; overdueDays: number; usualWeeks: number | null }[] };
+  // Visits likely to run over (her risk check), with the visit to open.
+  risks: { subject: string; headline: string; appointmentId: string | null }[];
+  likelyNoShows: { appointmentId: string; client: string; time: string; noShowPercent: number; visits: number }[];
+  dueNotBooked: { total: number; top: { clientId: string; client: string; overdueDays: number; usualWeeks: number | null }[] };
   openings: { count: number; withMatches: number };
-  lowStock: string[];
+  lowStock: { productId: string; name: string }[];
   // Clients coming in today with uses left on a package or money on a gift
   // card, so the desk can mention it.
-  credits: { client: string; packages: string[]; giftCardCents: number }[];
+  credits: { clientId: string; appointmentId: string; client: string; packages: string[]; giftCardCents: number }[];
 };
 
-export type Brief = {
-  facts: BriefFacts;
-  // Plain-English summary: Claude's from the facts, or the template.
-  text: string;
-  writtenBy: "template" | "claude";
+// The key an item is dismissed by (denise_dismissals), per section.
+export const briefItemKey = {
+  risk: (r: BriefFacts["risks"][number]) => `risk:${r.subject}`,
+  noShow: (n: BriefFacts["likelyNoShows"][number]) => `noshow:${n.appointmentId}`,
+  due: (d: BriefFacts["dueNotBooked"]["top"][number]) => `due:${d.clientId}`,
+  stock: (p: BriefFacts["lowStock"][number]) => `stock:${p.productId}`,
+  credit: (c: BriefFacts["credits"][number]) => `credit:${c.clientId}`,
 };
+
+// The brief without what's been dismissed today.
+export function withoutDismissed(f: BriefFacts, dismissed: ReadonlySet<string>): BriefFacts {
+  const top = f.dueNotBooked.top.filter((d) => !dismissed.has(briefItemKey.due(d)));
+  return {
+    ...f,
+    risks: f.risks.filter((r) => !dismissed.has(briefItemKey.risk(r))),
+    likelyNoShows: f.likelyNoShows.filter((n) => !dismissed.has(briefItemKey.noShow(n))),
+    dueNotBooked: { total: f.dueNotBooked.total - (f.dueNotBooked.top.length - top.length), top },
+    lowStock: f.lowStock.filter((p) => !dismissed.has(briefItemKey.stock(p))),
+    credits: f.credits.filter((c) => !dismissed.has(briefItemKey.credit(c))),
+  };
+}
 
 const shortName = (c: { first_name: string; last_name: string }) => `${c.first_name}${c.last_name ? ` ${c.last_name[0]}.` : ""}`;
 
@@ -54,7 +71,7 @@ export async function briefFacts(
   const [{ data: items, error }, insights] = await Promise.all([
     supabase
       .from("appointment_items")
-      .select("service_id, starts_at, appointment:appointments!inner(id, status, client:clients(id, first_name, last_name))")
+      .select("id, service_id, starts_at, appointment:appointments!inner(id, status, client:clients(id, first_name, last_name))")
       .eq("location_id", where.location.id)
       .gte("starts_at", startOfLocalDay(date, tz).toISOString())
       .lt("starts_at", startOfLocalDay(addDays(date, 1), tz).toISOString())
@@ -71,7 +88,7 @@ export async function briefFacts(
     const c = i.appointment.client;
     const known = c ? insights.get(c.id) : undefined;
     if (!c || !known || known.noShowRate === null || known.noShowRate < NO_SHOW_RATE || known.visits < NO_SHOW_VISITS) return [];
-    return [{ client: shortName(c), time: formatMinute(toLocal(new Date(i.starts_at), tz).minute), noShowPercent: Math.round(known.noShowRate * 100), visits: known.visits }];
+    return [{ appointmentId: i.appointment.id, client: shortName(c), time: formatMinute(toLocal(new Date(i.starts_at), tz).minute), noShowPercent: Math.round(known.noShowRate * 100), visits: known.visits }];
   });
 
   // Regulars due back (or overdue) with nothing booked, most overdue first.
@@ -81,12 +98,12 @@ export async function briefFacts(
   if (nameError) throw nameError;
   const nameOf = new Map(names.map((n) => [n.id, shortName(n)]));
   const top = due.slice(0, DUE_LISTED).flatMap(([id, c]: [string, ClientInsight]) =>
-    nameOf.has(id) ? [{ client: nameOf.get(id)!, overdueDays: c.overdueDays, usualWeeks: c.intervalDays ? Math.round(c.intervalDays / 7) : null }] : [],
+    nameOf.has(id) ? [{ clientId: id, client: nameOf.get(id)!, overdueDays: c.overdueDays, usualWeeks: c.intervalDays ? Math.round(c.intervalDays / 7) : null }] : [],
   );
 
   // Stock below its reorder point that today's services use.
   const serviceIds = [...new Set(items.map((i) => i.service_id))];
-  let lowStock: string[] = [];
+  let lowStock: BriefFacts["lowStock"] = [];
   if (serviceIds.length) {
     const { data: recipes, error: recipeError } = await supabase.from("service_products").select("product_id").in("service_id", serviceIds);
     if (recipeError) throw recipeError;
@@ -94,11 +111,13 @@ export async function briefFacts(
     if (productIds.length) {
       const { data: levels, error: levelError } = await supabase
         .from("stock_levels")
-        .select("on_hand, reorder_point, product:products(brand, line, name)")
+        .select("product_id, on_hand, reorder_point, product:products(brand, line, name)")
         .eq("location_id", where.location.id)
         .in("product_id", productIds);
       if (levelError) throw levelError;
-      lowStock = levels.filter((l) => Number(l.on_hand) < Number(l.reorder_point)).map((l) => [l.product.brand, l.product.line, l.product.name].filter(Boolean).join(" "));
+      lowStock = levels
+        .filter((l) => Number(l.on_hand) < Number(l.reorder_point))
+        .map((l) => ({ productId: l.product_id, name: [l.product.brand, l.product.line, l.product.name].filter(Boolean).join(" ") }));
     }
   }
 
@@ -117,13 +136,15 @@ export async function briefFacts(
     if (!c) return [];
     const uses = (packages.get(c.id) ?? []).filter((p) => isUsable(p, now)).flatMap((p) => p.items.filter((x) => x.used < x.total).map(usesLeft));
     const giftCardCents = cards.filter((g) => g.client_id === c.id && (g.expires_at === null || new Date(g.expires_at) > now)).reduce((n, g) => n + g.balance_cents, 0);
-    return uses.length || giftCardCents ? [{ client: shortName(c), packages: uses, giftCardCents }] : [];
+    return uses.length || giftCardCents ? [{ clientId: c.id, appointmentId: i.appointment.id, client: shortName(c), packages: uses, giftCardCents }] : [];
   });
 
   return {
     date,
     visits: firstItem.size,
-    risks: scan.conflicts.filter((c) => c.kind === "likely_overrun").map((c) => c.headline),
+    risks: scan.conflicts
+      .filter((c) => c.kind === "likely_overrun")
+      .map((c) => ({ subject: c.subject, headline: c.headline, appointmentId: items.find((i) => c.itemIds.includes(i.id))?.appointment.id ?? null })),
     likelyNoShows,
     dueNotBooked: { total: due.length, top },
     openings: { count: scan.openings.length, withMatches: scan.openings.filter((o) => o.matches.length > 0).length },
@@ -132,28 +153,8 @@ export async function briefFacts(
   };
 }
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-// "Ava K. (3 Blowouts left on a package, $40 on a gift card)"
+// "3 Blowouts left on a package, $40 on a gift card"
 export function creditText(c: BriefFacts["credits"][number]): string {
   const parts = [...c.packages.map((p) => `${p} on a package`), ...(c.giftCardCents ? [`${formatPrice(c.giftCardCents)} on a gift card`] : [])];
-  return `${c.client} (${parts.join(", ")})`;
-}
-// Ends with one full stop, even after a name like "Ava K.".
-const sentence = (text: string) => (text.endsWith(".") ? text : `${text}.`);
-
-// The template wording, from the facts only.
-export function briefTemplate(f: BriefFacts): string {
-  const lines: string[] = [`${plural(f.visits, "visit")} on the book today.`];
-  if (f.risks.length) lines.push(`${plural(f.risks.length, "visit")} likely to run over; I've lined up fixes below.`);
-  else lines.push("Nothing looks likely to run over.");
-  if (f.likelyNoShows.length) lines.push(`Might not show: ${f.likelyNoShows.map((n) => `${n.client} at ${n.time} (missed ${n.noShowPercent}% of visits)`).join(", ")}. A reminder call could help.`);
-  if (f.dueNotBooked.total) {
-    const names = f.dueNotBooked.top.slice(0, 3).map((d) => `${d.client}${d.overdueDays ? ` (${Math.max(1, Math.round(d.overdueDays / 7))} wk overdue)` : ""}`);
-    lines.push(sentence(`${plural(f.dueNotBooked.total, "regular")} due back with nothing booked${names.length ? `, most overdue: ${names.join(", ")}` : ""}`));
-  }
-  if (f.openings.withMatches) lines.push(`${plural(f.openings.withMatches, "opening")} I could fill from the waitlist.`);
-  if (f.lowStock.length) lines.push(`Low for today's services: ${f.lowStock.slice(0, 3).join(", ")}${f.lowStock.length > 3 ? ` and ${f.lowStock.length - 3} more` : ""}.`);
-  if (f.credits.length) lines.push(sentence(`Coming in with credit: ${f.credits.slice(0, 3).map(creditText).join("; ")}${f.credits.length > 3 ? ` and ${f.credits.length - 3} more` : ""}`));
-  return lines.join(" ");
+  return parts.join(", ");
 }

@@ -29,10 +29,12 @@ test.describe("owner", () => {
     await expect(main.getByRole("heading", { level: 1 })).toHaveText(/^Good (morning|afternoon|evening), Olivia$/);
     await expect(main.getByRole("form", { name: "Ask Denise" })).toBeVisible();
 
-    // Denise's brief as the hero, from the cached words or the template.
+    // Denise's brief as the hero, in sections.
     const denise = main.getByTestId("dashboard-denise");
-    await expect(denise.getByTestId("dashboard-brief-text")).toContainText(/visit/);
-    await expect(denise.getByTestId("dashboard-denise-says")).toHaveText(/All clear today\.|need(s)? a look:/);
+    await expect(denise.getByTestId("dashboard-brief-visits")).toContainText(/visits? on the book today/);
+    const brief = denise.getByTestId("dashboard-brief");
+    await expect(brief.getByRole("heading", { level: 3 })).toHaveText([/^Risks today/, /^Might not show/, /^Due back, nothing booked/, /^Low stock for today/, /^Coming in with credit/]);
+    await expect(denise.getByTestId("dashboard-denise-says")).toHaveText(/Nothing to act on right now\.|need(s)? a look:/);
 
     // Five tiles, each compared with last week.
     for (const id of ["tile-appointments", "tile-fullness", "tile-revenue", "tile-checked-in", "tile-missed"]) {

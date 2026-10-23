@@ -54,7 +54,7 @@ test("short visits show name and time on one line, with the details on hover", a
   await short.hover();
   const hint = page.getByRole("tooltip");
   await expect(hint).toBeVisible();
-  await expect(hint.locator("p")).toHaveText([`${PREFIX}Tiny Long-Surname`, "Bang Trim", "10am–10:15am · Bridget Callahan", "Booked", "New client consultation not signed yet"]);
+  await expect(hint.locator("p")).toHaveText([`${PREFIX}Tiny Long-Surname`, "Bang Trim", "10am–10:15am · Bridget Callahan", "Booked"]);
   await page.mouse.move(5, 5);
   await expect(hint).toBeHidden();
 

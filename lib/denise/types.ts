@@ -2,7 +2,7 @@
 // and gentle notices. Plain data, from the server to the calendar.
 
 import type { ConflictKind } from "@/lib/scheduling/resolve";
-import type { Brief } from "./brief";
+import type { BriefFacts } from "./brief";
 
 export type FixMove = {
   itemId: string;
@@ -44,7 +44,8 @@ export type ConflictView = {
   firstNames: { headline: string; options: string[] };
 };
 
-export type DeniseNotice = { id: string; appointmentId: string; itemId: string; text: string };
+// A client due who hasn't checked in yet ("late:<appointment>").
+export type DeniseNotice = { id: string; appointmentId: string; itemId: string; clientName: string; startMinute: number; text: string };
 
 // A reorder Denise has drafted on the Inventory page.
 export type ReorderNotice = {
@@ -67,8 +68,8 @@ export type DeniseState = {
   notices: DeniseNotice[];
   reorders: ReorderNotice[];
   openings: WaitlistOpening[];
-  // The morning brief, for today and the front of house.
-  brief: Brief | null;
+  // The morning brief, for today and the front of house (the Dashboard).
+  brief: BriefFacts | null;
   // Whether Claude is connected (ANTHROPIC_API_KEY is set).
   connected: boolean;
 };

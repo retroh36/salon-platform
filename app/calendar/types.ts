@@ -3,7 +3,7 @@
 
 import type { AppointmentStatus } from "@/lib/appointments";
 import type { PickerProduct } from "@/lib/inventory-load";
-import type { ServiceFamily } from "@/lib/calendar";
+import type { CalendarZoom, ServiceFamily } from "@/lib/calendar";
 import type { StaffLevel } from "@/lib/schedule-forms";
 import type { ItemTimes } from "@/lib/visit-times";
 import type { StaffRole } from "@/lib/staff";
@@ -24,6 +24,8 @@ export type ColumnData = {
   // On shift and the salon is open; others collapse to a thin column.
   working: boolean;
   hoursLabel: string;
+  // The same on one line: "9–1, 2–6".
+  hoursShort: string;
   offHours: Interval[];
   timeOff: (Interval & { label: string })[];
 };
@@ -94,7 +96,10 @@ export type AppointmentDetail = {
   // What Denise knows about the client ("Comes every ~6 weeks…").
   insight: { summary: string; tags: { label: string; tone: "neutral" | "good" | "warn" }[] } | null;
   // Patch test problems and forms still to sign, before the visit.
-  warnings: { patch: string[]; patchBlocks: boolean; forms: { templateId: string; name: string }[] } | null;
+  warnings: { patch: string[]; patchNotices: { title: string; detail: string }[]; patchBlocks: boolean; forms: { templateId: string; name: string }[] } | null;
+  // The sale a checked-out visit was paid on (reversing it means voiding
+  // that sale), when the viewer can see sales.
+  saleId: string | null;
 };
 
 export type MenuService = {
@@ -147,7 +152,7 @@ export type BoardData = {
   timeBlocks: TimeBlockData[];
   appointments: Record<string, AppointmentDetail>;
   menu: Menu;
-  me: { staffId: string; role: StaffRole; canBook: boolean };
+  me: { staffId: string; role: StaffRole; canBook: boolean; zoom: CalendarZoom };
   // See loadCalendarStamp: the board reloads when it changes.
   stamp: string;
   // What a link asked to show (from the Dashboard): a stylist's column,

@@ -11,6 +11,7 @@ import { noFixAdvice } from "@/lib/denise/respond";
 import type { ConflictKind } from "@/lib/scheduling/resolve";
 import { formatMinute } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
+import { BriefSections } from "./brief-sections";
 
 const KINDS: Record<ConflictKind, string> = {
   likely_overrun: "Might run over",
@@ -22,7 +23,8 @@ const KINDS: Record<ConflictKind, string> = {
 
 const REVIEW = "/calendar?denise=1";
 
-// Denise's brief for today as the hero card, with her open items under it
+// Denise's brief for today as the hero card (in sections: ./brief-sections),
+// with her open items under it
 // (fixes for conflicts and likely overruns, waitlist matches, reorder
 // drafts), each with its buttons. Apply, Dismiss and Book work right
 // here, through the same actions as her panel on the calendar.
@@ -37,7 +39,8 @@ export function DeniseCard({ initial, today, canBook, seesMoney }: { initial: De
     setOutcome(null);
     const result = await action();
     setWorking(false);
-    if (result.state) setState(result.state);
+    // Her panel's actions don't redo the brief; keep the one shown.
+    if (result.state) setState((was) => ({ ...result.state!, brief: was.brief }));
     setOutcome({ message: result.message, error: !result.ok, undo: result.ok ? undo : null });
   }
 
@@ -55,18 +58,20 @@ export function DeniseCard({ initial, today, canBook, seesMoney }: { initial: De
             <h2 id="denise-brief-heading" className="font-serif text-xl font-semibold text-denise-900">
               Denise&rsquo;s brief
             </h2>
-            {brief && <span className="text-xs text-ink-muted">{brief.writtenBy === "claude" ? "Written by Denise" : "From the calendar"}</span>}
           </div>
           {brief && (
-            <p className="mt-2 text-[15px] leading-relaxed text-ink" data-testid="dashboard-brief-text">
-              {brief.text}
+            <p className="mt-1 text-[15px] text-ink" data-testid="dashboard-brief-visits">
+              {brief.visits === 1 ? "1 visit" : `${brief.visits} visits`} on the book today.
             </p>
           )}
-          <p className="mt-2 font-medium text-denise-900" data-testid="dashboard-denise-says" aria-live="polite">
-            {count === 0 ? "All clear today." : count === 1 ? "One thing needs a look:" : `${count} things need a look:`}
-          </p>
         </div>
       </div>
+
+      {/* The brief first, then what to act on. */}
+      {brief && <BriefSections brief={brief} today={today} />}
+      <p className="border-t border-denise-200 px-5 pt-4 pb-3 font-medium text-denise-900 sm:px-6" data-testid="dashboard-denise-says" aria-live="polite">
+        {count === 0 ? "Nothing to act on right now." : count === 1 ? "One thing needs a look:" : `${count} things need a look:`}
+      </p>
 
       {outcome && (
         <div role="status" className={`mx-5 mb-4 flex animate-fade-in items-start gap-3 rounded-xl border p-3 text-sm sm:mx-6 ${outcome.error ? "border-danger/30 bg-danger-soft text-danger" : "border-denise-200 bg-surface text-ink"}`}>
@@ -82,7 +87,7 @@ export function DeniseCard({ initial, today, canBook, seesMoney }: { initial: De
       )}
 
       {count > 0 && (
-        <ul aria-label="Denise's open items" className="flex flex-col gap-2 border-t border-denise-200 bg-denise-50 p-3 sm:p-4">
+        <ul aria-label="Denise's open items" className="flex flex-col gap-2 bg-denise-50 px-3 pb-3 sm:px-4 sm:pb-4">
           {conflicts.map((c) => {
             const top = c.options[0];
             return (

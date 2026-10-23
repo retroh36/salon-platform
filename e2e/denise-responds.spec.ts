@@ -110,6 +110,17 @@ test.describe("at 10pm", () => {
     // is set aside and put back after.
     const { data: off } = await admin.from("staff_time_off").select("*").eq("staff_id", GIL).lte("starts_on", today).gte("ends_on", today);
     await admin.from("staff_time_off").delete().in("id", (off ?? []).map((t) => t.id));
+    // Shifting the zone can put some of his demo visits after 10pm there:
+    // those are set aside (canceled) and put back after too.
+    const { data: later } = await admin
+      .from("appointment_items")
+      .select("appointment:appointments!inner(id, status, canceled_at, cancel_reason)")
+      .eq("staff_id", GIL)
+      .gte("starts_at", new Date().toISOString())
+      .lt("starts_at", fromLocal(addDays(today, 1), 0, zone)!.toISOString())
+      .in("appointment.status", ["booked", "confirmed"]);
+    const setAside = [...new Map((later ?? []).map((i) => [i.appointment.id, i.appointment])).values()];
+    for (const a of setAside) await admin.from("appointments").update({ status: "canceled", canceled_at: new Date().toISOString(), cancel_reason: "Test" }).eq("id", a.id);
     await admin.from("locations").update({ timezone: zone }).eq("id", L);
     try {
       await page.goto("/calendar");
@@ -126,6 +137,7 @@ test.describe("at 10pm", () => {
         if (d.time_off_id) await admin.from("staff_time_off").delete().eq("id", d.time_off_id);
       }
       if (off?.length) await admin.from("staff_time_off").insert(off);
+      for (const a of setAside) await admin.from("appointments").update({ status: a.status, canceled_at: a.canceled_at, cancel_reason: a.cancel_reason }).eq("id", a.id);
     }
   });
 });

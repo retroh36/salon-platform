@@ -247,6 +247,8 @@ function lateNotices(day: Day, lookup: Lookup, date: LocalDate, conflicts: Confl
       id: `late:${appointmentId}`,
       appointmentId,
       itemId: item.id!,
+      clientName: name,
+      startMinute: toLocal(item.start, lookup.timeZone).minute,
       text: `${name} was due at ${clock(toLocal(item.start, lookup.timeZone).minute)} and hasn't checked in yet. If they're on the way, tell me how late and I'll rearrange things.`,
     });
   }
