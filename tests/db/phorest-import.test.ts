@@ -37,7 +37,11 @@ async function count(table: "locations" | "staff" | "services" | "staff_services
   return count;
 }
 
+// The demo salon's counts before any import, to check it's left alone.
+let before: { clients: number | null; services: number | null; staff: number | null };
+
 beforeAll(async () => {
+  before = { clients: await count("clients", SEED.business), services: await count("services", SEED.business), staff: await count("staff", SEED.business) };
   const { data } = await admin.from("businesses").insert({ name: "Imported Salon" }).select("id").single();
   businessId = data!.id;
   plan = freshPlan();
@@ -148,9 +152,7 @@ describe("saving an import", () => {
   });
 
   it("touches nothing outside the target business", async () => {
-    expect(await count("clients", SEED.business)).toBe(500);
-    expect(await count("services", SEED.business)).toBe(41);
-    expect(await count("staff", SEED.business)).toBe(SEED.staffCount);
+    expect({ clients: await count("clients", SEED.business), services: await count("services", SEED.business), staff: await count("staff", SEED.business) }).toEqual(before);
   });
 
   it("keeps the id mapping out of the API", async () => {

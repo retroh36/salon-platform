@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { admin, SEED } from "../tests/db/helpers";
+import { admin, countFor, SEED } from "../tests/db/helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
 // Unique per run; afterAll deletes these clients (formulas cascade).
@@ -50,7 +50,8 @@ test.describe("front desk", () => {
 
   test("search by name as you type, keeping focus", async ({ page }) => {
     await openClients(page);
-    await expect(ui(page).getByText("500 clients · showing the first 50")).toBeVisible();
+    // However many there are now (more if some were added by hand).
+    await expect(ui(page).getByText(`${await countFor("clients")} clients · showing the first 50`)).toBeVisible();
 
     const search = ui(page).getByRole("searchbox", { name: "Search clients" });
     await expect(search).toBeFocused();

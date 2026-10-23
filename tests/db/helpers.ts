@@ -110,3 +110,20 @@ export async function restoreLearnedDurations() {
   const { computeInsights } = await import("@/lib/insights/compute");
   await computeInsights(admin, SEED.business);
 }
+
+// How many rows a business has right now, for tests that check counts
+// against the database rather than the seed's numbers (so clients or staff
+// added while testing by hand don't break them).
+// For staff, `locationId` counts one location's team.
+export async function countFor(table: "clients" | "staff", businessId: string = SEED.business, locationId?: string): Promise<number> {
+  const { count, error } =
+    table === "staff" && locationId
+      ? await admin.from("staff").select("id", { count: "exact", head: true }).eq("business_id", businessId).eq("location_id", locationId)
+      : await admin.from(table).select("id", { count: "exact", head: true }).eq("business_id", businessId);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+// The seed's own clients: their ids are fixed (e0000000-…), so this stays
+// 500 whatever else is added.
+export const SEEDED_CLIENT_IDS = { from: "e0000000-0000-4000-8000-000000000000", to: "e0000000-0000-4000-8000-0000ffffffff" };

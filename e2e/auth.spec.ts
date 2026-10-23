@@ -1,3 +1,4 @@
+import { countFor, SEED } from "../tests/db/helpers";
 import { expect, signIn, test, ui, waitForHydration } from "./fixtures";
 
 test("signed-out visitors are sent to the login page", async ({ page }) => {
@@ -24,7 +25,7 @@ test("signing in greets you on the Dashboard, the team is under Team, and signin
   await expect(ui(page).getByRole("heading", { level: 1 })).toHaveText(/^Good (morning|afternoon|evening), Olivia$/);
   await page.locator("aside").first().getByRole("link", { name: "Team" }).click();
   await expect(page).toHaveURL("/team");
-  await expect(ui(page).getByRole("heading", { name: "Staff (10)" })).toBeVisible();
+  await expect(ui(page).getByRole("heading", { name: `Staff (${await countFor("staff", SEED.business, SEED.location)})` })).toBeVisible();
   await expect(ui(page).getByText("Olivia Bennett(you)")).toBeVisible();
 
   await page.getByRole("button", { name: "Sign out" }).click();

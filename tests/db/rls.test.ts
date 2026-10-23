@@ -1,12 +1,12 @@
 // Row Level Security checks for businesses, locations and staff.
 // Run with `npm run test:db` after `npx supabase db reset`.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { admin, anon, createOtherSalon, SEED, signIn, type Client } from "./helpers";
+import { admin, anon, countFor, createOtherSalon, SEED, signIn, type Client } from "./helpers";
 
 const SEED_BUSINESS = SEED.business;
 const SEED_LOCATION = SEED.location;
 const SEED_STYLIST = SEED.staff.hannah;
-const SEED_STAFF_COUNT = SEED.staffCount;
+
 
 let other: Awaited<ReturnType<typeof createOtherSalon>>;
 let owner: Client;
@@ -49,7 +49,7 @@ describe("tenant isolation", () => {
 
   it("each owner sees only their own staff", async () => {
     const mine = await owner.from("staff").select("business_id");
-    expect(mine.data).toHaveLength(SEED_STAFF_COUNT);
+    expect(mine.data).toHaveLength(await countFor("staff"));
     expect(new Set(mine.data?.map((s) => s.business_id))).toEqual(new Set([SEED_BUSINESS]));
 
     const theirs = await otherOwner.from("staff").select("business_id");
@@ -89,7 +89,7 @@ describe("tenant isolation", () => {
 describe("roles", () => {
   it("stylists can view staff but not change them", async () => {
     const { data } = await stylist.from("staff").select("id");
-    expect(data).toHaveLength(SEED_STAFF_COUNT);
+    expect(data).toHaveLength(await countFor("staff"));
 
     const insert = await stylist.from("staff").insert({
       business_id: SEED_BUSINESS,

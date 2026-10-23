@@ -1,7 +1,7 @@
 // Clients and client_formulas: RLS, constraints and generated search columns.
 // Run with `npm run test:db` after `npx supabase db reset`.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { admin, createOtherSalon, SEED, signIn, type Client } from "./helpers";
+import { admin, createOtherSalon, SEED, signIn, type Client, SEEDED_CLIENT_IDS } from "./helpers";
 
 const PREFIX = `Test${crypto.randomUUID().slice(0, 8)}`;
 
@@ -41,7 +41,13 @@ afterAll(async () => {
 
 describe("seed data", () => {
   it("has 500 clients, some with formula history", async () => {
-    const { count } = await admin.from("clients").select("id", { count: "exact", head: true }).eq("business_id", SEED.business);
+    // The seed's own clients (others may be added while testing by hand).
+    const { count } = await admin
+      .from("clients")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", SEED.business)
+      .gte("id", SEEDED_CLIENT_IDS.from)
+      .lte("id", SEEDED_CLIENT_IDS.to);
     expect(count).toBe(500);
 
     const { data } = await admin.from("client_formulas").select("client_id, staff_id").eq("business_id", SEED.business);

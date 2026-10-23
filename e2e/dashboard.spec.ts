@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { startOfLocalDay } from "@/lib/scheduling/load";
 import { addDays, todayIn } from "@/lib/scheduling/time";
-import { admin, SEED } from "../tests/db/helpers";
+import { admin, countFor, SEED } from "../tests/db/helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
 // The Dashboard for each role, on the demo data. Screenshots of each go to
@@ -171,7 +171,7 @@ test.describe("Team", () => {
     await page.goto("/team");
     const tabs = ui(page).getByRole("navigation", { name: "Team pages" });
     await expect(tabs.getByRole("link", { name: "Directory" })).toHaveAttribute("aria-current", "page");
-    await expect(ui(page).getByRole("heading", { name: `Staff (${SEED.staffCount})` })).toBeVisible();
+    await expect(ui(page).getByRole("heading", { name: `Staff (${await countFor("staff", SEED.business, SEED.location)})` })).toBeVisible();
     await expect(ui(page).getByText("Bridget Callahan(you)")).toBeVisible();
     await tabs.getByRole("link", { name: "Schedule" }).click();
     await expect(page).toHaveURL("/schedule");
