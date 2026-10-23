@@ -246,7 +246,9 @@ test.describe("front desk", () => {
   test("groups clients who haven't arrived into one card, to mark a no-show or dismiss for good", async ({ page }) => {
     const nowMinute = toLocal(new Date(), TZ).minute;
     test.skip(nowMinute < 60 || nowMinute > 23 * 60, "Needs room for visits due in the last hour");
-    const [ana, ben, cy, dee] = await Promise.all([client("Ana"), client("Ben"), client("Cy"), client("Dee")]);
+    // Ben's name is long: it wraps, never cut off.
+    const BEN = "Benedetta-Alessandrina Featherstonehaugh-Montgomery";
+    const [ana, ben, cy, dee] = await Promise.all([client("Ana"), client(BEN), client("Cy"), client("Dee")]);
     // Due 15 and 50 minutes ago, one after the other (not a clash), and
     // 30 minutes ago with another stylist; 5 minutes ago is still in the
     // grace period.
@@ -262,6 +264,26 @@ test.describe("front desk", () => {
     const line = (name: string) => card.getByRole("listitem").filter({ hasText: `${PREFIX}${name}` });
     await expect(line("Ana")).toContainText(/Due \d/);
     await expect(line("Ben").getByRole("button", { name: "Open" })).toBeVisible();
+    // Each row: the full name on its own line, the due time under it, the
+    // actions below that, and dismiss in the top right corner.
+    const name = line("Ben").getByTestId("late-name");
+    await expect(name).toHaveText(`${PREFIX}${BEN} Test`);
+    expect(await name.evaluate((el) => el.scrollWidth <= el.clientWidth && getComputedStyle(el).textOverflow !== "ellipsis")).toBe(true);
+    const [row, nameBox, due, open, noShow, dismiss] = await Promise.all([
+      line("Ben").boundingBox(),
+      name.boundingBox(),
+      line("Ben").getByText(/^Due \d/).boundingBox(),
+      line("Ben").getByRole("button", { name: "Open" }).boundingBox(),
+      line("Ben").getByRole("button", { name: "Mark no-show" }).boundingBox(),
+      line("Ben").getByRole("button", { name: /^Dismiss/ }).boundingBox(),
+    ]);
+    expect(due!.y).toBeGreaterThanOrEqual(nameBox!.y + nameBox!.height - 1);
+    expect(open!.y).toBeGreaterThanOrEqual(due!.y + due!.height - 1);
+    expect(noShow!.y).toBeCloseTo(open!.y, 0);
+    expect(open!.height).toBeLessThan(32);
+    expect(dismiss!.y - row!.y).toBeLessThan(10);
+    expect(row!.x + row!.width - (dismiss!.x + dismiss!.width)).toBeLessThan(10);
+    expect(dismiss!.x).toBeGreaterThanOrEqual(nameBox!.x + nameBox!.width - 1);
     await expect(line("Dee")).toHaveCount(0);
     // On the calendar: "Not arrived", not a growing count; still a count
     // in the grace period.
@@ -282,7 +304,7 @@ test.describe("front desk", () => {
     await expect(page.getByTestId("denise-late").getByRole("listitem").filter({ hasText: `${PREFIX}Ana` })).toHaveCount(0);
 
     await line("Ben").getByRole("button", { name: "Open" }).click();
-    await expect(details(page).getByTestId("client-name")).toHaveText(`${PREFIX}Ben Test`);
+    await expect(details(page).getByTestId("client-name")).toHaveText(`${PREFIX}${BEN} Test`);
   });
 });
 

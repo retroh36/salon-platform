@@ -9,6 +9,8 @@ const sidebar = (page: Page) => page.locator("aside").filter({ has: page.getByTe
 
 async function groups(page: Page) {
   const nav = sidebar(page).getByRole("navigation", { name: "Main" });
+  // evaluateAll doesn't wait: let the page render first.
+  await expect(nav.getByRole("group").first()).toBeVisible();
   return nav.getByRole("group").evaluateAll((els) => els.map((g) => [g.querySelector("h2")!.textContent, [...g.querySelectorAll("a")].map((a) => a.textContent)]));
 }
 

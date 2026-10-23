@@ -121,9 +121,17 @@ test.describe("front desk", () => {
     await openDenise(page);
     await expect(denisePanel(page).getByTestId("denise-says")).toHaveText("The calendar's clear. A few things about stock:");
     await expect(denisePanel(page).locator("[data-pose]")).toHaveAttribute("data-pose", "wave");
-    await expect(denisePanel(page).getByTestId("denise-reorder").first()).toContainText("I've put together an order for");
+    // One card for all her reorders: a line per supplier with its number of
+    // products and total, and one way to review them.
+    const card = denisePanel(page).getByTestId("denise-reorders");
+    await expect(card).toHaveCount(1);
+    await expect(card.getByText(/^\d+ reorders? ready to review$/)).toBeVisible();
+    await expect(card.getByTestId("denise-reorder").first()).toContainText(/\d+ products?\$[\d,.]+$/);
+    await expect(card.getByRole("link", { name: "Review on Inventory" })).toHaveCount(1);
+    await expect(card.getByRole("link", { name: "Review on Inventory" })).toHaveAttribute("href", "/inventory");
     // The badge counts exactly the orders she has waiting.
-    await expect(denisePanel(page).getByTestId("denise-reorder")).toHaveCount(waiting);
+    await expect(card.getByTestId("denise-reorder")).toHaveCount(waiting);
+    await expect(card).toContainText(`${waiting} ${waiting === 1 ? "reorder" : "reorders"} ready to review`);
   });
 
   test("finds a fix for an overrun, applies it, and undoes it", async ({ page }) => {

@@ -150,23 +150,29 @@ export function DenisePanel({
           </p>
           <ul className="flex flex-col gap-1.5">
             {notices.map((n) => (
-              <li key={n.id} className="flex animate-fade-in items-center gap-2 rounded-lg bg-surface px-2.5 py-2">
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium text-ink">{n.clientName}</span>
+              // The full name on its own line (never cut off), when they were
+              // due under it, then small actions; dismiss in the corner.
+              <li key={n.id} className="relative flex animate-fade-in flex-col gap-2 rounded-lg bg-surface px-2.5 py-2">
+                <span className={data.me.canBook ? "pr-8" : ""}>
+                  <span data-testid="late-name" className="block font-medium break-words text-ink">
+                    {n.clientName}
+                  </span>
                   <span className="block text-xs text-ink-muted">Due {formatMinute(n.startMinute)}</span>
                 </span>
-                <Button size="sm" onClick={() => onOpen(n.appointmentId)}>
-                  Open
-                </Button>
-                {data.me.canBook && (
-                  <>
-                    <Button size="sm" variant="ghost" className="whitespace-nowrap" onClick={() => onNoShow(n)}>
+                <span className="flex flex-wrap gap-1.5">
+                  <Button size="xs" onClick={() => onOpen(n.appointmentId)}>
+                    Open
+                  </Button>
+                  {data.me.canBook && (
+                    <Button size="xs" variant="ghost" onClick={() => onNoShow(n)}>
                       Mark no-show
                     </Button>
-                    <IconButton label={`Dismiss ${n.clientName}`} size="sm" onClick={() => onDismissNotice(n.id)}>
-                      <CloseIcon className="size-4" />
-                    </IconButton>
-                  </>
+                  )}
+                </span>
+                {data.me.canBook && (
+                  <IconButton label={`Dismiss ${n.clientName}`} size="xs" variant="ghost" className="absolute top-1.5 right-1.5" onClick={() => onDismissNotice(n.id)}>
+                    <CloseIcon className="size-3.5" />
+                  </IconButton>
                 )}
               </li>
             ))}
@@ -212,21 +218,31 @@ export function DenisePanel({
       )}
 
       {(state?.reorders.length ?? 0) > 0 && (
-        <section aria-label="Stock" className="flex flex-col gap-2">
-          {state!.reorders.map((r) => (
-            <div key={r.supplierId} data-testid="denise-reorder" className="flex animate-fade-in gap-2.5 rounded-xl border border-denise-200 bg-denise-50 p-3">
-              <DeniseFace size={24} className="mt-0.5" />
-              <div className="flex flex-1 flex-col items-start gap-2">
-                <p className="text-ink">
-                  <strong className="font-semibold text-denise-900">{r.headline}</strong> I&apos;ve put together an order for {r.supplier} ({r.lines}{" "}
-                  {r.lines === 1 ? "product" : "products"}, {formatPrice(r.totalCents)}).
-                </p>
-                <Link href="/inventory" className={buttonClass("secondary", "sm")}>
-                  Review on Inventory
-                </Link>
-              </div>
-            </div>
-          ))}
+        // Every reorder she's drafted in one card: a line per supplier, and
+        // one way to the Inventory page to review them.
+        <section aria-label="Reorders" data-testid="denise-reorders" className="flex animate-fade-in gap-2.5 rounded-xl border border-denise-200 bg-denise-50 p-3">
+          <DeniseFace size={24} className="mt-0.5" />
+          <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
+            <p className="font-semibold text-denise-900">
+              {state!.reorders.length === 1 ? "1 reorder ready to review" : `${state!.reorders.length} reorders ready to review`}
+            </p>
+            <ul className="flex w-full flex-col gap-1.5">
+              {state!.reorders.map((r) => (
+                <li key={r.supplierId} data-testid="denise-reorder" className="flex items-baseline justify-between gap-3 rounded-lg bg-surface px-2.5 py-2">
+                  <span className="min-w-0">
+                    <span className="block font-medium break-words text-ink">{r.supplier}</span>
+                    <span className="block text-xs text-ink-muted">
+                      {r.lines} {r.lines === 1 ? "product" : "products"}
+                    </span>
+                  </span>
+                  <span className="shrink-0 font-medium text-ink tabular-nums">{formatPrice(r.totalCents)}</span>
+                </li>
+              ))}
+            </ul>
+            <Link href="/inventory" className={buttonClass("secondary", "sm")}>
+              Review on Inventory
+            </Link>
+          </div>
         </section>
       )}
 

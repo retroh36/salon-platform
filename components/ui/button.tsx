@@ -1,7 +1,7 @@
 import { forwardRef } from "react";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
-export type ButtonSize = "sm" | "md" | "lg";
+export type ButtonSize = "xs" | "sm" | "md" | "lg";
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-navy-900 text-white shadow-card hover:bg-navy-800",
@@ -11,13 +11,14 @@ const VARIANTS: Record<ButtonVariant, string> = {
 };
 
 const SIZES: Record<ButtonSize, string> = {
+  xs: "h-7 gap-1 px-2.5 text-xs",
   sm: "h-8 gap-1.5 px-3 text-sm",
   md: "h-10 gap-2 px-4 text-sm",
   lg: "h-11 gap-2 px-5 text-base",
 };
 
 // Square, for a button that's just an icon.
-const SQUARE: Record<ButtonSize, string> = { sm: "size-8", md: "size-10", lg: "size-11" };
+const SQUARE: Record<ButtonSize, string> = { xs: "size-7", sm: "size-8", md: "size-10", lg: "size-11" };
 
 // Shared look for buttons and button-styled links. Pressing gives instant
 // feedback (a quick scale-down); focus shows a bright blue ring.
