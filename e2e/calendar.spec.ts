@@ -204,7 +204,8 @@ test.describe("front desk", () => {
     await expect(panel.getByTestId("client-name")).toHaveText(`${PREFIX}Ava Test`);
     await expect(panel).toContainText("All-Over Color");
     await expect(color).toHaveAttribute("aria-pressed", "true");
-    await panel.getByRole("link", { name: "View client profile" }).click();
+    // The name opens their profile.
+    await panel.getByTestId("client-name").getByRole("link").click();
     await expect(ui(page).getByRole("heading", { level: 1, name: `${PREFIX}Ava Test` })).toBeVisible();
   });
 

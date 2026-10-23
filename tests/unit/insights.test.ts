@@ -268,6 +268,7 @@ describe("describing a client", () => {
     const d = describeClient(habits, { lifetimeSpendCents: 54000, averageVisitCents: 9000, retailRate: 0.1 }, names, T0);
     expect(d.summary).toBe("Comes every ~6 weeks, usually Saturday mornings with Nola, slightly overdue, rarely buys retail.");
     expect(d.tags).toEqual([{ label: "$540 over 6 visits", tone: "neutral" }]);
+    expect(d.line).toBe("Every ~6 weeks with Nola · slightly overdue");
   });
 
   it("leaves out spend for stylists, and flags risks", () => {
@@ -278,6 +279,9 @@ describe("describing a client", () => {
 
   it("handles new and one-visit clients, and lapsed ones", () => {
     expect(describeClient(base, null, names, T0).summary).toBe("New client: no visits yet.");
+    expect(describeClient(base, null, names, T0).line).toBe("New client");
+    expect(describeClient({ ...base, visits: 1, due: "not_due" }, null, names, T0).line).toBe("One visit so far");
+    expect(describeClient({ ...base, visits: 3, intervalDays: 30, due: "lapsed", lastVisit: daysAfter(-70).toISOString() }, null, names, T0).line).toBe("Every ~4 weeks · hasn't been in for 10 weeks");
     expect(describeClient({ ...base, visits: 1, due: "not_due" }, null, names, T0).summary).toBe("One visit so far.");
     expect(describeClient({ ...base, visits: 3, intervalDays: 30, due: "lapsed", lastVisit: daysAfter(-70).toISOString() }, null, names, T0).summary).toBe("Comes every ~4 weeks, hasn't been in for 10 weeks.");
   });

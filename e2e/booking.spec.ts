@@ -3,7 +3,7 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { onCheckout } from "./checkout-helpers";
-import { AUTH, expect, test, ui, waitForHydration, pxPerMinute, slotAt, checkIn, moreAction } from "./fixtures";
+import { AUTH, expect, test, ui, waitForHydration, pxPerMinute, slotAt, checkIn, checkOut, moreAction, visitTab } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -209,12 +209,13 @@ test.describe("front desk", () => {
     await column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Cara Test`) }).click();
 
     const detail = panel(page);
+    await visitTab(detail, "History");
     await expect(detail).toContainText("Booked by Sam Rivera");
     await checkIn(detail);
     await expect(detail.locator("[data-status]")).toHaveText(/^Checked in/);
     await expect(detail.getByRole("button", { name: "Mark no-show" })).toHaveCount(0);
     // Checking out takes payment first.
-    await detail.getByRole("button", { name: "Check out", exact: true }).click();
+    await checkOut(detail);
     const checkout = await onCheckout(page);
     await checkout.card();
     const done = await checkout.complete();
@@ -222,7 +223,8 @@ test.describe("front desk", () => {
     await waitForHydration(page, "section[data-staff-id]");
     await column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Cara Test`) }).click();
     await expect(detail.locator("[data-status]")).toHaveText(/^Checked out/);
-    await expect(detail.getByRole("button", { name: "Edit booking" })).toHaveCount(0);
+    await expect(detail.getByRole("button", { name: "More actions" })).toHaveCount(0);
+    await visitTab(detail, "History");
     await expect(detail).toContainText("Last changed by Sam Rivera");
     expect(await appointment(id)).toMatchObject({ status: "completed", updated_by: FRONT_DESK });
   });
@@ -263,7 +265,7 @@ test.describe("front desk", () => {
     const id = await seedVisit(await newClient("Fay"), [{ service: "Women's Cut & Style", staff: BRIDGET, start: at(10), resource: "f0000000-0000-4000-8000-000000000001" }]);
     await openDay(page);
     await column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Fay Test`) }).click();
-    await panel(page).getByRole("button", { name: "Edit booking" }).click();
+    await moreAction(panel(page), "Edit booking");
 
     const form = panel(page).getByRole("form", { name: "Edit booking" });
     await expect(form.getByRole("region", { name: "Client" })).toContainText(`${PREFIX}Fay Test`);
@@ -272,7 +274,7 @@ test.describe("front desk", () => {
     await form.getByRole("button", { name: "Save changes" }).click();
 
     // Back on the visit, updated.
-    await expect(panel(page).getByRole("region", { name: "Services" })).toContainText("Curly Cut");
+    await expect(panel(page).getByRole("region", { name: "Visit", exact: true })).toContainText("Curly Cut");
     await expect(column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`^10am–11:15am, ${PREFIX}Fay Test, Curly Cut`) })).toBeVisible();
     const saved = await appointment(id);
     expect(saved).toMatchObject({ notes: "Bring curl cream", updated_by: FRONT_DESK });
@@ -337,8 +339,8 @@ test.describe("stylists", () => {
     const block = column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Jo Test`) });
     await block.click();
     const notes = panel(page).getByRole("form", { name: "Notes" });
-    await notes.getByLabel("Notes").fill("Wants a fringe");
-    await notes.getByRole("button", { name: "Save notes" }).click();
+    // Notes save as you type.
+    await notes.getByLabel("Visit notes").fill("Wants a fringe");
     await expect(notes.getByRole("status")).toHaveText("Notes saved.");
     await expect(panel(page).getByRole("button", { name: /Edit|Check in|Cancel/ })).toHaveCount(0);
     expect(await appointment(mine)).toMatchObject({ notes: "Wants a fringe", updated_by: BRIDGET });

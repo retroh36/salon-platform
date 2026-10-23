@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { addDays, fromLocal, toLocal, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, checkIn, expect, moreAction, pxPerMinute, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, checkIn, expect, moreAction, openChecklist, pxPerMinute, test, ui, waitForHydration } from "./fixtures";
 
 // The calendar's day: undoing a check-in, the patch test notice in booking
 // details, zoom, opening at the current time, and Denise's late-arrivals
@@ -86,16 +86,56 @@ test.describe("front desk", () => {
     ]);
   });
 
+  test("booking details: who and where it's at, the visit, tabs, and one main button with the rest under ⋯", async ({ page }) => {
+    const calm = await client("Calm");
+    await admin.from("clients").update({ phone: "+15555550123", preferences: "Likes it quiet" }).eq("id", calm);
+    await book(calm, "Blowout", fromLocal(DAY, 11 * 60, TZ)!);
+    await openDay(page);
+    await ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Calm`) }).click();
+    const panel = details(page);
+
+    // The name opens the profile; the phone is a call button, not text.
+    await expect(panel.getByTestId("client-name").getByRole("link")).toHaveAttribute("href", `/clients/${calm}`);
+    await expect(panel.getByRole("link", { name: `Call ${PREFIX}Calm` })).toHaveAttribute("href", "tel:+15555550123");
+    await expect(panel).not.toContainText("+15555550123");
+    await expect(panel.getByTestId("visit-status")).toHaveText("Booked");
+    // Not today: the date. One service: no total, and no "Not started".
+    await expect(panel.getByTestId("visit-date")).toBeVisible();
+    await expect(panel.getByRole("region", { name: "Visit", exact: true })).toContainText(/Blowout with Lois/);
+    await expect(panel).not.toContainText("Total");
+    await expect(panel).not.toContainText("Not started");
+
+    // One primary button, pinned at the bottom; the rest under ⋯.
+    await expect(panel.locator("button.bg-navy-900:visible")).toHaveCount(1);
+    await expect(panel.getByTestId("primary-action")).toHaveText("Check in");
+    const footer = panel.locator("footer");
+    const [foot, box] = await Promise.all([footer.boundingBox(), panel.boundingBox()]);
+    expect(Math.abs(foot!.y + foot!.height - (box!.y + box!.height))).toBeLessThan(2);
+    await panel.getByRole("button", { name: "More actions" }).click();
+    await expect(panel.getByRole("menu", { name: "More actions" }).getByRole("menuitem")).toHaveText(["Running late", "Edit booking", "Mark no-show", "Cancel booking"]);
+    await page.keyboard.press("Escape");
+    await expect(panel.getByRole("menu")).toHaveCount(0);
+    await expect(panel).toBeVisible();
+
+    // Notes · Formula · History.
+    await expect(panel.getByRole("tab")).toHaveText(["Notes", "Formula", "History"]);
+    await expect(panel.getByRole("tabpanel", { name: "Notes" })).toContainText("Likes it quiet");
+    await expect(panel.getByRole("button", { name: "Save notes" })).toHaveCount(0);
+    await panel.getByRole("tab", { name: "History" }).click();
+    await expect(panel.getByRole("region", { name: "Past visits" })).toContainText("No earlier visits.");
+    await expect(panel.getByRole("region", { name: "Changes" })).toContainText(/^Booking and changes/);
+  });
+
   test("a checked-out visit points to voiding its sale instead", async ({ page }) => {
     await openDay(page, addDays(today, -1));
     await ui(page).locator("[data-block][data-visit=done]").first().click({ position: { x: 10, y: 5 } });
     const note = details(page).getByTestId("checked-out-note");
-    await expect(note).toContainText("To reverse it, a manager or owner voids the sale");
+    await expect(note).toContainText("To reverse checkout, a manager or owner voids the sale");
     await expect(note.getByRole("link", { name: "view the sale" })).toHaveAttribute("href", /^\/sales\/[0-9a-f-]{36}$/);
     await expect(details(page).getByRole("button", { name: "Undo check-in" })).toHaveCount(0);
   });
 
-  test("lists what the visit needs in one checklist near the top, warns once at check-in, and ticks things off", async ({ page }) => {
+  test("lists what the visit needs in one collapsed row under the visit, warns once at check-in, and ticks things off", async ({ page }) => {
     const patchClient = await client("Patch");
     const id = await book(patchClient, "Gloss / Toner", fromLocal(DAY, 13 * 60, TZ)!);
     await openDay(page);
@@ -103,18 +143,22 @@ test.describe("front desk", () => {
     // Nothing about it on the block.
     await expect(block.locator("[data-attention]")).toHaveCount(0);
     await block.click();
+    // One row while something's outstanding, opening to the checklist.
     const list = details(page).getByRole("region", { name: "Before this visit" });
+    await expect(list.getByRole("button", { name: "Before this visit (3)" })).toHaveAttribute("aria-expanded", "false");
+    await expect(list.getByRole("listitem")).toHaveCount(0);
+    await openChecklist(details(page));
     const row = (label: string) => list.getByRole("listitem").filter({ hasText: label });
     await expect(row("Patch test")).toContainText("Patch test — none on file");
     await expect(row("Patch test")).toContainText("Needed for Gloss / Toner.");
     await expect(row("Color consent")).toContainText("Color consent — not signed");
     await expect(row("Color consent").getByRole("link", { name: "Fill it in now" })).toBeVisible();
     await expect(row("New client consultation")).toContainText("not signed");
-    // The old separate boxes are gone; the checklist is above the services.
+    // The old separate boxes are gone; the checklist comes after the visit.
     await expect(details(page).getByTestId("patch-notice")).toHaveCount(0);
     await expect(details(page).getByText("Still to do for this visit")).toHaveCount(0);
-    const [n, services] = await Promise.all([list.boundingBox(), details(page).getByRole("region", { name: "Service" }).boundingBox()]);
-    expect(n!.y).toBeLessThan(services!.y);
+    const [n, visit] = await Promise.all([list.boundingBox(), details(page).getByRole("region", { name: "Visit", exact: true }).boundingBox()]);
+    expect(n!.y).toBeGreaterThan(visit!.y);
 
     // Checking in warns once, with everything outstanding.
     await details(page).getByRole("button", { name: "Check in", exact: true }).click();
@@ -134,7 +178,7 @@ test.describe("front desk", () => {
     await expect(row("Patch test")).toContainText(/Patch test — passed/);
     await expect(row("Color consent")).not.toHaveAttribute("data-done");
 
-    // With the forms signed too, it's one line.
+    // With the forms signed too, there's nothing to show.
     const { data: templates } = await admin.from("form_templates").select("id, name").in("name", ["Color consent", "New client consultation"]);
     await admin.from("client_forms").insert(
       templates!.map((t) => ({ business_id: B, client_id: patchClient, template_id: t.id, template_name: t.name, fields: [], answers: {}, signature: SIGNATURE, collected_by: SEED.staff.frontDesk })),
@@ -142,7 +186,8 @@ test.describe("front desk", () => {
     await page.reload();
     await waitForHydration(page, "section[data-staff-id]");
     await ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Patch`) }).click();
-    await expect(details(page).getByRole("region", { name: "Before this visit" })).toHaveText("Ready for this visit ✓");
+    await expect(details(page).getByTestId("client-name")).toHaveText(`${PREFIX}Patch Test`);
+    await expect(details(page).getByRole("region", { name: "Before this visit" })).toHaveCount(0);
   });
 
   test("zooms between Compact, Comfortable and Detailed, remembered for the person", async ({ page }) => {
@@ -260,6 +305,7 @@ test.describe("when the salon requires patch tests", () => {
     };
 
     const desk = await open(AUTH.frontDesk);
+    await openChecklist(details(desk));
     await expect(details(desk).getByRole("listitem").filter({ hasText: "Patch test" })).toContainText("Holds up this visit");
     await details(desk).getByRole("button", { name: "Check in", exact: true }).click();
     const refused = details(desk).getByRole("group", { name: "Before checking in" });
@@ -276,6 +322,7 @@ test.describe("when the salon requires patch tests", () => {
     await form.getByLabel("Why check in without it?").fill("Tested at another salon on Monday");
     await form.getByRole("button", { name: "Check in without the patch test" }).click();
     await expect.poll(() => status(id)).toBe("checked_in");
+    await openChecklist(details(owner));
     await expect(details(owner).getByTestId("patch-override")).toContainText("“Tested at another salon on Monday”");
     const { data: events } = await admin.from("appointment_events").select("kind, staff_id, detail").eq("appointment_id", id);
     expect(events).toEqual([{ kind: "patch_test_override", staff_id: SEED.staff.owner, detail: { reason: "Tested at another salon on Monday", services: ["Gloss / Toner"] } }]);

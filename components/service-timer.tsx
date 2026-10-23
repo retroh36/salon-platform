@@ -7,9 +7,7 @@ import { EVENT_LABELS, nextEvents, timerState, timerStatus, type ItemTimes, type
 
 // One-tap times for a service: Start service, Processing, Back in chair,
 // Finish service, with Undo, under its status in words ("In service since
-// 10:52am"). Big targets, for a stylist's phone. In booking details the
-// next tap may be the panel's one primary button (`omit`), and the rest
-// here are secondary (`quiet`).
+// 10:52am"). Big targets, for a stylist's phone (My day).
 export function ServiceTimer({
   itemId,
   times,
@@ -18,8 +16,6 @@ export function ServiceTimer({
   canRecord,
   timeZone,
   big = false,
-  omit = null,
-  quiet = false,
 }: {
   itemId: string;
   times: ItemTimes;
@@ -28,14 +24,11 @@ export function ServiceTimer({
   canRecord: boolean;
   timeZone: string;
   big?: boolean;
-  omit?: TimeEvent | null;
-  // Secondary buttons only: the panel has the one primary action.
-  quiet?: boolean;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const state = timerState(times);
-  const events = canRecord ? nextEvents(times, hasProcessing).filter((e) => e !== omit) : [];
+  const events = canRecord ? nextEvents(times, hasProcessing) : [];
 
   const tap = (event: TimeEvent) =>
     start(async () => {
@@ -52,12 +45,12 @@ export function ServiceTimer({
         {status}
       </p>
       {events.length > 0 && (
-        <div className={quiet ? "flex flex-wrap gap-2" : `grid gap-2 ${events.length > 1 ? "grid-cols-2" : ""}`}>
+        <div className={`grid gap-2 ${events.length > 1 ? "grid-cols-2" : ""}`}>
           {events.map((e, i) => (
             <Button
               key={e}
-              variant={i === 0 && !quiet ? "primary" : "secondary"}
-              size={big ? "lg" : quiet ? "sm" : "md"}
+              variant={i === 0 ? "primary" : "secondary"}
+              size={big ? "lg" : "md"}
               disabled={pending}
               onClick={() => tap(e)}
               className={big ? "min-h-12" : "whitespace-nowrap"}

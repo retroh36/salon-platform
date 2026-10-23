@@ -86,7 +86,7 @@ async function markOut(page: Page, fullName: string, firstName: string, restOfDa
 
 async function reportLate(page: Page, client: string, minutes: number) {
   await block(page, client).click();
-  await details(page).getByRole("button", { name: "Running late" }).click();
+  await moreAction(details(page), "Running late");
   const form = details(page).getByRole("form", { name: "Running late" });
   await form.getByText(`${minutes} min`, { exact: true }).click();
   await form.getByRole("button", { name: "Tell Denise" }).click();

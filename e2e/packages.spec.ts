@@ -2,7 +2,7 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { onCheckout, openCheckout } from "./checkout-helpers";
-import { AUTH, expect, test, ui, waitForHydration, checkIn } from "./fixtures";
+import { AUTH, expect, test, ui, waitForHydration, checkIn, checkOut } from "./fixtures";
 
 const B = SEED.business;
 const TZ = "America/Chicago";
@@ -78,7 +78,7 @@ test.describe.serial("a package from start to finish", () => {
     // Checked in and out: the package pays for it.
     const details = page.getByRole("tabpanel", { name: "Booking details" });
     await checkIn(details);
-    await details.getByRole("button", { name: "Check out", exact: true }).click();
+    await checkOut(details);
     co = await onCheckout(page);
     await expect(co.lines.first()).toContainText("paid with package");
     await expect(co.remaining).toHaveText("Paid in full");

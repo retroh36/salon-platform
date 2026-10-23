@@ -83,12 +83,36 @@ export async function checkIn(panel: Locator) {
   const anyway = panel.getByRole("button", { name: "Check in anyway" });
   await expect(anyway.or(panel.getByTestId("visit-status").filter({ hasText: /^Checked in/ }))).toBeVisible();
   if (await anyway.isVisible()) await anyway.click();
+  await expect(panel.getByTestId("visit-status")).toHaveText(/^Checked in/);
 }
 
-// Booking details' rarer actions (Undo check-in, Mark no-show, Cancel
-// booking) are under "More".
+// Booking details' other actions (Running late, Edit booking, Check out
+// early, Undo check-in, Mark no-show, Cancel booking, a service's other
+// taps) are in the "⋯" menu in its footer.
 export async function moreAction(panel: Locator, name: string) {
-  const more = panel.getByRole("button", { name: "More", exact: true });
+  const more = panel.getByRole("button", { name: "More actions" });
   if ((await more.getAttribute("aria-expanded")) !== "true") await more.click();
-  await panel.getByRole("group", { name: "More actions" }).getByRole("button", { name }).click();
+  await panel.getByRole("menu", { name: "More actions" }).getByRole("menuitem", { name, exact: true }).click();
+}
+
+// Check out: the main button once every service is finished, else "Check
+// out early" in the menu.
+export async function checkOut(panel: Locator) {
+  await expect(panel.getByTestId("visit-status")).toBeVisible();
+  const primary = panel.getByTestId("primary-action");
+  if ((await primary.count()) && (await primary.textContent()) === "Check out") return primary.click();
+  await moreAction(panel, "Check out early");
+}
+
+// One of booking details' tabs: Notes, Formula or History.
+export async function visitTab(panel: Locator, name: "Notes" | "Formula" | "History") {
+  await panel.getByRole("tab", { name, exact: true }).click();
+}
+
+// "Before this visit (2)", opened to its checklist.
+export async function openChecklist(panel: Locator) {
+  const region = panel.getByRole("region", { name: "Before this visit" });
+  const toggle = region.getByRole("button", { name: /^Before this visit/ });
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  return region;
 }

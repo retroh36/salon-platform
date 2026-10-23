@@ -77,7 +77,10 @@ test.describe("the front desk", () => {
     await block.click({ position: { x: 10, y: 5 } });
     const card = page.getByRole("tabpanel", { name: "Booking details" }).getByTestId("client-insight");
     await expect(card).toBeVisible();
-    await expect(card).toContainText(/^(Comes every|One visit so far|New client)/);
+    // One quiet line, opening to her full sentence.
+    await expect(card).toContainText(/^(Every|One visit so far|New client|Has a package)/);
+    await card.getByRole("button").click();
+    await expect(card).toContainText(/(Comes every|One visit so far|New client|Has a package)/);
   });
 });
 

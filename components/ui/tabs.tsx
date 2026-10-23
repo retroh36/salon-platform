@@ -5,6 +5,7 @@ import { useId } from "react";
 // Tabs with arrow-key movement. The selected panel's content animates in
 // when it changes (keyed by `panelKey`). `trailing` sits at the end of the
 // tab row (e.g. the panel's close button), so a panel has one header.
+// `quiet` tabs are underlined words, for a section inside a panel.
 export function Tabs<T extends string>({
   label,
   tabs,
@@ -12,6 +13,7 @@ export function Tabs<T extends string>({
   onChange,
   panelKey,
   trailing,
+  quiet = false,
   children,
 }: {
   label: string;
@@ -25,6 +27,7 @@ export function Tabs<T extends string>({
   onChange: (value: T) => void;
   panelKey?: string;
   trailing?: React.ReactNode;
+  quiet?: boolean;
   children: React.ReactNode;
 }) {
   const id = useId();
@@ -50,7 +53,7 @@ export function Tabs<T extends string>({
         <div
           role="tablist"
           aria-label={label}
-          className="flex min-w-0 flex-1 gap-1 rounded-lg bg-sunken p-1"
+          className={quiet ? "flex min-w-0 flex-1 gap-5 border-b border-line" : "flex min-w-0 flex-1 gap-1 rounded-lg bg-sunken p-1"}
           onKeyDown={onKeyDown}
         >
           {tabs.map((t) => {
@@ -65,11 +68,15 @@ export function Tabs<T extends string>({
                 aria-controls={`${id}-panel`}
                 tabIndex={selected ? 0 : -1}
                 onClick={() => onChange(t.value)}
-                className={`flex h-9 flex-1 items-center justify-center gap-2 rounded-md text-sm font-medium transition-[background-color,color,box-shadow,transform] duration-(--motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-focus ${
-                  selected
-                    ? "bg-surface text-navy-900 shadow-card"
-                    : "text-ink-muted hover:text-ink"
-                }`}
+                className={
+                  quiet
+                    ? `-mb-px flex h-9 items-center gap-1.5 border-b-2 text-sm font-medium whitespace-nowrap transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-focus ${
+                        selected ? "border-navy-900 text-ink" : "border-transparent text-ink-muted hover:text-ink"
+                      }`
+                    : `flex h-9 flex-1 items-center justify-center gap-2 rounded-md text-sm font-medium transition-[background-color,color,box-shadow,transform] duration-(--motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-focus ${
+                        selected ? "bg-surface text-navy-900 shadow-card" : "text-ink-muted hover:text-ink"
+                      }`
+                }
               >
                 {t.icon}
                 {t.label}
@@ -85,7 +92,7 @@ export function Tabs<T extends string>({
         id={`${id}-panel`}
         role="tabpanel"
         aria-labelledby={`${id}-tab-${current.value}`}
-        className="min-h-0 flex-1 animate-panel-in overflow-y-auto"
+        className={quiet ? "animate-panel-in pt-4" : "min-h-0 flex-1 animate-panel-in overflow-y-auto"}
       >
         {children}
       </div>

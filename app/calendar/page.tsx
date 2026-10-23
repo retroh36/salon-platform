@@ -18,7 +18,7 @@ import { loadBlocks, loadCalendarStamp, loadLocationSchedule, loadOffers, loadSt
 import { describeClient } from "@/lib/insights/describe";
 import { loadClientInsights, loadDurations } from "@/lib/insights/read";
 import { loadPackagesByClient, withPackages } from "@/lib/packages";
-import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn, toLocal, WEEKDAYS } from "@/lib/scheduling/time";
+import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn, toLocal, WEEKDAYS, type LocalDate } from "@/lib/scheduling/time";
 import { visitWarnings } from "@/lib/client-checks";
 import { fullName, sortStaff } from "@/lib/staff";
 import { CalendarBoard } from "./board";
@@ -184,6 +184,9 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       warnings: null,
       saleId: null,
       patchOverride: null,
+      pastVisits: [],
+      pastFormulas: [],
+      log: [],
       group: a.group ? { ...a.group, members: [] } : null,
       series: a.series_id ? { id: a.series_id, index: a.series_index!, count: seriesCounts.get(a.series_id) ?? 1, intervalWeeks: a.series?.interval_weeks ?? 1 } : null,
     };
@@ -254,32 +257,98 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     for (const s of sales) if (s.appointment_id) appointments[s.appointment_id].saleId = s.id;
   }
 
-  // Clients a manager or owner checked in without the patch test the salon
-  // requires, and why (front of house only: RLS).
+  // What's happened to each visit (front of house only: RLS): clients a
+  // manager or owner checked in without the patch test the salon requires,
+  // and why; check-ins taken back.
   const visitIds = Object.keys(appointments);
   if (visitIds.length) {
-    const { data: overrides, error: overrideError } = await supabase
+    const { data: events, error: eventsError } = await supabase
       .from("appointment_events")
-      .select("appointment_id, staff_id, detail, created_at")
-      .eq("kind", "patch_test_override")
+      .select("appointment_id, kind, staff_id, detail, created_at")
       .in("appointment_id", visitIds)
       .order("created_at");
-    if (overrideError) throw overrideError;
-    for (const o of overrides) {
-      const detail = o.detail as { reason?: string };
-      appointments[o.appointment_id].patchOverride = { by: staffName(o.staff_id) ?? "A former team member", reason: detail.reason ?? "", at: when(o.created_at) };
+    if (eventsError) throw eventsError;
+    for (const e of events) {
+      const who = staffName(e.staff_id) ?? "A former team member";
+      if (e.kind === "patch_test_override") {
+        const detail = e.detail as { reason?: string };
+        appointments[e.appointment_id].patchOverride = { by: who, reason: detail.reason ?? "", at: when(e.created_at) };
+        appointments[e.appointment_id].log.push(`Checked in without the patch test by ${who} · ${when(e.created_at)}`);
+      } else if (e.kind === "check_in_undone") {
+        appointments[e.appointment_id].log.push(`Check-in undone by ${who} · ${when(e.created_at)}`);
+      }
     }
   }
 
   // What Denise knows about each client.
   const clientIds = [...new Set(Object.values(appointments).flatMap((a) => (a.client ? [a.client.id] : [])))];
-  const [insights, packages] = await Promise.all([loadClientInsights(supabase, me.business_id, clientIds), loadPackagesByClient(supabase, clientIds)]);
+  const [insights, packages, past, pastFormulas] = await Promise.all([
+    loadClientInsights(supabase, me.business_id, clientIds),
+    loadPackagesByClient(supabase, clientIds),
+    clientIds.length
+      ? supabase
+          .from("appointment_items")
+          .select("starts_at, staff_id, service:services(name), appointment:appointments!inner(id, client_id, status)")
+          .in("appointment.client_id", clientIds)
+          .eq("appointment.status", "completed")
+          .lt("starts_at", dayStart.toISOString())
+          .order("starts_at", { ascending: false })
+          .limit(3000)
+      : Promise.resolve({ data: [], error: null }),
+    clientIds.length
+      ? supabase
+          .from("client_formulas")
+          .select("id, client_id, visit_date, formula, notes, author:staff(first_name), formula_products(amount, position, product:products(brand, line, name, unit))")
+          .in("client_id", clientIds)
+          .lt("visit_date", date)
+          .order("visit_date", { ascending: false })
+          .order("created_at", { ascending: false })
+          .limit(1000)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (past.error) throw past.error;
+  if (pastFormulas.error) throw pastFormulas.error;
+  // Each client's last few visits: services in the order they were done.
+  const PAST = 3;
+  // "Oct 2", with the year when it isn't this one ("Dec 12, 2025").
+  const shortDay = (d: LocalDate) => formatDay(d, d.slice(0, 4) !== date.slice(0, 4)).replace(/^\w+, /, "");
+  const pastByClient = new Map<string, Map<string, { date: string; services: string[]; staff: Set<string> }>>();
+  for (const row of past.data) {
+    const visits = pastByClient.get(row.appointment.client_id!) ?? new Map();
+    pastByClient.set(row.appointment.client_id!, visits);
+    const visit = visits.get(row.appointment.id) ?? (visits.size < PAST ? { date: shortDay(toLocal(new Date(row.starts_at), tz).date), services: [], staff: new Set() } : null);
+    if (!visit) continue;
+    visits.set(row.appointment.id, visit);
+    visit.services.unshift(row.service.name);
+    visit.staff.add(staffById.get(row.staff_id)?.first_name ?? "Former staff");
+  }
+  const formulasByClient = new Map<string, AppointmentDetail["pastFormulas"]>();
+  for (const f of pastFormulas.data) {
+    const list = formulasByClient.get(f.client_id) ?? [];
+    formulasByClient.set(f.client_id, list);
+    if (list.length >= PAST) continue;
+    list.push({
+      id: f.id,
+      date: shortDay(f.visit_date),
+      author: f.author?.first_name ?? "Former staff",
+      text: f.formula,
+      products: [...f.formula_products]
+        .sort((a, b) => a.position - b.position)
+        .map((fp) => `${formatAmount(fp.amount, fp.product.unit)} ${productName(fp.product)}`)
+        .join(" + "),
+      notes: f.notes,
+    });
+  }
   const dayOf = (iso: string) => formatDay(toLocal(new Date(iso), tz).date);
   for (const a of Object.values(appointments)) {
     const known = a.client ? insights.get(a.client.id) : undefined;
     if (known) a.insight = describeClient(known.habits, known.spend, { staff: (id) => staffById.get(id)?.first_name ?? null, dayOf }, new Date());
     // What's left on their packages, too.
     if (a.client) a.insight = withPackages(a.insight, packages.get(a.client.id));
+    if (a.client) {
+      a.pastVisits = [...(pastByClient.get(a.client.id)?.values() ?? [])].map((v) => ({ date: v.date, services: v.services.join(", "), staff: [...v.staff].join(" and ") }));
+      a.pastFormulas = formulasByClient.get(a.client.id) ?? [];
+    }
   }
 
   const open = dayView({ weekly: {}, overrides: {}, timeOff: [] }, location, date).open;

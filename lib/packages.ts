@@ -140,9 +140,9 @@ export async function loadPackagesByClient(supabase: Supabase, clientIds: readon
 
 // Adds what's left on a client's packages to Denise's card about them (or
 // makes one, when that's all she has to say).
-export function withPackages<T extends { summary: string; tags: { label: string; tone: string }[] }>(insight: T | null, packages: readonly ClientPackage[] | undefined): T | { summary: string; tags: { label: string; tone: "good" }[] } | null {
+export function withPackages<T extends { summary: string; tags: { label: string; tone: string }[] }>(insight: T | null, packages: readonly ClientPackage[] | undefined): T | { summary: string; line: string; tags: { label: string; tone: "good" }[] } | null {
   const tags = packageTags(packages ?? []);
   if (!tags.length) return insight;
-  if (!insight) return { summary: "Has a package with uses left.", tags };
+  if (!insight) return { summary: "Has a package with uses left.", line: "Has a package with uses left", tags };
   return { ...insight, tags: [...insight.tags, ...tags] };
 }

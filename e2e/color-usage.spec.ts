@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { fromLocal, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { onCheckout } from "./checkout-helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, checkOut, expect, test, ui, visitTab, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -76,6 +76,7 @@ test.describe("formulas and stock", () => {
 
     const stylist = await browser.newPage({ storageState: AUTH.stylist, viewport: { width: 1920, height: 1300 } });
     const panel = await openVisit(stylist);
+    await visitTab(panel, "Formula");
     await panel.getByRole("button", { name: "Record formula" }).click();
     const form = panel.getByRole("form", { name: "Record formula" });
     const first = form.getByRole("group", { name: "Product 1" });
@@ -93,7 +94,7 @@ test.describe("formulas and stock", () => {
 
     const desk = await browser.newPage({ storageState: AUTH.frontDesk, viewport: { width: 1920, height: 1300 } });
     const deskPanel = await openVisit(desk);
-    await deskPanel.getByRole("button", { name: "Check out", exact: true }).click();
+    await checkOut(deskPanel);
     const checkout = await onCheckout(desk);
     await checkout.card();
     await checkout.complete();

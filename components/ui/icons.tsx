@@ -106,6 +106,11 @@ export const UndoIcon = (p: IconProps) => (
     <path d="M4.5 9.5h9.75a5.25 5.25 0 0 1 0 10.5H11" />
   </Icon>
 );
+export const PhoneIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M5.5 3.5h3l1.5 4-2 1.5a11 11 0 0 0 7 7l1.5-2 4 1.5v3a2 2 0 0 1-2 2A16.5 16.5 0 0 1 3.5 5.5a2 2 0 0 1 2-2z" />
+  </Icon>
+);
 export const MoreIcon = (p: IconProps) => (
   <Icon {...p}>
     <circle cx="6" cy="12" r="1" />

@@ -24,18 +24,20 @@ function every(days: number): string {
 const money = (cents: number) => `$${Math.round(cents / 100).toLocaleString("en-US")}`;
 const pct = (rate: number) => `${Math.round(rate * 100)}%`;
 
-// One sentence and a few short tags. Spend only when it's given (front of
-// house); stylists don't see it.
+// One sentence, a short line for booking details ("Every ~4 weeks with
+// Gil · slightly overdue") and a few short tags. Spend only when it's given
+// (front of house); stylists don't see it.
 export function describeClient(
   c: ClientInsight,
   spend: ClientSpend | null,
   names: { staff: (id: string) => string | null; dayOf: (iso: string) => string },
   asOf: Date,
-): { summary: string; tags: { label: string; tone: "neutral" | "good" | "warn" }[] } {
-  if (c.visits === 0) return { summary: "New client: no visits yet.", tags: [] };
+): { summary: string; line: string; tags: { label: string; tone: "neutral" | "good" | "warn" }[] } {
+  if (c.visits === 0) return { summary: "New client: no visits yet.", line: "New client", tags: [] };
 
   const parts: string[] = [];
-  parts.push(c.visits === 1 ? "One visit so far" : `Comes ${every(c.intervalDays ?? 42)}`);
+  const rhythm = c.visits === 1 ? "One visit so far" : `Comes ${every(c.intervalDays ?? 42)}`;
+  parts.push(rhythm);
   const when = [c.preferredWeekday ? WEEKDAYS[c.preferredWeekday] : null, c.timeOfDay ? TIMES[c.timeOfDay] : null].filter(Boolean);
   const stylist = c.preferredStaffId ? names.staff(c.preferredStaffId) : null;
   if (when.length || stylist) {
@@ -43,10 +45,17 @@ export function describeClient(
     parts.push(`usually ${[day, stylist ? `with ${stylist}` : ""].filter(Boolean).join(" ")}`);
   }
 
-  if (c.due === "booked" && c.nextBooked) parts.push(`next visit booked for ${names.dayOf(c.nextBooked)}`);
-  else if (c.due === "due_soon" && c.nextDue) parts.push(`due in about ${Math.max(1, Math.round((new Date(c.nextDue).getTime() - asOf.getTime()) / DAY))} days`);
-  else if (c.due === "overdue") parts.push(c.overdueDays <= 7 ? "slightly overdue" : `${Math.round(c.overdueDays / 7)} weeks overdue`);
-  else if (c.due === "lapsed" && c.lastVisit) parts.push(`hasn't been in for ${Math.round((asOf.getTime() - new Date(c.lastVisit).getTime()) / (7 * DAY))} weeks`);
+  let due: string | null = null;
+  if (c.due === "booked" && c.nextBooked) due = `next visit booked for ${names.dayOf(c.nextBooked)}`;
+  else if (c.due === "due_soon" && c.nextDue) {
+    const days = Math.max(1, Math.round((new Date(c.nextDue).getTime() - asOf.getTime()) / DAY));
+    due = `due in about ${days} ${days === 1 ? "day" : "days"}`;
+  }
+  else if (c.due === "overdue") due = c.overdueDays <= 7 ? "slightly overdue" : `${Math.round(c.overdueDays / 7)} weeks overdue`;
+  else if (c.due === "lapsed" && c.lastVisit) due = `hasn't been in for ${Math.round((asOf.getTime() - new Date(c.lastVisit).getTime()) / (7 * DAY))} weeks`;
+  if (due) parts.push(due);
+  const head = `${c.visits === 1 ? rhythm : rhythm.replace(/^Comes every/, "Every")}${stylist ? ` with ${stylist}` : ""}`;
+  const line = [head, due].filter(Boolean).join(" · ");
 
   if (spend?.retailRate !== null && spend?.retailRate !== undefined) {
     if (spend.retailRate >= 0.5) parts.push("often buys retail");
@@ -61,7 +70,7 @@ export function describeClient(
   if (spend) tags.push({ label: `${money(spend.lifetimeSpendCents)} over ${c.visits} ${c.visits === 1 ? "visit" : "visits"}`, tone: "neutral" });
 
   const sentence = parts.join(", ");
-  return { summary: `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`, tags };
+  return { summary: `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`, line, tags };
 }
 
 // "Bridget usually takes 3h 1m for this (9 visits)."

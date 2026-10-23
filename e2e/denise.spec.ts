@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, restoreLearnedDurations, SEED, setAsideLearnedDurations } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, moreAction, test, ui, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -133,7 +133,7 @@ test.describe("front desk", () => {
     // Report that Bridget's 10:00 is running 20 minutes over.
     await block(page, "Mia").click();
     const details = page.getByRole("tabpanel", { name: "Booking details" });
-    await details.getByRole("button", { name: "Running late" }).click();
+    await moreAction(details, "Running late");
     const form = details.getByRole("form", { name: "Running late" });
     await expect(form.getByRole("group", { name: "How far over is this running?" })).toBeVisible();
     await form.getByText("20 min").click();
@@ -194,7 +194,7 @@ test.describe("front desk", () => {
     await overrunMorning();
     await openDay(page);
     await block(page, "Mia").click();
-    await page.getByRole("button", { name: "Running late" }).click();
+    await moreAction(page.getByRole("tabpanel", { name: "Booking details" }), "Running late");
     await page.getByText("30 min").click();
     await page.getByRole("button", { name: "Tell Denise" }).click();
 
@@ -233,7 +233,7 @@ test.describe("front desk", () => {
     const grace = await seedCut(await newClient("Grace"), BRIDGET, at(11));
     await openDay(page);
     await block(page, "Mia").click();
-    await page.getByRole("button", { name: "Running late" }).click();
+    await moreAction(page.getByRole("tabpanel", { name: "Booking details" }), "Running late");
     await page.getByText("20 min").click();
     await page.getByRole("button", { name: "Tell Denise" }).click();
 
@@ -267,7 +267,7 @@ test.describe("stylist", () => {
     await overrunMorning();
     await openDay(page);
     await block(page, "Mia").click();
-    await page.getByRole("button", { name: "Running late" }).click();
+    await moreAction(page.getByRole("tabpanel", { name: "Booking details" }), "Running late");
     await page.getByText("15 min").click();
     await page.getByRole("button", { name: "Tell Denise" }).click();
 

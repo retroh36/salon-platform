@@ -98,7 +98,16 @@ export type AppointmentDetail = {
   // Part of a group booking: its label and the other guests that day.
   group: { id: string; label: string; members: { appointmentId: string; clientName: string; staffName: string; start: number }[] } | null;
   // What Denise knows about the client ("Comes every ~6 weeks…").
-  insight: { summary: string; tags: { label: string; tone: "neutral" | "good" | "warn" }[] } | null;
+  // `line` is the short version for booking details ("Every ~4 weeks with
+  // Gil · slightly overdue").
+  insight: { summary: string; line?: string; tags: { label: string; tone: "neutral" | "good" | "warn" }[] } | null;
+  // The client's last few checked-out visits before this day, newest first.
+  pastVisits: { date: string; services: string; staff: string }[];
+  // Their last few formulas from earlier visits, newest first.
+  pastFormulas: { id: string; date: string; author: string; text: string; products: string; notes: string | null }[];
+  // What's happened to the visit, oldest first, after bookedBy: checked in
+  // without a patch test, check-ins undone ("Check-in undone by Sam Rivera · …").
+  log: string[];
   // Patch tests and forms the visit needs, done or not.
   warnings: VisitWarnings | null;
   // The sale a checked-out visit was paid on (reversing it means voiding

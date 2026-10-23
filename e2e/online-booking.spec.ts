@@ -1,6 +1,6 @@
 import type { Browser, Page } from "@playwright/test";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, waitForHydration } from "./fixtures";
+import { AUTH, expect, test, visitTab, waitForHydration } from "./fixtures";
 
 // The public booking site, on a phone. Signed out, like a client.
 const SLUG = "maple-and-ash";
@@ -176,6 +176,8 @@ test("a new client books two services back to back on a phone", async ({ page })
   // In its details, not on the block.
   await expect(booked.getByTestId("online-badge")).toHaveCount(0);
   await booked.click();
+  // How it was booked is in its history.
+  await visitTab(calendar.getByRole("tabpanel", { name: "Booking details" }), "History");
   await expect(calendar.getByRole("tabpanel", { name: "Booking details" }).getByTestId("online-badge")).toBeVisible();
   await desk.close();
 });

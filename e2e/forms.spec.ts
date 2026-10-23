@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration, slotAt } from "./fixtures";
+import { AUTH, expect, test, ui, waitForHydration, openChecklist, slotAt } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -110,7 +110,7 @@ test.describe("front desk", () => {
     await ui(page).getByRole("region", { name: "Bridget Callahan", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Nova Test`) }).click();
     // One checklist near the top: the patch test with a way to record one,
     // and each form with a way to fill it in.
-    const before = page.getByRole("region", { name: "Before this visit" });
+    const before = await openChecklist(page.getByRole("tabpanel", { name: "Booking details" }));
     const row = (label: string) => before.getByRole("listitem").filter({ hasText: label });
     await expect(row("Patch test")).toContainText("Patch test — none on file");
     await expect(row("Patch test").getByRole("button", { name: "Record patch test" })).toBeVisible();
@@ -139,7 +139,7 @@ test.describe("front desk", () => {
     await waitForHydration(page, "section[data-staff-id]");
     await ui(page).getByRole("region", { name: "Bridget Callahan", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Nova Test`) }).click();
     // Signed: ticked off, the rest still to do.
-    const after = page.getByRole("region", { name: "Before this visit" }).getByRole("listitem").filter({ hasText: "New client consultation" });
+    const after = (await openChecklist(page.getByRole("tabpanel", { name: "Booking details" }))).getByRole("listitem").filter({ hasText: "New client consultation" });
     await expect(after).toHaveAttribute("data-done", "true");
     await expect(after).toContainText("New client consultation — signed");
     await expect(after.getByRole("link", { name: "Fill it in now" })).toHaveCount(0);

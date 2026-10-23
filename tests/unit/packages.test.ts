@@ -42,7 +42,7 @@ describe("package wording and refunds", () => {
     // Never more than was paid less what's already been refunded.
     expect(proRatedRefund(pkg({ refundedCents: 15000 }))).toBe(5000);
     expect(packageTags([pkg()], NOW)).toEqual([{ label: "Package: 3 Blowouts left", tone: "good" }]);
-    expect(withPackages(null, [pkg()])).toEqual({ summary: "Has a package with uses left.", tags: [{ label: "Package: 3 Blowouts left", tone: "good" }] });
+    expect(withPackages(null, [pkg()])).toEqual({ summary: "Has a package with uses left.", line: "Has a package with uses left", tags: [{ label: "Package: 3 Blowouts left", tone: "good" }] });
     expect(withPackages({ summary: "Comes every 4 weeks.", tags: [] }, [])).toEqual({ summary: "Comes every 4 weeks.", tags: [] });
   });
 });

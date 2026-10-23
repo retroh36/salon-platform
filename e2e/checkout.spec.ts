@@ -3,7 +3,7 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { onCheckout, openCheckout } from "./checkout-helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, checkOut, expect, test, ui, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -65,7 +65,7 @@ async function fromCalendar(page: Page, first: string) {
   await expect(ui(page).getByTestId("calendar-date")).toContainText(formatLongDay(DAY));
   await waitForHydration(page, "section[data-staff-id]");
   await ui(page).getByRole("button", { name: new RegExp(`${PREFIX}${first} Test`) }).click();
-  await page.getByRole("tabpanel", { name: "Booking details" }).getByRole("button", { name: "Check out", exact: true }).click();
+  await checkOut(page.getByRole("tabpanel", { name: "Booking details" }));
   return onCheckout(page);
 }
 
