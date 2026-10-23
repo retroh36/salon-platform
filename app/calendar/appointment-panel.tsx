@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Eyebrow, fieldClass, labelClass, selectClass } from "@/components/ui/field";
-import { CalendarIcon, ClockIcon, HourglassIcon } from "@/components/ui/icons";
+import { CalendarIcon, ClockIcon, GlobeIcon, HourglassIcon } from "@/components/ui/icons";
 import { StatusChip } from "@/components/ui/status-chip";
 import { ClientInsightCard } from "@/components/client-insight";
 import { ServiceTimer } from "@/components/service-timer";
@@ -96,7 +96,15 @@ export function AppointmentPanel({
             {client?.name ?? (appointment.group ? `${appointment.group.label} guest` : "Walk-in")}
           </h3>
           {client?.phone && <p className="text-ink-muted">{client.phone}</p>}
-          <StatusChip status={status} className="mt-1.5" />
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <StatusChip status={status} />
+            {appointment.online && (
+              <span data-testid="online-badge" className="flex items-center gap-1 text-ink-muted">
+                <GlobeIcon className="size-4" />
+                Booked online
+              </span>
+            )}
+          </div>
           {appointment.series && (
             <p className="mt-1.5 flex items-center gap-1.5 text-ink-muted" data-testid="series-info">
               <svg aria-hidden viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={2}>

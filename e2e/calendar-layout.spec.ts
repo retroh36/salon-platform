@@ -54,13 +54,14 @@ test("short visits show name and time on one line, with the details on hover", a
   await short.hover();
   const hint = page.getByRole("tooltip");
   await expect(hint).toBeVisible();
-  await expect(hint.locator("p")).toHaveText([`${PREFIX}Tiny Long-Surname`, "Bang Trim", "10am–10:15am · Bridget Callahan", "Booked"]);
+  await expect(hint.locator("p")).toHaveText([`${PREFIX}Tiny Long-Surname`, "Bang Trim", "10am–10:15am · Bridget Callahan", "Booked", "New client consultation not signed yet"]);
   await page.mouse.move(5, 5);
   await expect(hint).toBeHidden();
 
-  // A full-size visit shows everything itself: no tooltip.
+  // A full-size visit has the tooltip too, for its status and the rest.
   await next.hover();
-  await expect(page.getByRole("tooltip")).toBeHidden();
+  await expect(page.getByRole("tooltip").locator("p").first()).toHaveText(`${PREFIX}Next Long-Surname`);
+  await page.mouse.move(5, 5);
 
   // Selecting the short one draws its outline inside it, clear of the next.
   await short.click();
@@ -126,8 +127,15 @@ test("each stylist's header shows their day at a glance", async ({ page }) => {
   await book("Glance", "Women's Cut & Style", 9, 0, 60);
   await book("Glance2", "Bang Trim", 10, 0, 15);
   await openDay(page);
-  await expect(ui(page).locator("[data-column-header]").filter({ hasText: "Bridget Callahan" }).getByTestId("booked-summary")).toHaveText("2 visits · 1h 15m booked");
+  const summary = ui(page).locator("[data-column-header]").filter({ hasText: "Bridget" }).getByTestId("booked-summary");
+  await expect(summary).toHaveAttribute("title", "2 visits · 1h 15m booked");
+  // Shortened to fit if need be, never cut off with an ellipsis.
+  await expect(summary).toHaveText(/^2 (visits )?· 1h 15m( booked)?$/);
   await expect(ui(page).locator("[data-column-header]").filter({ hasText: "Nola Brennan" }).getByTestId("booked-summary")).toHaveText("No bookings");
+  // Narrower columns get the shorter form, whole.
+  await page.setViewportSize({ width: 1024, height: 800 });
+  await expect(summary).toHaveText(/^2 (visits )?· 1h 15m( booked)?$/);
+  expect(await summary.locator("span").evaluate((el) => el.scrollWidth <= el.clientWidth + 0.5)).toBe(true);
 });
 
 test("the stylist menu opens below the header, inside the screen", async ({ page }) => {

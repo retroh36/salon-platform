@@ -40,7 +40,7 @@ export type BlockData = Interval & {
   // First names of the visit's other stylists.
   with: string[];
   status: AppointmentStatus;
-  // Part of a recurring series (shows a repeat icon).
+  // Part of a recurring series.
   series: boolean;
   // Part of a group booking.
   group: { id: string; label: string } | null;
@@ -77,6 +77,8 @@ export type VisitFormula = {
 export type AppointmentDetail = {
   id: string;
   status: AppointmentStatus;
+  // Booked by the client on the salon's booking site.
+  online: boolean;
   notes: string;
   client: { id: string; name: string; phone: string | null; email: string | null; allergies: string | null; preferences: string | null } | null;
   items: ItemDetail[];

@@ -155,6 +155,14 @@ test.describe("front desk", () => {
     // new place shows dashed.
     await expect(ui(page).locator("[data-denise-highlight]")).toHaveCount(2);
     await expect(ui(page).locator("[data-fix-ghost]")).toContainText("→ 11:20am");
+    // Only while she's showing it: closing her panel clears the calendar,
+    // and her badge is all that's left.
+    await page.getByRole("button", { name: "Close panel" }).click();
+    await expect(ui(page).locator("[data-denise-highlight]")).toHaveCount(0);
+    await expect(ui(page).locator("[data-fix-ghost]")).toHaveCount(0);
+    await expect(page.getByTestId("denise-launcher")).toBeVisible();
+    await openDenise(page);
+    await expect(ui(page).locator("[data-denise-highlight]")).toHaveCount(2);
 
     await panel.getByRole("button", { name: "Apply fix" }).click();
     await expect(panel.getByRole("status")).toContainText(`Done — ${PREFIX}Grace has been moved and notified.`);
@@ -162,6 +170,9 @@ test.describe("front desk", () => {
     await expect(block(page, "Grace")).toHaveAccessibleName(/^11:20am–12:20pm/);
     await expect(panel.getByTestId("denise-message")).toHaveCount(0);
     await expect(panel.locator("[data-pose]")).toHaveAttribute("data-pose", "wave");
+    // Applied: nothing left glowing or dashed.
+    await expect(ui(page).locator("[data-denise-highlight]")).toHaveCount(0);
+    await expect(ui(page).locator("[data-fix-ghost]")).toHaveCount(0);
 
     // Logged and notified.
     const { data: logged } = await admin.from("ai_actions").select("id, status, decided_by").like("subject", `${DAY}:%`).eq("status", "approved").single();

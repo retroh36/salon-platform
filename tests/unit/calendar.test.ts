@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bookedSummary, FAMILIES, FAMILY_LABELS, gridRange, hourMarks, laneBox, layoutColumn, offHours, serviceFamily } from "@/lib/calendar";
+import { bookedSummary, summaryVariants, FAMILIES, FAMILY_LABELS, gridRange, hourMarks, laneBox, layoutColumn, offHours, serviceFamily } from "@/lib/calendar";
 
 const h = (hours: number, minutes = 0) => hours * 60 + minutes;
 const span = (start: number, end: number) => ({ start, end });
@@ -144,5 +144,11 @@ describe("bookedSummary", () => {
       ]),
     ).toBe("2 visits · 3h 30m booked");
     expect(bookedSummary([{ appointmentId: "a", minutes: 120 }])).toBe("1 visit · 2h booked");
+  });
+
+  it("shortens to fit a narrow header", () => {
+    expect(summaryVariants("7 visits · 6h 10m booked")).toEqual(["7 visits · 6h 10m booked", "7 visits · 6h 10m", "7 · 6h 10m"]);
+    expect(summaryVariants("1 visit · 45m booked")).toEqual(["1 visit · 45m booked", "1 visit · 45m", "1 · 45m"]);
+    expect(summaryVariants("No bookings")).toEqual(["No bookings"]);
   });
 });

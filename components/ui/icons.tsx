@@ -153,3 +153,15 @@ export const ChartIcon = (p: IconProps) => (
     <path d="M4 20.5h16M6.5 17V11M11 17V6.5M15.5 17v-4M20 17V9" />
   </Icon>
 );
+export const WarningIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M10.3 4.2 2.9 17.5A2 2 0 0 0 4.6 20.5h14.8a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0Z" />
+    <path d="M12 9.5v4M12 17h.01" />
+  </Icon>
+);
+export const GlobeIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M3.5 12h17M12 3.5a13 13 0 0 1 0 17M12 3.5a13 13 0 0 0 0 17" />
+  </Icon>
+);

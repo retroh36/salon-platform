@@ -10,13 +10,13 @@ import { LEVEL_BG, LevelBadge } from "@/components/ui/level";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { FitText } from "@/components/ui/fit-text";
-import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, MoreIcon, PlusIcon, SendIcon } from "@/components/ui/icons";
+import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, MoreIcon, PlusIcon, SendIcon, WarningIcon } from "@/components/ui/icons";
 import { Listbox } from "@/components/ui/listbox";
 import { Segmented } from "@/components/ui/segmented";
 import { Tabs } from "@/components/ui/tabs";
 import { isEditable, STATUS_LABELS } from "@/lib/appointments";
 import type { ChatMessage, DeniseRequest, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
-import { FAMILIES, FAMILY_LABELS, hourMarks, laneBox, layoutColumn, type ServiceFamily } from "@/lib/calendar";
+import { FAMILIES, FAMILY_LABELS, hourMarks, laneBox, layoutColumn, summaryVariants, type ServiceFamily } from "@/lib/calendar";
 import { LEVEL_LABELS, STAFF_LEVELS } from "@/lib/schedule-forms";
 import { BLOCK_LABELS } from "@/lib/scheduling/blocks";
 import { formatLongDay } from "@/lib/schedule-format";
@@ -33,7 +33,7 @@ import { BookingPanel, type BookingStart } from "./booking-panel";
 import { WalkInPanel } from "./walk-in-panel";
 import { GroupPanel } from "./group-panel";
 import { NowLine, useNow } from "./now-line";
-import type { BlockData, BoardData, ColumnData, TimeBlockData } from "./types";
+import type { AppointmentDetail, BlockData, BoardData, ColumnData, TimeBlockData } from "./types";
 
 export const PX_PER_MINUTE = 2;
 // Moves snap to 5 minutes; a click on an empty slot to the quarter hour.
@@ -296,9 +296,12 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   }, []);
 
 
-  // The fix shown on the calendar: the one hovered in Denise's panel, or her
-  // first suggestion. Blocks it's about glow; where they'd go shows dashed.
-  const previewConflict = (preview && conflicts.find((c) => c.subject === preview.subject)) || conflicts[0] || null;
+  // The fix shown on the calendar, only while her panel is open and showing
+  // it: the one hovered there, or her first suggestion. Blocks it's about
+  // glow; where they'd go shows dashed. Nothing is left on the calendar once
+  // the panel closes, she moves on, or the fix is applied or dismissed.
+  const showingFixes = panelOpen && tab === "denise" && !deciding;
+  const previewConflict = showingFixes ? (preview && conflicts.find((c) => c.subject === preview.subject)) || conflicts[0] || null : null;
   const previewOption = previewConflict?.options[preview && previewConflict.subject === preview.subject ? preview.index : 0] ?? null;
   const highlighted = new Set(previewConflict?.itemIds ?? []);
   // Copies of the moved blocks at their new places, laid out with the
@@ -608,21 +611,25 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         <ChevronRightIcon className="size-3.5" />
                       </button>
                     ) : (
-                      <div key={c.staffId} className="relative flex min-w-0 animate-fade-in items-center gap-2.5 border-l border-line px-3 py-3" data-column-header data-level={c.level ?? undefined}>
+                      <div key={c.staffId} className="relative flex min-w-0 animate-fade-in flex-col gap-1.5 border-l border-line px-3 py-3" data-column-header data-level={c.level ?? undefined}>
                         {c.level && <span aria-hidden data-testid="level-bar" className={`absolute inset-x-0 top-0 h-1 ${LEVEL_BG[c.level]}`} />}
-                        <Avatar name={c.name} color={c.color} level={c.level} />
-                        <div className="min-w-0 flex-1">
-                          <FitText variants={[c.name, `${c.firstName} ${c.name.split(" ").at(-1)![0]}.`, c.firstName]} className="pr-6 font-semibold" />
-                          <div className="truncate text-sm text-ink-muted" data-testid="booked-summary">
-                            {c.booked}
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <Avatar name={c.name} color={c.color} level={c.level} />
+                          <div className="min-w-0 flex-1">
+                            <FitText variants={[c.name, `${c.firstName} ${c.name.split(" ").at(-1)![0]}.`, c.firstName]} className="pr-6 font-semibold" />
+                            <div className="text-xs leading-4 text-ink-muted">{c.hoursLabel}</div>
                           </div>
-                          <div className="text-xs leading-4 text-ink-muted">{c.hoursLabel}</div>
+                          {!c.working && expanded.has(c.staffId) && (
+                            <IconButton label={`Hide ${c.name}`} size="sm" onClick={() => toggle(c.staffId, false)}>
+                              <ChevronLeftIcon className="size-4" />
+                            </IconButton>
+                          )}
                         </div>
-                        {!c.working && expanded.has(c.staffId) && (
-                          <IconButton label={`Hide ${c.name}`} size="sm" onClick={() => toggle(c.staffId, false)}>
-                            <ChevronLeftIcon className="size-4" />
-                          </IconButton>
-                        )}
+                        {/* Their day at a glance, across the column: shortened to
+                            fit, never cut off, with the full text on hover. */}
+                        <div title={c.booked} className="text-sm text-ink-muted" data-testid="booked-summary">
+                          <FitText variants={summaryVariants(c.booked)} />
+                        </div>
                         {c.working && data.date >= data.today && (me.canBook || me.staffId === c.staffId) && (
                           <div className="absolute top-1.5 right-1">
                             <OutMenu column={c} date={data.date} today={data.today} onMarkOut={markOut} />
@@ -739,7 +746,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                               key={b.itemId}
                               block={b}
                               y={y}
-                              late={nowMinute !== null && (b.status === "booked" || b.status === "confirmed") && b.start <= nowMinute}
+                              lateBy={nowMinute !== null && (b.status === "booked" || b.status === "confirmed") && b.start <= nowMinute ? nowMinute - b.start : null}
+                              warning={warningFor(data.appointments[b.appointmentId])}
                               draggable={canMove(b)}
                               dragging={drag?.moved === true && drag.itemId === b.itemId}
                               selected={b.appointmentId === selectedAppointment}
@@ -1022,35 +1030,6 @@ function DeniseBadge({ count }: { count: number }) {
   );
 }
 
-// The icon on visits that are part of a group booking.
-function GroupIcon({ className = "size-4" }: { className?: string }) {
-  return (
-    <svg role="img" aria-label="Group booking" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="9" cy="8" r="3.5" />
-      <path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14a6.5 6.5 0 0 1 3.5 6" />
-    </svg>
-  );
-}
-
-// The icon on visits the client booked online.
-function OnlineIcon({ className = "size-4" }: { className?: string }) {
-  return (
-    <svg role="img" aria-label="Online" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
-    </svg>
-  );
-}
-
-// The repeat icon on visits that are part of a series.
-function RepeatIcon({ className = "size-4", label }: { className?: string; label?: string }) {
-  return (
-    <svg aria-hidden={label ? undefined : true} role={label ? "img" : undefined} aria-label={label} viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2}>
-      <path d="M4 12a8 8 0 0 1 13.7-5.6L20 8M20 4v4h-4M20 12a8 8 0 0 1-13.7 5.6L4 16M4 20v-4h4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 // "This visit, the whole group, this and following, or all?" for a change
 // to a repeating or group visit.
 function ScopeDialog({
@@ -1266,9 +1245,22 @@ function Legend() {
         <span aria-hidden className="h-3.5 w-5 rounded-[3px] bg-sunken ring-1 ring-line-strong" />
         Not bookable
       </li>
-      <li className="flex items-center gap-2">
-        <span aria-hidden data-family="cut" className="h-3.5 w-5 rounded-[3px] border-l-[3px]" style={{ backgroundColor: "color-mix(in srgb, var(--fam-fill) 40%, white)", borderColor: "color-mix(in srgb, var(--fam-accent) 45%, white)" }} />
-        Checked out
+      {/* Where the client is in their visit: the block's fill (the service
+          color until they're here). */}
+      <li className="flex items-center gap-x-3.5 gap-y-2" data-testid="status-legend">
+        <span className="sr-only">Visit status:</span>
+        {(
+          [
+            ["here", "Checked in"],
+            ["done", "Checked out"],
+            ["off", "No-show"],
+          ] as const
+        ).map(([visit, text]) => (
+          <span key={visit} className="flex items-center gap-2" data-visit={visit}>
+            <span aria-hidden className="h-3.5 w-5 rounded-[3px] border-l-[3px] border-ink-subtle bg-(--visit-fill)" />
+            <span className={visit === "off" ? "line-through" : ""}>{text}</span>
+          </span>
+        ))}
       </li>
       {/* Stylist levels: the ring around each avatar and the bar on top of
           their column. */}
@@ -1285,15 +1277,14 @@ function Legend() {
   );
 }
 
-// Background for a block's parts: the family fill, lighter while processing,
-// and lighter again once the visit is over.
-function segmentStyle(kind: string, faded: boolean): React.CSSProperties {
-  const strength = faded ? (kind === "processing" ? 25 : 40) : kind === "processing" ? 45 : 100;
+// Background for a block's parts: its fill (the service color, or where
+// the client is in their visit), lighter while processing, with stripes.
+function segmentStyle(kind: string, visit: Visit): React.CSSProperties {
+  // --visit-fill comes from data-visit on the block (globals.css).
+  if (kind !== "processing") return { backgroundColor: "var(--visit-fill)" };
   return {
-    backgroundColor: strength === 100 ? "var(--fam-fill)" : `color-mix(in srgb, var(--fam-fill) ${strength}%, white)`,
-    ...(kind === "processing"
-      ? { backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--fam-accent) 14%, transparent) 6px 12px)" }
-      : {}),
+    backgroundColor: `color-mix(in srgb, var(--visit-fill) ${visit === "upcoming" ? 45 : 65}%, white)`,
+    backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--fam-accent) 14%, transparent) 6px 12px)",
   };
 }
 
@@ -1400,25 +1391,33 @@ function DragGhost({ block, start, y }: { block: BlockData; start: number; y: (m
   );
 }
 
-// States that need the front desk's attention get a chip on the block.
-type Attention = "checked_in" | "confirmed" | "late" | "no_show";
+// Where the client is in their visit, as the block's fill: the service
+// color until they're here, then yellow (checked in), green (checked out),
+// or grey and struck through (no-show). The service color stays as the
+// stripe down the left edge.
+type Visit = "upcoming" | "here" | "done" | "off";
 
-const ATTENTION: Record<Attention, { label: string; className: string }> = {
-  checked_in: { label: "Checked in", className: "bg-status-checked-in-bg text-status-checked-in-ink" },
-  confirmed: { label: "Confirmed", className: "bg-status-confirmed-bg text-status-confirmed-ink" },
-  late: { label: "Running late", className: "bg-status-late-bg text-status-late-ink" },
-  no_show: { label: "No-show", className: "bg-status-no-show-bg text-status-no-show-ink" },
-};
+const visitOf = (status: BlockData["status"]): Visit =>
+  status === "checked_in" ? "here" : status === "completed" ? "done" : status === "no_show" || status === "canceled" ? "off" : "upcoming";
+
+// What needs doing before the visit (a patch test, a form to sign), for
+// the warning icon on its block.
+function warningFor(appointment: AppointmentDetail | undefined): string | null {
+  const w = appointment?.warnings;
+  if (!w) return null;
+  const all = [...w.patch, ...w.forms.map((f) => `${f.name} not signed yet`)];
+  return all.length ? all.join(" · ") : null;
+}
 
 // Line heights in a block, in px.
 const NAME_LINE = 18;
 const LINE = 17;
-const CHIP_LINE = 26;
 
 function AppointmentBlock({
   block,
   y,
-  late,
+  lateBy,
+  warning,
   draggable,
   dragging,
   selected,
@@ -1433,17 +1432,20 @@ function AppointmentBlock({
 }: {
   block: BlockData & { lane: number; lanes: number };
   y: (minute: number) => number;
-  late: boolean;
+  // Minutes past its start with the client not checked in yet.
+  lateBy: number | null;
+  // A patch test or form still needed.
+  warning: string | null;
   draggable: boolean;
   dragging: boolean;
   selected: boolean;
-  // Denise is talking about it.
+  // Denise is showing a fix for it.
   highlight: boolean;
   // In the same group booking as the selected visit.
   grouped: boolean;
   // The stylist's name, for the tooltip.
   stylist: string;
-  // Shows (or, with null, hides) the tooltip of details the block can't fit.
+  // Shows (or, with null, hides) the tooltip of the visit's details.
   onHint: (details: string[] | null, rect: DOMRect) => void;
   settling: boolean;
   onSettled: () => void;
@@ -1457,16 +1459,14 @@ function AppointmentBlock({
   const processing = block.segments.find((s) => s.kind === "processing");
   const height = (block.end - block.start) * PX_PER_MINUTE;
   const box = laneBox(block.lane, block.lanes);
-  // A side lane (a client in another's processing gap) is narrow: first name
-  // and initial only.
+  // A side lane (a client in another's processing gap) is narrow.
   const narrow = block.lane > 0;
-  const faded = block.status === "completed" || block.status === "no_show";
-  const attention: Attention | null = block.status === "checked_in" ? "checked_in" : block.status === "no_show" ? "no_show" : late ? "late" : block.status === "confirmed" ? "confirmed" : null;
+  const visit = visitOf(block.status);
+  const late = lateBy !== null;
 
-  // Only lines that fit whole: name, service, time, then the chip on its own
-  // line if there's room (otherwise a dot beside the name).
+  // Only lines that fit whole: name, service, then time.
   let room = height - 6;
-  const show = { name: room >= NAME_LINE, service: false, time: false, chipLine: false, serviceLines: 1 as 1 | 2 };
+  const show = { name: room >= NAME_LINE, service: false, time: false, serviceLines: 1 as 1 | 2 };
   if (show.name) room -= NAME_LINE;
   if (room >= LINE) {
     show.service = true;
@@ -1476,31 +1476,27 @@ function AppointmentBlock({
     show.time = true;
     room -= LINE;
   }
-  if (attention && room >= CHIP_LINE && !narrow) {
-    show.chipLine = true;
-    room -= CHIP_LINE;
-  }
   // Leftover room lets a long service name wrap rather than shorten.
   if (show.service && room >= LINE) show.serviceLines = 2;
   // A short block puts the time on the name line.
   const timeOnName = show.name && !show.time;
 
-  // Shorter forms for narrow spaces, longest first.
+  // Shorter forms for narrow spaces, longest first. Never initials: a short
+  // block is the first name and time, cut off cleanly if it must be.
   const [first, ...rest] = block.clientName.split(" ");
-  const shortNames = [block.clientName, ...(rest.length ? [`${first} ${rest.at(-1)![0]}.`, first] : []), initials(block.clientName)];
   const startTime = formatMinute(block.start);
-  // On a short block: the name and time, shortening the name first, then
-  // initials alone in a very narrow lane; an ellipsis if even that won't fit.
   const names = timeOnName
-    ? [...new Set([`${block.clientName} · ${time}`, ...shortNames.slice(0, -1).map((n) => `${n} · ${startTime}`), `${initials(block.clientName)} · ${startTime}`, initials(block.clientName)])]
-    : shortNames;
-  // Everything about the visit, for the tooltip when the block hides some.
-  const hidden = timeOnName || !show.service || narrow;
+    ? [...new Set([`${first} · ${time}`, `${first} · ${startTime}`])]
+    : [block.clientName, ...(rest.length ? [`${first} ${rest.at(-1)![0]}.`, first] : [])];
+  // Everything about the visit, for the tooltip.
   const details = [
     block.clientName,
     [block.service, block.with.length > 0 && `with ${block.with.join(" and ")}`].filter(Boolean).join(" · "),
     `${time} · ${stylist}`,
-    [STATUS_LABELS[block.status], late && "running late", block.group && block.group.label, block.series && "repeating", block.online && "booked online"].filter(Boolean).join(" · "),
+    [STATUS_LABELS[block.status], late && (lateBy ? `${lateBy} min late` : "due now"), block.group && block.group.label, block.series && "repeating", block.online && "booked online"]
+      .filter(Boolean)
+      .join(" · "),
+    warning ?? "",
   ];
   const plainService = block.service.replace(/\s*\([^)]*\)/g, "");
   const services = [
@@ -1525,6 +1521,7 @@ function AppointmentBlock({
     block.online && "booked online",
     STATUS_LABELS[block.status],
     late && "running late",
+    warning,
   ]
     .filter(Boolean)
     .join(", ");
@@ -1538,7 +1535,7 @@ function AppointmentBlock({
         aria-pressed={selected}
         data-block
         data-family={block.family}
-        data-faded={faded || undefined}
+        data-visit={visit}
         data-denise-highlight={highlight || undefined}
         data-group-highlight={grouped || undefined}
         onClick={onOpen}
@@ -1549,24 +1546,21 @@ function AppointmentBlock({
           }
         }}
         onAnimationEnd={settling ? onSettled : undefined}
-        onMouseEnter={(e) => hidden && onHint(details, e.currentTarget.getBoundingClientRect())}
+        onMouseEnter={(e) => onHint(details, e.currentTarget.getBoundingClientRect())}
         onMouseLeave={(e) => onHint(null, e.currentTarget.getBoundingClientRect())}
-        onFocus={(e) => hidden && onHint(details, e.currentTarget.getBoundingClientRect())}
+        onFocus={(e) => onHint(details, e.currentTarget.getBoundingClientRect())}
         onBlur={(e) => onHint(null, e.currentTarget.getBoundingClientRect())}
-        aria-describedby={hidden ? `hint-${block.itemId}` : undefined}
+        aria-describedby={`hint-${block.itemId}`}
         {...pointer}
-        className={`absolute block touch-none overflow-hidden rounded-md border-l-4 bg-surface text-left select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
-          faded ? "text-ink-muted" : "text-ink shadow-card"
-        } ${selected || highlight || grouped ? "" : "ring-1 ring-surface"} ${draggable ? "cursor-grab" : "cursor-pointer"} ${
-          dragging ? "opacity-40 shadow-none outline-2 outline-ink-subtle outline-dashed" : ""
-        } ${settling ? "animate-settle" : ""}`}
+        className={`absolute block touch-none overflow-hidden rounded-md border-l-4 border-(--fam-accent) bg-surface text-left text-ink shadow-card select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
+          selected || highlight || grouped ? "" : "ring-1 ring-surface"
+        } ${draggable ? "cursor-grab" : "cursor-pointer"} ${dragging ? "opacity-40 shadow-none outline-2 outline-ink-subtle outline-dashed" : ""} ${settling ? "animate-settle" : ""}`}
         style={{
           top: y(block.start),
           height,
           left: `calc(${box.left}% + ${block.lane > 0 ? 1 : 3}px)`,
           width: `calc(${box.width}% - ${block.lanes > 1 ? 4 : 6}px)`,
           zIndex: 10 + block.lane,
-          borderLeftColor: faded ? "color-mix(in srgb, var(--fam-accent) 45%, white)" : "var(--fam-accent)",
         }}
       >
         {block.segments.map((s) => (
@@ -1575,7 +1569,7 @@ function AppointmentBlock({
             aria-hidden
             data-segment={s.kind}
             className="absolute inset-x-0"
-            style={{ top: (s.start - block.start) * PX_PER_MINUTE, height: (s.end - s.start) * PX_PER_MINUTE, ...segmentStyle(s.kind, faded) }}
+            style={{ top: (s.start - block.start) * PX_PER_MINUTE, height: (s.end - s.start) * PX_PER_MINUTE, ...segmentStyle(s.kind, visit) }}
           />
         ))}
         {/* The selection (and Denise's or a group's outline) is drawn inside
@@ -1588,33 +1582,30 @@ function AppointmentBlock({
           />
         )}
         {show.name && (
-          <span aria-hidden className={`relative flex items-center gap-1.5 pt-1 ${narrow ? "px-1.5" : "px-2"}`}>
-            {block.group && <GroupIcon className="size-3.5 shrink-0" />}
-            {block.series && <RepeatIcon className="size-3 shrink-0" label="Repeating" />}
-            {block.online && (
-              <span data-testid="online-badge" title="Booked online" className="shrink-0">
-                <OnlineIcon className="size-3" />
+          <span aria-hidden className={`relative flex items-center gap-1 pt-1 ${narrow ? "px-1.5" : "px-2"}`}>
+            <FitText variants={names} className={`flex-1 text-sm leading-[18px] font-semibold ${visit === "off" ? "text-block-ink-muted line-through" : ""}`} />
+            {/* Only what needs attention right now. */}
+            {late && (
+              <span data-attention="late" title={lateBy ? `Running ${lateBy} min late` : "Due now, not here yet"} className="flex shrink-0 items-center gap-0.5 text-xs leading-4 font-semibold text-status-late-ink">
+                <ClockIcon className="size-3.5" />
+                {lateBy ? `+${lateBy}m` : null}
               </span>
             )}
-            <FitText variants={names} className="flex-1 text-sm leading-[18px] font-semibold" />
-            {attention && !show.chipLine && <span data-attention={attention} title={ATTENTION[attention].label} className={`size-2.5 shrink-0 rounded-full ${ATTENTION[attention].className}`} style={{ backgroundColor: "currentColor" }} />}
+            {warning && (
+              <span data-attention="warning" title={warning} className="shrink-0 text-status-late-ink">
+                <WarningIcon className="size-3.5" />
+              </span>
+            )}
           </span>
         )}
         {show.service && (
           <span aria-hidden className={`relative block ${narrow ? "px-1.5" : "px-2"}`}>
-            <FitText variants={services} lines={show.serviceLines} className="text-[13px] leading-[17px] text-ink-muted" />
+            <FitText variants={services} lines={show.serviceLines} className="text-[13px] leading-[17px] text-block-ink-muted" />
           </span>
         )}
         {show.time && (
           <span aria-hidden className={`relative block ${narrow ? "px-1.5" : "px-2"}`}>
-            <FitText variants={times} className="text-[13px] leading-[17px] text-ink-muted" />
-          </span>
-        )}
-        {show.chipLine && attention && (
-          <span aria-hidden className="relative mt-1 block px-2">
-            <span data-attention={attention} className={`inline-block rounded-full px-2 text-xs leading-5 font-semibold ${ATTENTION[attention].className}`}>
-              {ATTENTION[attention].label}
-            </span>
+            <FitText variants={times} className="text-[13px] leading-[17px] text-block-ink-muted" />
           </span>
         )}
       </div>

@@ -173,7 +173,10 @@ test("a new client books two services back to back on a phone", async ({ page })
   const booked = shaeColumn.getByRole("button", { name: new RegExp(`Ob${RUN}New`) }).first();
   await expect(booked).toBeVisible();
   await expect(booked).toHaveAccessibleName(/booked online/);
-  await expect(booked.getByTestId("online-badge")).toBeVisible();
+  // In its details, not on the block.
+  await expect(booked.getByTestId("online-badge")).toHaveCount(0);
+  await booked.click();
+  await expect(calendar.getByRole("tabpanel", { name: "Booking details" }).getByTestId("online-badge")).toBeVisible();
   await desk.close();
 });
 

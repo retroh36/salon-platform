@@ -76,6 +76,17 @@
   --color-status-no-show-bg: #fae1dd;
   --color-status-no-show-ink: #9a2a1d;
 
+  /* Where the client is in their visit, as a calendar block's fill (not
+     yet here: the service color). Yellow and green differ in lightness,
+     not just hue, and from every service color, so they read with any
+     color vision; no-shows are grey and struck through (checked in the
+     token tests). Secondary text on any block uses block-ink-muted, which
+     passes AA on all of them. */
+  --color-visit-here: #fdf1a2;
+  --color-visit-done: #a9dbaf;
+  --color-visit-off: #e3e5e9;
+  --color-block-ink-muted: #454d5a;
+
   --color-danger: #b42318;
   --color-danger-soft: #fdecea;
   --color-now: #c8323a;
@@ -236,6 +247,21 @@
 [data-family="other"] {
   --fam-fill: var(--color-sand-fill);
   --fam-accent: var(--color-sand-accent);
+}
+
+/* Where the client is in their visit, as a calendar block's fill: set
+   data-visit on the element (under its data-family). */
+[data-visit="upcoming"] {
+  --visit-fill: var(--fam-fill);
+}
+[data-visit="here"] {
+  --visit-fill: var(--color-visit-here);
+}
+[data-visit="done"] {
+  --visit-fill: var(--color-visit-done);
+}
+[data-visit="off"] {
+  --visit-fill: var(--color-visit-off);
 }
 
 /* The arrow on styled native selects (selectClass). */

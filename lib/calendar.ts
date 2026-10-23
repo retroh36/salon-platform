@@ -112,3 +112,10 @@ export function bookedSummary(items: readonly { appointmentId: string; minutes: 
   const time = h === 0 ? `${m}m` : m === 0 ? `${h}h` : `${h}h ${m}m`;
   return `${visits} ${visits === 1 ? "visit" : "visits"} · ${time} booked`;
 }
+
+// Shorter forms of a booked summary for a narrow header, longest first:
+// "7 visits · 6h 10m booked", "7 visits · 6h 10m", "7 · 6h 10m".
+export function summaryVariants(summary: string): string[] {
+  const short = summary.replace(/ booked$/, "");
+  return [...new Set([summary, short, short.replace(/ visits? · /, " · ")])];
+}

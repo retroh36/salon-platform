@@ -163,6 +163,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     appointments[a.id] ??= {
       id: a.id,
       status: a.status as AppointmentStatus,
+      online: a.source === "online",
       notes: a.notes ?? "",
       client: client
         ? { id: client.id, name: fullName(client), phone: client.phone, email: client.email, allergies: client.allergies, preferences: client.preferences }

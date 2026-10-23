@@ -45,7 +45,7 @@ async function client(firstName: string) {
 async function book(
   clientId: string,
   items: { service: string; staff: string; start: Date; resource?: string }[],
-  status: "booked" | "confirmed" | "checked_in" | "completed" | "canceled" = "booked",
+  status: "booked" | "confirmed" | "checked_in" | "completed" | "canceled" | "no_show" = "booked",
 ) {
   const rows = await Promise.all(items.map(async (i) => ({ ...i, s: await service(i.service) })));
   const end = Math.max(...rows.map((r) => r.start.getTime() + r.s.duration_minutes! * 60_000));
@@ -129,12 +129,15 @@ test.describe("front desk", () => {
     const bridget = column(page, "Bridget Callahan");
 
     const color = bridget.getByRole("button", { name: new RegExp(`^10am–11:45am, ${PREFIX}Ava Test, All-Over Color`) });
-    await expect(color).toHaveAccessibleName(/processing 10:45am–11:20am, with Shae, Chair 1, Booked$/);
+    await expect(color).toHaveAccessibleName(/processing 10:45am–11:20am, with Shae, Chair 1, Booked(,|$)/);
     // (Test names are long, so the block may show a shorter form; the full
     // name is in its label.)
     await expect(color).toHaveAttribute("data-family", "color");
-    // Booked needs no attention, so no chip.
-    await expect(color.locator("[data-attention]")).toHaveCount(0);
+    // Not here yet: the service color. Not running late, but a new client
+    // with no patch test on record: a warning icon.
+    await expect(color).toHaveAttribute("data-visit", "upcoming");
+    await expect(color.locator("[data-attention=late]")).toHaveCount(0);
+    await expect(color.locator("[data-attention=warning]")).toHaveAttribute("title", /No patch test on record/);
 
     // 45 minutes applying, 35 processing, 25 finishing.
     const heights = await Promise.all(
@@ -171,8 +174,10 @@ test.describe("front desk", () => {
     const trimBox = (await trim.boundingBox())!;
     expect(trimBox.x).toBeGreaterThanOrEqual(colorBox.x + colorBox.width - 1);
     expect(trimBox.y).toBeCloseTo(colorBox.y + heights[0], 0);
-    // Its text fits its lane rather than being cut off.
-    expect(await trim.evaluate((el) => [...el.querySelectorAll(".truncate")].every((t) => t.scrollWidth <= t.clientWidth + 0.5))).toBe(true);
+    // A short block: the first name and time on one line (never initials),
+    // ending in an ellipsis if the lane is too narrow.
+    await expect(trim).toHaveText(new RegExp(`^${PREFIX}Ben · 10:45am`));
+    expect(await trim.locator(".truncate").first().evaluate((t) => getComputedStyle(t).textOverflow)).toBe("ellipsis");
 
     // The second stylist on Ava's visit.
     await expect(column(page, "Shae Morgan").getByRole("button", { name: /^11:45am–12:30pm, .*Ava Test, Blowout, with Bridget/ })).toBeVisible();
@@ -295,25 +300,52 @@ test.describe("design", () => {
     expect(headerTop - gridTop).toBeLessThan(40);
   });
 
-  test("shows chips only for states that need attention, and fades checked-out visits", async ({ page }) => {
+  test("shows where each client is in their visit by color, with icons only for what needs attention", async ({ page }) => {
     // Browser clock: 10:30 on the quiet Tuesday, so a 10:00 booking that
     // hasn't checked in is running late.
     await page.clock.setFixedTime(at(QUIET_TUESDAY, 10, 30));
-    const [late, done, ready, here] = await Promise.all(["Lou", "Dot", "Rey", "Ida"].map(client));
+    const [late, done, ready, here, gone] = await Promise.all(["Lou", "Dot", "Rey", "Ida", "Ned"].map(client));
     await book(late, [{ service: "Men's Cut", staff: SEED.staff.nola, start: at(QUIET_TUESDAY, 10) }]);
     await book(done, [{ service: "Men's Cut", staff: SEED.staff.nola, start: at(QUIET_TUESDAY, 9) }], "completed");
     await book(ready, [{ service: "Men's Cut", staff: SEED.staff.nola, start: at(QUIET_TUESDAY, 13) }], "confirmed");
     await book(here, [{ service: "Skin Fade", staff: SEED.staff.nola, start: at(QUIET_TUESDAY, 15) }], "checked_in");
+    await book(gone, [{ service: "Men's Cut", staff: SEED.staff.nola, start: at(QUIET_TUESDAY, 17) }], "no_show");
 
     await openDay(page, QUIET_TUESDAY);
     const nola = column(page, "Nola Brennan");
     const block = (name: string) => nola.getByRole("button", { name: new RegExp(`${PREFIX}${name}`) });
-    await expect(block("Lou").locator("[data-attention]")).toHaveAttribute("data-attention", "late");
-    await expect(block("Lou")).toHaveAccessibleName(/running late$/);
-    await expect(block("Rey").locator("[data-attention]")).toHaveAttribute("data-attention", "confirmed");
-    await expect(block("Ida").locator("[data-attention]")).toHaveAttribute("data-attention", "checked_in");
-    await expect(block("Dot")).toHaveAttribute("data-faded", "true");
-    await expect(block("Dot").locator("[data-attention]")).toHaveCount(0);
+    const fill = (name: string) => block(name).locator("[data-segment=active]").evaluate((el) => getComputedStyle(el).backgroundColor);
+    const stripe = (name: string) => block(name).evaluate((el) => getComputedStyle(el).borderLeftColor);
+
+    // Not here yet (booked or confirmed): the service color.
+    for (const name of ["Lou", "Rey"]) await expect(block(name)).toHaveAttribute("data-visit", "upcoming");
+    await expect(block("Ida")).toHaveAttribute("data-visit", "here");
+    await expect(block("Dot")).toHaveAttribute("data-visit", "done");
+    await expect(block("Ned")).toHaveAttribute("data-visit", "off");
+    // Four different fills, and the same service stripe on every one.
+    expect(new Set(await Promise.all(["Rey", "Ida", "Dot", "Ned"].map(fill))).size).toBe(4);
+    expect(new Set(await Promise.all(["Lou", "Rey", "Ida", "Dot", "Ned"].map(stripe))).size).toBe(1);
+    // Matching the legend.
+    const legend = ui(page).getByTestId("status-legend");
+    for (const [name, visit] of [["Ida", "here"], ["Dot", "done"], ["Ned", "off"]]) {
+      expect(await legend.locator(`[data-visit=${visit}] > span`).first().evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(await fill(name));
+    }
+    // A no-show's name is struck through.
+    expect(await block("Ned").locator("span.font-semibold").first().evaluate((el) => getComputedStyle(el).textDecorationLine)).toBe("line-through");
+
+    // No status badges. Running late gets a clock with how late; a form
+    // still to sign (these are new clients) a warning icon.
+    await expect(nola.getByText(/^(Confirmed|Checked in|Checked out)$/)).toHaveCount(0);
+    await expect(block("Lou").locator("[data-attention=late]")).toHaveText("+30m");
+    await expect(block("Lou")).toHaveAccessibleName(/running late(,|$)/);
+    await expect(block("Lou").locator("[data-attention=warning]")).toHaveAttribute("title", /consultation not signed/);
+    for (const name of ["Rey", "Ida", "Dot", "Ned"]) await expect(block(name).locator("[data-attention=late]")).toHaveCount(0);
+    // Finished visits need nothing more.
+    for (const name of ["Dot", "Ned"]) await expect(block(name).locator("[data-attention]")).toHaveCount(0);
+
+    // The confirmation is in the tooltip.
+    await block("Rey").hover();
+    await expect(page.getByRole("tooltip")).toContainText("Confirmed");
   });
 
   test("shows the week view as coming soon", async ({ page }) => {
