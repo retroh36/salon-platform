@@ -11,6 +11,7 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { formatMinute, minuteToTime, parseTime } from "@/lib/scheduling/time";
 import { formatMinutes, formatPrice, sortCategories } from "@/lib/services";
 import { DeniseFace } from "@/components/denise";
+import type { BookingIdea, BookingIdeas } from "@/lib/denise/ideas";
 import type { Scope } from "@/lib/scheduling/series";
 import { patchTestWarnings, findClients, previewSeries, quickAddClient, saveSeries, saveVisit, saveVisitScoped, type ClientOption, type SeriesPreviewVisit, type VisitInput } from "./actions";
 import type { AppointmentDetail, BoardData } from "./types";
@@ -68,6 +69,7 @@ export function BookingPanel({
   const [notes, setNotes] = useState(appointment?.notes ?? "");
   const [message, setMessage] = useState<string | null>(null);
   const [lineErrors, setLineErrors] = useState<string[][]>([]);
+  const [ideas, setIdeas] = useState<BookingIdeas | null>(null);
   const [pending, startTransition] = useTransition();
   // Repeating (new bookings), and the series' visits once checked; or, when
   // editing a series visit, which visits the change is for.
@@ -134,6 +136,7 @@ export function BookingPanel({
     e.preventDefault();
     setMessage(null);
     setLineErrors([]);
+    setIdeas(null);
     const input: VisitInput = {
       appointmentId: appointment?.id,
       date: data.date,
@@ -169,6 +172,7 @@ export function BookingPanel({
       else {
         setMessage(result.message);
         setLineErrors(result.lineErrors ?? []);
+        setIdeas(result.ideas ?? null);
       }
     });
   }
@@ -317,6 +321,17 @@ export function BookingPanel({
                     <li key={e}>{e}</li>
                   ))}
                 </ul>
+              )}
+              {ideas?.line === n && (
+                <IdeasCard
+                  ideas={ideas}
+                  onPick={(o) => {
+                    update(l.key, { staffId: o.staffId, startMinute: o.startMinute });
+                    setIdeas(null);
+                    setLineErrors([]);
+                    setMessage(null);
+                  }}
+                />
               )}
             </fieldset>
           );
@@ -647,3 +662,30 @@ function UsualLength({
 
 // Warn when the booking is this many minutes shorter than usual.
 const SHORT_BY = 5;
+
+// Denise, when the rules refuse a time: why, and the nearest times that
+// work (one click puts it in the form).
+function IdeasCard({ ideas, onPick }: { ideas: BookingIdeas; onPick: (o: BookingIdea) => void }) {
+  return (
+    <section aria-label="Denise's suggestions" className="flex animate-fade-in gap-2.5 rounded-lg border border-denise-200 bg-denise-50 px-3 py-2.5" data-testid="denise-ideas">
+      <DeniseFace size={24} className="mt-0.5" />
+      <div className="flex min-w-0 flex-col gap-2">
+        <p className="text-denise-900">{ideas.text}</p>
+        {ideas.options.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {ideas.options.map((o) => (
+              <button
+                key={`${o.staffId}-${o.startMinute}`}
+                type="button"
+                onClick={() => onPick(o)}
+                className="inline-flex h-8 items-center rounded-full border border-denise-200 bg-surface px-3 text-sm font-medium text-denise-900 transition-[background-color,border-color,transform] duration-(--motion-fast) hover:border-denise-500 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}

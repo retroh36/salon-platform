@@ -10,7 +10,6 @@ import { StatusChip } from "@/components/ui/status-chip";
 import { ClientInsightCard } from "@/components/client-insight";
 import { ServiceTimer } from "@/components/service-timer";
 import { ACTION_LABELS, allowedActions, CANCEL_REASONS, canEditNotes, isEditable, MAX_NOTES, type AppointmentAction } from "@/lib/appointments";
-import type { DeniseState } from "@/lib/denise/types";
 import { formatLongDay } from "@/lib/schedule-format";
 import { LATE_MINUTES } from "@/lib/scheduling/disruptions";
 import { formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
@@ -19,7 +18,6 @@ import { UsageLinesEditor, toUsageJson, type DraftLine } from "@/components/usag
 import type { PickerProduct } from "@/lib/inventory-load";
 import { addVisitFormula, changeGroupVisitStatus, changeVisitStatus, changeVisitStatusScoped, saveVisitNotes } from "./actions";
 import type { Scope } from "@/lib/scheduling/series";
-import { reportLate } from "./denise-actions";
 import { useNow } from "./now-line";
 import type { AppointmentDetail, BoardData } from "./types";
 
@@ -31,7 +29,8 @@ export function AppointmentPanel({
   me,
   onEdit,
   onClose,
-  onReported,
+  onReportLate,
+  onCanceled,
   onOpenVisit,
   products,
 }: {
@@ -43,8 +42,9 @@ export function AppointmentPanel({
   me: BoardData["me"];
   onEdit: () => void;
   onClose: () => void;
-  // Denise's view after a delay is reported.
-  onReported: (state: DeniseState) => void;
+  // Tell Denise: she takes it from here in her panel.
+  onReportLate: (itemId: string, minutes: number) => void;
+  onCanceled: (appointmentId: string) => void;
   // Open another guest's visit in the same group.
   onOpenVisit: (appointmentId: string) => void;
 }) {
@@ -75,7 +75,11 @@ export function AppointmentPanel({
             ? await changeGroupVisitStatus(appointment.id, action, reason, detail)
             : await changeVisitStatusScoped(appointment.id, action, scope, reason, detail);
       if (!result.ok) setMessage(result.message);
-      else if (action === "cancel") onClose(); // canceled visits leave the calendar
+      else if (action === "cancel") {
+        // Canceled visits leave the calendar; Denise looks at the time freed.
+        onClose();
+        onCanceled(appointment.id);
+      }
       else setCanceling(false);
     });
   }
@@ -240,9 +244,9 @@ export function AppointmentPanel({
                 appointment={appointment}
                 date={date}
                 timeZone={timeZone}
-                onReported={(state) => {
+                onReport={(itemId, minutes) => {
                   setReportingLate(false);
-                  onReported(state);
+                  onReportLate(itemId, minutes);
                 }}
                 onCancel={() => setReportingLate(false)}
               />
@@ -434,13 +438,13 @@ function RunningLateForm({
   appointment,
   date,
   timeZone,
-  onReported,
+  onReport,
   onCancel,
 }: {
   appointment: AppointmentDetail;
   date: LocalDate;
   timeZone: string;
-  onReported: (state: DeniseState) => void;
+  onReport: (itemId: string, minutes: number) => void;
   onCancel: () => void;
 }) {
   const now = useNow();
@@ -451,8 +455,6 @@ function RunningLateForm({
   const current = nowMinute === null ? items[0] : (items.filter((i) => i.start <= nowMinute).at(-1) ?? items[0]);
   const [itemId, setItemId] = useState(current.id);
   const [minutes, setMinutes] = useState<number | null>(null);
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
   const firstName = appointment.client?.name.split(" ")[0] ?? "the client";
 
   return (
@@ -462,12 +464,7 @@ function RunningLateForm({
       onSubmit={(e) => {
         e.preventDefault();
         if (!minutes) return;
-        setError(null);
-        startTransition(async () => {
-          const result = await reportLate(checkedIn ? itemId : items[0].id, minutes, date);
-          if (result.ok) onReported(result.state);
-          else setError(result.message);
-        });
+        onReport(checkedIn ? itemId : items[0].id, minutes);
       }}
     >
       <fieldset className="flex flex-col gap-2">
@@ -495,16 +492,11 @@ function RunningLateForm({
           </select>
         </label>
       )}
-      {error && (
-        <p role="alert" className="text-danger">
-          {error}
-        </p>
-      )}
       <div className="flex gap-2">
-        <Button type="submit" variant="primary" disabled={!minutes || pending}>
-          {pending ? "Telling Denise…" : "Tell Denise"}
+        <Button type="submit" variant="primary" disabled={!minutes}>
+          Tell Denise
         </Button>
-        <Button onClick={onCancel} disabled={pending}>
+        <Button onClick={onCancel}>
           Cancel
         </Button>
       </div>

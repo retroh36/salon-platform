@@ -91,3 +91,21 @@ export type BookingSuggestion = {
 };
 
 export type ChatMessage = { role: "user" | "denise"; text: string; suggestions?: BookingSuggestion[] };
+
+// Denise's streaming endpoint (app/api/denise/route.ts): what's asked of
+// her, and what she sends back as she works, one JSON object per line.
+export type DeniseRequest =
+  | { action: "ask"; date: string; history: ChatMessage[] }
+  | { action: "report_late"; date: string; itemId: string; minutes: number }
+  | { action: "report_out"; date: string; staffId: string }
+  | { action: "canceled"; date: string; appointmentId: string };
+
+export type DeniseEvent =
+  // What she's doing now ("Checking Bridget's openings…").
+  | { t: "status"; text: string }
+  // Her answer, word by word; "discard" drops words that turned out to be
+  // a step before using a tool.
+  | { t: "text"; text: string }
+  | { t: "discard" }
+  // Finished: what she says, and her view of the day after a report.
+  | { t: "done"; reply: { text: string; kind: "fixes" | "nothing" | "stuck" | "error" }; state?: DeniseState; suggestions?: BookingSuggestion[] };

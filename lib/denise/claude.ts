@@ -26,9 +26,25 @@ export const CHAT_MODEL = "claude-haiku-5-5";
 // A stronger one for the morning brief and "why" questions.
 export const ANALYSIS_MODEL = "claude-sonnet-5-5";
 
-// The one SDK call Denise makes (tests and the meter stand in for it).
+// A streamed reply: its events as they arrive, then the whole message.
+export type ClaudeStream = AsyncIterable<Anthropic.MessageStreamEvent> & { finalMessage: () => Promise<Anthropic.Message> };
+
+// The SDK calls Denise makes (tests and the meter stand in for them):
+// `stream`, when there, lets her answer appear word by word.
 export type ClaudeClient = {
-  messages: { create: (params: Anthropic.MessageCreateParamsNonStreaming, options?: Anthropic.RequestOptions) => Promise<Anthropic.Message> };
+  messages: {
+    create: (params: Anthropic.MessageCreateParamsNonStreaming, options?: Anthropic.RequestOptions) => Promise<Anthropic.Message>;
+    stream?: (params: Anthropic.MessageCreateParamsNonStreaming, options?: Anthropic.RequestOptions) => ClaudeStream;
+  };
+};
+
+// Live progress from a conversation: her words as they arrive (onText),
+// dropped again when that turn turns out to be a step before using a tool
+// (onDiscard), and each tool she uses (onTool).
+export type ConverseHooks = {
+  onText?: (delta: string) => void;
+  onDiscard?: () => void;
+  onTool?: (name: string, input: unknown) => void;
 };
 
 // Questions that ask for reasons or comparisons get the stronger model.
@@ -118,21 +134,40 @@ export async function converse(
   history: { role: "user" | "assistant"; text: string }[],
   runner: ToolRunner,
   model = CHAT_MODEL,
+  hooks: ConverseHooks = {},
 ): Promise<string> {
   const messages: Anthropic.MessageParam[] = history.map((m) => ({ role: m.role, content: m.text }));
   for (let step = 0; step < MAX_STEPS; step++) {
-    const response = await client.messages.create(
-      { model, max_tokens: 3000, system, tools: runner.tools, output_config: { effort: effortFor(model) }, messages },
-      model === ANALYSIS_MODEL ? { ...REQUEST, timeout: 45_000 } : REQUEST,
-    );
-    if (response.stop_reason === "refusal") return "I can't help with that one, sorry.";
+    const params: Anthropic.MessageCreateParamsNonStreaming = { model, max_tokens: 3000, system, tools: runner.tools, output_config: { effort: effortFor(model) }, messages };
+    const options = model === ANALYSIS_MODEL ? { ...REQUEST, timeout: 45_000 } : REQUEST;
+    let response: Anthropic.Message;
+    let streamed = false;
+    if (hooks.onText && client.messages.stream) {
+      const stream = client.messages.stream(params, options);
+      for await (const event of stream) {
+        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+          streamed = true;
+          hooks.onText(event.delta.text);
+        }
+      }
+      response = await stream.finalMessage();
+    } else {
+      response = await client.messages.create(params, options);
+    }
+    if (response.stop_reason === "refusal") {
+      if (streamed) hooks.onDiscard?.();
+      return "I can't help with that one, sorry.";
+    }
     messages.push({ role: "assistant", content: response.content });
     if (response.stop_reason !== "tool_use") return textOf(response.content) || "I'm not sure what to say to that one.";
+    // Words before using a tool ("Let me check…") aren't the answer.
+    if (streamed) hooks.onDiscard?.();
 
     // Run every tool call, and send all the results back together.
     const results: Anthropic.ToolResultBlockParam[] = [];
     for (const block of response.content) {
       if (block.type !== "tool_use") continue;
+      hooks.onTool?.(block.name, block.input);
       try {
         results.push({ type: "tool_result", tool_use_id: block.id, content: await runner.run(block.name, block.input) });
       } catch {

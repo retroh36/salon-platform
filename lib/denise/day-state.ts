@@ -85,7 +85,7 @@ export async function openingsOn(a: DeniseAsker, date: LocalDate): Promise<Waitl
   return waitlistOpenings(ctx, date, freed, entries, new Map(staff.map((x) => [x.id, x.first_name])), notBefore);
 }
 
-export async function deniseDay(a: DeniseAsker, date: LocalDate, options: { brief: "write" | "cached" } = { brief: "write" }): Promise<DeniseState> {
+export async function deniseDay(a: DeniseAsker, date: LocalDate, options: { brief?: "write" | "cached"; onStep?: (text: string) => void } = {}): Promise<DeniseState> {
   const connected = isConnected();
   // Reorders she's drafted on the Inventory page, for those who order.
   const reorders = canReceiveOrders(a.role)
@@ -102,14 +102,14 @@ export async function deniseDay(a: DeniseAsker, date: LocalDate, options: { brie
   if (date < a.today) return { date, conflicts: [], notices: [], reorders, openings: [], brief: null, connected };
   const client = claudeFor(a.businessId, "explain_fixes");
   const [state, openings] = await Promise.all([
-    scanDay(a.supabase, a.viewer, date, { explain: client ? (facts) => explainFixes(client, facts) : null }),
+    scanDay(a.supabase, a.viewer, date, { explain: client ? (facts) => explainFixes(client, facts) : null, onStep: options.onStep }),
     a.viewer.canBook ? openingsOn(a, date) : Promise.resolve([]),
   ]);
   // The morning brief: today, for the front of house.
   let brief: Brief | null = null;
   if (date === a.today && a.viewer.canBook) {
     const facts = await briefFacts(a.supabase, { businessId: a.businessId, location: a.viewer.location }, date, { conflicts: state.conflicts, openings });
-    brief = await briefFor(a, facts, options.brief);
+    brief = await briefFor(a, facts, options.brief ?? "write");
   }
   return { ...state, reorders, openings, brief, connected };
 }

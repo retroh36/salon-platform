@@ -235,7 +235,8 @@ test.describe("front desk", () => {
     await form.getByLabel("Details").fill("Will call to rebook");
     await form.getByRole("button", { name: "Cancel booking" }).click();
 
-    await expect(panel(page)).toContainText("Choose an appointment");
+    // Denise says what the cancellation freed.
+    await expect(page.getByRole("tabpanel", { name: /Denise/ })).toContainText("That frees 10am–11am with Bridget.");
     await expect(block).toHaveCount(0);
     expect(await appointment(id)).toMatchObject({ status: "canceled", cancel_reason: "Client is sick: Will call to rebook" });
   });

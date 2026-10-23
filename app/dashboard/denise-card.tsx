@@ -7,6 +7,7 @@ import { DeniseFace, DenisePose } from "@/components/denise";
 import { Button, buttonClass } from "@/components/ui/button";
 import { CheckCircleIcon, UndoIcon } from "@/components/ui/icons";
 import type { DeniseState, FixResult } from "@/lib/denise/types";
+import { noFixAdvice } from "@/lib/denise/respond";
 import type { ConflictKind } from "@/lib/scheduling/resolve";
 import { formatMinute } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
@@ -85,7 +86,7 @@ export function DeniseCard({ initial, today, canBook, seesMoney }: { initial: De
           {conflicts.map((c) => {
             const top = c.options[0];
             return (
-              <Item key={c.subject} label={KINDS[c.kind]} title={c.headline} detail={top ? top.summary : "I couldn't find a fix that works with everyone's hours."}>
+              <Item key={c.subject} label={KINDS[c.kind]} title={c.headline} detail={top ? top.summary : noFixAdvice(c.kind)}>
                 {canBook && top?.actionId && (
                   <Button variant="primary" size="sm" disabled={working} onClick={() => run(() => approveDeniseFix(top.actionId!, today), top.actionId)}>
                     Apply

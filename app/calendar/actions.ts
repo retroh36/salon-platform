@@ -13,7 +13,8 @@ import { describeUsage, parseUsageLines } from "@/lib/color-usage";
 import { isUuid } from "@/lib/ids";
 import { loadBackBarProducts } from "@/lib/inventory-load";
 import { changeStatus, moveItem, saveBooking, saveNotes, type BookingItemInput, type SaveResult } from "@/lib/scheduling/book";
-import { describeProblem } from "@/lib/scheduling/booking";
+import { describeProblem, type BookingProblem } from "@/lib/scheduling/booking";
+import { bookingIdeas, type BookingIdeas } from "@/lib/denise/ideas";
 import { loadBookingContext, loadCalendarStamp } from "@/lib/scheduling/load";
 import { MAX_VISITS, planSeries, seriesDates, type Scope, type SeriesEnd } from "@/lib/scheduling/series";
 import { bookSeries, changeSeries, changeSeriesStatus, moveSeriesItem, type VisitResult } from "@/lib/scheduling/series-book";
@@ -86,7 +87,8 @@ export type VisitInput = {
 
 export type SaveVisitResult =
   | { ok: true; appointmentId: string }
-  | { ok: false; message: string; lineErrors?: string[][] };
+  // ideas: Denise's nearest times that work, when the rules refused a time.
+  | { ok: false; message: string; lineErrors?: string[][]; ideas?: BookingIdeas | null };
 
 function saveErrorMessage(result: Exclude<SaveResult, { ok: true }>): string {
   switch (result.error) {
@@ -144,10 +146,24 @@ export async function saveVisit(input: VisitInput): Promise<SaveVisitResult> {
       ok: false,
       message: saveErrorMessage(result),
       lineErrors: result.error === "invalid" ? result.problems.map((p) => p.map(describeProblem)) : undefined,
+      ideas: result.error === "invalid" ? await ideasFor(supabase, me.location, input, result.problems) : null,
     };
   }
   refresh();
   return { ok: true, appointmentId: result.appointmentId };
+}
+
+// Denise's nearest times that work, for a refused booking. Never fails the
+// save's answer: without them, the rule's message still shows.
+async function ideasFor(supabase: Awaited<ReturnType<typeof getCurrentStaff>>["supabase"], location: { id: string; timezone: string }, input: VisitInput, problems: BookingProblem[][]) {
+  try {
+    const [ctx, { data: staff }] = await Promise.all([loadBookingContext(supabase, location, input.date, input.date), supabase.from("staff").select("id, first_name")]);
+    const today = todayIn(location.timezone);
+    return bookingIdeas(ctx, input.date, input.lines, problems, new Map((staff ?? []).map((s) => [s.id, s.first_name])), input.date === today ? new Date() : undefined);
+  } catch (error) {
+    console.error("Denise couldn't suggest times:", error);
+    return null;
+  }
 }
 
 export type MoveResult = { ok: true } | { ok: false; message: string };

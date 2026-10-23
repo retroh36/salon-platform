@@ -105,15 +105,20 @@ export async function scanDay(
   viewer: Viewer,
   date: LocalDate,
   // system: the nightly risk check, recording proposals as the server.
-  options: { now?: Date; explain?: Explainer | null; system?: boolean } = {},
+  // onStep: what she's doing, for the "Denise is thinking" status.
+  options: { now?: Date; explain?: Explainer | null; system?: boolean; onStep?: (text: string) => void } = {},
 ): Promise<DeniseState> {
   const now = options.now ?? new Date();
+  const step = options.onStep ?? (() => {});
   const loaded = await loadDay(supabase, viewer, date, now);
   const { lookup } = loaded;
   // The risk check: visits likely to run over, from what Denise has learned.
   const learned = await loadLearnedTimes(supabase, loaded.day.ctx);
   const day = { ...loaded.day, disruptions: [...loaded.day.disruptions, ...likelyOverruns(loaded.day.ctx, loaded.day.statuses, learned, now, loaded.day.disruptions)] };
+  step("Checking for clashes…");
   const conflicts = findConflicts(day);
+  const optionCount = conflicts.reduce((n, c) => n + c.options.length, 0);
+  if (conflicts.length) step(optionCount ? `Comparing ${optionCount} ${optionCount === 1 ? "option" : "options"}…` : "Looking for any way to fit everyone…");
   const prefix = `${date}:`;
 
   // Open proposals for the day: an unchanged option keeps its explanation.
@@ -144,6 +149,7 @@ export async function scanDay(
   if (options.explain) {
     const todo = worded.flatMap((w) => w.options.filter((o) => o.needsReason).map((o) => ({ w, o })));
     if (todo.length) {
+      step("Writing up why each fix works…");
       const reasons = await options.explain(todo.map(({ w, o }) => factsFor(w.conflict, o.option, lookup))).catch(() => todo.map(() => null));
       todo.forEach(({ o }, i) => {
         if (reasons[i]) o.reason = reasons[i]!;

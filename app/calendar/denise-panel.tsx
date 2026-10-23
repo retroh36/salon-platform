@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DeniseFace, DenisePose, type Pose } from "@/components/denise";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/field";
 import { CheckCircleIcon, ChevronDownIcon, ClockIcon, SendIcon, UndoIcon } from "@/components/ui/icons";
 import type { Brief } from "@/lib/denise/brief";
+import { noFixAdvice } from "@/lib/denise/respond";
 import type { BookingSuggestion, ChatMessage, ConflictView, DeniseState, FixView, OpeningMatch, WaitlistOpening } from "@/lib/denise/types";
 import { formatLongDay } from "@/lib/schedule-format";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
@@ -15,6 +16,7 @@ import type { ClientOption } from "./actions";
 import { ClientPicker } from "./booking-panel";
 import { useNow } from "./now-line";
 import type { BoardData } from "./types";
+import type { DeniseRun } from "./use-denise";
 
 // What Denise said after the last approve, reject or undo.
 export type Outcome = { message: string; error: boolean; undoActionId: string | null };
@@ -49,11 +51,15 @@ export function DenisePanel({
   onBook,
   onRejectSuggestion,
   onBookWaitlist,
+  run,
 }: {
   data: BoardData;
   state: DeniseState | null;
   // Scanning, applying, or answering.
   working: boolean;
+  // A question or report she's working on: what she's doing, her answer
+  // so far.
+  run: DeniseRun;
   outcome: Outcome | null;
   chat: ChatMessage[];
   preview: Preview | null;
@@ -77,8 +83,15 @@ export function DenisePanel({
   const pose: Pose = working ? "think" : conflicts.length ? "point" : "wave";
   const isToday = data.date === data.today;
 
+  // Her latest words in view.
+  const end = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "nearest" });
+  }, [chat.length, run.working, run.text]);
+
   let says: string;
-  if (!state) says = "Give me a second, I'm looking over the day…";
+  if (run.working) says = "Let me look into that…";
+  else if (!state) says = "Give me a second, I'm looking over the day…";
   else if (conflicts.length) says = conflicts.length === 1 ? "I spotted something." : `I spotted ${conflicts.length} things.`;
   else if (notices.length) says = "Nothing's clashing, but keep an eye on this:";
   else if (openings.length) says = "Some time opened up, and your waitlist could use it:";
@@ -195,7 +208,7 @@ export function DenisePanel({
 
       {!conflicts.length && !notices.length && !openings.length && state && <UpNext data={data} onOpen={onOpen} />}
 
-      {chat.length > 0 && (
+      {(chat.length > 0 || run.working) && (
         <section aria-label="Conversation with Denise" className="flex flex-col gap-3">
           {chat.map((m, i) =>
             m.role === "user" ? (
@@ -222,10 +235,12 @@ export function DenisePanel({
               </div>
             ),
           )}
+          {run.working && <Thinking run={run} />}
         </section>
       )}
+      <div ref={end} />
 
-      <AskForm onAsk={onAsk} disabled={working} />
+      <AskForm onAsk={onAsk} disabled={run.working} />
     </div>
   );
 }
@@ -268,7 +283,7 @@ function ConflictCard({
         <DeniseFace size={28} />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <p className="text-ink" data-testid="denise-message">
-            <strong className="font-semibold text-denise-900">{conflict.headline}</strong> {top ? top.intro : "I couldn't find a fix that works with everyone's hours and bookings."}
+            <strong className="font-semibold text-denise-900">{conflict.headline}</strong> {top ? top.intro : noFixAdvice(conflict.kind)}
           </p>
           {conflict.note && <p className="text-ink-muted">{conflict.note}</p>}
         </div>
@@ -503,6 +518,37 @@ function BriefList({ title, items }: { title: string; items: string[] }) {
           <li key={i}>{i}</li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+// While she works: "Denise is thinking…" (after 20 seconds, "Still working
+// on it…"), what she's doing now, and her answer as it streams in.
+function Thinking({ run }: { run: DeniseRun }) {
+  return (
+    <div className="flex max-w-[92%] animate-fade-in gap-2" data-testid="denise-thinking" aria-live="polite">
+      <DeniseFace size={24} className="mt-1" />
+      <div className="flex min-w-0 flex-col gap-1.5">
+        {run.text ? (
+          <p className="rounded-xl rounded-tl-sm border border-denise-200 bg-denise-50 px-3 py-2 whitespace-pre-line text-ink">{run.text}</p>
+        ) : (
+          <p className="flex items-center gap-1.5 rounded-xl rounded-tl-sm border border-denise-200 bg-denise-50 px-3 py-2 font-medium text-denise-900">
+            {run.slow ? "Still working on it" : "Denise is thinking"}
+            <span aria-hidden className="inline-flex gap-0.5">
+              {[0, 1, 2].map((i) => (
+                <span key={i} className="size-1 animate-breathe rounded-full bg-denise-500" style={{ animationDelay: `${i * 200}ms` }} />
+              ))}
+            </span>
+            <span className="sr-only">…</span>
+          </p>
+        )}
+        {run.status && (
+          <p className="text-xs text-ink-muted" data-testid="denise-status">
+            {run.slow && run.text ? "Still working on it… " : ""}
+            {run.status}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

@@ -14,7 +14,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { checkAppointment, describeProblem, durationMinutes, pickResource, stretchTiming, timingFor, type BookingContext, type ServiceTiming } from "@/lib/scheduling/booking";
 import { findOpenings } from "@/lib/scheduling/openings";
 import { formatMinute, fromLocal, isLocalDate, parseTime, toLocal, type LocalDate } from "@/lib/scheduling/time";
-import { converse, modelFor, VOICE, type ClaudeClient, type ToolRunner } from "./claude";
+import { converse, modelFor, VOICE, type ClaudeClient, type ConverseHooks, type ToolRunner } from "./claude";
 import { SALES_PERIODS, type Knowledge, type SalesPeriod } from "./knowledge";
 import type { BookingSuggestion } from "./types";
 
@@ -351,9 +351,45 @@ export async function answer(
   client: ClaudeClient,
   c: AssistantContext,
   history: { role: "user" | "assistant"; text: string }[],
+  hooks: ConverseHooks = {},
 ): Promise<{ text: string; suggestions: BookingSuggestion[] }> {
   const runner = assistantTools(c);
   const question = [...history].reverse().find((m) => m.role === "user")?.text ?? "";
-  const text = await converse(client, systemPrompt(c), history, runner, modelFor(question));
+  const text = await converse(client, systemPrompt(c), history, runner, modelFor(question), hooks);
   return { text, suggestions: runner.suggestions };
+}
+
+// What Denise is doing while she uses a tool, for her "thinking" status
+// ("Checking Bridget's openings…"). Our wording, from the tool's input.
+export function toolStatus(name: string, input: unknown, c: Pick<AssistantContext, "staff">): string {
+  const i = (input ?? {}) as Record<string, unknown>;
+  const stylist = typeof i.staff_id === "string" ? c.staff.find((s) => s.id === i.staff_id)?.firstName : undefined;
+  switch (name) {
+    case "find_openings":
+      return stylist ? `Checking ${stylist}'s openings…` : "Checking everyone's openings…";
+    case "propose_booking":
+      return "Checking that time works…";
+    case "list_services":
+      return "Looking at the menu…";
+    case "list_stylists":
+      return "Looking at the team…";
+    case "client_insights":
+      return typeof i.first_name === "string" ? `Looking up ${i.first_name}'s visits…` : "Looking up the client…";
+    case "overdue_clients":
+      return "Finding regulars who are due back…";
+    case "stylist_durations":
+      return stylist ? `Looking at how long ${stylist} usually takes…` : "Looking at how long everyone usually takes…";
+    case "salon_patterns":
+      return "Looking at the salon's patterns…";
+    case "day_schedule":
+      return "Reading the day's schedule…";
+    case "inventory_levels":
+      return "Checking stock…";
+    case "sales_summary":
+      return "Adding up sales…";
+    case "propose_fixes":
+      return "Looking for fixes…";
+    default:
+      return "Looking that up…";
+  }
 }

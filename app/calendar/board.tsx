@@ -15,7 +15,7 @@ import { Listbox } from "@/components/ui/listbox";
 import { Segmented } from "@/components/ui/segmented";
 import { Tabs } from "@/components/ui/tabs";
 import { isEditable, STATUS_LABELS } from "@/lib/appointments";
-import type { ChatMessage, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
+import type { ChatMessage, DeniseRequest, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
 import { FAMILIES, FAMILY_LABELS, hourMarks, laneBox, layoutColumn, type ServiceFamily } from "@/lib/calendar";
 import { LEVEL_LABELS, STAFF_LEVELS } from "@/lib/schedule-forms";
 import { BLOCK_LABELS } from "@/lib/scheduling/blocks";
@@ -26,7 +26,8 @@ import type { Scope } from "@/lib/scheduling/series";
 import { moveBlock } from "./block-actions";
 import { BlockPanel, repeatLabel } from "./block-panel";
 import { AppointmentPanel } from "./appointment-panel";
-import { approveDeniseFix, askDenise, bookFromWaitlist, rejectDeniseFix, reportOut, scanDenise, undoDeniseFix } from "./denise-actions";
+import { approveDeniseFix, bookFromWaitlist, rejectDeniseFix, scanDenise, undoDeniseFix } from "./denise-actions";
+import { useDeniseRun } from "./use-denise";
 import { DenisePanel, type Outcome, type Preview } from "./denise-panel";
 import { BookingPanel, type BookingStart } from "./booking-panel";
 import { WalkInPanel } from "./walk-in-panel";
@@ -96,7 +97,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // and what she's doing.
   const [denise, setDenise] = useState<{ state: DeniseState; for: BoardData } | null>(null);
   const [deciding, setDeciding] = useState(false);
-  const [asking, setAsking] = useState(false);
+  // A question or a report she's working on, streamed (./use-denise.ts).
+  const { run: deniseRun, start: startDenise } = useDeniseRun();
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -177,6 +179,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // just make her badge bounce; new ones while it's open open her panel.
   const seen = useRef(new Set<string>());
   const looked = useRef(false);
+  // Someone using the side panel (a booking, the walk-ins, a visit's
+  // details): Denise's badge calls rather than taking the panel over.
+  const busyWith = useRef<Selection["kind"]>("none");
+  busyWith.current = panelOpen ? selection.kind : "none";
   const showDenise = useCallback((state: DeniseState, forData: BoardData) => {
     setDenise({ state, for: forData });
     const keys = deniseKeys(state);
@@ -188,7 +194,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     // Risks she expects (likely overruns) wait in her badge and brief: they
     // aren't urgent enough to take over the panel.
     const urgent = (k: string) => k.startsWith("conflict:") && !k.includes(":likely:");
-    if (fresh.some((k) => urgent(k) || (!first && (k.startsWith("reorder:") || k.startsWith("opening:"))))) {
+    if (fresh.some((k) => urgent(k) || (!first && (k.startsWith("reorder:") || k.startsWith("opening:")))) && busyWith.current === "none") {
       setTab("denise");
       setPanelOpen(true);
     }
@@ -238,15 +244,40 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const undo = (actionId: string) => decide(() => undoDeniseFix(actionId, data.date), null);
 
   async function ask(question: string) {
+    if (deniseRun.working) return;
     const history: ChatMessage[] = [...chat, { role: "user", text: question }];
     setChat(history);
     setTab("denise");
     setPanelOpen(true);
-    setAsking(true);
-    const reply = await askDenise(history, data.date);
-    setAsking(false);
-    setChat([...history, reply]);
+    const done = await startDenise({ action: "ask", date: data.date, history }, "Reading your question…");
+    setChat([...history, { role: "denise", text: done.reply.text, suggestions: done.suggestions }]);
   }
+
+  // Something that triggers Denise (a report, a cancellation): she shows
+  // she's thinking at once, then always replies. Her panel opens, unless
+  // someone is in the middle of a booking, when her badge calls instead.
+  async function trigger(request: DeniseRequest, firstStatus: string) {
+    const midTask = selection.kind === "book" || selection.kind === "edit" || selection.kind === "new-block" || selection.kind === "group";
+    if (!midTask) {
+      setTab("denise");
+      setPanelOpen(true);
+    }
+    setOutcome(null);
+    const done = await startDenise(request, firstStatus);
+    if (done.state) {
+      // Conflicts from this report are new, whatever was seen before.
+      for (const k of [...seen.current]) if (k.startsWith("conflict:")) seen.current.delete(k);
+      showDenise(done.state, data);
+    }
+    setChat((all) => [...all, { role: "denise", text: done.reply.text }]);
+    if (midTask) setUnseen((all) => new Set([...all, `reply:${all.size}:${done.reply.text}`]));
+    router.refresh();
+  }
+  const firstNameOf = (staffId: string) => data.columns.find((c) => c.staffId === staffId)?.firstName ?? "the stylist";
+  const markOut = (staffId: string) =>
+    trigger({ action: "report_out", date: data.date, staffId }, `Looking at ${firstNameOf(staffId)}'s clients${data.date === data.today ? " for the rest of today" : ""}…`);
+  const reportLate = (itemId: string, minutes: number) => trigger({ action: "report_late", date: data.date, itemId, minutes }, "Checking what that pushes into…");
+  const onCanceled = (appointmentId: string) => trigger({ action: "canceled", date: data.date, appointmentId }, "Looking at the time that opened up…");
   // Following a link from the Dashboard (the panel and column are set up
   // above): scroll to the stylist's column, ask the question, and tidy the
   // address so a reload doesn't ask again. Once, on arrival.
@@ -264,10 +295,6 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onReported = (state: DeniseState) => {
-    for (const k of [...seen.current]) if (k.startsWith("conflict:")) seen.current.delete(k);
-    showDenise(state, data);
-  };
 
   // The fix shown on the calendar: the one hovered in Denise's panel, or her
   // first suggestion. Blocks it's about glow; where they'd go shows dashed.
@@ -594,7 +621,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         )}
                         {c.working && data.date >= data.today && (me.canBook || me.staffId === c.staffId) && (
                           <div className="absolute top-1.5 right-1">
-                            <OutMenu column={c} date={data.date} today={data.today} onReported={onReported} />
+                            <OutMenu column={c} date={data.date} today={data.today} onMarkOut={markOut} />
                           </div>
                         )}
                       </div>
@@ -796,7 +823,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             <DenisePanel
               data={data}
               state={deniseState && { ...deniseState, conflicts }}
-              working={deciding || asking || (scanning && !deniseState)}
+              working={deciding || deniseRun.working || (scanning && !deniseState)}
+              run={deniseRun}
               outcome={outcome}
               chat={chat}
               preview={preview}
@@ -820,7 +848,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               me={me}
               onEdit={() => select({ kind: "edit", appointmentId: selection.appointmentId })}
               onClose={closeDetails}
-              onReported={onReported}
+              onReportLate={reportLate}
+              onCanceled={onCanceled}
               onOpenVisit={(appointmentId) => select({ kind: "detail", appointmentId })}
               products={data.menu.products}
             />
@@ -1100,10 +1129,8 @@ function BlockHint({ id, details, rect }: { id: string; details: string[]; rect:
 const MENU_WIDTH = 340;
 const MENU_MARGIN = 8;
 
-function OutMenu({ column, date, today, onReported }: { column: ColumnData; date: string; today: string; onReported: (state: DeniseState) => void }) {
+function OutMenu({ column, date, today, onMarkOut }: { column: ColumnData; date: string; today: string; onMarkOut: (staffId: string) => void }) {
   const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const popover = useRef<HTMLDivElement>(null);
   // Where the popover sits: just below the stylist's header (never over
@@ -1134,14 +1161,10 @@ function OutMenu({ column, date, today, onReported }: { column: ColumnData; date
     };
   }, [open]);
 
-  async function markOut() {
-    setPending(true);
-    setError(null);
-    const result = await reportOut(column.staffId, date);
-    setPending(false);
-    if (!result.ok) return setError(result.message);
+  // Denise takes it from here, in her panel (and says if it didn't work).
+  function markOut() {
     setOpen(false);
-    onReported(result.state);
+    onMarkOut(column.staffId);
   }
 
   return (
@@ -1164,16 +1187,11 @@ function OutMenu({ column, date, today, onReported }: { column: ColumnData; date
             <p className="text-ink">
               Mark {column.firstName} out {restOfDay ? "for the rest of the day" : "for the day"}? Denise will find new places for {column.firstName}&apos;s clients.
             </p>
-            {error && (
-              <p role="alert" className="text-danger">
-                {error}
-              </p>
-            )}
             <div className="flex flex-wrap gap-2">
-              <Button variant="primary" size="sm" disabled={pending} onClick={markOut} className="whitespace-nowrap">
+              <Button variant="primary" size="sm" onClick={markOut} className="whitespace-nowrap">
                 {restOfDay ? "Out for the rest of the day" : "Out for the day"}
               </Button>
-              <Button size="sm" disabled={pending} onClick={() => setOpen(false)} className="whitespace-nowrap">
+              <Button size="sm" onClick={() => setOpen(false)} className="whitespace-nowrap">
                 Cancel
               </Button>
             </div>
