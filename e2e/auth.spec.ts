@@ -19,9 +19,11 @@ test("a wrong password shows an error and keeps the email", async ({ page }) => 
   await expect(page).toHaveURL("/login");
 });
 
-test("signing in shows the location's staff, and signing out ends the session", async ({ page }) => {
+test("signing in greets you on the Dashboard, the team is under Team, and signing out ends the session", async ({ page }) => {
   await signIn(page, "owner@mapleandash.test");
-  await expect(ui(page).getByRole("heading", { name: "Maple & Ash Downtown" })).toBeVisible();
+  await expect(ui(page).getByRole("heading", { level: 1 })).toHaveText(/^Good (morning|afternoon|evening), Olivia$/);
+  await page.locator("aside").first().getByRole("link", { name: "Team" }).click();
+  await expect(page).toHaveURL("/team");
   await expect(ui(page).getByRole("heading", { name: "Staff (10)" })).toBeVisible();
   await expect(ui(page).getByText("Olivia Bennett(you)")).toBeVisible();
 

@@ -20,6 +20,7 @@ import { CompensationForm } from "./compensation-form";
 import { DayChangeForm } from "./day-change-form";
 import { HoursEditor, type HoursRows } from "./hours-editor";
 import { StaffPhotoForm } from "./staff-photo";
+import { TeamTabs } from "../team/team-tabs";
 import { TimeOffForm } from "./time-off-form";
 
 
@@ -114,9 +115,9 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
   };
 
   return (
-    <AppShell section="schedule" me={me}>
+    <AppShell section="team" me={me}>
       <PageHeader
-        title="Schedule"
+        title="Team"
         description="Working hours, one-off changes and time off."
         actions={
           <Link href="/schedule/opening-hours" className={buttonClass("secondary", "md")}>
@@ -125,6 +126,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
           </Link>
         }
       />
+      <TeamTabs current="schedule" />
 
       {manager && pending.data.length > 0 && (
         <section aria-labelledby="requests-heading" className={`${cardClass} border-status-late-ink/30`}>

@@ -148,4 +148,7 @@ export type BoardData = {
   me: { staffId: string; role: StaffRole; canBook: boolean };
   // See loadCalendarStamp: the board reloads when it changes.
   stamp: string;
+  // What a link asked to show (from the Dashboard): a stylist's column,
+  // Denise's panel, a booking, or a question for Denise.
+  focus: { staffId: string | null; denise: boolean; appointmentId: string | null; ask: string | null };
 };

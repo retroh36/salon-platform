@@ -32,7 +32,7 @@ async function OpeningHours() {
   );
 
   return (
-    <AppShell section="schedule" me={me}>
+    <AppShell section="team" me={me}>
       <Link href="/schedule" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-ink-muted transition-colors duration-(--motion-fast) hover:text-navy-900">
         <ChevronLeftIcon className="size-4" />
         Schedule

@@ -17,7 +17,7 @@ function day(page: Page, date: string) {
 // Each helper waits for its navigation to finish, so the next click uses the
 // new page's links.
 async function pickStaff(page: Page, firstName: string) {
-  await ui(page).getByRole("navigation", { name: "Team" }).getByRole("link", { name: firstName }).click();
+  await ui(page).getByRole("navigation", { name: "Team", exact: true }).getByRole("link", { name: firstName }).click();
   await expect(ui(page).getByRole("heading", { level: 2, name: new RegExp(`^${firstName} `) })).toBeVisible();
 }
 
@@ -214,7 +214,7 @@ test.describe("stylists", () => {
     await page.goto(`/schedule?staff=${SEED.staff.sandra}`);
     // Asking for someone else's schedule still shows their own.
     await expect(ui(page).getByRole("heading", { level: 2 })).toHaveText("Bridget Callahan(you)");
-    await expect(ui(page).getByRole("navigation", { name: "Team" })).toHaveCount(0);
+    await expect(ui(page).getByRole("navigation", { name: "Team", exact: true })).toHaveCount(0);
     await expect(ui(page).getByRole("button", { name: "Save hours" })).toHaveCount(0);
     await expect(ui(page).getByRole("region", { name: "Weekly hours" })).toContainText("Tuesday9am–1pm, 2pm–6pm");
     await expect(ui(page).getByRole("region", { name: "Level and commission" })).toContainText("Service commission50%");

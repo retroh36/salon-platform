@@ -1,25 +1,19 @@
 "use server";
 
-import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { canBook } from "@/lib/appointments";
 import { getCurrentStaff } from "@/lib/auth";
 import { answer } from "@/lib/denise/assistant";
-import { briefFacts, briefTemplate, type Brief, type BriefFacts } from "@/lib/denise/brief";
-import { ANALYSIS_MODEL, claudeClient, explainFixes, firstNamesOnly, isConnected, writeBrief, type ClaudeClient } from "@/lib/denise/claude";
 import { assistantContext } from "@/lib/denise/context";
 import { approveFix, rejectFix, undoFix } from "@/lib/denise/fixes";
-import { suggestReorders } from "@/lib/denise/reorder";
-import { scanDay, type Viewer } from "@/lib/denise/scan";
-import type { ChatMessage, DeniseState, FixResult, WaitlistOpening } from "@/lib/denise/types";
-import { DailyLimitReached, metered } from "@/lib/denise/usage";
+import { claudeFor, deniseDay, type DeniseAsker } from "@/lib/denise/day-state";
+import type { Viewer } from "@/lib/denise/scan";
+import type { ChatMessage, DeniseState, FixResult } from "@/lib/denise/types";
+import { DailyLimitReached } from "@/lib/denise/usage";
 import { isUuid } from "@/lib/ids";
-import { canReceiveOrders } from "@/lib/inventory";
 import { LATE_MINUTES, reportCallOut, reportRunningLate } from "@/lib/scheduling/disruptions";
-import { loadBookingContext, startOfLocalDay } from "@/lib/scheduling/load";
-import { isLocalDate, todayIn, toLocal } from "@/lib/scheduling/time";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { freedOn, loadWaitlist, waitlistOpenings } from "@/lib/waitlist-load";
+import { startOfLocalDay } from "@/lib/scheduling/load";
+import { isLocalDate, todayIn } from "@/lib/scheduling/time";
 import { bookWaitlistEntry } from "@/lib/waitlist-book";
 
 const NOT_SIGNED_IN = "Sign in again.";
@@ -41,73 +35,12 @@ async function session() {
 
 type Session = NonNullable<Awaited<ReturnType<typeof session>>>;
 
-// Claude, metered for this salon (tokens logged, daily limit), or null when
-// Denise isn't connected.
-function claudeFor(s: Session, feature: string): ClaudeClient | null {
-  const client = claudeClient();
-  return client ? metered(client, createAdminClient(), s.me.business_id, feature) : null;
+function asker(s: Session): DeniseAsker {
+  return { supabase: s.supabase, role: s.me.role, businessId: s.me.business_id, viewer: s.viewer, today: s.today };
 }
 
-// Claude rewrites the brief at most this often while the facts keep
-// changing; in between, the template (always up to date) shows.
-const BRIEF_REWRITE_MS = 20 * 60_000;
-
-async function briefFor(s: Session, facts: BriefFacts): Promise<Brief> {
-  const template: Brief = { facts, text: briefTemplate(facts), writtenBy: "template" };
-  const client = claudeFor(s, "morning_brief");
-  if (!client) return template;
-  const admin = createAdminClient();
-  const hash = createHash("sha256").update(JSON.stringify(firstNamesOnly(facts))).digest("hex");
-  const { data: cached } = await admin.from("denise_briefs").select("facts_hash, text, created_at").eq("location_id", s.viewer.location.id).eq("day", facts.date).maybeSingle();
-  if (cached?.facts_hash === hash) return { facts, text: cached.text, writtenBy: "claude" };
-  if (cached && Date.now() - new Date(cached.created_at).getTime() < BRIEF_REWRITE_MS) return template;
-  const text = await writeBrief(client, facts).catch(() => null);
-  if (!text) return template;
-  await admin.from("denise_briefs").upsert({ location_id: s.viewer.location.id, day: facts.date, facts_hash: hash, text, model: ANALYSIS_MODEL, created_at: new Date().toISOString() });
-  return { facts, text, writtenBy: "claude" };
-}
-
-async function look(s: Session, date: string): Promise<DeniseState> {
-  const connected = isConnected();
-  // Reorders she's drafted on the Inventory page, for those who order.
-  const reorders = canReceiveOrders(s.me.role)
-    ? (await suggestReorders(s.supabase, { location: s.viewer.location, canManage: false })).map((r) => ({
-        supplierId: r.supplierId,
-        supplier: r.supplier,
-        headline: r.headline,
-        lines: r.lines.length,
-        totalCents: r.totalCents,
-      }))
-    : [];
-  // Past days can't be changed, so there's nothing to fix.
-  if (date < s.today) return { date, conflicts: [], notices: [], reorders, openings: [], brief: null, connected };
-  const client = claudeFor(s, "explain_fixes");
-  const [state, openings] = await Promise.all([
-    scanDay(s.supabase, s.viewer, date, { explain: client ? (facts) => explainFixes(client, facts) : null }),
-    s.viewer.canBook ? openingsOn(s, date) : Promise.resolve([]),
-  ]);
-  // The morning brief: today, for the front of house.
-  let brief: Brief | null = null;
-  if (date === s.today && s.viewer.canBook) {
-    const facts = await briefFacts(s.supabase, { businessId: s.me.business_id, location: s.viewer.location }, date, { conflicts: state.conflicts, openings });
-    brief = await briefFor(s, facts);
-  }
-  return { ...state, reorders, openings, brief, connected };
-}
-
-// Time that opened up on the day, matched to the waitlist.
-async function openingsOn(s: Session, date: string): Promise<WaitlistOpening[]> {
-  const tz = s.viewer.location.timezone;
-  const entries = (await loadWaitlist(s.supabase, s.viewer.location.id, date)).filter((e) => e.fromDate <= date);
-  if (!entries.length) return [];
-  const [freed, ctx, { data: staff, error }] = await Promise.all([
-    freedOn(s.supabase, s.viewer.location.id, date, tz),
-    loadBookingContext(s.supabase, s.viewer.location, date, date),
-    s.supabase.from("staff").select("id, first_name"),
-  ]);
-  if (error) throw error;
-  const notBefore = date === s.today ? toLocal(new Date(), tz).minute : 0;
-  return waitlistOpenings(ctx, date, freed, entries, new Map(staff.map((x) => [x.id, x.first_name])), notBefore);
+function look(s: Session, date: string): Promise<DeniseState> {
+  return deniseDay(asker(s), date);
 }
 
 // Books a waitlist client into an opening Denise found (staff choose and
@@ -200,7 +133,7 @@ export async function askDenise(history: ChatMessage[], date: string): Promise<C
   const s = await session();
   if (!s) return { role: "denise", text: NOT_SIGNED_IN };
   if (!isLocalDate(date) || !history.length) return { role: "denise", text: "What would you like to know?" };
-  const client = claudeFor(s, "ask_denise");
+  const client = claudeFor(s.me.business_id, "ask_denise");
   if (!client) return { role: "denise", text: NOT_CONNECTED };
 
   const context = await assistantContext(

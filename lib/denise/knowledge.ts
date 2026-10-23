@@ -299,7 +299,9 @@ export function salesRange(period: SalesPeriod, today: LocalDate): { from: Local
 }
 
 // Checked-out services at the prices booked, retail sold, and visits.
-async function salesBetween(supabase: Supabase, me: Asker, from: LocalDate, to: LocalDate) {
+// Checked-out service and retail sales between two dates (also the
+// Dashboard's "this week").
+export async function salesBetween(supabase: Supabase, me: Pick<Asker, "location">, from: LocalDate, to: LocalDate) {
   const tz = me.location.timezone;
   const start = startOfLocalDay(from, tz).toISOString();
   const end = startOfLocalDay(addDays(to, 1), tz).toISOString();

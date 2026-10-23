@@ -70,9 +70,12 @@ test.describe("owner", () => {
     await expect(ui(page).getByRole("heading", { level: 1 })).toContainText("Prairie Pro Distributors");
   });
 
-  test("sees low stock on the dashboard", async ({ page }) => {
+  test("sees stock upcoming services need on the dashboard", async ({ page }) => {
     await page.goto("/dashboard");
-    await expect(ui(page).getByTestId("low-stock-alert")).toContainText("below the reorder point");
+    const stock = ui(page).getByTestId("opportunity-stock");
+    await expect(stock.getByRole("listitem").first()).toContainText(/Runs out|reorder point/);
+    await stock.getByRole("link", { name: "See all low stock" }).click();
+    await expect(page).toHaveURL("/inventory?low=1");
   });
 });
 

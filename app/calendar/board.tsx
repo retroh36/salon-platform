@@ -87,8 +87,11 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // What the right panel shows, and which off-duty stylists are expanded.
   // Both reset when the day changes.
   const [shownDate, setShownDate] = useState(data.date);
-  const [selection, setSelection] = useState<Selection>({ kind: "none" });
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  // A link from the Dashboard can ask for a booking, a stylist's column or
+  // Denise's panel (data.focus).
+  const linked = data.focus.appointmentId && data.appointments[data.focus.appointmentId] ? data.focus.appointmentId : null;
+  const [selection, setSelection] = useState<Selection>(linked ? { kind: "detail", appointmentId: linked } : { kind: "none" });
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set(data.focus.staffId ? [data.focus.staffId] : []));
   // Denise: her view of the day (for the board's data she last looked at),
   // and what she's doing.
   const [denise, setDenise] = useState<{ state: DeniseState; for: BoardData } | null>(null);
@@ -106,10 +109,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     setOutcome(null);
     setPreview(null);
   }
-  const [tab, setTab] = useState<Tab>("denise");
+  const [tab, setTab] = useState<Tab>(linked ? "details" : "denise");
   // The panel is closed until something opens it: a booking, a new
   // booking, Denise spotting something, or a question for her.
-  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(Boolean(linked || data.focus.denise || data.focus.ask));
   // What Denise has that hasn't been looked at in her panel yet.
   const [unseen, setUnseen] = useState<ReadonlySet<string>>(new Set());
 
@@ -126,6 +129,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const [blockDrag, setBlockDrag] = useState<BlockDrag | null>(null);
   const [blockMoves, setBlockMoves] = useState<Record<string, { start: number; end: number }>>({});
   const [settling, setSettling] = useState<string | null>(null);
+  // A stylist's column a link asked for, tinted for a moment.
+  const [focusedStaff, setFocusedStaff] = useState<string | null>(data.focus.staffId);
   const dragRef = useRef<Drag | null>(null);
 
   // Loads the day again when the calendar changes elsewhere (another desk,
@@ -242,6 +247,23 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     setAsking(false);
     setChat([...history, reply]);
   }
+  // Following a link from the Dashboard (the panel and column are set up
+  // above): scroll to the stylist's column, ask the question, and tidy the
+  // address so a reload doesn't ask again. Once, on arrival.
+  const followed = useRef(false);
+  useEffect(() => {
+    if (followed.current) return;
+    followed.current = true;
+    const { staffId, denise: openDenise, appointmentId, ask: question } = data.focus;
+    if (!staffId && !openDenise && !appointmentId && !question) return;
+    if (staffId) columnRefs.current.get(staffId)?.scrollIntoView({ inline: "center", block: "nearest" });
+    if (staffId) setTimeout(() => setFocusedStaff(null), 2500);
+    if (question) queueMicrotask(() => ask(question));
+    window.history.replaceState(null, "", data.date === data.today ? "/calendar" : `/calendar?date=${data.date}`);
+    // Only on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const onReported = (state: DeniseState) => {
     for (const k of [...seen.current]) if (k.startsWith("conflict:")) seen.current.delete(k);
     showDenise(state, data);
@@ -617,7 +639,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         data-staff-id={c.staffId}
                         onClick={(e) => onSlotClick(e, c)}
                         className={`relative min-w-0 border-l border-line transition-colors duration-(--motion-fast) ${me.canBook ? "cursor-cell" : ""} ${
-                          drag?.moved && drag.staffId === c.staffId ? "bg-navy-100/40" : ""
+                          (drag?.moved && drag.staffId === c.staffId) || focusedStaff === c.staffId ? "bg-navy-100/40" : ""
                         }`}
                         style={{
                           height,

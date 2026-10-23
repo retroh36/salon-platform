@@ -11,8 +11,8 @@ type Me = {
 // The app's page layout: the AppFrame sidebar and search bar around the
 // page, with the content fading in on arrival. `bleed` gives the page the
 // full width and height (the calendar); otherwise content sits in a
-// centered column.
-export function AppShell({ section, me, bleed = false, children }: { section: Section; me: Me; bleed?: boolean; children: React.ReactNode }) {
+// centered column (`wide`: a little wider, for the Dashboard).
+export function AppShell({ section, me, bleed = false, wide = false, children }: { section: Section; me: Me; bleed?: boolean; wide?: boolean; children: React.ReactNode }) {
   return (
     <AppFrame
       section={section}
@@ -21,7 +21,7 @@ export function AppShell({ section, me, bleed = false, children }: { section: Se
       locationName={me.location.name}
       user={{ name: me.first_name, role: me.role }}
     >
-      {bleed ? children : <div className="mx-auto w-full max-w-5xl animate-fade-in px-4 py-8 sm:px-8">{children}</div>}
+      {bleed ? children : <div className={`mx-auto w-full animate-fade-in px-4 py-8 sm:px-8 ${wide ? "max-w-6xl" : "max-w-5xl"}`}>{children}</div>}
     </AppFrame>
   );
 }

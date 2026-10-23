@@ -47,7 +47,15 @@ export type ConflictView = {
 export type DeniseNotice = { id: string; appointmentId: string; itemId: string; text: string };
 
 // A reorder Denise has drafted on the Inventory page.
-export type ReorderNotice = { supplierId: string; supplier: string; headline: string; lines: number; totalCents: number };
+export type ReorderNotice = {
+  supplierId: string;
+  supplier: string;
+  headline: string;
+  lines: number;
+  totalCents: number;
+  // The most urgent few, with why.
+  items: { product: string; reason: string }[];
+};
 
 // Time that opened up, with waitlist clients who'd fit it, best first.
 export type OpeningMatch = { entryId: string; clientName: string; services: string; startMinute: number; endMinute: number; preferred: boolean; waitingSince: string };

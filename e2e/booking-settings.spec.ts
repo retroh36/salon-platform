@@ -75,7 +75,7 @@ test("a stylist's photo, added on the schedule page, shows on the booking site",
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
   try {
     await page.goto("/schedule");
-    await ui(page).getByRole("navigation", { name: "Team" }).getByRole("link", { name: "Shae" }).click();
+    await ui(page).getByRole("navigation", { name: "Team", exact: true }).getByRole("link", { name: "Shae" }).click();
     await expect(ui(page).getByRole("heading", { level: 2, name: /^Shae / })).toBeVisible();
     await waitForHydration(page, "form[aria-label=Photo] button");
     const form = ui(page).getByRole("form", { name: "Photo" });

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { isUuid } from "@/lib/ids";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { canBook, type AppointmentStatus } from "@/lib/appointments";
@@ -275,6 +276,12 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
 
   const data: BoardData = {
     stamp,
+    focus: {
+      staffId: typeof params.staff === "string" && isUuid(params.staff) ? params.staff : null,
+      denise: params.denise === "1",
+      appointmentId: typeof params.open === "string" && isUuid(params.open) ? params.open : null,
+      ask: typeof params.ask === "string" && params.ask.trim() ? params.ask.trim().slice(0, 300) : null,
+    },
     date,
     today,
     openLabel: open.length > 0 ? `Open ${formatIntervals(open)}` : "Salon closed",

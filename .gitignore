@@ -46,3 +46,4 @@ yarn-error.log*
 /e2e/.auth/
 /.next-e2e/
 /evals/denise-report.txt
+/e2e/screenshots/

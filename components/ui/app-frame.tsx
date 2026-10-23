@@ -6,7 +6,7 @@ import { BoxIcon, CalendarIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, 
 import { SalonMark } from "@/components/ui/salon-mark";
 import { roleLabel, type StaffRole } from "@/lib/staff";
 
-export type Section = "dashboard" | "my-day" | "calendar" | "clients" | "schedule" | "services" | "durations" | "inventory" | "forms" | "settings";
+export type Section = "dashboard" | "my-day" | "calendar" | "clients" | "team" | "services" | "durations" | "inventory" | "forms" | "settings";
 
 type NavItem = { section: Section; href: string; label: string; Icon: (p: { className?: string }) => React.ReactNode; ownersOnly?: boolean; managersOnly?: boolean; stylistsOnly?: boolean };
 
@@ -15,7 +15,7 @@ const NAV: NavItem[] = [
   { section: "my-day", href: "/my-day", label: "My day", Icon: ClockIcon, stylistsOnly: true },
   { section: "calendar", href: "/calendar", label: "Calendar", Icon: CalendarIcon },
   { section: "clients", href: "/clients", label: "Clients", Icon: UserIcon },
-  { section: "schedule", href: "/schedule", label: "Team schedule", Icon: TeamIcon },
+  { section: "team", href: "/team", label: "Team", Icon: TeamIcon },
   { section: "services", href: "/services", label: "Services", Icon: ScissorsIcon },
   { section: "durations", href: "/durations", label: "Durations", Icon: ClockIcon, managersOnly: true },
   { section: "inventory", href: "/inventory", label: "Inventory", Icon: BoxIcon },

@@ -107,6 +107,8 @@
   --animate-soft-bounce: soft-bounce 900ms var(--ease-out) 3;
   --animate-breathe: breathe 1.4s ease-in-out infinite alternate;
   --animate-step-in: step-in 250ms var(--ease-out) both;
+  --animate-skeleton: skeleton 1.2s ease-in-out infinite alternate;
+  --animate-grow-up: grow-up 400ms var(--ease-out) both;
 
   @keyframes panel-in {
     from {
@@ -138,6 +140,21 @@
     from {
       opacity: 0;
       transform: translateY(12px) scale(0.98);
+    }
+  }
+  /* Placeholders while the Dashboard loads: a slow shimmer. */
+  @keyframes skeleton {
+    from {
+      opacity: 0.55;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  /* The week's bars rising from the baseline. */
+  @keyframes grow-up {
+    from {
+      transform: scaleY(0);
     }
   }
   /* The Maestra mark while a page loads: a slow, small breath. */
