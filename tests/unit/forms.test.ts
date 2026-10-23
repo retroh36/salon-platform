@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkAnswers, missingForms, parseFields, type FormField, type FormTemplate } from "@/lib/forms";
+import { checkAnswers, missingForms, parseFields, requiredForms, type FormField, type FormTemplate } from "@/lib/forms";
 
 const SIG = "data:image/png;base64,AAAA";
 const FIELDS: FormField[] = [
@@ -44,5 +44,7 @@ describe("forms a client still needs", () => {
     expect(missingForms(templates, new Set(), { firstVisit: true, serviceIds: ["cut"] }).map((f) => f.id)).toEqual(["consult"]);
     expect(missingForms(templates, new Set(), { firstVisit: false, serviceIds: ["cut", "balayage"] }).map((f) => f.id)).toEqual(["color"]);
     expect(missingForms(templates, new Set(["consult", "color"]), { firstVisit: true, serviceIds: ["balayage"] })).toEqual([]);
+    // What the visit needs, signed or not (booking details ticks the signed ones).
+    expect(requiredForms(templates, { firstVisit: true, serviceIds: ["balayage"] }).map((f) => f.id)).toEqual(["consult", "color"]);
   });
 });

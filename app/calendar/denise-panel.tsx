@@ -7,7 +7,7 @@ import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/field";
 import { CheckCircleIcon, ChevronDownIcon, ClockIcon, CloseIcon, SendIcon, UndoIcon } from "@/components/ui/icons";
 import { noFixAdvice } from "@/lib/denise/respond";
-import type { BookingSuggestion, ChatMessage, ConflictView, DeniseState, FixView, OpeningMatch, WaitlistOpening } from "@/lib/denise/types";
+import type { BookingSuggestion, ChatMessage, ConflictView, DeniseNotice, DeniseState, FixView, OpeningMatch, WaitlistOpening } from "@/lib/denise/types";
 import { formatLongDay } from "@/lib/schedule-format";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
@@ -48,6 +48,7 @@ export function DenisePanel({
   onAsk,
   onOpen,
   onDismissNotice,
+  onNoShow,
   onBook,
   onRejectSuggestion,
   onBookWaitlist,
@@ -73,6 +74,8 @@ export function DenisePanel({
   onOpen: (appointmentId: string) => void;
   // A "hasn't checked in" line dismissed (it stays gone today).
   onDismissNotice: (id: string) => void;
+  // Marks a client who hasn't arrived as a no-show.
+  onNoShow: (notice: DeniseNotice) => void;
   // Approve a booking Denise suggested, for this client.
   onBook: (actionId: string, clientId: string) => void;
   onRejectSuggestion: (actionId: string) => void;
@@ -137,12 +140,13 @@ export function DenisePanel({
         />
       ))}
 
-      {/* Clients due who haven't checked in: one card, a line each. */}
+      {/* Clients who haven't arrived 15 minutes after they were due: one
+          card, a line each, to call them or mark a no-show. */}
       {notices.length > 0 && (
-        <section aria-label="Not checked in yet" data-testid="denise-late" className="flex animate-fade-in flex-col gap-2 rounded-xl border border-denise-200 bg-denise-50 p-3">
+        <section aria-label="Not arrived" data-testid="denise-late" className="flex animate-fade-in flex-col gap-2 rounded-xl border border-denise-200 bg-denise-50 p-3">
           <p className="flex items-center gap-2 font-semibold text-denise-900">
             <ClockIcon className="size-4 shrink-0 text-denise-700" />
-            {notices.length === 1 ? "Hasn't checked in yet" : `${notices.length} haven't checked in yet`}
+            {notices.length === 1 ? "Not arrived yet" : `${notices.length} not arrived yet`}
           </p>
           <ul className="flex flex-col gap-1.5">
             {notices.map((n) => (
@@ -155,14 +159,21 @@ export function DenisePanel({
                   Open
                 </Button>
                 {data.me.canBook && (
-                  <IconButton label={`Dismiss ${n.clientName}`} size="sm" onClick={() => onDismissNotice(n.id)}>
-                    <CloseIcon className="size-4" />
-                  </IconButton>
+                  <>
+                    <Button size="sm" variant="ghost" className="whitespace-nowrap" onClick={() => onNoShow(n)}>
+                      Mark no-show
+                    </Button>
+                    <IconButton label={`Dismiss ${n.clientName}`} size="sm" onClick={() => onDismissNotice(n.id)}>
+                      <CloseIcon className="size-4" />
+                    </IconButton>
+                  </>
                 )}
               </li>
             ))}
           </ul>
-          <p className="text-xs text-ink-muted">If they&apos;re on the way, open the booking and tell me how late; I&apos;ll rearrange things.</p>
+          <p className="text-xs text-ink-muted">
+            Give them a call (their number&apos;s in the booking), or mark a no-show. If they&apos;re on the way, open the booking and tell me how late; I&apos;ll rearrange things.
+          </p>
         </section>
       )}
 

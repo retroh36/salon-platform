@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bookedSummary, compactHours, quarterMarks, summaryVariants, ZOOM_PX_PER_MINUTE, FAMILIES, FAMILY_LABELS, gridRange, hourMarks, laneBox, layoutColumn, offHours, serviceFamily } from "@/lib/calendar";
+import { bookedSummary, compactHours, quarterMarks, summaryVariants, timeRangeVariants, ZOOM_PX_PER_MINUTE, FAMILIES, FAMILY_LABELS, gridRange, hourMarks, laneBox, layoutColumn, offHours, serviceFamily } from "@/lib/calendar";
 
 const h = (hours: number, minutes = 0) => hours * 60 + minutes;
 const span = (start: number, end: number) => ({ start, end });
@@ -172,5 +172,13 @@ describe("bookedSummary", () => {
     expect(summaryVariants("7 visits · 6h 10m booked")).toEqual(["7 visits · 6h 10m booked", "7 visits · 6h 10m", "7 · 6h 10m"]);
     expect(summaryVariants("1 visit · 45m booked")).toEqual(["1 visit · 45m booked", "1 visit · 45m", "1 · 45m"]);
     expect(summaryVariants("No bookings")).toEqual(["No bookings"]);
+  });
+});
+
+describe("a block's time", () => {
+  it("is always the whole range, shortened to fit", () => {
+    expect(timeRangeVariants(645, 730)).toEqual(["10:45am–12:10pm", "10:45–12:10"]);
+    expect(timeRangeVariants(780, 840)).toEqual(["1pm–2pm", "1–2pm", "1–2"]);
+    expect(timeRangeVariants(570, 615)).toEqual(["9:30am–10:15am", "9:30–10:15am", "9:30–10:15"]);
   });
 });

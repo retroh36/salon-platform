@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { addDays, fromLocal, toLocal, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, pxPerMinute, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, checkIn, expect, moreAction, pxPerMinute, test, ui, waitForHydration } from "./fixtures";
 
 // The calendar's day: undoing a check-in, the patch test notice in booking
 // details, zoom, opening at the current time, and Denise's late-arrivals
@@ -14,6 +14,8 @@ const today = todayIn(TZ);
 const DAY = addDays(today, 40);
 const PREFIX = `Cd${Date.now().toString(36)}`;
 const clientIds: string[] = [];
+// A signed form's signature (a 1×1 PNG).
+const SIGNATURE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
 async function client(first: string) {
   const { data } = await admin.from("clients").insert({ business_id: B, first_name: `${PREFIX}${first}`, last_name: "Test" }).select("id").single();
@@ -61,7 +63,7 @@ test.describe("front desk", () => {
     const id = await book(await client("Undo"), "Men's Cut", fromLocal(DAY, 10 * 60, TZ)!);
     await openDay(page);
     await ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Undo`) }).click();
-    await details(page).getByRole("button", { name: "Check in client" }).click();
+    await checkIn(details(page));
 
     // A toast with Undo, right after.
     const toast = page.getByTestId("check-in-toast");
@@ -69,12 +71,12 @@ test.describe("front desk", () => {
     await toast.getByRole("button", { name: "Undo" }).click();
     await expect(toast).toBeHidden();
     await expect.poll(() => status(id)).toBe("booked");
-    await expect(details(page).getByRole("button", { name: "Check in client" })).toBeVisible();
+    await expect(details(page).getByRole("button", { name: "Check in", exact: true })).toBeVisible();
 
     // Again, then from booking details once the toast has gone.
-    await details(page).getByRole("button", { name: "Check in client" }).click();
+    await checkIn(details(page));
     await expect.poll(() => status(id)).toBe("checked_in");
-    await details(page).getByRole("button", { name: "Undo check-in" }).click();
+    await moreAction(details(page), "Undo check-in");
     await expect.poll(() => status(id)).toBe("booked");
 
     const { data: events } = await admin.from("appointment_events").select("kind, staff_id").eq("appointment_id", id);
@@ -93,26 +95,54 @@ test.describe("front desk", () => {
     await expect(details(page).getByRole("button", { name: "Undo check-in" })).toHaveCount(0);
   });
 
-  test("shows a missing patch test near the top of booking details, and records one there", async ({ page }) => {
-    await book(await client("Patch"), "Gloss / Toner", fromLocal(DAY, 13 * 60, TZ)!);
+  test("lists what the visit needs in one checklist near the top, warns once at check-in, and ticks things off", async ({ page }) => {
+    const patchClient = await client("Patch");
+    const id = await book(patchClient, "Gloss / Toner", fromLocal(DAY, 13 * 60, TZ)!);
     await openDay(page);
     const block = ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Patch`) });
     // Nothing about it on the block.
     await expect(block.locator("[data-attention]")).toHaveCount(0);
     await block.click();
-    const notice = details(page).getByTestId("patch-notice");
-    await expect(notice).toContainText("Patch test missing — required for Gloss / Toner");
-    await expect(notice).toContainText("None on file for this client.");
-    // Above the services.
-    const [n, services] = await Promise.all([notice.boundingBox(), details(page).getByRole("region", { name: "Service" }).boundingBox()]);
+    const list = details(page).getByRole("region", { name: "Before this visit" });
+    const row = (label: string) => list.getByRole("listitem").filter({ hasText: label });
+    await expect(row("Patch test")).toContainText("Patch test — none on file");
+    await expect(row("Patch test")).toContainText("Needed for Gloss / Toner.");
+    await expect(row("Color consent")).toContainText("Color consent — not signed");
+    await expect(row("Color consent").getByRole("link", { name: "Fill it in now" })).toBeVisible();
+    await expect(row("New client consultation")).toContainText("not signed");
+    // The old separate boxes are gone; the checklist is above the services.
+    await expect(details(page).getByTestId("patch-notice")).toHaveCount(0);
+    await expect(details(page).getByText("Still to do for this visit")).toHaveCount(0);
+    const [n, services] = await Promise.all([list.boundingBox(), details(page).getByRole("region", { name: "Service" }).boundingBox()]);
     expect(n!.y).toBeLessThan(services!.y);
 
-    await notice.getByRole("button", { name: "Record a patch test" }).click();
-    const form = notice.getByRole("form", { name: "Record patch test" });
+    // Checking in warns once, with everything outstanding.
+    await details(page).getByRole("button", { name: "Check in", exact: true }).click();
+    const warning = details(page).getByRole("group", { name: "Before checking in" });
+    await expect(warning.getByRole("listitem")).toHaveText(["Patch test — none on file", "Color consent — not signed", "New client consultation — not signed"]);
+    await warning.getByRole("button", { name: "Not yet" }).click();
+    await expect(warning).toBeHidden();
+    expect(await status(id)).toBe("booked");
+
+    // Recording the patch test ticks its row.
+    await row("Patch test").getByRole("button", { name: "Record patch test" }).click();
+    const form = list.getByRole("form", { name: "Record patch test" });
     await form.getByLabel("Date").fill(addDays(today, -7));
     await form.getByLabel("Products tested").fill("Redken Shades EQ 09V");
     await form.getByRole("button", { name: "Record patch test" }).click();
-    await expect(details(page).getByTestId("patch-notice")).toHaveCount(0);
+    await expect(row("Patch test")).toHaveAttribute("data-done", "true");
+    await expect(row("Patch test")).toContainText(/Patch test — passed/);
+    await expect(row("Color consent")).not.toHaveAttribute("data-done");
+
+    // With the forms signed too, it's one line.
+    const { data: templates } = await admin.from("form_templates").select("id, name").in("name", ["Color consent", "New client consultation"]);
+    await admin.from("client_forms").insert(
+      templates!.map((t) => ({ business_id: B, client_id: patchClient, template_id: t.id, template_name: t.name, fields: [], answers: {}, signature: SIGNATURE, collected_by: SEED.staff.frontDesk })),
+    );
+    await page.reload();
+    await waitForHydration(page, "section[data-staff-id]");
+    await ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Patch`) }).click();
+    await expect(details(page).getByRole("region", { name: "Before this visit" })).toHaveText("Ready for this visit ✓");
   });
 
   test("zooms between Compact, Comfortable and Detailed, remembered for the person", async ({ page }) => {
@@ -168,20 +198,34 @@ test.describe("front desk", () => {
     expect((await ui(page).locator("[data-grid-header]").boundingBox())!.y).toBeCloseTo(header!.y, 0);
   });
 
-  test("groups clients who haven't checked in into one card, each dismissable for good", async ({ page }) => {
+  test("groups clients who haven't arrived into one card, to mark a no-show or dismiss for good", async ({ page }) => {
     const nowMinute = toLocal(new Date(), TZ).minute;
     test.skip(nowMinute < 60 || nowMinute > 23 * 60, "Needs room for visits due in the last hour");
-    const [ana, ben] = await Promise.all([client("Ana"), client("Ben")]);
-    // Due 15 and 50 minutes ago, one after the other (not a clash).
+    const [ana, ben, cy, dee] = await Promise.all([client("Ana"), client("Ben"), client("Cy"), client("Dee")]);
+    // Due 15 and 50 minutes ago, one after the other (not a clash), and
+    // 30 minutes ago with another stylist; 5 minutes ago is still in the
+    // grace period.
     await book(ana, "Men's Cut", new Date(Date.now() - 15 * 60_000));
     await book(ben, "Men's Cut", new Date(Date.now() - 50 * 60_000));
+    const cyVisit = await book(cy, "Men's Cut", new Date(Date.now() - 30 * 60_000), SEED.staff.nola);
+    await book(dee, "Men's Cut", new Date(Date.now() - 5 * 60_000), SEED.staff.shae);
     await openDay(page, today);
     await page.getByTestId("denise-launcher").click();
     const card = page.getByTestId("denise-late");
-    await expect(card).toContainText(/haven't checked in yet/);
+    await expect(card).toContainText(/not arrived yet/);
+    await expect(card).toContainText("Give them a call");
     const line = (name: string) => card.getByRole("listitem").filter({ hasText: `${PREFIX}${name}` });
     await expect(line("Ana")).toContainText(/Due \d/);
     await expect(line("Ben").getByRole("button", { name: "Open" })).toBeVisible();
+    await expect(line("Dee")).toHaveCount(0);
+    // On the calendar: "Not arrived", not a growing count; still a count
+    // in the grace period.
+    await expect(ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Ben`) }).locator("[data-attention=not-arrived]")).toHaveText("Not arrived");
+    await expect(ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Dee`) }).locator("[data-attention=late]")).toHaveText(/^\+\d+m$|^$/);
+
+    await line("Cy").getByRole("button", { name: "Mark no-show" }).click();
+    await expect(line("Cy")).toHaveCount(0);
+    await expect.poll(() => status(cyVisit)).toBe("no_show");
 
     await line("Ana").getByRole("button", { name: `Dismiss ${PREFIX}Ana Test` }).click();
     await expect(line("Ana")).toHaveCount(0);

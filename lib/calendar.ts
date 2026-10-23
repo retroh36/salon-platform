@@ -3,7 +3,7 @@
 // only; whether a booking is allowed is decided in lib/scheduling/booking.ts.
 
 import { subtractIntervals, type Interval } from "@/lib/scheduling/intervals";
-import { MINUTES_PER_DAY } from "@/lib/scheduling/time";
+import { formatMinute, MINUTES_PER_DAY } from "@/lib/scheduling/time";
 
 export type ServiceFamily = "color" | "cut" | "finish" | "treatment" | "other";
 
@@ -115,6 +115,24 @@ export function bookedSummary(items: readonly { appointmentId: string; minutes: 
 
 // Shorter forms of a booked summary for a narrow header, longest first:
 // "7 visits · 6h 10m booked", "7 visits · 6h 10m", "7 · 6h 10m".
+// A client who hasn't checked in this many minutes after their start shows
+// as "Not arrived" (not a growing count), and Denise suggests calling them
+// or marking a no-show.
+export const NOT_ARRIVED_MINUTES = 15;
+
+// A block's time, always the whole range, shortened to fit, longest first:
+// "10:45am–12:10pm", "10:45–12:10pm", "10:45–12:10".
+export function timeRangeVariants(start: number, end: number): string[] {
+  const bare = (m: number) => {
+    const h = Math.floor(m / 60) % 12 || 12;
+    return m % 60 ? `${h}:${String(m % 60).padStart(2, "0")}` : `${h}`;
+  };
+  const half = (m: number) => (Math.floor(m / 60) % 24 < 12 ? "am" : "pm");
+  const full = `${formatMinute(start)}–${formatMinute(end)}`;
+  const shorter = half(start) === half(end) ? `${bare(start)}–${formatMinute(end)}` : full;
+  return [...new Set([full, shorter, `${bare(start)}–${bare(end)}`])];
+}
+
 export function summaryVariants(summary: string): string[] {
   const short = summary.replace(/ booked$/, "");
   return [...new Set([summary, short, short.replace(/ visits? · /, " · ")])];

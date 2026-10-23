@@ -72,6 +72,7 @@ async function MyDay() {
                   <ServiceTimer
                     itemId={i.id}
                     big
+                    timeZone={tz}
                     times={{ startedAt: i.started_at, processingStartedAt: i.processing_started_at, processingEndedAt: i.processing_ended_at, finishedAt: i.finished_at }}
                     hasProcessing={i.processing_minutes > 0}
                     bookedMinutes={i.minutes}

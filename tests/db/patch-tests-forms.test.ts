@@ -101,22 +101,36 @@ describe("forms", () => {
     expect((await otherOwner.from("client_forms").select("id").eq("client_id", clientId)).data).toHaveLength(0);
   });
 
-  it("warns before a visit about missing forms and patch tests", async () => {
-    // A new client booking color: the consultation (first visit) and color consent.
+  it("lists what a visit needs, done or not, before it", async () => {
+    // A new client booking color: a patch test, the consultation (first
+    // visit) and color consent.
     const { data: c } = await admin.from("clients").insert({ business_id: B, first_name: "Newby", last_name: "Test" }).select("id").single();
     try {
       const warnings = await visitWarnings(frontDesk, B, [{ appointmentId: "a", clientId: c!.id, start: at(10), items: [{ serviceId: gloss, start: at(10) }] }]);
       expect(warnings.get("a")).toEqual({
         patch: ["No patch test on record for this client."],
-        patchNotices: [{ title: "Patch test missing — required for Gloss / Toner", detail: "None on file for this client." }],
         patchBlocks: false,
-        forms: [
-          { templateId: "e3000000-0000-4000-8000-000000000002", name: "Color consent" },
-          { templateId: "e3000000-0000-4000-8000-000000000001", name: "New client consultation" },
+        checklist: [
+          { key: "patch:missing", label: "Patch test", status: "none on file", detail: "Needed for Gloss / Toner.", done: false, blocks: false, action: { kind: "patch_test" } },
+          { key: "form:e3000000-0000-4000-8000-000000000002", label: "Color consent", status: "not signed", detail: null, done: false, blocks: false, action: { kind: "form", templateId: "e3000000-0000-4000-8000-000000000002" } },
+          { key: "form:e3000000-0000-4000-8000-000000000001", label: "New client consultation", status: "not signed", detail: null, done: false, blocks: false, action: { kind: "form", templateId: "e3000000-0000-4000-8000-000000000001" } },
         ],
       });
       const cutOnly = await visitWarnings(frontDesk, B, [{ appointmentId: "a", clientId: c!.id, start: at(10), items: [{ serviceId: cut, start: at(10) }] }]);
-      expect(cutOnly.get("a")?.forms.map((f) => f.name)).toEqual(["New client consultation"]);
+      expect(cutOnly.get("a")?.checklist.map((f) => f.label)).toEqual(["New client consultation"]);
+
+      // Once there's a patch test on file and the consent's signed, those
+      // rows are ticked rather than gone.
+      await admin.from("client_patch_tests").insert({ business_id: B, client_id: c!.id, tested_at: new Date(at(10).getTime() - 7 * 86_400_000).toISOString(), products: "6N + 20 vol", result: "no_reaction", performed_by: SEED.staff.frontDesk });
+      await admin.from("client_forms").insert({ business_id: B, client_id: c!.id, template_id: "e3000000-0000-4000-8000-000000000002", template_name: "Color consent", fields: [], answers: {}, signature: SIG, collected_by: SEED.staff.frontDesk });
+      const after = (await visitWarnings(frontDesk, B, [{ appointmentId: "a", clientId: c!.id, start: at(10), items: [{ serviceId: gloss, start: at(10) }] }])).get("a")!;
+      expect(after.patch).toEqual([]);
+      expect(after.checklist.map((r) => [r.label, r.done])).toEqual([
+        ["Patch test", true],
+        ["Color consent", true],
+        ["New client consultation", false],
+      ]);
+      expect(after.checklist[0].status).toMatch(/^passed /);
     } finally {
       await admin.from("clients").delete().eq("id", c!.id);
     }

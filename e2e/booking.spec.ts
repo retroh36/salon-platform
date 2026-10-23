@@ -3,7 +3,7 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { onCheckout } from "./checkout-helpers";
-import { AUTH, expect, test, ui, waitForHydration, pxPerMinute, slotAt } from "./fixtures";
+import { AUTH, expect, test, ui, waitForHydration, pxPerMinute, slotAt, checkIn, moreAction } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -145,7 +145,7 @@ test.describe("front desk", () => {
 
     const color = column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`^10am–11:45am, ${PREFIX}Ava Test, All-Over Color, .*with Shae, Chair 1`) });
     await expect(color).toBeVisible();
-    await expect(column(page, "Shae Morgan").getByRole("button", { name: new RegExp(`^11:45am–12:30pm, ${PREFIX}Ava Test, Blowout, with Bridget`) })).toBeVisible();
+    await expect(column(page, "Shae Morgan").getByRole("button", { name: new RegExp(`^11:45am–12:30pm, ${PREFIX}Ava Test, Blowout, part of a visit with Bridget`) })).toBeVisible();
 
     const { data } = await admin.from("appointments").select("id, created_by, updated_by").eq("location_id", L).gte("starts_at", at(0).toISOString()).lt("starts_at", at(23).toISOString());
     expect(data).toEqual([expect.objectContaining({ created_by: FRONT_DESK, updated_by: FRONT_DESK })]);
@@ -210,18 +210,18 @@ test.describe("front desk", () => {
 
     const detail = panel(page);
     await expect(detail).toContainText("Booked by Sam Rivera");
-    await detail.getByRole("button", { name: "Check in client" }).click();
-    await expect(detail.locator("[data-status]")).toHaveText("Checked in");
+    await checkIn(detail);
+    await expect(detail.locator("[data-status]")).toHaveText(/^Checked in/);
     await expect(detail.getByRole("button", { name: "Mark no-show" })).toHaveCount(0);
     // Checking out takes payment first.
-    await detail.getByRole("button", { name: "Check out client" }).click();
+    await detail.getByRole("button", { name: "Check out", exact: true }).click();
     const checkout = await onCheckout(page);
     await checkout.card();
     const done = await checkout.complete();
     await done.getByRole("link", { name: "Back to calendar" }).click();
     await waitForHydration(page, "section[data-staff-id]");
     await column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Cara Test`) }).click();
-    await expect(detail.locator("[data-status]")).toHaveText("Checked out");
+    await expect(detail.locator("[data-status]")).toHaveText(/^Checked out/);
     await expect(detail.getByRole("button", { name: "Edit booking" })).toHaveCount(0);
     await expect(detail).toContainText("Last changed by Sam Rivera");
     expect(await appointment(id)).toMatchObject({ status: "completed", updated_by: FRONT_DESK });
@@ -234,7 +234,7 @@ test.describe("front desk", () => {
     await block.click();
 
     const detail = panel(page);
-    await detail.getByRole("button", { name: "Cancel booking" }).click();
+    await moreAction(detail, "Cancel booking");
     const form = detail.getByRole("form", { name: "Cancel booking" });
     await form.getByLabel("Reason").selectOption("Other");
     await form.getByRole("button", { name: "Cancel booking" }).click();
@@ -253,7 +253,7 @@ test.describe("front desk", () => {
     const id = await seedVisit(await newClient("Eli"), [{ service: "Men's Cut", staff: SHAE, start: at(9) }]);
     await openDay(page);
     await column(page, "Shae Morgan").getByRole("button", { name: new RegExp(`${PREFIX}Eli Test`) }).click();
-    await panel(page).getByRole("button", { name: "Mark no-show" }).click();
+    await moreAction(panel(page), "Mark no-show");
     await expect(panel(page).locator("[data-status]")).toHaveText("No-show");
     await expect(column(page, "Shae Morgan").getByRole("button", { name: new RegExp(`${PREFIX}Eli Test.*No-show$`) })).toBeVisible();
     expect((await appointment(id)).status).toBe("no_show");

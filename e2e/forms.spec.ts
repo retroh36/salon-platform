@@ -108,17 +108,16 @@ test.describe("front desk", () => {
     await expect(ui(page).getByTestId("calendar-date")).toContainText(formatLongDay(DAY));
     await waitForHydration(page, "section[data-staff-id]");
     await ui(page).getByRole("region", { name: "Bridget Callahan", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Nova Test`) }).click();
-    // The patch test near the top, with a way to record one.
-    const patch = page.getByTestId("patch-notice");
-    await expect(patch).toContainText(/Patch test missing — required for .+None on file for this client\./);
-    await expect(patch.getByRole("button", { name: "Record a patch test" })).toBeVisible();
+    // One checklist near the top: the patch test with a way to record one,
+    // and each form with a way to fill it in.
     const before = page.getByRole("region", { name: "Before this visit" });
-    await expect(before).toContainText("Before check-in");
-    await expect(before).not.toContainText("patch test");
-    await expect(before).toContainText("Color consent isn't signed yet.");
-    await expect(before).toContainText("New client consultation isn't signed yet.");
+    const row = (label: string) => before.getByRole("listitem").filter({ hasText: label });
+    await expect(row("Patch test")).toContainText("Patch test — none on file");
+    await expect(row("Patch test").getByRole("button", { name: "Record patch test" })).toBeVisible();
+    await expect(row("Color consent")).toContainText("Color consent — not signed");
+    await expect(row("New client consultation")).toContainText("New client consultation — not signed");
 
-    await before.locator("p", { hasText: "New client consultation isn't signed yet." }).getByRole("link", { name: "Fill it in now" }).click();
+    await row("New client consultation").getByRole("link", { name: "Fill it in now" }).click();
     const form = page.getByRole("form", { name: "New client consultation" });
     await waitForHydration(page, "[data-testid=signature-pad]");
     await form.getByRole("button", { name: "Sign and submit" }).click();
@@ -139,7 +138,11 @@ test.describe("front desk", () => {
 
     await waitForHydration(page, "section[data-staff-id]");
     await ui(page).getByRole("region", { name: "Bridget Callahan", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Nova Test`) }).click();
-    await expect(page.getByRole("region", { name: "Before this visit" })).not.toContainText("New client consultation");
+    // Signed: ticked off, the rest still to do.
+    const after = page.getByRole("region", { name: "Before this visit" }).getByRole("listitem").filter({ hasText: "New client consultation" });
+    await expect(after).toHaveAttribute("data-done", "true");
+    await expect(after).toContainText("New client consultation — signed");
+    await expect(after.getByRole("link", { name: "Fill it in now" })).toHaveCount(0);
 
     // The signed form is on the client's profile.
     await page.goto(`/clients/${client}`);

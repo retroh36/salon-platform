@@ -138,6 +138,8 @@ test.describe("front desk", () => {
     await expect(form.getByRole("group", { name: "How far over is this running?" })).toBeVisible();
     await form.getByText("20 min").click();
     await form.getByRole("button", { name: "Tell Denise" }).click();
+    // Off her panel, so hovering an option doesn't preview it instead.
+    await page.mouse.move(5, 5);
 
     // Denise's panel slides in with her fix, pointing.
     await expect(deniseTab(page)).toHaveAttribute("aria-selected", "true");

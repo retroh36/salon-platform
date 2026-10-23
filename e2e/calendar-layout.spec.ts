@@ -46,8 +46,8 @@ test("short visits show name and time on one line, with the details on hover", a
   const short = bridget.getByRole("button", { name: new RegExp(`${PREFIX}Tiny`) });
   const next = bridget.getByRole("button", { name: new RegExp(`${PREFIX}Next`) });
 
-  // One line: the name (shortened if need be) and the time.
-  await expect(short).toHaveText(new RegExp(`${PREFIX}Tiny.* · 10am`));
+  // One line: the name (shortened if need be) and the whole time range.
+  await expect(short).toHaveText(new RegExp(`${PREFIX}Tiny.* · 10(am)?–10:15(am)?$`));
   const nameLine = short.locator("span.truncate").first();
   expect(await nameLine.evaluate((el) => getComputedStyle(el).textOverflow)).toBe("ellipsis");
 
@@ -71,14 +71,19 @@ test("short visits show name and time on one line, with the details on hover", a
   expect(r!.y).toBeGreaterThanOrEqual(s!.y - 0.5);
   expect(r!.y + r!.height).toBeLessThanOrEqual(s!.y + s!.height + 0.5);
   expect(r!.y + r!.height).toBeLessThanOrEqual(n!.y + 0.5);
-  expect(await ring.evaluate((el) => getComputedStyle(el).boxShadow)).toContain("inset");
+  // A subtle inset ring in the brand blue, not a heavy near-black outline.
+  const shadow = await ring.evaluate((el) => getComputedStyle(el).boxShadow);
+  expect(shadow).toContain("inset");
+  expect(shadow).not.toContain("rgb(23, 39, 59)");
 });
 
-test("Denise sits in the legend bar, not on top of the calendar", async ({ page }) => {
+test("the key is one small button under the calendar, with Denise at the end of its row", async ({ page }) => {
   await openDay(page);
   const launcher = page.getByTestId("denise-launcher");
   await expect(launcher).toBeVisible();
-  const legend = page.getByRole("list", { name: "Service families" });
+  // Folded away until asked for.
+  await expect(page.getByRole("list", { name: "Service families" })).toHaveCount(0);
+  const legend = page.getByRole("button", { name: "Key" });
   const [l, g] = await Promise.all([launcher.boundingBox(), legend.boundingBox()]);
   // On the legend's row, at its right end.
   expect(Math.abs(l!.y + l!.height / 2 - (g!.y + g!.height / 2))).toBeLessThan(l!.height);
@@ -93,6 +98,14 @@ test("Denise sits in the legend bar, not on top of the calendar", async ({ page 
       return (node ?? el).getBoundingClientRect().bottom;
     });
   expect(l!.y).toBeGreaterThanOrEqual(calendarBottom - 0.5);
+  // It opens the colors, statuses and levels.
+  await legend.click();
+  const key = page.getByRole("dialog", { name: "Calendar key" });
+  await expect(key.getByRole("list", { name: "Service families" })).toContainText("Color");
+  await expect(key.getByTestId("status-legend")).toContainText(/Checked in.*Checked out.*No-show/);
+  await expect(key.getByTestId("level-legend")).toBeVisible();
+  await page.mouse.click(5, 5);
+  await expect(key).toBeHidden();
   await launcher.click();
   await expect(page.locator("aside[aria-label]").first()).toBeVisible();
   await expect(launcher).toBeHidden();
@@ -115,7 +128,8 @@ test("shows each stylist's level as a colored ring, badge and bar, explained by 
     await expect(header(name).locator(`[data-level-badge=${level}]`)).toBeVisible();
   }
   expect(colors.size).toBe(3);
-  // The legend has the same badges; the calendar names no levels otherwise.
+  // The key has the same badges; the calendar names no levels otherwise.
+  await ui(page).getByRole("button", { name: "Key" }).click();
   const legend = ui(page).getByTestId("level-legend");
   for (const level of ["master", "senior", "artisan"]) await expect(legend.locator(`[data-level-badge=${level}]`)).toBeVisible();
   await expect(legend).toHaveText(/Master.*Senior.*Artisan/);

@@ -5,19 +5,20 @@ import { useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Eyebrow, fieldClass, labelClass, selectClass } from "@/components/ui/field";
-import { CalendarIcon, ClockIcon, GlobeIcon, HourglassIcon, ReceiptIcon, UndoIcon, WarningIcon } from "@/components/ui/icons";
+import { CalendarIcon, CheckCircleIcon, ChevronDownIcon, ClockIcon, GlobeIcon, HourglassIcon, MoreIcon, ReceiptIcon, UndoIcon, WarningIcon } from "@/components/ui/icons";
 import { PatchTestForm } from "@/app/clients/patch-test-form";
-import { StatusChip } from "@/components/ui/status-chip";
 import { ClientInsightCard } from "@/components/client-insight";
 import { ServiceTimer } from "@/components/service-timer";
-import { ACTION_LABELS, allowedActions, CANCEL_REASONS, canEditNotes, isEditable, MAX_NOTES, type AppointmentAction } from "@/lib/appointments";
+import { ACTION_LABELS, allowedActions, CANCEL_REASONS, canEditNotes, isEditable, MAX_NOTES, STATUS_LABELS, type AppointmentAction } from "@/lib/appointments";
+import type { ChecklistItem } from "@/lib/client-checks";
+import { EVENT_LABELS, nextStep, visitStatusText } from "@/lib/visit-times";
 import { formatLongDay } from "@/lib/schedule-format";
 import { LATE_MINUTES } from "@/lib/scheduling/disruptions";
 import { formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { formatMinutes, formatPrice } from "@/lib/services";
 import { UsageLinesEditor, toUsageJson, type DraftLine } from "@/components/usage-lines";
 import type { PickerProduct } from "@/lib/inventory-load";
-import { addVisitFormula, changeGroupVisitStatus, changeVisitStatus, changeVisitStatusScoped, saveVisitNotes, undoVisitCheckIn } from "./actions";
+import { addVisitFormula, changeGroupVisitStatus, changeVisitStatus, changeVisitStatusScoped, recordItemTime, saveVisitNotes, undoVisitCheckIn } from "./actions";
 import type { Scope } from "@/lib/scheduling/series";
 import { useNow } from "./now-line";
 import type { AppointmentDetail, BoardData } from "./types";
@@ -62,8 +63,11 @@ export function AppointmentPanel({
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [canceling, setCanceling] = useState(false);
-  const [recordingPatch, setRecordingPatch] = useState(false);
-  const patchNotices = appointment.warnings?.patchNotices ?? [];
+  const [confirmingCheckIn, setConfirmingCheckIn] = useState(false);
+  const [more, setMore] = useState(false);
+  // What the visit still needs before it goes ahead.
+  const checklist = client && (status === "booked" || status === "confirmed" || status === "checked_in") ? (appointment.warnings?.checklist ?? []) : [];
+  const outstanding = checklist.filter((c) => !c.done);
 
   function undoCheckIn() {
     setMessage(null);
@@ -78,7 +82,14 @@ export function AppointmentPanel({
   const total = items.reduce((sum, i) => sum + i.priceCents, 0);
   const notesEditable = canEditNotes(me.role, me.staffId, items.map((i) => i.staffId));
   const actions = me.canBook ? allowedActions(status) : [];
-  const primaryAction = actions.find((a) => a === "check_in" || a === "check_out");
+  // Times are tapped in on the day, by the front of house or the stylist.
+  const canTap = (staffId: string) => date === today && (me.canBook || staffId === me.staffId);
+  const step = nextStep(
+    status,
+    items.map((i) => ({ id: i.id, start: i.start, times: i.times, hasProcessing: i.processingMinutes > 0, canRecord: canTap(i.staffId) })),
+    me.canBook,
+  );
+  const stepItem = step?.kind === "tap" ? items.find((i) => i.id === step.itemId) : undefined;
   // The front of house, or a stylist on the visit, can say it's running late.
   const canReportLate = date >= today && isEditable(status) && (me.canBook || items.some((i) => i.staffId === me.staffId));
   const [reportingLate, setReportingLate] = useState(false);
@@ -105,6 +116,28 @@ export function AppointmentPanel({
     });
   }
 
+  function checkIn() {
+    setConfirmingCheckIn(false);
+    run("check_in");
+  }
+
+  function primary() {
+    if (!step) return;
+    if (step.kind === "check_out") return onCheckout();
+    if (step.kind === "check_in") return outstanding.length ? setConfirmingCheckIn(true) : checkIn();
+    setMessage(null);
+    startTransition(async () => {
+      const result = await recordItemTime(step.itemId, step.event);
+      if (!result.ok) setMessage(result.message);
+    });
+  }
+
+  const moreActions = [
+    status === "checked_in" && me.canBook && "undo_check_in",
+    actions.includes("no_show") && "no_show",
+    actions.includes("cancel") && "cancel",
+  ].filter(Boolean);
+
   return (
     <div className="flex flex-col gap-5 py-2 text-sm">
       <div className="flex items-center gap-4">
@@ -114,10 +147,12 @@ export function AppointmentPanel({
             {client?.name ?? (appointment.group ? `${appointment.group.label} guest` : "Walk-in")}
           </h3>
           {client?.phone && <p className="text-ink-muted">{client.phone}</p>}
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <StatusChip status={status} />
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <p data-testid="visit-status" data-status={status} className="font-medium text-ink">
+              {visitStatusText(status, STATUS_LABELS, appointment, timeZone)}
+            </p>
             {appointment.online && (
-              <span data-testid="online-badge" className="flex items-center gap-1 text-ink-muted">
+              <span data-testid="online-badge" className="flex items-center gap-1 whitespace-nowrap text-ink-muted">
                 <GlobeIcon className="size-4" />
                 Booked online
               </span>
@@ -134,25 +169,110 @@ export function AppointmentPanel({
         </div>
       </div>
 
-      {/* A patch test this visit needs and doesn't have, near the top. */}
-      {patchNotices.length > 0 && client && (
-        <section aria-label="Patch test" data-testid="patch-notice" className="flex flex-col gap-2 rounded-lg border border-status-late-ink/30 bg-status-late-bg px-3 py-2.5 text-status-late-ink">
-          {patchNotices.map((n) => (
-            <div key={n.title} className="flex gap-2">
-              <WarningIcon className="mt-0.5 size-4" />
-              <p>
-                <span className="block font-semibold">{n.title}</span>
-                {n.detail}
-                {appointment.warnings!.patchBlocks ? " The salon requires one before booking." : ""}
-              </p>
+      {/* Everything the visit needs (patch tests, forms), near the top. */}
+      {client && checklist.length > 0 && <VisitChecklist items={checklist} clientId={client.id} date={date} today={today} me={me} team={team} />}
+
+      {message && (
+        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-danger">
+          {message}
+        </p>
+      )}
+
+      {/* One main action for where the visit's at; the rest are secondary. */}
+      {(step || actions.length > 0 || (me.canBook && isEditable(status)) || canReportLate) && (
+        <section aria-label="Actions" className="flex flex-col gap-2">
+          {confirmingCheckIn ? (
+            <div role="group" aria-label="Before checking in" className="flex animate-fade-in flex-col gap-2 rounded-lg border border-status-late-ink/30 bg-status-late-bg px-3 py-2.5 text-status-late-ink">
+              <p className="font-semibold">Still to do before {client?.name.split(" ")[0] ?? "this visit"} checks in:</p>
+              <ul className="flex list-disc flex-col gap-0.5 pl-5">
+                {outstanding.map((c) => (
+                  <li key={c.key}>
+                    {c.label} — {c.status}
+                    {c.blocks && <span className="font-semibold"> (the salon requires this)</span>}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button variant="primary" disabled={pending} onClick={checkIn}>
+                  Check in anyway
+                </Button>
+                <Button disabled={pending} onClick={() => setConfirmingCheckIn(false)}>
+                  Not yet
+                </Button>
+              </div>
             </div>
-          ))}
-          {recordingPatch ? (
-            <PatchTestForm clientId={client.id} today={today} me={me.staffId} staff={team} compact />
           ) : (
-            <Button size="sm" className="self-start" onClick={() => setRecordingPatch(true)}>
-              Record a patch test
-            </Button>
+            step && (
+              <Button variant="primary" size="lg" disabled={pending} onClick={primary} data-testid="primary-action">
+                {step.kind === "tap" ? EVENT_LABELS[step.event] : step.kind === "check_in" ? "Check in" : "Check out"}
+                {stepItem && items.length > 1 && <span className="font-normal opacity-80">· {stepItem.serviceName}</span>}
+              </Button>
+            )
+          )}
+          <div className="flex flex-wrap gap-2">
+            {status === "checked_in" && me.canBook && step?.kind !== "check_out" && (
+              <Button disabled={pending} onClick={onCheckout} className="whitespace-nowrap">
+                Check out
+              </Button>
+            )}
+            {canReportLate && !reportingLate && (
+              <Button disabled={pending} onClick={() => setReportingLate(true)} className="whitespace-nowrap">
+                <HourglassIcon className="size-4 text-ink-muted" />
+                Running late
+              </Button>
+            )}
+            {me.canBook && isEditable(status) && (
+              <Button disabled={pending} onClick={onEdit} className="whitespace-nowrap">
+                Edit booking
+              </Button>
+            )}
+            {moreActions.length > 0 && (
+              <Button variant="ghost" aria-expanded={more} disabled={pending} onClick={() => setMore(!more)} className="whitespace-nowrap">
+                <MoreIcon className="size-4" />
+                More
+              </Button>
+            )}
+          </div>
+          {more && (
+            <div role="group" aria-label="More actions" className="flex animate-fade-in flex-wrap gap-2 rounded-lg bg-sunken/60 p-2">
+              {moreActions.includes("undo_check_in") && (
+                <Button variant="ghost" size="sm" disabled={pending} onClick={undoCheckIn} className="whitespace-nowrap">
+                  <UndoIcon className="size-4" />
+                  Undo check-in
+                </Button>
+              )}
+              {moreActions.includes("no_show") && (
+                <Button variant="ghost" size="sm" disabled={pending} onClick={() => run("no_show")} className="whitespace-nowrap">
+                  {ACTION_LABELS.no_show}
+                </Button>
+              )}
+              {moreActions.includes("cancel") && !canceling && (
+                <Button variant="ghost" size="sm" className="whitespace-nowrap text-danger" disabled={pending} onClick={() => setCanceling(true)}>
+                  {ACTION_LABELS.cancel}
+                </Button>
+              )}
+            </div>
+          )}
+          {canReportLate && reportingLate && (
+            <RunningLateForm
+              appointment={appointment}
+              date={date}
+              timeZone={timeZone}
+              onReport={(itemId, minutes) => {
+                setReportingLate(false);
+                onReportLate(itemId, minutes);
+              }}
+              onCancel={() => setReportingLate(false)}
+            />
+          )}
+          {canceling && (
+            <CancelForm
+              pending={pending}
+              series={Boolean(appointment.series)}
+              group={Boolean(appointment.group)}
+              onCancel={(reason, detail, scope) => run("cancel", reason, detail, scope)}
+              onKeep={() => setCanceling(false)}
+            />
           )}
         </section>
       )}
@@ -182,12 +302,6 @@ export function AppointmentPanel({
         </div>
       )}
 
-      {message && (
-        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-danger">
-          {message}
-        </p>
-      )}
-
       <dl className="flex flex-col gap-3 border-y border-line py-4">
         <div className="flex items-center gap-3">
           <dt className="sr-only">Date</dt>
@@ -215,8 +329,16 @@ export function AppointmentPanel({
                 <div>
                   <div className="font-semibold">{i.serviceName}</div>
                   <div className="text-ink-muted">
-                    With {i.staffName} · {formatMinute(i.start)}–{formatMinute(i.end)}
-                    {i.resourceName && ` · ${i.resourceName}`}
+                    <span className="whitespace-nowrap">With {i.staffName}</span> ·{" "}
+                    <span className="whitespace-nowrap">
+                      {formatMinute(i.start)}–{formatMinute(i.end)}
+                    </span>
+                    {i.resourceName && (
+                      <>
+                        {" "}
+                        · <span className="whitespace-nowrap">{i.resourceName}</span>
+                      </>
+                    )}
                   </div>
                 </div>
                 <span className="tabular-nums">{formatPrice(i.priceCents)}</span>
@@ -228,7 +350,16 @@ export function AppointmentPanel({
                   times={i.times}
                   hasProcessing={i.processingMinutes > 0}
                   bookedMinutes={i.bookedMinutes}
-                  canRecord={(me.canBook || i.staffId === me.staffId) && (status !== "completed" || i.times.startedAt !== null)}
+                  // The front of house checks a client in first (the main
+                  // button); a stylist's Start service does it too.
+                  canRecord={
+                    (me.canBook || i.staffId === me.staffId) &&
+                    (status !== "completed" || i.times.startedAt !== null) &&
+                    !(me.canBook && (status === "booked" || status === "confirmed"))
+                  }
+                  timeZone={timeZone}
+                  omit={step?.kind === "tap" && step.itemId === i.id ? step.event : null}
+                  quiet
                 />
               )}
             </li>
@@ -252,83 +383,6 @@ export function AppointmentPanel({
       )}
 
       <NotesForm key={appointment.notes} appointmentId={appointment.id} initial={appointment.notes} editable={notesEditable} />
-
-      {appointment.warnings && appointment.warnings.forms.length > 0 && client && (
-        <section aria-label="Before this visit" className="flex flex-col gap-2 rounded-lg border border-status-late-ink/25 bg-status-late-bg px-3 py-2.5 text-status-late-ink">
-          <p className="font-semibold">{status === "checked_in" ? "Still to do for this visit" : "Before check-in"}</p>
-          {appointment.warnings.forms.map((f) => (
-            <p key={f.templateId} className="flex flex-wrap items-center justify-between gap-2">
-              <span>{f.name} isn&apos;t signed yet.</span>
-              <Link
-                href={`/clients/${client.id}/forms/new?template=${f.templateId}&back=${encodeURIComponent(`/calendar?date=${date}`)}`}
-                className="font-semibold underline underline-offset-2"
-              >
-                Fill it in now
-              </Link>
-            </p>
-          ))}
-        </section>
-      )}
-
-      {(actions.length > 0 || (me.canBook && isEditable(status)) || canReportLate) && (
-        <section aria-label="Actions" className="flex flex-col gap-2">
-          {primaryAction && (
-            <Button variant="primary" size="lg" disabled={pending} onClick={() => (primaryAction === "check_out" ? onCheckout() : run(primaryAction))}>
-              {ACTION_LABELS[primaryAction]}
-            </Button>
-          )}
-          {canReportLate &&
-            (reportingLate ? (
-              <RunningLateForm
-                appointment={appointment}
-                date={date}
-                timeZone={timeZone}
-                onReport={(itemId, minutes) => {
-                  setReportingLate(false);
-                  onReportLate(itemId, minutes);
-                }}
-                onCancel={() => setReportingLate(false)}
-              />
-            ) : (
-              <Button size="lg" disabled={pending} onClick={() => setReportingLate(true)}>
-                <HourglassIcon className="size-4 text-ink-muted" />
-                Running late
-              </Button>
-            ))}
-          {me.canBook && isEditable(status) && (
-            <Button size="lg" disabled={pending} onClick={onEdit}>
-              Edit booking
-            </Button>
-          )}
-          <div className="flex flex-wrap justify-center gap-2">
-            {status === "checked_in" && me.canBook && (
-              <Button variant="ghost" size="sm" disabled={pending} onClick={undoCheckIn}>
-                <UndoIcon className="size-4" />
-                Undo check-in
-              </Button>
-            )}
-            {actions.includes("no_show") && (
-              <Button variant="ghost" size="sm" disabled={pending} onClick={() => run("no_show")}>
-                {ACTION_LABELS.no_show}
-              </Button>
-            )}
-            {actions.includes("cancel") && !canceling && (
-              <Button variant="ghost" size="sm" className="text-danger" disabled={pending} onClick={() => setCanceling(true)}>
-                {ACTION_LABELS.cancel}
-              </Button>
-            )}
-          </div>
-          {canceling && (
-            <CancelForm
-              pending={pending}
-              series={Boolean(appointment.series)}
-              group={Boolean(appointment.group)}
-              onCancel={(reason, detail, scope) => run("cancel", reason, detail, scope)}
-              onKeep={() => setCanceling(false)}
-            />
-          )}
-        </section>
-      )}
 
       {/* Checked out: there's no undo here; the sale is voided instead. */}
       {status === "completed" && me.canBook && (
@@ -660,6 +714,92 @@ function FormulaSection({ appointment, date, products, canRecord }: { appointmen
             {appointment.formulas.length ? "Record another formula" : "Record formula"}
           </Button>
         ))}
+    </section>
+  );
+}
+
+// "Before this visit": one row per thing the visit needs (a patch test, a
+// form to sign), each with its action, and whether it holds the visit up.
+// Done rows show a check and fade; once everything's done, it's one line.
+function VisitChecklist({
+  items,
+  clientId,
+  date,
+  today,
+  me,
+  team,
+}: {
+  items: ChecklistItem[];
+  clientId: string;
+  date: LocalDate;
+  today: LocalDate;
+  me: BoardData["me"];
+  team: { id: string; name: string }[];
+}) {
+  const [recordingPatch, setRecordingPatch] = useState(false);
+  const [showDone, setShowDone] = useState(false);
+  const ready = items.every((c) => c.done);
+  const back = encodeURIComponent(`/calendar?date=${date}`);
+
+  if (ready && !showDone) {
+    return (
+      <section aria-label="Before this visit" data-testid="visit-checklist" data-ready>
+        <button
+          type="button"
+          aria-expanded={false}
+          onClick={() => setShowDone(true)}
+          className="flex w-full items-center gap-2 rounded-lg border border-line bg-sunken/60 px-3 py-2 text-left font-medium text-status-confirmed-ink hover:bg-sunken focus-visible:outline-2 focus-visible:outline-focus"
+        >
+          <CheckCircleIcon className="size-4 shrink-0" />
+          <span className="flex-1">Ready for this visit ✓</span>
+          <ChevronDownIcon className="size-4 text-ink-muted" />
+        </button>
+      </section>
+    );
+  }
+
+  return (
+    <section aria-label="Before this visit" data-testid="visit-checklist" className="flex flex-col gap-2 rounded-lg border border-status-late-ink/30 bg-status-late-bg px-3 py-2.5 text-status-late-ink">
+      <p className="flex items-center justify-between gap-2 font-semibold">
+        Before this visit
+        {ready && (
+          <button type="button" aria-expanded onClick={() => setShowDone(false)} className="text-xs font-medium underline underline-offset-2">
+            Hide
+          </button>
+        )}
+      </p>
+      <ul className="flex flex-col gap-2">
+        {items.map((c) => (
+          <li key={c.key} data-done={c.done || undefined} className={`flex flex-col gap-2 ${c.done ? "opacity-60" : ""}`}>
+            <div className="flex flex-wrap items-start gap-x-3 gap-y-1.5">
+              <p className="flex min-w-0 flex-1 basis-56 gap-2">
+                {c.done ? <CheckCircleIcon className="mt-0.5 size-4 shrink-0" /> : <WarningIcon className="mt-0.5 size-4 shrink-0" />}
+                <span className="min-w-0">
+                <span className="font-semibold">{c.label}</span> — {c.status}
+                {c.detail && <span className="block text-xs">{c.detail}</span>}
+                {c.blocks && <span className="block font-semibold">Holds up this visit: the salon requires it first.</span>}
+                </span>
+              </p>
+              {!c.done &&
+                (c.action.kind === "form" ? (
+                  <Link
+                    href={`/clients/${clientId}/forms/new?template=${c.action.templateId}&back=${back}`}
+                    className="ml-6 shrink-0 font-semibold whitespace-nowrap underline underline-offset-2"
+                  >
+                    Fill it in now
+                  </Link>
+                ) : (
+                  !recordingPatch && (
+                    <Button size="sm" className="ml-6 shrink-0 whitespace-nowrap" onClick={() => setRecordingPatch(true)}>
+                      Record patch test
+                    </Button>
+                  )
+                ))}
+            </div>
+            {!c.done && c.action.kind === "patch_test" && recordingPatch && <PatchTestForm clientId={clientId} today={today} me={me.staffId} staff={team} compact />}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

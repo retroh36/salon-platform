@@ -53,7 +53,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     supabase
       .from("appointment_items")
       .select(
-        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, price_cents, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, created_at, updated_at, created_by, updated_by, series_id, series_index, series:appointment_series(interval_weeks), group:appointment_groups(id, label), client:clients(id, first_name, last_name, phone, email, allergies, preferences))",
+        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, price_cents, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, checked_in_at, checked_out_at, created_at, updated_at, created_by, updated_by, series_id, series_index, series:appointment_series(interval_weeks), group:appointment_groups(id, label), client:clients(id, first_name, last_name, phone, email, allergies, preferences))",
       )
       .eq("location_id", me.location.id)
       .lt("starts_at", dayEnd.toISOString())
@@ -109,8 +109,6 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     servicesResult.data.map((s) => [s.id, { price_cents: s.price_cents, levelPrices: levelPricesFrom(s.service_level_prices) }]),
   );
 
-  const staffByAppointment = new Map<string, Set<string>>();
-  for (const i of items) staffByAppointment.set(i.appointment_id, (staffByAppointment.get(i.appointment_id) ?? new Set()).add(i.staff_id));
 
   // Local minutes on this date, clipped to the day.
   const toMinute = (instant: Date) => (instant <= dayStart ? 0 : instant >= dayEnd ? MINUTES_PER_DAY : toLocal(instant, tz).minute);
@@ -136,6 +134,16 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     return a.updated_at !== a.created_at && who ? `Last changed by ${who} · ${when(a.updated_at)}` : null;
   };
 
+  // Each visit's services in start order, for the tooltip of a visit
+  // shared between stylists.
+  const partsByAppointment = new Map<string, BlockData["parts"]>();
+  for (const row of items) {
+    const parts = partsByAppointment.get(row.appointment_id) ?? [];
+    parts.push({ service: row.service.name, staff: staffById.get(row.staff_id)?.first_name ?? "another stylist", ...span(toBookedItem(row)) });
+    partsByAppointment.set(row.appointment_id, parts);
+  }
+  for (const parts of partsByAppointment.values()) parts.sort((x, y) => x.start - y.start);
+
   const blocks: BlockData[] = [];
   const appointments: Record<string, AppointmentDetail> = {};
   for (const row of items) {
@@ -152,9 +160,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       clientName: client ? fullName(client) : a.group ? `${a.group.label} guest` : "Walk-in",
       service: row.service.name,
       resource: row.resource?.name ?? null,
-      with: [...staffByAppointment.get(row.appointment_id)!]
-        .filter((id) => id !== row.staff_id)
-        .map((id) => staffById.get(id)?.first_name ?? "another stylist"),
+      parts: partsByAppointment.get(row.appointment_id)!,
       status: a.status as AppointmentStatus,
       series: Boolean(a.series_id),
       group: a.group,
@@ -164,6 +170,8 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       id: a.id,
       status: a.status as AppointmentStatus,
       online: a.source === "online",
+      checkedInAt: a.checked_in_at,
+      checkedOutAt: a.checked_out_at,
       notes: a.notes ?? "",
       client: client
         ? { id: client.id, name: fullName(client), phone: client.phone, email: client.email, allergies: client.allergies, preferences: client.preferences }

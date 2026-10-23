@@ -132,7 +132,7 @@ test.describe("front desk", () => {
     const bridget = column(page, "Bridget Callahan");
 
     const color = bridget.getByRole("button", { name: new RegExp(`^10am–11:45am, ${PREFIX}Ava Test, All-Over Color`) });
-    await expect(color).toHaveAccessibleName(/processing 10:45am–11:20am, with Shae, Chair 1, Booked(,|$)/);
+    await expect(color).toHaveAccessibleName(/processing 10:45am–11:20am, part of a visit with Shae, Chair 1, Booked(,|$)/);
     // (Test names are long, so the block may show a shorter form; the full
     // name is in its label.)
     await expect(color).toHaveAttribute("data-family", "color");
@@ -159,7 +159,8 @@ test.describe("front desk", () => {
       });
     expect(await lightness("processing")).toBeGreaterThan(await lightness("active"));
 
-    // The color matches its family in the legend, and differs from Cuts.
+    // The color matches its family in the key, and differs from Cuts.
+    await ui(page).getByRole("button", { name: "Key" }).click();
     const legendColor = await ui(page)
       .getByRole("list", { name: "Service families" })
       .getByRole("listitem")
@@ -167,6 +168,7 @@ test.describe("front desk", () => {
       .locator("span")
       .evaluate((el) => getComputedStyle(el).borderLeftColor);
     expect(await color.evaluate((el) => getComputedStyle(el).borderLeftColor)).toBe(legendColor);
+    await page.keyboard.press("Escape");
     const trim = bridget.getByRole("button", { name: new RegExp(`^10:45am–11am, ${PREFIX}Ben Test, Bang Trim`) });
     expect(await trim.evaluate((el) => getComputedStyle(el).borderLeftColor)).not.toBe(legendColor);
 
@@ -176,13 +178,21 @@ test.describe("front desk", () => {
     const trimBox = (await trim.boundingBox())!;
     expect(trimBox.x).toBeGreaterThanOrEqual(colorBox.x + colorBox.width - 1);
     expect(trimBox.y).toBeCloseTo(colorBox.y + heights[0], 0);
-    // A short block: the first name and time on one line (never initials),
-    // ending in an ellipsis if the lane is too narrow.
-    await expect(trim).toHaveText(new RegExp(`^${PREFIX}Ben · 10:45am`));
+    // A short block: the first name and the whole time range on one line
+    // (never initials, never just the start), ending in an ellipsis if the
+    // lane is too narrow.
+    await expect(trim).toHaveText(new RegExp(`^${PREFIX}Ben · 10:45(am)?–11(am)?$`));
     expect(await trim.locator(".truncate").first().evaluate((t) => getComputedStyle(t).textOverflow)).toBe("ellipsis");
 
-    // The second stylist on Ava's visit.
-    await expect(column(page, "Shae Morgan").getByRole("button", { name: /^11:45am–12:30pm, .*Ava Test, Blowout, with Bridget/ })).toBeVisible();
+    // The second stylist on Ava's visit: each block is that stylist's part,
+    // and the whole visit is in the tooltip.
+    const blowout = column(page, "Shae Morgan").getByRole("button", { name: /^11:45am–12:30pm, .*Ava Test, Blowout, part of a visit with Bridget/ });
+    await expect(blowout).toBeVisible();
+    await expect(blowout).not.toContainText("with");
+    await expect(color).not.toContainText("with");
+    await blowout.hover();
+    await expect(page.getByRole("tooltip")).toContainText("Whole visit:All-Over Color · Bridget, 10am–11:45amBlowout · Shae, 11:45am–12:30pm");
+    await page.mouse.move(5, 5);
     // Canceled visits aren't shown.
     await expect(ui(page).getByText(`${PREFIX}Cara`)).toHaveCount(0);
 
@@ -302,9 +312,32 @@ test.describe("design", () => {
     expect(headerTop - gridTop).toBeLessThan(40);
   });
 
+  test("keeps a blocked time's label readable where the current-time line crosses it", async ({ page }) => {
+    // 12:05 on the quiet Tuesday: the line crosses the top of Nola's
+    // lunch (noon, every Tuesday).
+    await page.clock.setFixedTime(at(QUIET_TUESDAY, 12, 5));
+    await openDay(page, QUIET_TUESDAY);
+    const label = column(page, "Nola Brennan").locator("[data-time-block=lunch] [data-block-label]");
+    await label.scrollIntoViewIfNeeded();
+    const line = (await ui(page).getByRole("img", { name: /^Now, 12:05pm/ }).boundingBox())!;
+    const box = (await label.boundingBox())!;
+    expect(line.y).toBeGreaterThan(box.y);
+    expect(line.y).toBeLessThan(box.y + box.height);
+    // What's on top where the line meets the text: the text. (The line
+    // ignores the pointer; let it be hit for this check.)
+    const onTop = await page.evaluate(
+      ([x, y]) => {
+        (document.querySelector("[role=img][aria-label^='Now,']") as HTMLElement).style.pointerEvents = "auto";
+        return document.elementFromPoint(x, y)?.closest("[data-block-label]") !== null;
+      },
+      [box.x + 8, line.y + 1],
+    );
+    expect(onTop).toBe(true);
+  });
+
   test("shows where each client is in their visit by color, with icons only for what needs attention", async ({ page }) => {
     // Browser clock: 10:30 on the quiet Tuesday, so a 10:00 booking that
-    // hasn't checked in is running late.
+    // hasn't checked in hasn't arrived.
     await page.clock.setFixedTime(at(QUIET_TUESDAY, 10, 30));
     const [late, done, ready, here, gone] = await Promise.all(["Lou", "Dot", "Rey", "Ida", "Ned"].map(client));
     await book(late, [{ service: "Men's Cut", staff: SEED.staff.nola, start: at(QUIET_TUESDAY, 10) }]);
@@ -327,7 +360,8 @@ test.describe("design", () => {
     // Four different fills, and the same service stripe on every one.
     expect(new Set(await Promise.all(["Rey", "Ida", "Dot", "Ned"].map(fill))).size).toBe(4);
     expect(new Set(await Promise.all(["Lou", "Rey", "Ida", "Dot", "Ned"].map(stripe))).size).toBe(1);
-    // Matching the legend.
+    // Matching the key.
+    await ui(page).getByRole("button", { name: "Key" }).click();
     const legend = ui(page).getByTestId("status-legend");
     for (const [name, visit] of [["Ida", "here"], ["Dot", "done"], ["Ned", "off"]]) {
       expect(await legend.locator(`[data-visit=${visit}] > span`).first().evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(await fill(name));
@@ -335,13 +369,17 @@ test.describe("design", () => {
     // A no-show's name is struck through.
     expect(await block("Ned").locator("span.font-semibold").first().evaluate((el) => getComputedStyle(el).textDecorationLine)).toBe("line-through");
 
-    // No status badges. Running late gets a clock with how late, and
-    // that's all (forms and patch tests are in booking details).
+    await page.keyboard.press("Escape");
+    await expect(ui(page).getByRole("dialog", { name: "Calendar key" })).toBeHidden();
+
+    // No status badges. Not here 15 minutes after the start: a clock and
+    // "Not arrived" (not a growing count), and that's all (forms and
+    // patch tests are in booking details).
     await expect(nola.getByText(/^(Confirmed|Checked in|Checked out)$/)).toHaveCount(0);
-    await expect(block("Lou").locator("[data-attention=late]")).toHaveText("+30m");
-    await expect(block("Lou")).toHaveAccessibleName(/running late(,|$)/);
+    await expect(block("Lou").locator("[data-attention=not-arrived]")).toHaveText("Not arrived");
+    await expect(block("Lou")).toHaveAccessibleName(/not arrived(,|$)/);
     await expect(block("Lou").locator("[data-attention]")).toHaveCount(1);
-    for (const name of ["Rey", "Ida", "Dot", "Ned"]) await expect(block(name).locator("[data-attention=late]")).toHaveCount(0);
+    for (const name of ["Rey", "Ida", "Dot", "Ned"]) await expect(block(name).locator("[data-attention]")).toHaveCount(0);
     // Finished visits need nothing more.
     for (const name of ["Dot", "Ned"]) await expect(block(name).locator("[data-attention]")).toHaveCount(0);
 

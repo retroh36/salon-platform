@@ -58,14 +58,14 @@ async function visit(first: string) {
   return { clientId: c!.id, appointmentId: a!.id };
 }
 
-// From the visit's "Check out client" on the calendar to the full-screen
+// From the visit's "Check out" on the calendar to the full-screen
 // checkout.
 async function fromCalendar(page: Page, first: string) {
   await page.goto(`/calendar?date=${DAY}`);
   await expect(ui(page).getByTestId("calendar-date")).toContainText(formatLongDay(DAY));
   await waitForHydration(page, "section[data-staff-id]");
   await ui(page).getByRole("button", { name: new RegExp(`${PREFIX}${first} Test`) }).click();
-  await page.getByRole("tabpanel", { name: "Booking details" }).getByRole("button", { name: "Check out client" }).click();
+  await page.getByRole("tabpanel", { name: "Booking details" }).getByRole("button", { name: "Check out", exact: true }).click();
   return onCheckout(page);
 }
 

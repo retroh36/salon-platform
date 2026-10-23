@@ -93,7 +93,7 @@ test.describe("formulas and stock", () => {
 
     const desk = await browser.newPage({ storageState: AUTH.frontDesk, viewport: { width: 1920, height: 1300 } });
     const deskPanel = await openVisit(desk);
-    await deskPanel.getByRole("button", { name: "Check out client" }).click();
+    await deskPanel.getByRole("button", { name: "Check out", exact: true }).click();
     const checkout = await onCheckout(desk);
     await checkout.card();
     await checkout.complete();

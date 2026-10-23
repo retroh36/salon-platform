@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, restoreLearnedDurations, SEED, setAsideLearnedDurations } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, test, ui, waitForHydration, moreAction } from "./fixtures";
 
 // Denise always responds: whatever triggers her, she shows she's thinking,
 // then says something (fixes, why there's nothing to do, or what staff can
@@ -110,15 +110,16 @@ test.describe("at 10pm", () => {
     // is set aside and put back after.
     const { data: off } = await admin.from("staff_time_off").select("*").eq("staff_id", GIL).lte("starts_on", today).gte("ends_on", today);
     await admin.from("staff_time_off").delete().in("id", (off ?? []).map((t) => t.id));
-    // Shifting the zone can put some of his demo visits after 10pm there:
-    // those are set aside (canceled) and put back after too.
+    // Shifting the zone can leave some of his demo visits not over by 10pm
+    // there (later ones, or a client in his chair right now): those are set
+    // aside (canceled) and put back after too.
     const { data: later } = await admin
       .from("appointment_items")
       .select("appointment:appointments!inner(id, status, canceled_at, cancel_reason)")
       .eq("staff_id", GIL)
-      .gte("starts_at", new Date().toISOString())
+      .gt("ends_at", new Date().toISOString())
       .lt("starts_at", fromLocal(addDays(today, 1), 0, zone)!.toISOString())
-      .in("appointment.status", ["booked", "confirmed"]);
+      .in("appointment.status", ["booked", "confirmed", "checked_in"]);
     const setAside = [...new Map((later ?? []).map((i) => [i.appointment.id, i.appointment])).values()];
     for (const a of setAside) await admin.from("appointments").update({ status: "canceled", canceled_at: new Date().toISOString(), cancel_reason: "Test" }).eq("id", a.id);
     await admin.from("locations").update({ timezone: zone }).eq("id", L);
@@ -270,7 +271,7 @@ test.describe("cancellations", () => {
     await seed(await newClient("Ann"), SHAE, at(10));
     await openDay(page);
     await block(page, "Ann").click();
-    await details(page).getByRole("button", { name: "Cancel booking" }).click();
+    await moreAction(details(page), "Cancel booking");
     const cancel = details(page).getByRole("form", { name: "Cancel booking" });
     await cancel.getByLabel("Reason").selectOption("Client canceled");
     await cancel.getByRole("button", { name: "Cancel booking" }).click();
@@ -284,7 +285,7 @@ test.describe("cancellations", () => {
     await admin.from("waitlist_entries").insert({ business_id: B, location_id: L, client_id: eli, service_ids: [cut], staff_ids: [], windows: [], from_date: addDays(DAY, -2), to_date: addDays(DAY, 2) });
     await openDay(page);
     await block(page, "Ann").click();
-    await details(page).getByRole("button", { name: "Cancel booking" }).click();
+    await moreAction(details(page), "Cancel booking");
     const cancel = details(page).getByRole("form", { name: "Cancel booking" });
     await cancel.getByLabel("Reason").selectOption("Client canceled");
     await cancel.getByRole("button", { name: "Cancel booking" }).click();

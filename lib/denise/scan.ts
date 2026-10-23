@@ -5,6 +5,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import { NOT_ARRIVED_MINUTES } from "@/lib/calendar";
 import { blockNotifications, notificationsFor } from "@/lib/notifications";
 import { recordProposals, type ProposalOption } from "@/lib/scheduling/ai-actions";
 import { loadDisruptions } from "@/lib/scheduling/disruptions";
@@ -26,8 +27,6 @@ export type FixFacts = ReturnType<typeof factsFor>;
 export type Explainer = (facts: FixFacts[]) => Promise<(string | null)[]>;
 
 export const FEATURE = "conflict_resolver";
-// A client this late without checking in gets a nudge.
-const LATE_NOTICE_MINUTES = 10;
 const MINUTE = 60_000;
 
 export type LoadedDay = { day: Day; lookup: Lookup };
@@ -226,7 +225,9 @@ export async function scanDay(
   return { date, conflicts: views, notices: lateNotices(day, lookup, date, conflicts), reorders: [], openings: [], brief: null, connected: false };
 }
 
-// Clients due a little while ago who haven't checked in, today only.
+// Clients who haven't arrived 15 minutes after they were due, today only:
+// one suggestion each (call them, or mark a no-show) until someone deals
+// with it or dismisses it.
 function lateNotices(day: Day, lookup: Lookup, date: LocalDate, conflicts: Conflict[]): DeniseNotice[] {
   if (todayIn(lookup.timeZone, day.now) !== date) return [];
   const reported = new Set(day.disruptions.flatMap((d) => (d.kind === "client_late" ? [d.appointmentId] : [])));
@@ -240,7 +241,7 @@ function lateNotices(day: Day, lookup: Lookup, date: LocalDate, conflicts: Confl
   for (const [appointmentId, item] of firstItems) {
     const status = day.statuses.get(appointmentId);
     const late = (day.now.getTime() - item.start.getTime()) / MINUTE;
-    if ((status !== "booked" && status !== "confirmed") || late < LATE_NOTICE_MINUTES || late > 60) continue;
+    if ((status !== "booked" && status !== "confirmed") || late < NOT_ARRIVED_MINUTES) continue;
     if (reported.has(appointmentId) || inConflict.has(appointmentId)) continue;
     const name = lookup.visits.get(appointmentId)?.client?.fullName ?? "A walk-in";
     notices.push({
@@ -249,7 +250,7 @@ function lateNotices(day: Day, lookup: Lookup, date: LocalDate, conflicts: Confl
       itemId: item.id!,
       clientName: name,
       startMinute: toLocal(item.start, lookup.timeZone).minute,
-      text: `${name} was due at ${clock(toLocal(item.start, lookup.timeZone).minute)} and hasn't checked in yet. If they're on the way, tell me how late and I'll rearrange things.`,
+      text: `${name} was due at ${clock(toLocal(item.start, lookup.timeZone).minute)} and hasn't arrived. Give them a call, or mark a no-show.`,
     });
   }
   return notices;

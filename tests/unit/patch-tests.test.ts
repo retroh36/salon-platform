@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_PATCH_SETTINGS, patchNotice, patchTestMessage, patchTestState, type PatchTest } from "@/lib/scheduling/patch-tests";
+import { DEFAULT_PATCH_SETTINGS, patchStatus, patchTestMessage, patchTestState, type PatchTest } from "@/lib/scheduling/patch-tests";
 
 const SERVICE = new Date("2026-11-20T15:00:00Z");
 const hoursBefore = (h: number, result: PatchTest["result"] = "no_reaction"): PatchTest => ({ testedAt: new Date(SERVICE.getTime() - h * 3_600_000), result });
@@ -32,29 +32,22 @@ describe("patch tests", () => {
   });
 });
 
-describe("the patch test notice in booking details", () => {
+describe("the patch test row in booking details' checklist", () => {
   const day = (at: Date) => at.toISOString().slice(0, 10);
   const passed = (iso: string): PatchTest => ({ testedAt: new Date(iso), result: "no_reaction" });
 
-  it("names the service and says none is on file", () => {
-    expect(patchNotice("missing", "Full Highlights", [], DEFAULT_PATCH_SETTINGS, day)).toEqual({
-      title: "Patch test missing — required for Full Highlights",
-      detail: "None on file for this client.",
-    });
+  it("says none is on file, or when the one on file passed", () => {
+    expect(patchStatus("missing", [], DEFAULT_PATCH_SETTINGS, day)).toBe("none on file");
+    expect(patchStatus("ok", [passed("2026-09-01T10:00:00Z"), passed("2026-10-01T10:00:00Z")], DEFAULT_PATCH_SETTINGS, day)).toBe("passed 2026-10-01");
   });
 
   it("says when the last one expired", () => {
     const tests = [passed("2026-01-10T10:00:00Z"), passed("2025-06-01T10:00:00Z")];
-    expect(patchNotice("expired", "Balayage", tests, DEFAULT_PATCH_SETTINGS, day)).toEqual({
-      title: "Patch test expired — required for Balayage",
-      detail: "The last one was 2026-01-10; it expired 2026-07-11.",
-    });
+    expect(patchStatus("expired", tests, DEFAULT_PATCH_SETTINGS, day)).toBe("expired 2026-07-11 (last one 2026-01-10)");
   });
 
   it("explains one too close to the visit, and a reaction", () => {
-    expect(patchNotice("too_recent", "Balayage", [passed("2026-10-22T10:00:00Z")], DEFAULT_PATCH_SETTINGS, day).detail).toBe("Done 2026-10-22; it needs 48 hours before the service.");
-    expect(patchNotice("reaction", "Balayage", [{ testedAt: new Date("2026-10-01T10:00:00Z"), result: "reaction" }], DEFAULT_PATCH_SETTINGS, day).title).toBe(
-      "Patch test showed a reaction — Balayage",
-    );
+    expect(patchStatus("too_recent", [passed("2026-10-22T10:00:00Z")], DEFAULT_PATCH_SETTINGS, day)).toBe("done 2026-10-22, needs 48 hours before the service");
+    expect(patchStatus("reaction", [{ testedAt: new Date("2026-10-01T10:00:00Z"), result: "reaction" }], DEFAULT_PATCH_SETTINGS, day)).toBe("showed a reaction on 2026-10-01");
   });
 });

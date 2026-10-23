@@ -10,18 +10,18 @@ import { LEVEL_BG, LevelBadge } from "@/components/ui/level";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { FitText } from "@/components/ui/fit-text";
-import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, MoreIcon, PlusIcon, SendIcon } from "@/components/ui/icons";
+import { CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, MoreIcon, PlusIcon, SendIcon } from "@/components/ui/icons";
 import { Listbox } from "@/components/ui/listbox";
 import { Segmented } from "@/components/ui/segmented";
 import { Tabs } from "@/components/ui/tabs";
 import { isEditable, STATUS_LABELS } from "@/lib/appointments";
 import type { ChatMessage, DeniseRequest, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
-import { FAMILIES, FAMILY_LABELS, laneBox, layoutColumn, quarterMarks, summaryVariants, ZOOM_LABELS, ZOOM_PX_PER_MINUTE, ZOOMS, type CalendarZoom, type ServiceFamily } from "@/lib/calendar";
+import { FAMILIES, FAMILY_LABELS, laneBox, layoutColumn, NOT_ARRIVED_MINUTES, quarterMarks, summaryVariants, timeRangeVariants, ZOOM_LABELS, ZOOM_PX_PER_MINUTE, ZOOMS, type CalendarZoom, type ServiceFamily } from "@/lib/calendar";
 import { LEVEL_LABELS, STAFF_LEVELS } from "@/lib/schedule-forms";
 import { BLOCK_LABELS } from "@/lib/scheduling/blocks";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, toLocal } from "@/lib/scheduling/time";
-import { calendarStamp, moveGroupVisit, saveCalendarZoom, moveVisitItem, moveVisitItemScoped, undoVisitCheckIn } from "./actions";
+import { calendarStamp, changeVisitStatus, moveGroupVisit, saveCalendarZoom, moveVisitItem, moveVisitItemScoped, undoVisitCheckIn } from "./actions";
 import type { Scope } from "@/lib/scheduling/series";
 import { moveBlock } from "./block-actions";
 import { BlockPanel, repeatLabel } from "./block-panel";
@@ -780,6 +780,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                                 dragging={blockDrag?.block.blockId === b.blockId && blockDrag.moved}
                                 selected={selection.kind === "block" && selection.blockId === b.blockId}
                                 columnName={c.name}
+                                labelOnTop={!blocks.some((a) => a.staffId === c.staffId && a.start < live.start + 30 && a.end > live.start)}
                                 onPointerDown={onBlockPointerDown}
                                 onPointerMove={onBlockPointerMove}
                                 onPointerUp={onBlockPointerUp}
@@ -843,10 +844,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           </div>
         </ViewTransition>
 
-        {/* The legend, with Denise's face at the end of it while her panel
+        {/* The key, with Denise's face at the end of the row while her panel
             is closed (so she never sits on top of the calendar). */}
         <div className="flex items-center gap-4">
-          <Legend />
+          <CalendarKey />
           <DeniseLauncher
             hidden={panelOpen}
             count={attention}
@@ -935,6 +936,23 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               onDismissNotice={(id) => {
                 setDismissed((all) => new Set(all).add(id));
                 startTransition(() => dismissDeniseItem(id, data.date).then(() => {}));
+              }}
+              onNoShow={(n) => {
+                setDismissed((all) => new Set(all).add(n.id));
+                startTransition(async () => {
+                  const result = await changeVisitStatus(n.appointmentId, "no_show");
+                  setOutcome(
+                    result.ok
+                      ? { message: `Marked ${n.clientName} as a no-show.`, error: false, undoActionId: null }
+                      : { message: result.message ?? "That didn't work. Try again from the booking.", error: true, undoActionId: null },
+                  );
+                  if (!result.ok)
+                    setDismissed((all) => {
+                      const next = new Set(all);
+                      next.delete(n.id);
+                      return next;
+                    });
+                });
               }}
               onBook={(actionId, clientId) => decide(() => approveDeniseFix(actionId, data.date, clientId), actionId)}
               onRejectSuggestion={(actionId) => decide(() => rejectDeniseFix(actionId, data.date), null)}
@@ -1369,56 +1387,95 @@ function FixGhost({ block, y }: { block: Placed & { lane: number; lanes: number 
   );
 }
 
-function Legend() {
+// A small "Key" button under the calendar, opening what the colors,
+// statuses and level badges mean.
+function CalendarKey() {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
+  const swatch = "h-3.5 w-5 shrink-0 rounded-[3px]";
+
   return (
-    <ul aria-label="Service families" className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-muted">
-      {FAMILIES.filter((f) => f !== "other").map((f) => (
-        <li key={f} className="flex items-center gap-2" data-family={f}>
-          <span aria-hidden className="h-3.5 w-5 rounded-[3px] border-l-[3px] border-(--fam-accent) bg-(--fam-fill)" />
-          {FAMILY_LABELS[f]}
-        </li>
-      ))}
-      <li className="flex items-center gap-2">
-        <span
-          aria-hidden
-          className="h-3.5 w-5 rounded-[3px] border border-line-strong"
-          style={{ backgroundImage: "repeating-linear-gradient(135deg, transparent 0 3px, rgb(23 39 59 / 0.18) 3px 6px)" }}
-        />
-        Processing (stylist free)
-      </li>
-      <li className="flex items-center gap-2">
-        <span aria-hidden className="h-3.5 w-5 rounded-[3px] bg-sunken ring-1 ring-line-strong" />
-        Not bookable
-      </li>
-      {/* Where the client is in their visit: the block's fill (the service
-          color until they're here). */}
-      <li className="flex items-center gap-x-3.5 gap-y-2" data-testid="status-legend">
-        <span className="sr-only">Visit status:</span>
-        {(
-          [
-            ["here", "Checked in"],
-            ["done", "Checked out"],
-            ["off", "No-show"],
-          ] as const
-        ).map(([visit, text]) => (
-          <span key={visit} className="flex items-center gap-2" data-visit={visit}>
-            <span aria-hidden className="h-3.5 w-5 rounded-[3px] border-l-[3px] border-ink-subtle bg-(--visit-fill)" />
-            <span className={visit === "off" ? "line-through" : ""}>{text}</span>
-          </span>
-        ))}
-      </li>
-      {/* Stylist levels: the ring around each avatar and the bar on top of
-          their column. */}
-      <li className="flex items-center gap-2" data-testid="level-legend">
-        <span className="sr-only">Stylist levels:</span>
-        {[...STAFF_LEVELS].reverse().map((l) => (
-          <span key={l} className="mr-1.5 flex items-center gap-1.5">
-            <LevelBadge level={l} className="size-4.5" />
-            {LEVEL_LABELS[l]}
-          </span>
-        ))}
-      </li>
-    </ul>
+    <div ref={root} className="relative" onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
+      <Button size="sm" variant="ghost" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)}>
+        Key
+        <ChevronDownIcon className={`size-4 transition-transform duration-(--motion-fast) ${open ? "" : "rotate-180"}`} />
+      </Button>
+      {open && (
+        <div
+          role="dialog"
+          aria-label="Calendar key"
+          className="absolute bottom-full left-0 z-[60] mb-2 grid w-[min(36rem,calc(100vw-2rem))] origin-bottom-left animate-pop-in gap-4 rounded-xl border border-line bg-surface p-4 text-sm text-ink-muted shadow-lift sm:grid-cols-3"
+        >
+          <section className="flex flex-col gap-2">
+            <h3 className="text-xs font-semibold tracking-wider text-ink uppercase">Services</h3>
+            <ul aria-label="Service families" className="flex flex-col gap-1.5">
+              {FAMILIES.filter((f) => f !== "other").map((f) => (
+                <li key={f} className="flex items-center gap-2" data-family={f}>
+                  <span aria-hidden className={`${swatch} border-l-[3px] border-(--fam-accent) bg-(--fam-fill)`} />
+                  {FAMILY_LABELS[f]}
+                </li>
+              ))}
+              <li className="flex items-center gap-2">
+                <span
+                  aria-hidden
+                  className={`${swatch} border border-line-strong`}
+                  style={{ backgroundImage: "repeating-linear-gradient(135deg, transparent 0 3px, rgb(23 39 59 / 0.18) 3px 6px)" }}
+                />
+                Processing (stylist free)
+              </li>
+              <li className="flex items-center gap-2">
+                <span aria-hidden className={`${swatch} bg-sunken ring-1 ring-line-strong`} />
+                Not bookable
+              </li>
+            </ul>
+          </section>
+          {/* Where the client is in their visit: the block's fill (the
+              service color until they're here). */}
+          <section className="flex flex-col gap-2">
+            <h3 className="text-xs font-semibold tracking-wider text-ink uppercase">Visit status</h3>
+            <ul aria-label="Visit status" className="flex flex-col gap-1.5" data-testid="status-legend">
+              {(
+                [
+                  ["here", "Checked in"],
+                  ["done", "Checked out"],
+                  ["off", "No-show"],
+                ] as const
+              ).map(([visit, text]) => (
+                <li key={visit} className="flex items-center gap-2" data-visit={visit}>
+                  <span aria-hidden className={`${swatch} border-l-[3px] border-ink-subtle bg-(--visit-fill)`} />
+                  <span className={visit === "off" ? "line-through" : ""}>{text}</span>
+                </li>
+              ))}
+              <li className="flex items-center gap-2">
+                <ClockIcon className="size-4 shrink-0 text-status-late-ink" />
+                Running late, or not arrived
+              </li>
+            </ul>
+          </section>
+          {/* Stylist levels: the ring around each avatar and the bar on top
+              of their column. */}
+          <section className="flex flex-col gap-2">
+            <h3 className="text-xs font-semibold tracking-wider text-ink uppercase">Stylist levels</h3>
+            <ul aria-label="Stylist levels" className="flex flex-col gap-1.5" data-testid="level-legend">
+              {[...STAFF_LEVELS].reverse().map((l) => (
+                <li key={l} className="flex items-center gap-2">
+                  <LevelBadge level={l} className="size-4.5" />
+                  {LEVEL_LABELS[l]}
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1442,6 +1499,7 @@ function TimeBlockBox({
   dragging,
   selected,
   columnName,
+  labelOnTop,
   onOpen,
   onPointerDown,
   onPointerMove,
@@ -1454,6 +1512,9 @@ function TimeBlockBox({
   dragging: boolean;
   selected: boolean;
   columnName: string;
+  // No appointment over its label, so the label can sit above the
+  // current-time line (the line passes behind the text).
+  labelOnTop: boolean;
   onOpen: () => void;
   onPointerDown: (e: React.PointerEvent, b: TimeBlockData, mode: "move" | "resize") => void;
   onPointerMove: (e: React.PointerEvent) => void;
@@ -1483,9 +1544,9 @@ function TimeBlockBox({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      className={`absolute inset-x-1 z-[5] touch-none overflow-hidden rounded-md border border-dashed border-line-strong px-2 py-1 text-xs text-ink-muted select-none transition-[box-shadow] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-focus ${
+      className={`absolute inset-x-1 touch-none overflow-hidden rounded-md border border-dashed border-line-strong px-2 py-1 text-xs text-ink-muted select-none transition-[box-shadow] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-focus ${
         editable ? "cursor-grab" : "cursor-pointer"
-      } ${selected ? "ring-2 ring-navy-900" : ""} ${dragging ? "z-40 shadow-lift" : ""}`}
+      } ${selected ? "ring-2 ring-link/70 ring-inset" : ""} ${dragging ? "z-40 shadow-lift" : ""}`}
       style={{
         top: y(block.start),
         height,
@@ -1494,7 +1555,7 @@ function TimeBlockBox({
       }}
     >
       {height >= 18 && (
-        <span className="flex items-center gap-1 font-semibold text-ink">
+        <span data-block-label className={`flex w-fit max-w-full items-center gap-1 rounded-sm bg-sunken font-semibold text-ink ${labelOnTop ? "relative z-[21]" : ""}`}>
           {block.weekdays && (
             <svg aria-hidden viewBox="0 0 24 24" className="size-3 shrink-0" fill="none" stroke="currentColor" strokeWidth={2}>
               <path d="M4 12a8 8 0 0 1 13.7-5.6L20 8M20 4v4h-4M20 12a8 8 0 0 1-13.7 5.6L4 16M4 20v-4h4" strokeLinecap="round" strokeLinejoin="round" />
@@ -1504,7 +1565,7 @@ function TimeBlockBox({
           {height >= 34 ? null : <span className="font-normal text-ink-muted"> · {time}</span>}
         </span>
       )}
-      {height >= 34 && <span className="block truncate">{time}</span>}
+      {height >= 34 && <span className={`block w-fit max-w-full truncate rounded-sm bg-sunken ${labelOnTop ? "relative z-[21]" : ""}`}>{time}</span>}
       {height >= 50 && block.note && <span className="block truncate">{block.note}</span>}
       {editable && (
         <span
@@ -1599,6 +1660,9 @@ function AppointmentBlock({
   const narrow = block.lane > 0;
   const visit = visitOf(block.status);
   const late = lateBy !== null;
+  // Past the grace period: "Not arrived", not a growing count.
+  const notArrived = late && lateBy >= NOT_ARRIVED_MINUTES;
+  const lateText = notArrived ? "not arrived" : lateBy ? `${lateBy} min late` : "due now";
 
   // Only lines that fit whole: name, service, then time.
   let room = height - 6;
@@ -1616,46 +1680,45 @@ function AppointmentBlock({
   if (show.service && room >= LINE) show.serviceLines = 2;
   // A short block puts the time on the name line.
   const timeOnName = show.name && !show.time;
+  // The name comes first; in a block shared with another lane there's no
+  // room for the lateness too (it's in the tooltip).
+  const showLate = late && block.lanes === 1;
 
-  // Shorter forms for narrow spaces, longest first. Never initials: a short
-  // block is the first name and time, cut off cleanly if it must be.
+  // Shorter forms for narrow spaces, longest first. The name always leads,
+  // never initials, and the time is always the whole range (shortened).
   const [first, ...rest] = block.clientName.split(" ");
-  const startTime = formatMinute(block.start);
+  const ranges = timeRangeVariants(block.start, block.end);
   const names = timeOnName
-    ? [...new Set([`${first} · ${time}`, `${first} · ${startTime}`])]
+    ? ranges.map((r) => `${first} · ${r}`)
     : [block.clientName, ...(rest.length ? [`${first} ${rest.at(-1)![0]}.`, first] : [])];
+  // The visit's other services, when stylists share it.
+  const others = block.parts.filter((p) => p.start !== block.start || p.service !== block.service);
   // Everything about the visit, for the tooltip.
   const details = [
     block.clientName,
-    [block.service, block.with.length > 0 && `with ${block.with.join(" and ")}`].filter(Boolean).join(" · "),
+    block.service,
     `${time} · ${stylist}`,
-    [STATUS_LABELS[block.status], late && (lateBy ? `${lateBy} min late` : "due now"), block.group && block.group.label, block.series && "repeating", block.online && "booked online"]
+    [STATUS_LABELS[block.status], late && lateText, block.group && block.group.label, block.series && "repeating", block.online && "booked online"]
       .filter(Boolean)
       .join(" · "),
+    ...(others.length ? ["Whole visit:", ...block.parts.map((p) => `${p.service} · ${p.staff}, ${formatMinute(p.start)}–${formatMinute(p.end)}`)] : []),
   ];
   const plainService = block.service.replace(/\s*\([^)]*\)/g, "");
-  const services = [
-    ...new Set([
-      ...(block.group ? [`${block.service} · ${block.group.label}`] : []),
-      ...(block.with.length ? [`${block.service} · with ${block.with.join(", ")}`] : []),
-      block.service,
-      plainService,
-    ]),
-  ];
-  const times = [time, formatMinute(block.start)];
+  // This stylist's part of the visit only; the rest is in the tooltip.
+  const services = [...new Set([...(block.group ? [`${block.service} · ${block.group.label}`] : []), block.service, plainService])];
 
   const label = [
     time,
     block.clientName,
     block.service,
     processing && `processing ${formatMinute(processing.start)}–${formatMinute(processing.end)}`,
-    block.with.length > 0 && `with ${block.with.join(" and ")}`,
+    others.length > 0 && `part of a visit with ${[...new Set(others.map((p) => p.staff))].join(" and ")}`,
     block.resource,
     block.series && "repeating",
     block.group && `group: ${block.group.label}`,
     block.online && "booked online",
     STATUS_LABELS[block.status],
-    late && "running late",
+    late && (notArrived ? "not arrived" : "running late"),
   ]
     .filter(Boolean)
     .join(", ");
@@ -1686,7 +1749,7 @@ function AppointmentBlock({
         onBlur={(e) => onHint(null, e.currentTarget.getBoundingClientRect())}
         aria-describedby={`hint-${block.itemId}`}
         {...pointer}
-        className={`absolute block touch-none overflow-hidden rounded-md border-l-4 border-(--fam-accent) bg-surface text-left text-ink shadow-card select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
+        className={`@container absolute block touch-none overflow-hidden rounded-md border-l-4 border-(--fam-accent) bg-surface text-left text-ink shadow-card select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
           selected || highlight || grouped ? "" : "ring-1 ring-surface"
         } ${draggable ? "cursor-grab" : "cursor-pointer"} ${dragging ? "opacity-40 shadow-none outline-2 outline-ink-subtle outline-dashed" : ""} ${settling ? "animate-settle" : ""}`}
         style={{
@@ -1712,17 +1775,23 @@ function AppointmentBlock({
           <span
             aria-hidden
             data-ring={selected ? "selected" : highlight ? "denise" : "group"}
-            className={`pointer-events-none absolute inset-0 z-10 rounded-md ring-2 ring-inset ${selected ? "ring-navy-900" : highlight ? "animate-glow ring-denise-500" : "ring-navy-700/50"}`}
+            className={`pointer-events-none absolute inset-0 z-10 rounded-md ring-inset ${selected ? "ring-2 ring-link/70" : highlight ? "animate-glow ring-2 ring-denise-500" : "ring-2 ring-navy-700/50"}`}
           />
         )}
         {show.name && (
           <span aria-hidden className={`relative flex items-center gap-1 pt-1 ${narrow ? "px-1.5" : "px-2"}`}>
             <FitText variants={names} className={`flex-1 text-sm leading-[18px] font-semibold ${visit === "off" ? "text-block-ink-muted line-through" : ""}`} />
             {/* Only what needs attention right now. */}
-            {late && (
-              <span data-attention="late" title={lateBy ? `Running ${lateBy} min late` : "Due now, not here yet"} className="flex shrink-0 items-center gap-0.5 text-xs leading-4 font-semibold text-status-late-ink">
+            {showLate && (
+              // The name wins: in a narrow block the words go, then the
+              // clock (it's all in the tooltip).
+              <span
+                data-attention={notArrived ? "not-arrived" : "late"}
+                title={notArrived ? `Not arrived: due ${formatMinute(block.start)}` : lateBy ? `Running ${lateBy} min late` : "Due now, not here yet"}
+                className="hidden shrink-0 items-center gap-0.5 text-xs leading-4 font-semibold whitespace-nowrap text-status-late-ink @min-[6.5rem]:flex"
+              >
                 <ClockIcon className="size-3.5" />
-                {lateBy ? `+${lateBy}m` : null}
+                {(notArrived || lateBy) && <span className={notArrived ? "hidden @min-[11rem]:inline" : "hidden @min-[8.5rem]:inline"}>{notArrived ? "Not arrived" : `+${lateBy}m`}</span>}
               </span>
             )}
           </span>
@@ -1734,7 +1803,7 @@ function AppointmentBlock({
         )}
         {show.time && (
           <span aria-hidden className={`relative block ${narrow ? "px-1.5" : "px-2"}`}>
-            <FitText variants={times} className="text-[13px] leading-[17px] text-block-ink-muted" />
+            <FitText variants={ranges} className="text-[13px] leading-[17px] text-block-ink-muted" />
           </span>
         )}
       </div>

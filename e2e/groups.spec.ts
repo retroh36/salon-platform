@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration, pxPerMinute, slotAt } from "./fixtures";
+import { AUTH, expect, test, ui, waitForHydration, pxPerMinute, slotAt, moreAction } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -87,7 +87,7 @@ test("books a group, shows it together, and moves and cancels the whole group", 
   await openDay(page);
   await column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Ava Test`) }).click();
   const panel = page.getByRole("tabpanel", { name: "Booking details" });
-  await panel.getByRole("button", { name: "Cancel booking" }).click();
+  await moreAction(panel, "Cancel booking");
   const cancel = panel.getByRole("form", { name: "Cancel booking" });
   await cancel.getByLabel("Reason").selectOption("Client canceled");
   await cancel.getByLabel("The whole group").check();

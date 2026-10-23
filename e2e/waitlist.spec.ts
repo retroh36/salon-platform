@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, test, ui, waitForHydration, moreAction } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -97,7 +97,7 @@ test("when a visit is canceled, Denise suggests who on the waitlist fits, and st
   await openDay(page);
   await ui(page).getByRole("region", { name: "Nola Brennan", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Gone Test`) }).click();
   const panel = page.getByRole("tabpanel", { name: "Booking details" });
-  await panel.getByRole("button", { name: "Cancel booking" }).click();
+  await moreAction(panel, "Cancel booking");
   const cancel = panel.getByRole("form", { name: "Cancel booking" });
   await cancel.getByLabel("Reason").selectOption("Client canceled");
   await cancel.getByRole("button", { name: "Cancel booking" }).click();

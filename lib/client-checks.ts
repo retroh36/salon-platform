@@ -4,20 +4,34 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import { missingForms, type FormTemplate } from "@/lib/forms";
+import { requiredForms, type FormTemplate } from "@/lib/forms";
 import { formatDay } from "@/lib/schedule-format";
-import { patchNotice, patchTestMessage, patchTestState, type PatchSettings, type PatchTest } from "@/lib/scheduling/patch-tests";
+import { patchStatus, patchTestMessage, patchTestState, type PatchSettings, type PatchState, type PatchTest } from "@/lib/scheduling/patch-tests";
 import { toLocal } from "@/lib/scheduling/time";
 
 type Supabase = SupabaseClient<Database>;
 
 export type VisitToCheck = { appointmentId: string; clientId: string | null; start: Date; items: { serviceId: string; start: Date }[] };
+// One row of booking details' "Before this visit" checklist: "Patch test —
+// none on file", "Color consent — not signed", or done ("signed").
+export type ChecklistItem = {
+  key: string;
+  label: string;
+  status: string;
+  // What it's for: "Needed for Gloss / Toner."
+  detail: string | null;
+  done: boolean;
+  // The salon won't take the visit without it.
+  blocks: boolean;
+  action: { kind: "patch_test" } | { kind: "form"; templateId: string };
+};
+
 export type VisitWarnings = {
+  // Patch test problems, for the booking panel.
   patch: string[];
-  // The same, per service, for booking details.
-  patchNotices: { title: string; detail: string }[];
   patchBlocks: boolean;
-  forms: { templateId: string; name: string }[];
+  // Everything the visit needs, done or not.
+  checklist: ChecklistItem[];
 };
 
 export async function patchSettings(supabase: Supabase, businessId: string): Promise<PatchSettings> {
@@ -68,17 +82,37 @@ export async function visitWarnings(supabase: Supabase, businessId: string, visi
       ),
     ];
     const tests = testsBy.get(v.clientId) ?? [];
-    const notices = new Map<string, { title: string; detail: string }>();
+    const checklist: ChecklistItem[] = [];
+    // One patch test row, or one per state when services on the visit
+    // differ (one too soon for an early service, say).
+    const byState = new Map<PatchState, string[]>();
     for (const i of v.items) {
       const service = needsTest.get(i.serviceId);
-      const state = service ? patchTestState(tests, i.start, settings) : "ok";
-      if (service && state !== "ok" && !notices.has(service)) notices.set(service, patchNotice(state, service, tests, settings, day));
+      if (!service) continue;
+      const state = patchTestState(tests, i.start, settings);
+      const services = byState.get(state) ?? [];
+      if (!services.includes(service)) byState.set(state, [...services, service]);
+    }
+    const problems = [...byState].filter(([state]) => state !== "ok");
+    for (const [state, services] of problems.length ? problems : [...byState]) {
+      const done = state === "ok";
+      checklist.push({
+        key: `patch:${state}`,
+        label: "Patch test",
+        status: patchStatus(state, tests, settings, day),
+        detail: `Needed for ${services.join(" and ")}.`,
+        done,
+        blocks: !done && settings.enforcement === "block",
+        action: { kind: "patch_test" },
+      });
     }
     const firstVisit = !firstDone.has(v.clientId) || firstDone.get(v.clientId)! >= v.start;
-    const missing = missingForms(templates, signedBy.get(v.clientId) ?? new Set(), { firstVisit, serviceIds: v.items.map((i) => i.serviceId) });
-    if (patch.length || missing.length) {
-      out.set(v.appointmentId, { patch, patchNotices: [...notices.values()], patchBlocks: settings.enforcement === "block", forms: missing.map((t) => ({ templateId: t.id, name: t.name })) });
+    const signed = signedBy.get(v.clientId) ?? new Set<string>();
+    for (const t of requiredForms(templates, { firstVisit, serviceIds: v.items.map((i) => i.serviceId) })) {
+      const done = signed.has(t.id);
+      checklist.push({ key: `form:${t.id}`, label: t.name, status: done ? "signed" : "not signed", detail: null, done, blocks: false, action: { kind: "form", templateId: t.id } });
     }
+    if (checklist.length) out.set(v.appointmentId, { patch, patchBlocks: settings.enforcement === "block", checklist });
   }
   return out;
 }

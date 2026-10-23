@@ -16,7 +16,7 @@ export async function openCheckout(page: Page, opts: { appointmentId?: string; p
   return checkout(page);
 }
 
-// After "Check out client" from the calendar.
+// After "Check out" from the calendar.
 export async function onCheckout(page: Page) {
   await expect(page).toHaveURL(/\/checkout\/[0-9a-f-]{36}$/);
   await waitForHydration(page, "#product-search");

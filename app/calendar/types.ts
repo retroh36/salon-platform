@@ -2,6 +2,7 @@
 // since midnight on the day shown, at the location.
 
 import type { AppointmentStatus } from "@/lib/appointments";
+import type { VisitWarnings } from "@/lib/client-checks";
 import type { PickerProduct } from "@/lib/inventory-load";
 import type { CalendarZoom, ServiceFamily } from "@/lib/calendar";
 import type { StaffLevel } from "@/lib/schedule-forms";
@@ -39,8 +40,9 @@ export type BlockData = Interval & {
   clientName: string;
   service: string;
   resource: string | null;
-  // First names of the visit's other stylists.
-  with: string[];
+  // Every service on the visit, this one included, in start order, with
+  // the stylist's first name (several when stylists share the visit).
+  parts: (Interval & { service: string; staff: string })[];
   status: AppointmentStatus;
   // Part of a recurring series.
   series: boolean;
@@ -81,6 +83,8 @@ export type AppointmentDetail = {
   status: AppointmentStatus;
   // Booked by the client on the salon's booking site.
   online: boolean;
+  checkedInAt: string | null;
+  checkedOutAt: string | null;
   notes: string;
   client: { id: string; name: string; phone: string | null; email: string | null; allergies: string | null; preferences: string | null } | null;
   items: ItemDetail[];
@@ -95,8 +99,8 @@ export type AppointmentDetail = {
   group: { id: string; label: string; members: { appointmentId: string; clientName: string; staffName: string; start: number }[] } | null;
   // What Denise knows about the client ("Comes every ~6 weeks…").
   insight: { summary: string; tags: { label: string; tone: "neutral" | "good" | "warn" }[] } | null;
-  // Patch test problems and forms still to sign, before the visit.
-  warnings: { patch: string[]; patchNotices: { title: string; detail: string }[]; patchBlocks: boolean; forms: { templateId: string; name: string }[] } | null;
+  // Patch tests and forms the visit needs, done or not.
+  warnings: VisitWarnings | null;
   // The sale a checked-out visit was paid on (reversing it means voiding
   // that sale), when the viewer can see sales.
   saleId: string | null;

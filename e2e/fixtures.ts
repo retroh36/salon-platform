@@ -75,3 +75,20 @@ export async function slotAt(page: Page, column: Locator, minute: number) {
   const box = (await column.boundingBox())!;
   return { box, y: box.y + (minute - start) * ppm + 3, ppm };
 }
+
+// "Check in" in booking details, through its one warning listing anything
+// the visit still needs (a new client's consultation form, say).
+export async function checkIn(panel: Locator) {
+  await panel.getByRole("button", { name: "Check in", exact: true }).click();
+  const anyway = panel.getByRole("button", { name: "Check in anyway" });
+  await expect(anyway.or(panel.getByTestId("visit-status").filter({ hasText: /^Checked in/ }))).toBeVisible();
+  if (await anyway.isVisible()) await anyway.click();
+}
+
+// Booking details' rarer actions (Undo check-in, Mark no-show, Cancel
+// booking) are under "More".
+export async function moreAction(panel: Locator, name: string) {
+  const more = panel.getByRole("button", { name: "More", exact: true });
+  if ((await more.getAttribute("aria-expanded")) !== "true") await more.click();
+  await panel.getByRole("group", { name: "More actions" }).getByRole("button", { name }).click();
+}

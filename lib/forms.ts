@@ -59,17 +59,19 @@ export function checkAnswers(fields: readonly FormField[], raw: Answers, signatu
   return missing.length ? { ok: false, missing } : { ok: true, answers };
 }
 
-// Required forms a client hasn't signed: ones for a first visit (if it is
-// one) and ones for services on this visit.
+// Forms a visit needs: ones for a first visit (if it is one) and ones for
+// services on this visit.
+export function requiredForms(templates: readonly FormTemplate[], visit: { firstVisit: boolean; serviceIds: readonly string[] }): FormTemplate[] {
+  return templates.filter(
+    (t) => t.isActive && ((t.required === "first_visit" && visit.firstVisit) || (t.required === "services" && t.serviceIds.some((id) => visit.serviceIds.includes(id)))),
+  );
+}
+
+// Required forms a client hasn't signed.
 export function missingForms(
   templates: readonly FormTemplate[],
   signedTemplateIds: ReadonlySet<string>,
   visit: { firstVisit: boolean; serviceIds: readonly string[] },
 ): FormTemplate[] {
-  return templates.filter(
-    (t) =>
-      t.isActive &&
-      !signedTemplateIds.has(t.id) &&
-      ((t.required === "first_visit" && visit.firstVisit) || (t.required === "services" && t.serviceIds.some((id) => visit.serviceIds.includes(id)))),
-  );
+  return requiredForms(templates, visit).filter((t) => !signedTemplateIds.has(t.id));
 }

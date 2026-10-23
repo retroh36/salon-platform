@@ -1,6 +1,6 @@
 import { todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, checkIn, expect, test, ui, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -27,20 +27,20 @@ test.afterAll(async () => {
 test.describe("a stylist on their phone", () => {
   test.use({ storageState: AUTH.stylist, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
-  test("taps Started, Processing, Back in chair and Finished on My day", async ({ page }) => {
+  test("taps Start service, Processing, Back in chair and Finish service on My day", async ({ page }) => {
     await page.goto("/my-day");
     const card = ui(page).getByRole("listitem").filter({ hasText: `${PREFIX}Tap C.` });
     await waitForHydration(page, "[data-testid=service-timer] button");
     const timer = card.getByTestId("service-timer");
     await expect(timer).toHaveAttribute("data-state", "waiting");
 
-    for (const [tap, state] of [["Started", "in_chair"], ["Processing", "processing"], ["Back in chair", "finishing"], ["Finished", "done"]] as const) {
+    for (const [tap, state] of [["Start service", "in_chair"], ["Processing", "processing"], ["Back in chair", "finishing"], ["Finish service", "done"]] as const) {
       const button = timer.getByRole("button", { name: tap });
       expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
       await button.click();
       await expect(timer).toHaveAttribute("data-state", state);
     }
-    await expect(timer).toContainText(/Done in/);
+    await expect(timer).toContainText(/Finished at \d/);
     // Starting checked the client in.
     await expect(card).toContainText("Checked in");
 
@@ -54,14 +54,25 @@ test.describe("a stylist on their phone", () => {
 test.describe("the front desk", () => {
   test.use({ storageState: AUTH.frontDesk, viewport: { width: 1440, height: 1000 } });
 
-  test("sees the timer in booking details and can finish the service", async ({ page }) => {
+  test("sees the timer in booking details, with the next tap as its one main button", async ({ page }) => {
     await page.goto(`/calendar?date=${todayIn("America/Chicago")}`);
     await waitForHydration(page, "section[data-staff-id]");
     await ui(page).getByRole("region", { name: "Bridget Callahan", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Tap`) }).click({ position: { x: 10, y: 5 } });
     const details = page.getByRole("tabpanel", { name: "Booking details" });
     const timer = details.getByTestId("service-timer");
     await expect(timer).toBeVisible();
-    if ((await timer.getAttribute("data-state")) !== "done") await timer.getByRole("button", { name: "Finished" }).click();
+    // The status in words, apart from the buttons.
+    await expect(details.getByTestId("visit-status")).toHaveText(/^(Confirmed|Checked in at|In service since|Processing since|Back in the chair since|Finished at|Checked out at) \d/);
+    // Each tap in turn is the panel's one main button.
+    if ((await details.getByTestId("primary-action").textContent()) === "Check in") await checkIn(details);
+    for (let i = 0; i < 4 && (await timer.getAttribute("data-state")) !== "done"; i++) {
+      const state = (await timer.getAttribute("data-state"))!;
+      await expect(details.getByTestId("primary-action")).toHaveText(/^(Start service|Processing|Back in chair|Finish service)$/);
+      await details.getByTestId("primary-action").click();
+      await expect(timer).not.toHaveAttribute("data-state", state);
+    }
     await expect(timer).toHaveAttribute("data-state", "done");
+    // Then checking out is the main button.
+    await expect(details.getByTestId("primary-action")).toHaveText("Check out");
   });
 });
