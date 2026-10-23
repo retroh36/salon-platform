@@ -13,7 +13,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { PaymentMethod } from "@/lib/checkout";
 
 export type SaleLineInput =
-  | { kind: "service"; appointmentItemId: string; unitPriceCents: number; priceReason: string }
+  // packageItemId: a use of the client's package pays for it.
+  | { kind: "service"; appointmentItemId: string; unitPriceCents: number; priceReason: string; packageItemId?: string | null }
+  | { kind: "package"; templateId: string }
   | { kind: "product"; productId: string; quantity: number }
   // A physical card has its own code; a digital one gets one and is emailed.
   | { kind: "gift_card"; amountCents: number; code: string | null; recipientName: string | null; recipientEmail: string | null }
@@ -59,7 +61,9 @@ export async function completeSale(input: SaleInput): Promise<SaleResult> {
       lines: input.lines.map((l) => {
         switch (l.kind) {
           case "service":
-            return { kind: "service", appointment_item_id: l.appointmentItemId, unit_price_cents: l.unitPriceCents, price_reason: l.priceReason };
+            return { kind: "service", appointment_item_id: l.appointmentItemId, unit_price_cents: l.unitPriceCents, price_reason: l.priceReason, package_item_id: l.packageItemId ?? null };
+          case "package":
+            return { kind: "package", template_id: l.templateId };
           case "product":
             return { kind: "product", product_id: l.productId, quantity: l.quantity };
           case "gift_card":

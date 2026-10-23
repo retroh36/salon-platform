@@ -347,6 +347,82 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"client_package_items": {
+                  Row: {
+                    "business_id": string,"client_package_id": string,"id": string,"service_id": string,"total": number,"use_value_cents": number,"used": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"client_package_id": string,"id"?: string,"service_id": string,"total": number,"use_value_cents": number,"used"?: number
+                  }
+                  Update: {
+                    "business_id"?: string,"client_package_id"?: string,"id"?: string,"service_id"?: string,"total"?: number,"use_value_cents"?: number,"used"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "client_package_items_client_package_id_business_id_fkey"
+      columns: ["client_package_id","business_id"]
+isOneToOne: false
+      referencedRelation: "client_packages"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "client_package_items_service_id_fkey"
+      columns: ["service_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"client_packages": {
+                  Row: {
+                    "business_id": string,"cancel_reason": string | null,"canceled_at": string | null,"canceled_by": string | null,"client_id": string,"created_at": string,"created_by": string | null,"expires_at": string | null,"id": string,"levels": (Database["public"]['Enums']["staff_level"])[] | null,"name": string,"price_cents": number,"refunded_cents": number,"sale_id": string | null,"status": Database["public"]['Enums']["client_package_status"],"template_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"canceled_by"?: string | null,"client_id": string,"created_at"?: string,"created_by"?: string | null,"expires_at"?: string | null,"id"?: string,"levels"?: (Database["public"]['Enums']["staff_level"])[] | null,"name": string,"price_cents": number,"refunded_cents"?: number,"sale_id"?: string | null,"status"?: Database["public"]['Enums']["client_package_status"],"template_id"?: string | null
+                  }
+                  Update: {
+                    "business_id"?: string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"canceled_by"?: string | null,"client_id"?: string,"created_at"?: string,"created_by"?: string | null,"expires_at"?: string | null,"id"?: string,"levels"?: (Database["public"]['Enums']["staff_level"])[] | null,"name"?: string,"price_cents"?: number,"refunded_cents"?: number,"sale_id"?: string | null,"status"?: Database["public"]['Enums']["client_package_status"],"template_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "client_packages_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_packages_canceled_by_business_id_fkey"
+      columns: ["canceled_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "client_packages_client_id_fkey"
+      columns: ["client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_packages_created_by_business_id_fkey"
+      columns: ["created_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "client_packages_sale_id_fkey"
+      columns: ["sale_id"]
+isOneToOne: false
+      referencedRelation: "sales"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_packages_template_id_fkey"
+      columns: ["template_id"]
+isOneToOne: false
+      referencedRelation: "package_templates"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"client_patch_tests": {
                   Row: {
                     "business_id": string,"client_id": string,"created_at": string,"id": string,"notes": string | null,"performed_by": string,"products": string,"result": Database["public"]['Enums']["patch_test_result"],"tested_at": string
@@ -795,16 +871,106 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"payments": {
+                },"package_events": {
                   Row: {
-                    "amount_cents": number,"business_id": string,"change_cents": number | null,"created_at": string,"created_by": string | null,"gift_card_id": string | null,"id": string,"location_id": string,"method": Database["public"]['Enums']["payment_method"],"processor": string | null,"processor_reference": string | null,"reason": string | null,"reference": string | null,"sale_id": string,"tendered_cents": number | null
+                    "amount_cents": number | null,"appointment_item_id": string | null,"business_id": string,"client_package_id": string,"created_at": string,"id": string,"kind": string,"quantity": number | null,"reason": string | null,"sale_id": string | null,"service_id": string | null,"staff_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount_cents": number,"business_id": string,"change_cents"?: number | null,"created_at"?: string,"created_by"?: string | null,"gift_card_id"?: string | null,"id"?: string,"location_id": string,"method": Database["public"]['Enums']["payment_method"],"processor"?: string | null,"processor_reference"?: string | null,"reason"?: string | null,"reference"?: string | null,"sale_id": string,"tendered_cents"?: number | null
+                    "amount_cents"?: number | null,"appointment_item_id"?: string | null,"business_id": string,"client_package_id": string,"created_at"?: string,"id"?: string,"kind": string,"quantity"?: number | null,"reason"?: string | null,"sale_id"?: string | null,"service_id"?: string | null,"staff_id"?: string | null
                   }
                   Update: {
-                    "amount_cents"?: number,"business_id"?: string,"change_cents"?: number | null,"created_at"?: string,"created_by"?: string | null,"gift_card_id"?: string | null,"id"?: string,"location_id"?: string,"method"?: Database["public"]['Enums']["payment_method"],"processor"?: string | null,"processor_reference"?: string | null,"reason"?: string | null,"reference"?: string | null,"sale_id"?: string,"tendered_cents"?: number | null
+                    "amount_cents"?: number | null,"appointment_item_id"?: string | null,"business_id"?: string,"client_package_id"?: string,"created_at"?: string,"id"?: string,"kind"?: string,"quantity"?: number | null,"reason"?: string | null,"sale_id"?: string | null,"service_id"?: string | null,"staff_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "package_events_appointment_item_id_fkey"
+      columns: ["appointment_item_id"]
+isOneToOne: false
+      referencedRelation: "appointment_items"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "package_events_client_package_id_business_id_fkey"
+      columns: ["client_package_id","business_id"]
+isOneToOne: false
+      referencedRelation: "client_packages"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "package_events_sale_id_fkey"
+      columns: ["sale_id"]
+isOneToOne: false
+      referencedRelation: "sales"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "package_events_service_id_fkey"
+      columns: ["service_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "package_events_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"package_template_items": {
+                  Row: {
+                    "business_id": string,"quantity": number,"service_id": string,"template_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"quantity": number,"service_id": string,"template_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"quantity"?: number,"service_id"?: string,"template_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "package_template_items_service_id_business_id_fkey"
+      columns: ["service_id","business_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "package_template_items_template_id_business_id_fkey"
+      columns: ["template_id","business_id"]
+isOneToOne: false
+      referencedRelation: "package_templates"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"package_templates": {
+                  Row: {
+                    "business_id": string,"created_at": string,"expiry_months": number | null,"id": string,"is_active": boolean,"levels": (Database["public"]['Enums']["staff_level"])[] | null,"name": string,"price_cents": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"expiry_months"?: number | null,"id"?: string,"is_active"?: boolean,"levels"?: (Database["public"]['Enums']["staff_level"])[] | null,"name": string,"price_cents": number,"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"expiry_months"?: number | null,"id"?: string,"is_active"?: boolean,"levels"?: (Database["public"]['Enums']["staff_level"])[] | null,"name"?: string,"price_cents"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "package_templates_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"payments": {
+                  Row: {
+                    "amount_cents": number,"business_id": string,"change_cents": number | null,"created_at": string,"created_by": string | null,"gift_card_id": string | null,"id": string,"location_id": string,"method": Database["public"]['Enums']["payment_method"],"package_item_id": string | null,"processor": string | null,"processor_reference": string | null,"reason": string | null,"reference": string | null,"sale_id": string,"tendered_cents": number | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount_cents": number,"business_id": string,"change_cents"?: number | null,"created_at"?: string,"created_by"?: string | null,"gift_card_id"?: string | null,"id"?: string,"location_id": string,"method": Database["public"]['Enums']["payment_method"],"package_item_id"?: string | null,"processor"?: string | null,"processor_reference"?: string | null,"reason"?: string | null,"reference"?: string | null,"sale_id": string,"tendered_cents"?: number | null
+                  }
+                  Update: {
+                    "amount_cents"?: number,"business_id"?: string,"change_cents"?: number | null,"created_at"?: string,"created_by"?: string | null,"gift_card_id"?: string | null,"id"?: string,"location_id"?: string,"method"?: Database["public"]['Enums']["payment_method"],"package_item_id"?: string | null,"processor"?: string | null,"processor_reference"?: string | null,"reason"?: string | null,"reference"?: string | null,"sale_id"?: string,"tendered_cents"?: number | null
                   }
                   Relationships: [
                     {
@@ -818,6 +984,12 @@ isOneToOne: false
       columns: ["gift_card_id"]
 isOneToOne: false
       referencedRelation: "gift_cards"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "payments_package_item_id_fkey"
+      columns: ["package_item_id"]
+isOneToOne: false
+      referencedRelation: "client_package_items"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "payments_sale_id_business_id_fkey"
@@ -1003,14 +1175,14 @@ isOneToOne: false
                   ]
                 },"sale_items": {
                   Row: {
-                    "appointment_item_id": string | null,"booked_price_cents": number | null,"business_id": string,"description": string,"discount_cents": number,"gift_card_id": string | null,"id": string,"kind": Database["public"]['Enums']["sale_item_kind"],"position": number,"price_reason": string | null,"product_id": string | null,"quantity": number,"returned_quantity": number,"sale_id": string,"service_id": string | null,"staff_id": string | null,"tax_cents": number,"total_cents": number,"unit_price_cents": number
+                    "appointment_item_id": string | null,"booked_price_cents": number | null,"business_id": string,"client_package_id": string | null,"description": string,"discount_cents": number,"gift_card_id": string | null,"id": string,"kind": Database["public"]['Enums']["sale_item_kind"],"package_item_id": string | null,"position": number,"price_reason": string | null,"product_id": string | null,"quantity": number,"returned_quantity": number,"sale_id": string,"service_id": string | null,"staff_id": string | null,"tax_cents": number,"total_cents": number,"unit_price_cents": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id": string,"description": string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["sale_item_kind"],"position": number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id": string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents": number,"unit_price_cents": number
+                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id": string,"client_package_id"?: string | null,"description": string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["sale_item_kind"],"package_item_id"?: string | null,"position": number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id": string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents": number,"unit_price_cents": number
                   }
                   Update: {
-                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id"?: string,"description"?: string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["sale_item_kind"],"position"?: number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id"?: string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents"?: number,"unit_price_cents"?: number
+                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id"?: string,"client_package_id"?: string | null,"description"?: string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["sale_item_kind"],"package_item_id"?: string | null,"position"?: number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id"?: string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents"?: number,"unit_price_cents"?: number
                   }
                   Relationships: [
                     {
@@ -1020,10 +1192,22 @@ isOneToOne: false
       referencedRelation: "appointment_items"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "sale_items_client_package_id_fkey"
+      columns: ["client_package_id"]
+isOneToOne: false
+      referencedRelation: "client_packages"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "sale_items_gift_card_id_fkey"
       columns: ["gift_card_id"]
 isOneToOne: false
       referencedRelation: "gift_cards"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sale_items_package_item_id_fkey"
+      columns: ["package_item_id"]
+isOneToOne: false
+      referencedRelation: "client_package_items"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "sale_items_product_id_fkey"
@@ -1791,6 +1975,9 @@ isOneToOne: false
 "cancel_online_appointment":
 { Args: { "p_appointment_id": string,"p_manage_token_hash": string }; Returns: undefined
                            },
+"cancel_package":
+{ Args: { "p_client_package_id": string,"p_reason": string,"p_refund_method": string }; Returns: number
+                           },
 "cancel_stocktake":
 { Args: { "p_stocktake_id": string }; Returns: undefined
                            },
@@ -1863,6 +2050,9 @@ isOneToOne: false
 "save_online_appointment":
 { Args: { "p_appointment_id": string,"p_client_id": string,"p_expected_version": number,"p_items": Json,"p_location_id": string,"p_manage_token_hash": string,"p_notes": string }; Returns: string
                            },
+"save_package_template":
+{ Args: { "p_input": Json,"p_template_id": string }; Returns: string
+                           },
 "save_purchase_order":
 { Args: { "p_lines": Json,"p_location_id": string,"p_notes": string,"p_order_id": string,"p_supplier_id": string }; Returns: string
                            },
@@ -1928,7 +2118,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","deposit_kind": "none"|"fixed"|"percent","disruption_kind": "overrun"|"client_late"|"call_out","form_requirement": "none"|"first_visit"|"services","gift_card_kind": "purchased"|"promotional","gift_card_status": "active"|"voided","notification_status": "pending"|"sent"|"canceled","online_service_mode": "bookable"|"consultation"|"off","patch_test_result": "no_reaction"|"reaction","payment_method": "cash"|"card"|"gift_card"|"package","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","sale_item_kind": "service"|"product"|"gift_card"|"gift_card_reload","sale_status": "completed"|"partly_refunded"|"refunded"|"voided","staff_level": "artisan"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
+            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","client_package_status": "active"|"canceled"|"refunded","deposit_kind": "none"|"fixed"|"percent","disruption_kind": "overrun"|"client_late"|"call_out","form_requirement": "none"|"first_visit"|"services","gift_card_kind": "purchased"|"promotional","gift_card_status": "active"|"voided","notification_status": "pending"|"sent"|"canceled","online_service_mode": "bookable"|"consultation"|"off","patch_test_result": "no_reaction"|"reaction","payment_method": "cash"|"card"|"gift_card"|"package","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","sale_item_kind": "service"|"product"|"gift_card"|"gift_card_reload"|"package","sale_status": "completed"|"partly_refunded"|"refunded"|"voided","staff_level": "artisan"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -2048,7 +2238,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"deposit_kind": ["none", "fixed", "percent"],"disruption_kind": ["overrun", "client_late", "call_out"],"form_requirement": ["none", "first_visit", "services"],"gift_card_kind": ["purchased", "promotional"],"gift_card_status": ["active", "voided"],"notification_status": ["pending", "sent", "canceled"],"online_service_mode": ["bookable", "consultation", "off"],"patch_test_result": ["no_reaction", "reaction"],"payment_method": ["cash", "card", "gift_card", "package"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"sale_item_kind": ["service", "product", "gift_card", "gift_card_reload"],"sale_status": ["completed", "partly_refunded", "refunded", "voided"],"staff_level": ["artisan", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
+            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"client_package_status": ["active", "canceled", "refunded"],"deposit_kind": ["none", "fixed", "percent"],"disruption_kind": ["overrun", "client_late", "call_out"],"form_requirement": ["none", "first_visit", "services"],"gift_card_kind": ["purchased", "promotional"],"gift_card_status": ["active", "voided"],"notification_status": ["pending", "sent", "canceled"],"online_service_mode": ["bookable", "consultation", "off"],"patch_test_result": ["no_reaction", "reaction"],"payment_method": ["cash", "card", "gift_card", "package"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"sale_item_kind": ["service", "product", "gift_card", "gift_card_reload", "package"],"sale_status": ["completed", "partly_refunded", "refunded", "voided"],"staff_level": ["artisan", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
           }
         }
 } as const

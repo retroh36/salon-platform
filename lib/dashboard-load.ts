@@ -16,6 +16,7 @@ import type { DeniseState } from "@/lib/denise/types";
 import type { ClientInsight } from "@/lib/insights/clients";
 import { describeClient } from "@/lib/insights/describe";
 import { loadAllClientInsights, loadSalonInsight } from "@/lib/insights/read";
+import { loadPackagesByClient, withPackages } from "@/lib/packages";
 import { formatDay, formatLongDay } from "@/lib/schedule-format";
 import type { StaffLevel } from "@/lib/schedule-forms";
 import { loadDisruptions } from "@/lib/scheduling/disruptions";
@@ -287,6 +288,7 @@ export async function loadDashboard(supabase: Supabase, me: DashboardMe, now = n
       firstOfVisit.find((v) => v.status === "checked_in" && !v.finished) ??
       firstOfVisit.find((v) => (v.status === "booked" || v.status === "confirmed") && v.start >= nowMinute - LATE_UNTIL);
     const known = nextVisit?.clientId ? insights.get(nextVisit.clientId) : undefined;
+    const nextPackages = nextVisit?.clientId ? (await loadPackagesByClient(supabase, [nextVisit.clientId])).get(nextVisit.clientId) : undefined;
     const rebooking = salon?.rebooking.find((r) => r.staffId === me.id);
     const myItems = new Set(myVisits.map((v) => v.itemId));
     return {
@@ -303,7 +305,7 @@ export async function loadDashboard(supabase: Supabase, me: DashboardMe, now = n
         next: nextVisit
           ? {
               ...view(nextVisit),
-              insight: known ? describeClient(known, null, { staff: (id) => names.get(id) ?? null, dayOf: (iso) => formatDay(iso.slice(0, 10)) }, now) : null,
+              insight: withPackages(known ? describeClient(known, null, { staff: (id) => names.get(id) ?? null, dayOf: (iso) => formatDay(iso.slice(0, 10)) }, now) : null, nextPackages),
             }
           : null,
         stats: {

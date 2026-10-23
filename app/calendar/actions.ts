@@ -11,6 +11,7 @@ import { searchClients } from "@/lib/client-search";
 import { normalizePhone } from "@/lib/clients";
 import { describeUsage, parseUsageLines } from "@/lib/color-usage";
 import { isUuid } from "@/lib/ids";
+import { isUsable, loadClientPackages, type ClientPackage } from "@/lib/packages";
 import { loadBackBarProducts } from "@/lib/inventory-load";
 import { changeStatus, moveItem, saveBooking, saveNotes, type BookingItemInput, type SaveResult } from "@/lib/scheduling/book";
 import { describeProblem, type BookingProblem } from "@/lib/scheduling/booking";
@@ -517,4 +518,12 @@ export async function recordItemTime(itemId: string, event: TimeEvent): Promise<
   refresh();
   revalidatePath("/my-day");
   return { ok: true };
+}
+
+// A client's packages with uses left, for the booking form ("Ava has 3
+// Blowouts left on a package").
+export async function clientPackagesFor(clientId: string): Promise<ClientPackage[]> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !isUuid(clientId)) return [];
+  return (await loadClientPackages(supabase, clientId, true)).filter((p) => isUsable(p));
 }

@@ -17,6 +17,7 @@ import { occurrences } from "@/lib/scheduling/blocks";
 import { loadBlocks, loadCalendarStamp, loadLocationSchedule, loadOffers, loadStaffSchedules, loadStaffTimings, startOfLocalDay, toBookedItem } from "@/lib/scheduling/load";
 import { describeClient } from "@/lib/insights/describe";
 import { loadClientInsights, loadDurations } from "@/lib/insights/read";
+import { loadPackagesByClient, withPackages } from "@/lib/packages";
 import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn, toLocal, WEEKDAYS } from "@/lib/scheduling/time";
 import { visitWarnings } from "@/lib/client-checks";
 import { fullName, sortStaff } from "@/lib/staff";
@@ -236,11 +237,13 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
 
   // What Denise knows about each client.
   const clientIds = [...new Set(Object.values(appointments).flatMap((a) => (a.client ? [a.client.id] : [])))];
-  const insights = await loadClientInsights(supabase, me.business_id, clientIds);
+  const [insights, packages] = await Promise.all([loadClientInsights(supabase, me.business_id, clientIds), loadPackagesByClient(supabase, clientIds)]);
   const dayOf = (iso: string) => formatDay(toLocal(new Date(iso), tz).date);
   for (const a of Object.values(appointments)) {
     const known = a.client ? insights.get(a.client.id) : undefined;
     if (known) a.insight = describeClient(known.habits, known.spend, { staff: (id) => staffById.get(id)?.first_name ?? null, dayOf }, new Date());
+    // What's left on their packages, too.
+    if (a.client) a.insight = withPackages(a.insight, packages.get(a.client.id));
   }
 
   const open = dayView({ weekly: {}, overrides: {}, timeOff: [] }, location, date).open;

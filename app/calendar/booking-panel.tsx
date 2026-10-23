@@ -12,8 +12,9 @@ import { formatMinute, minuteToTime, parseTime } from "@/lib/scheduling/time";
 import { formatMinutes, formatPrice, sortCategories } from "@/lib/services";
 import { DeniseFace } from "@/components/denise";
 import type { BookingIdea, BookingIdeas } from "@/lib/denise/ideas";
+import { packageFor, usesLeft, type ClientPackage } from "@/lib/packages";
 import type { Scope } from "@/lib/scheduling/series";
-import { patchTestWarnings, findClients, previewSeries, quickAddClient, saveSeries, saveVisit, saveVisitScoped, type ClientOption, type SeriesPreviewVisit, type VisitInput } from "./actions";
+import { clientPackagesFor, patchTestWarnings, findClients, previewSeries, quickAddClient, saveSeries, saveVisit, saveVisitScoped, type ClientOption, type SeriesPreviewVisit, type VisitInput } from "./actions";
 import type { AppointmentDetail, BoardData } from "./types";
 
 export type BookingStart = { staffId: string; startMinute: number };
@@ -197,6 +198,19 @@ export function BookingPanel({
   }, [patchKey]);
   const patchNow = client && patch?.key === patchKey ? patch : null;
 
+  // The client's packages: a booked service they have uses left for is
+  // pointed out, and used at checkout.
+  const [packages, setPackages] = useState<{ clientId: string; list: ClientPackage[] } | null>(null);
+  useEffect(() => {
+    if (!client) return;
+    let live = true;
+    clientPackagesFor(client.id).then((list) => live && setPackages({ clientId: client.id, list }));
+    return () => {
+      live = false;
+    };
+  }, [client]);
+  const clientPackages = client && packages?.clientId === client.id ? packages.list : [];
+
   return (
       <form onSubmit={submit} className="flex flex-col gap-5 py-2 text-sm" aria-label={appointment ? "Edit booking" : "New booking"}>
         <div className="flex items-start justify-between gap-2">
@@ -322,6 +336,15 @@ export function BookingPanel({
                   ))}
                 </ul>
               )}
+              {(() => {
+                const level = columns.find((c) => c.staffId === l.staffId)?.level ?? null;
+                const offer = l.serviceId ? packageFor(clientPackages, l.serviceId, level) : null;
+                return offer && client ? (
+                  <p className="rounded-md bg-status-confirmed-bg px-2.5 py-1.5 text-status-confirmed-ink" data-testid="package-note">
+                    {client.name.split(" ")[0]} has {usesLeft(offer.item)} on a package. It&apos;s used at checkout.
+                  </p>
+                ) : null;
+              })()}
               {ideas?.line === n && (
                 <IdeasCard
                   ideas={ideas}

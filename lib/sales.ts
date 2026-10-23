@@ -6,6 +6,8 @@ import type { Database } from "@/lib/database.types";
 import { productName } from "@/lib/inventory";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice } from "@/lib/services";
+import { isUsable, loadClientPackages, loadTemplates, type ClientPackage, type PackageTemplate } from "@/lib/packages";
+import type { StaffLevel } from "@/lib/schedule-forms";
 import { fullName, type StaffRole } from "@/lib/staff";
 import { METHOD_LABELS, type PaymentMethod } from "./checkout";
 
@@ -24,12 +26,15 @@ export type CheckoutProduct = { id: string; name: string; priceCents: number; on
 export type CheckoutData = {
   appointmentId: string | null;
   client: { id: string; name: string; email: string | null } | null;
-  services: { itemId: string; name: string; staffId: string; staffName: string; priceCents: number }[];
+  services: { itemId: string; serviceId: string; name: string; staffId: string; staffName: string; staffLevel: StaffLevel | null; priceCents: number }[];
   // Who can be tipped: the stylists on the visit.
   stylists: { id: string; firstName: string }[];
   products: CheckoutProduct[];
   settings: CheckoutSettings;
   role: StaffRole;
+  // The client's packages with uses left, and packages on offer.
+  packages: ClientPackage[];
+  templates: PackageTemplate[];
 };
 
 export function canTakePayments(role: StaffRole): boolean {
@@ -74,26 +79,41 @@ export async function loadCheckout(
   me: { business_id: string; role: StaffRole; location: { id: string } },
   appointmentId: string | null,
 ): Promise<CheckoutData | null> {
-  const [settings, products] = await Promise.all([loadCheckoutSettings(supabase, me.business_id), loadRetailProducts(supabase, me.business_id, me.location.id)]);
-  if (!appointmentId) return { appointmentId: null, client: null, services: [], stylists: [], products, settings, role: me.role };
+  const [settings, products, templates] = await Promise.all([
+    loadCheckoutSettings(supabase, me.business_id),
+    loadRetailProducts(supabase, me.business_id, me.location.id),
+    loadTemplates(supabase, me.business_id),
+  ]);
+  if (!appointmentId) return { appointmentId: null, client: null, services: [], stylists: [], products, settings, role: me.role, packages: [], templates };
 
   const { data: a, error } = await supabase
     .from("appointments")
-    .select("id, status, client:clients(id, first_name, last_name, email), appointment_items(id, starts_at, price_cents, staff_id, service:services(name), staff:staff(first_name, last_name))")
+    .select("id, status, client:clients(id, first_name, last_name, email), appointment_items(id, starts_at, price_cents, service_id, staff_id, service:services(name), staff:staff(first_name, last_name, level))")
     .eq("id", appointmentId)
     .maybeSingle();
   if (error) throw error;
   if (!a) return null;
   const items = [...a.appointment_items].sort((x, y) => x.starts_at.localeCompare(y.starts_at));
   const stylists = [...new Map(items.map((i) => [i.staff_id, { id: i.staff_id, firstName: i.staff?.first_name ?? "Stylist" }])).values()];
+  const packages = a.client ? (await loadClientPackages(supabase, a.client.id, true)).filter((p) => isUsable(p)) : [];
   return {
     appointmentId: a.id,
     client: a.client ? { id: a.client.id, name: fullName(a.client), email: a.client.email } : null,
-    services: items.map((i) => ({ itemId: i.id, name: i.service.name, staffId: i.staff_id, staffName: i.staff ? fullName(i.staff) : "Former staff", priceCents: i.price_cents })),
+    services: items.map((i) => ({
+      itemId: i.id,
+      serviceId: i.service_id,
+      name: i.service.name,
+      staffId: i.staff_id,
+      staffName: i.staff ? fullName(i.staff) : "Former staff",
+      staffLevel: i.staff?.level ?? null,
+      priceCents: i.price_cents,
+    })),
     stylists,
     products,
     settings,
     role: me.role,
+    packages,
+    templates,
   };
 }
 

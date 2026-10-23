@@ -8,6 +8,8 @@ import { getCurrentStaff } from "@/lib/auth";
 import { ClientInsightCard } from "@/components/client-insight";
 import { describeClient } from "@/lib/insights/describe";
 import { loadClientInsights } from "@/lib/insights/read";
+import { loadClientPackages, withPackages } from "@/lib/packages";
+import { PackagesList } from "./packages/packages-card";
 import { canEditClients, formatDate } from "@/lib/clients";
 import { isUuid } from "@/lib/ids";
 import { BackLink } from "@/components/ui/back-link";
@@ -77,6 +79,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
     patchSettings(supabase, me.business_id),
     loadClientInsights(supabase, me.business_id, [id]),
   ]);
+  const packages = await loadClientPackages(supabase, id);
   if (patchError) throw patchError;
   if (formsError) throw formsError;
   if (teamError) throw teamError;
@@ -93,9 +96,10 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
   const editable = canEditClients(me.role);
   const known = insights.get(id);
   const names = new Map(team.map((t) => [t.id, t.first_name]));
-  const insight = known
-    ? describeClient(known.habits, known.spend, { staff: (s) => names.get(s) ?? null, dayOf: (iso) => formatDate(toLocal(new Date(iso), tz).date) }, new Date())
-    : null;
+  const insight = withPackages(
+    known ? describeClient(known.habits, known.spend, { staff: (s) => names.get(s) ?? null, dayOf: (iso) => formatDate(toLocal(new Date(iso), tz).date) }, new Date()) : null,
+    packages,
+  );
   const contact = [client.phone, client.email].filter(Boolean).join(" · ");
 
   return (
@@ -113,6 +117,17 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
         <div className="mb-6">
           <ClientInsightCard insight={insight} />
         </div>
+      )}
+
+      {packages.length > 0 && (
+        <Card title="Packages" titleId="packages-heading" description="Uses left are offered at checkout.">
+          <PackagesList
+            clientId={id}
+            packages={packages}
+            canCancel={me.role === "owner" || me.role === "manager"}
+            expiresLabels={Object.fromEntries(packages.flatMap((p) => (p.expiresAt ? [[p.id, formatDate(toLocal(new Date(p.expiresAt), tz).date)]] : [])))}
+          />
+        </Card>
       )}
 
       {client.allergies && (

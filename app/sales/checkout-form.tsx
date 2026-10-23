@@ -11,6 +11,7 @@ import { computeSale, discountAllowed, formatRate, METHOD_LABELS, parseDollars, 
 import type { CheckoutData } from "@/lib/sales";
 import { formatPrice, centsToInput } from "@/lib/services";
 import { cardProblem, isCardCode, normalizeCode, type GiftCardLookup } from "@/lib/gift-cards";
+import { packageFor, usesLeft } from "@/lib/packages";
 import { pillClass } from "@/components/ui/page";
 import { completeSale, emailReceipt, lookupGiftCard, type SaleInput } from "./actions";
 
@@ -48,6 +49,12 @@ export function CheckoutForm({
   const [tips, setTips] = useState<Record<string, string>>({});
   const [tenders, setTenders] = useState<TenderRow[]>([]);
   const [cardSales, setCardSales] = useState<CardSale[]>([]);
+  // Services paid with the client's package (on by default when it covers
+  // them), and packages sold.
+  const [packageUse, setPackageUse] = useState<Record<string, string | null>>(() =>
+    Object.fromEntries(data.services.map((s) => [s.itemId, packageFor(data.packages, s.serviceId, s.staffLevel)?.item.id ?? null])),
+  );
+  const [packageSales, setPackageSales] = useState<{ key: number; templateId: string }[]>([]);
   const [reloads, setReloads] = useState<Reload[]>([]);
   const [client, setClient] = useState<ClientOption | null>(null);
   const [email, setEmail] = useState(data.client?.email ?? "");
@@ -58,24 +65,30 @@ export function CheckoutForm({
   const [pending, startTransition] = useTransition();
 
   const productById = useMemo(() => new Map(data.products.map((p) => [p.id, p])), [data.products]);
+  const templateById = useMemo(() => new Map(data.templates.map((t) => [t.id, t])), [data.templates]);
   const canDiscount = data.settings.discountRoles.includes(data.role);
 
   // The sale as it stands.
   const serviceCents = data.services.map((s) => parseDollars(prices[s.itemId]?.amount ?? "") ?? -1);
+  const covered = (itemId: string) => Boolean(packageUse[itemId]);
   const lines: SaleLine[] = [
-    ...data.services.map((s, i) => ({ grossCents: Math.max(0, serviceCents[i]), taxBp: data.settings.taxServicesBp, discountable: true })),
+    // A service paid with a package isn't taxed or discounted again.
+    ...data.services.map((s, i) => ({ grossCents: Math.max(0, serviceCents[i]), taxBp: covered(s.itemId) ? 0 : data.settings.taxServicesBp, discountable: !covered(s.itemId) })),
     ...products.map((p) => ({ grossCents: (productById.get(p.productId)?.priceCents ?? 0) * p.quantity, taxBp: data.settings.taxRetailBp, discountable: true })),
     // Gift cards: never taxed or discounted.
     ...cardSales.map((c) => ({ grossCents: parseDollars(c.amount) ?? 0, taxBp: 0, discountable: false })),
     ...reloads.map((r) => ({ grossCents: parseDollars(r.amount) ?? 0, taxBp: 0, discountable: false })),
+    ...packageSales.map((p) => ({ grossCents: templateById.get(p.templateId)?.priceCents ?? 0, taxBp: data.settings.taxServicesBp, discountable: true })),
   ];
+  // What packages pay for: the rest is due from the payments below.
+  const coveredCents = data.services.reduce((n, s, i) => n + (covered(s.itemId) ? Math.max(0, serviceCents[i]) : 0), 0);
   const discountValue = discount.on ? (discount.kind === "percent" ? Number(discount.value) || 0 : (parseDollars(discount.value) ?? 0)) : 0;
   const tipCents = data.stylists.map((s) => parseDollars(tips[s.id] ?? "") ?? 0);
   const totals = computeSale(lines, discount.on && discountValue > 0 ? { kind: discount.kind, value: discountValue } : null, tipCents);
   const pool = lines.filter((l) => l.discountable).reduce((n, l) => n + l.grossCents, 0);
   const discountCheck = discountAllowed(data.role, { roles: data.settings.discountRoles, maxPercent: data.settings.discountMaxPercent }, totals.discountCents, pool);
   const tenderRows = tenders.map((t) => ({ method: t.method, amountCents: parseDollars(t.amount) ?? 0, tenderedCents: t.method === "cash" && t.tendered ? (parseDollars(t.tendered) ?? undefined) : undefined }));
-  const status = paymentStatus(totals.totalCents, tenderRows);
+  const status = paymentStatus(totals.totalCents - coveredCents, tenderRows);
 
   const changedPrices = data.services.filter((s, i) => serviceCents[i] !== s.priceCents);
   const problems: string[] = [];
@@ -97,6 +110,7 @@ export function CheckoutForm({
   if (giftTenders.length && (cardSales.length || reloads.length)) problems.push("Gift cards can't be paid for with a gift card.");
   if (giftTenders.some((t) => !t.card)) problems.push("Check the balance of each gift card used.");
   if (giftTenders.some((t) => t.card && (parseDollars(t.amount) ?? 0) > t.card.balance_cents)) problems.push("That's more than is on the gift card.");
+  if (packageSales.length && !data.client && !client) problems.push("Choose the client the package is for.");
 
   function addProduct(id: string) {
     setProducts((all) => {
@@ -123,7 +137,7 @@ export function CheckoutForm({
     const problem = cardProblem(r.card);
     if (problem) return updateTender(t.key, { card: null, error: problem });
     const othersPaid = tenderRows.filter((_, i) => tenders[i].key !== t.key).reduce((n, x) => n + x.amountCents, 0);
-    const cover = Math.min(r.card.balance_cents, Math.max(0, totals.totalCents - othersPaid));
+    const cover = Math.min(r.card.balance_cents, Math.max(0, totals.totalCents - coveredCents - othersPaid));
     updateTender(t.key, { card: r.card, error: null, amount: cover ? centsToInput(cover) : "" });
   }
 
@@ -142,7 +156,14 @@ export function CheckoutForm({
       appointmentId: data.appointmentId,
       clientId: data.client?.id ?? client?.id ?? null,
       lines: [
-        ...data.services.map((s, i) => ({ kind: "service" as const, appointmentItemId: s.itemId, unitPriceCents: serviceCents[i], priceReason: prices[s.itemId].reason })),
+        ...data.services.map((s, i) => ({
+          kind: "service" as const,
+          appointmentItemId: s.itemId,
+          unitPriceCents: serviceCents[i],
+          priceReason: prices[s.itemId].reason,
+          packageItemId: packageUse[s.itemId],
+        })),
+        ...packageSales.map((p) => ({ kind: "package" as const, templateId: p.templateId })),
         ...products.map((p) => ({ kind: "product" as const, productId: p.productId, quantity: p.quantity })),
         ...cardSales.map((c) => ({
           kind: "gift_card" as const,
@@ -173,7 +194,7 @@ export function CheckoutForm({
         <div className="flex items-center gap-3 rounded-xl border border-status-confirmed-ink/25 bg-status-confirmed-bg p-4 text-status-confirmed-ink">
           <CheckCircleIcon className="size-6" />
           <div>
-            <p className="font-semibold">Paid {formatPrice(totals.totalCents)}</p>
+            <p className="font-semibold">Paid {formatPrice(totals.totalCents - coveredCents)}</p>
             {status.changeCents > 0 && <p data-testid="change-due">Change to give: {formatPrice(status.changeCents)}</p>}
           </div>
         </div>
@@ -227,6 +248,21 @@ export function CheckoutForm({
                     />
                   </label>
                 </div>
+                {(() => {
+                  const offer = packageFor(data.packages, s.serviceId, s.staffLevel);
+                  if (!offer) return null;
+                  return (
+                    <label className="flex items-center gap-2 rounded-md bg-status-confirmed-bg px-2.5 py-1.5 text-status-confirmed-ink">
+                      <input
+                        type="checkbox"
+                        className={checkboxClass}
+                        checked={covered(s.itemId)}
+                        onChange={(e) => setPackageUse((all) => ({ ...all, [s.itemId]: e.target.checked ? offer.item.id : null }))}
+                      />
+                      Use {data.client?.name.split(" ")[0] ?? "the client"}&apos;s package ({usesLeft(offer.item)})
+                    </label>
+                  );
+                })()}
                 {changed && (
                   <label className={labelClass}>
                     Why the price changed (booked at {formatPrice(s.priceCents)})
@@ -394,6 +430,36 @@ export function CheckoutForm({
         </div>
       </section>
 
+      {data.templates.length > 0 && (
+        <section aria-label="Packages" className="flex flex-col gap-2">
+          <h3 className={sectionTitle}>Packages</h3>
+          {packageSales.map((p, i) => {
+            const t = templateById.get(p.templateId);
+            return (
+              <div key={p.key} className="flex items-center justify-between gap-2 rounded-lg border border-line p-3" data-testid="checkout-package">
+                <label className={`${labelClass} flex-1`}>
+                  <select aria-label={`Package ${i + 1}`} value={p.templateId} onChange={(e) => setPackageSales((all) => all.map((x) => (x.key === p.key ? { ...x, templateId: e.target.value } : x)))} className={selectClass}>
+                    {data.templates.map((tpl) => (
+                      <option key={tpl.id} value={tpl.id}>
+                        {tpl.name} · {formatPrice(tpl.priceCents)}
+                      </option>
+                    ))}
+                  </select>
+                  {t && <span className="text-xs font-normal text-ink-muted">{t.items.map((x) => `${x.quantity} × ${x.serviceName}`).join(" + ")}</span>}
+                </label>
+                <IconButton label={`Remove package ${i + 1}`} size="sm" onClick={() => setPackageSales((all) => all.filter((x) => x.key !== p.key))}>
+                  <CloseIcon className="size-4" />
+                </IconButton>
+              </div>
+            );
+          })}
+          <Button size="sm" className="self-start" onClick={() => setPackageSales((all) => [...all, { key: nextKey.current++, templateId: data.templates[0].id }])}>
+            <PlusIcon className="size-4" />
+            Sell a package
+          </Button>
+        </section>
+      )}
+
       {canDiscount && (
         <section aria-label="Discount" className="flex flex-col gap-2">
           <label className="flex items-center gap-2 font-medium">
@@ -445,6 +511,7 @@ export function CheckoutForm({
         )}
         {totals.tipCents > 0 && <Row label="Tips" value={formatPrice(totals.tipCents)} />}
         <Row label="Total" value={formatPrice(totals.totalCents)} strong testId="checkout-total" />
+        {coveredCents > 0 && <Row label="Paid with package" value={`−${formatPrice(coveredCents)}`} />}
       </dl>
 
       <section aria-label="Payments" className="flex flex-col gap-2">
@@ -532,7 +599,7 @@ export function CheckoutForm({
       )}
 
       <Button type="submit" variant="primary" size="lg" disabled={pending}>
-        {pending ? "Taking payment…" : `Complete sale · ${formatPrice(totals.totalCents)}`}
+        {pending ? "Taking payment…" : `Complete sale · ${formatPrice(totals.totalCents - coveredCents)}`}
       </Button>
     </form>
   );
