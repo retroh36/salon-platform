@@ -8,7 +8,6 @@ import type { ProductUnit } from "@/lib/inventory";
 import {
   adjustProduct,
   saveStockSettings,
-  sellProduct,
   type StockResult,
 } from "../actions";
 
@@ -21,42 +20,6 @@ function Result({ result }: { result: StockResult | null }) {
     >
       {result.message}
     </span>
-  );
-}
-
-// A retail sale: how many went out the door.
-export function SellForm({ productId }: { productId: string }) {
-  const [quantity, setQuantity] = useState("1");
-  const [result, setResult] = useState<StockResult | null>(null);
-  const [pending, start] = useTransition();
-  return (
-    <form
-      aria-label="Sell"
-      className="flex flex-wrap items-end gap-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        start(async () =>
-          setResult(await sellProduct(productId, Number(quantity))),
-        );
-      }}
-    >
-      <label className={labelClass}>
-        Quantity sold
-        <input
-          type="number"
-          min={1}
-          max={100}
-          step={1}
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
-          className={`${fieldClass} w-28`}
-        />
-      </label>
-      <Button type="submit" variant="primary" disabled={pending}>
-        Record sale
-      </Button>
-      <Result result={result} />
-    </form>
   );
 }
 

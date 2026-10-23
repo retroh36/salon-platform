@@ -212,7 +212,13 @@ test.describe("front desk", () => {
     await detail.getByRole("button", { name: "Check in client" }).click();
     await expect(detail.locator("[data-status]")).toHaveText("Checked in");
     await expect(detail.getByRole("button", { name: "Mark no-show" })).toHaveCount(0);
+    // Checking out takes payment first.
     await detail.getByRole("button", { name: "Check out client" }).click();
+    const checkout = page.getByRole("form", { name: "Checkout" });
+    await checkout.getByRole("button", { name: "Card" }).click();
+    await checkout.getByRole("button", { name: /^Complete sale/ }).click();
+    await page.getByTestId("checkout-done").getByRole("button", { name: "Done" }).click();
+    await column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Cara Test`) }).click();
     await expect(detail.locator("[data-status]")).toHaveText("Checked out");
     await expect(detail.getByRole("button", { name: "Edit booking" })).toHaveCount(0);
     await expect(detail).toContainText("Last changed by Sam Rivera");

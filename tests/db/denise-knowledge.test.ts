@@ -95,7 +95,7 @@ describe("as the front desk", () => {
 });
 
 describe("as the owner", () => {
-  it("gets sales that match the checked-out visits and retail", async () => {
+  it("gets sales from the sales taken at checkout", async () => {
     const k = knowledgeFor(owner, asker("owner", SEED.staff.owner));
     const out = (await k.sales!("last_30_days")) as { from: string; to: string; services_dollars: number; retail_dollars: number; visits_checked_out: number; previous_period: { from: string } };
     const range = salesRange("last_30_days", today);
@@ -105,21 +105,23 @@ describe("as the owner", () => {
     const o = out as unknown as { total_dollars: number; previous_period: { total_dollars: number }; change: { total_dollars: number } };
     expect(o.change.total_dollars).toBeCloseTo(o.total_dollars - o.previous_period.total_dollars, 2);
 
-    // The same sums, worked out independently.
+    // The same sums, worked out independently from the sales taken (the
+    // demo's checked-out visits all have one).
     const start = startOfLocalDay(range.from, TZ).toISOString();
     const end = startOfLocalDay(addDays(range.to, 1), TZ).toISOString();
     let cents = 0;
     const visits = new Set<string>();
     for (let offset = 0; ; offset += 1000) {
-      const { data } = await admin.from("appointment_items").select("appointment_id, price_cents, appointment:appointments!inner(status)").eq("location_id", L).eq("appointment.status", "completed").gte("starts_at", start).lt("starts_at", end).order("id").range(offset, offset + 999);
-      for (const i of data!) {
-        cents += i.price_cents;
-        visits.add(i.appointment_id);
+      const { data } = await admin.from("sales").select("appointment_id, sale_items(kind, unit_price_cents, quantity, discount_cents)").eq("location_id", L).neq("status", "voided").gte("created_at", start).lt("created_at", end).order("id").range(offset, offset + 999);
+      for (const sale of data!) {
+        for (const i of sale.sale_items) if (i.kind === "service") cents += i.unit_price_cents * i.quantity - i.discount_cents;
+        if (sale.appointment_id) visits.add(sale.appointment_id);
       }
       if (data!.length < 1000) break;
     }
     expect(out.services_dollars).toBe(cents / 100);
     expect(out.visits_checked_out).toBe(visits.size);
+    expect(visits.size).toBeGreaterThan(100);
     expect(out.retail_dollars).toBeGreaterThan(0);
   });
 });

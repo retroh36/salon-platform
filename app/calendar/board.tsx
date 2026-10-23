@@ -27,6 +27,7 @@ import { moveBlock } from "./block-actions";
 import { BlockPanel, repeatLabel } from "./block-panel";
 import { AppointmentPanel } from "./appointment-panel";
 import { approveDeniseFix, bookFromWaitlist, rejectDeniseFix, scanDenise, undoDeniseFix } from "./denise-actions";
+import { CheckoutPanel } from "./checkout-panel";
 import { useDeniseRun } from "./use-denise";
 import { DenisePanel, type Outcome, type Preview } from "./denise-panel";
 import { BookingPanel, type BookingStart } from "./booking-panel";
@@ -50,7 +51,8 @@ type Selection =
   | { kind: "edit"; appointmentId: string }
   | { kind: "detail"; appointmentId: string }
   | { kind: "walk-ins" }
-  | { kind: "group"; start: BookingStart };
+  | { kind: "group"; start: BookingStart }
+  | { kind: "checkout"; appointmentId: string };
 
 type Tab = "denise" | "details";
 
@@ -257,7 +259,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // she's thinking at once, then always replies. Her panel opens, unless
   // someone is in the middle of a booking, when her badge calls instead.
   async function trigger(request: DeniseRequest, firstStatus: string) {
-    const midTask = selection.kind === "book" || selection.kind === "edit" || selection.kind === "new-block" || selection.kind === "group";
+    const midTask = selection.kind === "book" || selection.kind === "edit" || selection.kind === "new-block" || selection.kind === "group" || selection.kind === "checkout";
     if (!midTask) {
       setTab("denise");
       setPanelOpen(true);
@@ -850,9 +852,12 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               onClose={closeDetails}
               onReportLate={reportLate}
               onCanceled={onCanceled}
+              onCheckout={() => select({ kind: "checkout", appointmentId: selection.appointmentId })}
               onOpenVisit={(appointmentId) => select({ kind: "detail", appointmentId })}
               products={data.menu.products}
             />
+          ) : selection.kind === "checkout" ? (
+            <CheckoutPanel appointmentId={selection.appointmentId} onClose={closeDetails} onPaid={() => router.refresh()} />
           ) : selection.kind === "walk-ins" ? (
             <WalkInPanel
               data={data}

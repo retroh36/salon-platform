@@ -106,12 +106,16 @@ test.describe("front desk", () => {
   test("sells retail, but can't adjust or edit", async ({ page }) => {
     const id = await retailProduct("Sale Shampoo", 5);
     await page.goto(`/inventory/${id}`);
-    await waitForHydration(page, "form[aria-label=Sell] input");
     await expect(ui(page).getByTestId("on-hand")).toHaveText("5 units");
-    const sell = ui(page).getByRole("form", { name: "Sell" });
-    await sell.getByLabel("Quantity sold").fill("2");
-    await sell.getByRole("button", { name: "Record sale" }).click();
-    await expect(sell.getByRole("status")).toHaveText("Sold 2.");
+    // A sale at the front desk, with this product already on it.
+    await ui(page).getByRole("link", { name: "Sell this product" }).click();
+    await waitForHydration(page, "form[aria-label=Checkout] input");
+    const checkout = ui(page).getByRole("form", { name: "Checkout" });
+    await checkout.getByLabel(/^How many/).fill("2");
+    await checkout.getByRole("button", { name: "Cash" }).click();
+    await checkout.getByRole("button", { name: /^Complete sale/ }).click();
+    await expect(ui(page).getByTestId("checkout-done")).toBeVisible();
+    await page.goto(`/inventory/${id}`);
     await expect(ui(page).getByTestId("on-hand")).toHaveText("3 units");
     await expect(ui(page).getByRole("list", { name: "Stock history" }).getByRole("listitem").first()).toContainText("Sale");
     await expect(ui(page).getByRole("form", { name: "Adjust stock" })).toHaveCount(0);
@@ -127,7 +131,7 @@ test.describe("stylist", () => {
     await expect(ui(page).getByRole("link", { name: "Add product" })).toHaveCount(0);
     await products(page).filter({ hasText: "Olaplex No.3" }).getByRole("link").click();
     await expect(ui(page).getByTestId("on-hand")).toBeVisible();
-    await expect(ui(page).getByRole("form", { name: "Sell" })).toHaveCount(0);
+    await expect(ui(page).getByRole("link", { name: "Sell this product" })).toHaveCount(0);
     await expect(ui(page).getByRole("form", { name: "Adjust stock" })).toHaveCount(0);
     await page.goto("/inventory/new");
     await expect(page).toHaveURL(/\/inventory$/);

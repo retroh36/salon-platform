@@ -24,7 +24,7 @@ import {
 import { formatDay } from "@/lib/schedule-format";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
-import { AdjustForm, SellForm, SettingsForm } from "./stock-actions";
+import { AdjustForm, SettingsForm } from "./stock-actions";
 
 export const metadata: Metadata = { title: "Product" };
 
@@ -134,8 +134,10 @@ async function Product({ params }: Pick<PageProps<"/inventory/[id]">, "params">)
       </Card>
 
       {product.type === "retail" && canSellRetail(me.role) && (
-        <Card title="Sell" titleId="sell-heading" description="Takes it out of stock. Payments come with the point of sale.">
-          <SellForm productId={product.id} />
+        <Card title="Sell" titleId="sell-heading" description="A sale at the front desk takes it out of stock.">
+          <Link href={`/sales/new?product=${product.id}`} className={buttonClass("primary", "md")}>
+            Sell this product
+          </Link>
         </Card>
       )}
 

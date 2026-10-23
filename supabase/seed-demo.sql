@@ -500,6 +500,82 @@ update public.stock_movements m set created_at = a.checked_out_at, created_by = 
 from public.appointments a
 where m.reason = 'sale' and m.appointment_id = a.id;
 
+-- Checkout: retail is taxed (Chicago's 10.25%), services aren't. Every
+-- checked-out visit gets its sale: the services at their booked prices,
+-- the retail bought then, tips for about 60% of visits, and card or cash.
+update public.businesses set tax_rate_retail_bp = 1025, receipt_footer = 'Thank you for visiting Maple & Ash. Book your next visit online anytime.'
+where id = 'b0000000-0000-4000-8000-000000000001';
+
+create temp table seed_sales as
+select gen_random_uuid() as sale_id, a.id as appointment_id, a.client_id, a.checked_out_at as at,
+       (1000 + row_number() over (order by a.checked_out_at, a.id))::int as number
+from public.appointments a
+where a.business_id = 'b0000000-0000-4000-8000-000000000001' and a.status = 'completed';
+
+insert into public.sales (id, business_id, location_id, number, client_id, appointment_id, subtotal_cents, total_cents, created_by, created_at)
+select sale_id, 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', number, client_id, appointment_id, 0, 0,
+       'd0000000-0000-4000-8000-000000000003', at
+from seed_sales;
+
+insert into public.sale_items (sale_id, business_id, position, kind, service_id, appointment_item_id, staff_id, description, quantity, unit_price_cents, tax_cents, total_cents)
+select s.sale_id, 'b0000000-0000-4000-8000-000000000001', row_number() over (partition by s.sale_id order by i.starts_at), 'service',
+       i.service_id, i.id, i.staff_id, sv.name, 1, i.price_cents, 0, i.price_cents
+from seed_sales s
+join public.appointment_items i on i.appointment_id = s.appointment_id
+join public.services sv on sv.id = i.service_id;
+
+insert into public.sale_items (sale_id, business_id, position, kind, product_id, description, quantity, unit_price_cents, tax_cents, total_cents)
+select s.sale_id, 'b0000000-0000-4000-8000-000000000001', 50 + row_number() over (partition by s.sale_id order by m.created_at, m.id), 'product',
+       p.id, concat_ws(' ', p.brand, p.line, p.name), (-m.change)::int, p.price_cents,
+       round(p.price_cents * (-m.change) * 1025 / 10000.0)::int,
+       (p.price_cents * (-m.change))::int + round(p.price_cents * (-m.change) * 1025 / 10000.0)::int
+from seed_sales s
+join public.stock_movements m on m.appointment_id = s.appointment_id and m.reason = 'sale'
+join public.products p on p.id = m.product_id;
+
+update public.stock_movements m set note = 'Sale #' || s.number
+from seed_sales s where m.appointment_id = s.appointment_id and m.reason = 'sale';
+
+-- Tips: 15-20% of the services, to the nearest dollar, for the first stylist.
+insert into public.sale_tips (sale_id, business_id, staff_id, amount_cents)
+select s.sale_id, 'b0000000-0000-4000-8000-000000000001', x.staff_id, x.tip
+from seed_sales s
+cross join lateral (
+  select (select i.staff_id from public.appointment_items i where i.appointment_id = s.appointment_id order by i.starts_at limit 1) as staff_id,
+         (round((select sum(i.price_cents) from public.appointment_items i where i.appointment_id = s.appointment_id) * (15 + pg_temp.rnd('tip%' || s.sale_id) % 6) / 10000.0) * 100)::int as tip
+) x
+where pg_temp.rnd('tip' || s.appointment_id) % 100 < 60 and x.tip > 0;
+
+update public.sales v set
+  subtotal_cents = t.subtotal, tax_cents = t.tax, tip_cents = t.tips, total_cents = t.subtotal + t.tax + t.tips
+from (
+  select s.sale_id,
+         coalesce((select sum(unit_price_cents * quantity) from public.sale_items where sale_id = s.sale_id), 0)::int as subtotal,
+         coalesce((select sum(tax_cents) from public.sale_items where sale_id = s.sale_id), 0)::int as tax,
+         coalesce((select sum(amount_cents) from public.sale_tips where sale_id = s.sale_id), 0)::int as tips
+  from seed_sales s
+) t
+where v.id = t.sale_id;
+
+-- About one in five pays cash (handing over the next $10 up); the rest card.
+insert into public.payments (sale_id, business_id, location_id, method, amount_cents, tendered_cents, change_cents, reference, created_by, created_at)
+select v.id, v.business_id, v.location_id,
+       case when pg_temp.rnd('cash' || v.id) % 100 < 20 then 'cash' else 'card' end::public.payment_method,
+       v.total_cents,
+       case when pg_temp.rnd('cash' || v.id) % 100 < 20 then (ceil(v.total_cents / 1000.0) * 1000)::int end,
+       case when pg_temp.rnd('cash' || v.id) % 100 < 20 then (ceil(v.total_cents / 1000.0) * 1000)::int - v.total_cents end,
+       case when pg_temp.rnd('cash' || v.id) % 100 >= 20 then lpad((pg_temp.rnd('last4' || v.id) % 10000)::text, 4, '0') end,
+       v.created_by, v.created_at
+from public.sales v
+where v.business_id = 'b0000000-0000-4000-8000-000000000001' and v.total_cents > 0;
+
+insert into public.sale_events (sale_id, business_id, kind, amount_cents, staff_id, created_at)
+select id, business_id, 'completed', total_cents, created_by, created_at
+from public.sales where business_id = 'b0000000-0000-4000-8000-000000000001';
+
+update public.businesses set next_sale_number = (select coalesce(max(number), 1000) + 1 from public.sales where business_id = 'b0000000-0000-4000-8000-000000000001')
+where id = 'b0000000-0000-4000-8000-000000000001';
+
 alter table public.appointments enable trigger appointments_set_updated_at;
 
 -- Blocked time: lunches and a break that repeat, and a one-off training

@@ -157,7 +157,7 @@ const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "s
   },
   sales: {
     name: "sales_summary",
-    description: "Simple sales figures for a period: services and retail in dollars, visits checked out, average visit and no-shows, with the period before for comparison.",
+    description: "Sales for a period from the sales taken at checkout: services and retail in dollars (before tax), tax, tips and refunds, visits checked out, average visit and no-shows, with the period before for comparison.",
     strict: true,
     input_schema: { type: "object", properties: { period: { type: "string", enum: SALES_PERIODS } }, required: ["period"], additionalProperties: false },
   },

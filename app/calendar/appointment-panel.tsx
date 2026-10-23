@@ -31,6 +31,7 @@ export function AppointmentPanel({
   onClose,
   onReportLate,
   onCanceled,
+  onCheckout,
   onOpenVisit,
   products,
 }: {
@@ -45,6 +46,8 @@ export function AppointmentPanel({
   // Tell Denise: she takes it from here in her panel.
   onReportLate: (itemId: string, minutes: number) => void;
   onCanceled: (appointmentId: string) => void;
+  // Opens the checkout (services, products, tips and payments).
+  onCheckout: () => void;
   // Open another guest's visit in the same group.
   onOpenVisit: (appointmentId: string) => void;
 }) {
@@ -234,7 +237,7 @@ export function AppointmentPanel({
       {(actions.length > 0 || (me.canBook && isEditable(status)) || canReportLate) && (
         <section aria-label="Actions" className="flex flex-col gap-2">
           {primaryAction && (
-            <Button variant="primary" size="lg" disabled={pending} onClick={() => run(primaryAction)}>
+            <Button variant="primary" size="lg" disabled={pending} onClick={() => (primaryAction === "check_out" ? onCheckout() : run(primaryAction))}>
               {ACTION_LABELS[primaryAction]}
             </Button>
           )}

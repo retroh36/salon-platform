@@ -2,18 +2,28 @@ import Link from "next/link";
 import { logout } from "@/app/login/actions";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
-import { BoxIcon, CalendarIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, UserIcon } from "@/components/ui/icons";
+import { BoxIcon, CalendarIcon, ReceiptIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, UserIcon } from "@/components/ui/icons";
 import { SalonMark } from "@/components/ui/salon-mark";
 import { roleLabel, type StaffRole } from "@/lib/staff";
 
-export type Section = "dashboard" | "my-day" | "calendar" | "clients" | "team" | "services" | "durations" | "inventory" | "forms" | "settings";
+export type Section = "dashboard" | "my-day" | "calendar" | "sales" | "clients" | "team" | "services" | "durations" | "inventory" | "forms" | "settings";
 
-type NavItem = { section: Section; href: string; label: string; Icon: (p: { className?: string }) => React.ReactNode; ownersOnly?: boolean; managersOnly?: boolean; stylistsOnly?: boolean };
+type NavItem = {
+  section: Section;
+  href: string;
+  label: string;
+  Icon: (p: { className?: string }) => React.ReactNode;
+  ownersOnly?: boolean;
+  managersOnly?: boolean;
+  stylistsOnly?: boolean;
+  frontOfHouse?: boolean;
+};
 
 const NAV: NavItem[] = [
   { section: "dashboard", href: "/dashboard", label: "Dashboard", Icon: HomeIcon },
   { section: "my-day", href: "/my-day", label: "My day", Icon: ClockIcon, stylistsOnly: true },
   { section: "calendar", href: "/calendar", label: "Calendar", Icon: CalendarIcon },
+  { section: "sales", href: "/sales", label: "Sales", Icon: ReceiptIcon, frontOfHouse: true },
   { section: "clients", href: "/clients", label: "Clients", Icon: UserIcon },
   { section: "team", href: "/team", label: "Team", Icon: TeamIcon },
   { section: "services", href: "/services", label: "Services", Icon: ScissorsIcon },
@@ -24,7 +34,12 @@ const NAV: NavItem[] = [
 ];
 
 function shown(item: NavItem, role: StaffRole): boolean {
-  return (!item.ownersOnly || role === "owner") && (!item.managersOnly || role === "owner" || role === "manager") && (!item.stylistsOnly || role === "stylist");
+  return (
+    (!item.ownersOnly || role === "owner") &&
+    (!item.managersOnly || role === "owner" || role === "manager") &&
+    (!item.stylistsOnly || role === "stylist") &&
+    (!item.frontOfHouse || role !== "stylist")
+  );
 }
 
 // "Powered by Maestra", small, at the foot of the sidebar.

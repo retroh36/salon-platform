@@ -305,34 +305,39 @@ export async function salesBetween(supabase: Supabase, me: Pick<Asker, "location
   const tz = me.location.timezone;
   const start = startOfLocalDay(from, tz).toISOString();
   const end = startOfLocalDay(addDays(to, 1), tz).toISOString();
+  // From the sales taken (not voided): services and retail before tax, net
+  // of discounts and returned products; tax, tips and refunds on their own.
   let serviceCents = 0;
+  let retailCents = 0;
+  let taxCents = 0;
+  let tipCents = 0;
+  let refundCents = 0;
   const visits = new Set<string>();
   for (let offset = 0; ; offset += 1000) {
     const { data, error } = await supabase
-      .from("appointment_items")
-      .select("appointment_id, price_cents, appointment:appointments!inner(status)")
+      .from("sales")
+      .select("id, appointment_id, tax_cents, tip_cents, refunded_cents, sale_items(kind, quantity, returned_quantity, unit_price_cents, discount_cents)")
       .eq("location_id", me.location.id)
-      .eq("appointment.status", "completed")
-      .gte("starts_at", start)
-      .lt("starts_at", end)
+      .neq("status", "voided")
+      .gte("created_at", start)
+      .lt("created_at", end)
       .order("id")
       .range(offset, offset + 999);
     if (error) throw error;
-    for (const i of data) {
-      serviceCents += i.price_cents;
-      visits.add(i.appointment_id);
+    for (const sale of data) {
+      for (const i of sale.sale_items) {
+        const net = i.unit_price_cents * i.quantity - i.discount_cents;
+        const kept = i.quantity ? Math.round((net * (i.quantity - i.returned_quantity)) / i.quantity) : 0;
+        if (i.kind === "service") serviceCents += kept;
+        else if (i.kind === "product") retailCents += kept;
+      }
+      taxCents += sale.tax_cents;
+      tipCents += sale.tip_cents;
+      refundCents += sale.refunded_cents;
+      if (sale.appointment_id) visits.add(sale.appointment_id);
     }
     if (data.length < 1000) break;
   }
-  const { data: sales, error } = await supabase
-    .from("stock_movements")
-    .select("change, product:products(price_cents)")
-    .eq("location_id", me.location.id)
-    .eq("reason", "sale")
-    .gte("created_at", start)
-    .lt("created_at", end);
-  if (error) throw error;
-  const retailCents = sales.reduce((sum, m) => sum + -Number(m.change) * (m.product?.price_cents ?? 0), 0);
   const { count: noShows, error: noShowError } = await supabase
     .from("appointments")
     .select("id", { count: "exact", head: true })
@@ -345,6 +350,9 @@ export async function salesBetween(supabase: Supabase, me: Pick<Asker, "location
     services_dollars: dollars(serviceCents),
     retail_dollars: dollars(retailCents),
     total_dollars: dollars(serviceCents + retailCents),
+    tax_dollars: dollars(taxCents),
+    tips_dollars: dollars(tipCents),
+    refunds_dollars: dollars(refundCents),
     visits_checked_out: visits.size,
     average_visit_dollars: visits.size ? dollars(Math.round((serviceCents + retailCents) / visits.size)) : null,
     no_shows: noShows ?? 0,

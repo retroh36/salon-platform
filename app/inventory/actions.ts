@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentStaff } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
-import { canManageInventory, canSellRetail, parseAmount, parseProductForm, type ProductFormErrors } from "@/lib/inventory";
+import { canManageInventory, parseAmount, parseProductForm, type ProductFormErrors } from "@/lib/inventory";
 
 const MANAGERS_ONLY = "Only owners and managers can change products and stock.";
 
@@ -42,19 +42,6 @@ export async function saveProduct(_prev: ProductFormState, formData: FormData): 
 }
 
 export type StockResult = { ok: true; message: string } | { ok: false; message: string };
-
-// A retail sale: whole units out of stock (front of house).
-export async function sellProduct(productId: string, quantity: number): Promise<StockResult> {
-  const { supabase, staff: me } = await getCurrentStaff();
-  if (!me || !canSellRetail(me.role)) return { ok: false, message: "Only the front desk, managers and owners can sell retail." };
-  if (!isUuid(productId) || !Number.isInteger(quantity) || quantity < 1 || quantity > 100) return { ok: false, message: "Enter how many were sold." };
-  const { error } = await supabase.rpc("adjust_stock", { p_location_id: me.location.id, p_product_id: productId, p_change: -quantity, p_reason: "sale", p_note: "" });
-  if (error?.code === "42501") return { ok: false, message: "Only the front desk, managers and owners can sell retail." };
-  if (error?.code === "22023") return { ok: false, message: "Only retail products are sold, in whole units." };
-  if (error) throw error;
-  refresh();
-  return { ok: true, message: `Sold ${quantity}.` };
-}
 
 // A manual correction in the product's unit, with a reason (managers).
 export async function adjustProduct(productId: string, change: string, direction: "add" | "remove", note: string): Promise<StockResult> {
