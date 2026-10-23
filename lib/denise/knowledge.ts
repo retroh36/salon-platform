@@ -17,6 +17,7 @@ import { loadAllClientInsights, loadClientInsights, loadDurations, loadSalonInsi
 import { startOfLocalDay } from "@/lib/scheduling/load";
 import { addDays, formatMinute, startOfWeek, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import type { StaffRole } from "@/lib/staff";
+import { loadGiftCardLiability, loadUnusedPackages } from "@/lib/reports-load";
 import { scanDay, type Viewer } from "./scan";
 
 type Supabase = SupabaseClient<Database>;
@@ -35,6 +36,9 @@ export type Knowledge = {
   stock: (query: string | null) => Promise<unknown>;
   sales: ((period: SalesPeriod) => Promise<unknown>) | null;
   fixes: ((date: LocalDate) => Promise<unknown>) | null;
+  // Owners only: what's owed on gift cards and unused packages.
+  giftCards: (() => Promise<unknown>) | null;
+  packages: ((limit: number) => Promise<unknown>) | null;
 };
 
 const WEEKDAY = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -261,6 +265,36 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
           };
         }
       : null,
+
+    giftCards:
+      me.role === "owner"
+        ? async () => {
+            const l = await loadGiftCardLiability(supabase, me.businessId);
+            return {
+              purchased_balance_dollars: dollars(l.purchased.cents),
+              cards_with_a_balance: l.purchased.count,
+              promotional_balance_dollars: dollars(l.promotional.cents),
+              promotional_cards: l.promotional.count,
+              expired_balance_dollars: dollars(l.expired.cents),
+              expired_cards: l.expired.count,
+              note: "Purchased balances are services the salon owes; promotional credit has no cash value; what happens to expired balances depends on state law.",
+            };
+          }
+        : null,
+
+    packages:
+      me.role === "owner"
+        ? async (limit) => {
+            const p = await loadUnusedPackages(supabase, me.businessId);
+            return {
+              unused_value_dollars: dollars(p.cents),
+              uses_left: p.uses,
+              clients_with_unused_packages: p.clients.length,
+              // Most value first, first names only.
+              clients: p.clients.slice(0, Math.min(Math.max(limit, 1), 20)).map((c) => ({ first_name: c.firstName, packages: c.packages, uses_left: c.uses, value_dollars: dollars(c.cents) })),
+            };
+          }
+        : null,
 
     fixes: frontOfHouse
       ? async (date) => {

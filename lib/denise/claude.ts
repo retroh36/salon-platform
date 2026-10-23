@@ -212,5 +212,6 @@ export function firstNamesOnly(f: BriefFacts): BriefFacts {
     ...f,
     likelyNoShows: f.likelyNoShows.map((n) => ({ ...n, client: first(n.client) })),
     dueNotBooked: { ...f.dueNotBooked, top: f.dueNotBooked.top.map((d) => ({ ...d, client: first(d.client) })) },
+    credits: (f.credits ?? []).map((c) => ({ ...c, client: first(c.client) })),
   };
 }

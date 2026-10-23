@@ -453,7 +453,8 @@ times as (
          t.started + make_interval(mins => round(t.active_minutes * t.factor)::int + t.processing_minutes + (pg_temp.rnd(t.id || ':p') % 7) - 2) as proc_end,
          t.started + make_interval(mins => greatest(
            round((t.active_minutes + t.processing_minutes + t.finishing_minutes) * t.factor)::int,
-           round(t.active_minutes * t.factor)::int + t.processing_minutes + 5 + round(t.finishing_minutes * t.factor * 0.5)::int)) as finished
+           -- After processing, at least a few minutes at the chair (rinse).
+           case when t.processing_minutes > 0 then round(t.active_minutes * t.factor)::int + t.processing_minutes + 5 + round(t.finishing_minutes * t.factor * 0.5)::int else 0 end)) as finished
   from timed t
 )
 update public.appointment_items i set
@@ -575,6 +576,72 @@ from public.sales where business_id = 'b0000000-0000-4000-8000-000000000001';
 
 update public.businesses set next_sale_number = (select coalesce(max(number), 1000) + 1 from public.sales where business_id = 'b0000000-0000-4000-8000-000000000001')
 where id = 'b0000000-0000-4000-8000-000000000001';
+
+-- Packages on offer, and clients who bought them (some coming in today,
+-- so the brief has credit to mention), partly used.
+insert into public.package_templates (id, business_id, name, price_cents, expiry_months, levels)
+values
+  ('e3000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', '5 Blowouts', 20000, 12, null),
+  ('e3000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'Gloss & Treatment Trio', 33000, 12, null),
+  ('e3000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 'Master Blowouts', 30000, 6, array['master']::public.staff_level[]);
+insert into public.package_template_items (template_id, business_id, service_id, quantity)
+select t.id::uuid, 'b0000000-0000-4000-8000-000000000001', s.id, t.quantity
+from (values
+  ('e3000000-0000-4000-8000-000000000001', 'Blowout', 5),
+  ('e3000000-0000-4000-8000-000000000002', 'Gloss / Toner', 3),
+  ('e3000000-0000-4000-8000-000000000002', 'Deep Conditioning', 3),
+  ('e3000000-0000-4000-8000-000000000003', 'Blowout', 5)
+) as t (id, service, quantity)
+join public.services s on s.business_id = 'b0000000-0000-4000-8000-000000000001' and s.name = t.service;
+
+-- Four of today's clients and eight others.
+create temp table seed_package_clients as
+(select distinct a.client_id from public.appointments a
+ where a.business_id = 'b0000000-0000-4000-8000-000000000001' and a.client_id is not null
+   and (a.starts_at at time zone 'America/Chicago')::date = (now() at time zone 'America/Chicago')::date
+   and a.status in ('booked', 'confirmed', 'checked_in')
+ order by a.client_id limit 4)
+union
+(select id from public.clients where business_id = 'b0000000-0000-4000-8000-000000000001' order by id offset 100 limit 8);
+
+select private.sell_package(
+  case when pg_temp.rnd('pkg' || client_id) % 3 = 0 then 'e3000000-0000-4000-8000-000000000002'::uuid else 'e3000000-0000-4000-8000-000000000001'::uuid end,
+  client_id, null, case when pg_temp.rnd('pkg' || client_id) % 3 = 0 then 33000 else 20000 end)
+from seed_package_clients;
+update public.client_packages set created_by = 'd0000000-0000-4000-8000-000000000003', created_at = now() - make_interval(days => 20 + pg_temp.rnd('pkgday' || id) % 60)
+where business_id = 'b0000000-0000-4000-8000-000000000001';
+update public.client_package_items set used = pg_temp.rnd('used' || id) % total
+where business_id = 'b0000000-0000-4000-8000-000000000001';
+
+-- Gift cards: bought ones with what's left on them, a few promotional and
+-- one expired; some belong to today's clients.
+create temp table seed_cards as
+select row_number() over (order by c.id) as n, c.id as client_id
+from (
+  (select distinct a.client_id as id from public.appointments a
+   where a.business_id = 'b0000000-0000-4000-8000-000000000001' and a.client_id is not null
+     and (a.starts_at at time zone 'America/Chicago')::date = (now() at time zone 'America/Chicago')::date
+     and a.status in ('booked', 'confirmed', 'checked_in')
+   order by a.client_id offset 4 limit 3)
+  union
+  (select id from public.clients where business_id = 'b0000000-0000-4000-8000-000000000001' order by id offset 200 limit 22)
+) c;
+
+insert into public.gift_cards (business_id, code, kind, initial_cents, balance_cents, expires_at, client_id, physical, note, created_by, created_at)
+select 'b0000000-0000-4000-8000-000000000001', private.new_gift_code('b0000000-0000-4000-8000-000000000001'),
+       case when n % 8 = 0 then 'promotional' else 'purchased' end::public.gift_card_kind,
+       (array[2500, 5000, 10000, 15000])[1 + pg_temp.rnd('gcamt' || client_id) % 4], 0,
+       case when n % 8 = 0 then now() + interval '60 days' when n = 5 then now() - interval '10 days' end,
+       client_id, n % 2 = 0, case when n % 8 = 0 then 'Referral reward' end,
+       'd0000000-0000-4000-8000-000000000003', now() - make_interval(days => 5 + pg_temp.rnd('gcday' || client_id) % 90)
+from seed_cards;
+
+select private.move_gift_card(g, case when g.kind = 'promotional' then 'issued' else 'sold' end, g.initial_cents, null, g.note)
+from public.gift_cards g where g.business_id = 'b0000000-0000-4000-8000-000000000001';
+select private.move_gift_card(g, 'redeemed', -((g.initial_cents * (pg_temp.rnd('spent' || g.id) % 3)) / 4), null, null)
+from public.gift_cards g where g.business_id = 'b0000000-0000-4000-8000-000000000001' and pg_temp.rnd('spent' || g.id) % 3 > 0;
+update public.gift_card_events e set created_at = g.created_at + case when e.kind = 'redeemed' then interval '3 days' else interval '0' end, staff_id = 'd0000000-0000-4000-8000-000000000003'
+from public.gift_cards g where e.card_id = g.id;
 
 alter table public.appointments enable trigger appointments_set_updated_at;
 

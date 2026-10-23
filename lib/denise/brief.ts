@@ -9,7 +9,9 @@ import type { Database } from "@/lib/database.types";
 import type { ClientInsight } from "@/lib/insights/clients";
 import { loadAllClientInsights } from "@/lib/insights/read";
 import { startOfLocalDay } from "@/lib/scheduling/load";
+import { isUsable, loadPackagesByClient, usesLeft } from "@/lib/packages";
 import { addDays, formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
+import { formatPrice } from "@/lib/services";
 import type { ConflictView, WaitlistOpening } from "./types";
 
 type Supabase = SupabaseClient<Database>;
@@ -28,6 +30,9 @@ export type BriefFacts = {
   dueNotBooked: { total: number; top: { client: string; overdueDays: number; usualWeeks: number | null }[] };
   openings: { count: number; withMatches: number };
   lowStock: string[];
+  // Clients coming in today with uses left on a package or money on a gift
+  // card, so the desk can mention it.
+  credits: { client: string; packages: string[]; giftCardCents: number }[];
 };
 
 export type Brief = {
@@ -97,6 +102,24 @@ export async function briefFacts(
     }
   }
 
+  // Credit: package uses left and gift card balances, for today's clients.
+  const clientIds = [...new Set([...firstItem.values()].flatMap((i) => (i.appointment.client ? [i.appointment.client.id] : [])))];
+  const [packages, { data: cards, error: cardError }] = await Promise.all([
+    loadPackagesByClient(supabase, clientIds),
+    clientIds.length
+      ? supabase.from("gift_cards").select("client_id, balance_cents, expires_at").in("client_id", clientIds).eq("status", "active").gt("balance_cents", 0)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (cardError) throw cardError;
+  const now = new Date();
+  const credits = [...firstItem.values()].flatMap((i) => {
+    const c = i.appointment.client;
+    if (!c) return [];
+    const uses = (packages.get(c.id) ?? []).filter((p) => isUsable(p, now)).flatMap((p) => p.items.filter((x) => x.used < x.total).map(usesLeft));
+    const giftCardCents = cards.filter((g) => g.client_id === c.id && (g.expires_at === null || new Date(g.expires_at) > now)).reduce((n, g) => n + g.balance_cents, 0);
+    return uses.length || giftCardCents ? [{ client: shortName(c), packages: uses, giftCardCents }] : [];
+  });
+
   return {
     date,
     visits: firstItem.size,
@@ -105,10 +128,17 @@ export async function briefFacts(
     dueNotBooked: { total: due.length, top },
     openings: { count: scan.openings.length, withMatches: scan.openings.filter((o) => o.matches.length > 0).length },
     lowStock,
+    credits,
   };
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+// "Ava K. (3 Blowouts left on a package, $40 on a gift card)"
+export function creditText(c: BriefFacts["credits"][number]): string {
+  const parts = [...c.packages.map((p) => `${p} on a package`), ...(c.giftCardCents ? [`${formatPrice(c.giftCardCents)} on a gift card`] : [])];
+  return `${c.client} (${parts.join(", ")})`;
+}
 // Ends with one full stop, even after a name like "Ava K.".
 const sentence = (text: string) => (text.endsWith(".") ? text : `${text}.`);
 
@@ -124,5 +154,6 @@ export function briefTemplate(f: BriefFacts): string {
   }
   if (f.openings.withMatches) lines.push(`${plural(f.openings.withMatches, "opening")} I could fill from the waitlist.`);
   if (f.lowStock.length) lines.push(`Low for today's services: ${f.lowStock.slice(0, 3).join(", ")}${f.lowStock.length > 3 ? ` and ${f.lowStock.length - 3} more` : ""}.`);
+  if (f.credits.length) lines.push(sentence(`Coming in with credit: ${f.credits.slice(0, 3).map(creditText).join("; ")}${f.credits.length > 3 ? ` and ${f.credits.length - 3} more` : ""}`));
   return lines.join(" ");
 }

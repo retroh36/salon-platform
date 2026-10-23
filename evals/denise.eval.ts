@@ -1,4 +1,4 @@
-// Ask Denise, evaluated: 22 realistic questions from the front desk,
+// Ask Denise, evaluated: 24 realistic questions from the front desk,
 // the owner and a stylist, asked of the real Claude API against the demo
 // data (npm run seed:demo). Each case checks which tools she used and that
 // the answer carries the right facts, worked out independently here from
@@ -368,6 +368,28 @@ const CASES: Case[] = [
       return /usual|typical|really takes|normally/i.test(a) ? null : "should say she used Bridget's usual time";
     },
     checkTools: (outputs, f) => (outputs.some((o) => o.includes("Bridget's usual time")) ? null : `should search with Bridget's usual ${f.usual} minutes`),
+  },
+  {
+    question: "How much do we owe in gift cards?",
+    as: "owner",
+    tools: ["gift_card_balances"],
+    facts: async () => {
+      const { data } = await admin.from("gift_cards").select("balance_cents, expires_at").eq("business_id", B).eq("kind", "purchased").eq("status", "active").gt("balance_cents", 0);
+      const cents = data!.filter((c) => !c.expires_at || new Date(c.expires_at) > new Date()).reduce((n, c) => n + c.balance_cents, 0);
+      return { dollars: (cents / 100).toLocaleString("en-US", { maximumFractionDigits: 2 }) };
+    },
+    check: (a, f) => (has(a, `$${f.dollars}`) ? null : `should say $${f.dollars}`),
+    numbersFromTools: true,
+  },
+  {
+    question: "Who has unused packages?",
+    as: "owner",
+    tools: ["unused_packages"],
+    facts: async () => {
+      const { data } = await admin.from("client_package_items").select("client_package:client_packages!inner(status, client:clients(first_name))").eq("business_id", B).eq("client_package.status", "active").limit(1);
+      return { someone: data![0]?.client_package.client?.first_name ?? null };
+    },
+    check: (a) => (/package/i.test(a) ? null : "should talk about packages"),
   },
   {
     question: "Text {client} to remind them about their appointment.",

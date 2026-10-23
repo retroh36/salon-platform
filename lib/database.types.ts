@@ -271,6 +271,38 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"cash_closeouts": {
+                  Row: {
+                    "business_id": string,"closed_at": string,"closed_by": string | null,"counted_cents": number,"day": string,"expected_cents": number,"id": string,"location_id": string,"note": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"closed_at"?: string,"closed_by"?: string | null,"counted_cents": number,"day": string,"expected_cents": number,"id"?: string,"location_id": string,"note"?: string | null
+                  }
+                  Update: {
+                    "business_id"?: string,"closed_at"?: string,"closed_by"?: string | null,"counted_cents"?: number,"day"?: string,"expected_cents"?: number,"id"?: string,"location_id"?: string,"note"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "cash_closeouts_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "cash_closeouts_closed_by_business_id_fkey"
+      columns: ["closed_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "cash_closeouts_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"client_forms": {
                   Row: {
                     "answers": NonNullable<Json>,"business_id": string,"client_id": string,"collected_by": string | null,"fields": NonNullable<Json>,"id": string,"signature": string | null,"signed_at": string,"template_id": string | null,"template_name": string
@@ -2046,6 +2078,9 @@ isOneToOne: false
                            },
 "save_appointment":
 { Args: { "p_appointment_id": string,"p_client_id": string,"p_expected_version": number,"p_items": Json,"p_location_id": string,"p_notes": string }; Returns: string
+                           },
+"save_closeout":
+{ Args: { "p_counted_cents": number,"p_day": string,"p_location_id": string,"p_note": string }; Returns: number
                            },
 "save_online_appointment":
 { Args: { "p_appointment_id": string,"p_client_id": string,"p_expected_version": number,"p_items": Json,"p_location_id": string,"p_manage_token_hash": string,"p_notes": string }; Returns: string

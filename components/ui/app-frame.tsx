@@ -2,11 +2,11 @@ import Link from "next/link";
 import { logout } from "@/app/login/actions";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
-import { BoxIcon, CalendarIcon, GiftIcon, ReceiptIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, UserIcon } from "@/components/ui/icons";
+import { BoxIcon, CalendarIcon, ChartIcon, GiftIcon, ReceiptIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, UserIcon } from "@/components/ui/icons";
 import { SalonMark } from "@/components/ui/salon-mark";
 import { roleLabel, type StaffRole } from "@/lib/staff";
 
-export type Section = "dashboard" | "my-day" | "calendar" | "sales" | "gift-cards" | "clients" | "team" | "services" | "durations" | "inventory" | "forms" | "settings";
+export type Section = "dashboard" | "my-day" | "calendar" | "sales" | "gift-cards" | "reports" | "clients" | "team" | "services" | "durations" | "inventory" | "forms" | "settings";
 
 type NavItem = {
   section: Section;
@@ -31,6 +31,7 @@ const NAV: NavItem[] = [
   { section: "durations", href: "/durations", label: "Durations", Icon: ClockIcon, managersOnly: true },
   { section: "inventory", href: "/inventory", label: "Inventory", Icon: BoxIcon },
   { section: "forms", href: "/forms", label: "Forms", Icon: ClipboardIcon },
+  { section: "reports", href: "/reports", label: "Reports", Icon: ChartIcon, ownersOnly: true },
   { section: "settings", href: "/settings", label: "Settings", Icon: SettingsIcon, ownersOnly: true },
 ];
 

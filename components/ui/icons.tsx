@@ -148,3 +148,8 @@ export const GiftIcon = (p: IconProps) => (
     <path d="M3 9h18M12 9v11.5M12 9c-1.5-3.5-5.5-4.5-6-2s3.5 2 6 2Zm0 0c1.5-3.5 5.5-4.5 6-2s-3.5 2-6 2Z" />
   </Icon>
 );
+export const ChartIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 20.5h16M6.5 17V11M11 17V6.5M15.5 17v-4M20 17V9" />
+  </Icon>
+);

@@ -216,6 +216,8 @@ function knowledge(overrides: Partial<Knowledge> = {}): Knowledge & Record<strin
     stock: vi.fn(async () => ({ products: [] })),
     sales: vi.fn(async () => ({ total_dollars: 4210 })),
     fixes: vi.fn(async (date: string) => ({ date, problems: [] })),
+    giftCards: vi.fn(async () => ({ purchased_balance_dollars: 1250, cards_with_a_balance: 14 })),
+    packages: vi.fn(async () => ({ unused_value_dollars: 640, clients: [{ first_name: "Ava", uses_left: ["3 Blowout"] }] })),
     ...overrides,
   } as never;
 }
@@ -231,8 +233,14 @@ describe("Ask Denise's knowledge", () => {
   it("offers each tool only to those allowed it", () => {
     const names = (k?: Knowledge) => assistantTools(context({ knowledge: k })).tools.map((t) => t.name);
     expect(names(knowledge())).toEqual(expect.arrayContaining(["client_insights", "overdue_clients", "stylist_durations", "salon_patterns", "day_schedule", "inventory_levels", "sales_summary", "propose_fixes", "find_openings", "propose_booking"]));
+    // An owner: gift card and package totals too.
+    expect(names(knowledge())).toEqual(expect.arrayContaining(["gift_card_balances", "unused_packages"]));
+    // A manager or the front desk: not those.
+    const desk = names(knowledge({ giftCards: null, packages: null }));
+    expect(desk).not.toContain("gift_card_balances");
+    expect(desk).not.toContain("unused_packages");
     // A stylist: no sales and no fixes to approve.
-    const stylist = names(knowledge({ sales: null, fixes: null }));
+    const stylist = names(knowledge({ sales: null, fixes: null, giftCards: null, packages: null }));
     expect(stylist).not.toContain("sales_summary");
     expect(stylist).not.toContain("propose_fixes");
     // Without knowledge, just the booking tools.
@@ -277,6 +285,7 @@ describe("the morning brief in Denise's words", () => {
     dueNotBooked: { total: 37, top: [{ client: "Liam B.", overdueDays: 21, usualWeeks: 5 }] },
     openings: { count: 1, withMatches: 1 },
     lowStock: [],
+    credits: [{ client: "Mia R.", packages: ["3 Blowouts left"], giftCardCents: 0 }],
   };
 
   it("asks the stronger model, with first names only, and returns its text", async () => {
@@ -287,6 +296,8 @@ describe("the morning brief in Denise's words", () => {
     expect(sent).toContain("Emma");
     expect(sent).not.toContain("Emma S.");
     expect(sent).not.toContain("Liam B.");
+    expect(sent).not.toContain("Mia R.");
+    expect(sent).toContain("3 Blowouts left");
     expect(String(requests[0].system)).toMatch(/Use only the facts and numbers given/);
   });
 

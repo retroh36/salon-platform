@@ -1,0 +1,73 @@
+// The owners' reports, worked out from rows: what's owed on gift cards,
+// what unused packages are worth, gift card activity over a period, and a
+// day's money by tender for the close-out. Pure (loading is in
+// ./reports-load.ts); Denise's answers about them use these too.
+
+import type { PaymentMethod } from "./checkout";
+
+export type CardRow = { kind: "purchased" | "promotional"; status: "active" | "voided"; balance_cents: number; expires_at: string | null };
+
+const live = (c: CardRow, now: Date) => c.status === "active" && (c.expires_at === null || new Date(c.expires_at) > now);
+
+// Balances still on cards: purchased ones are money owed in services;
+// promotional ones are tracked apart (no cash value); expired balances
+// apart again (what happens to them depends on state law).
+export function giftCardLiability(cards: readonly CardRow[], now = new Date()) {
+  const sum = (keep: (c: CardRow) => boolean) => {
+    const rows = cards.filter((c) => c.balance_cents > 0 && keep(c));
+    return { cents: rows.reduce((n, c) => n + c.balance_cents, 0), count: rows.length };
+  };
+  return {
+    purchased: sum((c) => c.kind === "purchased" && live(c, now)),
+    promotional: sum((c) => c.kind === "promotional" && live(c, now)),
+    expired: sum((c) => c.status === "active" && !live(c, now)),
+  };
+}
+
+export type PackageItemRow = { client_id: string; status: "active" | "canceled" | "refunded"; expires_at: string | null; total: number; used: number; use_value_cents: number };
+
+// What the uses not yet taken on active packages are worth (services still
+// owed), and how many clients have them.
+export function unusedPackageValue(items: readonly PackageItemRow[], now = new Date()) {
+  const open = items.filter((i) => i.status === "active" && (i.expires_at === null || new Date(i.expires_at) > now) && i.used < i.total);
+  return {
+    cents: open.reduce((n, i) => n + (i.total - i.used) * i.use_value_cents, 0),
+    uses: open.reduce((n, i) => n + (i.total - i.used), 0),
+    clients: new Set(open.map((i) => i.client_id)).size,
+  };
+}
+
+export type CardEventRow = { kind: string; amount_cents: number; card_kind: "purchased" | "promotional" };
+
+// Gift card money in and out over a period.
+export function giftCardActivity(events: readonly CardEventRow[]) {
+  const total = (kind: string, cardKind: CardEventRow["card_kind"]) =>
+    events.filter((e) => e.kind === kind && e.card_kind === cardKind).reduce((n, e) => n + Math.abs(e.amount_cents), 0);
+  const count = (kind: string, cardKind: CardEventRow["card_kind"]) => events.filter((e) => e.kind === kind && e.card_kind === cardKind).length;
+  return {
+    soldCents: total("sold", "purchased"),
+    soldCount: count("sold", "purchased"),
+    reloadedCents: total("reloaded", "purchased"),
+    // Used at checkout, less what was put back by refunds and voids.
+    redeemedCents: total("redeemed", "purchased") - total("refunded", "purchased"),
+    promoIssuedCents: total("issued", "promotional"),
+    promoRedeemedCents: total("redeemed", "promotional") - total("refunded", "promotional"),
+  };
+}
+
+export type PaymentRow = { method: PaymentMethod; amount_cents: number };
+
+const METHODS: PaymentMethod[] = ["cash", "card", "gift_card", "package"];
+
+// A day's money by tender: taken, refunded (including voids), and net. The
+// cash that should be in the drawer is the net cash (change given is
+// already left out of the amounts).
+export function closeout(payments: readonly PaymentRow[]) {
+  const byMethod = METHODS.map((method) => {
+    const rows = payments.filter((p) => p.method === method);
+    const taken = rows.filter((p) => p.amount_cents > 0).reduce((n, p) => n + p.amount_cents, 0);
+    const refunded = -rows.filter((p) => p.amount_cents < 0).reduce((n, p) => n + p.amount_cents, 0);
+    return { method, takenCents: taken, refundedCents: refunded, netCents: taken - refunded };
+  });
+  return { byMethod, expectedCashCents: byMethod.find((m) => m.method === "cash")!.netCents, netCents: byMethod.reduce((n, m) => n + m.netCents, 0) };
+}

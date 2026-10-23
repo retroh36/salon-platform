@@ -6,7 +6,7 @@ import { DeniseFace, DenisePose, type Pose } from "@/components/denise";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/field";
 import { CheckCircleIcon, ChevronDownIcon, ClockIcon, SendIcon, UndoIcon } from "@/components/ui/icons";
-import type { Brief } from "@/lib/denise/brief";
+import { creditText, type Brief } from "@/lib/denise/brief";
 import { noFixAdvice } from "@/lib/denise/respond";
 import type { BookingSuggestion, ChatMessage, ConflictView, DeniseState, FixView, OpeningMatch, WaitlistOpening } from "@/lib/denise/types";
 import { formatLongDay } from "@/lib/schedule-format";
@@ -504,6 +504,7 @@ function BriefCard({ brief }: { brief: Brief }) {
           />
         )}
         {f.lowStock.length > 0 && <BriefList title="Low for today's services" items={f.lowStock} />}
+        {f.credits.length > 0 && <BriefList title="Coming in with credit" items={f.credits.map(creditText)} />}
       </div>
     </details>
   );

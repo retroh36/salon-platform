@@ -80,16 +80,17 @@ describe("the morning brief's template", () => {
     dueNotBooked: { total: 37, top: [{ client: "Liam B.", overdueDays: 21, usualWeeks: 5 }, { client: "Ava K.", overdueDays: 0, usualWeeks: 6 }] },
     openings: { count: 2, withMatches: 1 },
     lowStock: ["Goldwell Topchic 7N"],
+    credits: [{ client: "Mia R.", packages: ["3 Blowouts left"], giftCardCents: 4000 }],
   };
 
   it("says only what the facts say", () => {
     expect(briefTemplate(facts)).toBe(
-      "23 visits on the book today. 1 visit likely to run over; I've lined up fixes below. Might not show: Emma S. at 2pm (missed 33% of visits). A reminder call could help. 37 regulars due back with nothing booked, most overdue: Liam B. (3 wk overdue), Ava K. 1 opening I could fill from the waitlist. Low for today's services: Goldwell Topchic 7N.",
+      "23 visits on the book today. 1 visit likely to run over; I've lined up fixes below. Might not show: Emma S. at 2pm (missed 33% of visits). A reminder call could help. 37 regulars due back with nothing booked, most overdue: Liam B. (3 wk overdue), Ava K. 1 opening I could fill from the waitlist. Low for today's services: Goldwell Topchic 7N. Coming in with credit: Mia R. (3 Blowouts left on a package, $40 on a gift card).",
     );
   });
 
   it("is short on a quiet day", () => {
-    expect(briefTemplate({ ...facts, visits: 1, risks: [], likelyNoShows: [], dueNotBooked: { total: 0, top: [] }, openings: { count: 0, withMatches: 0 }, lowStock: [] })).toBe(
+    expect(briefTemplate({ ...facts, visits: 1, risks: [], likelyNoShows: [], dueNotBooked: { total: 0, top: [] }, openings: { count: 0, withMatches: 0 }, lowStock: [], credits: [] })).toBe(
       "1 visit on the book today. Nothing looks likely to run over.",
     );
   });

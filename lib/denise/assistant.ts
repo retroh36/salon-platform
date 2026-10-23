@@ -111,7 +111,19 @@ const TOOLS: Anthropic.Tool[] = [
 const noInput = { type: "object" as const, properties: {}, required: [], additionalProperties: false as const };
 
 // Read-only lookups of what Denise has learned, and her fixes.
-const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes", Anthropic.Tool> = {
+const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes" | "giftCards" | "packages", Anthropic.Tool> = {
+  giftCards: {
+    name: "gift_card_balances",
+    description: "What the salon owes in gift cards: purchased balances still on cards (services owed), promotional credit out (no cash value) and balances on expired cards. Owners only.",
+    strict: true,
+    input_schema: { type: "object", properties: {}, required: [], additionalProperties: false },
+  },
+  packages: {
+    name: "unused_packages",
+    description: "Unused package uses: what they're worth in total, how many uses are left, and the clients who have them (first names, most value first). Owners only.",
+    strict: true,
+    input_schema: { type: "object", properties: { limit: { ...nullable("integer"), description: "How many clients to list (1-20, default 5)." } }, required: ["limit"], additionalProperties: false },
+  },
   clients: {
     name: "client_insights",
     description:
@@ -305,7 +317,18 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
 
   const k = c.knowledge;
   const extra = k
-    ? [KNOWLEDGE_TOOLS.clients, KNOWLEDGE_TOOLS.overdue, KNOWLEDGE_TOOLS.durations, KNOWLEDGE_TOOLS.salon, KNOWLEDGE_TOOLS.schedule, KNOWLEDGE_TOOLS.stock, ...(k.sales ? [KNOWLEDGE_TOOLS.sales] : []), ...(k.fixes ? [KNOWLEDGE_TOOLS.fixes] : [])]
+    ? [
+        KNOWLEDGE_TOOLS.clients,
+        KNOWLEDGE_TOOLS.overdue,
+        KNOWLEDGE_TOOLS.durations,
+        KNOWLEDGE_TOOLS.salon,
+        KNOWLEDGE_TOOLS.schedule,
+        KNOWLEDGE_TOOLS.stock,
+        ...(k.sales ? [KNOWLEDGE_TOOLS.sales] : []),
+        ...(k.fixes ? [KNOWLEDGE_TOOLS.fixes] : []),
+        ...(k.giftCards ? [KNOWLEDGE_TOOLS.giftCards] : []),
+        ...(k.packages ? [KNOWLEDGE_TOOLS.packages] : []),
+      ]
     : [];
 
   async function runAny(name: string, raw: unknown): Promise<string> {
@@ -331,6 +354,12 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
         if (!k.sales) return "Sales figures are for owners and managers.";
         if (!SALES_PERIODS.includes(input.period as SalesPeriod)) return `Choose a period: ${SALES_PERIODS.join(", ")}.`;
         return JSON.stringify(await k.sales(input.period as SalesPeriod));
+      case "gift_card_balances":
+        if (!k.giftCards) return "Gift card totals are for owners.";
+        return JSON.stringify(await k.giftCards());
+      case "unused_packages":
+        if (!k.packages) return "Package totals are for owners.";
+        return JSON.stringify(await k.packages(typeof input.limit === "number" ? input.limit : 5));
       case "propose_fixes": {
         if (!k.fixes) return "Only the front desk, managers and owners can approve fixes.";
         const date = dayOf(input.date);
@@ -389,6 +418,10 @@ export function toolStatus(name: string, input: unknown, c: Pick<AssistantContex
       return "Adding up sales…";
     case "propose_fixes":
       return "Looking for fixes…";
+    case "gift_card_balances":
+      return "Adding up gift card balances…";
+    case "unused_packages":
+      return "Finding unused packages…";
     default:
       return "Looking that up…";
   }
