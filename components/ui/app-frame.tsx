@@ -2,11 +2,11 @@ import Link from "next/link";
 import { logout } from "@/app/login/actions";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
-import { BoxIcon, CalendarIcon, ReceiptIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, UserIcon } from "@/components/ui/icons";
+import { BoxIcon, CalendarIcon, GiftIcon, ReceiptIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, UserIcon } from "@/components/ui/icons";
 import { SalonMark } from "@/components/ui/salon-mark";
 import { roleLabel, type StaffRole } from "@/lib/staff";
 
-export type Section = "dashboard" | "my-day" | "calendar" | "sales" | "clients" | "team" | "services" | "durations" | "inventory" | "forms" | "settings";
+export type Section = "dashboard" | "my-day" | "calendar" | "sales" | "gift-cards" | "clients" | "team" | "services" | "durations" | "inventory" | "forms" | "settings";
 
 type NavItem = {
   section: Section;
@@ -24,6 +24,7 @@ const NAV: NavItem[] = [
   { section: "my-day", href: "/my-day", label: "My day", Icon: ClockIcon, stylistsOnly: true },
   { section: "calendar", href: "/calendar", label: "Calendar", Icon: CalendarIcon },
   { section: "sales", href: "/sales", label: "Sales", Icon: ReceiptIcon, frontOfHouse: true },
+  { section: "gift-cards", href: "/gift-cards", label: "Gift cards", Icon: GiftIcon, frontOfHouse: true },
   { section: "clients", href: "/clients", label: "Clients", Icon: UserIcon },
   { section: "team", href: "/team", label: "Team", Icon: TeamIcon },
   { section: "services", href: "/services", label: "Services", Icon: ScissorsIcon },

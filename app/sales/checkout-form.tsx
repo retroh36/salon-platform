@@ -10,10 +10,14 @@ import { CheckCircleIcon, CloseIcon, PlusIcon } from "@/components/ui/icons";
 import { computeSale, discountAllowed, formatRate, METHOD_LABELS, parseDollars, paymentStatus, type SaleLine } from "@/lib/checkout";
 import type { CheckoutData } from "@/lib/sales";
 import { formatPrice, centsToInput } from "@/lib/services";
-import { completeSale, emailReceipt, type SaleInput } from "./actions";
+import { cardProblem, isCardCode, normalizeCode, type GiftCardLookup } from "@/lib/gift-cards";
+import { pillClass } from "@/components/ui/page";
+import { completeSale, emailReceipt, lookupGiftCard, type SaleInput } from "./actions";
 
 type ProductLine = { key: number; productId: string; quantity: number };
-type TenderRow = { key: number; method: "cash" | "card"; amount: string; tendered: string; reference: string };
+type CardSale = { key: number; amount: string; physical: boolean; code: string; recipientName: string; recipientEmail: string };
+type Reload = { key: number; code: string; amount: string; card: GiftCardLookup | null; error: string | null };
+type TenderRow = { key: number; method: "cash" | "card" | "gift_card"; amount: string; tendered: string; reference: string; code: string; card: GiftCardLookup | null; error: string | null };
 
 const sectionTitle = "text-xs font-semibold tracking-wide text-ink-muted uppercase";
 
@@ -43,6 +47,8 @@ export function CheckoutForm({
   const [discount, setDiscount] = useState({ on: false, kind: "percent" as "percent" | "amount", value: "", reason: "" });
   const [tips, setTips] = useState<Record<string, string>>({});
   const [tenders, setTenders] = useState<TenderRow[]>([]);
+  const [cardSales, setCardSales] = useState<CardSale[]>([]);
+  const [reloads, setReloads] = useState<Reload[]>([]);
   const [client, setClient] = useState<ClientOption | null>(null);
   const [email, setEmail] = useState(data.client?.email ?? "");
   const [sendReceipt, setSendReceipt] = useState(false);
@@ -59,11 +65,14 @@ export function CheckoutForm({
   const lines: SaleLine[] = [
     ...data.services.map((s, i) => ({ grossCents: Math.max(0, serviceCents[i]), taxBp: data.settings.taxServicesBp, discountable: true })),
     ...products.map((p) => ({ grossCents: (productById.get(p.productId)?.priceCents ?? 0) * p.quantity, taxBp: data.settings.taxRetailBp, discountable: true })),
+    // Gift cards: never taxed or discounted.
+    ...cardSales.map((c) => ({ grossCents: parseDollars(c.amount) ?? 0, taxBp: 0, discountable: false })),
+    ...reloads.map((r) => ({ grossCents: parseDollars(r.amount) ?? 0, taxBp: 0, discountable: false })),
   ];
   const discountValue = discount.on ? (discount.kind === "percent" ? Number(discount.value) || 0 : (parseDollars(discount.value) ?? 0)) : 0;
   const tipCents = data.stylists.map((s) => parseDollars(tips[s.id] ?? "") ?? 0);
   const totals = computeSale(lines, discount.on && discountValue > 0 ? { kind: discount.kind, value: discountValue } : null, tipCents);
-  const pool = lines.reduce((n, l) => n + l.grossCents, 0);
+  const pool = lines.filter((l) => l.discountable).reduce((n, l) => n + l.grossCents, 0);
   const discountCheck = discountAllowed(data.role, { roles: data.settings.discountRoles, maxPercent: data.settings.discountMaxPercent }, totals.discountCents, pool);
   const tenderRows = tenders.map((t) => ({ method: t.method, amountCents: parseDollars(t.amount) ?? 0, tenderedCents: t.method === "cash" && t.tendered ? (parseDollars(t.tendered) ?? undefined) : undefined }));
   const status = paymentStatus(totals.totalCents, tenderRows);
@@ -76,6 +85,18 @@ export function CheckoutForm({
   if (!discountCheck.ok) problems.push(discountCheck.message);
   if (lines.length === 0) problems.push("Add something to the sale.");
   if (tenderRows.some((t) => t.method === "cash" && t.tenderedCents !== undefined && t.tenderedCents < t.amountCents)) problems.push("The cash handed over is less than the amount.");
+  const amountOk = (text: string) => {
+    const c = parseDollars(text);
+    return c !== null && c >= 500 && c <= 100000;
+  };
+  if (cardSales.some((c) => !amountOk(c.amount)) || reloads.some((r) => !amountOk(r.amount))) problems.push("A gift card is $5 to $1,000.");
+  if (cardSales.some((c) => c.physical && !isCardCode(c.code))) problems.push("Enter or scan the gift card's code.");
+  if (cardSales.some((c) => !c.physical && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.recipientEmail.trim()))) problems.push("Enter the email to send the digital gift card to.");
+  if (reloads.some((r) => !r.card)) problems.push("Check the card you're reloading.");
+  const giftTenders = tenders.filter((t) => t.method === "gift_card");
+  if (giftTenders.length && (cardSales.length || reloads.length)) problems.push("Gift cards can't be paid for with a gift card.");
+  if (giftTenders.some((t) => !t.card)) problems.push("Check the balance of each gift card used.");
+  if (giftTenders.some((t) => t.card && (parseDollars(t.amount) ?? 0) > t.card.balance_cents)) problems.push("That's more than is on the gift card.");
 
   function addProduct(id: string) {
     setProducts((all) => {
@@ -88,9 +109,28 @@ export function CheckoutForm({
     ? data.products.filter((p) => `${p.name} ${p.sku ?? ""}`.toLowerCase().includes(search.trim().toLowerCase()) || p.barcode === search.trim()).slice(0, 6)
     : [];
 
-  function addTender(method: "cash" | "card") {
+  function addTender(method: TenderRow["method"]) {
     const due = Math.max(0, status.dueCents);
-    setTenders((all) => [...all, { key: nextKey.current++, method, amount: due ? centsToInput(due) : "", tendered: "", reference: "" }]);
+    setTenders((all) => [...all, { key: nextKey.current++, method, amount: method !== "gift_card" && due ? centsToInput(due) : "", tendered: "", reference: "", code: "", card: null, error: null }]);
+  }
+  const updateTender = (key: number, change: Partial<TenderRow>) => setTenders((all) => all.map((x) => (x.key === key ? { ...x, ...change } : x)));
+
+  // Checks a gift card used to pay: its balance, and the amount it can
+  // cover (up to what's due).
+  async function checkTenderCard(t: TenderRow) {
+    const r = await lookupGiftCard(t.code);
+    if (!r.ok) return updateTender(t.key, { card: null, error: r.message });
+    const problem = cardProblem(r.card);
+    if (problem) return updateTender(t.key, { card: null, error: problem });
+    const othersPaid = tenderRows.filter((_, i) => tenders[i].key !== t.key).reduce((n, x) => n + x.amountCents, 0);
+    const cover = Math.min(r.card.balance_cents, Math.max(0, totals.totalCents - othersPaid));
+    updateTender(t.key, { card: r.card, error: null, amount: cover ? centsToInput(cover) : "" });
+  }
+
+  async function checkReload(r: Reload) {
+    const result = await lookupGiftCard(r.code);
+    const problem = result.ok ? (result.card.status === "voided" ? "That gift card was voided." : result.card.expired ? "That gift card has expired." : result.card.kind === "promotional" ? "Promotional cards can't be reloaded." : null) : result.message;
+    setReloads((all) => all.map((x) => (x.key === r.key ? { ...x, card: problem || !result.ok ? null : result.card, error: problem } : x)));
   }
 
   function submit(e: React.FormEvent) {
@@ -104,10 +144,18 @@ export function CheckoutForm({
       lines: [
         ...data.services.map((s, i) => ({ kind: "service" as const, appointmentItemId: s.itemId, unitPriceCents: serviceCents[i], priceReason: prices[s.itemId].reason })),
         ...products.map((p) => ({ kind: "product" as const, productId: p.productId, quantity: p.quantity })),
+        ...cardSales.map((c) => ({
+          kind: "gift_card" as const,
+          amountCents: parseDollars(c.amount)!,
+          code: c.physical ? normalizeCode(c.code) : null,
+          recipientName: c.recipientName.trim() || null,
+          recipientEmail: c.physical ? null : c.recipientEmail.trim(),
+        })),
+        ...reloads.map((r) => ({ kind: "gift_card_reload" as const, code: r.code, amountCents: parseDollars(r.amount)! })),
       ],
       discount: discount.on && totals.discountCents > 0 ? { kind: discount.kind, value: discount.kind === "percent" ? discountValue : totals.discountCents, reason: discount.reason } : null,
       tips: data.stylists.map((s, i) => ({ staffId: s.id, amountCents: tipCents[i] })).filter((t) => t.amountCents > 0),
-      payments: tenders.map((t, i) => ({ method: t.method, amountCents: tenderRows[i].amountCents, tenderedCents: tenderRows[i].tenderedCents, reference: t.reference || undefined })),
+      payments: tenders.map((t, i) => ({ method: t.method, amountCents: tenderRows[i].amountCents, tenderedCents: tenderRows[i].tenderedCents, reference: t.reference || undefined, code: t.method === "gift_card" ? t.code : undefined })),
       receiptEmail: sendReceipt && email.trim() ? email.trim() : null,
     };
     startTransition(async () => {
@@ -252,6 +300,100 @@ export function CheckoutForm({
         )}
       </section>
 
+      <section aria-label="Gift cards" className="flex flex-col gap-2">
+        <h3 className={sectionTitle}>Gift cards</h3>
+        {cardSales.map((c, i) => (
+          <fieldset key={c.key} aria-label={`Gift card ${i + 1}`} className="flex flex-col gap-2 rounded-lg border border-line p-3" data-testid="checkout-gift-card">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-medium">New gift card</span>
+              <IconButton label={`Remove gift card ${i + 1}`} size="sm" onClick={() => setCardSales((all) => all.filter((x) => x.key !== c.key))}>
+                <CloseIcon className="size-4" />
+              </IconButton>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {data.settings.giftCardPresetsCents.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  aria-pressed={parseDollars(c.amount) === p}
+                  onClick={() => setCardSales((all) => all.map((x) => (x.key === c.key ? { ...x, amount: centsToInput(p) } : x)))}
+                  className={pillClass(parseDollars(c.amount) === p)}
+                >
+                  {formatPrice(p)}
+                </button>
+              ))}
+              <label className="flex items-center gap-1 text-ink-muted">
+                <span className="sr-only">Gift card amount</span>$
+                <input inputMode="decimal" value={c.amount} onChange={(e) => setCardSales((all) => all.map((x) => (x.key === c.key ? { ...x, amount: e.target.value } : x)))} className={`${fieldClass} w-24`} placeholder="Other" />
+              </label>
+            </div>
+            <div role="radiogroup" aria-label="Kind of card" className="flex gap-4">
+              {([true, false] as const).map((physical) => (
+                <label key={String(physical)} className="flex items-center gap-1.5">
+                  <input type="radio" checked={c.physical === physical} onChange={() => setCardSales((all) => all.map((x) => (x.key === c.key ? { ...x, physical } : x)))} />
+                  {physical ? "Physical card" : "Digital (email)"}
+                </label>
+              ))}
+            </div>
+            {c.physical ? (
+              <label className={labelClass}>
+                Card code (enter or scan)
+                <input value={c.code} onChange={(e) => setCardSales((all) => all.map((x) => (x.key === c.key ? { ...x, code: e.target.value } : x)))} className={`${fieldClass} font-mono uppercase`} autoComplete="off" />
+              </label>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <label className={labelClass}>
+                  For (name)
+                  <input value={c.recipientName} onChange={(e) => setCardSales((all) => all.map((x) => (x.key === c.key ? { ...x, recipientName: e.target.value } : x)))} className={fieldClass} maxLength={120} />
+                </label>
+                <label className={labelClass}>
+                  Send to (email)
+                  <input type="email" value={c.recipientEmail} onChange={(e) => setCardSales((all) => all.map((x) => (x.key === c.key ? { ...x, recipientEmail: e.target.value } : x)))} className={fieldClass} />
+                </label>
+              </div>
+            )}
+          </fieldset>
+        ))}
+        {reloads.map((r, i) => (
+          <fieldset key={r.key} aria-label={`Reload ${i + 1}`} className="flex flex-col gap-2 rounded-lg border border-line p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-medium">Reload a card</span>
+              <IconButton label={`Remove reload ${i + 1}`} size="sm" onClick={() => setReloads((all) => all.filter((x) => x.key !== r.key))}>
+                <CloseIcon className="size-4" />
+              </IconButton>
+            </div>
+            <div className="flex items-end gap-2">
+              <label className={`${labelClass} flex-1`}>
+                Card code
+                <input value={r.code} onChange={(e) => setReloads((all) => all.map((x) => (x.key === r.key ? { ...x, code: e.target.value, card: null } : x)))} className={`${fieldClass} font-mono uppercase`} autoComplete="off" />
+              </label>
+              <Button size="sm" onClick={() => checkReload(r)}>
+                Check card
+              </Button>
+            </div>
+            {r.error && <p className="text-danger">{r.error}</p>}
+            {r.card && <p className="text-ink-muted">{formatPrice(r.card.balance_cents)} on it now.</p>}
+            <label className="flex items-center justify-between gap-2">
+              <span>Amount to add</span>
+              <span className="flex items-center gap-1 text-ink-muted">
+                $
+                <input inputMode="decimal" value={r.amount} onChange={(e) => setReloads((all) => all.map((x) => (x.key === r.key ? { ...x, amount: e.target.value } : x)))} className={`${fieldClass} w-24 text-right`} aria-label="Amount to add" />
+              </span>
+            </label>
+          </fieldset>
+        ))}
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => setCardSales((all) => [...all, { key: nextKey.current++, amount: "", physical: true, code: "", recipientName: "", recipientEmail: data.client?.email ?? "" }])}>
+            <PlusIcon className="size-4" />
+            Sell a gift card
+          </Button>
+          <Button size="sm" onClick={() => setReloads((all) => [...all, { key: nextKey.current++, code: "", amount: "", card: null, error: null }])}>
+            <PlusIcon className="size-4" />
+            Reload a card
+          </Button>
+        </div>
+      </section>
+
       {canDiscount && (
         <section aria-label="Discount" className="flex flex-col gap-2">
           <label className="flex items-center gap-2 font-medium">
@@ -321,7 +463,26 @@ export function CheckoutForm({
                 </IconButton>
               </span>
             </div>
-            {t.method === "cash" ? (
+            {t.method === "gift_card" ? (
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-end gap-2">
+                  <label className={`${labelClass} flex-1`}>
+                    Gift card code
+                    <input value={t.code} onChange={(e) => updateTender(t.key, { code: e.target.value, card: null })} className={`${fieldClass} font-mono uppercase`} autoComplete="off" />
+                  </label>
+                  <Button size="sm" onClick={() => checkTenderCard(t)}>
+                    Check balance
+                  </Button>
+                </div>
+                {t.error && <p className="text-danger">{t.error}</p>}
+                {t.card && (
+                  <p className="text-ink-muted" data-testid="gift-card-balance">
+                    Balance {formatPrice(t.card.balance_cents)} · {formatPrice(Math.max(0, t.card.balance_cents - (parseDollars(t.amount) ?? 0)))} left after this
+                    {t.card.kind === "promotional" ? " · promotional" : ""}
+                  </p>
+                )}
+              </div>
+            ) : t.method === "cash" ? (
               <label className="flex items-center justify-between gap-2">
                 <span>Cash handed over</span>
                 <span className="flex items-center gap-1 text-ink-muted">
@@ -345,6 +506,10 @@ export function CheckoutForm({
           <Button size="sm" onClick={() => addTender("cash")}>
             <PlusIcon className="size-4" />
             Cash
+          </Button>
+          <Button size="sm" onClick={() => addTender("gift_card")}>
+            <PlusIcon className="size-4" />
+            Gift card
           </Button>
         </div>
         <p className="text-xs text-ink-muted">Card payments are taken on the salon&apos;s terminal and recorded here.</p>

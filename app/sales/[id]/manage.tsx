@@ -69,14 +69,17 @@ export function RefundForm({
   saleId,
   refundableCents,
   products,
+  giftCards,
 }: {
   saleId: string;
   refundableCents: number;
   products: { id: string; description: string; quantity: number; returned: number }[];
+  // Gift cards the sale was paid with: money can go back onto them.
+  giftCards: { code: string; label: string }[];
 }) {
   const router = useRouter();
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState<"card" | "cash">("card");
+  const [method, setMethod] = useState<string>(giftCards.length ? `gift:${giftCards[0].code}` : "card");
   const [reason, setReason] = useState("");
   const [returns, setReturns] = useState<Record<string, string>>({});
   const [restock, setRestock] = useState(true);
@@ -91,9 +94,10 @@ export function RefundForm({
         const cents = parseDollars(amount);
         if (!cents) return setResult({ ok: false, message: "Enter how much to refund." });
         start(async () => {
+          const onCard = method.startsWith("gift:");
           const r = await refundSale(saleId, {
             reason,
-            payments: [{ method, amountCents: cents }],
+            payments: [onCard ? { method: "gift_card", amountCents: cents, code: method.slice(5) } : { method: method as "card" | "cash", amountCents: cents }],
             returns: Object.entries(returns)
               .map(([id, q]) => ({ saleItemId: id, quantity: Number(q) || 0 }))
               .filter((x) => x.quantity > 0),
@@ -112,7 +116,12 @@ export function RefundForm({
         </label>
         <label className={labelClass}>
           Given back by
-          <select value={method} onChange={(e) => setMethod(e.target.value as "card" | "cash")} className={selectClass}>
+          <select value={method} onChange={(e) => setMethod(e.target.value)} className={selectClass}>
+            {giftCards.map((g) => (
+              <option key={g.code} value={`gift:${g.code}`}>
+                Back onto {g.label}
+              </option>
+            ))}
             <option value="card">Card (on the terminal)</option>
             <option value="cash">Cash</option>
           </select>

@@ -94,7 +94,7 @@ test.describe("formulas and stock", () => {
     const deskPanel = await openVisit(desk);
     await deskPanel.getByRole("button", { name: "Check out client" }).click();
     const checkout = desk.getByRole("form", { name: "Checkout" });
-    await checkout.getByRole("button", { name: "Card" }).click();
+    await checkout.getByRole("button", { name: "Card", exact: true }).click();
     await checkout.getByRole("button", { name: /^Complete sale/ }).click();
     await expect(desk.getByTestId("checkout-done")).toBeVisible();
     await expect.poll(() => onHand("GW-TC-7N")).toBeCloseTo(before.tc - 30, 2);

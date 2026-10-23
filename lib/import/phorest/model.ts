@@ -104,7 +104,10 @@ export type ProductRecord = {
 
 export type GiftCardRecord = {
   externalId: string;
-  serial: string;
+  // The card's code as we store it (letters and digits); null when it
+  // can't be used as one (too short, or another card has it): it gets a
+  // new code.
+  code: string | null;
   clientExternalId: string | null;
   issued_at: string | null;
   expires_at: string | null;

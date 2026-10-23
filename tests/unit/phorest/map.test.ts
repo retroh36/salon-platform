@@ -314,7 +314,8 @@ describe("products and gift cards", () => {
     const cards = dataset.vouchers.map((v) => mapVoucher(v, new Set(["CL1"]), log));
     expect(cards[0]).toEqual({
       externalId: "VO1",
-      serial: "GC-0001",
+      // "GC-0001" is too short to be a safe code: the card gets a new one.
+      code: null,
       clientExternalId: "CL1",
       issued_at: "2026-01-05T12:00:00.000Z",
       expires_at: "2027-01-05T12:00:00.000Z",
@@ -323,6 +324,23 @@ describe("products and gift cards", () => {
     });
     expect(cards[1]!.clientExternalId).toBeNull();
     expect(cards[2]).toBeNull();
+  });
+
+  it("keeps usable codes, gives duplicates new ones, and flags cards that expired with money left", () => {
+    const log = new IssueLog();
+    const codes = new Set<string>();
+    const now = new Date("2026-10-22T12:00:00Z");
+    const voucher = { originalBalance: 50, remainingBalance: 20 };
+    const first = mapVoucher({ ...voucher, voucherId: "A", serialNumber: "abcd-2345-wxyz" }, new Set(), log, codes, now);
+    const twin = mapVoucher({ ...voucher, voucherId: "B", serialNumber: "ABCD 2345 WXYZ" }, new Set(), log, codes, now);
+    const old = mapVoucher({ ...voucher, voucherId: "C", serialNumber: "OLDCARD99", expiryDate: "2025-01-01T00:00:00Z" }, new Set(), log, codes, now);
+    expect(first!.code).toBe("ABCD2345WXYZ");
+    expect(twin!.code).toBeNull();
+    expect(old!.code).toBe("OLDCARD99");
+    expect(issues(log)).toEqual([
+      "1 gift_card.expiryDate review: expired with a balance left",
+      "1 gift_card.serialNumber review: another voucher has the same code; the card gets a new code",
+    ]);
   });
 });
 

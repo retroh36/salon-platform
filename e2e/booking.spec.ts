@@ -215,7 +215,7 @@ test.describe("front desk", () => {
     // Checking out takes payment first.
     await detail.getByRole("button", { name: "Check out client" }).click();
     const checkout = page.getByRole("form", { name: "Checkout" });
-    await checkout.getByRole("button", { name: "Card" }).click();
+    await checkout.getByRole("button", { name: "Card", exact: true }).click();
     await checkout.getByRole("button", { name: /^Complete sale/ }).click();
     await page.getByTestId("checkout-done").getByRole("button", { name: "Done" }).click();
     await column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Cara Test`) }).click();

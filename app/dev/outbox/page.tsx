@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const metadata: Metadata = { title: "Dev outbox", robots: { index: false } };
 
 // Development only: the texts and emails Maestra would have sent (booking
-// codes and confirmations), newest first, until a real provider is
+// codes and confirmations, receipts, gift cards), newest first, until a real provider is
 // connected. Shows nothing in production.
 export default function OutboxPage() {
   return (
@@ -22,7 +22,7 @@ async function Outbox() {
   if (process.env.NODE_ENV === "production") notFound();
   const { data, error } = await createAdminClient()
     .from("outbox_messages")
-    .select("id, channel, to_address, subject, body, created_at")
+    .select("id, channel, to_address, subject, body, html, created_at")
     .order("created_at", { ascending: false })
     .limit(50);
   if (error) throw error;
@@ -46,9 +46,11 @@ async function Outbox() {
                 <time dateTime={m.created_at}>{new Date(m.created_at).toLocaleString("en-US")}</time>
               </p>
               {m.subject && <p className="mt-1 font-semibold text-ink">{m.subject}</p>}
-              <p className="mt-1 text-ink" data-testid="outbox-body">
+              <p className="mt-1 whitespace-pre-line text-ink" data-testid="outbox-body">
                 {m.body}
               </p>
+              {/* The designed email, as the client would see it (scripts off). */}
+              {m.html && <iframe title={`Email to ${m.to_address}`} srcDoc={m.html} sandbox="" className="mt-3 h-[34rem] w-full rounded-lg border border-line bg-canvas" />}
             </li>
           ))}
         </ol>

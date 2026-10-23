@@ -97,8 +97,9 @@ export function mapPhorestData(data: PhorestData, options: MapOptions): { plan: 
       ...mapAppointments(branchData.appointments, { locationExternalId, timeZone, staffIds, serviceIds, clientIds }, log),
     );
   }
+  const codes = new Set<string>();
   for (const v of data.vouchers) {
-    const record = mapVoucher(v, clientIds, log);
+    const record = mapVoucher(v, clientIds, log, codes);
     if (record) plan.giftCards.push(record);
   }
 

@@ -67,6 +67,18 @@ describe("saving an import", () => {
 
     const { data: location } = await admin.from("locations").select("name, timezone").eq("business_id", businessId).single();
     expect(location).toEqual({ name: "Fixture Salon Downtown", timezone: "America/Chicago" });
+
+    // Vouchers become gift cards with the balance left, each with a usable
+    // code (the fixture's "GC-0001" is too short, so they get new ones).
+    expect(summary.gift_card).toEqual({ created: 2, updated: 0 });
+    const { data: cards } = await admin.from("gift_cards").select("code, kind, imported, initial_cents, balance_cents, client_id, gift_card_events(kind, amount_cents)").eq("business_id", businessId).order("initial_cents");
+    expect(cards!.map((c) => [c.kind, c.imported, c.initial_cents, c.balance_cents])).toEqual([
+      ["purchased", true, 5000, 5000],
+      ["purchased", true, 10000, 4000],
+    ]);
+    expect(cards!.every((c) => /^[A-Z0-9]{16}$/.test(c.code))).toBe(true);
+    expect(cards![1].client_id).not.toBeNull();
+    expect(cards![1].gift_card_events).toEqual([{ kind: "imported", amount_cents: 4000 }]);
   });
 
   it("links records to each other by their new ids", async () => {
@@ -91,6 +103,8 @@ describe("saving an import", () => {
     const { summary } = await savePhorestImport(admin, changed, { businessId });
 
     expect(summary.client).toEqual({ created: 0, updated: 451 });
+    // Gift cards aren't imported twice (their balances move on here).
+    expect(summary.gift_card).toEqual({ created: 0, updated: 0 });
     expect(await count("clients")).toBe(451);
     expect(await count("staff")).toBe(5);
     expect(await count("services")).toBe(6);

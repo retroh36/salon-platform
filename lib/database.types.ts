@@ -259,14 +259,14 @@ isOneToOne: false
                   ]
                 },"businesses": {
                   Row: {
-                    "ai_daily_token_limit": number,"created_at": string,"discount_max_percent": number,"discount_roles": (Database["public"]['Enums']["staff_role"])[],"id": string,"logo_path": string | null,"name": string,"next_sale_number": number,"patch_test_enforcement": string,"patch_test_min_hours": number,"patch_test_valid_days": number,"plan": string,"receipt_footer": string | null,"receipt_show_stylists": boolean,"settings": NonNullable<Json>,"slug": string | null,"tax_rate_retail_bp": number,"tax_rate_services_bp": number,"updated_at": string
+                    "ai_daily_token_limit": number,"created_at": string,"discount_max_percent": number,"discount_roles": (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months": number | null,"gift_card_presets_cents": (number)[],"id": string,"logo_path": string | null,"name": string,"next_sale_number": number,"patch_test_enforcement": string,"patch_test_min_hours": number,"patch_test_valid_days": number,"plan": string,"promo_card_expiry_days": number,"receipt_footer": string | null,"receipt_show_stylists": boolean,"settings": NonNullable<Json>,"slug": string | null,"tax_rate_retail_bp": number,"tax_rate_services_bp": number,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "ai_daily_token_limit"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"id"?: string,"logo_path"?: string | null,"name": string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"plan"?: string,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"updated_at"?: string
+                    "ai_daily_token_limit"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_presets_cents"?: (number)[],"id"?: string,"logo_path"?: string | null,"name": string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"updated_at"?: string
                   }
                   Update: {
-                    "ai_daily_token_limit"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"id"?: string,"logo_path"?: string | null,"name"?: string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"plan"?: string,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"updated_at"?: string
+                    "ai_daily_token_limit"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_presets_cents"?: (number)[],"id"?: string,"logo_path"?: string | null,"name"?: string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"updated_at"?: string
                   }
                   Relationships: [
                     
@@ -475,6 +475,96 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "products"
       referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"gift_card_events": {
+                  Row: {
+                    "amount_cents": number,"balance_after": number,"business_id": string,"card_id": string,"created_at": string,"id": string,"kind": string,"reason": string | null,"sale_id": string | null,"staff_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount_cents": number,"balance_after": number,"business_id": string,"card_id": string,"created_at"?: string,"id"?: string,"kind": string,"reason"?: string | null,"sale_id"?: string | null,"staff_id"?: string | null
+                  }
+                  Update: {
+                    "amount_cents"?: number,"balance_after"?: number,"business_id"?: string,"card_id"?: string,"created_at"?: string,"id"?: string,"kind"?: string,"reason"?: string | null,"sale_id"?: string | null,"staff_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "gift_card_events_card_id_business_id_fkey"
+      columns: ["card_id","business_id"]
+isOneToOne: false
+      referencedRelation: "gift_cards"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "gift_card_events_sale_id_fkey"
+      columns: ["sale_id"]
+isOneToOne: false
+      referencedRelation: "sales"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "gift_card_events_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"gift_card_lookups": {
+                  Row: {
+                    "business_id": string,"code_hint": string | null,"created_at": string,"found": boolean,"id": string,"staff_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"code_hint"?: string | null,"created_at"?: string,"found": boolean,"id"?: string,"staff_id"?: string | null
+                  }
+                  Update: {
+                    "business_id"?: string,"code_hint"?: string | null,"created_at"?: string,"found"?: boolean,"id"?: string,"staff_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "gift_card_lookups_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"gift_cards": {
+                  Row: {
+                    "balance_cents": number,"business_id": string,"client_id": string | null,"code": string,"created_at": string,"created_by": string | null,"expires_at": string | null,"id": string,"imported": boolean,"initial_cents": number,"kind": Database["public"]['Enums']["gift_card_kind"],"note": string | null,"physical": boolean,"recipient_email": string | null,"recipient_name": string | null,"sale_id": string | null,"status": Database["public"]['Enums']["gift_card_status"]
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "balance_cents": number,"business_id": string,"client_id"?: string | null,"code": string,"created_at"?: string,"created_by"?: string | null,"expires_at"?: string | null,"id"?: string,"imported"?: boolean,"initial_cents": number,"kind": Database["public"]['Enums']["gift_card_kind"],"note"?: string | null,"physical"?: boolean,"recipient_email"?: string | null,"recipient_name"?: string | null,"sale_id"?: string | null,"status"?: Database["public"]['Enums']["gift_card_status"]
+                  }
+                  Update: {
+                    "balance_cents"?: number,"business_id"?: string,"client_id"?: string | null,"code"?: string,"created_at"?: string,"created_by"?: string | null,"expires_at"?: string | null,"id"?: string,"imported"?: boolean,"initial_cents"?: number,"kind"?: Database["public"]['Enums']["gift_card_kind"],"note"?: string | null,"physical"?: boolean,"recipient_email"?: string | null,"recipient_name"?: string | null,"sale_id"?: string | null,"status"?: Database["public"]['Enums']["gift_card_status"]
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "gift_cards_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "gift_cards_client_id_fkey"
+      columns: ["client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "gift_cards_created_by_business_id_fkey"
+      columns: ["created_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "gift_cards_sale_id_fkey"
+      columns: ["sale_id"]
+isOneToOne: false
+      referencedRelation: "sales"
+      referencedColumns: ["id"]
     }
                   ]
                 },"import_external_ids": {
@@ -707,14 +797,14 @@ isOneToOne: false
                   ]
                 },"payments": {
                   Row: {
-                    "amount_cents": number,"business_id": string,"change_cents": number | null,"created_at": string,"created_by": string | null,"id": string,"location_id": string,"method": Database["public"]['Enums']["payment_method"],"processor": string | null,"processor_reference": string | null,"reason": string | null,"reference": string | null,"sale_id": string,"tendered_cents": number | null
+                    "amount_cents": number,"business_id": string,"change_cents": number | null,"created_at": string,"created_by": string | null,"gift_card_id": string | null,"id": string,"location_id": string,"method": Database["public"]['Enums']["payment_method"],"processor": string | null,"processor_reference": string | null,"reason": string | null,"reference": string | null,"sale_id": string,"tendered_cents": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount_cents": number,"business_id": string,"change_cents"?: number | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id": string,"method": Database["public"]['Enums']["payment_method"],"processor"?: string | null,"processor_reference"?: string | null,"reason"?: string | null,"reference"?: string | null,"sale_id": string,"tendered_cents"?: number | null
+                    "amount_cents": number,"business_id": string,"change_cents"?: number | null,"created_at"?: string,"created_by"?: string | null,"gift_card_id"?: string | null,"id"?: string,"location_id": string,"method": Database["public"]['Enums']["payment_method"],"processor"?: string | null,"processor_reference"?: string | null,"reason"?: string | null,"reference"?: string | null,"sale_id": string,"tendered_cents"?: number | null
                   }
                   Update: {
-                    "amount_cents"?: number,"business_id"?: string,"change_cents"?: number | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id"?: string,"method"?: Database["public"]['Enums']["payment_method"],"processor"?: string | null,"processor_reference"?: string | null,"reason"?: string | null,"reference"?: string | null,"sale_id"?: string,"tendered_cents"?: number | null
+                    "amount_cents"?: number,"business_id"?: string,"change_cents"?: number | null,"created_at"?: string,"created_by"?: string | null,"gift_card_id"?: string | null,"id"?: string,"location_id"?: string,"method"?: Database["public"]['Enums']["payment_method"],"processor"?: string | null,"processor_reference"?: string | null,"reason"?: string | null,"reference"?: string | null,"sale_id"?: string,"tendered_cents"?: number | null
                   }
                   Relationships: [
                     {
@@ -723,6 +813,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "staff"
       referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "payments_gift_card_id_fkey"
+      columns: ["gift_card_id"]
+isOneToOne: false
+      referencedRelation: "gift_cards"
+      referencedColumns: ["id"]
     },{
       foreignKeyName: "payments_sale_id_business_id_fkey"
       columns: ["sale_id","business_id"]
@@ -907,14 +1003,14 @@ isOneToOne: false
                   ]
                 },"sale_items": {
                   Row: {
-                    "appointment_item_id": string | null,"booked_price_cents": number | null,"business_id": string,"description": string,"discount_cents": number,"id": string,"kind": Database["public"]['Enums']["sale_item_kind"],"position": number,"price_reason": string | null,"product_id": string | null,"quantity": number,"returned_quantity": number,"sale_id": string,"service_id": string | null,"staff_id": string | null,"tax_cents": number,"total_cents": number,"unit_price_cents": number
+                    "appointment_item_id": string | null,"booked_price_cents": number | null,"business_id": string,"description": string,"discount_cents": number,"gift_card_id": string | null,"id": string,"kind": Database["public"]['Enums']["sale_item_kind"],"position": number,"price_reason": string | null,"product_id": string | null,"quantity": number,"returned_quantity": number,"sale_id": string,"service_id": string | null,"staff_id": string | null,"tax_cents": number,"total_cents": number,"unit_price_cents": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id": string,"description": string,"discount_cents"?: number,"id"?: string,"kind": Database["public"]['Enums']["sale_item_kind"],"position": number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id": string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents": number,"unit_price_cents": number
+                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id": string,"description": string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["sale_item_kind"],"position": number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id": string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents": number,"unit_price_cents": number
                   }
                   Update: {
-                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id"?: string,"description"?: string,"discount_cents"?: number,"id"?: string,"kind"?: Database["public"]['Enums']["sale_item_kind"],"position"?: number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id"?: string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents"?: number,"unit_price_cents"?: number
+                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id"?: string,"description"?: string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["sale_item_kind"],"position"?: number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id"?: string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents"?: number,"unit_price_cents"?: number
                   }
                   Relationships: [
                     {
@@ -922,6 +1018,12 @@ isOneToOne: false
       columns: ["appointment_item_id"]
 isOneToOne: false
       referencedRelation: "appointment_items"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sale_items_gift_card_id_fkey"
+      columns: ["gift_card_id"]
+isOneToOne: false
+      referencedRelation: "gift_cards"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "sale_items_product_id_fkey"
@@ -1666,6 +1768,9 @@ isOneToOne: false
             "add_formula":
 { Args: { "p_appointment_item_id": string,"p_client_id": string,"p_formula": string,"p_lines": Json,"p_notes": string,"p_visit_date": string }; Returns: string
                            },
+"adjust_gift_card":
+{ Args: { "p_card_id": string,"p_change_cents": number,"p_reason": string }; Returns: number
+                           },
 "adjust_stock":
 { Args: { "p_change": number,"p_location_id": string,"p_note": string,"p_product_id": string,"p_reason": Database["public"]['Enums']["stock_reason"] }; Returns: number
                            },
@@ -1707,8 +1812,17 @@ isOneToOne: false
 "hit_rate_limit":
 { Args: { "p_key": string,"p_limit": number,"p_window_seconds": number }; Returns: boolean
                            },
+"import_gift_card":
+{ Args: { "p_balance_cents": number,"p_business_id": string,"p_client_id": string,"p_code": string,"p_expires_at": string,"p_initial_cents": number,"p_issued_at": string }; Returns: string
+                           },
+"issue_promo_card":
+{ Args: { "p_amount_cents": number,"p_client_id": string,"p_expires_in_days": number,"p_reason": string,"p_recipient_email": string,"p_recipient_name": string }; Returns: string
+                           },
 "log_receipt_email":
 { Args: { "p_email": string,"p_sale_id": string }; Returns: undefined
+                           },
+"lookup_gift_card":
+{ Args: { "p_code": string }; Returns: Json
                            },
 "move_time_block":
 { Args: { "p_block_id": string,"p_end": number,"p_on_date": string,"p_start": number }; Returns: string
@@ -1773,6 +1887,9 @@ isOneToOne: false
 "set_checkout_settings":
 { Args: { "p_business_id": string,"p_settings": Json }; Returns: undefined
                            },
+"set_gift_card_settings":
+{ Args: { "p_business_id": string,"p_expiry_months": number,"p_presets": (number)[],"p_promo_days": number }; Returns: undefined
+                           },
 "set_location_hours":
 { Args: { "p_business_id": string,"p_hours": Json,"p_location_id": string }; Returns: undefined
                            },
@@ -1803,12 +1920,15 @@ isOneToOne: false
 "undo_reorder_draft":
 { Args: { "p_action_id": string }; Returns: undefined
                            },
+"void_gift_card":
+{ Args: { "p_card_id": string,"p_reason": string }; Returns: undefined
+                           },
 "void_sale":
 { Args: { "p_reason": string,"p_sale_id": string }; Returns: undefined
                            }
           }
           Enums: {
-            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","deposit_kind": "none"|"fixed"|"percent","disruption_kind": "overrun"|"client_late"|"call_out","form_requirement": "none"|"first_visit"|"services","notification_status": "pending"|"sent"|"canceled","online_service_mode": "bookable"|"consultation"|"off","patch_test_result": "no_reaction"|"reaction","payment_method": "cash"|"card"|"gift_card"|"package","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","sale_item_kind": "service"|"product","sale_status": "completed"|"partly_refunded"|"refunded"|"voided","staff_level": "artisan"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
+            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","deposit_kind": "none"|"fixed"|"percent","disruption_kind": "overrun"|"client_late"|"call_out","form_requirement": "none"|"first_visit"|"services","gift_card_kind": "purchased"|"promotional","gift_card_status": "active"|"voided","notification_status": "pending"|"sent"|"canceled","online_service_mode": "bookable"|"consultation"|"off","patch_test_result": "no_reaction"|"reaction","payment_method": "cash"|"card"|"gift_card"|"package","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","sale_item_kind": "service"|"product"|"gift_card"|"gift_card_reload","sale_status": "completed"|"partly_refunded"|"refunded"|"voided","staff_level": "artisan"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -1928,7 +2048,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"deposit_kind": ["none", "fixed", "percent"],"disruption_kind": ["overrun", "client_late", "call_out"],"form_requirement": ["none", "first_visit", "services"],"notification_status": ["pending", "sent", "canceled"],"online_service_mode": ["bookable", "consultation", "off"],"patch_test_result": ["no_reaction", "reaction"],"payment_method": ["cash", "card", "gift_card", "package"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"sale_item_kind": ["service", "product"],"sale_status": ["completed", "partly_refunded", "refunded", "voided"],"staff_level": ["artisan", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
+            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"deposit_kind": ["none", "fixed", "percent"],"disruption_kind": ["overrun", "client_late", "call_out"],"form_requirement": ["none", "first_visit", "services"],"gift_card_kind": ["purchased", "promotional"],"gift_card_status": ["active", "voided"],"notification_status": ["pending", "sent", "canceled"],"online_service_mode": ["bookable", "consultation", "off"],"patch_test_result": ["no_reaction", "reaction"],"payment_method": ["cash", "card", "gift_card", "package"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"sale_item_kind": ["service", "product", "gift_card", "gift_card_reload"],"sale_status": ["completed", "partly_refunded", "refunded", "voided"],"staff_level": ["artisan", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
           }
         }
 } as const

@@ -57,6 +57,9 @@ async function Sale({ params, searchParams }: Pick<PageProps<"/sales/[id]">, "pa
 
   const paid = sale.payments.filter((p) => p.amountCents > 0).reduce((n, p) => n + p.amountCents, 0);
   const manager = canRefund(me.role);
+  // Gift cards it was paid with (money can go back onto them).
+  const { data: used } = await supabase.from("payments").select("gift_card:gift_cards(code, kind)").eq("sale_id", sale.id).not("gift_card_id", "is", null);
+  const giftCards = [...new Map((used ?? []).flatMap((p) => (p.gift_card ? [[p.gift_card.code, { code: p.gift_card.code, label: `${p.gift_card.kind === "promotional" ? "promotional card" : "gift card"} …${p.gift_card.code.slice(-4)}` }] as const] : []))).values()];
   const products = sale.items.filter((i) => i.kind === "product").map((i) => ({ id: i.id, description: i.description, quantity: i.quantity, returned: i.returnedQuantity }));
 
   return (
@@ -96,7 +99,7 @@ async function Sale({ params, searchParams }: Pick<PageProps<"/sales/[id]">, "pa
           )}
           {manager && sale.status !== "voided" && sale.status !== "refunded" && (
             <Card title="Refund" titleId="refund-heading">
-              <RefundForm saleId={sale.id} refundableCents={paid - sale.refundedCents} products={products} />
+              <RefundForm saleId={sale.id} refundableCents={paid - sale.refundedCents} products={products} giftCards={giftCards} />
             </Card>
           )}
           {manager && sale.status === "completed" && (

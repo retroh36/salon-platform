@@ -43,7 +43,7 @@ export function buildReport(data: PhorestData, plan: ImportPlan, issues: IssueLo
       products: plan.products.length,
       "gift cards": plan.giftCards.length,
     },
-    notSavedYet: ["appointments", "products", "gift cards"],
+    notSavedYet: ["appointments", "products"],
     issues: issues.list(),
     requests: { ...requests },
   };

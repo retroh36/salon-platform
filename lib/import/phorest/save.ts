@@ -9,8 +9,9 @@
 // already wrote rather than duplicating them.
 //
 // Saves what we have tables for: locations, staff, working hours, one-off
-// changes, time off, services, who offers them, and clients. Appointments,
-// products and gift cards wait for their tables (see model.ts).
+// changes, time off, services, who offers them, clients and gift cards
+// (Phorest vouchers, with their balances). Appointments and products wait
+// for their import (see model.ts).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../../database.types.ts";
@@ -18,7 +19,7 @@ import { IssueLog } from "./issues.ts";
 import type { ImportPlan } from "./model.ts";
 
 type Db = SupabaseClient<Database>;
-type Entity = "location" | "staff" | "service" | "client" | "time_off";
+type Entity = "location" | "staff" | "service" | "client" | "time_off" | "gift_card";
 
 export type SaveSummary = Record<string, { created: number; updated: number }>;
 
@@ -51,7 +52,7 @@ export async function savePhorestImport(
 
   // Phorest id -> our id, per entity, from earlier runs.
   const ids = new Map<Entity, Map<string, string>>();
-  for (const entity of ["location", "staff", "service", "client", "time_off"] as Entity[]) ids.set(entity, new Map());
+  for (const entity of ["location", "staff", "service", "client", "time_off", "gift_card"] as Entity[]) ids.set(entity, new Map());
   for (let from = 0; ; from += 1000) {
     const { data } = check(
       await db
@@ -221,6 +222,30 @@ export async function savePhorestImport(
   // In a batch, columns some rows leave out would otherwise be sent as null;
   // defaultToNull: false gives them the column default (e.g. created_at).
   for (const batch of chunks(clientRows)) check(await db.from("clients").upsert(batch, { defaultToNull: false }), "clients");
+  await saveMappings();
+
+  // Gift cards: once, with the balance left on them. Cards from an earlier
+  // run are left alone: their balance has moved on here since.
+  for (const g of plan.giftCards) {
+    if (ids.get("gift_card")!.has(g.externalId)) {
+      summary.gift_card ??= { created: 0, updated: 0 };
+      continue;
+    }
+    const { data } = check(
+      await db.rpc("import_gift_card", {
+        p_business_id: businessId,
+        p_code: g.code ?? "",
+        p_initial_cents: g.original_cents,
+        p_balance_cents: g.remaining_cents,
+        p_issued_at: g.issued_at!,
+        p_expires_at: g.expires_at!,
+        p_client_id: g.clientExternalId ? (ids.get("client")!.get(g.clientExternalId) ?? null)! : null!,
+      }),
+      "gift cards",
+    );
+    count("gift_card", true);
+    remember("gift_card", g.externalId, data!);
+  }
   await saveMappings();
 
   return { summary, issues };

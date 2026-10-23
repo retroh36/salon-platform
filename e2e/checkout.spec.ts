@@ -93,7 +93,7 @@ test.describe("front desk", () => {
     // plus the tip: $135.60.
     await expect(form.getByTestId("checkout-total")).toHaveText("$135.60");
 
-    await form.getByRole("button", { name: "Card" }).click();
+    await form.getByRole("button", { name: "Card", exact: true }).click();
     await form.getByRole("group", { name: "Payment 1" }).getByLabel("Amount").fill("100");
     await form.getByRole("button", { name: "Cash" }).click();
     await expect(form.getByRole("group", { name: "Payment 2" }).getByLabel("Amount")).toHaveValue("35.60");
@@ -135,7 +135,7 @@ test.describe("front desk", () => {
       await form.getByLabel("Add a discount").check();
       await form.getByLabel("Percent", { exact: true }).fill("25");
       await form.getByLabel("Reason", { exact: true }).fill("Friend");
-      await form.getByRole("button", { name: "Card" }).click();
+      await form.getByRole("button", { name: "Card", exact: true }).click();
       await form.getByRole("button", { name: /^Complete sale/ }).click();
       await expect(form.getByRole("alert")).toHaveText("You can give up to 10% off. Ask a manager for more.");
       await form.getByLabel("Add a discount").uncheck();

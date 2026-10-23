@@ -6,14 +6,18 @@ import { recomputeForVisit } from "@/lib/insights/compute";
 import { getCurrentStaff } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
 import { canRefund, canTakePayments, loadCheckout, loadSale, receiptSalon, receiptText, type CheckoutData } from "@/lib/sales";
-import { formatDay } from "@/lib/schedule-format";
+import { formatDay, formatLongDay } from "@/lib/schedule-format";
+import { giftCardEmail, isCardCode, type GiftCardLookup } from "@/lib/gift-cards";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { PaymentMethod } from "@/lib/checkout";
 
 export type SaleLineInput =
   | { kind: "service"; appointmentItemId: string; unitPriceCents: number; priceReason: string }
-  | { kind: "product"; productId: string; quantity: number };
+  | { kind: "product"; productId: string; quantity: number }
+  // A physical card has its own code; a digital one gets one and is emailed.
+  | { kind: "gift_card"; amountCents: number; code: string | null; recipientName: string | null; recipientEmail: string | null }
+  | { kind: "gift_card_reload"; code: string; amountCents: number };
 
 export type SaleInput = {
   appointmentId: string | null;
@@ -21,7 +25,7 @@ export type SaleInput = {
   lines: SaleLineInput[];
   discount: { kind: "amount" | "percent"; value: number; reason: string } | null;
   tips: { staffId: string; amountCents: number }[];
-  payments: { method: PaymentMethod; amountCents: number; tenderedCents?: number; reference?: string }[];
+  payments: { method: PaymentMethod; amountCents: number; tenderedCents?: number; reference?: string; code?: string }[];
   receiptEmail: string | null;
 };
 
@@ -52,14 +56,21 @@ export async function completeSale(input: SaleInput): Promise<SaleResult> {
     p_input: {
       appointment_id: input.appointmentId,
       client_id: input.clientId,
-      lines: input.lines.map((l) =>
-        l.kind === "service"
-          ? { kind: "service", appointment_item_id: l.appointmentItemId, unit_price_cents: l.unitPriceCents, price_reason: l.priceReason }
-          : { kind: "product", product_id: l.productId, quantity: l.quantity },
-      ),
+      lines: input.lines.map((l) => {
+        switch (l.kind) {
+          case "service":
+            return { kind: "service", appointment_item_id: l.appointmentItemId, unit_price_cents: l.unitPriceCents, price_reason: l.priceReason };
+          case "product":
+            return { kind: "product", product_id: l.productId, quantity: l.quantity };
+          case "gift_card":
+            return { kind: "gift_card", amount_cents: l.amountCents, code: l.code, recipient_name: l.recipientName, recipient_email: l.recipientEmail };
+          case "gift_card_reload":
+            return { kind: "gift_card_reload", code: l.code, amount_cents: l.amountCents };
+        }
+      }),
       discount: input.discount,
       tips: input.tips.map((t) => ({ staff_id: t.staffId, amount_cents: t.amountCents })),
-      payments: input.payments.map((p) => ({ method: p.method, amount_cents: p.amountCents, tendered_cents: p.tenderedCents ?? null, reference: p.reference ?? null })),
+      payments: input.payments.map((p) => ({ method: p.method, amount_cents: p.amountCents, tendered_cents: p.tenderedCents ?? null, reference: p.reference ?? null, code: p.code ?? null })),
       receipt_email: input.receiptEmail,
     },
   });
@@ -68,6 +79,9 @@ export async function completeSale(input: SaleInput): Promise<SaleResult> {
   // What Denise learns from the visit, as after any checkout.
   if (input.appointmentId) after(() => recomputeForVisit(createAdminClient(), input.appointmentId!));
   if (input.receiptEmail) await emailReceipt(data, input.receiptEmail);
+  // Digital gift cards go out by email.
+  const { data: cards } = await supabase.from("gift_cards").select("id, recipient_email").eq("sale_id", data).not("recipient_email", "is", null);
+  for (const card of cards ?? []) await sendGiftCard(card.id, card.recipient_email!);
   return { ok: true, saleId: data };
 }
 
@@ -85,7 +99,7 @@ export async function voidSale(saleId: string, reason: string): Promise<SimpleRe
 
 export async function refundSale(
   saleId: string,
-  input: { reason: string; payments: { method: "cash" | "card"; amountCents: number; reference?: string }[]; returns: { saleItemId: string; quantity: number }[]; restock: boolean },
+  input: { reason: string; payments: { method: "cash" | "card" | "gift_card"; amountCents: number; reference?: string; code?: string }[]; returns: { saleItemId: string; quantity: number }[]; restock: boolean },
 ): Promise<SimpleResult> {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me || !canRefund(me.role)) return { ok: false, message: "Only managers and owners can refund." };
@@ -94,7 +108,7 @@ export async function refundSale(
     p_sale_id: saleId,
     p_input: {
       reason: input.reason,
-      payments: input.payments.map((p) => ({ method: p.method, amount_cents: p.amountCents, reference: p.reference ?? null })),
+      payments: input.payments.map((p) => ({ method: p.method, amount_cents: p.amountCents, reference: p.reference ?? null, code: p.code ?? null })),
       returns: input.returns.map((r) => ({ sale_item_id: r.saleItemId, quantity: r.quantity })),
       restock: input.restock,
     },
@@ -130,4 +144,45 @@ export async function checkoutFor(appointmentId: string): Promise<CheckoutData |
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me || !canTakePayments(me.role) || !isUuid(appointmentId)) return null;
   return loadCheckout(supabase, me, appointmentId);
+}
+
+export type LookupResult = { ok: true; card: GiftCardLookup } | { ok: false; message: string };
+
+// A gift card's balance by its code (logged, and limited per person).
+export async function lookupGiftCard(code: string): Promise<LookupResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canTakePayments(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isCardCode(code)) return { ok: false, message: "Enter the card's code (8 or more letters and numbers)." };
+  const { data, error } = await supabase.rpc("lookup_gift_card", { p_code: code });
+  if (error?.code === "54000") return { ok: false, message: error.message };
+  if (error) return { ok: false, message: messageFor(error, "That didn't work. Try again.") };
+  if (!data) return { ok: false, message: "No gift card has that code." };
+  return { ok: true, card: data as unknown as GiftCardLookup };
+}
+
+// A digital gift card by email, through the outbox.
+export async function sendGiftCard(cardId: string, email: string): Promise<SimpleResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canTakePayments(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(cardId)) return { ok: false, message: "That gift card doesn't exist." };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return { ok: false, message: "Enter a valid email." };
+  const { data: card } = await supabase.from("gift_cards").select("code, initial_cents, recipient_name, expires_at, status").eq("id", cardId).maybeSingle();
+  if (!card || card.status === "voided") return { ok: false, message: "That gift card can't be sent." };
+  const [salon, { data: site }] = await Promise.all([
+    receiptSalon(me.business_id, me.location.id),
+    createAdminClient().from("businesses").select("slug").eq("id", me.business_id).single(),
+  ]);
+  const base = process.env.NEXT_PUBLIC_SITE_URL;
+  const email_ = giftCardEmail({
+    code: card.code,
+    amountCents: card.initial_cents,
+    recipientName: card.recipient_name,
+    expiresOn: card.expires_at ? formatLongDay(toLocal(new Date(card.expires_at), me.location.timezone).date) : null,
+    salon: { name: salon.name, locationName: salon.locationName, accentColor: salon.accentColor, bookingUrl: base && site?.slug ? `${base}/book/${site.slug}` : null },
+  });
+  const { error } = await createAdminClient()
+    .from("outbox_messages")
+    .insert({ business_id: me.business_id, channel: "email", to_address: email.trim(), subject: email_.subject, body: email_.text, html: email_.html });
+  if (error) throw error;
+  return { ok: true, message: `Gift card sent to ${email.trim()}.` };
 }

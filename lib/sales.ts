@@ -16,6 +16,7 @@ export type CheckoutSettings = {
   taxRetailBp: number;
   discountRoles: StaffRole[];
   discountMaxPercent: number;
+  giftCardPresetsCents: number[];
 };
 
 export type CheckoutProduct = { id: string; name: string; priceCents: number; onHand: number; sku: string | null; barcode: string | null };
@@ -42,11 +43,17 @@ export function canRefund(role: StaffRole): boolean {
 export async function loadCheckoutSettings(supabase: Supabase, businessId: string): Promise<CheckoutSettings> {
   const { data, error } = await supabase
     .from("businesses")
-    .select("tax_rate_services_bp, tax_rate_retail_bp, discount_roles, discount_max_percent")
+    .select("tax_rate_services_bp, tax_rate_retail_bp, discount_roles, discount_max_percent, gift_card_presets_cents")
     .eq("id", businessId)
     .single();
   if (error) throw error;
-  return { taxServicesBp: data.tax_rate_services_bp, taxRetailBp: data.tax_rate_retail_bp, discountRoles: data.discount_roles, discountMaxPercent: data.discount_max_percent };
+  return {
+    taxServicesBp: data.tax_rate_services_bp,
+    taxRetailBp: data.tax_rate_retail_bp,
+    discountRoles: data.discount_roles,
+    discountMaxPercent: data.discount_max_percent,
+    giftCardPresetsCents: data.gift_card_presets_cents,
+  };
 }
 
 export async function loadRetailProducts(supabase: Supabase, businessId: string, locationId: string): Promise<CheckoutProduct[]> {

@@ -41,7 +41,9 @@ export function mapProduct(p: PhorestProduct, locationExternalId: string, log: I
   };
 }
 
-export function mapVoucher(v: PhorestVoucher, clientIds: Set<string>, log: IssueLog): GiftCardRecord | null {
+// Vouchers become purchased gift cards with their remaining balance.
+// `codes` collects the codes used so far, to spot two vouchers with one.
+export function mapVoucher(v: PhorestVoucher, clientIds: Set<string>, log: IssueLog, codes: Set<string> = new Set(), now = new Date()): GiftCardRecord | null {
   const externalId = text(v.voucherId);
   const serial = text(v.serialNumber);
   if (!externalId || !serial) {
@@ -59,12 +61,23 @@ export function mapVoucher(v: PhorestVoucher, clientIds: Set<string>, log: Issue
   const clientId = text(v.clientId);
   if (clientId && !clientIds.has(clientId)) log.add("gift_card", "clientId", "dropped", "client not imported");
 
+  let code: string | null = serial.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  if (code.length < 8 || code.length > 32) {
+    log.add("gift_card", "serialNumber", "review", "not usable as a code; the card gets a new code");
+    code = null;
+  } else if (codes.has(code)) {
+    log.add("gift_card", "serialNumber", "review", "another voucher has the same code; the card gets a new code");
+    code = null;
+  } else codes.add(code);
+  const expires = isoDateTime(v.expiryDate);
+  if (expires && remaining > 0 && new Date(expires) <= now) log.add("gift_card", "expiryDate", "review", "expired with a balance left");
+
   return {
     externalId,
-    serial,
+    code,
     clientExternalId: clientId && clientIds.has(clientId) ? clientId : null,
     issued_at: isoDateTime(v.issueDate),
-    expires_at: isoDateTime(v.expiryDate),
+    expires_at: expires,
     original_cents: original,
     remaining_cents: remaining,
   };
