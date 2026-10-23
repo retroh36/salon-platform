@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { admin, SEED } from "../tests/db/helpers";
+import { onCheckout } from "./checkout-helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
@@ -109,12 +110,10 @@ test.describe("front desk", () => {
     await expect(ui(page).getByTestId("on-hand")).toHaveText("5 units");
     // A sale at the front desk, with this product already on it.
     await ui(page).getByRole("link", { name: "Sell this product" }).click();
-    await waitForHydration(page, "form[aria-label=Checkout] input");
-    const checkout = ui(page).getByRole("form", { name: "Checkout" });
-    await checkout.getByLabel(/^How many/).fill("2");
-    await checkout.getByRole("button", { name: "Cash" }).click();
-    await checkout.getByRole("button", { name: /^Complete sale/ }).click();
-    await expect(ui(page).getByTestId("checkout-done")).toBeVisible();
+    const checkout = await onCheckout(page);
+    await (await checkout.edit("Sale Shampoo")).getByRole("button", { name: "One more" }).click();
+    await checkout.cash();
+    await checkout.complete();
     await page.goto(`/inventory/${id}`);
     await expect(ui(page).getByTestId("on-hand")).toHaveText("3 units");
     await expect(ui(page).getByRole("list", { name: "Stock history" }).getByRole("listitem").first()).toContainText("Sale");

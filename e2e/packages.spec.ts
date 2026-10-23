@@ -1,6 +1,7 @@
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
+import { onCheckout, openCheckout } from "./checkout-helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
@@ -49,16 +50,15 @@ test.describe.serial("a package from start to finish", () => {
 
   test("the front desk sells it, booking points it out, and checkout uses it", async ({ browser }) => {
     const page = await browser.newPage({ storageState: AUTH.frontDesk, viewport: { width: 1920, height: 1500 } });
-    await page.goto("/sales/new");
-    await waitForHydration(page, "form[aria-label=Checkout] input");
-    let form = ui(page).getByRole("form", { name: "Checkout" });
-    await form.getByLabel("Find a client").fill(`${PREFIX}ava`);
-    await form.getByRole("list", { name: "Matching clients" }).getByRole("button").first().click();
-    await form.getByRole("button", { name: "Sell a package" }).click();
-    await form.getByLabel("Package 1", { exact: true }).selectOption({ label: `${NAME} · $160` });
-    await form.getByRole("button", { name: "Card", exact: true }).click();
-    await form.getByRole("button", { name: /^Complete sale/ }).click();
-    await expect(ui(page).getByTestId("checkout-done")).toBeVisible();
+    let co = await openCheckout(page, { from: "/sales" });
+    await co.ticket.getByLabel("Find a client").fill(`${PREFIX}ava`);
+    await co.ticket.getByRole("list", { name: "Matching clients" }).getByRole("button").first().click();
+    await expect(co.ticket.getByTestId("checkout-client")).toHaveText(new RegExp(`^${PREFIX}Ava`));
+    await co.ticket.getByRole("button", { name: "Package", exact: true }).click();
+    await co.dialog.getByRole("button", { name: new RegExp(`^${NAME}`) }).click();
+    await expect(co.total).toHaveText("$160");
+    await co.card();
+    await co.complete();
 
     // A blowout with Bridget: the booking form mentions the package.
     await page.goto(`/calendar?date=${DAY}`);
@@ -79,12 +79,11 @@ test.describe.serial("a package from start to finish", () => {
     const details = page.getByRole("tabpanel", { name: "Booking details" });
     await details.getByRole("button", { name: "Check in client" }).click();
     await details.getByRole("button", { name: "Check out client" }).click();
-    form = page.getByRole("form", { name: "Checkout" });
-    await waitForHydration(page, "form[aria-label=Checkout] input");
-    await expect(form.getByLabel(/^Use .*'s package \(4 Blowouts left\)$/)).toBeChecked();
-    await expect(form.getByTestId("checkout-due")).toHaveText("Paid in full");
-    await form.getByRole("button", { name: "Complete sale · $0" }).click();
-    await expect(page.getByTestId("checkout-done")).toBeVisible();
+    co = await onCheckout(page);
+    await expect(co.lines.first()).toContainText("paid with package");
+    await expect(co.remaining).toHaveText("Paid in full");
+    await co.payment.getByRole("button", { name: "Complete sale · $0" }).click();
+    await expect(page.getByTestId("checkout-success")).toBeVisible();
 
     const { data: items } = await admin.from("client_package_items").select("used, total, client_package:client_packages!inner(client_id)").eq("client_package.client_id", clientId);
     expect(items!.map((i) => [i.used, i.total])).toEqual([[1, 4]]);

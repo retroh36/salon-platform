@@ -34,8 +34,14 @@ beforeAll(async () => {
   clientId = c!.id;
   const { data: s } = await admin.from("services").select("id, price_cents").eq("business_id", B).eq("name", "Women's Cut & Style").single();
   cut = { id: s!.id, price: s!.price_cents };
-  const { data: p } = await admin.from("products").select("id, price_cents").eq("business_id", B).eq("type", "retail").eq("is_active", true).order("sku").limit(1).single();
+  // A product of our own, well stocked (selling out of stock needs a manager).
+  const { data: p } = await admin
+    .from("products")
+    .insert({ business_id: B, brand: PREFIX, name: "Shampoo", sku: `${PREFIX}-SH`, type: "retail", unit: "unit", size: 1, cost_cents: 1000, price_cents: 2800 })
+    .select("id, price_cents")
+    .single();
   product = { id: p!.id, price: p!.price_cents! };
+  await admin.from("stock_levels").insert({ business_id: B, location_id: L, product_id: product.id, on_hand: 50 });
   // Tax: services untaxed, retail 10.25%; discounts for the front desk up to 10%.
   await admin.from("businesses").update({ tax_rate_services_bp: 0, tax_rate_retail_bp: 1025, discount_max_percent: 10, discount_roles: ["owner", "manager", "front_desk"] }).eq("id", B);
 });
@@ -44,6 +50,10 @@ afterAll(async () => {
   for (const id of sales) await admin.from("sales").delete().eq("id", id);
   await admin.from("appointments").delete().eq("client_id", clientId);
   await admin.from("clients").delete().eq("id", clientId);
+  await admin.from("sale_items").delete().eq("product_id", product.id);
+  await admin.from("stock_movements").delete().eq("product_id", product.id);
+  await admin.from("stock_levels").delete().eq("product_id", product.id);
+  await admin.from("products").delete().eq("id", product.id);
   await admin.from("businesses").update({ discount_max_percent: 100 }).eq("id", B);
   await other.cleanup();
 });

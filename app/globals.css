@@ -109,6 +109,7 @@
   --animate-step-in: step-in 250ms var(--ease-out) both;
   --animate-skeleton: skeleton 1.2s ease-in-out infinite alternate;
   --animate-grow-up: grow-up 400ms var(--ease-out) both;
+  --animate-ticket-in: ticket-in 900ms var(--ease-out) both;
 
   @keyframes panel-in {
     from {
@@ -149,6 +150,20 @@
     }
     to {
       opacity: 1;
+    }
+  }
+  /* A line arriving on the checkout ticket: it slides in, lit up, then
+     settles. */
+  @keyframes ticket-in {
+    0% {
+      opacity: 0;
+      transform: translateX(16px);
+      background-color: var(--color-navy-100);
+    }
+    35% {
+      opacity: 1;
+      transform: translateX(0);
+      background-color: var(--color-navy-100);
     }
   }
   /* The week's bars rising from the baseline. */

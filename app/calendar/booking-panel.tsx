@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
-import { Button, IconButton } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
-import { CloseIcon, PlusIcon } from "@/components/ui/icons";
+import { PlusIcon } from "@/components/ui/icons";
 import { MAX_NOTES, priceFor, visitSummary } from "@/lib/appointments";
 import { parseClientSearch } from "@/lib/clients";
 import { formatLongDay } from "@/lib/schedule-format";
@@ -232,9 +232,6 @@ export function BookingPanel({
               </p>
             )}
           </div>
-          <IconButton label="Close" onClick={onClose}>
-            <CloseIcon />
-          </IconButton>
         </div>
 
         {message && (

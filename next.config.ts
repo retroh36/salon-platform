@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   // (playwright.config.ts).
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
   cacheComponents: true,
+  // No Next.js badge in the corner in development: it covered the sidebar
+  // footer and the checkout's buttons.
+  devIndicators: false,
   experimental: {
     // Salon logos are uploaded through a server action (up to 2 MB).
     serverActions: { bodySizeLimit: "3mb" },

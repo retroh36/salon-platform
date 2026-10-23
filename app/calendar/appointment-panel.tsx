@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
-import { Button, buttonClass, IconButton } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { Eyebrow, fieldClass, labelClass, selectClass } from "@/components/ui/field";
-import { CalendarIcon, ClockIcon, CloseIcon, HourglassIcon } from "@/components/ui/icons";
+import { CalendarIcon, ClockIcon, HourglassIcon } from "@/components/ui/icons";
 import { StatusChip } from "@/components/ui/status-chip";
 import { ClientInsightCard } from "@/components/client-insight";
 import { ServiceTimer } from "@/components/service-timer";
@@ -89,13 +89,6 @@ export function AppointmentPanel({
 
   return (
     <div className="flex flex-col gap-5 py-2 text-sm">
-      <div className="flex items-center justify-between">
-        <h2 className="font-serif text-2xl font-semibold text-navy-900">Booking details</h2>
-        <IconButton label="Close booking details" onClick={onClose}>
-          <CloseIcon />
-        </IconButton>
-      </div>
-
       <div className="flex items-center gap-4">
         <Avatar name={client?.name ?? appointment.group?.label ?? "Walk in"} size="lg" />
         <div className="min-w-0">

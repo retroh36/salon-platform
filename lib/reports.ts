@@ -71,3 +71,23 @@ export function closeout(payments: readonly PaymentRow[]) {
   });
   return { byMethod, expectedCashCents: byMethod.find((m) => m.method === "cash")!.netCents, netCents: byMethod.reduce((n, m) => n + m.netCents, 0) };
 }
+
+export type RebookRow = { staff_id: string | null; rebooked: boolean };
+
+// Rebooked before leaving, per stylist: of the visits they checked out (the
+// visit's main stylist), how many left with their next one booked.
+export function rebookingAtCheckout(rows: readonly RebookRow[]) {
+  const by = new Map<string, { visits: number; rebooked: number }>();
+  for (const r of rows) {
+    if (!r.staff_id) continue;
+    const s = by.get(r.staff_id) ?? { visits: 0, rebooked: 0 };
+    s.visits += 1;
+    if (r.rebooked) s.rebooked += 1;
+    by.set(r.staff_id, s);
+  }
+  const rate = (n: number, d: number) => (d ? Math.round((n / d) * 100) : 0);
+  const stylists = [...by.entries()].map(([staffId, s]) => ({ staffId, ...s, percent: rate(s.rebooked, s.visits) })).sort((a, b) => b.percent - a.percent || b.visits - a.visits);
+  const visits = stylists.reduce((n, s) => n + s.visits, 0);
+  const rebooked = stylists.reduce((n, s) => n + s.rebooked, 0);
+  return { visits, rebooked, percent: rate(rebooked, visits), stylists };
+}

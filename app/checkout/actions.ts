@@ -1,0 +1,151 @@
+"use server";
+
+import { createClient } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { sendGiftCard } from "@/app/sales/actions";
+import { getCurrentStaff } from "@/lib/auth";
+import { isUuid } from "@/lib/ids";
+import { recomputeForVisit } from "@/lib/insights/compute";
+import { fitsOn } from "@/lib/rebook";
+import { canTakePayments } from "@/lib/sales";
+import { formatDay } from "@/lib/schedule-format";
+import { saveBooking } from "@/lib/scheduling/book";
+import { loadBookingContext } from "@/lib/scheduling/load";
+import { formatMinute, fromLocal, isLocalDate, todayIn } from "@/lib/scheduling/time";
+import { chainLines } from "@/lib/scheduling/waitlist";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { saleInput, type Ticket } from "@/lib/ticket";
+import { startCheckout } from "@/lib/checkout-screen";
+
+export type Result<T = object> = ({ ok: true } & T) | { ok: false; message: string };
+
+const NOT_ALLOWED = "Only the front desk, managers and owners can take payments.";
+
+async function session() {
+  const { supabase, staff: me } = await getCurrentStaff();
+  return me && canTakePayments(me.role) ? { supabase, me } : null;
+}
+
+// Messages our database functions raise are written for staff.
+const message = (error: { code?: string; message: string }, fallback: string) =>
+  ["22023", "42501", "55000", "P0002", "54000"].includes(error.code ?? "") ? error.message : fallback;
+
+// Keeps the ticket as it's built, so nothing is lost on leaving.
+export async function saveTicket(draftId: string, ticket: Ticket): Promise<Result> {
+  const s = await session();
+  if (!s) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(draftId) || JSON.stringify(ticket).length > 100_000) return { ok: false, message: "That checkout doesn't exist." };
+  const { data, error } = await s.supabase.from("sale_drafts").update({ ticket: ticket as never }).eq("id", draftId).eq("status", "open").select("id");
+  if (error) throw error;
+  return data.length ? { ok: true } : { ok: false, message: "This checkout was already completed." };
+}
+
+// A checkout for a visit, or a new sale: its id, to open it.
+export async function openCheckout(input: { appointmentId?: string; productId?: string; returnTo?: string }): Promise<Result<{ id: string }>> {
+  const s = await session();
+  if (!s) return { ok: false, message: NOT_ALLOWED };
+  if ((input.appointmentId && !isUuid(input.appointmentId)) || (input.productId && !isUuid(input.productId))) return { ok: false, message: "That visit no longer exists." };
+  const id = await startCheckout(s.supabase, s.me, input);
+  return id ? { ok: true, id } : { ok: false, message: "This visit can't be checked out." };
+}
+
+export async function completeCheckout(draftId: string, ticket: Ticket): Promise<Result<{ saleId: string }>> {
+  const s = await session();
+  if (!s) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(draftId)) return { ok: false, message: "That checkout doesn't exist." };
+  const saved = await saveTicket(draftId, ticket);
+  if (!saved.ok) return saved;
+  const { data: draft } = await s.supabase.from("sale_drafts").select("appointment_id, client_id").eq("id", draftId).single();
+  const { data: saleId, error } = await s.supabase.rpc("complete_sale", {
+    p_location_id: s.me.location.id,
+    p_input: saleInput(ticket, { draftId, appointmentId: draft!.appointment_id, clientId: draft!.client_id }) as never,
+  });
+  if (error) return { ok: false, message: message(error, "That didn't go through. Try again.") };
+  revalidatePath("/calendar", "layout");
+  revalidatePath("/sales", "layout");
+  // What Denise learns from the visit, as after any checkout.
+  if (draft!.appointment_id) after(() => recomputeForVisit(createAdminClient(), draft!.appointment_id!));
+  // Digital gift cards go out by email.
+  const { data: cards } = await s.supabase.from("gift_cards").select("id, recipient_email").eq("sale_id", saleId).not("recipient_email", "is", null);
+  for (const card of cards ?? []) await sendGiftCard(card.id, card.recipient_email!);
+  return { ok: true, saleId };
+}
+
+// A manager OKs selling an out-of-stock product: they sign in here for a
+// moment (their password isn't kept or logged), and it's recorded as theirs.
+export async function approveOutOfStock(draftId: string, productId: string, email: string, password: string): Promise<Result> {
+  const s = await session();
+  if (!s) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(draftId) || !isUuid(productId)) return { ok: false, message: "That product isn't on this checkout." };
+  // The signed-in person may already be a manager.
+  if (s.me.role === "owner" || s.me.role === "manager") {
+    const { error } = await s.supabase.rpc("approve_stock_override", { p_draft_id: draftId, p_product_id: productId });
+    return error ? { ok: false, message: message(error, "That didn't work.") } : { ok: true };
+  }
+  const manager = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { error: signInError } = await manager.auth.signInWithPassword({ email: email.trim(), password });
+  if (signInError) return { ok: false, message: "That email and password don't match." };
+  const { error } = await manager.rpc("approve_stock_override", { p_draft_id: draftId, p_product_id: productId });
+  await manager.auth.signOut();
+  return error ? { ok: false, message: error.code === "42501" ? "Only a manager or owner can OK that." : "That didn't work." } : { ok: true };
+}
+
+type RebookChoice = { date: string; staffId: string; startMinute: number; serviceIds: string[] };
+
+// Free times for the client's next visit on a date, with that stylist.
+export async function rebookTimes(draftId: string, choice: { date: string; staffId: string; serviceIds: string[]; aroundMinute: number }): Promise<Result<{ starts: number[] }>> {
+  const s = await session();
+  if (!s) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(draftId) || !isLocalDate(choice.date) || !isUuid(choice.staffId) || choice.serviceIds.some((id) => !isUuid(id))) return { ok: false, message: "Choose a day." };
+  if (choice.date <= todayIn(s.me.location.timezone)) return { ok: false, message: "Choose a day after today." };
+  const ctx = await loadBookingContext(s.supabase, s.me.location, choice.date, choice.date);
+  const fits = fitsOn(ctx, choice.date, choice.staffId, choice.serviceIds, choice.aroundMinute);
+  return { ok: true, starts: fits.map((l) => l[0].startMinute).sort((a, b) => a - b) };
+}
+
+// Books the client's next visit (through the booking rules) and puts it on
+// the ticket.
+export async function bookRebook(draftId: string, ticket: Ticket, choice: RebookChoice): Promise<Result<{ ticket: Ticket }>> {
+  const s = await session();
+  if (!s) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(draftId) || !isLocalDate(choice.date) || !isUuid(choice.staffId) || choice.serviceIds.some((id) => !isUuid(id))) return { ok: false, message: "That time isn't available." };
+  const { data: draft } = await s.supabase.from("sale_drafts").select("client_id, status").eq("id", draftId).single();
+  if (!draft?.client_id || draft.status !== "open") return { ok: false, message: "There's no client to book." };
+  // The services back to back, by the stylist's own lengths (as suggested).
+  const ctx = await loadBookingContext(s.supabase, s.me.location, choice.date, choice.date);
+  const lines = chainLines(ctx, choice.serviceIds, choice.staffId, choice.startMinute);
+  if (!lines) return { ok: false, message: "That service isn't available." };
+  const items = lines.map((l) => ({ serviceId: l.serviceId, staffId: l.staffId, start: fromLocal(choice.date, l.startMinute, s.me.location.timezone)!, resource: { kind: "any" as const } }));
+  const result = await saveBooking(s.supabase, s.me.location, { clientId: draft.client_id, notes: "Rebooked at checkout", items });
+  if (!result.ok) return { ok: false, message: "That time was just taken. Pick another." };
+  const next: Ticket = { ...ticket, rebook: { appointmentId: result.appointmentId, label: `${formatDay(choice.date)} at ${formatMinute(choice.startMinute)}` } };
+  await saveTicket(draftId, next);
+  revalidatePath("/calendar", "layout");
+  return { ok: true, ticket: next };
+}
+
+// Takes the rebooked visit back off (canceled, with a reason).
+export async function undoRebook(draftId: string, ticket: Ticket): Promise<Result<{ ticket: Ticket }>> {
+  const s = await session();
+  if (!s || !ticket.rebook) return { ok: false, message: NOT_ALLOWED };
+  const { error } = await s.supabase.rpc("set_appointment_status", { p_appointment_id: ticket.rebook.appointmentId, p_status: "canceled", p_reason: "Rebooked at checkout, then changed" });
+  if (error) return { ok: false, message: "That booking couldn't be undone." };
+  const next: Ticket = { ...ticket, rebook: null };
+  await saveTicket(draftId, next);
+  revalidatePath("/calendar", "layout");
+  return { ok: true, ticket: next };
+}
+
+// The client on a sale without a visit (for a package, their gift cards
+// and their receipt), or none.
+export async function setSaleClient(draftId: string, clientId: string | null): Promise<Result> {
+  const s = await session();
+  if (!s) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(draftId) || (clientId !== null && !isUuid(clientId))) return { ok: false, message: "That client doesn't exist." };
+  const { data, error } = await s.supabase.from("sale_drafts").update({ client_id: clientId }).eq("id", draftId).eq("status", "open").is("appointment_id", null).select("id");
+  if (error) return { ok: false, message: "That client doesn't exist." };
+  if (!data.length) return { ok: false, message: "The client of a visit can't be changed here." };
+  revalidatePath(`/checkout/${draftId}`);
+  return { ok: true };
+}

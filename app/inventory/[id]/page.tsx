@@ -135,9 +135,9 @@ async function Product({ params }: Pick<PageProps<"/inventory/[id]">, "params">)
 
       {product.type === "retail" && canSellRetail(me.role) && (
         <Card title="Sell" titleId="sell-heading" description="A sale at the front desk takes it out of stock.">
-          <Link href={`/sales/new?product=${product.id}`} className={buttonClass("primary", "md")}>
+          <a href={`/checkout/new?product=${product.id}&from=/inventory/${product.id}`} className={buttonClass("primary", "md")}>
             Sell this product
-          </Link>
+          </a>
         </Card>
       )}
 

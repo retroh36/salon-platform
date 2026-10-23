@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closeout, giftCardActivity, giftCardLiability, unusedPackageValue } from "@/lib/reports";
+import { closeout, giftCardActivity, giftCardLiability, rebookingAtCheckout, unusedPackageValue } from "@/lib/reports";
 
 const NOW = new Date("2026-10-23T12:00:00Z");
 
@@ -64,5 +64,28 @@ describe("closing out the day", () => {
     expect(c.expectedCashCents).toBe(4500);
     expect(c.byMethod.find((m) => m.method === "cash")).toEqual({ method: "cash", takenCents: 6500, refundedCents: 2000, netCents: 4500 });
     expect(c.netCents).toBe(4500 + 12000 + 3000 + 4500);
+  });
+});
+
+describe("rebooked at checkout", () => {
+  it("is per stylist (the visit's main one): visits, rebooked and the rate, best first", () => {
+    const rows = [
+      { staff_id: "gil", rebooked: true },
+      { staff_id: "gil", rebooked: true },
+      { staff_id: "gil", rebooked: false },
+      { staff_id: "bridget", rebooked: true },
+      { staff_id: "bridget", rebooked: false },
+      { staff_id: null, rebooked: true },
+    ];
+    expect(rebookingAtCheckout(rows)).toEqual({
+      visits: 5,
+      rebooked: 3,
+      percent: 60,
+      stylists: [
+        { staffId: "gil", visits: 3, rebooked: 2, percent: 67 },
+        { staffId: "bridget", visits: 2, rebooked: 1, percent: 50 },
+      ],
+    });
+    expect(rebookingAtCheckout([])).toEqual({ visits: 0, rebooked: 0, percent: 0, stylists: [] });
   });
 });

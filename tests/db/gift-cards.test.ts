@@ -17,8 +17,14 @@ const cards: string[] = [];
 
 beforeAll(async () => {
   [frontDesk, manager, stylist] = await Promise.all([signIn("frontdesk@mapleandash.test"), signIn("manager@mapleandash.test"), signIn("bridget@mapleandash.test")]);
-  const { data: p } = await admin.from("products").select("id, price_cents").eq("business_id", B).eq("type", "retail").eq("is_active", true).order("sku").limit(1).single();
+  // A product of our own, well stocked (selling out of stock needs a manager).
+  const { data: p } = await admin
+    .from("products")
+    .insert({ business_id: B, brand: PREFIX, name: "Mask", sku: `${PREFIX}-MK`, type: "retail", unit: "unit", size: 1, cost_cents: 1000, price_cents: 3200 })
+    .select("id, price_cents")
+    .single();
   product = { id: p!.id, price: p!.price_cents! };
+  await admin.from("stock_levels").insert({ business_id: B, location_id: L, product_id: product.id, on_hand: 50 });
   await admin.from("businesses").update({ tax_rate_retail_bp: 0, gift_card_expiry_months: null }).eq("id", B);
 });
 
@@ -27,6 +33,10 @@ afterAll(async () => {
   await admin.from("gift_cards").delete().in("id", cards);
   await admin.from("gift_cards").delete().like("note", `${PREFIX}%`);
   await admin.from("gift_card_lookups").delete().eq("business_id", B);
+  await admin.from("sale_items").delete().eq("product_id", product.id);
+  await admin.from("stock_movements").delete().eq("product_id", product.id);
+  await admin.from("stock_levels").delete().eq("product_id", product.id);
+  await admin.from("products").delete().eq("id", product.id);
   await admin.from("businesses").update({ tax_rate_retail_bp: 1025, gift_card_expiry_months: null }).eq("id", B);
 });
 

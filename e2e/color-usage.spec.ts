@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import { fromLocal, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
+import { onCheckout } from "./checkout-helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
@@ -93,10 +94,9 @@ test.describe("formulas and stock", () => {
     const desk = await browser.newPage({ storageState: AUTH.frontDesk, viewport: { width: 1920, height: 1300 } });
     const deskPanel = await openVisit(desk);
     await deskPanel.getByRole("button", { name: "Check out client" }).click();
-    const checkout = desk.getByRole("form", { name: "Checkout" });
-    await checkout.getByRole("button", { name: "Card", exact: true }).click();
-    await checkout.getByRole("button", { name: /^Complete sale/ }).click();
-    await expect(desk.getByTestId("checkout-done")).toBeVisible();
+    const checkout = await onCheckout(desk);
+    await checkout.card();
+    await checkout.complete();
     await expect.poll(() => onHand("GW-TC-7N")).toBeCloseTo(before.tc - 30, 2);
     await expect.poll(() => onHand("GW-TC-7N")).toBeCloseTo(before.tc - 30, 2);
     expect(await onHand("GW-DEV-20")).toBeCloseTo(before.dev - 30, 2);

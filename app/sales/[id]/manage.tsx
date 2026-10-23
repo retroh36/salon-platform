@@ -1,20 +1,50 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
 import { parseDollars } from "@/lib/checkout";
 import { formatPrice } from "@/lib/services";
-import { refundSale, voidSale, type SimpleResult } from "../actions";
-import { ReceiptActions } from "../checkout-form";
+import { emailReceipt, refundSale, voidSale, type SimpleResult } from "../actions";
 
 export function PrintOnOpen() {
   useEffect(() => {
     window.print();
   }, []);
   return null;
+}
+
+export function ReceiptActions({ saleId, email, onSent }: { saleId: string; email: string; onSent: (message: string) => void }) {
+  const [to, setTo] = useState(email);
+  const [pending, startTransition] = useTransition();
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
+        <Link href={`/sales/${saleId}?print=1`} target="_blank" className={buttonClass("secondary", "sm")}>
+          Print receipt
+        </Link>
+      </div>
+      <form
+        aria-label="Email receipt"
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          startTransition(async () => {
+            const r = await emailReceipt(saleId, to);
+            onSent(r.message);
+          });
+        }}
+      >
+        <input type="email" value={to} onChange={(e) => setTo(e.target.value)} aria-label="Email address" placeholder="client@example.com" className={`${fieldClass} min-w-0 flex-1`} required />
+        <Button type="submit" size="sm" disabled={pending}>
+          Email receipt
+        </Button>
+      </form>
+    </div>
+  );
 }
 
 export function EmailReceipt({ saleId, email }: { saleId: string; email: string }) {

@@ -5,7 +5,7 @@ import { after } from "next/server";
 import { recomputeForVisit } from "@/lib/insights/compute";
 import { getCurrentStaff } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
-import { canRefund, canTakePayments, loadCheckout, loadSale, receiptSalon, receiptText, type CheckoutData } from "@/lib/sales";
+import { canRefund, canTakePayments, loadSale, receiptSalon, receiptText } from "@/lib/sales";
 import { formatDay, formatLongDay } from "@/lib/schedule-format";
 import { giftCardEmail, isCardCode, type GiftCardLookup } from "@/lib/gift-cards";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
@@ -141,13 +141,6 @@ export async function emailReceipt(saleId: string, email: string): Promise<Simpl
     .insert({ business_id: me.business_id, channel: "email", to_address: email.trim(), subject: receipt.subject, body: receipt.text, html: receipt.html });
   if (outboxError) throw outboxError;
   return { ok: true, message: `Receipt sent to ${email.trim()}.` };
-}
-
-// What the checkout panel needs for a visit.
-export async function checkoutFor(appointmentId: string): Promise<CheckoutData | null> {
-  const { supabase, staff: me } = await getCurrentStaff();
-  if (!me || !canTakePayments(me.role) || !isUuid(appointmentId)) return null;
-  return loadCheckout(supabase, me, appointmentId);
 }
 
 export type LookupResult = { ok: true; card: GiftCardLookup } | { ok: false; message: string };

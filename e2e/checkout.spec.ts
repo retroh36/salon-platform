@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
+import { onCheckout, openCheckout } from "./checkout-helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
@@ -57,15 +58,15 @@ async function visit(first: string) {
   return { clientId: c!.id, appointmentId: a!.id };
 }
 
-async function openCheckout(page: Page, first: string) {
+// From the visit's "Check out client" on the calendar to the full-screen
+// checkout.
+async function fromCalendar(page: Page, first: string) {
   await page.goto(`/calendar?date=${DAY}`);
   await expect(ui(page).getByTestId("calendar-date")).toContainText(formatLongDay(DAY));
   await waitForHydration(page, "section[data-staff-id]");
   await ui(page).getByRole("button", { name: new RegExp(`${PREFIX}${first} Test`) }).click();
   await page.getByRole("tabpanel", { name: "Booking details" }).getByRole("button", { name: "Check out client" }).click();
-  const form = page.getByRole("form", { name: "Checkout" });
-  await waitForHydration(page, "form[aria-label=Checkout] input");
-  return form;
+  return onCheckout(page);
 }
 
 const onHand = async () => Number((await admin.from("stock_levels").select("on_hand").eq("product_id", productId).single()).data!.on_hand);
@@ -75,38 +76,41 @@ test.describe("front desk", () => {
 
   test("checks out a visit: a changed price, retail, a discount, a tip, and card plus cash with change", async ({ page }) => {
     const { appointmentId } = await visit("Ava");
-    const form = await openCheckout(page, "Ava");
+    const co = await fromCalendar(page, "Ava");
 
     // $100 cut at $90, with a reason.
-    await form.getByLabel("Price for Women's Cut & Style").fill("90");
-    await form.getByLabel(/^Why the price changed/).fill("Shorter visit");
+    let line = await co.edit("Women's Cut & Style");
+    await line.getByLabel("Price ($)").fill("90");
+    await line.getByLabel(/^Why the price changed/).fill("Shorter visit");
     // Two shine sprays, found by name.
-    await form.getByLabel(/^Add a product/).fill("shine");
-    await form.getByRole("list", { name: "Matching products" }).getByRole("button").first().click();
-    await form.getByLabel(/^How many/).fill("2");
-    // 10% off with a reason, and a $15 tip for Bridget.
-    await form.getByLabel("Add a discount").check();
-    await form.getByLabel("Percent", { exact: true }).fill("10");
-    await form.getByLabel("Reason", { exact: true }).fill("First visit");
-    await form.getByLabel("Tip for Bridget").fill("15");
+    await co.addProduct("shine");
+    line = await co.edit("Shine Spray");
+    await line.getByRole("button", { name: "One more" }).click();
+    await expect(line.getByTestId("line-quantity")).toHaveText("2");
+    // 10% off the sale with a reason, and a $15 tip for Bridget.
+    await co.ticket.getByRole("button", { name: "Discount the whole sale" }).click();
+    await co.dialog.getByLabel("Percent off").fill("10");
+    await co.dialog.getByLabel("Reason").fill("First visit");
+    await co.dialog.getByRole("button", { name: "Apply discount" }).click();
+    const tip = co.payment.getByRole("group", { name: "Tip for Bridget" });
+    await tip.getByRole("button", { name: "Custom" }).click();
+    await tip.getByLabel("Custom tip for Bridget ($)").fill("15");
     // $90 + $40 = $130; 10% off = $117 ($81 + $36); tax 10% of $36 = $3.60;
     // plus the tip: $135.60.
-    await expect(form.getByTestId("checkout-total")).toHaveText("$135.60");
+    await expect(co.total).toHaveText("$135.60");
 
-    await form.getByRole("button", { name: "Card", exact: true }).click();
-    await form.getByRole("group", { name: "Payment 1" }).getByLabel("Amount").fill("100");
-    await form.getByRole("button", { name: "Cash" }).click();
-    await expect(form.getByRole("group", { name: "Payment 2" }).getByLabel("Amount")).toHaveValue("35.60");
-    await form.getByLabel("Cash handed over").fill("40");
-    await expect(form.getByTestId("checkout-due")).toHaveText("Paid in full · change $4.40");
-    await form.getByRole("button", { name: /^Complete sale/ }).click();
+    await co.card("100");
+    await expect(co.remaining).toHaveText("$35.60 remaining to pay");
+    await co.cash(40);
+    await expect(co.remaining).toHaveText("Paid in fullChange to give: $4.40");
+    const done = await co.complete();
+    await expect(done).toContainText("$135.60");
+    await expect(done.getByTestId("success-change")).toHaveText("Change to give: $4.40");
 
-    const done = page.getByTestId("checkout-done");
-    await expect(done).toContainText("Paid $135.60");
-    await expect(done.getByTestId("change-due")).toHaveText("Change to give: $4.40");
     // Email the receipt (to the dev outbox).
+    await done.getByRole("button", { name: "Email" }).click();
     await done.getByLabel("Email address").fill("ava@example.com");
-    await done.getByRole("button", { name: "Email receipt" }).click();
+    await done.getByRole("button", { name: "Send" }).click();
     await expect(done.getByRole("status")).toHaveText("Receipt sent to ava@example.com.");
     const { data: sent } = await admin.from("outbox_messages").select("subject, body, html").eq("to_address", "ava@example.com").order("created_at", { ascending: false }).limit(1).single();
     expect(sent!.subject).toBe("Your receipt from Maple & Ash Hair Studio");
@@ -117,7 +121,7 @@ test.describe("front desk", () => {
     expect((await admin.from("appointments").select("status").eq("id", appointmentId).single()).data!.status).toBe("completed");
 
     // The sale's page: the receipt, and no refunds for the front desk.
-    await done.getByRole("link", { name: "View sale" }).click();
+    await done.getByRole("link", { name: "View the sale" }).click();
     const receipt = ui(page).getByTestId("receipt");
     await expect(receipt).toContainText("Booked at $100 · Shorter visit");
     await expect(receipt).toContainText("Discount (First visit)−$13");
@@ -130,35 +134,37 @@ test.describe("front desk", () => {
   test("can't pay short, and can't give more discount than allowed", async ({ page }) => {
     await admin.from("businesses").update({ discount_max_percent: 10 }).eq("id", B);
     try {
-      await visit("Bea");
-      const form = await openCheckout(page, "Bea");
-      await form.getByLabel("Add a discount").check();
-      await form.getByLabel("Percent", { exact: true }).fill("25");
-      await form.getByLabel("Reason", { exact: true }).fill("Friend");
-      await form.getByRole("button", { name: "Card", exact: true }).click();
-      await form.getByRole("button", { name: /^Complete sale/ }).click();
-      await expect(form.getByRole("alert")).toHaveText("You can give up to 10% off. Ask a manager for more.");
-      await form.getByLabel("Add a discount").uncheck();
-      await form.getByRole("group", { name: "Payment 1" }).getByLabel("Amount").fill("50");
-      await form.getByRole("button", { name: /^Complete sale/ }).click();
-      await expect(form.getByRole("alert")).toHaveText("$50 still to pay.");
+      const { appointmentId } = await visit("Bea");
+      const co = await openCheckout(page, { appointmentId });
+      await co.ticket.getByRole("button", { name: "Discount the whole sale" }).click();
+      await co.dialog.getByLabel("Percent off").fill("25");
+      await co.dialog.getByLabel("Reason").fill("Friend");
+      await co.dialog.getByRole("button", { name: "Apply discount" }).click();
+      await co.card();
+      await expect(co.payment.getByTestId("checkout-blocked")).toHaveText("You can give up to 10% off. Ask a manager for more.");
+      await expect(co.payment.getByRole("button", { name: /^Complete sale/ })).toBeDisabled();
+      // Without the discount, the card's $75 leaves $25 to pay, and the sale
+      // can't be completed.
+      await co.ticket.getByRole("button", { name: "Change discount" }).click();
+      await co.dialog.getByLabel("Percent off").fill("");
+      await co.dialog.getByRole("button", { name: "No discount" }).click();
+      await expect(co.payment.getByTestId("checkout-blocked")).toHaveText("$25 still to pay.");
+      await expect(co.payment.getByRole("button", { name: /^Complete sale/ })).toBeDisabled();
     } finally {
       await admin.from("businesses").update({ discount_max_percent: 100 }).eq("id", B);
     }
   });
 
   test("sells retail without a visit", async ({ page }) => {
-    await page.goto("/sales/new");
-    await waitForHydration(page, "form[aria-label=Checkout] input");
-    const form = ui(page).getByRole("form", { name: "Checkout" });
+    const co = await openCheckout(page, { from: "/sales" });
     // Scanning: the SKU and Enter.
-    await form.getByLabel(/^Add a product/).fill(`${PREFIX}-SS`);
-    await form.getByLabel(/^Add a product/).press("Enter");
-    await expect(form.getByTestId("checkout-total")).toHaveText("$22");
-    await form.getByRole("button", { name: "Cash" }).click();
-    await form.getByRole("button", { name: /^Complete sale/ }).click();
-    await expect(ui(page).getByTestId("checkout-done")).toContainText("Paid $22");
-    await page.goto("/sales");
+    await co.search(`${PREFIX}-SS`);
+    await co.ticket.getByLabel("Add a product: name, brand, SKU or scan").press("Enter");
+    await expect(co.total).toHaveText("$22");
+    await co.cash();
+    const done = await co.complete();
+    await expect(done).toContainText("$22");
+    await done.getByRole("link", { name: "Back to sales" }).click();
     await expect(ui(page).getByRole("list", { name: "Sales" }).getByRole("listitem").first()).toContainText("Walk-in sale");
   });
 });

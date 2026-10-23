@@ -2,6 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
+import { onCheckout } from "./checkout-helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
@@ -214,10 +215,11 @@ test.describe("front desk", () => {
     await expect(detail.getByRole("button", { name: "Mark no-show" })).toHaveCount(0);
     // Checking out takes payment first.
     await detail.getByRole("button", { name: "Check out client" }).click();
-    const checkout = page.getByRole("form", { name: "Checkout" });
-    await checkout.getByRole("button", { name: "Card", exact: true }).click();
-    await checkout.getByRole("button", { name: /^Complete sale/ }).click();
-    await page.getByTestId("checkout-done").getByRole("button", { name: "Done" }).click();
+    const checkout = await onCheckout(page);
+    await checkout.card();
+    const done = await checkout.complete();
+    await done.getByRole("link", { name: "Back to calendar" }).click();
+    await waitForHydration(page, "section[data-staff-id]");
     await column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Cara Test`) }).click();
     await expect(detail.locator("[data-status]")).toHaveText("Checked out");
     await expect(detail.getByRole("button", { name: "Edit booking" })).toHaveCount(0);
@@ -329,7 +331,7 @@ test.describe("stylists", () => {
     await column(page, "Sandra Whitfield").getByRole("button", { name: new RegExp(`${PREFIX}Kit Test`) }).click();
     await expect(panel(page).getByRole("region", { name: "Notes" })).toContainText("No notes.");
     await expect(panel(page).getByRole("button", { name: /Edit|Check in|Cancel/ })).toHaveCount(0);
-    await panel(page).getByRole("button", { name: "Close booking details" }).click();
+    await page.getByRole("button", { name: "Close panel" }).click();
 
     // Their own: notes only.
     const block = column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Jo Test`) });
@@ -340,7 +342,7 @@ test.describe("stylists", () => {
     await expect(notes.getByRole("status")).toHaveText("Notes saved.");
     await expect(panel(page).getByRole("button", { name: /Edit|Check in|Cancel/ })).toHaveCount(0);
     expect(await appointment(mine)).toMatchObject({ notes: "Wants a fringe", updated_by: BRIDGET });
-    await panel(page).getByRole("button", { name: "Close booking details" }).click();
+    await page.getByRole("button", { name: "Close panel" }).click();
 
     // Dragging does nothing.
     await drag(page, block, "Bridget Callahan", 60);

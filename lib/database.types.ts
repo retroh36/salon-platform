@@ -1179,6 +1179,56 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"sale_drafts": {
+                  Row: {
+                    "appointment_id": string | null,"business_id": string,"client_id": string | null,"created_at": string,"created_by": string | null,"id": string,"location_id": string,"return_to": string | null,"sale_id": string | null,"status": string,"ticket": NonNullable<Json>,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "appointment_id"?: string | null,"business_id": string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id": string,"return_to"?: string | null,"sale_id"?: string | null,"status"?: string,"ticket"?: NonNullable<Json>,"updated_at"?: string
+                  }
+                  Update: {
+                    "appointment_id"?: string | null,"business_id"?: string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id"?: string,"return_to"?: string | null,"sale_id"?: string | null,"status"?: string,"ticket"?: NonNullable<Json>,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "sale_drafts_appointment_id_fkey"
+      columns: ["appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sale_drafts_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sale_drafts_client_id_fkey"
+      columns: ["client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sale_drafts_created_by_business_id_fkey"
+      columns: ["created_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "sale_drafts_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "sale_drafts_sale_id_fkey"
+      columns: ["sale_id"]
+isOneToOne: false
+      referencedRelation: "sales"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"sale_events": {
                   Row: {
                     "amount_cents": number | null,"business_id": string,"created_at": string,"detail": string | null,"id": string,"kind": string,"sale_id": string,"staff_id": string | null
@@ -1207,14 +1257,14 @@ isOneToOne: false
                   ]
                 },"sale_items": {
                   Row: {
-                    "appointment_item_id": string | null,"booked_price_cents": number | null,"business_id": string,"client_package_id": string | null,"description": string,"discount_cents": number,"gift_card_id": string | null,"id": string,"kind": Database["public"]['Enums']["sale_item_kind"],"package_item_id": string | null,"position": number,"price_reason": string | null,"product_id": string | null,"quantity": number,"returned_quantity": number,"sale_id": string,"service_id": string | null,"staff_id": string | null,"tax_cents": number,"total_cents": number,"unit_price_cents": number
+                    "appointment_item_id": string | null,"booked_price_cents": number | null,"business_id": string,"client_package_id": string | null,"description": string,"discount_cents": number,"gift_card_id": string | null,"id": string,"kind": Database["public"]['Enums']["sale_item_kind"],"line_discount_cents": number,"line_discount_reason": string | null,"package_item_id": string | null,"position": number,"price_reason": string | null,"product_id": string | null,"quantity": number,"returned_quantity": number,"sale_id": string,"service_id": string | null,"staff_id": string | null,"tax_cents": number,"total_cents": number,"unit_price_cents": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id": string,"client_package_id"?: string | null,"description": string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["sale_item_kind"],"package_item_id"?: string | null,"position": number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id": string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents": number,"unit_price_cents": number
+                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id": string,"client_package_id"?: string | null,"description": string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["sale_item_kind"],"line_discount_cents"?: number,"line_discount_reason"?: string | null,"package_item_id"?: string | null,"position": number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id": string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents": number,"unit_price_cents": number
                   }
                   Update: {
-                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id"?: string,"client_package_id"?: string | null,"description"?: string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["sale_item_kind"],"package_item_id"?: string | null,"position"?: number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id"?: string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents"?: number,"unit_price_cents"?: number
+                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id"?: string,"client_package_id"?: string | null,"description"?: string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["sale_item_kind"],"line_discount_cents"?: number,"line_discount_reason"?: string | null,"package_item_id"?: string | null,"position"?: number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id"?: string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents"?: number,"unit_price_cents"?: number
                   }
                   Relationships: [
                     {
@@ -1295,14 +1345,14 @@ isOneToOne: false
                   ]
                 },"sales": {
                   Row: {
-                    "appointment_id": string | null,"business_id": string,"client_id": string | null,"created_at": string,"created_by": string | null,"discount_cents": number,"discount_reason": string | null,"id": string,"location_id": string,"note": string | null,"number": number,"receipt_email": string | null,"refunded_cents": number,"status": Database["public"]['Enums']["sale_status"],"subtotal_cents": number,"tax_cents": number,"tip_cents": number,"total_cents": number,"void_reason": string | null,"voided_at": string | null,"voided_by": string | null
+                    "appointment_id": string | null,"business_id": string,"client_id": string | null,"created_at": string,"created_by": string | null,"discount_cents": number,"discount_reason": string | null,"draft_id": string | null,"id": string,"location_id": string,"note": string | null,"number": number,"rebook_appointment_id": string | null,"receipt_email": string | null,"refunded_cents": number,"status": Database["public"]['Enums']["sale_status"],"subtotal_cents": number,"tax_cents": number,"tip_cents": number,"total_cents": number,"void_reason": string | null,"voided_at": string | null,"voided_by": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_id"?: string | null,"business_id": string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"discount_cents"?: number,"discount_reason"?: string | null,"id"?: string,"location_id": string,"note"?: string | null,"number": number,"receipt_email"?: string | null,"refunded_cents"?: number,"status"?: Database["public"]['Enums']["sale_status"],"subtotal_cents": number,"tax_cents"?: number,"tip_cents"?: number,"total_cents": number,"void_reason"?: string | null,"voided_at"?: string | null,"voided_by"?: string | null
+                    "appointment_id"?: string | null,"business_id": string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"discount_cents"?: number,"discount_reason"?: string | null,"draft_id"?: string | null,"id"?: string,"location_id": string,"note"?: string | null,"number": number,"rebook_appointment_id"?: string | null,"receipt_email"?: string | null,"refunded_cents"?: number,"status"?: Database["public"]['Enums']["sale_status"],"subtotal_cents": number,"tax_cents"?: number,"tip_cents"?: number,"total_cents": number,"void_reason"?: string | null,"voided_at"?: string | null,"voided_by"?: string | null
                   }
                   Update: {
-                    "appointment_id"?: string | null,"business_id"?: string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"discount_cents"?: number,"discount_reason"?: string | null,"id"?: string,"location_id"?: string,"note"?: string | null,"number"?: number,"receipt_email"?: string | null,"refunded_cents"?: number,"status"?: Database["public"]['Enums']["sale_status"],"subtotal_cents"?: number,"tax_cents"?: number,"tip_cents"?: number,"total_cents"?: number,"void_reason"?: string | null,"voided_at"?: string | null,"voided_by"?: string | null
+                    "appointment_id"?: string | null,"business_id"?: string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"discount_cents"?: number,"discount_reason"?: string | null,"draft_id"?: string | null,"id"?: string,"location_id"?: string,"note"?: string | null,"number"?: number,"rebook_appointment_id"?: string | null,"receipt_email"?: string | null,"refunded_cents"?: number,"status"?: Database["public"]['Enums']["sale_status"],"subtotal_cents"?: number,"tax_cents"?: number,"tip_cents"?: number,"total_cents"?: number,"void_reason"?: string | null,"voided_at"?: string | null,"voided_by"?: string | null
                   }
                   Relationships: [
                     {
@@ -1330,11 +1380,23 @@ isOneToOne: false
       referencedRelation: "staff"
       referencedColumns: ["id","business_id"]
     },{
+      foreignKeyName: "sales_draft_id_fkey"
+      columns: ["draft_id"]
+isOneToOne: false
+      referencedRelation: "sale_drafts"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "sales_location_id_business_id_fkey"
       columns: ["location_id","business_id"]
 isOneToOne: false
       referencedRelation: "locations"
       referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "sales_rebook_appointment_id_fkey"
+      columns: ["rebook_appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id"]
     },{
       foreignKeyName: "sales_voided_by_business_id_fkey"
       columns: ["voided_by","business_id"]
@@ -1727,6 +1789,44 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"stock_overrides": {
+                  Row: {
+                    "approved_by": string,"business_id": string,"created_at": string,"draft_id": string,"id": string,"product_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "approved_by": string,"business_id": string,"created_at"?: string,"draft_id": string,"id"?: string,"product_id": string
+                  }
+                  Update: {
+                    "approved_by"?: string,"business_id"?: string,"created_at"?: string,"draft_id"?: string,"id"?: string,"product_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "stock_overrides_approved_by_business_id_fkey"
+      columns: ["approved_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "stock_overrides_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "stock_overrides_draft_id_fkey"
+      columns: ["draft_id"]
+isOneToOne: false
+      referencedRelation: "sale_drafts"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "stock_overrides_product_id_fkey"
+      columns: ["product_id"]
+isOneToOne: false
+      referencedRelation: "products"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"stocktake_counts": {
                   Row: {
                     "business_id": string,"counted": number,"counted_at": string,"counted_by": string | null,"expected": number,"id": string,"product_id": string,"stocktake_id": string
@@ -2003,6 +2103,9 @@ isOneToOne: false
                            },
 "apply_reorder_draft":
 { Args: { "p_action_id": string }; Returns: string
+                           },
+"approve_stock_override":
+{ Args: { "p_draft_id": string,"p_product_id": string }; Returns: undefined
                            },
 "cancel_online_appointment":
 { Args: { "p_appointment_id": string,"p_manage_token_hash": string }; Returns: undefined

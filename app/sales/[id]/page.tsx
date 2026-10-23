@@ -7,7 +7,7 @@ import { Badge, Card, PageHeader, type Tone } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { METHOD_LABELS } from "@/lib/checkout";
 import { isUuid } from "@/lib/ids";
-import { canRefund, canTakePayments, loadSale, receiptSalon, type ReceiptSalon, type SaleView } from "@/lib/sales";
+import { canRefund, canTakePayments, loadSale, receiptGroups, receiptSalon, type ReceiptSalon, type SaleView } from "@/lib/sales";
 import { formatDay } from "@/lib/schedule-format";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
@@ -130,26 +130,40 @@ function Receipt({ sale, salon, when }: { sale: SaleView; salon: ReceiptSalon; w
           {sale.soldBy ? ` · served by ${sale.soldBy}` : ""}
         </p>
       </div>
-      <table className="w-full tabular-nums">
-        <tbody>
-          {sale.items.map((i) => (
-            <tr key={i.id}>
-              <td className="py-1 pr-2">
-                {i.quantity > 1 ? `${i.quantity} × ` : ""}
-                {i.description}
-                {salon.showStylists && i.staffName ? <span className="text-ink-muted"> ({i.staffName})</span> : null}
-                {i.bookedPriceCents !== null && (
-                  <span className="block text-xs text-ink-muted">
-                    Booked at {formatPrice(i.bookedPriceCents)} · {i.priceReason}
-                  </span>
-                )}
-                {i.returnedQuantity > 0 && <span className="block text-xs text-ink-muted">{i.returnedQuantity} returned</span>}
-              </td>
-              <td className="py-1 text-right">{formatPrice(i.unitPriceCents * i.quantity)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {receiptGroups(sale).map((g) => (
+        <section key={g.staffName ?? "other"} aria-label={salon.showStylists && g.staffName ? `${g.staffName}'s lines` : "Lines"}>
+          {salon.showStylists && (
+            <p className="flex justify-between border-b border-line pb-0.5 text-xs font-semibold tracking-wide text-ink-muted uppercase">
+              <span>{g.staffName ?? "Other"}</span>
+              <span className="tabular-nums">{formatPrice(g.subtotalCents)}</span>
+            </p>
+          )}
+          <table className="w-full tabular-nums">
+            <tbody>
+              {g.items.map((i) => (
+                <tr key={i.id}>
+                  <td className="py-1 pr-2">
+                    {i.quantity > 1 ? `${i.quantity} × ` : ""}
+                    {i.description}
+                    {i.bookedPriceCents !== null && (
+                      <span className="block text-xs text-ink-muted">
+                        Booked at {formatPrice(i.bookedPriceCents)} · {i.priceReason}
+                      </span>
+                    )}
+                    {i.lineDiscountCents > 0 && (
+                      <span className="block text-xs text-ink-muted">
+                        −{formatPrice(i.lineDiscountCents)} discount{i.lineDiscountReason ? ` · ${i.lineDiscountReason}` : ""}
+                      </span>
+                    )}
+                    {i.returnedQuantity > 0 && <span className="block text-xs text-ink-muted">{i.returnedQuantity} returned</span>}
+                  </td>
+                  <td className="py-1 text-right">{formatPrice(i.unitPriceCents * i.quantity)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ))}
       <dl className="flex flex-col gap-0.5 border-t border-line pt-2 tabular-nums">
         <Line label="Subtotal" value={formatPrice(sale.subtotalCents)} />
         {sale.discountCents > 0 && <Line label={`Discount${sale.discountReason ? ` (${sale.discountReason})` : ""}`} value={`−${formatPrice(sale.discountCents)}`} />}

@@ -525,14 +525,30 @@ from seed_sales s
 join public.appointment_items i on i.appointment_id = s.appointment_id
 join public.services sv on sv.id = i.service_id;
 
-insert into public.sale_items (sale_id, business_id, position, kind, product_id, description, quantity, unit_price_cents, tax_cents, total_cents)
+-- Retail is credited to the visit's (first) stylist, who recommended it.
+insert into public.sale_items (sale_id, business_id, position, kind, product_id, staff_id, description, quantity, unit_price_cents, tax_cents, total_cents)
 select s.sale_id, 'b0000000-0000-4000-8000-000000000001', 50 + row_number() over (partition by s.sale_id order by m.created_at, m.id), 'product',
-       p.id, concat_ws(' ', p.brand, p.line, p.name), (-m.change)::int, p.price_cents,
+       p.id, (select i.staff_id from public.appointment_items i where i.appointment_id = s.appointment_id order by i.starts_at limit 1),
+       concat_ws(' ', p.brand, p.line, p.name), (-m.change)::int, p.price_cents,
        round(p.price_cents * (-m.change) * 1025 / 10000.0)::int,
        (p.price_cents * (-m.change))::int + round(p.price_cents * (-m.change) * 1025 / 10000.0)::int
 from seed_sales s
 join public.stock_movements m on m.appointment_id = s.appointment_id and m.reason = 'sale'
 join public.products p on p.id = m.product_id;
+
+-- Rebooked at checkout: most visits whose client already has their next
+-- one within ten weeks (some stylists rebook more than others).
+update public.sales x set rebook_appointment_id = n.id
+from seed_sales s
+cross join lateral (
+  select a2.id from public.appointments a2
+  join public.appointments a1 on a1.id = s.appointment_id
+  where a2.client_id = s.client_id and a2.starts_at > a1.starts_at and a2.starts_at < a1.starts_at + interval '70 days'
+    and a2.status <> 'canceled'
+  order by a2.starts_at limit 1
+) n
+where x.id = s.sale_id
+  and abs(hashtext(s.sale_id::text)) % 100 < 45 + 5 * (abs(hashtext((select i.staff_id::text from public.appointment_items i where i.appointment_id = s.appointment_id order by i.starts_at limit 1))) % 8);
 
 update public.stock_movements m set note = 'Sale #' || s.number
 from seed_sales s where m.appointment_id = s.appointment_id and m.reason = 'sale';

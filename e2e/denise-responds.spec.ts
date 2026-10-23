@@ -106,6 +106,10 @@ test.describe("at 10pm", () => {
     const zone = zoneAt(22);
     const today = todayIn(zone);
     const outReports = () => admin.from("schedule_disruptions").select("id, time_off_id").eq("staff_id", GIL).eq("kind", "call_out").eq("on_date", today);
+    // Gil works that day (the demo data may give him it off): his time off
+    // is set aside and put back after.
+    const { data: off } = await admin.from("staff_time_off").select("*").eq("staff_id", GIL).lte("starts_on", today).gte("ends_on", today);
+    await admin.from("staff_time_off").delete().in("id", (off ?? []).map((t) => t.id));
     await admin.from("locations").update({ timezone: zone }).eq("id", L);
     try {
       await page.goto("/calendar");
@@ -121,6 +125,7 @@ test.describe("at 10pm", () => {
         await admin.from("schedule_disruptions").delete().eq("id", d.id);
         if (d.time_off_id) await admin.from("staff_time_off").delete().eq("id", d.time_off_id);
       }
+      if (off?.length) await admin.from("staff_time_off").insert(off);
     }
   });
 });

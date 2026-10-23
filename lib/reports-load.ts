@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { startOfLocalDay } from "@/lib/scheduling/load";
 import { addDays, type LocalDate } from "@/lib/scheduling/time";
-import { closeout, giftCardActivity, giftCardLiability, unusedPackageValue, type CardRow, type PackageItemRow } from "./reports";
+import { closeout, giftCardActivity, giftCardLiability, rebookingAtCheckout, unusedPackageValue, type CardRow, type PackageItemRow } from "./reports";
 
 type Supabase = SupabaseClient<Database>;
 
@@ -89,4 +89,28 @@ export async function loadCloseout(supabase: Supabase, location: { id: string; t
   ]);
   if (error) throw error;
   return { ...closeout(payments), saved };
+}
+
+// Visits checked out in a period (not voided) and whether the client left
+// with their next visit booked, by the visit's main stylist (the one on its
+// first service line).
+export async function loadRebooking(supabase: Supabase, location: { id: string; timezone: string }, from: LocalDate, to: LocalDate) {
+  const sales = await all<{ rebook_appointment_id: string | null; sale_items: { kind: string; staff_id: string | null; position: number }[] }>((f, t) =>
+    supabase
+      .from("sales")
+      .select("rebook_appointment_id, sale_items(kind, staff_id, position)")
+      .eq("location_id", location.id)
+      .not("appointment_id", "is", null)
+      .neq("status", "voided")
+      .gte("created_at", startOfLocalDay(from, location.timezone).toISOString())
+      .lt("created_at", startOfLocalDay(addDays(to, 1), location.timezone).toISOString())
+      .order("id")
+      .range(f, t) as never,
+  );
+  return rebookingAtCheckout(
+    sales.map((s) => ({
+      staff_id: [...s.sale_items].filter((i) => i.kind === "service").sort((a, b) => a.position - b.position)[0]?.staff_id ?? null,
+      rebooked: s.rebook_appointment_id !== null,
+    })),
+  );
 }

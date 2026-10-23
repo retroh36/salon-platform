@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import { formatCode } from "@/lib/gift-cards";
 import { admin, SEED } from "../tests/db/helpers";
+import { openCheckout } from "./checkout-helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
@@ -34,27 +35,22 @@ test.afterAll(async () => {
   await admin.from("businesses").update({ tax_rate_retail_bp: 1025, gift_card_presets_cents: [2500, 5000, 10000, 15000] }).eq("id", B);
 });
 
-async function newSale(page: Page) {
-  await page.goto("/sales/new");
-  await waitForHydration(page, "form[aria-label=Checkout] input");
-  return ui(page).getByRole("form", { name: "Checkout" });
-}
+const newSale = (page: Page) => openCheckout(page, { from: "/sales" });
 
 test.describe("front desk", () => {
   test.use({ storageState: AUTH.frontDesk });
 
   test("sells a digital gift card, emailed in the salon's colors, then it pays for part of a sale", async ({ page }) => {
-    let form = await newSale(page);
-    await form.getByRole("button", { name: "Sell a gift card" }).click();
-    const giftCard = form.getByRole("group", { name: "Gift card 1" });
-    await giftCard.getByRole("button", { name: "$50" }).click();
-    await giftCard.getByLabel("Digital (email)").check();
-    await giftCard.getByLabel("For (name)").fill(`${PREFIX} Ava`);
-    await giftCard.getByLabel("Send to (email)").fill("ava.gift@example.com");
-    await expect(form.getByTestId("checkout-total")).toHaveText("$50");
-    await form.getByRole("button", { name: "Card", exact: true }).click();
-    await form.getByRole("button", { name: /^Complete sale/ }).click();
-    await expect(ui(page).getByTestId("checkout-done")).toContainText("Paid $50");
+    let co = await newSale(page);
+    await co.ticket.getByRole("button", { name: "Gift card", exact: true }).click();
+    await co.dialog.getByRole("button", { name: "Digital (email)" }).click();
+    await co.dialog.getByRole("button", { name: "$50" }).click();
+    await co.dialog.getByLabel("Recipient’s name").fill(`${PREFIX} Ava`);
+    await co.dialog.getByLabel("Recipient’s email").fill("ava.gift@example.com");
+    await co.dialog.getByRole("button", { name: "Add to ticket" }).click();
+    await expect(co.total).toHaveText("$50");
+    await co.card();
+    await expect(await co.complete()).toContainText("$50");
 
     const { data: card } = await admin.from("gift_cards").select("code").eq("recipient_name", `${PREFIX} Ava`).single();
     const code = formatCode(card!.code);
@@ -63,24 +59,23 @@ test.describe("front desk", () => {
     expect(email!.body).toContain(`Your code: ${code}`);
     expect(email!.html).toContain(code);
 
-    // Two repair masks ($60): $50 from the card (all of it), $10 cash.
-    form = await newSale(page);
-    await form.getByLabel(/^Add a product/).fill(`${PREFIX}-RM`);
-    await form.getByLabel(/^Add a product/).press("Enter");
-    await form.getByLabel(/^How many/).fill("2");
-    await form.getByRole("button", { name: "Gift card", exact: true }).click();
-    const pay = form.getByRole("group", { name: "Payment 1" });
-    await pay.getByLabel("Gift card code").fill(code.toLowerCase());
-    await pay.getByRole("button", { name: "Check balance" }).click();
-    await expect(pay.getByTestId("gift-card-balance")).toHaveText("Balance $50 · $0 left after this");
-    await expect(pay.getByLabel("Amount")).toHaveValue("50");
-    // Only $40 of it, actually: $10 stays on the card.
-    await pay.getByLabel("Amount").fill("40");
-    await expect(pay.getByTestId("gift-card-balance")).toHaveText("Balance $50 · $10 left after this");
-    await form.getByRole("button", { name: "Cash" }).click();
-    await expect(form.getByTestId("checkout-due")).toHaveText("Paid in full");
-    await form.getByRole("button", { name: /^Complete sale/ }).click();
-    await expect(ui(page).getByTestId("checkout-done")).toContainText("Paid $60");
+    // Two repair masks ($60): $40 from the card, $10 stays on it, $20 cash.
+    co = await newSale(page);
+    await co.search(`${PREFIX}-RM`);
+    await co.ticket.getByLabel("Add a product: name, brand, SKU or scan").press("Enter");
+    await (await co.edit("Repair Mask")).getByRole("button", { name: "One more" }).click();
+    await co.payment.getByRole("button", { name: "Gift card", exact: true }).click();
+    await co.dialog.getByLabel("Gift card code").fill(code.toLowerCase());
+    await co.dialog.getByRole("button", { name: "Check" }).click();
+    await expect(co.dialog.getByTestId("gift-card-balance")).toHaveText("Balance $50");
+    await expect(co.dialog.getByLabel("Amount ($)")).toHaveValue("50.00");
+    await co.dialog.getByLabel("Amount ($)").fill("40");
+    await co.dialog.getByRole("button", { name: "Use $40 from the card" }).click();
+    await expect(co.payment.getByTestId("payment-line")).toContainText("$10 left on it");
+    await expect(co.remaining).toHaveText("$20 remaining to pay");
+    await co.cash();
+    await expect(co.remaining).toHaveText("Paid in full");
+    await expect(await co.complete()).toContainText("$60");
 
     // Its balance and history.
     await page.goto("/gift-cards");
@@ -98,12 +93,11 @@ test.describe("front desk", () => {
   });
 
   test("says when a code isn't a gift card", async ({ page }) => {
-    const form = await newSale(page);
-    await form.getByRole("button", { name: "Gift card", exact: true }).click();
-    const pay = form.getByRole("group", { name: "Payment 1" });
-    await pay.getByLabel("Gift card code").fill("ZZZZ-ZZZZ-ZZZZ");
-    await pay.getByRole("button", { name: "Check balance" }).click();
-    await expect(pay).toContainText("No gift card has that code.");
+    const co = await newSale(page);
+    await co.payment.getByRole("button", { name: "Gift card", exact: true }).click();
+    await co.dialog.getByLabel("Gift card code").fill("ZZZZ-ZZZZ-ZZZZ");
+    await co.dialog.getByRole("button", { name: "Check" }).click();
+    await expect(co.dialog.getByRole("alert")).toHaveText("No gift card has that code.");
   });
 });
 

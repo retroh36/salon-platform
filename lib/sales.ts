@@ -6,8 +6,6 @@ import type { Database } from "@/lib/database.types";
 import { productName } from "@/lib/inventory";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPrice } from "@/lib/services";
-import { isUsable, loadClientPackages, loadTemplates, type ClientPackage, type PackageTemplate } from "@/lib/packages";
-import type { StaffLevel } from "@/lib/schedule-forms";
 import { fullName, type StaffRole } from "@/lib/staff";
 import { METHOD_LABELS, type PaymentMethod } from "./checkout";
 
@@ -22,20 +20,6 @@ export type CheckoutSettings = {
 };
 
 export type CheckoutProduct = { id: string; name: string; priceCents: number; onHand: number; sku: string | null; barcode: string | null };
-
-export type CheckoutData = {
-  appointmentId: string | null;
-  client: { id: string; name: string; email: string | null } | null;
-  services: { itemId: string; serviceId: string; name: string; staffId: string; staffName: string; staffLevel: StaffLevel | null; priceCents: number }[];
-  // Who can be tipped: the stylists on the visit.
-  stylists: { id: string; firstName: string }[];
-  products: CheckoutProduct[];
-  settings: CheckoutSettings;
-  role: StaffRole;
-  // The client's packages with uses left, and packages on offer.
-  packages: ClientPackage[];
-  templates: PackageTemplate[];
-};
 
 export function canTakePayments(role: StaffRole): boolean {
   return role === "owner" || role === "manager" || role === "front_desk";
@@ -72,50 +56,6 @@ export async function loadRetailProducts(supabase: Supabase, businessId: string,
   return data.map((p) => ({ id: p.id, name: productName(p), priceCents: p.price_cents ?? 0, onHand: onHand.get(p.id) ?? 0, sku: p.sku, barcode: p.barcode }));
 }
 
-// Everything the checkout panel needs for a visit (or for a retail sale
-// without one, when appointmentId is null).
-export async function loadCheckout(
-  supabase: Supabase,
-  me: { business_id: string; role: StaffRole; location: { id: string } },
-  appointmentId: string | null,
-): Promise<CheckoutData | null> {
-  const [settings, products, templates] = await Promise.all([
-    loadCheckoutSettings(supabase, me.business_id),
-    loadRetailProducts(supabase, me.business_id, me.location.id),
-    loadTemplates(supabase, me.business_id),
-  ]);
-  if (!appointmentId) return { appointmentId: null, client: null, services: [], stylists: [], products, settings, role: me.role, packages: [], templates };
-
-  const { data: a, error } = await supabase
-    .from("appointments")
-    .select("id, status, client:clients(id, first_name, last_name, email), appointment_items(id, starts_at, price_cents, service_id, staff_id, service:services(name), staff:staff(first_name, last_name, level))")
-    .eq("id", appointmentId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!a) return null;
-  const items = [...a.appointment_items].sort((x, y) => x.starts_at.localeCompare(y.starts_at));
-  const stylists = [...new Map(items.map((i) => [i.staff_id, { id: i.staff_id, firstName: i.staff?.first_name ?? "Stylist" }])).values()];
-  const packages = a.client ? (await loadClientPackages(supabase, a.client.id, true)).filter((p) => isUsable(p)) : [];
-  return {
-    appointmentId: a.id,
-    client: a.client ? { id: a.client.id, name: fullName(a.client), email: a.client.email } : null,
-    services: items.map((i) => ({
-      itemId: i.id,
-      serviceId: i.service_id,
-      name: i.service.name,
-      staffId: i.staff_id,
-      staffName: i.staff ? fullName(i.staff) : "Former staff",
-      staffLevel: i.staff?.level ?? null,
-      priceCents: i.price_cents,
-    })),
-    stylists,
-    products,
-    settings,
-    role: me.role,
-    packages,
-    templates,
-  };
-}
 
 export type SaleView = {
   id: string;
@@ -124,7 +64,7 @@ export type SaleView = {
   createdAt: string;
   client: { id: string; name: string; email: string | null } | null;
   appointmentId: string | null;
-  items: { id: string; kind: string; description: string; staffName: string | null; quantity: number; unitPriceCents: number; bookedPriceCents: number | null; priceReason: string | null; discountCents: number; taxCents: number; totalCents: number; returnedQuantity: number }[];
+  items: { id: string; kind: string; description: string; staffName: string | null; quantity: number; unitPriceCents: number; bookedPriceCents: number | null; priceReason: string | null; discountCents: number; lineDiscountCents: number; lineDiscountReason: string | null; taxCents: number; totalCents: number; returnedQuantity: number }[];
   tips: { staffName: string; amountCents: number }[];
   payments: { id: string; method: PaymentMethod; amountCents: number; tenderedCents: number | null; changeCents: number | null; reference: string | null; reason: string | null; createdAt: string }[];
   events: { kind: string; amountCents: number | null; detail: string | null; staffName: string | null; createdAt: string }[];
@@ -144,7 +84,7 @@ export async function loadSale(supabase: Supabase, saleId: string): Promise<Sale
   const { data: s, error } = await supabase
     .from("sales")
     .select(
-      "id, number, status, created_at, appointment_id, subtotal_cents, discount_cents, discount_reason, tax_cents, tip_cents, total_cents, refunded_cents, void_reason, receipt_email, client:clients(id, first_name, last_name, email), seller:staff!sales_created_by_business_id_fkey(first_name), sale_items(id, position, kind, description, quantity, unit_price_cents, booked_price_cents, price_reason, discount_cents, tax_cents, total_cents, returned_quantity, staff:staff(first_name)), sale_tips(amount_cents, staff:staff(first_name)), payments(id, method, amount_cents, tendered_cents, change_cents, reference, reason, created_at), sale_events(kind, amount_cents, detail, created_at, staff:staff(first_name))",
+      "id, number, status, created_at, appointment_id, subtotal_cents, discount_cents, discount_reason, tax_cents, tip_cents, total_cents, refunded_cents, void_reason, receipt_email, client:clients(id, first_name, last_name, email), seller:staff!sales_created_by_business_id_fkey(first_name), sale_items(id, position, kind, description, quantity, unit_price_cents, booked_price_cents, price_reason, discount_cents, line_discount_cents, line_discount_reason, tax_cents, total_cents, returned_quantity, staff:staff(first_name)), sale_tips(amount_cents, staff:staff(first_name)), payments(id, method, amount_cents, tendered_cents, change_cents, reference, reason, created_at), sale_events(kind, amount_cents, detail, created_at, staff:staff(first_name))",
     )
     .eq("id", saleId)
     .maybeSingle();
@@ -169,6 +109,8 @@ export async function loadSale(supabase: Supabase, saleId: string): Promise<Sale
         bookedPriceCents: i.booked_price_cents,
         priceReason: i.price_reason,
         discountCents: i.discount_cents,
+        lineDiscountCents: i.line_discount_cents,
+        lineDiscountReason: i.line_discount_reason,
         taxCents: i.tax_cents,
         totalCents: i.total_cents,
         returnedQuantity: i.returned_quantity,
@@ -198,11 +140,33 @@ export type ReceiptSalon = { name: string; locationName: string; address: string
 const escape = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 // The receipt as plain text and as a simple HTML email.
+// A receipt's lines grouped by stylist (as on the checkout ticket), each
+// with its subtotal after its own discounts; lines with no stylist last.
+export function receiptGroups(sale: Pick<SaleView, "items">): { staffName: string | null; items: SaleView["items"]; subtotalCents: number }[] {
+  const groups = new Map<string | null, { staffName: string | null; items: SaleView["items"]; subtotalCents: number }>();
+  for (const i of sale.items) {
+    const g = groups.get(i.staffName) ?? { staffName: i.staffName, items: [], subtotalCents: 0 };
+    g.items.push(i);
+    g.subtotalCents += i.unitPriceCents * i.quantity - i.lineDiscountCents;
+    groups.set(i.staffName, g);
+  }
+  const all = [...groups.values()];
+  return [...all.filter((g) => g.staffName !== null), ...all.filter((g) => g.staffName === null)];
+}
+
 export function receiptText(sale: SaleView, salon: ReceiptSalon, when: string): { subject: string; text: string; html: string } {
   const lines: [string, string][] = [];
-  for (const i of sale.items) {
-    const who = salon.showStylists && i.staffName ? ` (${i.staffName})` : "";
-    lines.push([`${i.quantity > 1 ? `${i.quantity} × ` : ""}${i.description}${who}`, formatPrice(i.unitPriceCents * i.quantity)]);
+  const grouped = salon.showStylists ? receiptGroups(sale) : [{ staffName: null, items: sale.items, subtotalCents: 0 }];
+  const heads = new Set<number>();
+  for (const g of grouped) {
+    if (salon.showStylists && grouped.length > 1) {
+      heads.add(lines.length);
+      lines.push([g.staffName ?? "Other", formatPrice(g.subtotalCents)]);
+    }
+    for (const i of g.items) {
+      lines.push([`${i.quantity > 1 ? `${i.quantity} × ` : ""}${i.description}`, formatPrice(i.unitPriceCents * i.quantity)]);
+      if (i.lineDiscountCents) lines.push([`  Discount${i.lineDiscountReason ? ` (${i.lineDiscountReason})` : ""}`, `−${formatPrice(i.lineDiscountCents)}`]);
+    }
   }
   const totals: [string, string][] = [["Subtotal", formatPrice(sale.subtotalCents)]];
   if (sale.discountCents) totals.push([`Discount${sale.discountReason ? ` (${sale.discountReason})` : ""}`, `−${formatPrice(sale.discountCents)}`]);
@@ -223,7 +187,7 @@ export function receiptText(sale: SaleView, salon: ReceiptSalon, when: string): 
     `Receipt #${sale.number} · ${when}`,
     sale.client ? `For ${sale.client.name}` : "",
     "",
-    ...lines.map(([a, b]) => `${a}  ${b}`),
+    ...lines.map(([a, b], i) => (heads.has(i) ? `${a.toUpperCase()}  ${b}` : `${a}  ${b}`)),
     "",
     ...totals.map(([a, b]) => `${a}  ${b}`),
     ...paid.map(([a, b]) => `${a}  ${b}`),
@@ -241,7 +205,7 @@ export function receiptText(sale: SaleView, salon: ReceiptSalon, when: string): 
 <div style="background:${escape(accent)};color:#fff;padding:20px 24px"><div style="font-size:20px;font-weight:600">${escape(salon.name)}</div><div style="opacity:.85;font-size:14px">${escape(salon.locationName)}</div></div>
 <div style="padding:20px 24px;font-size:14px">
 <p style="margin:0 0 12px;color:#565E6B">Receipt #${sale.number} · ${escape(when)}${sale.client ? `<br>For ${escape(sale.client.name)}` : ""}</p>
-<table style="width:100%;border-collapse:collapse">${lines.map((l) => row(l)).join("")}</table>
+<table style="width:100%;border-collapse:collapse">${lines.map((l, i) => row(l, heads.has(i))).join("")}</table>
 <hr style="border:0;border-top:1px solid #EBE4DD;margin:12px 0">
 <table style="width:100%;border-collapse:collapse">${totals.map((l) => row(l, l[0] === "Total")).join("")}${paid.map((l) => row(l)).join("")}</table>
 ${sale.status === "voided" ? '<p style="color:#B42318">This sale was voided.</p>' : ""}

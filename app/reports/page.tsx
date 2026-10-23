@@ -6,7 +6,7 @@ import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Card, PageHeader, pillClass } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { METHOD_LABELS } from "@/lib/checkout";
-import { loadCloseout, loadGiftCardActivity, loadGiftCardLiability, loadUnusedPackages } from "@/lib/reports-load";
+import { loadCloseout, loadGiftCardActivity, loadGiftCardLiability, loadRebooking, loadUnusedPackages } from "@/lib/reports-load";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, isLocalDate, todayIn } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
@@ -59,12 +59,15 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
   const period: Period = typeof params.period === "string" && params.period in PERIODS ? (params.period as Period) : "this_month";
   const day = typeof params.day === "string" && isLocalDate(params.day) && params.day <= today ? params.day : today;
   const range = rangeOf(period, today);
-  const [liability, packages, activity, close] = await Promise.all([
+  const [liability, packages, activity, close, rebooking, staff] = await Promise.all([
     loadGiftCardLiability(supabase, me.business_id),
     loadUnusedPackages(supabase, me.business_id),
     loadGiftCardActivity(supabase, me.business_id, range.from, range.to, tz),
     loadCloseout(supabase, me.location, day),
+    loadRebooking(supabase, me.location, range.from, range.to),
+    supabase.from("staff").select("id, first_name, last_name").eq("business_id", me.business_id),
   ]);
+  const staffName = new Map((staff.data ?? []).map((s) => [s.id, `${s.first_name} ${s.last_name}`]));
   const link = (q: { period?: Period; day?: string }) => {
     const s = new URLSearchParams();
     if ((q.period ?? period) !== "this_month") s.set("period", q.period ?? period);
@@ -74,7 +77,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
 
   return (
     <AppShell section="reports" me={me}>
-      <PageHeader title="Reports" description="What you owe in gift cards and packages, gift card activity, and closing out the day." />
+      <PageHeader title="Reports" description="What you owe in gift cards and packages, gift card activity, rebooking, and closing out the day." />
 
       <Card title="What you owe in services" titleId="owed-heading" description="Gift card balances and unused package uses are services clients have paid for and not had yet.">
         <dl className="grid gap-5 sm:grid-cols-3" data-testid="liabilities">
@@ -125,6 +128,47 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
           <Stat label="Used" value={formatPrice(activity.redeemedCents)} testId="gift-cards-redeemed" />
           <Stat label="Promotional used" value={formatPrice(activity.promoRedeemedCents)} note={`${formatPrice(activity.promoIssuedCents)} issued`} />
         </dl>
+      </Card>
+
+      <Card
+        title="Rebooked at checkout"
+        titleId="rebook-heading"
+        description={`Visits checked out ${formatLongDay(range.from, false)} to ${formatLongDay(range.to, false)} where the client left with their next visit booked, by stylist.`}
+      >
+        {rebooking.visits === 0 ? (
+          <p className="text-sm text-ink-muted">No visits checked out in this period.</p>
+        ) : (
+          <>
+            <p className="mb-3">
+              <strong className="font-serif text-3xl text-navy-900 tabular-nums" data-testid="rebook-rate">
+                {rebooking.percent}%
+              </strong>{" "}
+              <span className="text-ink-muted">
+                of {rebooking.visits} visits ({rebooking.rebooked} rebooked)
+              </span>
+            </p>
+            <table className="w-full text-sm tabular-nums" aria-label="Rebooking by stylist">
+              <thead>
+                <tr className="text-left text-ink-muted">
+                  <th className="py-1 font-medium">Stylist</th>
+                  <th className="py-1 text-right font-medium">Visits</th>
+                  <th className="py-1 text-right font-medium">Rebooked</th>
+                  <th className="py-1 text-right font-medium">Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rebooking.stylists.map((s) => (
+                  <tr key={s.staffId} className="border-t border-line">
+                    <td className="py-1.5">{staffName.get(s.staffId) ?? "Former staff"}</td>
+                    <td className="py-1.5 text-right">{s.visits}</td>
+                    <td className="py-1.5 text-right">{s.rebooked}</td>
+                    <td className="py-1.5 text-right font-medium">{s.percent}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
       </Card>
 
       <Card

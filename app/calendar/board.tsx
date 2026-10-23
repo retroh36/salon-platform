@@ -27,7 +27,6 @@ import { moveBlock } from "./block-actions";
 import { BlockPanel, repeatLabel } from "./block-panel";
 import { AppointmentPanel } from "./appointment-panel";
 import { approveDeniseFix, bookFromWaitlist, rejectDeniseFix, scanDenise, undoDeniseFix } from "./denise-actions";
-import { CheckoutPanel } from "./checkout-panel";
 import { useDeniseRun } from "./use-denise";
 import { DenisePanel, type Outcome, type Preview } from "./denise-panel";
 import { BookingPanel, type BookingStart } from "./booking-panel";
@@ -51,8 +50,7 @@ type Selection =
   | { kind: "edit"; appointmentId: string }
   | { kind: "detail"; appointmentId: string }
   | { kind: "walk-ins" }
-  | { kind: "group"; start: BookingStart }
-  | { kind: "checkout"; appointmentId: string };
+  | { kind: "group"; start: BookingStart };
 
 type Tab = "denise" | "details";
 
@@ -259,7 +257,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // she's thinking at once, then always replies. Her panel opens, unless
   // someone is in the middle of a booking, when her badge calls instead.
   async function trigger(request: DeniseRequest, firstStatus: string) {
-    const midTask = selection.kind === "book" || selection.kind === "edit" || selection.kind === "new-block" || selection.kind === "group" || selection.kind === "checkout";
+    const midTask = selection.kind === "book" || selection.kind === "edit" || selection.kind === "new-block" || selection.kind === "group";
     if (!midTask) {
       setTab("denise");
       setPanelOpen(true);
@@ -470,7 +468,11 @@ export function CalendarBoard({ data }: { data: BoardData }) {
 
   return (
     <div className="flex min-h-0 flex-1">
-      <div className="flex min-w-0 flex-1 flex-col gap-4 px-4 pt-6 pb-4 sm:px-6 lg:min-h-0">
+      {/* With the panel open on a wide screen, the page makes room for it, so
+          the toolbar wraps instead of hiding under it. */}
+      <div
+        className={`flex min-w-0 flex-1 flex-col gap-4 px-4 pt-6 pb-4 transition-[padding] duration-(--motion-slow) sm:px-6 lg:min-h-0 ${panelOpen ? "lg:pr-[25.5rem]" : ""}`}
+      >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="font-serif text-4xl font-semibold tracking-tight text-navy-900">Appointments</h1>
@@ -484,7 +486,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               </p>
             </ViewTransition>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex min-w-0 flex-wrap gap-2">
           <Link href="/calendar/waitlist" className={buttonClass("ghost", "lg")}>
             Waitlist
           </Link>
@@ -805,12 +807,6 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           panelOpen ? "visible translate-x-0" : "invisible translate-x-full"
         }`}
       >
-        <div className="flex items-center gap-2">
-          <span className="font-serif text-lg font-semibold text-navy-900">{tab === "denise" ? "Denise" : "Booking details"}</span>
-          <IconButton label="Close panel" className="ml-auto" onClick={() => setPanelOpen(false)}>
-            <CloseIcon />
-          </IconButton>
-        </div>
         <Tabs
           label="Assistant"
           value={tab}
@@ -820,6 +816,18 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             { value: "denise", label: "Denise", icon: <DeniseFace size={20} />, badge: <DeniseBadge count={attention} /> },
             { value: "details", label: "Booking details", icon: <CalendarIcon className="size-4" /> },
           ]}
+          trailing={
+            // The panel's one close button (a visit being viewed is let go too).
+            <IconButton
+              label="Close panel"
+              onClick={() => {
+                setPanelOpen(false);
+                if (selection.kind === "detail") closeDetails();
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          }
         >
           {tab === "denise" ? (
             <DenisePanel
@@ -852,12 +860,12 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               onClose={closeDetails}
               onReportLate={reportLate}
               onCanceled={onCanceled}
-              onCheckout={() => select({ kind: "checkout", appointmentId: selection.appointmentId })}
+              // A full load: /checkout/new is a route handler that opens the checkout.
+              // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+              onCheckout={() => window.location.assign(`/checkout/new?appointment=${selection.appointmentId}&from=${encodeURIComponent(window.location.pathname + window.location.search)}`)}
               onOpenVisit={(appointmentId) => select({ kind: "detail", appointmentId })}
               products={data.menu.products}
             />
-          ) : selection.kind === "checkout" ? (
-            <CheckoutPanel appointmentId={selection.appointmentId} onClose={closeDetails} onPaid={() => router.refresh()} />
           ) : selection.kind === "walk-ins" ? (
             <WalkInPanel
               data={data}

@@ -60,10 +60,12 @@ async function Sales({ searchParams }: Pick<PageProps<"/sales">, "searchParams">
         title="Sales"
         description={formatLongDay(date)}
         actions={
-          <Link href="/sales/new" className={buttonClass("primary", "md")}>
+          // A plain link: /checkout/new is a route handler that opens the checkout.
+          // eslint-disable-next-line @next/next/no-html-link-for-pages
+          <a href="/checkout/new?from=/sales" className={buttonClass("primary", "md")}>
             <PlusIcon className="size-4" />
             New sale
-          </Link>
+          </a>
         }
       />
       <nav aria-label="Day" className="mb-4 flex flex-wrap gap-2">

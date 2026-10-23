@@ -19,21 +19,38 @@ type NavItem = {
   frontOfHouse?: boolean;
 };
 
-const NAV: NavItem[] = [
-  { section: "dashboard", href: "/dashboard", label: "Dashboard", Icon: HomeIcon },
-  { section: "my-day", href: "/my-day", label: "My day", Icon: ClockIcon, stylistsOnly: true },
-  { section: "calendar", href: "/calendar", label: "Calendar", Icon: CalendarIcon },
-  { section: "sales", href: "/sales", label: "Sales", Icon: ReceiptIcon, frontOfHouse: true },
-  { section: "gift-cards", href: "/gift-cards", label: "Gift cards", Icon: GiftIcon, frontOfHouse: true },
-  { section: "clients", href: "/clients", label: "Clients", Icon: UserIcon },
-  { section: "team", href: "/team", label: "Team", Icon: TeamIcon },
-  { section: "services", href: "/services", label: "Services", Icon: ScissorsIcon },
-  { section: "durations", href: "/durations", label: "Durations", Icon: ClockIcon, managersOnly: true },
-  { section: "inventory", href: "/inventory", label: "Inventory", Icon: BoxIcon },
-  { section: "forms", href: "/forms", label: "Forms", Icon: ClipboardIcon },
-  { section: "reports", href: "/reports", label: "Reports", Icon: ChartIcon, ownersOnly: true },
-  { section: "settings", href: "/settings", label: "Settings", Icon: SettingsIcon, ownersOnly: true },
+// The sidebar, in groups under small headings; Settings sits at the
+// bottom. Items (and whole groups) a role can't use are hidden.
+const GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: "Daily",
+    items: [
+      { section: "dashboard", href: "/dashboard", label: "Dashboard", Icon: HomeIcon },
+      { section: "my-day", href: "/my-day", label: "My day", Icon: ClockIcon, stylistsOnly: true },
+      { section: "calendar", href: "/calendar", label: "Calendar", Icon: CalendarIcon },
+      { section: "clients", href: "/clients", label: "Clients", Icon: UserIcon },
+    ],
+  },
+  {
+    label: "Sales",
+    items: [
+      { section: "sales", href: "/sales", label: "Sales", Icon: ReceiptIcon, frontOfHouse: true },
+      { section: "gift-cards", href: "/gift-cards", label: "Gift cards", Icon: GiftIcon, frontOfHouse: true },
+      { section: "reports", href: "/reports", label: "Reports", Icon: ChartIcon, ownersOnly: true },
+    ],
+  },
+  {
+    label: "Salon",
+    items: [
+      { section: "team", href: "/team", label: "Team", Icon: TeamIcon },
+      { section: "services", href: "/services", label: "Services", Icon: ScissorsIcon },
+      { section: "durations", href: "/durations", label: "Durations", Icon: ClockIcon, managersOnly: true },
+      { section: "inventory", href: "/inventory", label: "Inventory", Icon: BoxIcon },
+      { section: "forms", href: "/forms", label: "Forms", Icon: ClipboardIcon },
+    ],
+  },
 ];
+const SETTINGS: NavItem = { section: "settings", href: "/settings", label: "Settings", Icon: SettingsIcon, ownersOnly: true };
 
 function shown(item: NavItem, role: StaffRole): boolean {
   return (
@@ -44,10 +61,26 @@ function shown(item: NavItem, role: StaffRole): boolean {
   );
 }
 
+function NavLink({ item, current }: { item: NavItem; current: boolean }) {
+  const { href, label, Icon } = item;
+  return (
+    <Link
+      href={href}
+      aria-current={current ? "page" : undefined}
+      className={`flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-[background-color,color,transform] duration-(--motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-focus ${
+        current ? "bg-navy-100 text-navy-900" : "text-ink-muted hover:bg-surface hover:text-ink"
+      }`}
+    >
+      <Icon className="size-5 shrink-0" />
+      <span className="truncate">{label}</span>
+    </Link>
+  );
+}
+
 // "Powered by Maestra", small, at the foot of the sidebar.
 function PoweredBy() {
   return (
-    <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-ink-subtle" data-testid="powered-by">
+    <p className="flex items-center justify-center gap-1.5 text-xs whitespace-nowrap text-ink-subtle" data-testid="powered-by">
       Powered by
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/brand/maestra/maestra-mark.svg" alt="" className="h-3 w-auto" />
@@ -74,6 +107,8 @@ export function AppFrame({
   user: { name: string; role: StaffRole };
   children: React.ReactNode;
 }) {
+  const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => shown(n, user.role)) })).filter((g) => g.items.length > 0);
+  const settings = shown(SETTINGS, user.role);
   return (
     // One screen tall on large screens: the calendar and panels scroll inside.
     <div className="flex min-h-screen flex-1 bg-canvas text-ink lg:h-screen lg:min-h-0 lg:flex-none lg:overflow-hidden">
@@ -86,29 +121,32 @@ export function AppFrame({
           </div>
         </div>
         {/* Scrolls on short screens, so it never runs into the footer. */}
-        <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 pb-3">
-          {NAV.filter((n) => shown(n, user.role)).map(({ section: s, href, label, Icon }) => {
-            const current = s === section;
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={current ? "page" : undefined}
-                className={`flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-[background-color,color,transform] duration-(--motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-focus ${
-                  current ? "bg-navy-100 text-navy-900" : "text-ink-muted hover:bg-surface hover:text-ink"
-                }`}
-              >
-                <Icon className="size-5" />
-                {label}
-              </Link>
-            );
-          })}
+        <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 pb-3">
+          {groups.map((g) => (
+            <div key={g.label} role="group" aria-labelledby={`nav-${g.label}`} className="flex flex-col gap-0.5">
+              <h2 id={`nav-${g.label}`} className="px-3 pb-1 text-[11px] font-semibold tracking-wider text-ink-muted uppercase">
+                {g.label}
+              </h2>
+              {g.items.map((item) => (
+                <NavLink key={item.href} item={item} current={item.section === section} />
+              ))}
+            </div>
+          ))}
+          {settings && (
+            <div className="mt-auto border-t border-line pt-3">
+              <NavLink item={SETTINGS} current={section === "settings"} />
+            </div>
+          )}
         </nav>
-        <div className="shrink-0 border-t border-line px-4 pt-4 pb-3" data-testid="sidebar-footer">
-          <div className="flex items-center gap-3">
+        {/* The footer: who's signed in, sign out, and "Powered by Maestra",
+            each on its own line, never under anything else. */}
+        <div className="flex shrink-0 flex-col gap-3 border-t border-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]" data-testid="sidebar-footer">
+          <div className="flex min-w-0 items-center gap-3">
             <Avatar name={user.name} size="sm" halo={false} />
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium">{user.name}</div>
+              <div className="truncate text-sm font-medium" data-testid="sidebar-user">
+                {user.name}
+              </div>
               <div className="truncate text-xs text-ink-muted">{roleLabel(user.role)}</div>
             </div>
             <form action={logout} className="shrink-0">
@@ -145,7 +183,7 @@ export function AppFrame({
           </form>
         </header>
         <nav aria-label="Main" className="flex gap-1 overflow-x-auto border-b border-line px-4 py-2 lg:hidden">
-          {NAV.filter((n) => shown(n, user.role)).map(({ section: s, href, label }) => (
+          {[...groups.flatMap((g) => g.items), ...(settings ? [SETTINGS] : [])].map(({ section: s, href, label }) => (
             <Link
               key={href}
               href={href}
