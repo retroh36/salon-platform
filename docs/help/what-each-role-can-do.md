@@ -9,8 +9,8 @@ Each person has one role: Owner, Manager, Front desk or Stylist. The sidebar hid
 1. Check your role at the bottom of the sidebar, under your name.
 2. **Stylists**: **My day** (their visits, service timer, their earnings), the calendar (view, block their own time), clients (view, notes and formulas on their visits), Team, Services, Inventory (view) and Forms. No salon money.
 3. **Front desk**: everything a stylist sees except **My day**, plus booking and changing visits, check-in and checkout, **Sales**, **Gift cards**, editing clients, selling retail and receiving orders. Discounts only if the owner allows, up to the set limit. No payroll or money reports.
-4. **Managers**: everything the front desk does, plus **Payroll**, **Durations**, voids and refunds, inventory, orders and stocktakes, services, schedules and staff rates.
-5. **Owners**: everything, plus **Reports** and **Settings** (online booking, tax and receipts, gift cards, packages, memberships, automations, payroll periods, your data).
+4. **Managers**: everything the front desk does, plus **Payroll**, **Durations**, voids and refunds, inventory, orders and stocktakes, services, schedules and staff rates. Under **Settings** they can see **Automations** (each message and what it's done) but not change them.
+5. **Owners**: everything, plus **Reports** and **Settings** (online booking, tax and receipts, gift cards, packages, memberships, automations, payroll periods, your data). Only owners change automations.
 
 ## Good to know
 

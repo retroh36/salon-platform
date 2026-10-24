@@ -12,8 +12,19 @@ import { decideSuggestion, saveAutomation, sendDueNow, type Result } from "./act
 type Salon = { name: string; bookingUrl: string; bookingLive: boolean; googleUrl: string | null; yelpUrl: string | null };
 
 // One automation: on or off, when it goes out, the message (with a live
-// preview as a text and as an email), and what it's done.
-export function AutomationCard({ automation, salon, results }: { automation: Automation; salon: Salon; results: { sent: number; booked: number; revenueCents: number; optedOut: number } }) {
+// preview as a text and as an email), and what it's done. Managers see it
+// all, read-only (canEdit false); only owners change it.
+export function AutomationCard({
+  automation,
+  salon,
+  results,
+  canEdit = true,
+}: {
+  automation: Automation;
+  salon: Salon;
+  results: { sent: number; booked: number; revenueCents: number; optedOut: number };
+  canEdit?: boolean;
+}) {
   const [a, setA] = useState(automation);
   const [google, setGoogle] = useState(salon.googleUrl ?? "");
   const [yelp, setYelp] = useState(salon.yelpUrl ?? "");
@@ -45,7 +56,7 @@ export function AutomationCard({ automation, salon, results }: { automation: Aut
         <Badge tone={a.enabled ? "green" : "neutral"}>{a.enabled ? "On" : "Off"}</Badge>
       </div>
       <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
-        <div className="flex flex-col gap-4">
+        <fieldset disabled={!canEdit} className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-wrap items-end gap-4">
             {a.kind === "rebook" && (
               <label className={labelClass}>
@@ -115,6 +126,7 @@ export function AutomationCard({ automation, salon, results }: { automation: Aut
               ))}
             </ul>
           )}
+          {canEdit && (
           <div className="flex flex-wrap items-center gap-2">
             {a.enabled ? (
               <>
@@ -136,12 +148,13 @@ export function AutomationCard({ automation, salon, results }: { automation: Aut
               </>
             )}
           </div>
+          )}
           {result && (
             <p role="status" className={`text-sm ${result.ok ? "text-ink-muted" : "text-danger"}`}>
               {result.message}
             </p>
           )}
-        </div>
+        </fieldset>
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-2">

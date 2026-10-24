@@ -51,7 +51,9 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
     ],
   },
 ];
-const SETTINGS: NavItem = { section: "settings", href: "/settings", label: "Settings", Icon: SettingsIcon, ownersOnly: true };
+// Managers get the settings they can see (automations, read-only).
+const SETTINGS: NavItem = { section: "settings", href: "/settings", label: "Settings", Icon: SettingsIcon, managersOnly: true };
+const settingsFor = (role: StaffRole): NavItem => (role === "owner" ? SETTINGS : { ...SETTINGS, href: "/settings/automations" });
 
 function shown(item: NavItem, role: StaffRole): boolean {
   return (
@@ -109,7 +111,7 @@ export function AppFrame({
   children: React.ReactNode;
 }) {
   const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => shown(n, user.role)) })).filter((g) => g.items.length > 0);
-  const settings = shown(SETTINGS, user.role);
+  const settings = shown(SETTINGS, user.role) ? settingsFor(user.role) : null;
   return (
     // One screen tall on large screens: the calendar and panels scroll inside.
     <div className="flex min-h-screen flex-1 bg-canvas text-ink lg:h-screen lg:min-h-0 lg:flex-none lg:overflow-hidden">
@@ -135,7 +137,7 @@ export function AppFrame({
           ))}
           {settings && (
             <div className="mt-auto border-t border-line pt-3">
-              <NavLink item={SETTINGS} current={section === "settings"} />
+              <NavLink item={settings} current={section === "settings"} />
             </div>
           )}
         </nav>
@@ -184,7 +186,7 @@ export function AppFrame({
           </form>
         </header>
         <nav aria-label="Main" className="flex gap-1 overflow-x-auto border-b border-line px-4 py-2 lg:hidden">
-          {[...groups.flatMap((g) => g.items), ...(settings ? [SETTINGS] : [])].map(({ section: s, href, label }) => (
+          {[...groups.flatMap((g) => g.items), ...(settings ? [settings] : [])].map(({ section: s, href, label }) => (
             <Link
               key={href}
               href={href}

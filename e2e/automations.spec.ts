@@ -94,8 +94,34 @@ test.describe("a client", () => {
   });
 });
 
+test.describe("manager", () => {
+  test.use({ storageState: AUTH.manager });
+
+  test("sees every automation and what it's done, but can't change them", async ({ page }) => {
+    await page.goto("/dashboard");
+    await page.locator("aside").first().getByRole("link", { name: "Settings" }).click();
+    await expect(page).toHaveURL("/settings/automations");
+    const main = ui(page);
+    await expect(main.getByRole("navigation", { name: "Settings" }).getByRole("link")).toHaveText(["Automations"]);
+    await expect(main.getByText("Only owners can change automations")).toBeVisible();
+    await expect(main.getByTestId("automation")).toHaveCount(4);
+    await expect(main.getByTestId("automation-results").first()).toContainText("Sent (90 days)");
+    await expect(main.getByLabel("Message").first()).toBeDisabled();
+    await expect(main.getByRole("button", { name: /Turn on|Save|Turn off|Send due messages now/ })).toHaveCount(0);
+    await expect(main.getByTestId("automation-suggestions")).toHaveCount(0);
+    // The rest of Settings is still the owner's.
+    await page.goto("/settings");
+    await expect(page).not.toHaveURL("/settings");
+  });
+});
+
 test.describe("front desk", () => {
   test.use({ storageState: AUTH.frontDesk });
+
+  test("can't open automations", async ({ page }) => {
+    await page.goto("/settings/automations");
+    await expect(page).toHaveURL("/dashboard");
+  });
 
   test("records a client's birthday", async ({ page }) => {
     const { data: c } = await admin.from("clients").insert({ business_id: B, first_name: "Birthdayna", last_name: "Test" }).select("id").single();
