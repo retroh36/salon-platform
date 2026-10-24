@@ -51,6 +51,8 @@ export type BlockData = Interval & {
   group: { id: string; label: string } | null;
   // Booked by the client on the salon's booking site.
   online: boolean;
+  // Their membership, for the tooltip ("Blowout Club member").
+  member: string | null;
 };
 
 export type ItemDetail = Interval & {
@@ -106,6 +108,9 @@ export type AppointmentDetail = {
   pastVisits: { date: string; services: string; staff: string }[];
   // Their last few formulas from earlier visits, newest first.
   pastFormulas: { id: string; date: string; author: string; text: string; products: string; notes: string | null }[];
+  // Their membership: "Blowout Club member · 1 Blowout left", or a failed
+  // payment (no benefits until it's paid).
+  membership: { name: string; status: "active" | "past_due" | "paused"; text: string } | null;
   // What's happened to the visit, oldest first, after bookedBy: checked in
   // without a patch test, check-ins undone ("Check-in undone by Sam Rivera · …").
   log: string[];

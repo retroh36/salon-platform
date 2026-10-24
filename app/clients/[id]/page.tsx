@@ -11,6 +11,14 @@ import { loadClientInsights } from "@/lib/insights/read";
 import { loadClientPackages, withPackages } from "@/lib/packages";
 import { PackagesList } from "./packages/packages-card";
 import { PhotoGallery } from "@/components/visit-photos";
+import { MembershipList, type MembershipHistory } from "./memberships/membership-card";
+import { historyText } from "@/lib/memberships";
+import { loadClientMemberships } from "@/lib/memberships-load";
+import { currentProvider } from "@/lib/payments";
+import { canTakePayments } from "@/lib/sales";
+import { formatPrice } from "@/lib/services";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
 import { loadPhotos } from "@/lib/photos-load";
 import { canEditClients, formatDate } from "@/lib/clients";
 import { isUuid } from "@/lib/ids";
@@ -81,7 +89,8 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
     patchSettings(supabase, me.business_id),
     loadClientInsights(supabase, me.business_id, [id]),
   ]);
-  const [packages, gallery] = await Promise.all([loadClientPackages(supabase, id), loadPhotos(supabase, me, { clientId: id })]);
+  const [packages, gallery, memberships] = await Promise.all([loadClientPackages(supabase, id), loadPhotos(supabase, me, { clientId: id }), loadClientMemberships(supabase, id)]);
+  const membershipHistory = await loadMembershipHistory(supabase, memberships.map((m) => m.id), tz);
   if (patchError) throw patchError;
   if (formsError) throw formsError;
   if (teamError) throw teamError;
@@ -128,6 +137,19 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
             packages={packages}
             canCancel={me.role === "owner" || me.role === "manager"}
             expiresLabels={Object.fromEntries(packages.flatMap((p) => (p.expiresAt ? [[p.id, formatDate(toLocal(new Date(p.expiresAt), tz).date)]] : [])))}
+          />
+        </Card>
+      )}
+
+      {memberships.length > 0 && (
+        <Card title="Membership" titleId="membership-heading" description="Member prices and included services apply at checkout automatically.">
+          <MembershipList
+            memberships={memberships}
+            history={membershipHistory}
+            today={today}
+            canChange={canTakePayments(me.role)}
+            canEndNow={me.role === "owner" || me.role === "manager"}
+            testCards={currentProvider().testCards.map((c) => ({ ...c }))}
           />
         </Card>
       )}
@@ -335,4 +357,24 @@ function toFields(client: {
     email_opt_in: client.email_opt_in,
     consent_signed: client.consent_signed_on !== null,
   };
+}
+
+// Each membership's history in words, newest first, with what was paid
+// (for those who can see charges).
+async function loadMembershipHistory(supabase: SupabaseClient<Database>, ids: string[], tz: string): Promise<Record<string, MembershipHistory[]>> {
+  if (!ids.length) return {};
+  const [{ data: events }, { data: charges }] = await Promise.all([
+    supabase.from("membership_events").select("id, membership_id, kind, detail, sale_id, created_at, service:services(name)").in("membership_id", ids).order("created_at", { ascending: false }).limit(200),
+    supabase.from("membership_charges").select("sale_id, amount_cents").in("membership_id", ids).eq("status", "succeeded"),
+  ]);
+  const paid = new Map((charges ?? []).flatMap((c) => (c.sale_id ? [[c.sale_id, formatPrice(c.amount_cents)] as const] : [])));
+  const out: Record<string, MembershipHistory[]> = {};
+  for (const e of events ?? []) {
+    (out[e.membership_id] ??= []).push({
+      id: e.id,
+      at: toLocal(new Date(e.created_at), tz).date,
+      text: historyText({ kind: e.kind, detail: e.detail, service: e.service?.name }, e.sale_id ? paid.get(e.sale_id) : undefined),
+    });
+  }
+  return out;
 }

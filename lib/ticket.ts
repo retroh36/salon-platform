@@ -4,6 +4,7 @@
 // services, and what's still missing. Pure.
 
 import { computeSale, lineDiscountCents, paymentStatus, type Discount, type SaleLine, type Tender } from "./checkout";
+import { memberDiscountCents, type MemberPrices } from "./memberships";
 
 export type TicketDiscount = { kind: "amount" | "percent"; value: number; reason: string } | null;
 
@@ -24,6 +25,8 @@ export type ServiceLine = {
   discount: TicketDiscount;
   // Paid with a use of the client's package.
   packageItemId: string | null;
+  // Or with what their membership includes this period.
+  membershipCreditId?: string | null;
 };
 
 export type ProductLine = {
@@ -41,8 +44,10 @@ export type ProductLine = {
 export type GiftCardLine = { key: string; kind: "gift_card"; amountCents: number; physical: boolean; code: string; recipientName: string; recipientEmail: string };
 export type ReloadLine = { key: string; kind: "gift_card_reload"; code: string; amountCents: number };
 export type PackageLine = { key: string; kind: "package"; templateId: string; name: string; priceCents: number };
+// A membership sold, with the card it renews on (a token at the provider).
+export type MembershipLine = { key: string; kind: "membership"; planId: string; name: string; priceCents: number; provider: string; cardRef: string; cardLabel: string };
 
-export type TicketLine = ServiceLine | ProductLine | GiftCardLine | ReloadLine | PackageLine;
+export type TicketLine = ServiceLine | ProductLine | GiftCardLine | ReloadLine | PackageLine | MembershipLine;
 
 export type TicketPayment =
   | { key: string; method: "card"; amountCents: number; reference: string }
@@ -63,7 +68,14 @@ export type Ticket = {
 
 export const EMPTY_TICKET: Ticket = { lines: [], saleDiscount: null, tips: {}, payments: [], receiptEmail: "", rebook: null };
 
-export type Rates = { taxServicesBp: number; taxRetailBp: number };
+// Tax, and the client's member prices (taken off automatically, as
+// complete_sale does).
+export type Rates = { taxServicesBp: number; taxRetailBp: number; member?: MemberPrices | null };
+
+const NO_MEMBER: Rates = { taxServicesBp: 0, taxRetailBp: 0 };
+
+// Paid for already: a package use or a membership service.
+export const isCovered = (line: TicketLine) => line.kind === "service" && Boolean(line.packageItemId || line.membershipCreditId);
 
 const asDiscount = (d: TicketDiscount): Discount => (d && d.value > 0 ? { kind: d.kind, value: d.value } : null);
 
@@ -77,14 +89,26 @@ export function grossOf(line: TicketLine): number {
     case "gift_card_reload":
       return line.amountCents;
     case "package":
+    case "membership":
       return line.priceCents;
   }
 }
 
-// Its own discount, in cents.
-export function ownDiscountOf(line: TicketLine): number {
-  if (line.kind === "service" && line.packageItemId) return 0;
-  return line.kind === "service" || line.kind === "product" ? lineDiscountCents(grossOf(line), asDiscount(line.discount)) : 0;
+// The member price's part of a line's discount.
+export function memberDiscountOf(line: TicketLine, rates: Rates = NO_MEMBER): number {
+  if (!rates.member || isCovered(line)) return 0;
+  if (line.kind === "service") return memberDiscountCents(grossOf(line), rates.member.servicePct);
+  if (line.kind === "product") return memberDiscountCents(grossOf(line), rates.member.retailPct);
+  return 0;
+}
+
+// Its own discount, in cents: the member price, then what staff give on
+// the rest.
+export function ownDiscountOf(line: TicketLine, rates: Rates = NO_MEMBER): number {
+  if (isCovered(line)) return 0;
+  if (line.kind !== "service" && line.kind !== "product") return 0;
+  const member = memberDiscountOf(line, rates);
+  return member + lineDiscountCents(grossOf(line) - member, asDiscount(line.discount));
 }
 
 // The lines as the sale prices them: services paid with a package aren't
@@ -94,13 +118,15 @@ export function saleLines(ticket: Ticket, rates: Rates): SaleLine[] {
     const gross = grossOf(l);
     switch (l.kind) {
       case "service":
-        return l.packageItemId
+        return isCovered(l)
           ? { grossCents: gross, taxBp: 0, discountable: false }
-          : { grossCents: gross, taxBp: rates.taxServicesBp, discountable: true, lineDiscountCents: ownDiscountOf(l) };
+          : { grossCents: gross, taxBp: rates.taxServicesBp, discountable: true, lineDiscountCents: ownDiscountOf(l, rates) };
       case "product":
-        return { grossCents: gross, taxBp: rates.taxRetailBp, discountable: true, lineDiscountCents: ownDiscountOf(l) };
+        return { grossCents: gross, taxBp: rates.taxRetailBp, discountable: true, lineDiscountCents: ownDiscountOf(l, rates) };
       case "package":
         return { grossCents: gross, taxBp: rates.taxServicesBp, discountable: true };
+      case "membership":
+        return { grossCents: gross, taxBp: rates.taxServicesBp, discountable: false };
       default:
         return { grossCents: gross, taxBp: 0, discountable: false };
     }
@@ -110,24 +136,27 @@ export function saleLines(ticket: Ticket, rates: Rates): SaleLine[] {
 export function totalsOf(ticket: Ticket, rates: Rates) {
   const lines = saleLines(ticket, rates);
   const sale = computeSale(lines, asDiscount(ticket.saleDiscount), Object.values(ticket.tips));
-  // What packages pay for (added as payments by the database).
-  const covered = ticket.lines.reduce((n, l, i) => n + (l.kind === "service" && l.packageItemId ? sale.lines[i].totalCents : 0), 0);
+  // What packages and memberships pay for (added as payments by the
+  // database).
+  const covered = ticket.lines.reduce((n, l, i) => n + (isCovered(l) ? sale.lines[i].totalCents : 0), 0);
+  // Member prices: part of the discount, never counted against staff limits.
+  const member = ticket.lines.reduce((n, l) => n + memberDiscountOf(l, rates), 0);
   const tenders: Tender[] = ticket.payments.map((p) => ({ method: p.method, amountCents: p.amountCents, tenderedCents: p.method === "cash" ? p.tenderedCents : undefined }));
   const status = paymentStatus(sale.totalCents - covered, tenders);
-  return { ...sale, coveredCents: covered, ...status };
+  return { ...sale, coveredCents: covered, memberDiscountCents: member, ...status };
 }
 
 export type StylistGroup = { staffId: string | null; lines: { line: TicketLine; index: number }[]; subtotalCents: number };
 
 // Lines grouped by who did them (or gets the credit), in the order they
 // first appear; gift cards, packages and uncredited products last.
-export function stylistGroups(ticket: Ticket): StylistGroup[] {
+export function stylistGroups(ticket: Ticket, rates: Rates = NO_MEMBER): StylistGroup[] {
   const groups = new Map<string | null, StylistGroup>();
   ticket.lines.forEach((line, index) => {
     const staffId = line.kind === "service" || line.kind === "product" ? line.staffId : null;
     const g = groups.get(staffId) ?? { staffId, lines: [], subtotalCents: 0 };
     g.lines.push({ line, index });
-    g.subtotalCents += grossOf(line) - ownDiscountOf(line);
+    g.subtotalCents += grossOf(line) - ownDiscountOf(line, rates);
     groups.set(staffId, g);
   });
   const all = [...groups.values()];
@@ -136,8 +165,8 @@ export function stylistGroups(ticket: Ticket): StylistGroup[] {
 
 // A stylist's services on the ticket, after their own discounts: what tip
 // presets are worked out on.
-export function servicesFor(ticket: Ticket, staffId: string): number {
-  return ticket.lines.reduce((n, l) => n + (l.kind === "service" && l.staffId === staffId ? grossOf(l) - ownDiscountOf(l) : 0), 0);
+export function servicesFor(ticket: Ticket, staffId: string, rates: Rates = NO_MEMBER): number {
+  return ticket.lines.reduce((n, l) => n + (l.kind === "service" && l.staffId === staffId ? grossOf(l) - ownDiscountOf(l, rates) : 0), 0);
 }
 
 // What stops the sale being completed, first thing first.
@@ -153,6 +182,8 @@ export function ticketProblems(ticket: Ticket, rates: Rates, hasClient: boolean)
     if (l.kind === "gift_card" && l.physical && !/^[A-Z0-9]{8,32}$/.test(l.code.replace(/[^A-Za-z0-9]/g, "").toUpperCase())) problems.push("Enter or scan the gift card's code.");
     if (l.kind === "gift_card" && !l.physical && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l.recipientEmail.trim())) problems.push("Enter the email to send the digital gift card to.");
     if (l.kind === "package" && !hasClient) problems.push("Choose the client the package is for.");
+    if (l.kind === "membership" && !hasClient) problems.push("Choose the client the membership is for.");
+    if (l.kind === "membership" && !l.cardRef) problems.push(`Choose the card ${l.name} renews on.`);
   }
   if (ticket.saleDiscount && ticket.saleDiscount.value > 0 && !ticket.saleDiscount.reason.trim()) problems.push("Say why there's a discount.");
   if (ticket.payments.some((p) => p.method === "gift_card") && ticket.lines.some((l) => l.kind === "gift_card" || l.kind === "gift_card_reload")) problems.push("Gift cards can't be paid for with a gift card.");
@@ -187,6 +218,7 @@ export function saleInput(ticket: Ticket, ids: { draftId: string; appointmentId:
             unit_price_cents: l.unitPriceCents,
             price_reason: l.priceReason,
             package_item_id: l.packageItemId,
+            membership_credit_id: l.membershipCreditId ?? null,
             discount: l.discount && l.discount.value > 0 ? l.discount : null,
           };
         case "product":
@@ -197,6 +229,8 @@ export function saleInput(ticket: Ticket, ids: { draftId: string; appointmentId:
           return { kind: "gift_card_reload", code: l.code, amount_cents: l.amountCents };
         case "package":
           return { kind: "package", template_id: l.templateId };
+        case "membership":
+          return { kind: "membership", plan_id: l.planId, provider: l.provider, payment_method_ref: l.cardRef, card_label: l.cardLabel };
       }
     }),
     discount: ticket.saleDiscount && ticket.saleDiscount.value > 0 ? ticket.saleDiscount : null,

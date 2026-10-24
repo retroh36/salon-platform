@@ -140,7 +140,7 @@ describe("promotional cards", () => {
     const amount = Math.min(2000, product.price);
     const { data: saleId } = await sell(frontDesk, { lines: retail(1), payments: [{ method: "gift_card", amount_cents: amount, code: promo!.code }, ...(product.price > amount ? [{ method: "card", amount_cents: product.price - amount }] : [])] });
     const refund = (input: Record<string, unknown>) => manager.rpc("refund_sale", { p_sale_id: saleId!, p_input: input as never });
-    expect((await refund({ reason: "Returned", payments: [{ method: "cash", amount_cents: product.price }] })).error?.message).toBe("Promotional credit and package uses can't be refunded as cash or card");
+    expect((await refund({ reason: "Returned", payments: [{ method: "cash", amount_cents: product.price }] })).error?.message).toBe("Promotional credit, package uses and membership services can't be refunded as cash or card");
     expect((await refund({ reason: "Returned", payments: [{ method: "gift_card", amount_cents: amount, code: promo!.code }] })).error).toBeNull();
     expect(await balance(promo!.code)).toBe(2000);
   });

@@ -5,7 +5,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { describeClient } from "@/lib/insights/describe";
 import { loadClientInsights } from "@/lib/insights/read";
+import { memberPrices, type MemberPrices } from "@/lib/memberships";
+import { creditFor, loadClientMemberships, loadPlans, type ClientMembership, type MembershipPlan } from "@/lib/memberships-load";
 import { isUsable, loadClientPackages, loadTemplates, packageFor, withPackages, type ClientPackage, type PackageTemplate } from "@/lib/packages";
+import { currentProvider } from "@/lib/payments";
 import { suggestRebook, weeksUntilNext, type RebookSuggestion } from "@/lib/rebook";
 import { loadCheckoutSettings, loadRetailProducts, type CheckoutProduct, type CheckoutSettings } from "@/lib/sales";
 import { formatDay } from "@/lib/schedule-format";
@@ -27,7 +30,8 @@ export function safeReturn(path: string | null | undefined): string | null {
 }
 
 // A checkout for a visit (its open one if there is, else a new ticket with
-// the visit's services, using the client's package where it covers one),
+// the visit's services, using the client's package or what their
+// membership includes where one covers it),
 // or a new sale (optionally with a product on it). Returns the draft's id.
 export async function startCheckout(supabase: Supabase, me: Me, options: { appointmentId?: string | null; productId?: string | null; returnTo?: string | null }): Promise<string | null> {
   const returnTo = safeReturn(options.returnTo);
@@ -41,7 +45,9 @@ export async function startCheckout(supabase: Supabase, me: Me, options: { appoi
       .maybeSingle();
     if (!a || a.location_id !== me.location.id || !["booked", "confirmed", "checked_in"].includes(a.status)) return null;
     const packages = a.client_id ? (await loadClientPackages(supabase, a.client_id, true)).filter((p) => isUsable(p)) : [];
+    const memberships = a.client_id ? await loadClientMemberships(supabase, a.client_id, true) : [];
     const used = new Map<string, number>();
+    const creditsUsed = new Map<string, number>();
     const lines: ServiceLine[] = [...a.appointment_items]
       .sort((x, y) => x.starts_at.localeCompare(y.starts_at))
       .map((i) => {
@@ -53,6 +59,8 @@ export async function startCheckout(supabase: Supabase, me: Me, options: { appoi
           i.staff?.level ?? null,
         );
         if (offer) used.set(offer.item.id, (used.get(offer.item.id) ?? 0) + 1);
+        const included = offer ? null : creditFor(memberships, i.service_id, creditsUsed);
+        if (included) creditsUsed.set(included.credit.id, (creditsUsed.get(included.credit.id) ?? 0) + 1);
         return {
           key: key(),
           kind: "service",
@@ -66,6 +74,7 @@ export async function startCheckout(supabase: Supabase, me: Me, options: { appoi
           quantity: 1,
           discount: null,
           packageItemId: offer?.item.id ?? null,
+          membershipCreditId: included?.credit.id ?? null,
         };
       });
     const { data, error } = await supabase
@@ -102,6 +111,12 @@ export type CheckoutScreenData = {
   client: { id: string; name: string; firstName: string; email: string | null } | null;
   insight: { summary: string; tags: { label: string; tone: string }[] } | null;
   packages: ClientPackage[];
+  // Live memberships: what they include this period, and member prices.
+  memberships: ClientMembership[];
+  member: MemberPrices | null;
+  // Memberships for sale, and the provider renewals are charged through.
+  plans: MembershipPlan[];
+  provider: { id: string; label: string; testMode: boolean; testCards: { ref: string; label: string; outcome: string }[] };
   giftCards: { code: string; balanceCents: number; kind: "purchased" | "promotional" }[];
   staff: ScreenStaff[];
   services: ScreenService[];
@@ -126,7 +141,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
   const tz = me.location.timezone;
   const today = todayIn(tz, now);
 
-  const [staffRows, settings, products, templates, servicesRows, clientRow, overrides] = await Promise.all([
+  const [staffRows, settings, products, templates, servicesRows, clientRow, overrides, plans] = await Promise.all([
     supabase.from("staff").select("id, first_name, last_name, role, level, color, is_active, location_id").eq("location_id", me.location.id).eq("is_active", true),
     loadCheckoutSettings(supabase, me.business_id),
     loadRetailProducts(supabase, me.business_id, me.location.id),
@@ -134,6 +149,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     supabase.from("services").select("id, name, category, price_cents, archived_at, service_level_prices(level, price_cents)").eq("business_id", me.business_id).is("archived_at", null).order("name"),
     draft.client_id ? supabase.from("clients").select("id, first_name, last_name, email").eq("id", draft.client_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("stock_overrides").select("product_id").eq("draft_id", draft.id),
+    loadPlans(supabase, me.business_id),
   ]);
   if (staffRows.error) throw staffRows.error;
   if (servicesRows.error) throw servicesRows.error;
@@ -171,15 +187,18 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
   // The client: what Denise knows, packages and gift cards.
   let insight: CheckoutScreenData["insight"] = null;
   let packages: ClientPackage[] = [];
+  let memberships: ClientMembership[] = [];
   let giftCards: CheckoutScreenData["giftCards"] = [];
   let rebook: RebookSuggestion | null = null;
   if (client) {
-    const [insights, pkgs, cards] = await Promise.all([
+    const [insights, pkgs, cards, live] = await Promise.all([
       loadClientInsights(supabase, me.business_id, [client.id]),
       loadClientPackages(supabase, client.id, true),
       supabase.from("gift_cards").select("code, balance_cents, kind, expires_at").eq("client_id", client.id).eq("status", "active").gt("balance_cents", 0),
+      loadClientMemberships(supabase, client.id, true),
     ]);
     packages = pkgs.filter((p) => isUsable(p, now));
+    memberships = live;
     giftCards = (cards.data ?? []).filter((c) => !c.expires_at || new Date(c.expires_at) > now).map((c) => ({ code: c.code, balanceCents: c.balance_cents, kind: c.kind }));
     const names = new Map(staff.map((s) => [s.id, s.firstName]));
     const known = insights.get(client.id);
@@ -229,6 +248,10 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     client,
     insight,
     packages,
+    memberships,
+    member: memberPrices(memberships),
+    plans,
+    provider: (({ id, label, testMode, testCards }) => ({ id, label, testMode, testCards: testCards.map((c) => ({ ...c })) }))(currentProvider()),
     giftCards,
     staff,
     services,

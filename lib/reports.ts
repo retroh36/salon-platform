@@ -3,7 +3,7 @@
 // day's money by tender for the close-out. Pure (loading is in
 // ./reports-load.ts); Denise's answers about them use these too.
 
-import type { PaymentMethod } from "./checkout";
+import { METHOD_LABELS, type PaymentMethod } from "./checkout";
 
 export type CardRow = { kind: "purchased" | "promotional"; status: "active" | "voided"; balance_cents: number; expires_at: string | null };
 
@@ -55,16 +55,23 @@ export function giftCardActivity(events: readonly CardEventRow[]) {
   };
 }
 
-export type PaymentRow = { method: PaymentMethod; amount_cents: number };
+// processor: taken by a payment provider (a membership renewal, a payment
+// link), not at the desk.
+export type PaymentRow = { method: PaymentMethod; amount_cents: number; processor?: string | null };
 
-const METHODS: PaymentMethod[] = ["cash", "card", "gift_card", "package"];
+export type Tender = PaymentMethod | "card_on_file";
+const TENDERS: Tender[] = ["cash", "card", "card_on_file", "gift_card", "package", "membership"];
+export const TENDER_LABELS: Record<Tender, string> = { ...METHOD_LABELS, card: "Card at the desk", card_on_file: "Card online" };
 
-// A day's money by tender: taken, refunded (including voids), and net. The
-// cash that should be in the drawer is the net cash (change given is
-// already left out of the amounts).
+const tenderOf = (p: PaymentRow): Tender => (p.method === "card" && p.processor ? "card_on_file" : p.method);
+
+// A day's money by tender: taken, refunded (including voids), and net, with
+// cards taken online (renewals, payment links) apart from the desk's
+// terminal. The cash that should be in the drawer is the net cash (change
+// given is already left out of the amounts).
 export function closeout(payments: readonly PaymentRow[]) {
-  const byMethod = METHODS.map((method) => {
-    const rows = payments.filter((p) => p.method === method);
+  const byMethod = TENDERS.map((method) => {
+    const rows = payments.filter((p) => tenderOf(p) === method);
     const taken = rows.filter((p) => p.amount_cents > 0).reduce((n, p) => n + p.amount_cents, 0);
     const refunded = -rows.filter((p) => p.amount_cents < 0).reduce((n, p) => n + p.amount_cents, 0);
     return { method, takenCents: taken, refundedCents: refunded, netCents: taken - refunded };

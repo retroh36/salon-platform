@@ -172,7 +172,7 @@ describe("canceling", () => {
     // A service paid by the package can't be refunded as money.
     const { data: covered } = await admin.from("sale_items").select("sale_id").eq("package_item_id", item.id).limit(1).single();
     expect((await manager.rpc("refund_sale", { p_sale_id: covered!.sale_id, p_input: { reason: "Unhappy", payments: [{ method: "cash", amount_cents: 1000 }] } as never })).error?.message).toBe(
-      "Promotional credit and package uses can't be refunded as cash or card",
+      "Promotional credit, package uses and membership services can't be refunded as cash or card",
     );
   });
 

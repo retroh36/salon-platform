@@ -7,6 +7,8 @@ import { Sheet } from "@/components/ui/sheet";
 import { parseDollars, quickCash } from "@/lib/checkout";
 import type { CheckoutScreenData } from "@/lib/checkout-screen";
 import { cardProblem } from "@/lib/gift-cards";
+import { benefitsText, periodName, priceText } from "@/lib/memberships";
+import { creditFor } from "@/lib/memberships-load";
 import { packageFor, usesLeft } from "@/lib/packages";
 import { formatPrice } from "@/lib/services";
 import type { Ticket, TicketDiscount, TicketLine, TicketPayment, totalsOf } from "@/lib/ticket";
@@ -19,6 +21,8 @@ export type DialogState =
   | { kind: "add-service" }
   | { kind: "sell-gift-card" }
   | { kind: "sell-package" }
+  | { kind: "sell-membership" }
+  | { kind: "membership" }
   | { kind: "sale-discount" }
   | { kind: "card" }
   | { kind: "cash" }
@@ -59,6 +63,18 @@ export function Dialogs(props: Props) {
       return (
         <Sheet title="Sell a package" onClose={onClose}>
           <SellPackage {...props} />
+        </Sheet>
+      );
+    case "sell-membership":
+      return (
+        <Sheet title="Sell a membership" onClose={onClose}>
+          <SellMembership {...props} />
+        </Sheet>
+      );
+    case "membership":
+      return (
+        <Sheet title="Use their membership" onClose={onClose}>
+          <MembershipPay {...props} />
         </Sheet>
       );
     case "sale-discount":
@@ -263,6 +279,92 @@ function SellPackage({ data, onAddLine, onClose }: Props) {
         </li>
       ))}
       {!data.client && <li className="px-4 py-3 text-sm text-ink-muted">Packages need a client on the sale.</li>}
+    </ul>
+  );
+}
+
+// A membership: the plan, and the card it renews on. In test mode staff
+// pick a test card; a real provider saves the client's card on its reader.
+function SellMembership({ data, ticket, onAddLine, onClose }: Props) {
+  const taken = new Set([...data.memberships.map((m) => m.planId), ...ticket.lines.flatMap((l) => (l.kind === "membership" ? [l.planId] : []))]);
+  const [planId, setPlanId] = useState(data.plans.find((p) => !taken.has(p.id))?.id ?? "");
+  const [card, setCard] = useState(data.provider.testCards[0]?.ref ?? "");
+  const plan = data.plans.find((p) => p.id === planId);
+  if (!data.client) return <p className="text-ink-muted">Memberships need a client on the sale.</p>;
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const chosen = data.provider.testCards.find((c) => c.ref === card);
+        if (!plan || !chosen) return;
+        onAddLine({ key: newKey(), kind: "membership", planId: plan.id, name: plan.name, priceCents: plan.priceCents, provider: data.provider.id, cardRef: chosen.ref, cardLabel: chosen.label });
+        onClose();
+      }}
+    >
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1 text-sm font-medium">Membership</legend>
+        {data.plans.map((p) => (
+          <label key={p.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 ${planId === p.id ? "border-navy-900 bg-navy-100/40" : "border-line"} ${taken.has(p.id) ? "opacity-50" : ""}`}>
+            <input type="radio" name="plan" value={p.id} checked={planId === p.id} disabled={taken.has(p.id)} onChange={() => setPlanId(p.id)} className="mt-1" />
+            <span className="min-w-0 flex-1">
+              <span className="flex justify-between gap-3 font-medium">
+                {p.name}
+                <span className="tabular-nums">{priceText(p.priceCents, p.intervalUnit, p.intervalCount)}</span>
+              </span>
+              <span className="block text-sm text-ink-muted">{taken.has(p.id) ? `${data.client!.firstName} is already a member` : benefitsText(p)}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      <label className={labelClass}>
+        Card it renews on
+        <select value={card} onChange={(e) => setCard(e.target.value)} className={`${selectClass} h-12`}>
+          {data.provider.testCards.map((c) => (
+            <option key={c.ref} value={c.ref}>
+              {c.label} ({c.outcome.toLowerCase()})
+            </option>
+          ))}
+        </select>
+        {data.provider.testMode && <span className="text-xs font-normal text-ink-muted">Test mode: no real card is saved or charged. With Stripe, the client&apos;s card is saved on the reader.</span>}
+      </label>
+      <p className="text-sm text-ink-muted">Today&apos;s payment covers the first {plan ? periodName(plan.intervalUnit, plan.intervalCount) : "period"}; it renews automatically after that.</p>
+      <Button type="submit" variant="primary" size="lg" disabled={!plan || taken.has(planId) || !card}>
+        Add to ticket
+      </Button>
+    </form>
+  );
+}
+
+// Pays for a service with what their membership includes this period.
+function MembershipPay({ data, ticket, onUpdateLine, onClose }: Props) {
+  const used = new Map<string, number>();
+  for (const l of ticket.lines) if (l.kind === "service" && l.membershipCreditId) used.set(l.membershipCreditId, (used.get(l.membershipCreditId) ?? 0) + 1);
+  const options = ticket.lines.flatMap((l) => {
+    if (l.kind !== "service" || l.packageItemId || l.membershipCreditId || l.quantity !== 1) return [];
+    const offer = creditFor(data.memberships, l.serviceId, used);
+    return offer ? [{ line: l, offer }] : [];
+  });
+  if (!options.length) return <p className="text-ink-muted">No service on the ticket is included in {data.client?.firstName ?? "the client"}’s membership this period.</p>;
+  return (
+    <ul className="flex flex-col gap-2">
+      {options.map(({ line, offer }) => (
+        <li key={line.key}>
+          <Button
+            size="lg"
+            className="w-full justify-between"
+            onClick={() => {
+              onUpdateLine(line.key, { membershipCreditId: offer.credit.id, discount: null, unitPriceCents: line.basePriceCents, priceReason: "" } as Partial<TicketLine>);
+              onClose();
+            }}
+          >
+            <span>{line.name}</span>
+            <span className="text-sm font-normal">
+              {offer.membership.name}: {offer.credit.allowance - offer.credit.used - (used.get(offer.credit.id) ?? 0)} left
+            </span>
+          </Button>
+        </li>
+      ))}
     </ul>
   );
 }

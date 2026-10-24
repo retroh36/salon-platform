@@ -57,8 +57,9 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
     () => ({
       taxServicesBp: data.settings.taxServicesBp,
       taxRetailBp: data.settings.taxRetailBp,
+      member: data.member,
     }),
-    [data.settings],
+    [data.settings, data.member],
   );
 
   // Save as the ticket changes (after a short pause).
@@ -187,7 +188,8 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
       roles: data.settings.discountRoles,
       maxPercent: data.settings.discountMaxPercent,
     },
-    totals.discountCents,
+    // Member prices aren't staff discounts.
+    totals.discountCents - totals.memberDiscountCents,
     pool,
   );
   const problems = [
@@ -289,6 +291,7 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
         <PaymentPanel
           data={data}
           ticket={ticket}
+          rates={rates}
           totals={totals}
           problems={problems}
           message={message}

@@ -411,6 +411,56 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"client_memberships": {
+                  Row: {
+                    "allow_pause": boolean,"anchor_on": string,"business_id": string,"cancel_notice_days": number,"cancel_reason": string | null,"canceled_at": string | null,"cancels_on": string | null,"card_label": string | null,"client_id": string,"created_at": string,"created_by": string | null,"current_period_end": string,"current_period_start": string,"failed_attempts": number,"id": string,"interval_count": number,"interval_unit": string,"location_id": string,"max_pause_periods": number,"min_term_periods": number,"name": string,"next_retry_at": string | null,"pause_from": string | null,"payment_method_ref": string,"periods_paid": number,"plan_id": string | null,"price_cents": number,"provider": string,"resume_on": string | null,"retail_discount_pct": number,"sale_id": string | null,"service_discount_pct": number,"started_on": string,"status": Database["public"]['Enums']["membership_status"]
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "allow_pause"?: boolean,"anchor_on": string,"business_id": string,"cancel_notice_days"?: number,"cancel_reason"?: string | null,"canceled_at"?: string | null,"cancels_on"?: string | null,"card_label"?: string | null,"client_id": string,"created_at"?: string,"created_by"?: string | null,"current_period_end": string,"current_period_start": string,"failed_attempts"?: number,"id"?: string,"interval_count": number,"interval_unit": string,"location_id": string,"max_pause_periods"?: number,"min_term_periods"?: number,"name": string,"next_retry_at"?: string | null,"pause_from"?: string | null,"payment_method_ref": string,"periods_paid"?: number,"plan_id"?: string | null,"price_cents": number,"provider"?: string,"resume_on"?: string | null,"retail_discount_pct"?: number,"sale_id"?: string | null,"service_discount_pct"?: number,"started_on": string,"status"?: Database["public"]['Enums']["membership_status"]
+                  }
+                  Update: {
+                    "allow_pause"?: boolean,"anchor_on"?: string,"business_id"?: string,"cancel_notice_days"?: number,"cancel_reason"?: string | null,"canceled_at"?: string | null,"cancels_on"?: string | null,"card_label"?: string | null,"client_id"?: string,"created_at"?: string,"created_by"?: string | null,"current_period_end"?: string,"current_period_start"?: string,"failed_attempts"?: number,"id"?: string,"interval_count"?: number,"interval_unit"?: string,"location_id"?: string,"max_pause_periods"?: number,"min_term_periods"?: number,"name"?: string,"next_retry_at"?: string | null,"pause_from"?: string | null,"payment_method_ref"?: string,"periods_paid"?: number,"plan_id"?: string | null,"price_cents"?: number,"provider"?: string,"resume_on"?: string | null,"retail_discount_pct"?: number,"sale_id"?: string | null,"service_discount_pct"?: number,"started_on"?: string,"status"?: Database["public"]['Enums']["membership_status"]
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "client_memberships_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_memberships_client_id_fkey"
+      columns: ["client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_memberships_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_memberships_location_id_fkey"
+      columns: ["location_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_memberships_plan_id_fkey"
+      columns: ["plan_id"]
+isOneToOne: false
+      referencedRelation: "membership_plans"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_memberships_sale_id_fkey"
+      columns: ["sale_id"]
+isOneToOne: false
+      referencedRelation: "sales"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"client_package_items": {
                   Row: {
                     "business_id": string,"client_package_id": string,"id": string,"service_id": string,"total": number,"use_value_cents": number,"used": number
@@ -845,6 +895,166 @@ isOneToOne: false
                   Relationships: [
                     {
       foreignKeyName: "locations_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"membership_charges": {
+                  Row: {
+                    "amount_cents": number,"attempt": number,"business_id": string,"created_at": string,"failure_reason": string | null,"id": string,"membership_id": string,"period_start": string,"provider": string,"provider_reference": string | null,"sale_id": string | null,"status": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount_cents": number,"attempt"?: number,"business_id": string,"created_at"?: string,"failure_reason"?: string | null,"id"?: string,"membership_id": string,"period_start": string,"provider": string,"provider_reference"?: string | null,"sale_id"?: string | null,"status": string
+                  }
+                  Update: {
+                    "amount_cents"?: number,"attempt"?: number,"business_id"?: string,"created_at"?: string,"failure_reason"?: string | null,"id"?: string,"membership_id"?: string,"period_start"?: string,"provider"?: string,"provider_reference"?: string | null,"sale_id"?: string | null,"status"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "membership_charges_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "membership_charges_membership_id_fkey"
+      columns: ["membership_id"]
+isOneToOne: false
+      referencedRelation: "client_memberships"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "membership_charges_sale_id_fkey"
+      columns: ["sale_id"]
+isOneToOne: false
+      referencedRelation: "sales"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"membership_credits": {
+                  Row: {
+                    "allowance": number,"business_id": string,"id": string,"membership_id": string,"period_start": string,"service_id": string,"used": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "allowance": number,"business_id": string,"id"?: string,"membership_id": string,"period_start": string,"service_id": string,"used"?: number
+                  }
+                  Update: {
+                    "allowance"?: number,"business_id"?: string,"id"?: string,"membership_id"?: string,"period_start"?: string,"service_id"?: string,"used"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "membership_credits_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "membership_credits_membership_id_fkey"
+      columns: ["membership_id"]
+isOneToOne: false
+      referencedRelation: "client_memberships"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "membership_credits_service_id_fkey"
+      columns: ["service_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"membership_events": {
+                  Row: {
+                    "business_id": string,"created_at": string,"detail": string | null,"id": string,"kind": string,"membership_id": string,"sale_id": string | null,"service_id": string | null,"staff_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"detail"?: string | null,"id"?: string,"kind": string,"membership_id": string,"sale_id"?: string | null,"service_id"?: string | null,"staff_id"?: string | null
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"detail"?: string | null,"id"?: string,"kind"?: string,"membership_id"?: string,"sale_id"?: string | null,"service_id"?: string | null,"staff_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "membership_events_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "membership_events_membership_id_fkey"
+      columns: ["membership_id"]
+isOneToOne: false
+      referencedRelation: "client_memberships"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "membership_events_sale_id_fkey"
+      columns: ["sale_id"]
+isOneToOne: false
+      referencedRelation: "sales"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "membership_events_service_id_fkey"
+      columns: ["service_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "membership_events_staff_id_fkey"
+      columns: ["staff_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"membership_plan_services": {
+                  Row: {
+                    "business_id": string,"id": string,"plan_id": string,"quantity": number,"rollover": boolean,"service_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"id"?: string,"plan_id": string,"quantity": number,"rollover"?: boolean,"service_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"id"?: string,"plan_id"?: string,"quantity"?: number,"rollover"?: boolean,"service_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "membership_plan_services_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "membership_plan_services_plan_id_fkey"
+      columns: ["plan_id"]
+isOneToOne: false
+      referencedRelation: "membership_plans"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "membership_plan_services_service_id_fkey"
+      columns: ["service_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"membership_plans": {
+                  Row: {
+                    "allow_pause": boolean,"business_id": string,"cancel_notice_days": number,"created_at": string,"description": string | null,"id": string,"interval_count": number,"interval_unit": string,"is_active": boolean,"max_pause_periods": number,"min_term_periods": number,"name": string,"price_cents": number,"retail_discount_pct": number,"service_discount_pct": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "allow_pause"?: boolean,"business_id": string,"cancel_notice_days"?: number,"created_at"?: string,"description"?: string | null,"id"?: string,"interval_count"?: number,"interval_unit"?: string,"is_active"?: boolean,"max_pause_periods"?: number,"min_term_periods"?: number,"name": string,"price_cents": number,"retail_discount_pct"?: number,"service_discount_pct"?: number,"updated_at"?: string
+                  }
+                  Update: {
+                    "allow_pause"?: boolean,"business_id"?: string,"cancel_notice_days"?: number,"created_at"?: string,"description"?: string | null,"id"?: string,"interval_count"?: number,"interval_unit"?: string,"is_active"?: boolean,"max_pause_periods"?: number,"min_term_periods"?: number,"name"?: string,"price_cents"?: number,"retail_discount_pct"?: number,"service_discount_pct"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "membership_plans_business_id_fkey"
       columns: ["business_id"]
 isOneToOne: false
       referencedRelation: "businesses"
@@ -1353,14 +1563,14 @@ isOneToOne: false
                   ]
                 },"sale_items": {
                   Row: {
-                    "appointment_item_id": string | null,"booked_price_cents": number | null,"business_id": string,"client_package_id": string | null,"description": string,"discount_cents": number,"gift_card_id": string | null,"id": string,"kind": Database["public"]['Enums']["sale_item_kind"],"line_discount_cents": number,"line_discount_reason": string | null,"package_item_id": string | null,"position": number,"price_reason": string | null,"product_id": string | null,"quantity": number,"returned_quantity": number,"sale_id": string,"service_id": string | null,"staff_id": string | null,"tax_cents": number,"total_cents": number,"unit_price_cents": number
+                    "appointment_item_id": string | null,"booked_price_cents": number | null,"business_id": string,"client_package_id": string | null,"description": string,"discount_cents": number,"gift_card_id": string | null,"id": string,"kind": Database["public"]['Enums']["sale_item_kind"],"line_discount_cents": number,"line_discount_reason": string | null,"member_discount_cents": number,"membership_credit_id": string | null,"membership_id": string | null,"package_item_id": string | null,"position": number,"price_reason": string | null,"product_id": string | null,"quantity": number,"returned_quantity": number,"sale_id": string,"service_id": string | null,"staff_id": string | null,"tax_cents": number,"total_cents": number,"unit_price_cents": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id": string,"client_package_id"?: string | null,"description": string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["sale_item_kind"],"line_discount_cents"?: number,"line_discount_reason"?: string | null,"package_item_id"?: string | null,"position": number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id": string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents": number,"unit_price_cents": number
+                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id": string,"client_package_id"?: string | null,"description": string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["sale_item_kind"],"line_discount_cents"?: number,"line_discount_reason"?: string | null,"member_discount_cents"?: number,"membership_credit_id"?: string | null,"membership_id"?: string | null,"package_item_id"?: string | null,"position": number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id": string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents": number,"unit_price_cents": number
                   }
                   Update: {
-                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id"?: string,"client_package_id"?: string | null,"description"?: string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["sale_item_kind"],"line_discount_cents"?: number,"line_discount_reason"?: string | null,"package_item_id"?: string | null,"position"?: number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id"?: string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents"?: number,"unit_price_cents"?: number
+                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id"?: string,"client_package_id"?: string | null,"description"?: string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["sale_item_kind"],"line_discount_cents"?: number,"line_discount_reason"?: string | null,"member_discount_cents"?: number,"membership_credit_id"?: string | null,"membership_id"?: string | null,"package_item_id"?: string | null,"position"?: number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id"?: string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents"?: number,"unit_price_cents"?: number
                   }
                   Relationships: [
                     {
@@ -1380,6 +1590,18 @@ isOneToOne: false
       columns: ["gift_card_id"]
 isOneToOne: false
       referencedRelation: "gift_cards"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sale_items_membership_credit_id_fkey"
+      columns: ["membership_credit_id"]
+isOneToOne: false
+      referencedRelation: "membership_credits"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sale_items_membership_id_fkey"
+      columns: ["membership_id"]
+isOneToOne: false
+      referencedRelation: "client_memberships"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "sale_items_package_item_id_fkey"
@@ -2239,6 +2461,9 @@ isOneToOne: false
 "adjust_stock":
 { Args: { "p_change": number,"p_location_id": string,"p_note": string,"p_product_id": string,"p_reason": Database["public"]['Enums']["stock_reason"] }; Returns: number
                            },
+"advance_membership":
+{ Args: { "p_membership_id": string,"p_today": string }; Returns: Json
+                           },
 "ai_usage_today":
 { Args: { "p_business_id": string }; Returns: {
               "daily_limit": number,"used": number
@@ -2255,6 +2480,9 @@ isOneToOne: false
                            },
 "approve_stock_override":
 { Args: { "p_draft_id": string,"p_product_id": string }; Returns: undefined
+                           },
+"cancel_membership":
+{ Args: { "p_membership_id": string,"p_now": boolean,"p_reason": string }; Returns: string
                            },
 "cancel_online_appointment":
 { Args: { "p_appointment_id": string,"p_manage_token_hash": string }; Returns: undefined
@@ -2298,6 +2526,9 @@ isOneToOne: false
 "issue_promo_card":
 { Args: { "p_amount_cents": number,"p_client_id": string,"p_expires_in_days": number,"p_reason": string,"p_recipient_email": string,"p_recipient_name": string }; Returns: string
                            },
+"keep_membership":
+{ Args: { "p_membership_id": string }; Returns: undefined
+                           },
 "log_data_export":
 { Args: { "p_business_id": string,"p_bytes": number,"p_row_counts": Json }; Returns: string
                            },
@@ -2309,6 +2540,9 @@ isOneToOne: false
                            },
 "move_time_block":
 { Args: { "p_block_id": string,"p_end": number,"p_on_date": string,"p_start": number }; Returns: string
+                           },
+"pause_membership":
+{ Args: { "p_membership_id": string,"p_periods": number }; Returns: undefined
                            },
 "payroll_sales":
 { Args: { "p_business_id": string,"p_from": string,"p_staff_id"?: string,"p_to": string }; Returns: Json
@@ -2331,6 +2565,9 @@ isOneToOne: false
 "record_item_time":
 { Args: { "p_event": string,"p_item_id": string }; Returns: undefined
                            },
+"record_membership_charge":
+{ Args: { "p_membership_id": string,"p_result": Json,"p_today": string }; Returns: Json
+                           },
 "refund_sale":
 { Args: { "p_input": Json,"p_sale_id": string }; Returns: undefined
                            },
@@ -2343,11 +2580,20 @@ isOneToOne: false
 "report_running_late":
 { Args: { "p_item_id": string,"p_minutes": number }; Returns: string
                            },
+"resume_membership":
+{ Args: { "p_membership_id": string }; Returns: undefined
+                           },
+"retry_membership_payment":
+{ Args: { "p_membership_id": string }; Returns: undefined
+                           },
 "save_appointment":
 { Args: { "p_appointment_id": string,"p_client_id": string,"p_expected_version": number,"p_items": Json,"p_location_id": string,"p_notes": string }; Returns: string
                            },
 "save_closeout":
 { Args: { "p_counted_cents": number,"p_day": string,"p_location_id": string,"p_note": string }; Returns: number
+                           },
+"save_membership_plan":
+{ Args: { "p_business_id": string,"p_input": Json,"p_plan_id": string }; Returns: string
                            },
 "save_online_appointment":
 { Args: { "p_appointment_id": string,"p_client_id": string,"p_expected_version": number,"p_items": Json,"p_location_id": string,"p_manage_token_hash": string,"p_notes": string }; Returns: string
@@ -2427,6 +2673,9 @@ isOneToOne: false
 "undo_reorder_draft":
 { Args: { "p_action_id": string }; Returns: undefined
                            },
+"update_membership_card":
+{ Args: { "p_label": string,"p_membership_id": string,"p_provider": string,"p_ref": string }; Returns: undefined
+                           },
 "void_gift_card":
 { Args: { "p_card_id": string,"p_reason": string }; Returns: undefined
                            },
@@ -2435,7 +2684,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","client_package_status": "active"|"canceled"|"refunded","deposit_kind": "none"|"fixed"|"percent","disruption_kind": "overrun"|"client_late"|"call_out","form_requirement": "none"|"first_visit"|"services","gift_card_kind": "purchased"|"promotional","gift_card_status": "active"|"voided","notification_status": "pending"|"sent"|"canceled","online_service_mode": "bookable"|"consultation"|"off","patch_test_result": "no_reaction"|"reaction","payment_method": "cash"|"card"|"gift_card"|"package","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","sale_item_kind": "service"|"product"|"gift_card"|"gift_card_reload"|"package","sale_status": "completed"|"partly_refunded"|"refunded"|"voided","staff_level": "artisan"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
+            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","client_package_status": "active"|"canceled"|"refunded","deposit_kind": "none"|"fixed"|"percent","disruption_kind": "overrun"|"client_late"|"call_out","form_requirement": "none"|"first_visit"|"services","gift_card_kind": "purchased"|"promotional","gift_card_status": "active"|"voided","membership_status": "active"|"past_due"|"paused"|"canceled","notification_status": "pending"|"sent"|"canceled","online_service_mode": "bookable"|"consultation"|"off","patch_test_result": "no_reaction"|"reaction","payment_method": "cash"|"card"|"gift_card"|"package"|"membership","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","sale_item_kind": "service"|"product"|"gift_card"|"gift_card_reload"|"package"|"membership","sale_status": "completed"|"partly_refunded"|"refunded"|"voided","staff_level": "artisan"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -2555,7 +2804,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"client_package_status": ["active", "canceled", "refunded"],"deposit_kind": ["none", "fixed", "percent"],"disruption_kind": ["overrun", "client_late", "call_out"],"form_requirement": ["none", "first_visit", "services"],"gift_card_kind": ["purchased", "promotional"],"gift_card_status": ["active", "voided"],"notification_status": ["pending", "sent", "canceled"],"online_service_mode": ["bookable", "consultation", "off"],"patch_test_result": ["no_reaction", "reaction"],"payment_method": ["cash", "card", "gift_card", "package"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"sale_item_kind": ["service", "product", "gift_card", "gift_card_reload", "package"],"sale_status": ["completed", "partly_refunded", "refunded", "voided"],"staff_level": ["artisan", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
+            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"client_package_status": ["active", "canceled", "refunded"],"deposit_kind": ["none", "fixed", "percent"],"disruption_kind": ["overrun", "client_late", "call_out"],"form_requirement": ["none", "first_visit", "services"],"gift_card_kind": ["purchased", "promotional"],"gift_card_status": ["active", "voided"],"membership_status": ["active", "past_due", "paused", "canceled"],"notification_status": ["pending", "sent", "canceled"],"online_service_mode": ["bookable", "consultation", "off"],"patch_test_result": ["no_reaction", "reaction"],"payment_method": ["cash", "card", "gift_card", "package", "membership"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"sale_item_kind": ["service", "product", "gift_card", "gift_card_reload", "package", "membership"],"sale_status": ["completed", "partly_refunded", "refunded", "voided"],"staff_level": ["artisan", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
           }
         }
 } as const

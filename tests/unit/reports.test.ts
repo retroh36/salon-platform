@@ -65,6 +65,18 @@ describe("closing out the day", () => {
     expect(c.byMethod.find((m) => m.method === "cash")).toEqual({ method: "cash", takenCents: 6500, refundedCents: 2000, netCents: 4500 });
     expect(c.netCents).toBe(4500 + 12000 + 3000 + 4500);
   });
+
+  it("keeps cards taken online (renewals, payment links) apart from the desk's terminal", () => {
+    const c = closeout([
+      { method: "card", amount_cents: 12000, processor: null },
+      { method: "card", amount_cents: 8900, processor: "test" },
+      { method: "membership", amount_cents: 4500 },
+    ]);
+    expect(c.byMethod.find((m) => m.method === "card")!.netCents).toBe(12000);
+    expect(c.byMethod.find((m) => m.method === "card_on_file")!.netCents).toBe(8900);
+    expect(c.byMethod.find((m) => m.method === "membership")!.netCents).toBe(4500);
+    expect(c.expectedCashCents).toBe(0);
+  });
 });
 
 describe("rebooked at checkout", () => {

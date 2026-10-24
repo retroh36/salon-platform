@@ -1698,7 +1698,7 @@ function AppointmentBlock({
     block.clientName,
     block.service,
     `${time} · ${stylist}`,
-    [STATUS_LABELS[block.status], late && lateText, block.group && block.group.label, block.series && "repeating", block.online && "booked online"]
+    [STATUS_LABELS[block.status], late && lateText, block.group && block.group.label, block.series && "repeating", block.online && "booked online", block.member]
       .filter(Boolean)
       .join(" · "),
     ...(others.length ? ["Whole visit:", ...block.parts.map((p) => `${p.service} · ${p.staff}, ${formatMinute(p.start)}–${formatMinute(p.end)}`)] : []),
@@ -1717,6 +1717,7 @@ function AppointmentBlock({
     block.series && "repeating",
     block.group && `group: ${block.group.label}`,
     block.online && "booked online",
+    block.member,
     STATUS_LABELS[block.status],
     late && (notArrived ? "not arrived" : "running late"),
   ]

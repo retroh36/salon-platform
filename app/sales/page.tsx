@@ -85,8 +85,8 @@ async function Sales({ searchParams }: Pick<PageProps<"/sales">, "searchParams">
       </nav>
 
       <Card title="Taken" titleId="taken-heading" description="By how it was paid, after refunds and voids.">
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-5" data-testid="sales-by-tender">
-          {(["cash", "card", "gift_card", "package"] as const).map((m) => (
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-6" data-testid="sales-by-tender">
+          {(["cash", "card", "gift_card", "package", "membership"] as const).map((m) => (
             <div key={m}>
               <dt className="text-sm text-ink-muted">{METHOD_LABELS[m]}</dt>
               <dd className="font-serif text-2xl font-semibold text-navy-900 tabular-nums">{formatPrice(byTender.get(m) ?? 0)}</dd>

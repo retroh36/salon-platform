@@ -228,6 +228,14 @@ export function AppointmentPanel({
               <span className="tabular-nums">{formatPrice(total)}</span>
             </p>
           )}
+          {appointment.membership && (
+            <p className={`flex items-start gap-1.5 ${appointment.membership.status === "past_due" ? "text-status-late-ink" : "text-ink-muted"}`} data-testid="membership-info">
+              <svg aria-hidden viewBox="0 0 24 24" className="mt-0.5 size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.75}>
+                <path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z" strokeLinejoin="round" />
+              </svg>
+              <span>{appointment.membership.text}</span>
+            </p>
+          )}
           {appointment.series && (
             <p className="flex items-center gap-1.5 text-ink-muted" data-testid="series-info">
               <svg aria-hidden viewBox="0 0 24 24" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.75}>

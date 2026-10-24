@@ -75,10 +75,10 @@ export async function loadGiftCardActivity(supabase: Supabase, businessId: strin
 
 export async function loadCloseout(supabase: Supabase, location: { id: string; timezone: string }, day: LocalDate) {
   const [payments, { data: saved, error }] = await Promise.all([
-    all<{ method: Database["public"]["Enums"]["payment_method"]; amount_cents: number }>((from, to) =>
+    all<{ method: Database["public"]["Enums"]["payment_method"]; amount_cents: number; processor: string | null }>((from, to) =>
       supabase
         .from("payments")
-        .select("method, amount_cents")
+        .select("method, amount_cents, processor")
         .eq("location_id", location.id)
         .gte("created_at", startOfLocalDay(day, location.timezone).toISOString())
         .lt("created_at", startOfLocalDay(addDays(day, 1), location.timezone).toISOString())

@@ -13,7 +13,8 @@ import { parseDollars } from "@/lib/checkout";
 import type { CheckoutScreenData } from "@/lib/checkout-screen";
 import { usesLeft } from "@/lib/packages";
 import { centsToInput, formatPrice } from "@/lib/services";
-import { grossOf, ownDiscountOf, stylistGroups, type Rates, type Ticket, type TicketDiscount, type TicketLine } from "@/lib/ticket";
+import { priceText } from "@/lib/memberships";
+import { grossOf, isCovered, memberDiscountOf, ownDiscountOf, stylistGroups, type Rates, type Ticket, type TicketDiscount, type TicketLine } from "@/lib/ticket";
 import { setSaleClient } from "../actions";
 import type { DialogState } from "./dialogs";
 
@@ -39,6 +40,22 @@ export function ClientHeader({ data }: { data: CheckoutScreenData }) {
                 Package: {data.packages.flatMap((p) => p.items.filter((i) => i.used < i.total).map(usesLeft)).join(", ")}
               </span>
             )}
+            {data.memberships.map((m) => (
+              <span
+                key={m.id}
+                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${m.status === "past_due" ? "bg-status-late-bg text-status-late-ink" : "bg-denise-50 text-navy-900"}`}
+                data-testid="badge-membership"
+              >
+                {m.name}
+                {m.status === "past_due"
+                  ? ": payment failed, no member benefits"
+                  : m.status === "paused"
+                    ? ": paused"
+                    : m.credits.length
+                      ? ` · ${m.credits.map((c) => `${c.serviceName}: ${c.allowance - c.used} left`).join(", ")}`
+                      : ""}
+              </span>
+            ))}
             {giftCents > 0 && (
               <span className="rounded-full bg-status-checked-in-bg px-2.5 py-0.5 text-xs font-semibold text-status-checked-in-ink" data-testid="badge-gift-card">
                 Gift card: {formatPrice(giftCents)}
@@ -137,11 +154,12 @@ function lineTitle(line: TicketLine): string {
     case "gift_card_reload":
       return "Gift card reload";
     case "package":
+    case "membership":
       return line.name;
   }
 }
 
-const KIND_LABEL: Record<TicketLine["kind"], string> = { service: "Service", product: "Product", gift_card: "Gift card", gift_card_reload: "Reload", package: "Package" };
+const KIND_LABEL: Record<TicketLine["kind"], string> = { service: "Service", product: "Product", gift_card: "Gift card", gift_card_reload: "Reload", package: "Package", membership: "Member" };
 
 // Every line, grouped by stylist with a subtotal each, like a receipt
 // being built. Tap a line to edit it; the × removes it (with Undo).
@@ -169,8 +187,7 @@ export function TicketList({
   onDialog: (d: DialogState) => void;
 }) {
   const names = new Map(data.staff.map((s) => [s.id, s]));
-  const groups = stylistGroups(ticket);
-  void rates;
+  const groups = stylistGroups(ticket, rates);
   return (
     <div className="flex flex-col gap-4">
       {groups.length === 0 && (
@@ -194,6 +211,7 @@ export function TicketList({
                   key={line.key}
                   data={data}
                   line={line}
+                  rates={rates}
                   open={editing === line.key}
                   arrived={arrived === line.key}
                   short={line.kind === "product" ? shortOf(line.productId) : null}
@@ -222,6 +240,12 @@ export function TicketList({
             Package
           </Button>
         )}
+        {data.plans.length > 0 && (
+          <Button size="lg" variant="ghost" onClick={() => onDialog({ kind: "sell-membership" })}>
+            <PlusIcon className="size-5" />
+            Membership
+          </Button>
+        )}
         <Button size="lg" variant="ghost" onClick={() => onDialog({ kind: "sale-discount" })}>
           {ticket.saleDiscount && ticket.saleDiscount.value > 0 ? "Change discount" : "Discount the whole sale"}
         </Button>
@@ -230,7 +254,7 @@ export function TicketList({
   );
 }
 
-function detailOf(line: TicketLine, data: CheckoutScreenData): string[] {
+function detailOf(line: TicketLine, data: CheckoutScreenData, rates: Rates): string[] {
   const staff = (id: string | null) => data.staff.find((s) => s.id === id)?.firstName;
   const out: string[] = [];
   if (line.kind === "service") {
@@ -238,19 +262,28 @@ function detailOf(line: TicketLine, data: CheckoutScreenData): string[] {
     if (!line.appointmentItemId) out.push("added at checkout");
     if (line.unitPriceCents !== line.basePriceCents) out.push(`was ${formatPrice(line.basePriceCents)}${line.priceReason ? `: ${line.priceReason}` : ""}`);
     if (line.packageItemId) out.push("paid with package");
+    if (line.membershipCreditId) out.push(`included in ${data.memberships.find((m) => m.credits.some((c) => c.id === line.membershipCreditId))?.name ?? "their membership"}`);
   }
+  const member = memberDiscountOf(line, rates);
+  if (member > 0 && rates.member) out.push(`member price, ${line.kind === "service" ? rates.member.servicePct : rates.member.retailPct}% off`);
   if (line.kind === "product") out.push(line.staffId ? `sold by ${staff(line.staffId)}` : "no stylist credited");
   if ((line.kind === "service" || line.kind === "product") && line.discount && line.discount.value > 0)
     out.push(`${line.discount.kind === "percent" ? `${line.discount.value}%` : formatPrice(line.discount.value)} off${line.discount.reason ? `: ${line.discount.reason}` : ""}`);
   if (line.kind === "gift_card") out.push(line.physical ? `card ${line.code}` : `for ${line.recipientName || line.recipientEmail}`);
   if (line.kind === "gift_card_reload") out.push(`card ${line.code}`);
   if (line.kind === "package") out.push(`for ${data.client?.firstName ?? "the client"}`);
+  if (line.kind === "membership") {
+    const plan = data.plans.find((p) => p.id === line.planId);
+    if (plan) out.push(priceText(plan.priceCents, plan.intervalUnit, plan.intervalCount));
+    out.push(`renews on ${line.cardLabel}`);
+  }
   return out;
 }
 
 function TicketRow({
   data,
   line,
+  rates,
   open,
   arrived,
   short,
@@ -261,6 +294,7 @@ function TicketRow({
 }: {
   data: CheckoutScreenData;
   line: TicketLine;
+  rates: Rates;
   open: boolean;
   arrived: boolean;
   short: number | null;
@@ -278,7 +312,7 @@ function TicketRow({
   const [dx, setDx] = useState(0);
   const qty = line.kind === "service" || line.kind === "product" ? line.quantity : 1;
   const unit = line.kind === "service" || line.kind === "product" ? line.unitPriceCents : grossOf(line);
-  const total = grossOf(line) - ownDiscountOf(line);
+  const total = grossOf(line) - ownDiscountOf(line, rates);
   const title = lineTitle(line);
   return (
     <li ref={row} className={`relative ${arrived ? "animate-ticket-in" : ""}`} data-testid="ticket-line" data-kind={line.kind}>
@@ -312,7 +346,7 @@ function TicketRow({
           <span className="w-16 shrink-0 text-xs font-semibold tracking-wide text-ink-muted uppercase">{KIND_LABEL[line.kind]}</span>
           <span className="min-w-0 flex-1">
             <span className="block truncate font-medium text-ink">{title}</span>
-            <span className="block truncate text-sm text-ink-muted">{detailOf(line, data).join(" · ")}</span>
+            <span className="block truncate text-sm text-ink-muted">{detailOf(line, data, rates).join(" · ")}</span>
             {short !== null && (
               <span className="mt-0.5 block text-sm font-medium text-status-late-ink" data-testid="out-of-stock">
                 Only {short} in stock
@@ -355,10 +389,15 @@ function LineEditor({
   onOverride: () => void;
 }) {
   const [price, setPrice] = useState(line.kind === "service" ? centsToInput(line.unitPriceCents) : "");
-  const canQuantity = line.kind === "product" || (line.kind === "service" && !line.appointmentItemId && !line.packageItemId);
+  const canQuantity = line.kind === "product" || (line.kind === "service" && !line.appointmentItemId && !isCovered(line));
   return (
     <div className="flex animate-fade-in flex-col gap-4 border-t border-line bg-sunken/40 px-4 py-4" aria-label={`Edit ${lineTitle(line)}`} role="group">
-      {line.kind === "service" && !line.packageItemId && (
+      {line.kind === "service" && line.membershipCreditId && (
+        <Button className="self-start" onClick={() => onUpdate({ membershipCreditId: null } as Partial<TicketLine>)}>
+          Don&apos;t use the membership for this
+        </Button>
+      )}
+      {line.kind === "service" && !isCovered(line) && (
         <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
           <label className={labelClass}>
             Price ($)
@@ -416,7 +455,7 @@ function LineEditor({
           </label>
         )}
       </div>
-      {(line.kind === "service" || line.kind === "product") && !(line.kind === "service" && line.packageItemId) && (
+      {(line.kind === "service" || line.kind === "product") && !isCovered(line) && (
         <LineDiscount discount={line.discount} onChange={(discount) => onUpdate({ discount })} />
       )}
       {short !== null && (

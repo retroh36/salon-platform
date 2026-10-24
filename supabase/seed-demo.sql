@@ -639,6 +639,84 @@ where business_id = 'b0000000-0000-4000-8000-000000000001';
 update public.client_package_items set used = pg_temp.rnd('used' || id) % total
 where business_id = 'b0000000-0000-4000-8000-000000000001';
 
+-- Memberships: a Blowout Club and a Color Club, with members who joined
+-- over the last few months (three of them coming in today), a few who
+-- left, one paused and one whose last payment failed. Their history is
+-- charges and events only (no renewal sales in the demo history).
+insert into public.membership_plans (id, business_id, name, description, price_cents, interval_unit, interval_count, service_discount_pct, retail_discount_pct, min_term_periods, cancel_notice_days, allow_pause, max_pause_periods)
+values
+  ('e4000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'Blowout Club', 'Two blowouts a month and member prices on retail.', 8900, 'month', 1, 0, 10, 0, 0, true, 2),
+  ('e4000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'Color Club', 'A root touch-up every month, member prices on everything.', 14900, 'month', 1, 10, 15, 3, 14, true, 1);
+insert into public.membership_plan_services (plan_id, business_id, service_id, quantity, rollover)
+select p.id::uuid, 'b0000000-0000-4000-8000-000000000001', s.id, p.quantity, p.rollover
+from (values
+  ('e4000000-0000-4000-8000-000000000001', 'Blowout', 2, false),
+  ('e4000000-0000-4000-8000-000000000002', 'Root Touch-Up', 1, true)
+) as p (id, service, quantity, rollover)
+join public.services s on s.business_id = 'b0000000-0000-4000-8000-000000000001' and s.name = p.service;
+
+create temp table seed_members as
+select row_number() over (order by c.id) as n, c.id as client_id
+from (
+  (select distinct a.client_id as id from public.appointments a
+   where a.business_id = 'b0000000-0000-4000-8000-000000000001' and a.client_id is not null
+     and (a.starts_at at time zone 'America/Chicago')::date = (now() at time zone 'America/Chicago')::date
+     and a.status not in ('canceled', 'no_show')
+     and a.client_id not in (select client_id from seed_package_clients)
+   order by a.client_id offset 8 limit 3)
+  union
+  (select id from public.clients where business_id = 'b0000000-0000-4000-8000-000000000001' order by id offset 300 limit 31)
+) c;
+
+insert into public.client_memberships (business_id, location_id, client_id, plan_id, name, price_cents, interval_unit, interval_count, service_discount_pct, retail_discount_pct,
+  min_term_periods, cancel_notice_days, allow_pause, max_pause_periods, started_on, anchor_on, periods_paid, current_period_start, current_period_end, provider, payment_method_ref, card_label, created_by, created_at)
+select 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', m.client_id, p.id, p.name, p.price_cents, p.interval_unit, p.interval_count,
+       p.service_discount_pct, p.retail_discount_pct, p.min_term_periods, p.cancel_notice_days, p.allow_pause, p.max_pause_periods,
+       x.started, x.started, x.months + 1, (x.started + make_interval(months => x.months))::date, (x.started + make_interval(months => x.months + 1))::date,
+       'test', 'test_visa_4242', 'Visa …4242', 'd0000000-0000-4000-8000-000000000003', x.started::timestamp at time zone 'America/Chicago' + interval '11 hours'
+from seed_members m
+join public.membership_plans p on p.id = case when m.n % 3 = 0 then 'e4000000-0000-4000-8000-000000000002'::uuid else 'e4000000-0000-4000-8000-000000000001'::uuid end
+cross join lateral (select (now() at time zone 'America/Chicago')::date - (12 + pg_temp.rnd('joined' || m.client_id) % 120) as started) s
+cross join lateral (select s.started, (extract(year from age((now() at time zone 'America/Chicago')::date, s.started)) * 12 + extract(month from age((now() at time zone 'America/Chicago')::date, s.started)))::int as months) x;
+
+-- What they've paid, and what's included this month (some used already).
+insert into public.membership_charges (business_id, membership_id, period_start, amount_cents, status, attempt, provider, provider_reference, created_at)
+select m.business_id, m.id, (m.anchor_on + make_interval(months => k))::date, m.price_cents, 'succeeded', 1,
+       case when k = 0 then 'checkout' else 'test' end, case when k > 0 then 'test_ch_seed_' || left(md5(m.id || ':' || k), 16) end,
+       (m.anchor_on + make_interval(months => k))::timestamp at time zone 'America/Chicago' + interval '11 hours'
+from public.client_memberships m cross join generate_series(0, m.periods_paid - 1) k
+where m.business_id = 'b0000000-0000-4000-8000-000000000001';
+insert into public.membership_events (business_id, membership_id, kind, staff_id, created_at)
+select business_id, membership_id, case when provider = 'checkout' then 'started' else 'renewed' end,
+       case when provider = 'checkout' then 'd0000000-0000-4000-8000-000000000003'::uuid end, created_at
+from public.membership_charges where business_id = 'b0000000-0000-4000-8000-000000000001';
+select private.grant_membership_credits(id) from public.client_memberships where business_id = 'b0000000-0000-4000-8000-000000000001';
+update public.membership_credits c set used = least(c.allowance, pg_temp.rnd('mused' || c.id) % (c.allowance + 1))
+from seed_members s, public.client_memberships m
+where c.membership_id = m.id and m.client_id = s.client_id and s.n > 3;
+
+-- Four who left (two this month), one paused, one whose payment failed
+-- yesterday on a card that's declined.
+update public.client_memberships m set status = 'canceled', cancel_reason = (array['Moving away', 'Too busy to come in', 'Cost', 'Switching to a package'])[1 + s.n % 4],
+  cancels_on = (now() at time zone 'America/Chicago')::date - (2 + 9 * (s.n % 5))::int, canceled_at = now() - make_interval(days => (2 + 9 * (s.n % 5))::int)
+from seed_members s where m.client_id = s.client_id and s.n in (5, 13, 21, 29);
+insert into public.membership_events (business_id, membership_id, kind, detail, created_at)
+select business_id, id, 'canceled', cancel_reason, canceled_at from public.client_memberships
+where business_id = 'b0000000-0000-4000-8000-000000000001' and status = 'canceled';
+update public.client_memberships m set status = 'paused', pause_from = (now() at time zone 'America/Chicago')::date - 6, resume_on = (now() at time zone 'America/Chicago')::date + 24
+from seed_members s where m.client_id = s.client_id and s.n = 8;
+update public.client_memberships m set status = 'past_due', failed_attempts = 1, next_retry_at = now() + interval '1 day',
+  periods_paid = periods_paid - 1, current_period_start = (current_period_start - interval '1 month')::date,
+  current_period_end = (now() at time zone 'America/Chicago')::date - 1,
+  payment_method_ref = 'test_visa_0002', card_label = 'Visa …0002'
+from seed_members s where m.client_id = s.client_id and s.n = 10;
+insert into public.membership_charges (business_id, membership_id, period_start, amount_cents, status, attempt, provider, failure_reason, created_at)
+select business_id, id, current_period_end, price_cents, 'failed', 1, 'test', 'The card was declined', now() - interval '20 hours'
+from public.client_memberships where business_id = 'b0000000-0000-4000-8000-000000000001' and status = 'past_due';
+insert into public.membership_events (business_id, membership_id, kind, detail, created_at)
+select business_id, id, 'payment_failed', 'The card was declined', now() - interval '20 hours'
+from public.client_memberships where business_id = 'b0000000-0000-4000-8000-000000000001' and status = 'past_due';
+
 -- Gift cards: bought ones with what's left on them, a few promotional and
 -- one expired; some belong to today's clients.
 create temp table seed_cards as

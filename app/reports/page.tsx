@@ -5,7 +5,9 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Card, PageHeader, pillClass } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
-import { METHOD_LABELS } from "@/lib/checkout";
+import { TENDER_LABELS } from "@/lib/reports";
+import { membershipReport } from "@/lib/memberships";
+import { loadMembershipRows } from "@/lib/memberships-load";
 import { loadCloseout, loadGiftCardActivity, loadGiftCardLiability, loadRebooking, loadUnusedPackages } from "@/lib/reports-load";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, isLocalDate, todayIn } from "@/lib/scheduling/time";
@@ -59,14 +61,16 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
   const period: Period = typeof params.period === "string" && params.period in PERIODS ? (params.period as Period) : "this_month";
   const day = typeof params.day === "string" && isLocalDate(params.day) && params.day <= today ? params.day : today;
   const range = rangeOf(period, today);
-  const [liability, packages, activity, close, rebooking, staff] = await Promise.all([
+  const [liability, packages, activity, close, rebooking, staff, membershipRows] = await Promise.all([
     loadGiftCardLiability(supabase, me.business_id),
     loadUnusedPackages(supabase, me.business_id),
     loadGiftCardActivity(supabase, me.business_id, range.from, range.to, tz),
     loadCloseout(supabase, me.location, day),
     loadRebooking(supabase, me.location, range.from, range.to),
     supabase.from("staff").select("id, first_name, last_name").eq("business_id", me.business_id),
+    loadMembershipRows(supabase, me.business_id, tz),
   ]);
+  const members = membershipReport(membershipRows, range.from, range.to);
   const staffName = new Map((staff.data ?? []).map((s) => [s.id, `${s.first_name} ${s.last_name}`]));
   const link = (q: { period?: Period; day?: string }) => {
     const s = new URLSearchParams();
@@ -77,7 +81,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
 
   return (
     <AppShell section="reports" me={me}>
-      <PageHeader title="Reports" description="What you owe in gift cards and packages, gift card activity, rebooking, and closing out the day." />
+      <PageHeader title="Reports" description="What you owe in gift cards and packages, gift card activity, memberships, rebooking, and closing out the day." />
 
       <Card title="What you owe in services" titleId="owed-heading" description="Gift card balances and unused package uses are services clients have paid for and not had yet.">
         <dl className="grid gap-5 sm:grid-cols-3" data-testid="liabilities">
@@ -128,6 +132,44 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
           <Stat label="Used" value={formatPrice(activity.redeemedCents)} testId="gift-cards-redeemed" />
           <Stat label="Promotional used" value={formatPrice(activity.promoRedeemedCents)} note={`${formatPrice(activity.promoIssuedCents)} issued`} />
         </dl>
+      </Card>
+
+      <Card
+        title="Memberships"
+        titleId="memberships-heading"
+        description={`Members now and what they bring in each month; joined and churn for ${formatLongDay(range.from, false)} to ${formatLongDay(range.to, false)}.`}
+      >
+        <dl className="grid gap-5 sm:grid-cols-4" data-testid="membership-report">
+          <Stat label="Members" value={String(members.members)} note={[members.pastDue && `${members.pastDue} payment failed`, members.paused && `${members.paused} paused`].filter(Boolean).join(" · ") || undefined} testId="members" />
+          <Stat label="Monthly recurring revenue" value={formatPrice(members.mrrCents)} note="Active and past-due members, as a monthly amount" testId="mrr" />
+          <Stat label="Joined" value={String(members.joined)} />
+          <Stat
+            label="Churn"
+            value={members.churnPercent === null ? "—" : `${members.churnPercent}%`}
+            note={members.startingMembers ? `${members.churned} of ${members.startingMembers} members at the start ended` : "No members at the start"}
+            testId="churn"
+          />
+        </dl>
+        {members.plans.length > 0 && (
+          <table className="mt-4 w-full text-sm tabular-nums" aria-label="Members by membership">
+            <thead>
+              <tr className="text-left text-ink-muted">
+                <th className="py-1 font-medium">Membership</th>
+                <th className="py-1 text-right font-medium">Members</th>
+                <th className="py-1 text-right font-medium">Monthly</th>
+              </tr>
+            </thead>
+            <tbody>
+              {members.plans.map((p) => (
+                <tr key={p.name} className="border-t border-line">
+                  <td className="py-1.5">{p.name}</td>
+                  <td className="py-1.5 text-right">{p.members}</td>
+                  <td className="py-1.5 text-right">{formatPrice(p.mrrCents)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </Card>
 
       <Card
@@ -200,7 +242,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
           <tbody>
             {close.byMethod.map((m) => (
               <tr key={m.method} className="border-t border-line">
-                <td className="py-1.5">{METHOD_LABELS[m.method]}</td>
+                <td className="py-1.5">{TENDER_LABELS[m.method]}</td>
                 <td className="py-1.5 text-right">{formatPrice(m.takenCents)}</td>
                 <td className="py-1.5 text-right">{m.refundedCents ? `−${formatPrice(m.refundedCents)}` : "—"}</td>
                 <td className="py-1.5 text-right font-medium">{formatPrice(m.netCents)}</td>

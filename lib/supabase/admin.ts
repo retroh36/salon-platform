@@ -3,10 +3,13 @@ import type { Database } from "@/lib/database.types";
 import { getSupabaseEnv } from "./env";
 
 // A Supabase client with the service role, which bypasses RLS. Only for
-// the public booking site (app/book/), which has no signed-in user: its
+// code with no signed-in user: the public booking site (app/book/), whose
 // server code reads exactly the columns it shows, checks the booking rules
-// and saves through functions only the service role can call. Never import
-// this from client components, and never use it for staff pages.
+// and saves through functions only the service role can call; and
+// background jobs (nightly insights, membership billing, also run for one
+// membership right after staff change it, once their own login has shown
+// they may). Never import this from client components, and never use it to
+// load what staff pages show.
 export function createAdminClient() {
   const { url } = getSupabaseEnv();
   const secretKey = process.env.SUPABASE_SECRET_KEY;

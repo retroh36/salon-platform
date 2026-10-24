@@ -7,10 +7,11 @@ import { fieldClass } from "@/components/ui/field";
 import { CalendarIcon, CloseIcon } from "@/components/ui/icons";
 import { parseDollars, tipFor, TIP_PERCENTS } from "@/lib/checkout";
 import type { CheckoutScreenData } from "@/lib/checkout-screen";
+import { creditFor } from "@/lib/memberships-load";
 import { packageFor } from "@/lib/packages";
 import { formatPrice } from "@/lib/services";
 import { formatMinute } from "@/lib/scheduling/time";
-import { servicesFor, totalsOf, type Ticket } from "@/lib/ticket";
+import { servicesFor, totalsOf, type Rates, type Ticket } from "@/lib/ticket";
 import { bookRebook, rebookTimes, undoRebook } from "../actions";
 import type { DialogState } from "./dialogs";
 
@@ -21,6 +22,7 @@ const METHOD = { card: "Card", cash: "Cash", gift_card: "Gift card" } as const;
 export function PaymentPanel({
   data,
   ticket,
+  rates,
   totals,
   problems,
   message,
@@ -32,6 +34,7 @@ export function PaymentPanel({
 }: {
   data: CheckoutScreenData;
   ticket: Ticket;
+  rates: Rates;
   totals: Totals;
   problems: string[];
   message: string | null;
@@ -42,8 +45,9 @@ export function PaymentPanel({
   onComplete: () => void;
 }) {
   // Stylists with services on the ticket, for tips.
-  const stylists = data.staff.filter((s) => servicesFor(ticket, s.id) > 0 || (ticket.tips[s.id] ?? 0) > 0);
+  const stylists = data.staff.filter((s) => servicesFor(ticket, s.id, rates) > 0 || (ticket.tips[s.id] ?? 0) > 0);
   const packageUsable = ticket.lines.some((l) => l.kind === "service" && !l.packageItemId && packageFor(data.packages, l.serviceId, data.staff.find((s) => s.id === l.staffId)?.level ?? null));
+  const membershipUsable = ticket.lines.some((l) => l.kind === "service" && !l.packageItemId && !l.membershipCreditId && l.quantity === 1 && creditFor(data.memberships, l.serviceId));
   const blocking = message ?? problems[0] ?? null;
   return (
     <aside aria-label="Payment" className="flex min-h-0 flex-col border-t border-line bg-surface md:border-t-0 md:border-l">
@@ -59,7 +63,7 @@ export function PaymentPanel({
               {formatPrice(totals.totalCents)}
             </dd>
           </div>
-          {totals.coveredCents > 0 && <Row label="Paid with package" value={`−${formatPrice(totals.coveredCents)}`} />}
+          {totals.coveredCents > 0 && <Row label={coveredLabel(ticket)} value={`−${formatPrice(totals.coveredCents)}`} />}
         </dl>
 
         {stylists.length > 0 && (
@@ -69,7 +73,7 @@ export function PaymentPanel({
               <TipPicker
                 key={s.id}
                 name={s.firstName}
-                servicesCents={servicesFor(ticket, s.id)}
+                servicesCents={servicesFor(ticket, s.id, rates)}
                 cents={ticket.tips[s.id] ?? 0}
                 onChange={(cents) => onChange((t) => ({ ...t, tips: { ...t.tips, [s.id]: cents } }))}
               />
@@ -84,12 +88,13 @@ export function PaymentPanel({
             <PayButton label="Cash" onClick={() => onDialog({ kind: "cash" })} />
             <PayButton label="Gift card" onClick={() => onDialog({ kind: "gift-card" })} />
             <PayButton label="Package" disabled={!packageUsable} onClick={() => onDialog({ kind: "package" })} />
+            {data.memberships.length > 0 && <PayButton label="Membership" disabled={!membershipUsable} onClick={() => onDialog({ kind: "membership" })} />}
           </div>
           {(ticket.payments.length > 0 || totals.coveredCents > 0) && (
             <ul aria-label="Payments taken" className="flex flex-col divide-y divide-line rounded-xl border border-line">
               {totals.coveredCents > 0 && (
                 <li className="flex items-center justify-between px-3 py-2.5">
-                  <span>Package</span>
+                  <span>{coveredLabel(ticket).replace(/^Paid with /, "").replace(/^./, (c) => c.toUpperCase())}</span>
                   <span className="font-semibold tabular-nums">{formatPrice(totals.coveredCents)}</span>
                 </li>
               )}
@@ -303,4 +308,11 @@ function Rebook({ data, ticket, onChange }: { data: CheckoutScreenData; ticket: 
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
     </section>
   );
+}
+
+// What packages and memberships pay for, in words.
+function coveredLabel(ticket: Ticket): string {
+  const pkg = ticket.lines.some((l) => l.kind === "service" && l.packageItemId);
+  const membership = ticket.lines.some((l) => l.kind === "service" && l.membershipCreditId);
+  return pkg && membership ? "Paid with package and membership" : membership ? "Paid with membership" : "Paid with package";
 }

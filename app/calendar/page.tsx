@@ -17,6 +17,7 @@ import { occurrences } from "@/lib/scheduling/blocks";
 import { loadBlocks, loadCalendarStamp, loadLocationSchedule, loadOffers, loadStaffSchedules, loadStaffTimings, startOfLocalDay, toBookedItem } from "@/lib/scheduling/load";
 import { describeClient } from "@/lib/insights/describe";
 import { loadClientInsights, loadDurations } from "@/lib/insights/read";
+import { loadMembershipsByClient, type ClientMembership } from "@/lib/memberships-load";
 import { loadPackagesByClient, withPackages } from "@/lib/packages";
 import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn, toLocal, WEEKDAYS, type LocalDate } from "@/lib/scheduling/time";
 import { visitWarnings } from "@/lib/client-checks";
@@ -165,6 +166,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       series: Boolean(a.series_id),
       group: a.group,
       online: a.source === "online",
+      member: null,
     });
     appointments[a.id] ??= {
       id: a.id,
@@ -186,6 +188,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       patchOverride: null,
       pastVisits: [],
       pastFormulas: [],
+      membership: null,
       log: [],
       group: a.group ? { ...a.group, members: [] } : null,
       series: a.series_id ? { id: a.series_id, index: a.series_index!, count: seriesCounts.get(a.series_id) ?? 1, intervalWeeks: a.series?.interval_weeks ?? 1 } : null,
@@ -282,7 +285,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
 
   // What Denise knows about each client.
   const clientIds = [...new Set(Object.values(appointments).flatMap((a) => (a.client ? [a.client.id] : [])))];
-  const [insights, packages, past, pastFormulas] = await Promise.all([
+  const [insights, packages, past, pastFormulas, memberships] = await Promise.all([
     loadClientInsights(supabase, me.business_id, clientIds),
     loadPackagesByClient(supabase, clientIds),
     clientIds.length
@@ -305,6 +308,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
           .order("created_at", { ascending: false })
           .limit(1000)
       : Promise.resolve({ data: [], error: null }),
+    loadMembershipsByClient(supabase, clientIds),
   ]);
   if (past.error) throw past.error;
   if (pastFormulas.error) throw pastFormulas.error;
@@ -348,7 +352,12 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     if (a.client) {
       a.pastVisits = [...(pastByClient.get(a.client.id)?.values() ?? [])].map((v) => ({ date: v.date, services: v.services.join(", "), staff: [...v.staff].join(" and ") }));
       a.pastFormulas = formulasByClient.get(a.client.id) ?? [];
+      a.membership = membershipLine(memberships.get(a.client.id) ?? []);
     }
+  }
+  for (const b of blocks) {
+    const m = appointments[b.appointmentId]?.membership;
+    b.member = m ? (m.status === "active" ? `${m.name} member` : `${m.name}: ${m.status === "paused" ? "paused" : "payment failed"}`) : null;
   }
 
   const open = dayView({ weekly: {}, overrides: {}, timeOff: [] }, location, date).open;
@@ -452,4 +461,16 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       )}
     </AppShell>
   );
+}
+
+// A client's membership in a line for booking details: the one that needs
+// attention first (a failed payment), else what's left this period.
+function membershipLine(list: readonly ClientMembership[]): AppointmentDetail["membership"] {
+  const m = list.find((x) => x.status === "past_due") ?? list.find((x) => x.status === "active") ?? list.find((x) => x.status === "paused");
+  if (!m || m.status === "canceled") return null;
+  if (m.status === "past_due") return { name: m.name, status: m.status, text: `${m.name}: the last payment didn't go through, so no member benefits until it's paid` };
+  if (m.status === "paused") return { name: m.name, status: m.status, text: `${m.name} member (paused)` };
+  const left = m.credits.map((c) => `${c.serviceName}: ${c.allowance - c.used} left`).join(", ");
+  const off = [m.serviceDiscountPct && `${m.serviceDiscountPct}% off services`, m.retailDiscountPct && `${m.retailDiscountPct}% off retail`].filter(Boolean).join(", ");
+  return { name: m.name, status: m.status, text: [`${m.name} member`, left, off].filter(Boolean).join(" · ") };
 }

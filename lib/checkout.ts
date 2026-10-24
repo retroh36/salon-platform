@@ -3,9 +3,9 @@
 // private.price_sale / complete_sale (the tests check they agree); this is
 // for showing it as staff build the sale. Pure.
 
-export type PaymentMethod = "cash" | "card" | "gift_card" | "package";
+export type PaymentMethod = "cash" | "card" | "gift_card" | "package" | "membership";
 
-export const METHOD_LABELS: Record<PaymentMethod, string> = { cash: "Cash", card: "Card", gift_card: "Gift card", package: "Package" };
+export const METHOD_LABELS: Record<PaymentMethod, string> = { cash: "Cash", card: "Card", gift_card: "Gift card", package: "Package", membership: "Membership" };
 
 export type SaleLine = {
   // Before discount and tax: unit price × quantity.
