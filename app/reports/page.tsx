@@ -82,9 +82,29 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
 
   return (
     <AppShell section="reports" me={me}>
-      <PageHeader title="Reports" description="What you owe in gift cards and packages, gift card activity, memberships, where online bookings came from, rebooking, and closing out the day." />
+      {/* The period is the whole page's: every report below but what's owed now and the close-out follows it. */}
+      <PageHeader
+        title="Reports"
+        description={
+          <>
+            What you owe in gift cards and packages, gift card activity, memberships, where online bookings came from, rebooking, and closing out the day.
+            <span className="mt-1 block text-sm" data-testid="report-period">
+              Showing {formatLongDay(range.from, false)} to {formatLongDay(range.to, false)}
+            </span>
+          </>
+        }
+        actions={
+          <nav aria-label="Period" className="flex flex-wrap gap-2">
+            {(Object.keys(PERIODS) as Period[]).map((p) => (
+              <Link key={p} href={link({ period: p })} className={pillClass(p === period)} aria-current={p === period ? "page" : undefined}>
+                {PERIODS[p]}
+              </Link>
+            ))}
+          </nav>
+        }
+      />
 
-      <Card title="What you owe in services" titleId="owed-heading" description="Gift card balances and unused package uses are services clients have paid for and not had yet.">
+      <Card title="What you owe in services" titleId="owed-heading" description="As of now, whatever the period: gift card balances and unused package uses are services clients have paid for and not had yet.">
         <dl className="grid gap-5 sm:grid-cols-3" data-testid="liabilities">
           <Stat label="Gift card balances" value={formatPrice(liability.purchased.cents)} note={`On ${liability.purchased.count} cards`} testId="gift-card-liability" />
           <Stat label="Unused package uses" value={formatPrice(packages.cents)} note={`${packages.uses} uses, ${packages.clients} clients`} testId="package-liability" />
@@ -117,15 +137,6 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
         title="Gift cards sold and used"
         titleId="activity-heading"
         description={`${formatLongDay(range.from, false)} to ${formatLongDay(range.to, false)}`}
-        actions={
-          <nav aria-label="Period" className="flex flex-wrap gap-2">
-            {(Object.keys(PERIODS) as Period[]).map((p) => (
-              <Link key={p} href={link({ period: p })} className={pillClass(p === period)} aria-current={p === period ? "page" : undefined}>
-                {PERIODS[p]}
-              </Link>
-            ))}
-          </nav>
-        }
       >
         <dl className="grid gap-5 sm:grid-cols-4" data-testid="gift-card-activity">
           <Stat label="Sold" value={formatPrice(activity.soldCents)} note={`${activity.soldCount} cards`} testId="gift-cards-sold" />

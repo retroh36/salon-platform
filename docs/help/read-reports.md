@@ -8,7 +8,7 @@ open: /reports | Open Reports
 Reports show what the salon owes in services, gift card activity, memberships, where online bookings came from, rebooking, and the day's close-out.
 
 1. In the sidebar, under **Sales**, tap **Reports**.
-2. Choose **This month**, **Last month** or **Last 30 days** at the top of **Gift cards sold and used**. The period applies to the cards below it too.
+2. Choose **This month**, **Last month** or **Last 30 days** at the top of the page. Under the title it says which dates you're seeing; every report follows it except what you owe (always as of now) and the close-out (by day).
 3. Read **What you owe in services**: gift card balances, unused package uses and promotional credit.
 4. Read **Gift cards sold and used**: sold, reloaded and used in the period.
 5. Read **Memberships**: members, monthly recurring revenue, who joined and churn.

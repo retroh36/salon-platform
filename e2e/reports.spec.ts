@@ -19,8 +19,13 @@ test.describe("owner", () => {
     await expect(main.getByTestId("gift-card-liability")).toHaveText(/^\$[\d,.]+$/);
     await expect(main.getByTestId("package-liability")).toHaveText(/^\$[\d,.]+$/);
     await expect(main.getByTestId("liabilities")).toContainText("no cash value");
-    await main.getByRole("link", { name: "Last 30 days" }).click();
+    // The period is at the top, for the whole page.
+    const period = main.getByRole("navigation", { name: "Period" });
+    await expect(main.getByRole("heading", { name: "Reports" }).locator("xpath=../..").getByRole("navigation", { name: "Period" })).toBeVisible();
+    const before = await main.getByTestId("report-period").textContent();
+    await period.getByRole("link", { name: "Last 30 days" }).click();
     await expect(page).toHaveURL("/reports?period=last_30_days");
+    await expect(main.getByTestId("report-period")).not.toHaveText(before!);
     await expect(main.getByTestId("gift-cards-sold")).toHaveText(/^\$[\d,.]+$/);
 
     // Count the drawer: $5 more than expected.

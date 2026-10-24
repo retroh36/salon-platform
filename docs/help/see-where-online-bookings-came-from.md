@@ -8,7 +8,7 @@ open: /reports | Open Reports
 See how many online bookings came from Google, Instagram, Facebook, your website and your automated messages, and what they brought in.
 
 1. Go to **Reports**.
-2. Pick the period at the top of the report cards: **This month**, **Last month** or **Last 30 days**.
+2. Pick the period at the top of the page: **This month**, **Last month** or **Last 30 days**.
 3. Scroll to **Where online bookings came from**.
 4. Read each row: **From** (where the client clicked), **Bookings**, **Came in** (checked out) and **Revenue**.
 
