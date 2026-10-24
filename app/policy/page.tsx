@@ -13,6 +13,7 @@ import { formatDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, toLocal, todayIn } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { ChargeNowButton } from "./charge-now";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Policy" };
 
@@ -49,7 +50,7 @@ function Stat({ label, value, note, testId }: { label: string; value: string; no
 async function Policy({ searchParams }: Pick<PageProps<"/policy">, "searchParams">) {
   const [params, { supabase, staff: me }] = await Promise.all([searchParams, getCurrentStaff()]);
   if (!me) return <NotLinked />;
-  if (me.role !== "owner" && me.role !== "manager") redirect("/dashboard");
+  if (!can(me, "reports")) redirect("/dashboard");
   const tz = me.location.timezone;
   const today = todayIn(tz);
   const month = typeof params.month === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.month) ? params.month : today.slice(0, 7);
@@ -90,7 +91,7 @@ async function Policy({ searchParams }: Pick<PageProps<"/policy">, "searchParams
         title="Cancellation policy"
         description="Late cancellations and no-shows, and what the policy charged for them. Fees are charged to the card on file 10 minutes after; waive one with a reason, before or after."
         actions={
-          me.role === "owner" ? (
+          can(me, "settings") ? (
             <div className="flex flex-wrap gap-2">
               <ChargeNowButton />
               <Link href="/settings/policies" className={pillClass(false)}>

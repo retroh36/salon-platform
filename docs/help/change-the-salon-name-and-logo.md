@@ -1,7 +1,7 @@
 ---
 title: Change the salon name and logo
 keywords: salon name, business name, logo, upload logo, change logo, remove logo, branding, salon brand, sidebar logo
-who: owner
+who: owner, manager
 open: /settings | Open Settings
 ---
 

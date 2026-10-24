@@ -7,7 +7,6 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AppointmentStatus } from "@/lib/appointments";
-import { canManage } from "@/lib/auth";
 import { staffPhotoUrl } from "@/lib/branding";
 import type { Database } from "@/lib/database.types";
 import { deniseDay } from "@/lib/denise/day-state";
@@ -23,7 +22,8 @@ import { loadDisruptions } from "@/lib/scheduling/disruptions";
 import { loadBookingContext, loadOffers, startOfLocalDay } from "@/lib/scheduling/load";
 import { addDays, startOfWeek, toLocal, todayIn, type LocalDate } from "@/lib/scheduling/time";
 import { matchOpening } from "@/lib/scheduling/waitlist";
-import { sortStaff, type StaffRole } from "@/lib/staff";
+import { can } from "@/lib/permissions";
+import { isFrontOfHouse, sortStaff, type StaffRole } from "@/lib/staff";
 import { loadWaitlist } from "@/lib/waitlist-load";
 import { compare, dayCounts, LATE_UNTIL, fullness, gapsWorthFilling, rightNow, stylistToday, type DayCounts, type DayVisit, type StylistToday } from "./dashboard";
 
@@ -31,11 +31,17 @@ type Supabase = SupabaseClient<Database>;
 
 export type DashboardMe = {
   id: string;
+  // An assistant's stylist: their dashboard is that stylist's day.
+  assists_staff_id?: string | null;
   first_name: string;
   role: StaffRole;
+  permissions: readonly string[];
   business_id: string;
   location: { id: string; name: string; timezone: string; business: { name: string } | null };
 };
+
+// Whose day a stylist or assistant sees: their own, or their stylist's.
+const bookOf = (me: Pick<DashboardMe, "id" | "assists_staff_id">) => me.assists_staff_id ?? me.id;
 
 export type Comparison = { now: number; then: number; change: number };
 
@@ -168,9 +174,10 @@ function live(
   nowMinute: number,
   me: DashboardMe,
 ): LiveData {
-  const mineOnly = me.role === "stylist";
+  const mineOnly = !isFrontOfHouse(me.role);
+  const book = bookOf(me);
   const names = new Map(team.map((s) => [s.id, s.first_name]));
-  const shown = visits.filter((v) => !mineOnly || v.staffId === me.id);
+  const shown = visits.filter((v) => !mineOnly || v.staffId === book);
   const now = rightNow(shown, nowMinute);
   const view = (v: DayVisit): LiveVisit => ({
     appointmentId: v.appointmentId,
@@ -189,7 +196,7 @@ function live(
     upNext: now.upNext.map(view),
     late: now.late.map((v) => ({ ...view(v), lateMinutes: v.lateMinutes })),
     team: team
-      .filter((s) => !mineOnly || s.id === me.id)
+      .filter((s) => !mineOnly || s.id === book)
       .flatMap((s) => {
         const t = stylistToday(ctx, visits, s.id, today, nowMinute, disruptions);
         return t ? [{ ...t, name: s.first_name, level: s.level, color: s.color, photoUrl: staffPhotoUrl(s.photo_path) }] : [];
@@ -206,7 +213,7 @@ export async function loadDashboard(supabase: Supabase, me: DashboardMe, now = n
   const weekStart = startOfWeek(today);
   const weekEnd = addDays(weekStart, 6);
   const frontOfHouse = FRONT_OF_HOUSE.includes(me.role);
-  const seesMoney = canManage(me.role);
+  const seesMoney = can(me, "reports");
   const viewer = { location: { id: me.location.id, timezone: tz }, salon: me.location.business?.name ?? "the salon", canBook: frontOfHouse };
 
   const [visits, before, team, ctx, disruptions, insights, salon, denise, services] = await Promise.all([
@@ -223,8 +230,10 @@ export async function loadDashboard(supabase: Supabase, me: DashboardMe, now = n
   ]);
   const stylistIds = team.map((s) => s.id);
   const names = new Map(team.map((s) => [s.id, s.first_name]));
-  const mine = (v: DayVisit) => me.role !== "stylist" || v.staffId === me.id;
-  const scopeIds = me.role === "stylist" ? [me.id] : stylistIds;
+  const book = bookOf(me);
+  const ownBook = !isFrontOfHouse(me.role);
+  const mine = (v: DayVisit) => !ownBook || v.staffId === book;
+  const scopeIds = ownBook ? [book] : stylistIds;
 
   // Today at a glance, against the same day last week (check-ins up to
   // the same time of day).
@@ -268,8 +277,8 @@ export async function loadDashboard(supabase: Supabase, me: DashboardMe, now = n
     week: { days, sales },
   };
 
-  if (me.role === "stylist") {
-    const myVisits = visits.filter((v) => v.staffId === me.id && v.status !== "canceled");
+  if (ownBook) {
+    const myVisits = visits.filter((v) => v.staffId === book && v.status !== "canceled");
     // Only what's shown: no prices.
     const view = (v: DayVisit): LiveVisit => ({
       appointmentId: v.appointmentId,
@@ -280,7 +289,7 @@ export async function loadDashboard(supabase: Supabase, me: DashboardMe, now = n
       end: v.end,
       status: v.status,
       staffId: v.staffId,
-      staffName: me.first_name,
+      staffName: names.get(book) ?? me.first_name,
     });
     const firstOfVisit = [...new Map(myVisits.map((v) => [v.appointmentId, v])).values()];
     // Who's in their chair now, else the next client still to come.
@@ -289,13 +298,13 @@ export async function loadDashboard(supabase: Supabase, me: DashboardMe, now = n
       firstOfVisit.find((v) => (v.status === "booked" || v.status === "confirmed") && v.start >= nowMinute - LATE_UNTIL);
     const known = nextVisit?.clientId ? insights.get(nextVisit.clientId) : undefined;
     const nextPackages = nextVisit?.clientId ? (await loadPackagesByClient(supabase, [nextVisit.clientId])).get(nextVisit.clientId) : undefined;
-    const rebooking = salon?.rebooking.find((r) => r.staffId === me.id);
+    const rebooking = salon?.rebooking.find((r) => r.staffId === book);
     const myItems = new Set(myVisits.map((v) => v.itemId));
     return {
       ...base,
       denise: null,
       opportunities: {
-        ...(await overdueFor(supabase, insights, (c) => c.preferredStaffId === me.id, names, now)),
+        ...(await overdueFor(supabase, insights, (c) => c.preferredStaffId === book, names, now)),
         gaps: [],
         lowStock: [],
         lowStockTotal: 0,
@@ -360,10 +369,10 @@ async function overdueFor(supabase: Supabase, insights: Map<string, ClientInsigh
 
 // Regulars due back with nothing booked, most overdue first (a stylist's
 // own regulars, for a stylist): the Clients page's "Due back" list.
-export async function loadDueBack(supabase: Supabase, me: Pick<DashboardMe, "id" | "role" | "business_id" | "location">, limit = 100) {
+export async function loadDueBack(supabase: Supabase, me: Pick<DashboardMe, "id" | "assists_staff_id" | "role" | "business_id" | "location">, limit = 100) {
   const [insights, team] = await Promise.all([loadAllClientInsights(supabase, me.business_id), loadTeam(supabase, me.location.id)]);
   const names = new Map(team.map((s) => [s.id, s.first_name]));
-  return overdueFor(supabase, insights, (c) => me.role !== "stylist" || c.preferredStaffId === me.id, names, new Date(), limit);
+  return overdueFor(supabase, insights, (c) => isFrontOfHouse(me.role) || c.preferredStaffId === bookOf(me), names, new Date(), limit);
 }
 
 export function overdueReason(c: ClientInsight, names: Map<string, string>, now: Date): string {

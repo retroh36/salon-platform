@@ -1,7 +1,7 @@
 ---
 title: Set up gift card settings
 keywords: gift card settings, preset amounts, gift card expiry, expiration, promo card expiry, gift card rules, voucher settings
-who: owner
+who: owner, manager
 open: /settings/gift-cards | Open gift card settings
 ---
 

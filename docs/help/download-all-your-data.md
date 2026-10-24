@@ -1,7 +1,7 @@
 ---
 title: Download all your data
 keywords: export data, download data, backup, CSV, spreadsheet, export clients, client list, leave, switch software, your data, data export, zip
-who: owner
+who: owner, manager
 open: /settings/data | Open Your data
 ---
 
@@ -19,4 +19,4 @@ Download everything your salon keeps here as spreadsheet files (CSV) in one zip.
 - Card numbers are never stored, so they're never in it.
 - Before and after photos aren't in the zip; they stay in your private storage.
 - The file has clients' private details (phones, notes, allergies): keep it somewhere safe.
-- Only owners can download, and every download is logged.
+- Owners and managers can download (an owner can switch it off for a manager), and every download is logged.

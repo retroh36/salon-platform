@@ -1,7 +1,7 @@
 ---
 title: Close out the day
 keywords: float, starting float, cash float, opening cash, starting cash, close out, closeout, end of day, cash count, count the drawer, cash drawer, till, balance the till, drawer short, drawer over, Z report, daily totals
-who: owner
+who: owner, manager
 open: /reports | Open Reports
 ---
 
@@ -16,7 +16,7 @@ Count the cash drawer at the end of the day and check it against the day's sales
 
 ## Good to know
 
-- Only owners can see Reports and close out the day.
+- Owners and managers see Reports and close out the day (an owner can also allow someone else).
 - Expected cash is the starting float plus the day's cash payments, less cash refunds and voids.
 - Set the usual float on Settings, under **Tax and receipts** (**Cash drawer**). A float changed for one day stays with that day.
 - You can save the count again for the same day; the latest count replaces the earlier one.

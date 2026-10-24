@@ -1,7 +1,7 @@
 ---
 title: Choose which services clients can book online
 keywords: services online, bookable online, hide service online, not online, consultation first, deposit, online deposit, booking deposit, percent deposit, fixed deposit, online menu
-who: owner
+who: owner, manager
 open: /settings/booking | Open Online booking settings
 ---
 

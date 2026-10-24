@@ -1,7 +1,7 @@
 ---
 title: Read the owner reports
 keywords: reports, reporting, analytics, numbers, gift card liability, outstanding gift cards, unused packages, memberships, MRR, churn, rebooking rate, rebook rate, online bookings, booking sources, where bookings came from, close out, end of day
-who: owner
+who: owner, manager
 open: /reports | Open Reports
 ---
 
@@ -18,6 +18,6 @@ Reports show what the salon owes in services, gift card activity, memberships, w
 
 ## Good to know
 
-- Only owners can see Reports.
+- Owners and managers see Reports (an owner can also allow someone else).
 - For each person's sales, commission and tips, see "Run payroll for a pay period". For a day's sales, see **Sales**.
 - Memberships run on a test payment provider for now, so no real money moves.

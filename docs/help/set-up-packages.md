@@ -1,7 +1,7 @@
 ---
 title: Set up packages
 keywords: create package, package template, new package, series, bundle, edit package, stop selling package, prepaid services setup
-who: owner
+who: owner, manager
 open: /settings/packages | Open package settings
 ---
 

@@ -484,9 +484,11 @@ const results: Result[] = [];
 const clients = new Map<Role, Supabase>();
 const contexts = new Map<Role, AssistantContext>();
 
-function contextFor(role: Role) {
+async function contextFor(role: Role) {
   const login = LOGINS[role];
-  return assistantContext(clients.get(role)!, { role: login.role, staffId: login.staffId, businessId: B, location: { id: L, timezone: TZ }, salon: "Maple & Ash Hair Studio", today }, today);
+  const { data: permissions, error } = await clients.get(role)!.rpc("my_permissions", { p_business_id: B });
+  if (error) throw error;
+  return assistantContext(clients.get(role)!, { role: login.role, permissions: permissions ?? [], staffId: login.staffId, businessId: B, location: { id: L, timezone: TZ }, salon: "Maple & Ash Hair Studio", today }, today);
 }
 
 beforeAll(async () => {

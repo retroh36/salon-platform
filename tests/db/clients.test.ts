@@ -30,8 +30,15 @@ beforeAll(async () => {
     signIn("bridget@mapleandash.test"),
     signIn(other.email),
   ]);
-  const { data } = await admin.from("clients").select("id").eq("business_id", SEED.business).limit(1).single();
-  clientId = data!.id;
+  // A client on Bridget's book: she's had a visit with them.
+  const { data } = await admin
+    .from("appointment_items")
+    .select("appointment:appointments!inner(client_id)")
+    .eq("staff_id", SEED.staff.bridget)
+    .not("appointment.client_id", "is", null)
+    .limit(1)
+    .single();
+  clientId = data!.appointment.client_id!;
 });
 
 afterAll(async () => {
@@ -82,9 +89,13 @@ describe("who can change clients", () => {
     expect(update.data).toEqual([{ allergies: "Latex" }]);
   });
 
-  it("stylists can view clients but not add or edit them", async () => {
+  it("stylists can view clients on their book but not add or edit them", async () => {
     const view = await stylist.from("clients").select("id, allergies, notes").eq("id", clientId);
     expect(view.data).toHaveLength(1);
+    // A client who's never been booked with Bridget isn't hers to see.
+    const stranger = await newClient();
+    expect((await stylist.from("clients").select("id").eq("id", stranger)).data).toEqual([]);
+    expect((await frontDesk.from("clients").select("id").eq("id", stranger)).data).toHaveLength(1);
 
     const insert = await stylist.from("clients").insert({ business_id: SEED.business, first_name: `${PREFIX} Nope` });
     expect(insert.error?.code).toBe("42501");
@@ -142,7 +153,7 @@ describe("formulas", () => {
   });
 
   it("entries can't be edited or deleted, even by their author or the owner", async () => {
-    const id = await newClient();
+    const id = clientId;
     const { data: entry } = await stylist
       .from("client_formulas")
       .insert({ business_id: SEED.business, client_id: id, staff_id: SEED.staff.bridget, formula: "original" })

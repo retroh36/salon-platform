@@ -184,7 +184,8 @@ export type BoardData = {
   menu: Menu;
   // fitAll: squeeze every column on screen (Compact zoom), remembered on
   // this device.
-  me: { staffId: string; role: StaffRole; canBook: boolean; zoom: CalendarZoom; fitAll: boolean };
+  // canArrange: the salon's column order and shared views (the settings permission).
+  me: { staffId: string; role: StaffRole; canBook: boolean; canArrange: boolean; zoom: CalendarZoom; fitAll: boolean };
   // Saved views (shared, and this person's own), and the one to open on:
   // the last used on this device.
   views: CalendarView[];

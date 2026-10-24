@@ -6,13 +6,13 @@ import { briefFacts } from "@/lib/denise/brief";
 import { knowledgeFor, type Asker } from "@/lib/denise/knowledge";
 import { loadCloseout, loadGiftCardLiability, loadUnusedPackages } from "@/lib/reports-load";
 import { todayIn } from "@/lib/scheduling/time";
-import { admin, SEED, signIn, type Client } from "./helpers";
+import { admin, DEFAULT_PERMISSIONS, SEED, signIn, type Client } from "./helpers";
 
 const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
 const today = todayIn(TZ);
-const asker = (role: Asker["role"], staffId: string): Asker => ({ role, staffId, businessId: B, location: { id: L, timezone: TZ }, salon: "Maple & Ash", today });
+const asker = (role: Asker["role"], staffId: string): Asker => ({ role, permissions: DEFAULT_PERMISSIONS[role], staffId, businessId: B, location: { id: L, timezone: TZ }, salon: "Maple & Ash", today });
 
 let owner: Client;
 let manager: Client;
@@ -41,7 +41,7 @@ describe("what's owed", () => {
     expect(p.clients.length).toBeGreaterThan(0);
   });
 
-  it("is for owners: managers and the front desk get Denise's answers without these totals", async () => {
+  it("is for owners and managers: the front desk gets Denise's answers without these totals", async () => {
     const forOwner = knowledgeFor(owner, asker("owner", SEED.staff.owner));
     const cards = (await forOwner.giftCards!()) as { purchased_balance_dollars: number };
     expect(cards.purchased_balance_dollars).toBe((await loadGiftCardLiability(owner, B)).purchased.cents / 100);
@@ -49,21 +49,24 @@ describe("what's owed", () => {
     expect(packages.clients.length).toBeLessThanOrEqual(3);
     // First names only.
     expect(Object.keys(packages.clients[0])).toEqual(["first_name", "packages", "uses_left", "value_dollars"]);
-    expect(knowledgeFor(manager, asker("manager", SEED.staff.manager)).giftCards).toBeNull();
+    expect(knowledgeFor(manager, asker("manager", SEED.staff.manager)).giftCards).not.toBeNull();
+    expect(knowledgeFor(frontDesk, asker("front_desk", SEED.staff.frontDesk)).giftCards).toBeNull();
     expect(knowledgeFor(frontDesk, asker("front_desk", SEED.staff.frontDesk)).packages).toBeNull();
   });
 });
 
 describe("closing out the day", () => {
-  it("works out the expected cash itself, saves the count, and is for owners only", async () => {
+  it("works out the expected cash itself, saves the count, and is for owners and managers only", async () => {
     const close = await loadCloseout(owner, B, { id: L, timezone: TZ }, today);
-    expect((await manager.rpc("save_closeout", { p_location_id: L, p_day: today, p_counted_cents: 1000, p_note: "" })).error?.code).toBe("42501");
+    const desk = await signIn("frontdesk@mapleandash.test");
+    expect((await desk.rpc("save_closeout", { p_location_id: L, p_day: today, p_counted_cents: 1000, p_note: "" })).error?.code).toBe("42501");
     const { data: difference, error } = await owner.rpc("save_closeout", { p_location_id: L, p_day: today, p_counted_cents: close.expectedCashCents + 500, p_note: "Found a $5 tip" });
     expect(error).toBeNull();
     expect(difference).toBe(500);
     const { data: saved } = await owner.from("cash_closeouts").select("expected_cents, counted_cents, note").eq("location_id", L).eq("day", today).single();
     expect(saved).toEqual({ expected_cents: close.expectedCashCents, counted_cents: close.expectedCashCents + 500, note: "Found a $5 tip" });
-    expect((await manager.from("cash_closeouts").select("id").eq("location_id", L)).data).toEqual([]);
+    expect((await manager.from("cash_closeouts").select("id").eq("location_id", L)).data).toHaveLength(1);
+    expect((await desk.from("cash_closeouts").select("id").eq("location_id", L)).data).toEqual([]);
   });
 
   it("counts the starting float: the salon's usual one, or the day's", async () => {

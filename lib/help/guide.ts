@@ -16,7 +16,7 @@
 
 import type { StaffRole } from "@/lib/staff";
 
-export const ROLES: StaffRole[] = ["owner", "manager", "front_desk", "stylist"];
+export const ROLES: StaffRole[] = ["owner", "manager", "front_desk", "stylist", "assistant"];
 
 export type HelpPage = {
   slug: string;
@@ -158,7 +158,7 @@ export function searchHelp(pages: HelpPage[], query: string, limit = 3): HelpPag
     .map((r) => r.page);
 }
 
-const ROLE_PLURAL: Record<StaffRole, string> = { owner: "owners", manager: "managers", front_desk: "the front desk", stylist: "stylists" };
+const ROLE_PLURAL: Record<StaffRole, string> = { owner: "owners", manager: "managers", front_desk: "the front desk", stylist: "stylists", assistant: "assistants" };
 
 // "owners and managers", "owners, managers and the front desk".
 export function whoText(roles: StaffRole[]): string {

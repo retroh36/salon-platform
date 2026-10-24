@@ -9,6 +9,7 @@ import { LEVEL_LABELS } from "@/lib/schedule-forms";
 import { formatPrice } from "@/lib/services";
 import { SettingsNav } from "../settings-nav";
 import { PackageForm } from "./package-form";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Packages" };
 
@@ -23,7 +24,7 @@ export default function PackagesSettingsPage() {
 async function PackagesSettings() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
-  if (me.role !== "owner") redirect("/dashboard");
+  if (!can(me, "settings")) redirect("/dashboard");
   const [templates, { data: services, error }] = await Promise.all([
     loadTemplates(supabase, me.business_id, false),
     supabase.from("services").select("id, name").eq("business_id", me.business_id).is("archived_at", null).order("name"),
@@ -32,7 +33,7 @@ async function PackagesSettings() {
   return (
     <AppShell section="settings" me={me}>
       <PageHeader title="Settings" description="Packages: services clients buy up front at one price and use over several visits." />
-      <SettingsNav current="packages" />
+      <SettingsNav current="packages" me={me} />
       <Card title="New package" titleId="new-package-heading">
         <PackageForm template={null} services={services} />
       </Card>

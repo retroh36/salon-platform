@@ -8,6 +8,7 @@ import { getCurrentStaff } from "@/lib/auth";
 import { LEVEL_LABELS } from "@/lib/schedule-forms";
 import { fullName, sortForCalendar } from "@/lib/staff";
 import { OrderForm } from "./order-form";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Calendar order" };
 
@@ -24,7 +25,7 @@ export default function CalendarOrderPage() {
 async function CalendarOrder() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
-  if (me.role !== "owner") redirect("/team");
+  if (!can(me, "settings")) redirect("/team");
   const { data, error } = await supabase
     .from("staff")
     .select("id, first_name, last_name, role, level, color, is_active, calendar_position, staff_services(service_id)")

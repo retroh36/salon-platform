@@ -1,7 +1,7 @@
 ---
 title: Change tax, discount, receipt and cash drawer settings
 keywords: sales tax, tax rate, retail tax, service tax, discount permissions, who can discount, discount limit, max discount, front desk discount, receipt footer, receipt note, show stylist on receipt, checkout settings, cash float, starting float, drawer float
-who: owner
+who: owner, manager
 open: /settings/checkout | Open Tax and receipts
 ---
 

@@ -14,6 +14,6 @@ See each automated message, whether it's on, and what it has done in the last 90
 
 ## Good to know
 
-- Managers can see automations but not change them; only owners turn them on or off or edit the message. See "Set up a marketing automation".
+- Owners and managers turn automations on or off and edit the message. See "Set up a marketing automation".
 - **Booked from it** counts clients who booked any way within 14 days of the message.
 - Texts and email aren't connected yet, so messages wait in the outbox for now.

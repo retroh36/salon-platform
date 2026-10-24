@@ -3,13 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentStaff } from "@/lib/auth";
 import { LOGO_BUCKET, LOGO_TYPES, MAX_LOGO_BYTES } from "@/lib/branding";
+import { can } from "@/lib/permissions";
 
 export type SettingsResult = { ok: true; message: string } | { ok: false; message: string };
-const OWNERS_ONLY = "Only owners can change the salon's name and logo.";
+const OWNERS_ONLY = "Only owners and managers can change the salon's name and logo.";
 
-async function owner() {
+async function manager() {
   const { supabase, staff: me } = await getCurrentStaff();
-  return me?.role === "owner" ? { supabase, me } : null;
+  return can(me, "settings") ? { supabase, me } : null;
 }
 
 function refresh() {
@@ -18,7 +19,7 @@ function refresh() {
 }
 
 export async function saveSalonName(name: string): Promise<SettingsResult> {
-  const s = await owner();
+  const s = await manager();
   if (!s) return { ok: false, message: OWNERS_ONLY };
   const trimmed = name.trim();
   if (!trimmed || trimmed.length > 100) return { ok: false, message: "Enter the salon's name (up to 100 characters)." };
@@ -32,7 +33,7 @@ export async function saveSalonName(name: string): Promise<SettingsResult> {
 // Stores the logo under the business id, then points the salon at it and
 // removes the old one.
 export async function uploadSalonLogo(formData: FormData): Promise<SettingsResult> {
-  const s = await owner();
+  const s = await manager();
   if (!s) return { ok: false, message: OWNERS_ONLY };
   const file = formData.get("logo");
   if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Choose an image." };
@@ -52,7 +53,7 @@ export async function uploadSalonLogo(formData: FormData): Promise<SettingsResul
 }
 
 export async function removeSalonLogo(): Promise<SettingsResult> {
-  const s = await owner();
+  const s = await manager();
   if (!s) return { ok: false, message: OWNERS_ONLY };
   const { data: before } = await s.supabase.from("businesses").select("logo_path").eq("id", s.me.business_id).single();
   const { error } = await s.supabase.from("businesses").update({ logo_path: null }).eq("id", s.me.business_id);
@@ -62,10 +63,12 @@ export async function removeSalonLogo(): Promise<SettingsResult> {
   return { ok: true, message: "Removed the logo. The salon's initial shows instead." };
 }
 
-// How many tokens Denise may use a day (owners). 0 turns her thinking off.
+// How many tokens Denise may use a day (owners: it's billing). 0 turns her
+// thinking off.
 export async function saveDeniseLimit(limit: number): Promise<SettingsResult> {
-  const s = await owner();
-  if (!s) return { ok: false, message: "Only owners can change Denise's limit." };
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!can(me, "billing")) return { ok: false, message: "Only owners can change Denise's limit." };
+  const s = { supabase, me };
   if (!Number.isInteger(limit) || limit < 0 || limit > 50_000_000) return { ok: false, message: "Enter a whole number of tokens, up to 50,000,000." };
   const { error } = await s.supabase.from("businesses").update({ ai_daily_token_limit: limit }).eq("id", s.me.business_id);
   if (error) throw error;

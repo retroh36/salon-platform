@@ -12,10 +12,11 @@ import { fullName, roleLabel, sortStaff, type StaffRole } from "@/lib/staff";
 import { canManage } from "@/lib/auth";
 import { canManageMember, LOGIN_LABELS, loginState } from "@/lib/team";
 import { TeamTabs } from "./team-tabs";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Team" };
 
-const ROLE_TONES: Record<StaffRole, Tone> = { owner: "navy", manager: "blue", front_desk: "green", stylist: "neutral" };
+const ROLE_TONES: Record<StaffRole, Tone> = { owner: "navy", manager: "blue", front_desk: "green", stylist: "neutral", assistant: "neutral" };
 
 export default function TeamPage() {
   return (
@@ -50,7 +51,7 @@ async function Directory() {
         actions={
           canManageMember(me, null) ? (
             <>
-              {me.role === "owner" && (
+              {can(me, "settings") && (
                 <Link href="/team/order" className={buttonClass("secondary", "md")}>
                   Calendar order
                 </Link>

@@ -29,8 +29,9 @@ export const SEED = {
     sandra: "d0000000-0000-4000-8000-000000000008",
     shae: "d0000000-0000-4000-8000-000000000009",
     lois: "d0000000-0000-4000-8000-000000000010",
+    ari: "d0000000-0000-4000-8000-000000000011",
   },
-  staffCount: 10,
+  staffCount: 11,
   // The second, larger demo salon (supabase/seed-large.sql): 35 stylists.
   large: {
     business: "b1000000-0000-4000-8000-000000000001",
@@ -45,6 +46,16 @@ const options = { auth: { persistSession: false, autoRefreshToken: false } };
 // Bypasses RLS. Only for test setup, cleanup and checking results.
 export const admin: Client = createClient<Database>(url, secretKey, options);
 export const anon: Client = createClient<Database>(url, publishableKey, options);
+
+// What each role can do by default (private.role_default; owners can't be
+// limited). tests/db/permissions.test.ts checks the database agrees.
+export const DEFAULT_PERMISSIONS: Record<"owner" | "manager" | "front_desk" | "stylist" | "assistant", string[]> = {
+  owner: ["big_discounts", "billing", "delete_business", "export_data", "payroll", "reports", "see_team_numbers", "settings", "team", "void_refund", "waive_fees"],
+  manager: ["big_discounts", "export_data", "payroll", "reports", "see_team_numbers", "settings", "team", "void_refund", "waive_fees"],
+  front_desk: [],
+  stylist: [],
+  assistant: [],
+};
 
 export async function signIn(email: string): Promise<Client> {
   const client = createClient<Database>(url, publishableKey, options);

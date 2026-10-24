@@ -42,12 +42,16 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
   if (!me) return <NotLinked />;
   const tz = me.location.timezone;
   const today = todayIn(tz);
+  // An assistant follows the stylist they assist (read-only: the stylist
+  // taps their own times).
+  const book = me.role === "assistant" ? me.assists_staff_id : me.id;
+  const { data: stylist } = book && book !== me.id ? await supabase.from("staff").select("first_name").eq("id", book).maybeSingle() : { data: null };
   const { data, error } = await supabase
     .from("appointment_items")
     .select(
       "id, appointment_id, starts_at, active_minutes, processing_minutes, finishing_minutes, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name), appointment:appointments!inner(status, client:clients(first_name, last_name))",
     )
-    .eq("staff_id", me.id)
+    .eq("staff_id", book ?? me.id)
     .eq("location_id", me.location.id)
     .gte("starts_at", startOfLocalDay(today, tz).toISOString())
     .lt("starts_at", startOfLocalDay(addDays(today, 1), tz).toISOString())
@@ -60,12 +64,18 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
 
   return (
     <AppShell section="my-day" me={me}>
-      <PageHeader title="My day" description={`${formatLongDay(today, false)} · ${bookedSummary(counted)}`} />
-      <p className="mx-auto mb-4 max-w-xl text-sm text-ink-muted" data-testid="taps-optional">
-        Tapping your times is optional. When you do, Denise learns how long you really take; otherwise she goes by check-in and checkout.
-      </p>
-      {visits.length === 0 ? (
-        <p className="rounded-xl bg-sunken px-4 py-8 text-center text-ink-muted">Nothing booked for you today.</p>
+      <PageHeader title="My day" description={`${stylist ? `${stylist.first_name}'s day, ` : ""}${formatLongDay(today, false)} · ${bookedSummary(counted)}`} />
+      {me.role === "assistant" ? (
+        <p className="mx-auto mb-4 max-w-xl text-sm text-ink-muted" data-testid="assisting">
+          {stylist ? `You're assisting ${stylist.first_name}: here's their day, as it's booked.` : "You're not assigned to a stylist yet. Ask a manager to choose one on your Team page."}
+        </p>
+      ) : (
+        <p className="mx-auto mb-4 max-w-xl text-sm text-ink-muted" data-testid="taps-optional">
+          Tapping your times is optional. When you do, Denise learns how long you really take; otherwise she goes by check-in and checkout.
+        </p>
+      )}
+      {me.role === "assistant" && !book ? null : visits.length === 0 ? (
+        <p className="rounded-xl bg-sunken px-4 py-8 text-center text-ink-muted">Nothing booked {stylist ? `for ${stylist.first_name}` : "for you"} today.</p>
       ) : (
         <ol className="mx-auto flex max-w-xl flex-col gap-3" aria-label="Today's services">
           {visits.map((i) => {
@@ -85,7 +95,7 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
                   </div>
                   <StatusChip status={status} />
                 </div>
-                {status !== "no_show" && (
+                {status !== "no_show" && me.role !== "assistant" && (
                   <ServiceTimer
                     itemId={i.id}
                     big
@@ -101,7 +111,7 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
           })}
         </ol>
       )}
-      <MyGoalsSection supabase={supabase} me={me} />
+      {me.role !== "assistant" && <MyGoalsSection supabase={supabase} me={me} />}
       <MyEarnings supabase={supabase} me={me} last={params.pay === "last"} />
     </AppShell>
   );

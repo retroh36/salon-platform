@@ -350,7 +350,7 @@ test.describe("front desk", () => {
 test.describe("stylists", () => {
   test.use({ storageState: AUTH.stylist });
 
-  test("view everything but only edit notes on their own visits", async ({ page }) => {
+  test("see only their own book, and only edit notes on their visits", async ({ page }) => {
     const mine = await seedVisit(await newClient("Jo"), [{ service: "Women's Cut & Style", staff: BRIDGET, start: at(10) }]);
     await seedVisit(await newClient("Kit"), [{ service: "All-Over Color", staff: SANDRA, start: at(10) }]);
     await openDay(page);
@@ -362,11 +362,8 @@ test.describe("stylists", () => {
     await expect(page.getByRole("form", { name: "Block time" })).toBeVisible();
     await page.keyboard.press("Escape");
 
-    // Someone else's visit: read only.
-    await column(page, "Sandra Whitfield").getByRole("button", { name: new RegExp(`${PREFIX}Kit Test`) }).click();
-    await expect(panel(page).getByRole("region", { name: "Notes" })).toContainText("No notes.");
-    await expect(panel(page).getByRole("button", { name: /Edit|Check in|Cancel/ })).toHaveCount(0);
-    await page.getByRole("button", { name: "Close panel" }).click();
+    // Someone else's client isn't on their calendar at all.
+    await expect(ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Kit Test`) })).toHaveCount(0);
 
     // Their own: notes only.
     const block = column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Jo Test`) });

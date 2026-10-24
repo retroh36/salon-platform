@@ -10,19 +10,25 @@ const form = (fields: Record<string, string | string[]>) => {
 const SERVICE = "a0000000-0000-4000-8000-000000000001";
 
 describe("who manages whom", () => {
-  it("owners manage everyone; managers everyone but owners; nobody else anyone", () => {
-    expect(canManageMember({ role: "owner" }, { role: "owner" })).toBe(true);
-    expect(canManageMember({ role: "manager" }, { role: "manager" })).toBe(true);
-    expect(canManageMember({ role: "manager" }, { role: "owner" })).toBe(false);
-    expect(canManageMember({ role: "manager" }, null)).toBe(true);
-    expect(canManageMember({ role: "front_desk" }, null)).toBe(false);
-    expect(canManageMember({ role: "stylist" }, { role: "stylist" })).toBe(false);
+  const owner = { role: "owner" as const, permissions: ["team"] };
+  const manager = { role: "manager" as const, permissions: ["team"] };
+  const of = (role: "front_desk" | "stylist") => ({ role, permissions: [] });
+
+  it("owners manage everyone; managers everyone but owners, while they have the team; nobody else anyone", () => {
+    expect(canManageMember(owner, { role: "owner" })).toBe(true);
+    expect(canManageMember(manager, { role: "manager" })).toBe(true);
+    expect(canManageMember(manager, { role: "owner" })).toBe(false);
+    expect(canManageMember(manager, null)).toBe(true);
+    // An owner switched the team off for this manager.
+    expect(canManageMember({ role: "manager", permissions: [] }, null)).toBe(false);
+    expect(canManageMember(of("front_desk"), null)).toBe(false);
+    expect(canManageMember(of("stylist"), { role: "stylist" })).toBe(false);
   });
 
   it("only owners make owners, or reset someone's password", () => {
-    expect(rolesFor({ role: "owner" })).toEqual(["owner", "manager", "front_desk", "stylist"]);
-    expect(rolesFor({ role: "manager" })).toEqual(["manager", "front_desk", "stylist"]);
-    expect(rolesFor({ role: "front_desk" })).toEqual([]);
+    expect(rolesFor(owner)).toEqual(["owner", "manager", "front_desk", "stylist", "assistant"]);
+    expect(rolesFor(manager)).toEqual(["manager", "front_desk", "stylist", "assistant"]);
+    expect(rolesFor(of("front_desk"))).toEqual([]);
     expect(canResetPassword({ role: "owner" })).toBe(true);
     expect(canResetPassword({ role: "manager" })).toBe(false);
   });

@@ -1,7 +1,7 @@
 ---
 title: Find your way around the calendar
 keywords: calendar, appointment book, schedule view, day view, week view, zoom, go to date, today, department filter, saved view, change day, bigger, smaller, column
-who: owner, manager, front_desk, stylist
+who: owner, manager, front_desk, stylist, assistant
 open: /calendar | Open calendar
 ---
 

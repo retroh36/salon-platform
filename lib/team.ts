@@ -1,27 +1,31 @@
 // Managing the team (Team → Add team member, a member's page): who may
 // manage whom, the member form, and where each person's login stands.
-// Owners manage everyone; managers manage everyone but owners and can't
-// make anyone an owner (the database enforces the same). Pure.
+// Owners manage everyone; managers (with the team permission) manage
+// everyone but owners and can't make anyone an owner (the database enforces
+// the same). Pure.
 
 import { isUuid } from "@/lib/ids";
 import { normalizePhone } from "@/lib/clients";
 import { parseWeeklyHoursForm, STAFF_LEVELS, type StaffLevel, type WeeklyHoursRow } from "@/lib/schedule-forms";
+import { can } from "@/lib/permissions";
 import type { StaffRole } from "@/lib/staff";
 import type { Weekday } from "@/lib/scheduling/time";
 
 type FormLike = { get(name: string): FormDataEntryValue | null; getAll(name: string): FormDataEntryValue[] };
 
-export const ALL_ROLES: StaffRole[] = ["owner", "manager", "front_desk", "stylist"];
+export const ALL_ROLES: StaffRole[] = ["owner", "manager", "front_desk", "stylist", "assistant"];
+
+type Me = { role: StaffRole; permissions: readonly string[] };
 
 // Whether `me` may change this person (null: someone new).
-export function canManageMember(me: { role: StaffRole }, target: { role: StaffRole } | null): boolean {
+export function canManageMember(me: Me, target: { role: StaffRole } | null): boolean {
   if (me.role === "owner") return true;
-  return me.role === "manager" && (!target || target.role !== "owner");
+  return me.role === "manager" && can(me, "team") && (!target || target.role !== "owner");
 }
 
 // The roles `me` can give someone.
-export function rolesFor(me: { role: StaffRole }): StaffRole[] {
-  return me.role === "owner" ? ALL_ROLES : me.role === "manager" ? ["manager", "front_desk", "stylist"] : [];
+export function rolesFor(me: Me): StaffRole[] {
+  return me.role === "owner" ? ALL_ROLES : canManageMember(me, null) ? ALL_ROLES.filter((r) => r !== "owner") : [];
 }
 
 // Only owners send a password reset for someone who already signs in.

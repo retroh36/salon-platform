@@ -1,7 +1,7 @@
 ---
 title: Set up your cancellation policy
 keywords: cancellation policy, no-show fee, late cancel fee, late cancellation fee, card on file, require a card, cancellation window, 24 hour policy, 48 hour notice, deposit, repeat offenders, no show policy, cancel fee
-who: owner
+who: owner, manager
 open: /settings/policies | Open Policy settings
 ---
 

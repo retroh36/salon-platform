@@ -31,6 +31,8 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  const { data: made } = await admin.from("clients").select("id").like("first_name", `${PREFIX}%`);
+  if (made?.length) await admin.from("appointments").delete().in("client_id", made.map((c) => c.id));
   await admin.from("clients").delete().like("first_name", `${PREFIX}%`);
 });
 
@@ -164,6 +166,28 @@ test.describe("stylists", () => {
       .insert({ business_id: SEED.business, first_name: `${PREFIX} Formula`, last_name: "Client", notes: "Growing out bangs." })
       .select("id")
       .single();
+    // A stylist sees the clients on their own book: one past visit with Bridget.
+    const { data: svc } = await admin.from("services").select("id, active_minutes, price_cents").eq("business_id", SEED.business).eq("name", "Blowout").single();
+    const start = new Date(Date.now() - 400 * 86_400_000);
+    const end = new Date(start.getTime() + svc!.active_minutes * 60_000);
+    const { data: visit } = await admin
+      .from("appointments")
+      .insert({ business_id: SEED.business, location_id: SEED.location, client_id: data!.id, starts_at: start.toISOString(), ends_at: end.toISOString(), status: "canceled", canceled_at: start.toISOString(), cancel_reason: "Test visit", created_by: SEED.staff.frontDesk })
+      .select("id")
+      .single();
+    await admin.from("appointment_items").insert({
+      business_id: SEED.business,
+      location_id: SEED.location,
+      appointment_id: visit!.id,
+      service_id: svc!.id,
+      staff_id: SEED.staff.bridget,
+      starts_at: start.toISOString(),
+      ends_at: end.toISOString(),
+      active_minutes: svc!.active_minutes,
+      processing_minutes: 0,
+      finishing_minutes: 0,
+      price_cents: svc!.price_cents,
+    });
     await page.goto(`/clients/${data!.id}`);
     await waitForHydration(page, "textarea[name=formula]");
 

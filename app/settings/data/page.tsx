@@ -8,6 +8,7 @@ import { getCurrentStaff } from "@/lib/auth";
 import { formatDate } from "@/lib/clients";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { SettingsNav } from "../settings-nav";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Your data" };
 
@@ -33,7 +34,7 @@ export default function DataPage() {
 async function Data() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
-  if (me.role !== "owner") redirect("/dashboard");
+  if (!can(me, "export_data")) redirect("/dashboard");
   const { data: exports, error } = await supabase
     .from("data_exports")
     .select("id, created_at, bytes, row_counts, staff:staff(first_name)")
@@ -46,7 +47,7 @@ async function Data() {
   return (
     <AppShell section="settings" me={me}>
       <PageHeader title="Settings" description="Download everything your salon keeps here." />
-      <SettingsNav current="data" />
+      <SettingsNav current="data" me={me} />
       <Card title="Your data is yours" titleId="data-heading">
         <div className="flex max-w-2xl flex-col gap-4">
           <p>

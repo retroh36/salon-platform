@@ -7,6 +7,7 @@ import { getCurrentStaff } from "@/lib/auth";
 import { centsToInput } from "@/lib/services";
 import { SettingsNav } from "../settings-nav";
 import { CheckoutSettingsForm } from "./checkout-settings";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Tax and receipts" };
 
@@ -23,7 +24,7 @@ const percent = (bp: number) => String(bp / 100);
 async function CheckoutSettings() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
-  if (me.role !== "owner") redirect("/dashboard");
+  if (!can(me, "settings")) redirect("/dashboard");
   const { data: b, error } = await supabase
     .from("businesses")
     .select("tax_rate_services_bp, tax_rate_retail_bp, discount_roles, discount_max_percent, receipt_footer, receipt_show_stylists, cash_float_cents")
@@ -33,7 +34,7 @@ async function CheckoutSettings() {
   return (
     <AppShell section="settings" me={me}>
       <PageHeader title="Settings" description="Tax, discounts, receipts and the cash drawer." />
-      <SettingsNav current="checkout" />
+      <SettingsNav current="checkout" me={me} />
       <Card>
         <CheckoutSettingsForm
           initial={{

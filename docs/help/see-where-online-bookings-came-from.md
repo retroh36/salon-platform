@@ -1,7 +1,7 @@
 ---
 title: See where online bookings came from
 keywords: booking sources, where bookings came from, Google bookings, Instagram bookings, Facebook bookings, marketing results, online booking report, referral source, tracking, attribution
-who: owner
+who: owner, manager
 open: /reports | Open Reports
 ---
 
@@ -18,4 +18,4 @@ See how many online bookings came from Google, Instagram, Facebook, your website
 - **No tag (shared link, typed in)** means the plain link was used, or someone typed the address.
 - Links in rebook reminders, win-back, birthday and review messages are counted under those names.
 - If a client reschedules, the booking keeps where it first came from.
-- Only owners can see Reports.
+- Owners and managers see Reports (an owner can also allow someone else).

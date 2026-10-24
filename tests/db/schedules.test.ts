@@ -284,14 +284,14 @@ describe("time off requests", () => {
 });
 
 describe("time off visibility", () => {
-  it("everyone sees approved time off; pending and declined only the requester and managers", async () => {
+  it("the front of house sees approved time off; pending and declined only the requester and managers; stylists only their own", async () => {
     const statuses = async (client: Client, staffId: string) => {
       const { data } = await client.from("staff_time_off").select("status").eq("staff_id", staffId);
       return data!.map((r) => r.status).sort();
     };
 
-    // Sandra's vacation is approved.
-    expect(await statuses(gil, SANDRA)).toEqual(["approved"]);
+    // Sandra's vacation is approved: it says why, so other stylists don't see it.
+    expect(await statuses(gil, SANDRA)).toEqual([]);
     expect(await statuses(frontDesk, SANDRA)).toEqual(["approved"]);
     // Shae's request is pending: hidden from other staff, visible to managers.
     expect(await statuses(gil, SHAE)).toEqual([]);
@@ -333,7 +333,7 @@ describe("commission", () => {
     expect(await ids(gil)).toEqual([GIL]);
     // The front desk sees only their own hourly rate.
     expect(await ids(frontDesk)).toEqual([SEED.staff.frontDesk]);
-    expect(await ids(manager)).toHaveLength(9); // the stylists, the manager and the front desk
+    expect(await ids(manager)).toHaveLength(10); // the stylists, the manager, the front desk and the assistant
   });
 
   it("only owners and managers change it", async () => {

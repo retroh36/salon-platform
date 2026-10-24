@@ -1,7 +1,7 @@
 ---
 title: Add your booking link to Google, Instagram and Facebook
 keywords: booking link, book now button, Google Business Profile, Google Maps, reserve with google, Instagram bio, link in bio, Facebook book button, website book button, embed, iframe, share booking link, copy link
-who: owner
+who: owner, manager
 open: /settings/booking | Open Online booking settings
 ---
 

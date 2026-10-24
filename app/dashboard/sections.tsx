@@ -1,3 +1,4 @@
+import { isFrontOfHouse } from "@/lib/staff";
 import Link from "next/link";
 import { ClientInsightCard } from "@/components/client-insight";
 import { STATUS_LABELS } from "@/lib/appointments";
@@ -40,7 +41,7 @@ export function Glance({ data, lastWeek }: { data: DashboardData; lastWeek: stri
   const fullnessChange = t.fullness.now !== null && t.fullness.then !== null ? { change: t.fullness.now - t.fullness.then } : null;
   const missed = t.missed.noShows + t.missed.canceled;
   const thenMissed = t.missed.thenNoShows + t.missed.thenCanceled;
-  const mine = data.role === "stylist";
+  const mine = !isFrontOfHouse(data.role);
   return (
     <section aria-labelledby="glance-heading" className="mb-6">
       <h2 id="glance-heading" className={`${headingClass} mb-3`}>

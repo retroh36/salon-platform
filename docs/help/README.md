@@ -31,7 +31,7 @@ Sell a physical or digital gift card at checkout, on its own or with a visit.
 
 - **title**: the task as staff would say it, starting with a verb. Titles are unique.
 - **keywords**: the words and phrases staff might use for it, slang and other salons' software included ("ring up", "voucher", "comp"). Search matches the question against the title and keywords first, so this is how a page gets found.
-- **who**: the roles that can do it: `owner`, `manager`, `front_desk`, `stylist`. Check the permission in the code. Someone not listed gets no steps from Denise, only who can.
+- **who**: the roles that can do it: `owner`, `manager`, `front_desk`, `stylist`, `assistant`. Owners can also give someone a permission their role lacks (Team → their page); `who` lists the roles that can by default. Check the permission in the code. Someone not listed gets no steps from Denise, only who can.
 - **open** (optional): the screen to start on, then `|` and its button label, starting with "Open". It must be a real page (no ids).
 - **Body**: one sentence on what it is; numbered steps (3 to 10, one action each, with on-screen labels in bold, exactly as they appear); then up to five "Good to know" bullets and up to three "If it doesn't work" bullets. Under about 250 words. Say "tap", "the calendar", "booking details", "Denise's panel". No code names or file paths.
 - Say plainly when something only half works yet (texts and email wait in the outbox; card payments are recorded as taken on the salon's terminal; memberships and payment links use test cards).

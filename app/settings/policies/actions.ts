@@ -5,14 +5,15 @@ import { getCurrentStaff } from "@/lib/auth";
 import { parseFeeRule, parsePolicyForm, type PolicyErrors } from "@/lib/policy";
 import { runPolicyCharges } from "@/lib/policy-billing";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { can } from "@/lib/permissions";
 
 export type PolicyResult = { ok: true; message: string } | { ok: false; message: string; errors?: PolicyErrors };
 
-const ONLY_OWNERS = "Only owners can change the policy.";
+const ONLY_OWNERS = "Only owners and managers can change the policy.";
 
 export async function savePolicy(form: FormData): Promise<PolicyResult> {
   const { supabase, staff: me } = await getCurrentStaff();
-  if (!me || me.role !== "owner") return { ok: false, message: ONLY_OWNERS };
+  if (!can(me, "settings")) return { ok: false, message: ONLY_OWNERS };
   const parsed = parsePolicyForm(form);
   if (!parsed.ok) return { ok: false, message: "Check the highlighted fields.", errors: parsed.errors };
   const p = parsed.value;
@@ -46,7 +47,7 @@ export type StaffPolicyInput = { staffId: string; windowHours: string; lateKind:
 // A stylist's own, stricter rules ("" for each: the salon's).
 export async function saveStaffPolicy(input: StaffPolicyInput): Promise<PolicyResult> {
   const { supabase, staff: me } = await getCurrentStaff();
-  if (!me || me.role !== "owner") return { ok: false, message: ONLY_OWNERS };
+  if (!can(me, "settings")) return { ok: false, message: ONLY_OWNERS };
   const window = input.windowHours.trim() ? Number(input.windowHours) : null;
   if (window !== null && !(Number.isInteger(window) && window >= 1 && window <= 168)) return { ok: false, message: "Enter a window of 1 to 168 hours, or leave it empty." };
   const late = input.lateKind ? parseFeeRule(input.lateKind, input.lateAmount) : null;
@@ -72,7 +73,7 @@ export async function saveStaffPolicy(input: StaffPolicyInput): Promise<PolicyRe
 // Charges fees whose grace is over now, rather than at the next run.
 export async function chargeDueFeesNow(): Promise<{ ok: boolean; message: string }> {
   const { staff: me } = await getCurrentStaff();
-  if (!me || me.role !== "owner") return { ok: false, message: ONLY_OWNERS };
+  if (!can(me, "settings")) return { ok: false, message: ONLY_OWNERS };
   const s = await runPolicyCharges(createAdminClient(), { businessId: me.business_id });
   revalidatePath("/policy");
   const parts = [`${s.charged} charged`, s.failed && `${s.failed} didn't go through`, s.refunded && `${s.refunded} refunded`].filter(Boolean);

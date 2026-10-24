@@ -1,7 +1,7 @@
 ---
 title: Set up a marketing automation
 keywords: automations, automated messages, marketing, rebook reminder, win-back, winback, lapsed clients, birthday message, birthday offer, review request, google review, yelp, auto text, auto email, campaign, message template, preview message, send due messages, automation results
-who: owner
+who: owner, manager
 open: /settings/automations | Open Automations
 ---
 

@@ -96,10 +96,9 @@ test.describe("owner", () => {
 test.describe("manager", () => {
   test.use({ storageState: AUTH.manager });
 
-  test("sees the team's goals but doesn't set them", async ({ page }) => {
+  test("sees and sets the team's goals (managing the team)", async ({ page }) => {
     await page.goto("/team/goals");
     await expect(ui(page).getByTestId("team-goal-row").filter({ hasText: "Bridget" }).getByTestId("team-goal").first()).toBeVisible();
-    await expect(ui(page).getByRole("button", { name: "Set a goal" })).toHaveCount(0);
-    await expect(ui(page).getByRole("button", { name: /^Remove/ })).toHaveCount(0);
+    await expect(ui(page).getByRole("button", { name: "Set a goal" }).first()).toBeVisible();
   });
 });

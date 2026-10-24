@@ -25,6 +25,8 @@ export function canTakePayments(role: StaffRole): boolean {
   return role === "owner" || role === "manager" || role === "front_desk";
 }
 
+// Gift card and package changes (managers and owners). Voiding and refunding
+// a sale is the void_refund permission (lib/permissions.ts).
 export function canRefund(role: StaffRole): boolean {
   return role === "owner" || role === "manager";
 }

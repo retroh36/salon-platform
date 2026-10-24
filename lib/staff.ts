@@ -9,10 +9,18 @@ const ROLE_LABELS: Record<StaffRole, string> = {
   manager: "Manager",
   front_desk: "Front desk",
   stylist: "Stylist",
+  assistant: "Assistant",
 };
 
 // Display order on staff lists: leadership first, then desk, then stylists.
-const ROLE_ORDER: StaffRole[] = ["owner", "manager", "front_desk", "stylist"];
+const ROLE_ORDER: StaffRole[] = ["owner", "manager", "front_desk", "stylist", "assistant"];
+
+// The front of house: everyone but stylists and assistants, who see only
+// their own (or their stylist's) book. The database draws the same line
+// (private.front_of_house).
+export function isFrontOfHouse(role: StaffRole): boolean {
+  return role === "owner" || role === "manager" || role === "front_desk";
+}
 
 export function roleLabel(role: StaffRole): string {
   return ROLE_LABELS[role];

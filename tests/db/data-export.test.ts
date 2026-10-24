@@ -59,15 +59,17 @@ describe("the export", () => {
     expect(files.every((f) => f.rows.length === 0)).toBe(true);
   });
 
-  it("is logged, for owners only", async () => {
-    expect((await manager.rpc("log_data_export", { p_business_id: B, p_row_counts: { clients: 1 }, p_bytes: 10 })).error?.code).toBe("42501");
+  it("is logged, for owners and managers only", async () => {
+    const desk = await signIn("frontdesk@mapleandash.test");
+    expect((await desk.rpc("log_data_export", { p_business_id: B, p_row_counts: { clients: 1 }, p_bytes: 10 })).error?.code).toBe("42501");
     expect((await otherOwner.rpc("log_data_export", { p_business_id: B, p_row_counts: { clients: 1 }, p_bytes: 10 })).error?.code).toBe("42501");
     const { data: id, error } = await owner.rpc("log_data_export", { p_business_id: B, p_row_counts: { clients: 3 }, p_bytes: 1234 });
     expect(error).toBeNull();
     const { data: row } = await owner.from("data_exports").select("staff_id, row_counts, bytes").eq("id", id!).single();
     expect(row).toEqual({ staff_id: SEED.staff.owner, row_counts: { clients: 3 }, bytes: 1234 });
-    // Managers can't read the log; nobody writes it directly.
-    expect((await manager.from("data_exports").select("id")).data).toEqual([]);
+    // Managers read the log too, the front desk doesn't; nobody writes it directly.
+    expect((await manager.from("data_exports").select("id").eq("id", id!)).data).toHaveLength(1);
+    expect((await desk.from("data_exports").select("id")).data).toEqual([]);
     expect((await owner.from("data_exports").insert({ business_id: B, row_counts: {}, bytes: 0 })).error).not.toBeNull();
   });
 });

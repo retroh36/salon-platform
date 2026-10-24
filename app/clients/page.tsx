@@ -9,7 +9,7 @@ import { Badge, Card, listClass, PageHeader, rowLinkClass } from "@/components/u
 import { getCurrentStaff } from "@/lib/auth";
 import { searchClients } from "@/lib/client-search";
 import { canEditClients, SEARCH_LIMIT } from "@/lib/clients";
-import { fullName } from "@/lib/staff";
+import { fullName, isFrontOfHouse } from "@/lib/staff";
 import { loadDueBack, type DashboardMe } from "@/lib/dashboard-load";
 import { ClientSearch } from "./client-search";
 
@@ -89,7 +89,7 @@ async function DueBack({ me }: { me: DashboardMe }) {
     <AppShell section="clients" me={me}>
       <PageHeader
         title="Due back"
-        description={`${me.role === "stylist" ? "Your regulars" : "Regulars"} who are due or overdue for a visit, with nothing booked. Most overdue first.`}
+        description={`${!isFrontOfHouse(me.role) ? "Your regulars" : "Regulars"} who are due or overdue for a visit, with nothing booked. Most overdue first.`}
         actions={
           <Link href="/clients" className={buttonClass("secondary", "md")}>
             All clients

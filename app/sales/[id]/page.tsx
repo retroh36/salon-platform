@@ -1,3 +1,4 @@
+import { can } from "@/lib/permissions";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -7,7 +8,7 @@ import { Badge, Card, PageHeader, type Tone } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { METHOD_LABELS } from "@/lib/checkout";
 import { isUuid } from "@/lib/ids";
-import { canRefund, canTakePayments, loadSale, receiptGroups, receiptSalon, type ReceiptSalon, type SaleView } from "@/lib/sales";
+import { canTakePayments, loadSale, receiptGroups, receiptSalon, type ReceiptSalon, type SaleView } from "@/lib/sales";
 import { formatDay } from "@/lib/schedule-format";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
@@ -56,7 +57,7 @@ async function Sale({ params, searchParams }: Pick<PageProps<"/sales/[id]">, "pa
   }
 
   const paid = sale.payments.filter((p) => p.amountCents > 0).reduce((n, p) => n + p.amountCents, 0);
-  const manager = canRefund(me.role);
+  const manager = can(me, "void_refund");
   // Gift cards it was paid with (money can go back onto them).
   const { data: used } = await supabase.from("payments").select("gift_card:gift_cards(code, kind)").eq("sale_id", sale.id).not("gift_card_id", "is", null);
   const giftCards = [...new Map((used ?? []).flatMap((p) => (p.gift_card ? [[p.gift_card.code, { code: p.gift_card.code, label: `${p.gift_card.kind === "promotional" ? "promotional card" : "gift card"} …${p.gift_card.code.slice(-4)}` }] as const] : []))).values()];

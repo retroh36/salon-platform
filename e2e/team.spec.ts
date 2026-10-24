@@ -169,7 +169,7 @@ test.describe("roles", () => {
     await expect(page).toHaveURL("/team");
     await page.goto("/team/new");
     await waitForHydration(page, "select[name=role]");
-    await expect(ui(page).getByLabel("Role").locator("option")).toHaveText(["Manager", "Front desk", "Stylist"]);
+    await expect(ui(page).getByLabel("Role").locator("option")).toHaveText(["Manager", "Front desk", "Stylist", "Assistant"]);
     // Their own role is fixed, and there's no reset for them to send.
     await page.goto(`/team/${SEED.staff.manager}`);
     await expect(ui(page).getByLabel("Role")).toBeDisabled();

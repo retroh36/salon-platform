@@ -27,6 +27,7 @@ import { fullName, sortForCalendar } from "@/lib/staff";
 import { CalendarBoard } from "./board";
 import { loadVisitPolicies } from "@/lib/policy-visits";
 import type { AppointmentDetail, BlockData, BoardData, ColumnData } from "./types";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Calendar" };
 
@@ -429,7 +430,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     name: v.name,
     staffIds: v.staff_ids,
     shared: v.owner_staff_id === null,
-    editable: v.owner_staff_id === me.id || (v.owner_staff_id === null && me.role === "owner"),
+    editable: v.owner_staff_id === me.id || (v.owner_staff_id === null && can(me, "settings")),
   }));
   // The view this person last used on this device, if it's still there.
   const lastView = jar.get(viewCookie(me.id))?.value;
@@ -493,7 +494,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       resources: resourcesResult.data,
       products,
     },
-    me: { staffId: me.id, role: me.role, canBook: canBook(me.role), zoom: isZoom(me.calendar_zoom) ? me.calendar_zoom : "comfortable", fitAll: jar.get(fitCookie(me.id))?.value === "1" },
+    me: { staffId: me.id, role: me.role, canBook: canBook(me.role), canArrange: can(me, "settings"), zoom: isZoom(me.calendar_zoom) ? me.calendar_zoom : "comfortable", fitAll: jar.get(fitCookie(me.id))?.value === "1" },
     views,
     initialView,
   };

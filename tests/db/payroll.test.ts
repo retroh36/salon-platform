@@ -120,8 +120,12 @@ describe("who sees pay", () => {
     expect((await owner.rpc("payroll_sales", { p_business_id: "b0000000-0000-4000-8000-000000000099", ...RANGE })).error?.code).toBe("42501");
   });
 
-  it("lets only owners change the pay period", async () => {
-    expect((await manager.rpc("set_payroll_settings", { p_business_id: B, p_pay_period: "weekly", p_anchor: "2026-01-05" })).error?.code).toBe("42501");
+  it("lets only owners and managers change the pay period", async () => {
+    const desk = await signIn("frontdesk@mapleandash.test");
+    expect((await desk.rpc("set_payroll_settings", { p_business_id: B, p_pay_period: "weekly", p_anchor: "2026-01-05" })).error?.code).toBe("42501");
+    // Not around the function either.
+    expect((await desk.from("businesses").update({ pay_period: "weekly" }).eq("id", B).select()).data).toEqual([]);
+    expect((await manager.rpc("set_payroll_settings", { p_business_id: B, p_pay_period: "biweekly", p_anchor: "2026-01-05" })).error).toBeNull();
     expect((await owner.rpc("set_payroll_settings", { p_business_id: B, p_pay_period: "fortnightly", p_anchor: "2026-01-05" })).error?.code).toBe("22023");
     expect((await owner.rpc("set_payroll_settings", { p_business_id: B, p_pay_period: "biweekly", p_anchor: "2026-01-05" })).error).toBeNull();
   });

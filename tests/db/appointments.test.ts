@@ -279,8 +279,8 @@ describe("constraints", () => {
 });
 
 describe("row level security", () => {
-  it("lets every member read the calendar", async () => {
-    for (const client of [bridget, frontDesk, manager]) {
+  it("lets the front of house read the whole calendar, and a stylist only visits they're on", async () => {
+    for (const client of [frontDesk, manager]) {
       const appointments = await client.from("appointments").select("id", { count: "exact", head: true });
       const items = await client.from("appointment_items").select("id", { count: "exact", head: true });
       const resources = await client.from("resources").select("id", { count: "exact", head: true });
@@ -288,6 +288,15 @@ describe("row level security", () => {
       expect(items.count).toBeGreaterThan(600);
       expect(resources.count).toBe(9);
     }
+    // Bridget: every visit she's on, with all its services (a shared
+    // visit shows the whole visit), and no others.
+    const { data: hers } = await admin.from("appointment_items").select("appointment_id").eq("staff_id", BRIDGET).limit(100000);
+    const mine = new Set(hers!.map((i) => i.appointment_id));
+    const { data: seen } = await bridget.from("appointments").select("id").limit(100000);
+    expect(new Set(seen!.map((a) => a.id))).toEqual(mine);
+    const { data: items } = await bridget.from("appointment_items").select("appointment_id").limit(100000);
+    expect(items!.every((i) => mine.has(i.appointment_id))).toBe(true);
+    expect((await bridget.from("resources").select("id", { count: "exact", head: true })).count).toBe(9);
   });
 
   it("hides the calendar from other salons and signed-out users", async () => {

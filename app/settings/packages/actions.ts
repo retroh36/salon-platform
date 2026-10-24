@@ -5,6 +5,7 @@ import { getCurrentStaff } from "@/lib/auth";
 import { parseDollars } from "@/lib/checkout";
 import { isUuid } from "@/lib/ids";
 import { STAFF_LEVELS, type StaffLevel } from "@/lib/schedule-forms";
+import { can } from "@/lib/permissions";
 
 export type PackageInput = {
   id: string | null;
@@ -20,7 +21,7 @@ export type SaveResult = { ok: true; message: string; id: string } | { ok: false
 
 export async function savePackage(input: PackageInput): Promise<SaveResult> {
   const { supabase, staff: me } = await getCurrentStaff();
-  if (!me || me.role !== "owner") return { ok: false, message: "Only owners can set up packages." };
+  if (!can(me, "settings")) return { ok: false, message: "Only owners and managers can set up packages." };
   const name = input.name.trim();
   if (!name || name.length > 120) return { ok: false, message: "Give the package a name." };
   const price = parseDollars(input.price);

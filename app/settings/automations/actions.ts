@@ -6,6 +6,7 @@ import { AUTOMATION_KINDS, automationProblems, type AutomationKind, type Automat
 import { runAutomations, type RunSummary } from "@/lib/automations-run";
 import { isUuid } from "@/lib/ids";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { can } from "@/lib/permissions";
 
 export type Result = { ok: true; message: string } | { ok: false; message: string };
 
@@ -16,7 +17,7 @@ export async function saveAutomation(
   input: { enabled: boolean; subject: string; body: string; settings: AutomationSettings; googleUrl?: string; yelpUrl?: string },
 ): Promise<Result> {
   const { supabase, staff: me } = await getCurrentStaff();
-  if (!me || me.role !== "owner") return { ok: false, message: "Only owners can change automations." };
+  if (!can(me, "settings")) return { ok: false, message: "Only owners and managers can change automations." };
   if (!AUTOMATION_KINDS.includes(kind)) return { ok: false, message: "That automation doesn't exist." };
   const googleUrl = input.googleUrl?.trim() ?? "";
   const yelpUrl = input.yelpUrl?.trim() ?? "";
@@ -37,7 +38,7 @@ export async function saveAutomation(
     p_kind: kind,
     p_input: { enabled: input.enabled, subject: input.subject.trim(), body: input.body.trim(), settings, ...(kind === "review" ? { google_review_url: googleUrl, yelp_url: yelpUrl } : {}) } as never,
   });
-  if (error) return { ok: false, message: error.code === "42501" ? "Only owners can change automations." : "That didn't save. Try again." };
+  if (error) return { ok: false, message: error.code === "42501" ? "Only owners and managers can change automations." : "That didn't save. Try again." };
   revalidatePath("/settings/automations");
   return { ok: true, message: input.enabled ? "Saved. It's on." : "Saved. It's off." };
 }
@@ -45,7 +46,7 @@ export async function saveAutomation(
 // Messages due now, for this salon (the hourly job does the same).
 export async function sendDueNow(): Promise<{ ok: true; summary: RunSummary } | { ok: false; message: string }> {
   const { staff: me } = await getCurrentStaff();
-  if (!me || me.role !== "owner") return { ok: false, message: "Only owners can send messages now." };
+  if (!can(me, "settings")) return { ok: false, message: "Only owners and managers can send messages now." };
   const summary = await runAutomations(createAdminClient(), { businessId: me.business_id });
   revalidatePath("/settings/automations");
   return { ok: true, summary };
@@ -56,7 +57,7 @@ export async function sendDueNow(): Promise<{ ok: true; summary: RunSummary } | 
 // again).
 export async function decideSuggestion(actionId: string, decision: "apply" | "reject" | "undo"): Promise<Result> {
   const { supabase, staff: me } = await getCurrentStaff();
-  if (!me || me.role !== "owner" || !isUuid(actionId)) return { ok: false, message: "Only owners can turn automations on." };
+  if (!can(me, "settings") || !isUuid(actionId)) return { ok: false, message: "Only owners and managers can turn automations on." };
   const fn = decision === "apply" ? "apply_automation_action" : decision === "undo" ? "undo_automation_action" : "reject_ai_action";
   const { error } = await supabase.rpc(fn, { p_action_id: actionId });
   if (error) return { ok: false, message: ["42501", "55000", "P0002"].includes(error.code ?? "") ? error.message : "That didn't work. Try again." };

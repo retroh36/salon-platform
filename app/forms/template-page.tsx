@@ -6,12 +6,13 @@ import { getCurrentStaff } from "@/lib/auth";
 import { loadTemplates } from "@/lib/client-checks";
 import { isUuid } from "@/lib/ids";
 import { TemplateEditor, type TemplateDraft } from "./template-editor";
+import { can } from "@/lib/permissions";
 
 // Build a new form (no id) or view/edit one. Only owners can change them.
 export async function TemplatePage({ id }: { id?: string }) {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
-  const owner = me.role === "owner";
+  const owner = can(me, "settings");
   if (!id && !owner) redirect("/forms");
   if (id && !isUuid(id)) notFound();
   const [templates, { data: services, error }] = await Promise.all([

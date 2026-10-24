@@ -186,10 +186,12 @@ describe("booking online", () => {
 });
 
 describe("settings and the log", () => {
-  it("members see the settings; only owners change them; other salons see nothing", async () => {
+  it("members see the settings; only owners and managers change them; other salons see nothing", async () => {
     expect((await frontDesk.from("online_booking_settings").select("enabled").eq("business_id", B).single()).data).toEqual({ enabled: true });
-    const byManager = await manager.from("online_booking_settings").update({ window_days: 5 }).eq("business_id", B).select("business_id");
-    expect(byManager.data).toEqual([]);
+    const byDesk = await frontDesk.from("online_booking_settings").update({ window_days: 5 }).eq("business_id", B).select("business_id");
+    expect(byDesk.data).toEqual([]);
+    const byManager = await manager.from("online_booking_settings").update({ window_days: 60 }).eq("business_id", B).select("window_days");
+    expect(byManager.data).toEqual([{ window_days: 60 }]);
     const byOwner = await owner.from("online_booking_settings").update({ window_days: 61 }).eq("business_id", B).select("window_days");
     expect(byOwner.data).toEqual([{ window_days: 61 }]);
     await admin.from("online_booking_settings").update({ window_days: 60 }).eq("business_id", B);

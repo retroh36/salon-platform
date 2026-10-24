@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { computeSale, discountAllowed, discountLimitWarning, discountCents, formatRate, parseDollars, paymentStatus, priceLines } from "@/lib/checkout";
 
+// Who's giving a discount: the front desk has a limit; managers (and
+// anyone an owner allowed) can give big discounts.
+const DESK = { role: "front_desk", permissions: [] };
+const MANAGER = { role: "manager", permissions: ["big_discounts"] };
 const service = (cents: number, taxBp = 0) => ({ grossCents: cents, taxBp, discountable: true });
 const retail = (cents: number, taxBp = 1025) => ({ grossCents: cents, taxBp, discountable: true });
 
@@ -48,18 +52,21 @@ describe("payments", () => {
 describe("who may discount", () => {
   const settings = { roles: ["owner", "manager", "front_desk"], maxPercent: 10 };
   it("allows the salon's roles, within its limit for the front desk", () => {
-    expect(discountAllowed("front_desk", settings, 1000, 10000)).toEqual({ ok: true });
-    expect(discountAllowed("front_desk", settings, 1001, 10000)).toEqual({ ok: false, message: "You can give up to 10% off. Ask a manager for more." });
-    expect(discountAllowed("manager", settings, 5000, 10000)).toEqual({ ok: true });
-    expect(discountAllowed("front_desk", { ...settings, roles: ["owner"] }, 100, 10000)).toMatchObject({ ok: false });
-    expect(discountAllowed("front_desk", { ...settings, roles: ["owner"] }, 0, 10000)).toEqual({ ok: true });
+    expect(discountAllowed(DESK, settings, 1000, 10000)).toEqual({ ok: true });
+    expect(discountAllowed(DESK, settings, 1001, 10000)).toEqual({ ok: false, message: "You can give up to 10% off. Ask a manager for more." });
+    expect(discountAllowed(MANAGER, settings, 5000, 10000)).toEqual({ ok: true });
+    expect(discountAllowed(DESK, { ...settings, roles: ["owner"] }, 100, 10000)).toMatchObject({ ok: false });
+    expect(discountAllowed(DESK, { ...settings, roles: ["owner"] }, 0, 10000)).toEqual({ ok: true });
   });
 
   it("warns only the front desk about the percent limit", () => {
-    expect(discountLimitWarning("front_desk", "percent", 15, 10)).toBe("You can give up to 10% off. Ask a manager for more.");
-    expect(discountLimitWarning("front_desk", "percent", 10, 10)).toBeNull();
-    expect(discountLimitWarning("manager", "percent", 50, 10)).toBeNull();
-    expect(discountLimitWarning("owner", "percent", 100, 10)).toBeNull();
+    expect(discountLimitWarning(DESK, "percent", 15, 10)).toBe("You can give up to 10% off. Ask a manager for more.");
+    expect(discountLimitWarning(DESK, "percent", 10, 10)).toBeNull();
+    // A front desk the owner trusts with big discounts.
+    expect(discountLimitWarning({ role: "front_desk", permissions: ["big_discounts"] }, "percent", 50, 10)).toBeNull();
+    expect(discountAllowed({ role: "front_desk", permissions: ["big_discounts"] }, { roles: ["owner", "manager", "front_desk"], maxPercent: 10 }, 5000, 10000)).toEqual({ ok: true });
+    expect(discountLimitWarning(MANAGER, "percent", 50, 10)).toBeNull();
+    expect(discountLimitWarning(MANAGER, "percent", 100, 10)).toBeNull();
   });
 });
 

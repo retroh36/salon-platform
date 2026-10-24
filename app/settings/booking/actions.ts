@@ -4,14 +4,15 @@ import { revalidatePath } from "next/cache";
 import { getCurrentStaff } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
 import { parseBookingSettings, parseServiceOnline, type BookingSettingsErrors } from "@/lib/online-booking/settings";
+import { can } from "@/lib/permissions";
 
 export type BookingSettingsState = { ok: true; message: string } | { ok: false; message: string; errors?: BookingSettingsErrors } | undefined;
 
-const OWNERS_ONLY = "Only owners can change online booking.";
+const OWNERS_ONLY = "Only owners and managers can change online booking.";
 
 async function owner() {
   const { supabase, staff: me } = await getCurrentStaff();
-  return me?.role === "owner" ? { supabase, me } : null;
+  return can(me, "settings") ? { supabase, me } : null;
 }
 
 // The rules and look of the salon's booking site, and its address.

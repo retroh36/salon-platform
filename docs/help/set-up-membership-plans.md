@@ -1,7 +1,7 @@
 ---
 title: Set up membership plans
 keywords: create membership, membership plan, new plan, subscription plan, club, member discount, included services, minimum term, notice period, pause rules, edit membership
-who: owner
+who: owner, manager
 open: /settings/memberships | Open membership settings
 ---
 

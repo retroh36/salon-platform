@@ -1,7 +1,7 @@
 ---
 title: Explain online booking to a client
 keywords: how do clients book online, card to book online, deposit online, client booking steps, booking site, booking code, verification code, one time code, didn't get code, no preference stylist, book online help, client can't book online
-who: owner, manager, front_desk, stylist
+who: owner, manager, front_desk, stylist, assistant
 ---
 
 What a client sees on your booking site, so you can walk them through it on the phone.

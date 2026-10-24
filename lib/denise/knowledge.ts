@@ -8,6 +8,8 @@
 //   - sales figures for owners and managers.
 // Every number is calculated here; Claude only reads them.
 
+import { can } from "@/lib/permissions";
+import { isFrontOfHouse } from "@/lib/staff";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { canManage } from "@/lib/auth";
 import type { Database } from "@/lib/database.types";
@@ -28,7 +30,7 @@ type Supabase = SupabaseClient<Database>;
 export type SalesPeriod = "today" | "yesterday" | "this_week" | "last_week" | "this_month" | "last_30_days";
 export const SALES_PERIODS: SalesPeriod[] = ["today", "yesterday", "this_week", "last_week", "this_month", "last_30_days"];
 
-export type Asker = { role: StaffRole; staffId: string; businessId: string; location: { id: string; timezone: string }; salon: string; today: LocalDate };
+export type Asker = { role: StaffRole; permissions: readonly string[]; staffId: string; bookStaffId?: string | null; businessId: string; location: { id: string; timezone: string }; salon: string; today: LocalDate };
 
 export type Knowledge = {
   clients: (firstName: string) => Promise<unknown>;
@@ -55,13 +57,19 @@ const pct = (rate: number | null | undefined) => (rate === null || rate === unde
 const dollars = (cents: number) => Math.round(cents) / 100;
 const hourText = (hour: number) => formatMinute(hour * 60);
 
-export function canSeeSales(role: StaffRole): boolean {
-  return canManage(role);
+// Sales and what the salon owes are reports (lib/permissions.ts).
+export function canSeeSales(me: { permissions: readonly string[] }): boolean {
+  return can(me, "reports");
 }
 
 export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
-  const isStylist = me.role === "stylist";
-  const frontOfHouse = me.role === "owner" || me.role === "manager" || me.role === "front_desk";
+  // Stylists and assistants see their own book: an assistant's is the
+  // stylist they assist. Other stylists' times and rebooking need
+  // see_team_numbers (an owner can allow it).
+  const frontOfHouse = isFrontOfHouse(me.role);
+  const isStylist = !frontOfHouse;
+  const own = me.bookStaffId ?? me.staffId;
+  const ownTimesOnly = isStylist && !can(me, "see_team_numbers");
   const tz = me.location.timezone;
   const dateOf = (iso: string | null) => (iso ? toLocal(new Date(iso), tz).date : null);
 
@@ -119,7 +127,7 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
       const all = await loadAllClientInsights(supabase, me.businessId);
       const due = [...all]
         .filter(([, c]) => (c.due === "overdue" || c.due === "due_soon") && c.visits >= 2)
-        .filter(([, c]) => !isStylist || c.preferredStaffId === me.staffId)
+        .filter(([, c]) => !isStylist || c.preferredStaffId === own)
         .sort((a, b) => b[1].overdueDays - a[1].overdueDays);
       const top = due.slice(0, Math.min(Math.max(limit, 1), 20));
       const { data, error } = top.length ? await supabase.from("clients").select("id, first_name").in("id", top.map(([id]) => id)) : { data: [], error: null };
@@ -143,8 +151,8 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
 
     async durations({ staffId, serviceId }) {
       // Stylists see their own times only, and are told so.
-      if (isStylist && staffId && staffId !== me.staffId) return { restricted: "Stylists can see their own times only, not other stylists'." };
-      const only = isStylist ? me.staffId : staffId;
+      if (ownTimesOnly && staffId && staffId !== own) return { restricted: "Stylists can see their own times only, not other stylists'." };
+      const only = ownTimesOnly ? own : staffId;
       const all = await loadDurations(supabase, me.businessId, only ? [only] : undefined);
       const { staff, services } = await lookups();
       const rows = [...all.values()]
@@ -169,14 +177,14 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
           ran_over_percent: pct(d.overrunRate),
           suggested_booking_minutes: d.suggestedMinutes,
         }));
-      return { scope: isStylist ? "your own services" : "all stylists", rows, note: rows.length ? undefined : "No timed visits for that yet." };
+      return { scope: ownTimesOnly ? "your own services" : "all stylists", rows, note: rows.length ? undefined : "No timed visits for that yet." };
     },
 
     async salon() {
       const s = await loadSalonInsight(supabase, me.businessId, me.location.id);
       if (!s) return { error: "Nothing learned yet." };
       const { staff, services } = await lookups();
-      const mine = (id: string | null) => (!isStylist || id === me.staffId ? (id ? (staff.get(id) ?? null) : null) : "(another stylist)");
+      const mine = (id: string | null) => (!ownTimesOnly || id === own ? (id ? (staff.get(id) ?? null) : null) : "(another stylist)");
       return {
         weeks_of_history: s.weeks,
         busiest_hours: s.busiest.map((h) => ({ day: WEEKDAY[h.weekday], hour: hourText(h.hour), booked_minutes_per_week: h.bookedMinutesPerWeek })),
@@ -187,14 +195,14 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
           ran_over_percent: pct(w.overrunRate),
           average_minutes_over: w.averageOverMinutes,
           stylist_running_over_most: mine(w.worstStaffId),
-          stylist_ran_over_percent: !isStylist || w.worstStaffId === me.staffId ? pct(w.worstStaffRate) : null,
+          stylist_ran_over_percent: !ownTimesOnly || w.worstStaffId === own ? pct(w.worstStaffRate) : null,
           services_running_over_most: w.worstServiceIds.map((id) => services.get(id) ?? "a service"),
           estimated_percent: pct(w.estimatedShare ?? 0),
         })),
         services_running_over: s.serviceOverruns.slice(0, 6).map((o) => ({ service: services.get(o.serviceId) ?? "a service", timed_visits: o.visits, ran_over_percent: pct(o.overrunRate), typical_minutes_over: o.typicalOverMinutes, estimated_percent: pct(o.estimatedShare ?? 0) })),
         no_shows_by_day: s.noShowsByWeekday.map((n) => ({ day: WEEKDAY[n.key], visits: n.visits, no_show_percent: pct(n.rate) })),
         no_shows_by_time_of_day: s.noShowsByTimeOfDay.map((n) => ({ time_of_day: n.key, visits: n.visits, no_show_percent: pct(n.rate) })),
-        rebooking_by_stylist: s.rebooking.filter((r) => !isStylist || r.staffId === me.staffId).map((r) => ({ stylist: staff.get(r.staffId) ?? "a stylist", visits: r.visits, rebooked_before_leaving_percent: pct(r.rebookedRate) })),
+        rebooking_by_stylist: s.rebooking.filter((r) => !ownTimesOnly || r.staffId === own).map((r) => ({ stylist: staff.get(r.staffId) ?? "a stylist", visits: r.visits, rebooked_before_leaving_percent: pct(r.rebookedRate) })),
         salon_no_show_percent: pct(s.noShowRate),
         salon_ran_over_percent: pct(s.overrunRate),
         // How much of the running-over figures comes from check-in to
@@ -259,7 +267,7 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
       return { scope: words.length ? `matching "${query}"` : "low stock only", products: rows.slice(0, 25) };
     },
 
-    sales: canSeeSales(me.role)
+    sales: canSeeSales(me)
       ? async (period) => {
           const range = salesRange(period, me.today);
           const previous = { from: addDays(range.from, -daysIn(range)), to: addDays(range.from, -1) };
@@ -283,7 +291,7 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
       : null,
 
     giftCards:
-      me.role === "owner"
+      canSeeSales(me)
         ? async () => {
             const l = await loadGiftCardLiability(supabase, me.businessId);
             return {
@@ -299,7 +307,7 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
         : null,
 
     packages:
-      me.role === "owner"
+      canSeeSales(me)
         ? async (limit) => {
             const p = await loadUnusedPackages(supabase, me.businessId);
             return {

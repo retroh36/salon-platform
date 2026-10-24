@@ -1,7 +1,7 @@
 ---
 title: Set the pay period
 keywords: pay period, pay schedule, payroll schedule, weekly, biweekly, every two weeks, semi-monthly, twice a month, pay cycle, payroll settings
-who: owner
+who: owner, manager
 open: /settings/payroll | Open payroll settings
 ---
 
@@ -14,6 +14,6 @@ Choose how often you run payroll, so Payroll and each stylist's earnings show th
 
 ## Good to know
 
-- Only owners can change the pay period. Managers can still run payroll.
+- Owners and managers with payroll can change the pay period.
 - With **Custom**, pick the dates on the Payroll page each time.
 - Commission and hourly rates are set per person on Team → Schedule. See "Set someone's commission or hourly rate".

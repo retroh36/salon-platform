@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentStaff } from "@/lib/auth";
 import { viewProblems, VIEW_NAME_MAX } from "@/lib/calendar-views";
 import { isUuid } from "@/lib/ids";
+import { can } from "@/lib/permissions";
 
 // Saved calendar views and the salon's column order. The database checks
 // who may do what (save_calendar_view, delete_calendar_view,
@@ -28,7 +29,7 @@ export async function saveCalendarView(input: { id: string | null; name: string;
   const problems = viewProblems(input.name.slice(0, VIEW_NAME_MAX + 1), staffIds, []);
   if (problems.name) return { ok: false, message: problems.name, field: "name" };
   if (problems.staff) return { ok: false, message: problems.staff, field: "staff" };
-  if (input.shared && me.role !== "owner") return { ok: false, message: "Only owners make views for everyone." };
+  if (input.shared && !can(me, "settings")) return { ok: false, message: "Only owners and managers make views for everyone." };
 
   const { data, error } = await supabase.rpc("save_calendar_view", {
     p_location_id: me.location.id,
@@ -59,7 +60,7 @@ export async function deleteCalendarView(id: string): Promise<{ ok: boolean; mes
 export async function setCalendarOrder(staffIds: string[]): Promise<{ ok: boolean; message?: string }> {
   const { supabase, staff: me } = await getCurrentStaff();
   const list = ids(staffIds);
-  if (!me || me.role !== "owner" || !list) return { ok: false, message: "Only owners set the calendar order." };
+  if (!can(me, "settings") || !list) return { ok: false, message: "Only owners and managers set the calendar order." };
   const { error } = await supabase.rpc("set_calendar_order", { p_business_id: me.business_id, p_staff_ids: list });
   if (error?.code === "42501") return { ok: false, message: "Only owners set the calendar order." };
   if (error) throw error;

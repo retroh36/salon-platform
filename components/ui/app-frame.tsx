@@ -4,20 +4,27 @@ import { Avatar } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
 import { BoxIcon, CalendarIcon, ChartIcon, GiftIcon, ReceiptIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, ShieldIcon, UserIcon, WalletIcon } from "@/components/ui/icons";
 import { SalonMark } from "@/components/ui/salon-mark";
-import { roleLabel, type StaffRole } from "@/lib/staff";
+import { firstSettingsPage } from "@/app/settings/settings-nav";
+import { AutoLock } from "@/components/auto-lock";
+import { can, type Permission } from "@/lib/permissions";
+import { isFrontOfHouse, roleLabel, type StaffRole } from "@/lib/staff";
 
-export type Section = "dashboard" | "my-day" | "calendar" | "sales" | "gift-cards" | "reports" | "payroll" | "policy" | "clients" | "team" | "services" | "durations" | "inventory" | "forms" | "settings";
+export type Section = "account" | "dashboard" | "my-day" | "calendar" | "sales" | "gift-cards" | "reports" | "payroll" | "policy" | "clients" | "team" | "services" | "durations" | "inventory" | "forms" | "settings";
 
 type NavItem = {
   section: Section;
   href: string;
   label: string;
   Icon: (p: { className?: string }) => React.ReactNode;
-  ownersOnly?: boolean;
+  // Who sees it: a permission (lib/permissions.ts), owners and managers,
+  // their own book (stylists and assistants) or the front of house.
+  needs?: Permission;
   managersOnly?: boolean;
-  stylistsOnly?: boolean;
+  ownBook?: boolean;
   frontOfHouse?: boolean;
 };
+
+type User = { name: string; role: StaffRole; permissions: readonly string[] };
 
 // The sidebar, in groups under small headings; Settings sits at the
 // bottom. Items (and whole groups) a role can't use are hidden.
@@ -26,7 +33,7 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
     label: "Daily",
     items: [
       { section: "dashboard", href: "/dashboard", label: "Dashboard", Icon: HomeIcon },
-      { section: "my-day", href: "/my-day", label: "My day", Icon: ClockIcon, stylistsOnly: true },
+      { section: "my-day", href: "/my-day", label: "My day", Icon: ClockIcon, ownBook: true },
       { section: "calendar", href: "/calendar", label: "Calendar", Icon: CalendarIcon },
       { section: "clients", href: "/clients", label: "Clients", Icon: UserIcon },
     ],
@@ -36,9 +43,9 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { section: "sales", href: "/sales", label: "Sales", Icon: ReceiptIcon, frontOfHouse: true },
       { section: "gift-cards", href: "/gift-cards", label: "Gift cards", Icon: GiftIcon, frontOfHouse: true },
-      { section: "reports", href: "/reports", label: "Reports", Icon: ChartIcon, ownersOnly: true },
-      { section: "payroll", href: "/payroll", label: "Payroll", Icon: WalletIcon, managersOnly: true },
-      { section: "policy", href: "/policy", label: "Policy", Icon: ShieldIcon, managersOnly: true },
+      { section: "reports", href: "/reports", label: "Reports", Icon: ChartIcon, needs: "reports" },
+      { section: "payroll", href: "/payroll", label: "Payroll", Icon: WalletIcon, needs: "payroll" },
+      { section: "policy", href: "/policy", label: "Policy", Icon: ShieldIcon, needs: "reports" },
     ],
   },
   {
@@ -52,16 +59,18 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
     ],
   },
 ];
-// Managers get the settings they can see (automations, read-only).
-const SETTINGS: NavItem = { section: "settings", href: "/settings", label: "Settings", Icon: SettingsIcon, managersOnly: true };
-const settingsFor = (role: StaffRole): NavItem => (role === "owner" ? SETTINGS : { ...SETTINGS, href: "/settings/automations" });
+// Settings opens on the first settings page they can use, if any.
+function settingsFor(user: User): NavItem | null {
+  const href = firstSettingsPage(user);
+  return href ? { section: "settings", href, label: "Settings", Icon: SettingsIcon } : null;
+}
 
-function shown(item: NavItem, role: StaffRole): boolean {
+function shown(item: NavItem, user: User): boolean {
   return (
-    (!item.ownersOnly || role === "owner") &&
-    (!item.managersOnly || role === "owner" || role === "manager") &&
-    (!item.stylistsOnly || role === "stylist") &&
-    (!item.frontOfHouse || role !== "stylist")
+    (!item.needs || can(user, item.needs)) &&
+    (!item.managersOnly || user.role === "owner" || user.role === "manager") &&
+    (!item.ownBook || user.role === "stylist" || user.role === "assistant") &&
+    (!item.frontOfHouse || isFrontOfHouse(user.role))
   );
 }
 
@@ -102,17 +111,21 @@ export function AppFrame({
   logoUrl,
   locationName,
   user,
+  sharedDevice = null,
   children,
 }: {
   section: Section;
   businessName: string;
   logoUrl: string | null;
   locationName: string;
-  user: { name: string; role: StaffRole };
+  user: User;
+  // On the shared front-desk iPad: switch to someone else, and lock after
+  // the salon's idle time.
+  sharedDevice?: { autoLockMinutes: number } | null;
   children: React.ReactNode;
 }) {
-  const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => shown(n, user.role)) })).filter((g) => g.items.length > 0);
-  const settings = shown(SETTINGS, user.role) ? settingsFor(user.role) : null;
+  const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => shown(n, user)) })).filter((g) => g.items.length > 0);
+  const settings = settingsFor(user);
   return (
     // One screen tall on large screens: the calendar and panels scroll inside.
     <div className="flex min-h-screen flex-1 bg-canvas text-ink lg:h-screen lg:min-h-0 lg:flex-none lg:overflow-hidden">
@@ -148,17 +161,26 @@ export function AppFrame({
           <div className="flex min-w-0 items-center gap-3">
             <Avatar name={user.name} size="sm" halo={false} />
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium" data-testid="sidebar-user">
+              <Link href="/account" className="block truncate text-sm font-medium hover:underline" data-testid="sidebar-user">
                 {user.name}
-              </div>
+              </Link>
               <div className="truncate text-xs text-ink-muted">{roleLabel(user.role)}</div>
             </div>
-            <form action={logout} className="shrink-0">
-              <button type="submit" aria-label="Sign out" title="Sign out" className={buttonClass("ghost", "sm", "", { square: true })}>
-                <LogOutIcon className="size-4" />
+            {!sharedDevice && (
+              <form action={logout} className="shrink-0">
+                <button type="submit" aria-label="Sign out" title="Sign out" className={buttonClass("ghost", "sm", "", { square: true })}>
+                  <LogOutIcon className="size-4" />
+                </button>
+              </form>
+            )}
+          </div>
+          {sharedDevice && (
+            <form action="/switch/lock" method="post">
+              <button type="submit" className={buttonClass("secondary", "sm", "w-full")}>
+                Switch user
               </button>
             </form>
-          </div>
+          )}
           <PoweredBy />
         </div>
       </aside>
@@ -180,11 +202,19 @@ export function AppFrame({
               className="h-10 w-full rounded-md border border-line bg-surface pr-3 pl-9 text-sm placeholder:text-ink-subtle focus:border-focus focus:ring-2 focus:ring-focus/25 focus:outline-none"
             />
           </form>
-          <form action={logout} className="lg:hidden">
-            <button type="submit" aria-label="Sign out" title="Sign out" className={buttonClass("ghost", "md", "", { square: true })}>
-              <LogOutIcon className="size-5" />
-            </button>
-          </form>
+          {sharedDevice ? (
+            <form action="/switch/lock" method="post" className="lg:hidden">
+              <button type="submit" className={buttonClass("secondary", "sm")}>
+                Switch user
+              </button>
+            </form>
+          ) : (
+            <form action={logout} className="lg:hidden">
+              <button type="submit" aria-label="Sign out" title="Sign out" className={buttonClass("ghost", "md", "", { square: true })}>
+                <LogOutIcon className="size-5" />
+              </button>
+            </form>
+          )}
         </header>
         <nav aria-label="Main" className="flex gap-1 overflow-x-auto border-b border-line px-4 py-2 lg:hidden">
           {[...groups.flatMap((g) => g.items), ...(settings ? [settings] : [])].map(({ section: s, href, label }) => (
@@ -200,6 +230,7 @@ export function AppFrame({
         </nav>
         <main className="flex min-h-0 flex-1 flex-col lg:overflow-y-auto">{children}</main>
       </div>
+      {sharedDevice && <AutoLock minutes={sharedDevice.autoLockMinutes} />}
     </div>
   );
 }

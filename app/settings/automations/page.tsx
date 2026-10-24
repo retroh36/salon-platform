@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Alert, Card, PageHeader } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
+import { can } from "@/lib/permissions";
 import { AUTOMATION_KINDS, automationProblems, suggestAutomations } from "@/lib/automations";
 import { loadAutomationResults, loadAutomations, loadSalonFacts } from "@/lib/automations-load";
 import { siteUrl } from "@/lib/branding";
@@ -25,13 +26,12 @@ export default function AutomationsPage() {
 
 // Rebook reminders, win-back, birthdays and review requests, each in the
 // salon's own words, sent only to clients who said yes, with what each has
-// done. Denise suggests which to turn on; an owner decides. Managers see
-// it all, read-only (the database lets only owners change it).
+// done. Denise suggests which to turn on; an owner or manager decides
+// (the settings permission, which the database checks).
 async function Automations() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
-  if (me.role !== "owner" && me.role !== "manager") redirect("/dashboard");
-  const isOwner = me.role === "owner";
+  if (!can(me, "settings")) redirect("/dashboard");
   const [{ data: b, error }, automations, results] = await Promise.all([
     supabase.from("businesses").select("name, slug, google_review_url, yelp_url, online_booking_settings(enabled)").eq("id", me.business_id).single(),
     loadAutomations(supabase, me.business_id),
@@ -40,26 +40,23 @@ async function Automations() {
   if (error) throw error;
   const salon = { name: b.name, bookingUrl: `${siteUrl()}/book/${b.slug ?? "your-salon"}`, bookingLive: Boolean(b.slug && b.online_booking_settings?.enabled), googleUrl: b.google_review_url, yelpUrl: b.yelp_url };
 
-  const suggestions = isOwner ? await ownerSuggestions(supabase, me, automations, salon, Boolean(b.google_review_url || b.yelp_url)) : [];
+  const suggestions = await ownerSuggestions(supabase, me, automations, salon, Boolean(b.google_review_url || b.yelp_url));
 
   return (
     <AppShell section="settings" me={me}>
       <PageHeader title="Settings" description="Automations: messages that go out by themselves, in your words, so nobody at the desk has to remember to send them." />
-      <SettingsNav current="automations" role={me.role} />
+      <SettingsNav current="automations" me={me} />
       <Alert tone="info" className="mb-6">
         Only clients who said yes to texts or marketing emails get these (it&apos;s on their profile), and every message has a way to opt out. They go out between 9am and 8pm.
         Texts and email aren&apos;t connected yet, so for now they wait in the outbox.
-        {!isOwner && " Only owners can change automations; you can see each one and what it's done."}
       </Alert>
-      {isOwner && <Suggestions suggestions={suggestions} />}
-      {isOwner && (
-        <Card title="Sending" titleId="sending-heading" description="Every hour, whatever's due goes out. You can send what's due now, too.">
-          <SendNow />
-        </Card>
-      )}
+      <Suggestions suggestions={suggestions} />
+      <Card title="Sending" titleId="sending-heading" description="Every hour, whatever's due goes out. You can send what's due now, too.">
+        <SendNow />
+      </Card>
       {automations.map((a) => (
         // Fresh when it's turned on or off elsewhere (a suggestion approved).
-        <AutomationCard key={`${a.kind}:${a.enabled}`} automation={a} salon={salon} results={results[a.kind]} canEdit={isOwner} />
+        <AutomationCard key={`${a.kind}:${a.enabled}`} automation={a} salon={salon} results={results[a.kind]} canEdit />
       ))}
     </AppShell>
   );

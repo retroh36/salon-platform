@@ -18,7 +18,7 @@ Save a view of just the stylists you need, in the order you want, for example "H
 ## Good to know
 
 - Your views are yours: only you see them. Owners can tick **Share with everyone at the salon** to make a view for the whole team. Shared views are listed under **Views for everyone**.
-- Only owners can change or delete a shared view.
+- Only owners and managers can change or delete a shared view.
 - The calendar remembers the last view you used on each device.
 - To go back to everyone, pick **All departments**. Departments (Color, Cuts, Nails, Skin…) show everyone who does those services.
 - Stylists who are off still don't show in a view. See See who's off today.

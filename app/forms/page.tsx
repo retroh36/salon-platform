@@ -7,6 +7,7 @@ import { Badge, Card, EmptyState, listClass, PageHeader, rowLinkClass } from "@/
 import { getCurrentStaff } from "@/lib/auth";
 import { loadTemplates, patchSettings } from "@/lib/client-checks";
 import { PatchSettingsForm } from "./patch-settings";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Forms" };
 
@@ -23,7 +24,7 @@ const REQUIRED_LABELS = { none: "Optional", first_visit: "Before a first visit",
 async function Forms() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
-  const owner = me.role === "owner";
+  const owner = can(me, "settings");
   const [templates, settings, { data: counts, error }] = await Promise.all([
     loadTemplates(supabase),
     patchSettings(supabase, me.business_id),

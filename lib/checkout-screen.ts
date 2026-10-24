@@ -21,7 +21,7 @@ import { fullName, sortStaff, type StaffRole } from "@/lib/staff";
 import { EMPTY_TICKET, parseTicket, type ServiceLine, type Ticket } from "@/lib/ticket";
 
 type Supabase = SupabaseClient<Database>;
-type Me = { id: string; business_id: string; role: StaffRole; location: { id: string; timezone: string } };
+type Me = { id: string; business_id: string; role: StaffRole; permissions: readonly string[]; location: { id: string; timezone: string } };
 
 const key = () => crypto.randomUUID();
 
@@ -136,6 +136,7 @@ export type CheckoutScreenData = {
   templates: PackageTemplate[];
   settings: CheckoutSettings;
   role: StaffRole;
+  permissions: readonly string[];
   canOverride: boolean;
   overrides: string[];
   rebook: RebookSuggestion | null;
@@ -289,6 +290,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     templates,
     settings,
     role: me.role,
+    permissions: me.permissions,
     canOverride: me.role === "owner" || me.role === "manager",
     overrides: (overrides.data ?? []).map((o) => o.product_id),
     rebook,

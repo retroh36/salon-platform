@@ -1,7 +1,7 @@
 ---
 title: Set the order of stylists on the calendar
 keywords: calendar order, column order, reorder stylists, rearrange columns, move a stylist, stylist order, drag column, sort stylists, who comes first
-who: owner
+who: owner, manager
 open: /team/order | Open calendar order
 ---
 

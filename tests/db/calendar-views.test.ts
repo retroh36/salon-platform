@@ -36,23 +36,23 @@ describe("the salon's column order", () => {
     expect((await admin.from("staff").select("id").eq("business_id", B).not("calendar_position", "is", null)).data).toEqual([{ id: GIL }]);
   });
 
-  it("isn't for anyone else, or another salon", async () => {
-    for (const as of [manager, frontDesk, bridget, otherOwner]) {
+  it("isn't for anyone but owners and managers, or another salon", async () => {
+    for (const as of [frontDesk, bridget, otherOwner]) {
       expect((await as.rpc("set_calendar_order", { p_business_id: B, p_staff_ids: [SHAE] })).error?.code).toBe("42501");
     }
   });
 });
 
 describe("saved views", () => {
-  it("shared ones are made by owners and seen by everyone at the salon", async () => {
+  it("shared ones are made by owners and managers and seen by everyone at the salon", async () => {
     const { data: id, error } = await save(owner, `${TAG} Color`, [SANDRA, BRIDGET, SANDRA, "00000000-0000-4000-8000-000000000000"], true);
     expect(error).toBeNull();
     // Duplicates and strangers dropped, order kept.
     expect((await admin.from("calendar_views").select("staff_ids, owner_staff_id").eq("id", id!).single()).data).toEqual({ staff_ids: [SANDRA, BRIDGET], owner_staff_id: null });
     for (const as of [manager, frontDesk, bridget]) expect((await as.from("calendar_views").select("id").eq("id", id!)).data).toHaveLength(1);
     expect((await otherOwner.from("calendar_views").select("id").eq("id", id!)).data).toEqual([]);
-    // Only owners make, change or delete them.
-    expect((await save(manager, `${TAG} Nope`, [SHAE], true)).error?.code).toBe("42501");
+    // Only owners and managers make, change or delete them.
+    expect((await save(frontDesk, `${TAG} Nope`, [SHAE], true)).error?.code).toBe("42501");
     expect((await save(bridget, `${TAG} Color`, [SHAE], true, id!)).error?.code).toBe("42501");
     // Nor can someone take one over as their own.
     expect((await save(bridget, `${TAG} Color`, [SHAE], false, id!)).error?.code).toBe("42501");

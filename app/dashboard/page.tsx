@@ -1,3 +1,4 @@
+import { isFrontOfHouse } from "@/lib/staff";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
@@ -55,7 +56,7 @@ async function Dashboard() {
             {longToday(tz)} · {me.location.name}
           </p>
         </div>
-        <AskBar example={me.role === "stylist" ? "Am I getting faster at cuts?" : "Who's free for a color at 3?"} />
+        <AskBar example={!isFrontOfHouse(me.role) ? "Am I getting faster at cuts?" : "Who's free for a color at 3?"} />
       </header>
       <Suspense fallback={<DashboardSkeleton />}>
         <Body me={me} />
@@ -69,7 +70,7 @@ async function Body({ me }: { me: DashboardMe }) {
   const data = await loadDashboard(supabase, me);
   const [y, m, d] = data.today.split("-").map(Number);
   const lastWeek = `last ${WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}`;
-  const stylist = data.role === "stylist";
+  const stylist = !isFrontOfHouse(data.role);
 
   return (
     <div data-testid="dashboard" data-role={data.role}>

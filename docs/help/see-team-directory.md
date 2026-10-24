@@ -1,7 +1,7 @@
 ---
 title: See the team directory
 keywords: team, staff list, directory, employees, coworkers, phone number, email, staff contact, who works here
-who: owner, manager, front_desk, stylist
+who: owner, manager, front_desk, stylist, assistant
 open: /team | Open Team
 ---
 

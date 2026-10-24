@@ -136,9 +136,12 @@ describe("sending", () => {
 });
 
 describe("who can do what", () => {
-  it("lets owners change automations, managers only look, and nobody else in", async () => {
+  it("lets owners and managers change automations, and nobody else in", async () => {
     const manager = await signIn("manager@mapleandash.test");
-    expect((await manager.rpc("save_automation", { p_business_id: SEED.business, p_kind: "rebook", p_input: { enabled: true, subject: "x", body: "y" } as never })).error?.code).toBe("42501");
+    // A manager gets past the permission check (the input is then refused).
+    expect((await manager.rpc("save_automation", { p_business_id: SEED.business, p_kind: "rebook", p_input: { enabled: true, subject: "x", body: "y" } as never })).error?.code).not.toBe("42501");
+    const bridget = await signIn("bridget@mapleandash.test");
+    expect((await bridget.rpc("save_automation", { p_business_id: SEED.business, p_kind: "rebook", p_input: { enabled: true, subject: "x", body: "y" } as never })).error?.code).toBe("42501");
     expect((await manager.from("marketing_automations").select("kind").eq("business_id", SEED.business)).error).toBeNull();
     expect((await manager.from("marketing_messages").select("id").eq("business_id", salon.businessId)).data).toEqual([]);
     const desk = await signIn("frontdesk@mapleandash.test");

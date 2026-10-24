@@ -13,6 +13,7 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, isLocalDate, todayIn } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { CloseoutForm } from "./closeout-form";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Reports" };
 
@@ -55,7 +56,7 @@ function Stat({ label, value, note, testId }: { label: string; value: string; no
 async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchParams">) {
   const [params, { supabase, staff: me }] = await Promise.all([searchParams, getCurrentStaff()]);
   if (!me) return <NotLinked />;
-  if (me.role !== "owner") redirect("/dashboard");
+  if (!can(me, "reports")) redirect("/dashboard");
   const tz = me.location.timezone;
   const today = todayIn(tz);
   const period: Period = typeof params.period === "string" && params.period in PERIODS ? (params.period as Period) : "this_month";

@@ -1,11 +1,12 @@
 "use server";
 
+import { can } from "@/lib/permissions";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { recomputeForVisit } from "@/lib/insights/compute";
 import { getCurrentStaff } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
-import { canRefund, canTakePayments, loadSale, receiptSalon, receiptText } from "@/lib/sales";
+import { canTakePayments, loadSale, receiptSalon, receiptText } from "@/lib/sales";
 import { formatDay, formatLongDay } from "@/lib/schedule-format";
 import { giftCardEmail, isCardCode, type GiftCardLookup } from "@/lib/gift-cards";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
@@ -93,7 +94,7 @@ export type SimpleResult = { ok: true; message: string } | { ok: false; message:
 
 export async function voidSale(saleId: string, reason: string): Promise<SimpleResult> {
   const { supabase, staff: me } = await getCurrentStaff();
-  if (!me || !canRefund(me.role)) return { ok: false, message: "Only managers and owners can void a sale." };
+  if (!can(me, "void_refund")) return { ok: false, message: "Only managers and owners can void a sale." };
   if (!isUuid(saleId)) return { ok: false, message: "That sale doesn't exist." };
   const { error } = await supabase.rpc("void_sale", { p_sale_id: saleId, p_reason: reason });
   if (error) return { ok: false, message: messageFor(error, "That didn't go through. Try again.") };
@@ -106,7 +107,7 @@ export async function refundSale(
   input: { reason: string; payments: { method: "cash" | "card" | "gift_card"; amountCents: number; reference?: string; code?: string }[]; returns: { saleItemId: string; quantity: number }[]; restock: boolean },
 ): Promise<SimpleResult> {
   const { supabase, staff: me } = await getCurrentStaff();
-  if (!me || !canRefund(me.role)) return { ok: false, message: "Only managers and owners can refund." };
+  if (!can(me, "void_refund")) return { ok: false, message: "Only managers and owners can refund." };
   if (!isUuid(saleId) || input.returns.some((r) => !isUuid(r.saleItemId))) return { ok: false, message: "That sale doesn't exist." };
   const { error } = await supabase.rpc("refund_sale", {
     p_sale_id: saleId,

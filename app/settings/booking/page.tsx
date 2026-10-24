@@ -10,6 +10,7 @@ import { sortCategories } from "@/lib/services";
 import { SettingsNav } from "../settings-nav";
 import { shareLinks } from "@/lib/online-booking/sources";
 import { BookingLink, BookingRulesForm, ServicesOnlineForm, ShareLinks } from "./booking-settings";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Online booking" };
 
@@ -24,7 +25,7 @@ export default function BookingSettingsPage() {
 async function BookingSettings() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
-  if (me.role !== "owner") redirect("/dashboard");
+  if (!can(me, "settings")) redirect("/dashboard");
 
   const [{ data: business, error }, { data: services, error: serviceError }] = await Promise.all([
     supabase.from("businesses").select("name, slug, online_booking_settings(*)").eq("id", me.business_id).single(),
@@ -40,7 +41,7 @@ async function BookingSettings() {
   return (
     <AppShell section="settings" me={me}>
       <PageHeader title="Settings" description="Your salon's own booking site, where clients book themselves in." />
-      <SettingsNav current="booking" />
+      <SettingsNav current="booking" me={me} />
       <div>
         <Card title="Your booking site" titleId="site-heading" description="Share the link, or put a Book button on your website.">
           <BookingLink url={`${siteUrl()}/book/${slug}`} name={business.name} live={Boolean(s?.enabled && business.slug)} />

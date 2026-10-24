@@ -1,7 +1,7 @@
 ---
 title: Approve or dismiss Denise's automation suggestions
 keywords: Denise suggests, automation suggestion, approve suggestion, turn on suggestion, not now, dismiss suggestion, undo automation, marketing ideas, AI suggestion
-who: owner
+who: owner, manager
 open: /settings/automations | Open Automations
 ---
 

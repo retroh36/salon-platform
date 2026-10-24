@@ -21,6 +21,9 @@ type Supabase = SupabaseClient<Database>;
 
 export type Asking = {
   role: StaffRole;
+  permissions: readonly string[];
+  // An assistant's stylist, whose book they see.
+  bookStaffId?: string | null;
   staffId: string;
   businessId: string;
   location: { id: string; timezone: string };
@@ -28,7 +31,7 @@ export type Asking = {
   today: LocalDate;
 };
 
-const ROLE_NAMES = { owner: "owner", manager: "manager", front_desk: "front desk", stylist: "stylist" } as const;
+const ROLE_NAMES = { owner: "owner", manager: "manager", front_desk: "front desk", stylist: "stylist", assistant: "assistant" } as const;
 
 export async function assistantContext(supabase: Supabase, me: Asking, date: LocalDate, now = new Date()): Promise<AssistantContext> {
   const [services, staff] = await Promise.all([

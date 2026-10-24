@@ -406,7 +406,7 @@ function SaleDiscount({ data, ticket, onChange, onClose }: Props) {
         Reason
         <input value={reason} onChange={(e) => setReason(e.target.value)} className={`${fieldClass} h-12`} maxLength={300} required={v > 0} />
       </label>
-      {allowed && discountLimitWarning(data.role, kind, v, data.settings.discountMaxPercent) && <Problem text={discountLimitWarning(data.role, kind, v, data.settings.discountMaxPercent)!} />}
+      {allowed && discountLimitWarning(data, kind, v, data.settings.discountMaxPercent) && <Problem text={discountLimitWarning(data, kind, v, data.settings.discountMaxPercent)!} />}
       <div className="flex gap-2">
         <Button type="submit" variant="primary" size="lg" disabled={!allowed && v > 0}>
           {v > 0 ? "Apply discount" : "No discount"}

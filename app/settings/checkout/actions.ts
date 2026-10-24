@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentStaff } from "@/lib/auth";
 import { parseDollars } from "@/lib/checkout";
 import type { StaffRole } from "@/lib/staff";
+import { can } from "@/lib/permissions";
 
 export type CheckoutSettingsInput = {
   taxServicesPercent: string;
@@ -28,7 +29,7 @@ function basisPoints(text: string): number | null {
 
 export async function saveCheckoutSettings(input: CheckoutSettingsInput): Promise<SettingsResult> {
   const { supabase, staff: me } = await getCurrentStaff();
-  if (!me || me.role !== "owner") return { ok: false, message: "Only owners can change these settings." };
+  if (!can(me, "settings")) return { ok: false, message: "Only owners and managers can change these settings." };
   const services = basisPoints(input.taxServicesPercent || "0");
   const retail = basisPoints(input.taxRetailPercent || "0");
   if (services === null || retail === null) return { ok: false, message: "Enter tax rates from 0 to 25%." };
@@ -42,7 +43,7 @@ export async function saveCheckoutSettings(input: CheckoutSettingsInput): Promis
     p_business_id: me.business_id,
     p_settings: { tax_rate_services_bp: services, tax_rate_retail_bp: retail, discount_roles: roles, discount_max_percent: max, receipt_footer: input.receiptFooter, receipt_show_stylists: input.receiptShowStylists, cash_float_cents: float },
   });
-  if (error?.code === "42501") return { ok: false, message: "Only owners can change these settings." };
+  if (error?.code === "42501") return { ok: false, message: "Only owners and managers can change these settings." };
   if (error) throw error;
   revalidatePath("/settings/checkout");
   return { ok: true, message: "Saved." };

@@ -8,6 +8,7 @@ import { salonLogoUrl } from "@/lib/branding";
 import { addDays, todayIn } from "@/lib/scheduling/time";
 import { DeniseUsage, SalonSettings } from "./salon-settings";
 import { SettingsNav } from "./settings-nav";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -22,7 +23,7 @@ export default function SettingsPage() {
 async function Settings() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
-  if (me.role !== "owner") redirect("/dashboard");
+  if (!can(me, "settings")) redirect("/dashboard");
   const business = me.location.business;
   // Usage is counted by UTC day (the database's current_date).
   const today = todayIn("UTC");
@@ -38,7 +39,7 @@ async function Settings() {
   return (
     <AppShell section="settings" me={me}>
       <PageHeader title="Settings" description="Your salon's name and logo, shown to your team and on messages to your clients." />
-      <SettingsNav current="salon" />
+      <SettingsNav current="salon" me={me} />
       <Card title="Your salon" titleId="salon-heading">
         <SalonSettings name={business?.name ?? ""} logoUrl={salonLogoUrl(business?.logo_path)} />
       </Card>
@@ -49,6 +50,7 @@ async function Settings() {
           requests={usage.reduce((sum, r) => sum + r.requests, 0)}
           limit={limits.ai_daily_token_limit}
           connected={Boolean(process.env.ANTHROPIC_API_KEY)}
+          canChange={can(me, "billing")}
         />
       </Card>
     </AppShell>

@@ -1,7 +1,7 @@
 ---
 title: Ask Denise a question
 keywords: Ask Denise, AI, assistant, question, who's free, find an opening, availability, chatbot, help, look up, suggest a time
-who: owner, manager, front_desk, stylist
+who: owner, manager, front_desk, stylist, assistant
 open: /calendar | Open calendar
 ---
 

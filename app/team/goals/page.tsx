@@ -12,6 +12,7 @@ import { goalLine, goalValue, periodName } from "@/lib/goals/wording";
 import { formatPrice } from "@/lib/services";
 import { fullName } from "@/lib/staff";
 import { TeamTabs } from "../team-tabs";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Team goals" };
 
@@ -35,7 +36,7 @@ async function TeamGoals() {
   ]);
   if (error) throw error;
   const paced = new Map((await paceGoals(supabase, me, goals)).map((s) => [s.staffId, s.pacings]));
-  const owner = me.role === "owner";
+  const owner = can(me, "team");
 
   return (
     <AppShell section="team" me={me}>

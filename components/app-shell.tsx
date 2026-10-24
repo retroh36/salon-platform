@@ -1,25 +1,30 @@
 import { AppFrame, type Section } from "@/components/ui/app-frame";
 import { salonLogoUrl } from "@/lib/branding";
+import { deviceTokenHash } from "@/lib/shared-device";
 import type { StaffRole } from "@/lib/staff";
 
 type Me = {
   first_name: string;
   role: StaffRole;
-  location: { name: string; business: { name: string; logo_path?: string | null } | null };
+  permissions: readonly string[];
+  location: { name: string; business: { name: string; logo_path?: string | null; auto_lock_minutes?: number } | null };
 };
 
 // The app's page layout: the AppFrame sidebar and search bar around the
 // page, with the content fading in on arrival. `bleed` gives the page the
 // full width and height (the calendar); otherwise content sits in a
 // centered column (`wide`: a little wider, for the Dashboard).
-export function AppShell({ section, me, bleed = false, wide = false, children }: { section: Section; me: Me; bleed?: boolean; wide?: boolean; children: React.ReactNode }) {
+export async function AppShell({ section, me, bleed = false, wide = false, children }: { section: Section; me: Me; bleed?: boolean; wide?: boolean; children: React.ReactNode }) {
+  // On the shared iPad: Switch user, and lock when idle.
+  const shared = (await deviceTokenHash()) ? { autoLockMinutes: me.location.business?.auto_lock_minutes ?? 5 } : null;
   return (
     <AppFrame
+      sharedDevice={shared}
       section={section}
       businessName={me.location.business?.name ?? "Salon"}
       logoUrl={salonLogoUrl(me.location.business?.logo_path)}
       locationName={me.location.name}
-      user={{ name: me.first_name, role: me.role }}
+      user={{ name: me.first_name, role: me.role, permissions: me.permissions }}
     >
       {bleed ? children : <div className={`mx-auto w-full animate-fade-in px-4 py-8 sm:px-8 ${wide ? "max-w-6xl" : "max-w-5xl"}`}>{children}</div>}
     </AppFrame>

@@ -1,7 +1,7 @@
 ---
 title: Read the calendar colors
 keywords: calendar key, legend, colors, colours, what does yellow mean, green appointment, grey appointment, striped, clock icon, stylist level, badge, status
-who: owner, manager, front_desk, stylist
+who: owner, manager, front_desk, stylist, assistant
 open: /calendar | Open calendar
 ---
 

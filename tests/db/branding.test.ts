@@ -24,9 +24,8 @@ afterAll(async () => {
 });
 
 describe("the salon's logo", () => {
-  it("only the salon's owners can upload, replace and remove it", async () => {
+  it("only the salon's owners and managers can upload, replace and remove it", async () => {
     const upload = (c: Client, p = path) => c.storage.from("salon-logos").upload(p, PNG, { contentType: "image/png", upsert: true });
-    expect((await upload(manager)).error).not.toBeNull();
     expect((await upload(frontDesk)).error).not.toBeNull();
     expect((await upload(otherOwner)).error).not.toBeNull();
     expect((await upload(owner)).error).toBeNull();
@@ -55,8 +54,9 @@ describe("the salon's logo", () => {
 });
 
 describe("the salon's name", () => {
-  it("only owners can change it", async () => {
-    expect((await manager.from("businesses").update({ name: "Nope" }).eq("id", B).select("id")).data).toEqual([]);
+  it("only owners and managers can change it", async () => {
+    expect((await frontDesk.from("businesses").update({ name: "Nope" }).eq("id", B).select("id")).data).toEqual([]);
+    expect((await manager.from("businesses").update({ name: "Maple & Ash" }).eq("id", B).select("name")).data).toEqual([{ name: "Maple & Ash" }]);
     expect((await owner.from("businesses").update({ name: "Maple & Ash" }).eq("id", B).select("name")).data).toEqual([{ name: "Maple & Ash" }]);
   });
 });

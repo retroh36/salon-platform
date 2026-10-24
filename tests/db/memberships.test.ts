@@ -92,8 +92,9 @@ afterAll(async () => {
 });
 
 describe("plans", () => {
-  it("are set up by owners only, and seen by everyone at the salon", async () => {
-    expect((await manager.rpc("save_membership_plan", { p_business_id: B, p_plan_id: null as never, p_input: { name: "Nope" } as never })).error?.code).toBe("42501");
+  it("are set up by owners and managers only, and seen by everyone at the salon", async () => {
+    expect((await frontDesk.rpc("save_membership_plan", { p_business_id: B, p_plan_id: null as never, p_input: { name: "Nope" } as never })).error?.code).toBe("42501");
+    expect((await stylist.rpc("save_membership_plan", { p_business_id: B, p_plan_id: null as never, p_input: { name: "Nope" } as never })).error?.code).toBe("42501");
     expect((await stylist.from("membership_plans").select("id").eq("id", plans.club)).data).toHaveLength(1);
     expect((await manager.from("membership_plans").update({ price_cents: 1 }).eq("id", plans.club).select()).data).toEqual([]);
     const { data: services } = await admin.from("membership_plan_services").select("quantity, rollover").eq("plan_id", plans.color);
@@ -287,11 +288,16 @@ describe("billing", () => {
 });
 
 describe("who sees what", () => {
-  it("lets stylists see memberships but not charges; another salon sees nothing", async () => {
+  it("lets stylists see their own clients' memberships but not charges; another salon sees nothing", async () => {
     const other = await createOtherSalon();
     try {
       const otherOwner = await signIn(other.email);
-      expect((await stylist.from("client_memberships").select("id").eq("plan_id", plans.club)).data!.length).toBeGreaterThan(0);
+      // Bridget sees the memberships of clients on her book, and no others.
+      const { data: all } = await admin.from("client_memberships").select("id, client_id").eq("business_id", B);
+      const { data: booked } = await admin.from("appointment_items").select("appointment:appointments!inner(client_id)").eq("staff_id", SEED.staff.bridget).limit(100000);
+      const hers = new Set(booked!.map((b) => b.appointment.client_id));
+      const { data: seen } = await stylist.from("client_memberships").select("id");
+      expect(new Set(seen!.map((m) => m.id))).toEqual(new Set(all!.filter((m) => hers.has(m.client_id)).map((m) => m.id)));
       expect((await stylist.from("membership_charges").select("id").limit(1)).data).toEqual([]);
       expect((await otherOwner.from("client_memberships").select("id").eq("plan_id", plans.club)).data).toEqual([]);
       expect((await otherOwner.from("membership_plans").select("id").eq("id", plans.club)).data).toEqual([]);

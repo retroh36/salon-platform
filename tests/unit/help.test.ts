@@ -90,7 +90,8 @@ describe("roles", () => {
   it("names roles in plain words", () => {
     expect(whoText(["manager", "owner"])).toBe("owners and managers");
     expect(whoText(["owner", "manager", "front_desk"])).toBe("owners, managers and the front desk");
-    expect(whoText(["owner", "manager", "front_desk", "stylist"])).toBe("everyone");
+    expect(whoText(["owner", "manager", "front_desk", "stylist"])).toBe("owners, managers, the front desk and stylists");
+    expect(whoText(["owner", "manager", "front_desk", "stylist", "assistant"])).toBe("everyone");
     expect(titled("Sell a gift card").who).not.toContain("stylist");
   });
 });

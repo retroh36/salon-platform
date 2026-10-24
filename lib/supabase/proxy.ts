@@ -6,8 +6,11 @@ const PUBLIC_PATHS = ["/login"];
 // Open to everyone, signed in or not: salons' booking sites, payment, card
 // and opt-out links, the dev outbox (which shows nothing in production), and
 // scheduled jobs (which check their own secret), and the link in invite and
-// password reset emails (which signs them in).
-const OPEN_PATHS = ["/book", "/dev/outbox", "/api/cron", "/unsubscribe", "/pay", "/card", "/auth/confirm"];
+// password reset emails (which signs them in), and the shared iPad's PIN
+// screen (which checks the device itself).
+const OPEN_PATHS = ["/book", "/dev/outbox", "/api/cron", "/unsubscribe", "/pay", "/card", "/auth/confirm", "/switch"];
+// Set on a device marked as shared (lib/shared-device.ts).
+const DEVICE_COOKIE = "maestra_device";
 
 // Refreshes the auth session cookie on every request and sends signed-out
 // users to /login (and signed-in users away from it).
@@ -41,7 +44,8 @@ export async function updateSession(request: NextRequest) {
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
 
   if (!isSignedIn && !isPublic) {
-    return redirectWithCookies(request, response, "/login");
+    // The shared iPad goes to its PIN screen, which falls back to sign-in.
+    return redirectWithCookies(request, response, request.cookies.has(DEVICE_COOKIE) ? "/switch" : "/login");
   }
   if (isSignedIn && isPublic) {
     return redirectWithCookies(request, response, "/dashboard");

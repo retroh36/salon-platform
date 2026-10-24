@@ -1,7 +1,7 @@
 ---
 title: Request time off
 keywords: time off, vacation, holiday, PTO, day off, sick day, leave, book time off, request leave, personal day, add time off, absence
-who: owner, manager, front_desk, stylist
+who: owner, manager, front_desk, stylist, assistant
 open: /schedule | Open Schedule
 ---
 

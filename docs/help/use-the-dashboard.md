@@ -1,7 +1,7 @@
 ---
 title: Use the Dashboard and Denise's brief
 keywords: dashboard, home, morning brief, Denise's brief, daily brief, today, overview, at a glance, risks today, might not show, due back, low stock, credit, team today, right now, opportunities
-who: owner, manager, front_desk, stylist
+who: owner, manager, front_desk, stylist, assistant
 open: /dashboard | Open Dashboard
 ---
 

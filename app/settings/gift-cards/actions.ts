@@ -3,12 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentStaff } from "@/lib/auth";
 import { parseDollars } from "@/lib/checkout";
+import { can } from "@/lib/permissions";
 
 export type SettingsResult = { ok: true; message: string } | { ok: false; message: string };
 
 export async function saveGiftCardSettings(input: { presets: string; expiryMonths: string; promoDays: string }): Promise<SettingsResult> {
   const { supabase, staff: me } = await getCurrentStaff();
-  if (!me || me.role !== "owner") return { ok: false, message: "Only owners can change gift card settings." };
+  if (!can(me, "settings")) return { ok: false, message: "Only owners and managers can change gift card settings." };
   const presets = input.presets
     .split(",")
     .map((p) => p.trim())
@@ -20,7 +21,7 @@ export async function saveGiftCardSettings(input: { presets: string; expiryMonth
   const days = Number(input.promoDays);
   if (!Number.isInteger(days) || days < 1 || days > 3650) return { ok: false, message: "Enter how many days promotional cards last (1 to 3650)." };
   const { error } = await supabase.rpc("set_gift_card_settings", { p_business_id: me.business_id, p_presets: presets as number[], p_expiry_months: months!, p_promo_days: days });
-  if (error?.code === "42501") return { ok: false, message: "Only owners can change gift card settings." };
+  if (error?.code === "42501") return { ok: false, message: "Only owners and managers can change gift card settings." };
   if (error) throw error;
   revalidatePath("/settings/gift-cards");
   return { ok: true, message: "Saved." };

@@ -15,6 +15,7 @@ import { todayIn } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { averageTipPct, pctText, tipItems, topTippers } from "@/lib/tips";
 import { TipDetails } from "@/components/tip-details";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Payroll" };
 
@@ -33,7 +34,7 @@ const query = (p: PayPeriod, staff?: string) => `?${new URLSearchParams({ from: 
 async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchParams">) {
   const [params, { supabase, staff: me }] = await Promise.all([searchParams, getCurrentStaff()]);
   if (!me) return <NotLinked />;
-  if (me.role !== "owner" && me.role !== "manager") redirect("/dashboard");
+  if (!can(me, "payroll")) redirect("/dashboard");
   const tz = me.location.timezone;
   const today = todayIn(tz);
   const settings = await loadPaySettings(supabase, me.business_id);
@@ -99,7 +100,7 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
             Commission is on sales after discounts, before tax, at the rate each person had when each sale was made (changing a rate on Team → Schedule only affects
             sales from then on). Refunds and voids are taken back at the same rate, in the period they happen. Hours come from their schedule, less approved time off
             {running ? ", up to today" : ""}, at the hourly rate in effect each day.
-            {me.role === "owner" && (
+            {can(me, "payroll") && (
               <>
                 {" "}
                 <Link href="/settings/payroll" className="text-link hover:underline">

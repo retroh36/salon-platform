@@ -18,6 +18,10 @@
 --   lois@mapleandash.test        stylist, Senior
 --   shae@mapleandash.test        stylist, Artisan
 --   hannah@mapleandash.test      stylist, Artisan
+--   ari@mapleandash.test         assistant (to Bridget)
+--
+-- PINs for the shared front-desk iPad (Settings → Shared devices):
+-- owner 2580, manager 3691, front desk 4826, Bridget 5937, Ari 7193.
 
 -- ---------------------------------------------------------------------------
 -- Auth users
@@ -34,7 +38,8 @@ with seed_users (id, email) as (
     ('a0000000-0000-4000-8000-000000000007'::uuid, 'nola@mapleandash.test'),
     ('a0000000-0000-4000-8000-000000000008'::uuid, 'sandra@mapleandash.test'),
     ('a0000000-0000-4000-8000-000000000009'::uuid, 'shae@mapleandash.test'),
-    ('a0000000-0000-4000-8000-000000000010'::uuid, 'lois@mapleandash.test')
+    ('a0000000-0000-4000-8000-000000000010'::uuid, 'lois@mapleandash.test'),
+    ('a0000000-0000-4000-8000-000000000011'::uuid, 'ari@mapleandash.test')
 ),
 inserted_users as (
   insert into auth.users (
@@ -103,7 +108,13 @@ insert into public.staff (
   ('d0000000-0000-4000-8000-000000000009', 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001',
    'a0000000-0000-4000-8000-000000000009', 'Shae', 'Morgan', 'shae@mapleandash.test', '(555) 010-0109', 'stylist', '#4f46e5', true),
   ('d0000000-0000-4000-8000-000000000010', 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001',
-   'a0000000-0000-4000-8000-000000000010', 'Lois', 'Park', 'lois@mapleandash.test', '(555) 010-0110', 'stylist', '#be185d', true);
+   'a0000000-0000-4000-8000-000000000010', 'Lois', 'Park', 'lois@mapleandash.test', '(555) 010-0110', 'stylist', '#be185d', true),
+  -- Bridget's assistant: sees her day and clients, no prices or pay.
+  ('d0000000-0000-4000-8000-000000000011', 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001',
+   'a0000000-0000-4000-8000-000000000011', 'Ari', 'Delgado', 'ari@mapleandash.test', '(555) 010-0111', 'assistant', null, true);
+
+update public.staff set assists_staff_id = 'd0000000-0000-4000-8000-000000000004'
+where id = 'd0000000-0000-4000-8000-000000000011';
 
 -- ---------------------------------------------------------------------------
 -- Services
@@ -478,7 +489,19 @@ where s.business_id = 'b0000000-0000-4000-8000-000000000001' and s.role = 'styli
 -- The front desk and the manager are paid by the hour.
 insert into public.staff_compensation (staff_id, business_id, hourly_rate_cents) values
   ('d0000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 2600),
-  ('d0000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 1800);
+  ('d0000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 1800),
+  ('d0000000-0000-4000-8000-000000000011', 'b0000000-0000-4000-8000-000000000001', 1600);
+
+-- Demo PINs for the shared iPad (see the top of this file).
+insert into public.staff_pins (staff_id, business_id, pin_hash)
+select p.staff_id, 'b0000000-0000-4000-8000-000000000001', extensions.crypt(p.pin, extensions.gen_salt('bf', 8))
+from (values
+  ('d0000000-0000-4000-8000-000000000001'::uuid, '2580'),
+  ('d0000000-0000-4000-8000-000000000002'::uuid, '3691'),
+  ('d0000000-0000-4000-8000-000000000003'::uuid, '4826'),
+  ('d0000000-0000-4000-8000-000000000004'::uuid, '5937'),
+  ('d0000000-0000-4000-8000-000000000011'::uuid, '7193')
+) as p (staff_id, pin);
 
 -- ---------------------------------------------------------------------------
 -- Resources: seven chairs, Nola's barber station and a treatment room for

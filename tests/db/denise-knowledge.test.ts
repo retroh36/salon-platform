@@ -7,13 +7,13 @@ import { computeInsights } from "@/lib/insights/compute";
 import { knowledgeFor, salesRange, type Asker } from "@/lib/denise/knowledge";
 import { startOfLocalDay } from "@/lib/scheduling/load";
 import { addDays, todayIn } from "@/lib/scheduling/time";
-import { admin, anon, SEED, signIn, type Client } from "./helpers";
+import { admin, DEFAULT_PERMISSIONS, anon, SEED, signIn, type Client } from "./helpers";
 
 const B = SEED.business;
 const L = SEED.location;
 const TZ = "America/Chicago";
 const today = todayIn(TZ);
-const asker = (role: Asker["role"], staffId: string): Asker => ({ role, staffId, businessId: B, location: { id: L, timezone: TZ }, salon: "Maple & Ash", today });
+const asker = (role: Asker["role"], staffId: string): Asker => ({ role, permissions: DEFAULT_PERMISSIONS[role], staffId, businessId: B, location: { id: L, timezone: TZ }, salon: "Maple & Ash", today });
 
 let owner: Client;
 let frontDesk: Client;

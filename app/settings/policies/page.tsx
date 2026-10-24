@@ -8,6 +8,7 @@ import { loadPolicy } from "@/lib/policy-load";
 import { fullName, sortStaff } from "@/lib/staff";
 import { SettingsNav } from "../settings-nav";
 import { PolicyForm, StaffPolicies } from "./policy-settings";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Policies" };
 
@@ -22,7 +23,7 @@ export default function PoliciesPage() {
 async function Policies() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
-  if (me.role !== "owner") redirect("/dashboard");
+  if (!can(me, "settings")) redirect("/dashboard");
   const [policy, { data: services, error: sError }, { data: staff, error: tError }, { data: business }] = await Promise.all([
     loadPolicy(supabase, me.business_id),
     supabase.from("services").select("id, name, category").eq("business_id", me.business_id).is("archived_at", null).order("category").order("name"),
@@ -35,7 +36,7 @@ async function Policies() {
   return (
     <AppShell section="settings" me={me}>
       <PageHeader title="Settings" description="Your cancellation and no-show policy: clients see it in plain language and agree before their card is saved. Fees are charged to the card on file automatically." />
-      <SettingsNav current="policies" />
+      <SettingsNav current="policies" me={me} />
       <div className="flex flex-col gap-6">
         <Card>
           <PolicyForm

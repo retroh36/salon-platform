@@ -14,7 +14,7 @@ Owners set goals for any stylist, and owners and managers see how everyone is pa
 
 ## Good to know
 
-- Only owners set or remove goals here. Managers can see them.
+- Owners and managers set or remove goals here.
 - Stylists can set their own goals on My day, but they can't change one an owner set.
 - Goals can be service revenue, retail sales, rebooking %, new clients or average ticket, for a week, month, quarter or year.
 - Sales count before tax and after discounts, and refunds come off.

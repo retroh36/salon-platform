@@ -10,7 +10,7 @@ import { admin, createOtherSalon, SEED, signIn, type Client } from "./helpers";
 const TZ = "America/Chicago";
 const today = todayIn(TZ);
 const location = { id: SEED.location, name: "Maple & Ash Downtown", timezone: TZ, business: { name: "Maple & Ash Hair Studio" } };
-const me = (id: string, role: DashboardMe["role"], first: string): DashboardMe => ({ id, first_name: first, role, business_id: SEED.business, location });
+const me = (id: string, role: DashboardMe["role"], first: string): DashboardMe => ({ id, first_name: first, role, permissions: role === "owner" || role === "manager" ? ["reports", "payroll", "settings", "team"] : [], business_id: SEED.business, location });
 
 let owner: DashboardData;
 let frontDesk: DashboardData;
@@ -96,7 +96,7 @@ describe("a brand-new salon", () => {
     try {
       const client = await signIn(other.email);
       const loc = { id: other.locationId, name: "Other Salon Main", timezone: "America/New_York", business: { name: "Other Salon" } };
-      const data = await loadDashboard(client, { id: other.staffId, first_name: "Other", role: "owner", business_id: other.businessId, location: loc });
+      const data = await loadDashboard(client, { id: other.staffId, first_name: "Other", role: "owner", permissions: ["reports"], business_id: other.businessId, location: loc });
       expect(data.newSalon).toBe(true);
       expect(data.tiles.appointments.now).toBe(0);
       expect(data.tiles.fullness.now).toBeNull();

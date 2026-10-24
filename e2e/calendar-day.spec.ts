@@ -146,7 +146,8 @@ test.describe("front desk", () => {
     await ui(page).locator("[data-block][data-visit=done]").first().click({ position: { x: 10, y: 5 } });
     const note = details(page).getByTestId("checked-out-note");
     await expect(note).toContainText("To reverse checkout, a manager or owner voids the sale");
-    await expect(note.getByRole("link", { name: "view the sale" })).toHaveAttribute("href", /^\/sales\/[0-9a-f-]{36}$/);
+    // Yesterday's sale is a report: the front desk sees today's sales only.
+    await expect(note.getByRole("link", { name: "view the sale" })).toHaveCount(0);
     await expect(details(page).getByRole("button", { name: "Undo check-in" })).toHaveCount(0);
   });
 

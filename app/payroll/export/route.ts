@@ -4,6 +4,7 @@ import { payrollCsv, requestedPeriod } from "@/lib/payroll";
 import { loadPayroll, loadPaySettings } from "@/lib/payroll-load";
 import { todayIn } from "@/lib/scheduling/time";
 import { tipItems, tipsCsv } from "@/lib/tips";
+import { can } from "@/lib/permissions";
 
 // /payroll/export?from=…&to=…: the period's pay as CSV, a row per person
 // (with their average tip), or with &detail=tips every tip, for the salon's
@@ -11,7 +12,7 @@ import { tipItems, tipsCsv } from "@/lib/tips";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const { supabase, staff: me } = await getCurrentStaff();
-  if (!me || (me.role !== "owner" && me.role !== "manager")) return new NextResponse("Only owners and managers can export payroll.", { status: 403 });
+  if (!can(me, "payroll")) return new NextResponse("Only owners and managers can export payroll.", { status: 403 });
   const today = todayIn(me.location.timezone);
   const settings = await loadPaySettings(supabase, me.business_id);
   const period = requestedPeriod({ from: url.searchParams.get("from"), to: url.searchParams.get("to") }, settings.kind, settings.anchor, today);

@@ -1,7 +1,7 @@
 ---
 title: Set up online booking
 keywords: online booking, turn on online booking, book online, booking site, booking page, web booking, self booking, booking window, notice, lead time, new clients online, cancellation policy, cancel cutoff, booking color, welcome message, consultation, booking address
-who: owner
+who: owner, manager
 open: /settings/booking | Open Online booking settings
 ---
 
@@ -28,4 +28,4 @@ Turn on your salon's own booking site and set its rules: how far ahead, how much
 ## If it doesn't work
 
 - **Another salon has this address**: pick a different booking address.
-- Only owners can see this page.
+- Owners and managers can see this page.

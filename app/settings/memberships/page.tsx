@@ -9,6 +9,7 @@ import { loadPlans } from "@/lib/memberships-load";
 import { currentProvider } from "@/lib/payments";
 import { SettingsNav } from "../settings-nav";
 import { PlanForm, RunRenewals } from "./plan-form";
+import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Memberships" };
 
@@ -23,7 +24,7 @@ export default function MembershipsSettingsPage() {
 async function MembershipsSettings() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
-  if (me.role !== "owner") redirect("/dashboard");
+  if (!can(me, "settings")) redirect("/dashboard");
   const [plans, { data: services, error }, members] = await Promise.all([
     loadPlans(supabase, me.business_id, false),
     supabase.from("services").select("id, name").eq("business_id", me.business_id).is("archived_at", null).order("name"),
@@ -36,7 +37,7 @@ async function MembershipsSettings() {
   return (
     <AppShell section="settings" me={me}>
       <PageHeader title="Settings" description="Memberships: clients pay every week or month for included services and member prices. Sold at checkout; benefits apply there automatically." />
-      <SettingsNav current="memberships" />
+      <SettingsNav current="memberships" me={me} />
       {provider.testMode && (
         <Alert tone="info" className="mb-6">
           Payments are in test mode: renewals go through the test provider and no real card is charged. Stripe plugs in here when it&apos;s connected.

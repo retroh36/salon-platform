@@ -1,7 +1,7 @@
 ---
 title: Reset your own password
 keywords: forgot password, forgot my password, reset my password, can't remember password, change my password, new password, locked out
-who: owner, manager, front_desk, stylist
+who: owner, manager, front_desk, stylist, assistant
 open: /login/forgot | Open Forgot password
 ---
 

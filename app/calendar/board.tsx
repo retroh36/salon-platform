@@ -431,7 +431,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // Who can drag a column header: owners, for the salon's order (on
   // everyone or a department); anyone, for a view of their own (owners,
   // shared views too).
-  const canReorder = currentView ? currentView.editable : me.role === "owner";
+  const canReorder = currentView ? currentView.editable : me.canArrange;
   const headerRefs = useRef(new Map<string, HTMLElement>());
 
   // Scrolls the grid sideways while something is dragged near its edge.
@@ -1011,7 +1011,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           team={data.columns}
           departments={departments.map((f): Department => ({ label: FAMILY_LABELS[f], staffIds: data.columns.filter((c) => offersFamily(c, f)).map((c) => c.staffId) }))}
           views={data.views}
-          canShare={me.role === "owner"}
+          canShare={me.canArrange}
           onClose={() => setEditing(null)}
           onSaved={(id) => {
             setEditing(null);

@@ -6,12 +6,13 @@ import { isUuid } from "@/lib/ids";
 import { parsePlanForm, type PlanForm } from "@/lib/memberships";
 import { runMembershipBilling, type BillingSummary } from "@/lib/memberships-billing";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { can } from "@/lib/permissions";
 
 export type SaveResult = { ok: true; message: string; id: string } | { ok: false; message: string };
 
 export async function savePlan(id: string | null, form: PlanForm): Promise<SaveResult> {
   const { supabase, staff: me } = await getCurrentStaff();
-  if (!me || me.role !== "owner") return { ok: false, message: "Only owners can set up memberships." };
+  if (!can(me, "settings")) return { ok: false, message: "Only owners and managers can set up memberships." };
   const parsed = parsePlanForm(form);
   if (!parsed.ok) return parsed;
   const { data, error } = await supabase.rpc("save_membership_plan", { p_business_id: me.business_id, p_plan_id: id && isUuid(id) ? id : (null as never), p_input: parsed.plan as never });
@@ -25,7 +26,7 @@ export async function savePlan(id: string | null, form: PlanForm): Promise<SaveR
 // same for every salon).
 export async function runRenewals(): Promise<{ ok: true; summary: BillingSummary } | { ok: false; message: string }> {
   const { staff: me } = await getCurrentStaff();
-  if (!me || me.role !== "owner") return { ok: false, message: "Only owners can run renewals." };
+  if (!can(me, "settings")) return { ok: false, message: "Only owners and managers can run renewals." };
   const summary = await runMembershipBilling(createAdminClient(), { businessId: me.business_id });
   revalidatePath("/settings/memberships");
   revalidatePath("/dashboard");

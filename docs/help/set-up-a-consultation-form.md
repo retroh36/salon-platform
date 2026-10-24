@@ -1,7 +1,7 @@
 ---
 title: Set up a consultation form
 keywords: set up a form, set up a consent form, set up a consultation form, make a form, create form, new form, consultation form, consent form template, intake form, build a form, waiver template, form builder, required form
-who: owner
+who: owner, manager
 open: /forms | Open Forms
 ---
 
@@ -19,5 +19,5 @@ Build the consultation and consent forms clients fill in and sign.
 - A form can have one signature.
 - When a form is needed, booking details shows it under **Before this visit** until it's signed, and check-in warns about it.
 - Untick **In use** to stop using a form. Forms already signed stay on clients' profiles.
-- Everyone can see the Forms page; only owners can change it.
+- Everyone can see the Forms page; only owners and managers can change it.
 - Patch test rules are on the same page (see Set patch test rules).

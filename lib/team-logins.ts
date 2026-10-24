@@ -15,7 +15,7 @@ import type { StaffRole } from "@/lib/staff";
 import { canManageMember, canResetPassword, loginState } from "./team";
 
 type Supabase = SupabaseClient<Database>;
-type Me = { id: string; role: StaffRole; business_id: string };
+type Me = { id: string; role: StaffRole; business_id: string; permissions: readonly string[] };
 
 export type LoginResult = { ok: true; message: string } | { ok: false; message: string };
 

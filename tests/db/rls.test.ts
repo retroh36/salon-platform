@@ -119,9 +119,11 @@ describe("roles", () => {
     expect(error?.code).toBe("42501");
   });
 
-  it("only owners can update the business", async () => {
+  it("owners and managers update the business; only owners its billing", async () => {
     const byManager = await manager.from("businesses").update({ plan: "pro" }).eq("id", SEED_BUSINESS).select();
-    expect(byManager.data).toEqual([]);
+    expect(byManager.error?.code).toBe("42501");
+    expect((await manager.from("businesses").update({ receipt_footer: "Thanks" }).eq("id", SEED_BUSINESS).select("receipt_footer")).data).toEqual([{ receipt_footer: "Thanks" }]);
+    await admin.from("businesses").update({ receipt_footer: null }).eq("id", SEED_BUSINESS);
 
     const byOwner = await owner.from("businesses").update({ plan: "trial" }).eq("id", SEED_BUSINESS).select("plan");
     expect(byOwner.data).toEqual([{ plan: "trial" }]);

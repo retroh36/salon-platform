@@ -97,21 +97,21 @@ test.describe("a client", () => {
 test.describe("manager", () => {
   test.use({ storageState: AUTH.manager });
 
-  test("sees every automation and what it's done, but can't change them", async ({ page }) => {
+  test("manages automations like the rest of Settings, but not billing", async ({ page }) => {
     await page.goto("/dashboard");
     await page.locator("aside").first().getByRole("link", { name: "Settings" }).click();
-    await expect(page).toHaveURL("/settings/automations");
+    await expect(page).toHaveURL("/settings");
+    await page.goto("/settings/automations");
     const main = ui(page);
-    await expect(main.getByRole("navigation", { name: "Settings" }).getByRole("link")).toHaveText(["Automations"]);
-    await expect(main.getByText("Only owners can change automations")).toBeVisible();
+    const nav = main.getByRole("navigation", { name: "Settings" });
+    await expect(nav.getByRole("link", { name: "Automations" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Billing" })).toHaveCount(0);
     await expect(main.getByTestId("automation")).toHaveCount(4);
     await expect(main.getByTestId("automation-results").first()).toContainText("Sent (90 days)");
-    await expect(main.getByLabel("Message").first()).toBeDisabled();
-    await expect(main.getByRole("button", { name: /Turn on|Save|Turn off|Send due messages now/ })).toHaveCount(0);
-    await expect(main.getByTestId("automation-suggestions")).toHaveCount(0);
-    // The rest of Settings is still the owner's.
-    await page.goto("/settings");
-    await expect(page).not.toHaveURL("/settings");
+    await expect(main.getByLabel("Message").first()).toBeEnabled();
+    await expect(main.getByRole("button", { name: "Send due messages now" })).toBeVisible();
+    await page.goto("/settings/billing");
+    await expect(page).toHaveURL("/dashboard");
   });
 });
 

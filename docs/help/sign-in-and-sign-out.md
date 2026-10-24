@@ -1,7 +1,7 @@
 ---
 title: Sign in and sign out
 keywords: log in, login, sign in, log out, logout, sign out, password, can't sign in, wrong password, forgot password, switch user, shared iPad
-who: owner, manager, front_desk, stylist
+who: owner, manager, front_desk, stylist, assistant
 open: /login | Open sign in
 ---
 

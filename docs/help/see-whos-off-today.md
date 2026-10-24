@@ -1,7 +1,7 @@
 ---
 title: See who's off today
 keywords: off today, day off, who is off, who's off, sick, vacation, holiday, time off, hidden stylist, missing column, stylist not showing, show everyone, not working
-who: owner, manager, front_desk, stylist
+who: owner, manager, front_desk, stylist, assistant
 open: /calendar | Open calendar
 ---
 

@@ -1,7 +1,7 @@
 ---
 title: Run membership renewals now
 keywords: run renewals, charge members now, billing run, renew memberships, process renewals, retry failed payments, recurring billing
-who: owner
+who: owner, manager
 open: /settings/memberships | Open membership settings
 ---
 

@@ -67,12 +67,13 @@ const entry = (clientId: string, more: Record<string, unknown> = {}) => ({
 });
 
 describe("waitlist", () => {
-  it("front of house adds and updates entries; everyone in the salon sees them, no one else", async () => {
+  it("front of house adds, updates and sees entries; stylists and other salons don't", async () => {
     const c = await newClient("Rls");
     expect((await bridget.from("waitlist_entries").insert(entry(c))).error?.code).toBe("42501");
     const { data, error } = await frontDesk.from("waitlist_entries").insert(entry(c)).select("id").single();
     expect(error).toBeNull();
-    expect((await bridget.from("waitlist_entries").select("id").eq("id", data!.id)).data).toHaveLength(1);
+    expect((await bridget.from("waitlist_entries").select("id").eq("id", data!.id)).data).toHaveLength(0);
+    expect((await frontDesk.from("waitlist_entries").select("id").eq("id", data!.id)).data).toHaveLength(1);
     expect((await bridget.from("waitlist_entries").update({ status: "removed" }).eq("id", data!.id).select("id")).data).toHaveLength(0);
     expect((await otherOwner.from("waitlist_entries").select("id").eq("id", data!.id)).data).toHaveLength(0);
     expect((await frontDesk.from("waitlist_entries").insert(entry(c, { windows: ["night"] }))).error?.code).toBe("23514");

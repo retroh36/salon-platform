@@ -130,8 +130,8 @@ afterAll(async () => {
 });
 
 describe("policy settings", () => {
-  it("are set by owners only, and everyone at the salon can read them", async () => {
-    expect((await manager.rpc("save_policy_settings", { p_business_id: B, p: POLICY })).error?.code).toBe("42501");
+  it("are set by owners and managers only, and everyone at the salon can read them", async () => {
+    expect((await frontDesk.rpc("save_policy_settings", { p_business_id: B, p: POLICY })).error?.code).toBe("42501");
     expect((await frontDesk.rpc("save_staff_policy", { p_staff_id: BRIDGET, p: { cancel_window_hours: 72 } })).error?.code).toBe("42501");
     const { data } = await stylist.from("policy_settings").select("cancel_window_hours, no_show_fee_kind").eq("business_id", B).single();
     expect(data).toEqual({ cancel_window_hours: 48, no_show_fee_kind: "percent" });

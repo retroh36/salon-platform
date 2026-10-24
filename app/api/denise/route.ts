@@ -108,7 +108,7 @@ async function run(s: DeniseSession, body: DeniseRequest, send: Send) {
       status("Reading your question…");
       const context = await assistantContext(
         s.supabase,
-        { role: s.me.role, staffId: s.me.id, businessId: s.me.business_id, location: s.viewer.location, salon: s.viewer.salon, today: s.today },
+        { role: s.me.role, permissions: s.me.permissions, staffId: s.me.id, bookStaffId: s.me.assists_staff_id, businessId: s.me.business_id, location: s.viewer.location, salon: s.viewer.salon, today: s.today },
         body.date,
       );
       // Text only, starting with the staff member's question.

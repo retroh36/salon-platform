@@ -52,8 +52,8 @@ describe("who sets goals", () => {
     expect((await admin.from("staff_goals").select("target, set_by_owner").eq("id", own!).single()).data).toEqual({ target: 70, set_by_owner: false });
     expect((await save(bridget, BRIDGET, "rebooking_rate", "month", 120)).error).not.toBeNull();
     expect((await bridget.rpc("delete_staff_goal", { p_goal_id: own! })).error).toBeNull();
-    // Nobody but an owner sets goals for others.
-    for (const c of [manager, frontDesk, bridget]) expect((await save(c, GIL, "retail_revenue", "week", 30000)).error?.code).toBe("42501");
+    // Nobody but owners and managers sets goals for others.
+    for (const c of [frontDesk, bridget]) expect((await save(c, GIL, "retail_revenue", "week", 30000)).error?.code).toBe("42501");
     expect((await save(owner, GIL, "retail_revenue", "week", 30000)).error).toBeNull();
   });
 

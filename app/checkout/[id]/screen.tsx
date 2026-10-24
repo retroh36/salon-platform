@@ -184,7 +184,7 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
     0,
   );
   const allowed = discountAllowed(
-    data.role,
+    data,
     {
       roles: data.settings.discountRoles,
       maxPercent: data.settings.discountMaxPercent,

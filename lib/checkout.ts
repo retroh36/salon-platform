@@ -86,21 +86,24 @@ export function paymentStatus(totalCents: number, tenders: readonly Tender[]) {
   return { paidCents: paid, dueCents: totalCents - paid, changeCents: change, settled: paid === totalCents };
 }
 
+type Giver = { role: string; permissions: readonly string[] };
+
 // Whether someone may give this discount: their role is allowed, and
-// unless they're an owner or manager, it's within the salon's limit.
-export function discountAllowed(role: string, settings: { roles: readonly string[]; maxPercent: number }, discountCents: number, poolCents: number): { ok: true } | { ok: false; message: string } {
+// unless they can give big discounts (owners and managers, or someone an
+// owner allowed), it's within the salon's limit.
+export function discountAllowed(who: Giver, settings: { roles: readonly string[]; maxPercent: number }, discountCents: number, poolCents: number): { ok: true } | { ok: false; message: string } {
   if (discountCents <= 0) return { ok: true };
-  if (!settings.roles.includes(role)) return { ok: false, message: "You can't give discounts. Ask a manager." };
-  if (role !== "owner" && role !== "manager" && discountCents * 100 > poolCents * settings.maxPercent) {
+  if (!settings.roles.includes(who.role)) return { ok: false, message: "You can't give discounts. Ask a manager." };
+  if (!who.permissions.includes("big_discounts") && discountCents * 100 > poolCents * settings.maxPercent) {
     return { ok: false, message: `You can give up to ${settings.maxPercent}% off. Ask a manager for more.` };
   }
   return { ok: true };
 }
 
-// The warning in the discount dialog: the percent limit only binds the
-// front desk (owners and managers can give any discount), so only they see it.
-export function discountLimitWarning(role: string, kind: "percent" | "amount", value: number, maxPercent: number): string | null {
-  if (role === "owner" || role === "manager") return null;
+// The warning in the discount dialog: the percent limit binds only those
+// who can't give big discounts, so only they see it.
+export function discountLimitWarning(who: Giver, kind: "percent" | "amount", value: number, maxPercent: number): string | null {
+  if (who.permissions.includes("big_discounts")) return null;
   return kind === "percent" && value > maxPercent ? `You can give up to ${maxPercent}% off. Ask a manager for more.` : null;
 }
 
