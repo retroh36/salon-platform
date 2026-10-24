@@ -1,5 +1,6 @@
-// Ask Denise, evaluated: 24 realistic questions from the front desk,
-// the owner and a stylist, asked of the real Claude API against the demo
+// Ask Denise, evaluated: 34 realistic questions from the front desk,
+// the owner and a stylist (10 of them "how do I…?", answered from the help
+// guide in docs/help/), asked of the real Claude API against the demo
 // data (npm run seed:demo). Each case checks which tools she used and that
 // the answer carries the right facts, worked out independently here from
 // the same data, and that she respects permissions and privacy.
@@ -20,6 +21,7 @@ import type { Database } from "@/lib/database.types";
 import { assistantTools, systemPrompt, type AssistantContext } from "@/lib/denise/assistant";
 import { claudeClient, converse, modelFor } from "@/lib/denise/claude";
 import { assistantContext } from "@/lib/denise/context";
+import { howTo } from "@/lib/help/guide";
 import type { ClientInsight } from "@/lib/insights/clients";
 import type { DurationInsight } from "@/lib/insights/durations";
 import { minutesText } from "@/lib/insights/describe";
@@ -83,7 +85,28 @@ type Case = {
   check: (answer: string, facts: Facts) => string | null;
   // The same, for what the tools returned.
   checkTools?: (outputs: string[], facts: Facts) => string | null;
+  // A how-to question: the help page that answers it (null: none does),
+  // and whether the person asking can do it. Checked in the dry run too.
+  help?: { page: string | null; canDo?: boolean };
 };
+
+// How-to answers: numbered steps when they can do it; who can, and no
+// steps, when they can't; "not in the guide" when no page covers it.
+const steps = (a: string) => /^\s*1[.)]\s/m.test(a) && /^\s*2[.)]\s/m.test(a);
+const howToCase = (question: string, as: Role, page: string | null, check: (a: string) => string | null, canDo = true): Case => ({
+  question,
+  as,
+  tools: ["how_to"],
+  help: { page, canDo },
+  facts: async () => ({}),
+  check: (a) => {
+    if (page === null) return /\b(guide|not sure|don't know)\b/i.test(a) && !steps(a) ? check(a) : "should say it isn't in the help guide, without steps";
+    if (!canDo) return !steps(a) ? check(a) : "shouldn't give steps to someone who can't do it";
+    return steps(a) ? check(a) : "should answer with numbered steps";
+  },
+  checkTools: (outputs) => (page === null || outputs.some((o) => o.includes(`"title":"${page}"`)) ? null : `should find the page "${page}"`),
+});
+const says = (pattern: RegExp, why: string) => (a: string) => (pattern.test(a) ? null : why);
 
 // Helpers for the facts.
 async function duration(staffId: string, service: string): Promise<DurationInsight> {
@@ -397,6 +420,16 @@ const CASES: Case[] = [
     },
     check: (a) => (/package/i.test(a) ? null : "should talk about packages"),
   },
+  howToCase("How do I ring up a gift card?", "front_desk", "Sell a gift card", says(/gift card/i, "should mention the Gift card button")),
+  howToCase("A client wants to pay with their gift card. What do I do?", "front_desk", "Pay with a gift card", says(/gift card/i, "should mention paying by gift card")),
+  howToCase("How do I check a client in?", "front_desk", "Check in a client", says(/check in/i, "should mention Check in")),
+  howToCase("How do I book someone every 6 weeks?", "front_desk", "Book a repeating appointment", says(/repeat/i, "should mention repeating")),
+  howToCase("How do I send a client a link to pay on their phone?", "front_desk", "Send a payment link", says(/link/i, "should mention the payment link")),
+  howToCase("How do I block off my lunch?", "stylist", "Block time", says(/block|lunch/i, "should mention blocking time")),
+  howToCase("How do I run payroll?", "owner", "Run payroll for a pay period", says(/payroll/i, "should mention Payroll")),
+  howToCase("How do I void a sale?", "stylist", "Void a sale", says(/owner|manager/i, "should say owners and managers can"), false),
+  howToCase("How do I do the end of day close-out?", "front_desk", "Close out the day", says(/owner/i, "should say owners can"), false),
+  howToCase("How do I set up Apple Pay on the card reader?", "front_desk", null, () => null),
   {
     question: "Text {client} to remind them about their appointment.",
     as: "front_desk",
@@ -477,8 +510,16 @@ describe("Ask Denise", () => {
       if (DRY) {
         const missing = c.tools.filter((t) => !available.includes(t));
         const forbidden = (c.notTools ?? []).filter((t) => available.includes(t));
-        const ok = (c.tools.length === 0 || missing.length < c.tools.length) && forbidden.length === 0;
-        results.push({ n: i + 1, as: c.as, question, ok, why: `missing tools ${missing.join(", ")}; offered forbidden ${forbidden.join(", ")}`, answer: "(dry run)", tools: [], usage: {} });
+        // A how-to question finds its page (or none), for the right role.
+        let helpWrong = "";
+        if (c.help) {
+          const r = howTo(ctx.help ?? [], question, LOGINS[c.as].role);
+          const found = r.found ? r.page.title : null;
+          if (found !== c.help.page) helpWrong = `found the page "${found}", expected "${c.help.page}"`;
+          else if (r.found && r.page.can_do !== (c.help.canDo ?? true)) helpWrong = `can_do is ${r.page.can_do}`;
+        }
+        const ok = (c.tools.length === 0 || missing.length < c.tools.length) && forbidden.length === 0 && !helpWrong;
+        results.push({ n: i + 1, as: c.as, question, ok, why: helpWrong || `missing tools ${missing.join(", ")}; offered forbidden ${forbidden.join(", ")}`, answer: "(dry run)", tools: [], usage: {} });
         expect(ok).toBe(true);
         return;
       }

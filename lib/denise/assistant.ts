@@ -10,6 +10,7 @@
 // Clients appear by first name only (no contact details, allergies or
 // notes), and what each tool returns depends on who's asking (./knowledge.ts).
 
+import { howTo, type HelpPage } from "@/lib/help/guide";
 import { BASIS_TEXT, type DurationBasis } from "@/lib/insights/durations";
 import type Anthropic from "@anthropic-ai/sdk";
 import { checkAppointment, describeProblem, durationMinutes, pickResource, stretchTiming, timingFor, type BookingContext, type ServiceTiming } from "@/lib/scheduling/booking";
@@ -17,7 +18,8 @@ import { findOpenings } from "@/lib/scheduling/openings";
 import { formatMinute, fromLocal, isLocalDate, parseTime, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { converse, modelFor, VOICE, type ClaudeClient, type ConverseHooks, type ToolRunner } from "./claude";
 import { SALES_PERIODS, type Knowledge, type SalesPeriod } from "./knowledge";
-import type { BookingSuggestion } from "./types";
+import type { StaffRole } from "@/lib/staff";
+import type { BookingSuggestion, HelpLink } from "./types";
 
 export type AssistantContext = {
   salon: string;
@@ -41,6 +43,22 @@ export type AssistantContext = {
   asker?: string;
   askerName?: string;
   knowledge?: Knowledge;
+  // The help guide (docs/help/) and the asker's role, for how_to.
+  help?: HelpPage[];
+  role?: StaffRole;
+};
+
+const HOW_TO_TOOL: Anthropic.Tool = {
+  name: "how_to",
+  description:
+    "Search Maestra's help guide: how to do something in the app (ring up a sale, sell a gift card, check in, refunds, payroll, settings…). Returns the best page: its steps, who can do it (can_do for the person asking, who_can), and other pages close to the question (ask again with one of their titles if it fits better). found is false when the guide doesn't cover it.",
+  strict: true,
+  input_schema: {
+    type: "object",
+    properties: { query: { type: "string", description: "The task in a few words, e.g. 'sell a gift card', or a page title from other_pages." } },
+    required: ["query"],
+    additionalProperties: false,
+  },
 };
 
 // "haircuts" -> "cut", "colour" -> "color".
@@ -199,12 +217,20 @@ Actions: you can't book, move or cancel anything yourself. propose_booking and p
 
 Style: keep it scannable. Two to four sentences unless they ask for more. For lists, give the top 3, each with a short reason, then offer the rest ("Want the rest?"). End with one useful next step (e.g. "Want me to look for a time?"). Clients by first name only. Times are the salon's local time; say them like "1:15pm".
 
-Today is ${c.today}; it's now ${formatMinute(local.minute)}. The calendar is showing ${c.date}; questions without a day are about that day.`;
+${
+    c.help
+      ? `How to use Maestra: for any question about how to do something in the app, look it up in the help guide and answer only from the page you get back; never describe screens, buttons or steps from memory. Give its steps as a short numbered list (1. 2. 3.), one line each, in the page's words, then at most one "Good to know" line if it matters. If the person asking can't do it themselves (can_do false), don't list the steps: say who can (who_can) and suggest asking them. If the guide doesn't cover it (found false), say it isn't in the help guide yet and suggest asking a manager; don't guess. When the page has a button, it appears under your answer, so you can say "tap Open new sale below".
+
+`
+      : ""
+  }Today is ${c.today}; it's now ${formatMinute(local.minute)}. The calendar is showing ${c.date}; questions without a day are about that day.`;
 }
 
 // A tool runner for one question; suggestions it makes are collected.
-export function assistantTools(c: AssistantContext): ToolRunner & { suggestions: BookingSuggestion[] } {
+export function assistantTools(c: AssistantContext): ToolRunner & { suggestions: BookingSuggestion[]; links: HelpLink[] } {
   const suggestions: BookingSuggestion[] = [];
+  // The button under her answer: the page from her last how_to.
+  const links: HelpLink[] = [];
   const services = new Map(c.services.map((s) => [s.id, s]));
   const staff = new Map(c.staff.map((s) => [s.id, s]));
   // A stylist's usual time for a service, when trusted, as a timing (in
@@ -269,6 +295,14 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
             length_basis: basis(o.staffId),
           })),
         );
+      }
+      case "how_to": {
+        if (!c.help) return "The help guide isn't available.";
+        const result = howTo(c.help, String(input.query ?? "").slice(0, 200), c.role ?? "stylist");
+        links.length = 0;
+        if (result.found && result.link) links.push(result.link);
+        if (!result.found) return JSON.stringify(result);
+        return JSON.stringify({ found: true, page: result.page, other_pages: result.other_pages });
       }
       case "propose_booking": {
         const date = dayOf(input.date);
@@ -375,7 +409,7 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
     }
   }
 
-  return { tools: [...TOOLS, ...extra], run: runAny, suggestions };
+  return { tools: [...TOOLS, ...(c.help ? [HOW_TO_TOOL] : []), ...extra], run: runAny, suggestions, links };
 }
 
 // Answers a staff question, with any bookings Denise suggests.
@@ -384,11 +418,11 @@ export async function answer(
   c: AssistantContext,
   history: { role: "user" | "assistant"; text: string }[],
   hooks: ConverseHooks = {},
-): Promise<{ text: string; suggestions: BookingSuggestion[] }> {
+): Promise<{ text: string; suggestions: BookingSuggestion[]; links: HelpLink[] }> {
   const runner = assistantTools(c);
   const question = [...history].reverse().find((m) => m.role === "user")?.text ?? "";
   const text = await converse(client, systemPrompt(c), history, runner, modelFor(question), hooks);
-  return { text, suggestions: runner.suggestions };
+  return { text, suggestions: runner.suggestions, links: runner.links };
 }
 
 // What Denise is doing while she uses a tool, for her "thinking" status
@@ -425,6 +459,8 @@ export function toolStatus(name: string, input: unknown, c: Pick<AssistantContex
       return "Adding up gift card balances…";
     case "unused_packages":
       return "Finding unused packages…";
+    case "how_to":
+      return "Looking it up in the help guide…";
     default:
       return "Looking that up…";
   }

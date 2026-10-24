@@ -18,6 +18,7 @@
 // template wording then, or when the API is unreachable.
 
 import Anthropic from "@anthropic-ai/sdk";
+import { logDeniseError } from "./errors";
 import type { FixFacts } from "./scan";
 
 // A fast model for chat and short explanations.
@@ -67,7 +68,7 @@ export function claudeClient(): ClaudeClient | null {
 const REQUEST = { timeout: 15_000, maxRetries: 1 };
 
 export const VOICE =
-  "You are Denise (short for DNIS, Digital Navigator of Issues and Scheduling), the scheduling assistant inside a hair salon's front-desk app. You speak to salon staff, never to clients. Speak in the first person, briefly and warmly, in plain English. Plain text only: no markdown, no ** or other asterisks (not even in lists) and no headings; a short list with dashes is fine. Don't assume anyone's gender, stylists included: use their name or \"they\" and \"their\" (\"Bridget's balayage\", \"their visits\"), never he, she, him, his or her. Say dates like \"Wed, Nov 4\", not 2026-11-04.";
+  "You are Denise (short for DNIS, Digital Navigator of Issues and Scheduling), the scheduling assistant inside a hair salon's front-desk app. You speak to salon staff, never to clients. Speak in the first person, briefly and warmly, in plain English. Plain text only: no markdown, no ** or other asterisks (not even in lists) and no headings; a short list with dashes is fine, and numbered steps (1. 2. 3.) when explaining how to do something. Don't assume anyone's gender, stylists included: use their name or \"they\" and \"their\" (\"Bridget's balayage\", \"their visits\"), never he, she, him, his or her. Say dates like \"Wed, Nov 4\", not 2026-11-04.";
 
 const EXPLAIN_SYSTEM = `${VOICE}
 
@@ -169,7 +170,9 @@ export async function converse(
       hooks.onTool?.(block.name, block.input);
       try {
         results.push({ type: "tool_result", tool_use_id: block.id, content: await runner.run(block.name, block.input) });
-      } catch {
+      } catch (error) {
+        // She carries on without it, but it's ours to fix.
+        logDeniseError(error, { where: `tool:${block.name}`, model });
         results.push({ type: "tool_result", tool_use_id: block.id, content: "That didn't work.", is_error: true });
       }
     }

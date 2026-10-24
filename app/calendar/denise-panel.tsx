@@ -260,6 +260,12 @@ export function DenisePanel({
                 <DeniseFace size={24} className="mt-1" />
                 <div className="flex min-w-0 flex-col gap-2">
                   <p className="rounded-xl rounded-tl-sm border border-denise-200 bg-denise-50 px-3 py-2 whitespace-pre-line text-ink">{m.text}</p>
+                  {m.links?.map((l) => (
+                    // A plain link: some screens start in a route handler (/checkout/new).
+                    <a key={l.path} href={l.path} className={`${buttonClass("secondary", "sm")} self-start`} data-testid="denise-help-link">
+                      {l.label}
+                    </a>
+                  ))}
                   {m.suggestions?.map((sg, j) => (
                     <SuggestionCard
                       key={sg.actionId ?? j}

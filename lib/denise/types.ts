@@ -91,7 +91,11 @@ export type BookingSuggestion = {
   clientHint: string | null;
 };
 
-export type ChatMessage = { role: "user" | "denise"; text: string; suggestions?: BookingSuggestion[] };
+// A button under her answer to a "how do I…" question: the screen the
+// help page starts on ("Open new sale").
+export type HelpLink = { path: string; label: string };
+
+export type ChatMessage = { role: "user" | "denise"; text: string; suggestions?: BookingSuggestion[]; links?: HelpLink[] };
 
 // Denise's streaming endpoint (app/api/denise/route.ts): what's asked of
 // her, and what she sends back as she works, one JSON object per line.
@@ -109,4 +113,4 @@ export type DeniseEvent =
   | { t: "text"; text: string }
   | { t: "discard" }
   // Finished: what she says, and her view of the day after a report.
-  | { t: "done"; reply: { text: string; kind: "fixes" | "nothing" | "stuck" | "error" }; state?: DeniseState; suggestions?: BookingSuggestion[] };
+  | { t: "done"; reply: { text: string; kind: "fixes" | "nothing" | "stuck" | "error" }; state?: DeniseState; suggestions?: BookingSuggestion[]; links?: HelpLink[] };

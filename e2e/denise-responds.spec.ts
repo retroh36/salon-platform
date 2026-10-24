@@ -337,6 +337,22 @@ test.describe("while she works", () => {
     await expect(panel.getByRole("button", { name: "Send" })).toBeEnabled();
   });
 
+  test("a how-to answer comes with a button that opens the right screen", async ({ page }) => {
+    await openDay(page);
+    // Her answer as the server streams it (the browser tests have no API key).
+    const done = { t: "done", reply: { text: "1. Tap New sale.\n2. Under the lines, tap Gift card.", kind: "fixes" }, links: [{ path: "/checkout/new?from=/sales", label: "Open new sale" }] };
+    await page.route("**/api/denise", (route) => route.fulfill({ status: 200, contentType: "application/x-ndjson", body: `${JSON.stringify(done)}\n` }));
+    await page.getByTestId("denise-launcher").click();
+    const panel = denisePanel(page);
+    await panel.locator("#denise-follow-up").fill("How do I ring up a gift card?");
+    await panel.getByRole("button", { name: "Send" }).click();
+    await expect(panel).toContainText("2. Under the lines, tap Gift card.");
+    const button = panel.getByRole("link", { name: "Open new sale" });
+    await expect(button).toHaveAttribute("href", "/checkout/new?from=/sales");
+    await button.click();
+    await expect(page).toHaveURL(/\/checkout\/[0-9a-f-]{36}/);
+  });
+
   test("if something breaks, she says so", async ({ page }) => {
     await seed(await newClient("Grace"), BRIDGET, at(10));
     await openDay(page);

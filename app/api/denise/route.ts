@@ -2,17 +2,19 @@
 // (a visit running late, a stylist out, a cancellation). She sends what
 // she's doing as she works, her answer word by word, then her reply and
 // her view of the day, one JSON object per line (DeniseEvent). She always
-// replies: if something fails, she says so and the error is logged.
+// replies: if something fails, the error is logged with what she was doing
+// (./lib/denise/errors.ts) and she says what staff can do: wait for
+// tomorrow at the daily limit, try again in a minute when the API is busy,
+// or that it's been logged, with a reference that matches the log line.
 
 import { revalidatePath } from "next/cache";
 import { answer, toolStatus } from "@/lib/denise/assistant";
 import { assistantContext } from "@/lib/denise/context";
 import { claudeFor, deniseDay } from "@/lib/denise/day-state";
-import { ERROR_REPLY } from "@/lib/denise/respond";
+import { FAILURE_TEXT, failureRef, logDeniseError } from "@/lib/denise/errors";
 import { askerOf, deniseSession, type DeniseSession } from "@/lib/denise/session";
 import { replyToCallOut, replyToCancel, replyToLate } from "@/lib/denise/triggers";
 import type { DeniseEvent, DeniseRequest } from "@/lib/denise/types";
-import { DailyLimitReached } from "@/lib/denise/usage";
 import { isUuid } from "@/lib/ids";
 import { LATE_MINUTES, reportCallOut, reportRunningLate } from "@/lib/scheduling/disruptions";
 import { startOfLocalDay } from "@/lib/scheduling/load";
@@ -20,7 +22,6 @@ import { isLocalDate } from "@/lib/scheduling/time";
 
 const NOT_CONNECTED =
   "I'm not connected yet, so I can't answer questions. Once I am, ask me things like “Who's free for a color at 3?” In the meantime I'm still watching the calendar for clashes.";
-const LIMIT_REACHED = "I've used up today's thinking for the salon, so I'll be back for questions tomorrow. I'm still watching the calendar for clashes in the meantime.";
 
 const REPORT_ERRORS = {
   forbidden: "Only the front desk, managers and owners, or the stylist on this visit, can report that.",
@@ -37,18 +38,21 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       const send: Send = (event) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      let businessId: string | undefined;
       try {
         const s = await deniseSession();
+        businessId = s?.me.business_id;
         if (!s) send(reply("Sign in again.", "error"));
         else if (!body || !isLocalDate(body.date)) send(reply("I didn't catch that. Try again.", "error"));
         else await run(s, body, send);
       } catch (error) {
-        if (error instanceof DailyLimitReached) send(reply(LIMIT_REACHED, "nothing"));
-        else {
-          // Logged without request details (no client data in logs).
-          console.error("Denise:", error instanceof Error ? error.message : error);
-          send({ t: "done", reply: ERROR_REPLY });
-        }
+        // Logged with the error's details and what she was doing, never the
+        // question or client data.
+        const ref = failureRef();
+        const kind = logDeniseError(error, { where: typeof body?.action === "string" ? body.action : "unknown", businessId, ref });
+        if (kind === "limit") send(reply(FAILURE_TEXT.limit, "nothing"));
+        else if (kind === "busy") send(reply(FAILURE_TEXT.busy, "error"));
+        else send(reply(`${FAILURE_TEXT[kind]} (Ref ${ref})`, "error"));
       }
       controller.close();
     },
@@ -118,7 +122,7 @@ async function run(s: DeniseSession, body: DeniseRequest, send: Send) {
         onDiscard: () => send({ t: "discard" }),
         onTool: (name, input) => status(toolStatus(name, input, context)),
       });
-      return send({ t: "done", reply: { text: result.text, kind: "fixes" }, suggestions: result.suggestions });
+      return send({ t: "done", reply: { text: result.text, kind: "fixes" }, suggestions: result.suggestions, links: result.links });
     }
   }
 }

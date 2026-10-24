@@ -124,7 +124,8 @@ describe("sending", () => {
     const start = new Date(NOW.getTime() + 5 * 86_400_000);
     const { data: a } = await admin
       .from("appointments")
-      .insert({ business_id: salon.businessId, location_id: salon.locationId, client_id: ids.Wes, starts_at: start.toISOString(), ends_at: new Date(start.getTime() + 3_600_000).toISOString() })
+      // Booked an hour after the message (NOW), whatever the real time is.
+      .insert({ business_id: salon.businessId, location_id: salon.locationId, client_id: ids.Wes, starts_at: start.toISOString(), ends_at: new Date(start.getTime() + 3_600_000).toISOString(), created_at: new Date(NOW.getTime() + 3_600_000).toISOString() })
       .select("id")
       .single();
     await admin.from("sales").insert({ business_id: salon.businessId, location_id: salon.locationId, number: 1, client_id: ids.Wes, appointment_id: a!.id, subtotal_cents: 12000, total_cents: 12000 });

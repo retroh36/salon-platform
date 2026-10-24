@@ -13,6 +13,7 @@ import { loadBookingContext } from "@/lib/scheduling/load";
 import { activeDisruptions, effectiveCalendar, findConflicts, type Conflict, type Day, type FixOption } from "@/lib/scheduling/resolve";
 import { todayIn, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { fullName } from "@/lib/staff";
+import { logDeniseError } from "./errors";
 import { likelyOverruns, type LearnedTime } from "./risk";
 import type { ConflictView, DeniseNotice, DeniseState } from "./types";
 import { clock, factsFor, headline, intro, moves, note, summary, templateReason, visitChanges, type Lookup, type Visit } from "./wording";
@@ -149,7 +150,11 @@ export async function scanDay(
     const todo = worded.flatMap((w) => w.options.filter((o) => o.needsReason).map((o) => ({ w, o })));
     if (todo.length) {
       step("Writing up why each fix works…");
-      const reasons = await options.explain(todo.map(({ w, o }) => factsFor(w.conflict, o.option, lookup))).catch(() => todo.map(() => null));
+      const reasons = await options.explain(todo.map(({ w, o }) => factsFor(w.conflict, o.option, lookup))).catch((error) => {
+        // Template wording instead; logged unless it's just the daily limit.
+        logDeniseError(error, { where: "explain_fixes" });
+        return todo.map(() => null);
+      });
       todo.forEach(({ o }, i) => {
         if (reasons[i]) o.reason = reasons[i]!;
       });

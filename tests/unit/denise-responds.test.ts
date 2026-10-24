@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { toolStatus } from "@/lib/denise/assistant";
 import { CHAT_MODEL, converse, type ClaudeClient } from "@/lib/denise/claude";
 import { bookingIdeas } from "@/lib/denise/ideas";
-import { callOutReply, canceledReply, ERROR_REPLY, lateReply, noFixAdvice } from "@/lib/denise/respond";
+import { callOutReply, canceledReply, lateReply, noFixAdvice } from "@/lib/denise/respond";
 import { metered } from "@/lib/denise/usage";
 import { checkItem, fromLocal, parseTime, type BookedItem, type BookingContext, type ItemCheck } from "@/lib/scheduling";
 
@@ -166,7 +166,7 @@ describe("while she works", () => {
     expect(rpc).toHaveBeenCalledWith("record_ai_usage", expect.objectContaining({ p_feature: "ask_denise", p_input: 10, p_output: 5 }));
   });
 
-  it("if something fails, says so and logs it (no details for the browser)", async () => {
+  it("if something fails, says so and logs it with a reference (no details for the browser)", async () => {
     vi.doMock("@/lib/denise/session", () => ({
       deniseSession: async () => {
         throw new Error("database is down");
@@ -177,9 +177,32 @@ describe("while she works", () => {
     const { POST } = await import("@/app/api/denise/route");
     const response = await POST(new Request("http://x/api/denise", { method: "POST", body: JSON.stringify({ action: "canceled", date: "2026-10-27", appointmentId: "x" }) }));
     const lines = (await response.text()).trim().split("\n").map((l) => JSON.parse(l));
-    expect(lines).toEqual([{ t: "done", reply: ERROR_REPLY }]);
-    expect(ERROR_REPLY.text).toMatch(/^Something went wrong on my end\./);
-    expect(logged).toHaveBeenCalledWith("Denise:", "database is down");
+    expect(lines).toHaveLength(1);
+    expect(lines[0].reply.kind).toBe("error");
+    expect(lines[0].reply.text).toMatch(/^Something went wrong on my end, and I've logged it.* \(Ref D-[A-Z0-9]{6}\)$/);
+    expect(lines[0].reply.text).not.toContain("database");
+    const [tag, json] = logged.mock.calls[0] as [string, string];
+    expect(tag).toBe("[denise]");
+    const ref = lines[0].reply.text.match(/D-[A-Z0-9]{6}/)![0];
+    expect(JSON.parse(json)).toMatchObject({ where: "canceled", kind: "bug", name: "Error", message: "database is down", ref });
+    expect(JSON.parse(json).stack).toContain("denise-responds.test.ts");
+    vi.doUnmock("@/lib/denise/session");
+  });
+
+  it("when the API is busy, says to try again in a minute", async () => {
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    vi.doMock("@/lib/denise/session", () => ({
+      deniseSession: async () => {
+        throw Anthropic.APIError.generate(529, { type: "error", error: { type: "overloaded_error", message: "Overloaded" } }, undefined, new Headers({ "request-id": "req_busy" }));
+      },
+      askerOf: () => null,
+    }));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { POST } = await import("@/app/api/denise/route");
+    const response = await POST(new Request("http://x/api/denise", { method: "POST", body: JSON.stringify({ action: "ask", date: "2026-10-27", history: [] }) }));
+    const [line] = (await response.text()).trim().split("\n").map((l) => JSON.parse(l));
+    expect(line.reply.text).toMatch(/^I'm swamped right now.*ask again/);
+    expect(JSON.parse(logged.mock.calls[0][1] as string)).toMatchObject({ where: "ask", kind: "busy", status: 529, apiType: "overloaded_error", requestId: "req_busy" });
     vi.doUnmock("@/lib/denise/session");
   });
 });

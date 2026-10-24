@@ -297,7 +297,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     setTab("denise");
     setPanelOpen(true);
     const done = await startDenise({ action: "ask", date: data.date, history }, "Reading your question…");
-    setChat([...history, { role: "denise", text: done.reply.text, suggestions: done.suggestions }]);
+    setChat([...history, { role: "denise", text: done.reply.text, suggestions: done.suggestions, links: done.links }]);
   }
 
   // Something that triggers Denise (a report, a cancellation): she shows

@@ -14,6 +14,7 @@ import type { LocalDate } from "@/lib/scheduling/time";
 import type { StaffRole } from "@/lib/staff";
 import type { AssistantContext } from "./assistant";
 import { loadDurations } from "@/lib/insights/read";
+import { loadHelpPages } from "@/lib/help/load";
 import { knowledgeFor } from "./knowledge";
 
 type Supabase = SupabaseClient<Database>;
@@ -70,5 +71,7 @@ export async function assistantContext(supabase: Supabase, me: Asking, date: Loc
     asker: ROLE_NAMES[me.role],
     askerName: staff.data.find((m) => m.id === me.staffId)?.first_name,
     knowledge: knowledgeFor(supabase, me),
+    help: loadHelpPages(),
+    role: me.role,
   };
 }

@@ -42,7 +42,9 @@ export function metered(client: ClaudeClient, admin: Admin, businessId: string, 
     });
     if (error) throw error;
   };
-  const stream = client.messages.stream;
+  // Called on client.messages, never detached: the SDK's methods need
+  // their `this` (a detached stream() fails with "reading '_client'").
+  const messages = client.messages;
   return {
     messages: {
       create: async (params, options) => {
@@ -53,13 +55,13 @@ export function metered(client: ClaudeClient, admin: Admin, businessId: string, 
       },
       // The same for a streamed reply: the limit first, the usage once it's
       // all arrived.
-      stream: stream
+      stream: messages.stream
         ? (params, options): ClaudeStream => {
             let final: Promise<Anthropic.Message> | null = null;
             return {
               async *[Symbol.asyncIterator]() {
                 await checkLimit();
-                const s = stream(params, options);
+                const s = messages.stream!(params, options);
                 for await (const event of s) yield event;
                 final = s.finalMessage();
                 await record(String(params.model), await final);
