@@ -9,6 +9,7 @@
 // and nothing is ever paid twice. Commission is worked out on the period's
 // totals, ex tax and after discounts, at the staff member's current rates.
 
+import { csvTable, dollars } from "./csv.ts";
 import { mergeIntervals, subtractIntervals } from "./scheduling/intervals.ts";
 import type { StaffSchedule } from "./scheduling/availability.ts";
 import { addDays, datesBetween, weekdayOf, type LocalDate } from "./scheduling/time.ts";
@@ -201,18 +202,6 @@ export function payLine(person: { staffId: string; name: string; role: string },
 
 export const formatHours = (minutes: number) => (minutes / 60).toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
 
-const dollars = (cents: number) => (cents / 100).toFixed(2);
-
-function csvCell(value: string | number): string {
-  const s = String(value);
-  // Quote anything with a comma, quote or line break; a leading =, +, - or
-  // @ is prefixed so spreadsheets don't run it as a formula.
-  const safe = /^[=+\-@]/.test(s) && Number.isNaN(Number(s)) ? `'${s}` : s;
-  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-}
-
-export const csvLine = (cells: (string | number)[]) => cells.map(csvCell).join(",");
-
 // One row per person, in dollars, for a payroll provider.
 export function payrollCsv(lines: readonly PayLine[], period: PayPeriod): string {
   const header = [
@@ -249,7 +238,7 @@ export function payrollCsv(lines: readonly PayLine[], period: PayPeriod): string
     dollars(l.hourlyPayCents),
     dollars(l.totalCents),
   ]);
-  return [header, ...rows].map(csvLine).join("\r\n") + "\r\n";
+  return csvTable(header, rows);
 }
 
 // The period a page asks for: from and to dates if they make sense (up to

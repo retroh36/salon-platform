@@ -46,3 +46,8 @@ Known gaps to pick up later. Move an item into a task when it's scheduled.
 - [ ] **Staff-specific durations and gap times.** Phorest's `userDurations` / `userGapTimes` aren't imported (no per-stylist duration yet).
 - [ ] **Client fields with no home yet:** birthday, address, banned flag, account balances and loyalty points are reported as dropped by the dry run.
 - [ ] **Import command.** Only the dry run exists. A real import needs a target business, a confirmation step, and polling for changes during the switch-over week (`updatedAfter` / `updated_from` filters).
+
+## Operations
+
+- [ ] **Back up Storage files.** Database backups don't include files. Copy the `visit-photos`, `staff-photos` and `salon-logos` buckets nightly to private, versioned object storage in another account (`docs/operations.md`).
+- [ ] **Confirm the hosted backups.** When the production Supabase project is set up: a paid plan, Point-in-Time Recovery on, retention of 7+ days, and two owners with 2FA; then the first quarterly restore (`docs/operations.md`).

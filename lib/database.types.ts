@@ -551,6 +551,32 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"data_exports": {
+                  Row: {
+                    "business_id": string,"bytes": number,"created_at": string,"id": string,"row_counts": NonNullable<Json>,"staff_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"bytes": number,"created_at"?: string,"id"?: string,"row_counts": NonNullable<Json>,"staff_id"?: string | null
+                  }
+                  Update: {
+                    "business_id"?: string,"bytes"?: number,"created_at"?: string,"id"?: string,"row_counts"?: NonNullable<Json>,"staff_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "data_exports_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "data_exports_staff_id_fkey"
+      columns: ["staff_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"denise_briefs": {
                   Row: {
                     "created_at": string,"day": string,"facts_hash": string,"location_id": string,"model": string,"text": string
@@ -2271,6 +2297,9 @@ isOneToOne: false
                            },
 "issue_promo_card":
 { Args: { "p_amount_cents": number,"p_client_id": string,"p_expires_in_days": number,"p_reason": string,"p_recipient_email": string,"p_recipient_name": string }; Returns: string
+                           },
+"log_data_export":
+{ Args: { "p_business_id": string,"p_bytes": number,"p_row_counts": Json }; Returns: string
                            },
 "log_receipt_email":
 { Args: { "p_email": string,"p_sale_id": string }; Returns: undefined

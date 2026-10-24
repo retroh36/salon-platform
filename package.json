@@ -16,7 +16,8 @@
     "db:types": "supabase gen types typescript --local > lib/database.types.ts",
     "test:e2e": "playwright test",
     "eval:denise": "vitest run --project eval",
-    "import:phorest:dry-run": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/phorest-dry-run.ts"
+    "import:phorest:dry-run": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/phorest-dry-run.ts",
+    "backup:drill": "./scripts/backup-drill.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.1.0",
