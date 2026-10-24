@@ -16,9 +16,10 @@ Everyone has their own login, so the app shows what your role can use and record
 
 - Your name and role show at the bottom of the sidebar, so you can check who's signed in.
 - Sign out on a shared iPad before handing it over, so nothing is done under your name.
-- There's no "forgot password" button yet, and logins can't be added or reset from inside the app: ask the salon owner.
+- Forgot your password? Tap **Forgot password?** on the sign-in screen (see Reset your own password).
+- New on the team? Your owner or manager sends you an invite by email: open it and choose a password.
 
 ## If it doesn't work
 
-- **That email and password don't match.**: check for typos; ask the owner if you still can't get in.
+- **That email and password don't match.**: check for typos, or tap **Forgot password?**.
 - **Not linked to a salon**: your login works but isn't on the team yet. Ask the salon owner.

@@ -2780,6 +2780,9 @@ isOneToOne: false
 "save_service":
 { Args: { "p_active_minutes": number,"p_business_id": string,"p_category": string,"p_description": string,"p_finishing_minutes": number,"p_name": string,"p_price_cents": number,"p_processing_minutes": number,"p_service_id": string,"p_staff": Json }; Returns: string
                            },
+"save_team_member":
+{ Args: { "p_business_id": string,"p_input": Json,"p_location_id": string,"p_staff_id": string }; Returns: string
+                           },
 "scheduled_jobs_status":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
@@ -2825,6 +2828,9 @@ isOneToOne: false
 "set_service_recipe":
 { Args: { "p_lines": Json,"p_service_id": string }; Returns: undefined
                            },
+"set_staff_active":
+{ Args: { "p_active": boolean,"p_staff_id": string }; Returns: undefined
+                           },
 "set_staff_day_override":
 { Args: { "p_business_id": string,"p_hours": Json,"p_on_date": string,"p_staff_id": string }; Returns: undefined
                            },
@@ -2836,6 +2842,11 @@ isOneToOne: false
                            },
 "start_stocktake":
 { Args: { "p_location_id": string }; Returns: string
+                           },
+"team_logins":
+{ Args: { "p_business_id": string }; Returns: {
+              "email": string,"invited_at": string,"last_sign_in_at": string,"staff_id": string
+            }[]
                            },
 "undo_ai_action":
 { Args: { "p_action_id": string,"p_expected_version": number }; Returns: undefined

@@ -1,6 +1,6 @@
 ---
 title: See the team directory
-keywords: team, staff list, directory, employees, coworkers, phone number, email, staff contact, who works here, add staff, new hire, add team member, add employee, new staff member, staff member, invite staff
+keywords: team, staff list, directory, employees, coworkers, phone number, email, staff contact, who works here
 who: owner, manager, front_desk, stylist
 open: /team | Open Team
 ---
@@ -15,6 +15,6 @@ See everyone at your location, with their role, level and contact details.
 
 ## Good to know
 
-- Adding a new team member, or changing someone's contact details, isn't in the app yet.
-- Someone who has left shows as **Inactive**.
+- Owners and managers tap a name to change someone's details, role, level or services, or to invite or deactivate them. To add someone, see Add a team member.
+- Someone who has left shows as **Deactivated**. Owners and managers also see who hasn't signed in yet (**Invited**) or has no login (**No login**).
 - Stylist photos for online booking are uploaded on the Schedule tab, under the stylist's name (owners and managers).

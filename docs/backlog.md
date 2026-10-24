@@ -50,5 +50,7 @@ Known gaps to pick up later. Move an item into a task when it's scheduled.
 ## Operations
 
 - [ ] **Photo backups to a separate project.** The nightly Storage backup is built (`lib/photo-backup.ts`); point it at a bucket in a separate Supabase project (`PHOTO_BACKUP_SUPABASE_URL`, `docs/operations.md`) when production is set up.
+- [ ] **Set up login emails in production.** Site URL, the Invite and Reset password templates from `supabase/templates/`, and an SMTP provider in the hosted project, so staff invites and password resets arrive (`docs/operations.md`, "Login emails").
+- [ ] **Week view.** The calendar's Week view (and dragging a visit onto another day there); visits move to another day from "⋯" → Move to another day for now.
 - [ ] **Configure scheduled jobs in production.** `CRON_SECRET` in Vercel, then `npm run jobs -- configure` against the production project (`docs/operations.md`).
 - [ ] **Confirm the hosted backups.** When the production Supabase project is set up: a paid plan, Point-in-Time Recovery on, retention of 7+ days, and two owners with 2FA; then the first quarterly restore (`docs/operations.md`).

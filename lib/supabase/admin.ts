@@ -8,8 +8,10 @@ import { getSupabaseEnv } from "./env";
 // and saves through functions only the service role can call; and
 // background jobs (nightly insights, membership billing, also run for one
 // membership right after staff change it, once their own login has shown
-// they may). Never import this from client components, and never use it to
-// load what staff pages show.
+// they may); and creating a team member's login when they're invited
+// (lib/team-logins.ts, after the inviter's own login has shown they may
+// manage them). Never import this from client components, and never use it
+// to load what staff pages show.
 export function createAdminClient() {
   const { url } = getSupabaseEnv();
   const secretKey = process.env.SUPABASE_SECRET_KEY;

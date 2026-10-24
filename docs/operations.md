@@ -84,6 +84,16 @@ Last run: 2026-10-23, passed: 104 tables, 24,078 rows, 67 tables with row level 
 | | Hosted project: plan, PITR window and retention confirmed in the dashboard | To do when production is set up | |
 | | First quarterly production restore | To do | |
 
+## Login emails (invites and password resets)
+
+Staff logins are invited from the Team page, and anyone can reset a forgotten password from the sign-in page. Supabase Auth sends those emails, so the hosted project needs, once:
+
+1. **Authentication → URL Configuration:** Site URL set to the app's address (the emails link to `<Site URL>/auth/confirm`).
+2. **Authentication → Email Templates:** the Invite user and Reset password templates (subject and body) copied from `supabase/templates/invite.html` and `recovery.html`, with the subjects in `supabase/config.toml`. Their links must stay `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite` (or `recovery`).
+3. **Authentication → SMTP Settings:** a real email provider. Supabase's built-in sender is only for trying things out (a few emails an hour, to team addresses).
+
+Locally the emails land in Mailpit at http://127.0.0.1:54324; restart local Supabase after changing a template.
+
 ## Scheduled jobs
 
 The database runs them (Supabase's scheduler, `pg_cron`), so they work on any Vercel plan, including the free one (whose own cron jobs are limited). Each job calls one of the app's endpoints, `/api/cron/<job>`, through `pg_net`, with `CRON_SECRET` as a bearer token; the endpoints refuse anything else. The jobs and their schedule are in `supabase/migrations/…_scheduled_jobs.sql`.
