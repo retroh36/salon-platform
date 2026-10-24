@@ -25,6 +25,7 @@ import { completeCheckout, saveTicket } from "../actions";
 import { Dialogs, type DialogState } from "./dialogs";
 import { PaymentPanel } from "./payment";
 import { ProductPicker } from "./products";
+import { LinkWaiting } from "./payment-link";
 import { Success } from "./success";
 import { ClientHeader, TicketList } from "./ticket-view";
 
@@ -212,8 +213,16 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
     (data.draft.status === "completed" ? data.draft.saleId : null);
   if (saleId)
     return (
-      <Success data={data} ticket={ticket} totals={totals} saleId={saleId} />
+      <Success
+        data={data}
+        ticket={ticket}
+        totals={totals}
+        saleId={saleId}
+        paidByLink={data.link?.status === "paid" ? { amountCents: data.link.amountCents, tipCents: data.link.tipCents ?? 0 } : null}
+      />
     );
+  // A payment link is out: the ticket waits as sent.
+  const linkOut = data.link?.status === "open" ? data.link : null;
 
   return (
     <div className="flex h-dvh flex-col bg-canvas text-ink">
@@ -237,8 +246,9 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
 
       <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)]">
         <main
-          className="flex min-h-0 flex-col overflow-y-auto md:overflow-hidden"
+          className={`flex min-h-0 flex-col overflow-y-auto md:overflow-hidden ${linkOut ? "opacity-60" : ""}`}
           aria-label="Ticket"
+          inert={Boolean(linkOut)}
         >
           <div className="shrink-0 space-y-3 border-b border-line bg-surface/60 px-4 py-4 sm:px-6">
             <ClientHeader data={data} />
@@ -288,19 +298,23 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
           </div>
         </main>
 
-        <PaymentPanel
-          data={data}
-          ticket={ticket}
-          rates={rates}
-          totals={totals}
-          problems={problems}
-          message={message}
-          pending={pending}
-          onChange={change}
-          onDialog={setDialog}
-          onRemovePayment={removePayment}
-          onComplete={complete}
-        />
+        {linkOut ? (
+          <LinkWaiting data={data} link={linkOut} />
+        ) : (
+          <PaymentPanel
+            data={data}
+            ticket={ticket}
+            rates={rates}
+            totals={totals}
+            problems={problems}
+            message={message}
+            pending={pending}
+            onChange={change}
+            onDialog={setDialog}
+            onRemovePayment={removePayment}
+            onComplete={complete}
+          />
+        )}
       </div>
 
       {removed && (

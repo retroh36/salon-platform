@@ -22,8 +22,11 @@ export interface PaymentProvider {
   // Shown to staff: "Test mode" until a real provider is connected.
   label: string;
   testMode: boolean;
-  // Charges a saved card.
+  // Charges a saved card (or one the client enters on a payment page).
   charge(request: ChargeRequest): Promise<ChargeResult>;
+  // Gives a charge back in full (when what it paid for couldn't be
+  // completed).
+  refund(reference: string): Promise<{ ok: boolean }>;
   // Cards staff can choose in test mode (a real provider saves the card
   // on its own reader or page instead).
   testCards: readonly (SavedCard & { outcome: string })[];

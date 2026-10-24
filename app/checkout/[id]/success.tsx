@@ -12,7 +12,20 @@ import { emailReceipt } from "@/app/sales/actions";
 
 // After Complete sale: done, the receipt (print, email or none), the next
 // visit if they rebooked, and where to go next.
-export function Success({ data, ticket, totals, saleId }: { data: CheckoutScreenData; ticket: Ticket; totals: ReturnType<typeof totalsOf>; saleId: string }) {
+export function Success({
+  data,
+  ticket,
+  totals,
+  saleId,
+  paidByLink = null,
+}: {
+  data: CheckoutScreenData;
+  ticket: Ticket;
+  totals: ReturnType<typeof totalsOf>;
+  saleId: string;
+  // Paid by the client on a payment link (with their tip).
+  paidByLink?: { amountCents: number; tipCents: number } | null;
+}) {
   const [receipt, setReceipt] = useState<"choose" | "email" | "done">("choose");
   const [email, setEmail] = useState(ticket.receiptEmail || data.client?.email || "");
   const [note, setNote] = useState<string | null>(null);
@@ -26,8 +39,9 @@ export function Success({ data, ticket, totals, saleId }: { data: CheckoutScreen
           <CheckCircleIcon className="size-8" />
         </span>
         <div className="flex flex-col items-center gap-1">
-          <h1 className="font-serif text-3xl font-semibold text-navy-900">Sale complete</h1>
-          <p className="font-serif text-4xl font-semibold text-navy-900 tabular-nums">{formatPrice(totals.totalCents)}</p>
+          <h1 className="font-serif text-3xl font-semibold text-navy-900">{paidByLink ? "Paid by link" : "Sale complete"}</h1>
+          <p className="font-serif text-4xl font-semibold text-navy-900 tabular-nums">{formatPrice(paidByLink ? paidByLink.amountCents + paidByLink.tipCents : totals.totalCents)}</p>
+          {paidByLink && paidByLink.tipCents > 0 && <p className="text-ink-muted">Including {formatPrice(paidByLink.tipCents)} in tips</p>}
           {data.client && <p className="text-lg text-ink-muted">{data.client.name}</p>}
         </div>
         {totals.changeCents > 0 && (

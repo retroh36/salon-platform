@@ -14,6 +14,7 @@ import { formatPrice } from "@/lib/services";
 import type { Ticket, TicketDiscount, TicketLine, TicketPayment, totalsOf } from "@/lib/ticket";
 import { lookupGiftCard } from "@/app/sales/actions";
 import { approveOutOfStock } from "../actions";
+import { SendLink } from "./payment-link";
 import { newKey } from "./screen";
 
 export type DialogState =
@@ -22,6 +23,7 @@ export type DialogState =
   | { kind: "sell-gift-card" }
   | { kind: "sell-package" }
   | { kind: "sell-membership" }
+  | { kind: "payment-link" }
   | { kind: "membership" }
   | { kind: "sale-discount" }
   | { kind: "card" }
@@ -75,6 +77,12 @@ export function Dialogs(props: Props) {
       return (
         <Sheet title="Use their membership" onClose={onClose}>
           <MembershipPay {...props} />
+        </Sheet>
+      );
+    case "payment-link":
+      return (
+        <Sheet title="Text a payment link" onClose={onClose}>
+          <SendLink data={props.data} ticket={props.ticket} dueCents={props.totals.dueCents} onClose={onClose} />
         </Sheet>
       );
     case "sale-discount":

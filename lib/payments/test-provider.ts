@@ -30,5 +30,6 @@ export const testProvider: PaymentProvider = {
   label: "Test mode",
   testMode: true,
   charge: async (request) => testCharge(request),
+  refund: async (reference) => ({ ok: reference.startsWith("test_ch_") }),
   testCards: TEST_CARDS,
 };

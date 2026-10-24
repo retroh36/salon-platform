@@ -1,5 +1,6 @@
 "use server";
 
+import { createHash, randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -8,7 +9,7 @@ import { getCurrentStaff } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
 import { recomputeForVisit } from "@/lib/insights/compute";
 import { fitsOn } from "@/lib/rebook";
-import { canTakePayments } from "@/lib/sales";
+import { canTakePayments, loadCheckoutSettings } from "@/lib/sales";
 import { formatDay } from "@/lib/schedule-format";
 import { saveBooking } from "@/lib/scheduling/book";
 import { loadBookingContext } from "@/lib/scheduling/load";
@@ -17,6 +18,11 @@ import { chainLines } from "@/lib/scheduling/waitlist";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { saleInput, type Ticket } from "@/lib/ticket";
 import { startCheckout } from "@/lib/checkout-screen";
+import { siteUrl } from "@/lib/branding";
+import { normalizePhone } from "@/lib/clients";
+import { memberPrices } from "@/lib/memberships";
+import { loadClientMemberships } from "@/lib/memberships-load";
+import { LINK_HOURS, linkMessage, linkSnapshot } from "@/lib/payment-links";
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; message: string };
 
@@ -147,5 +153,63 @@ export async function setSaleClient(draftId: string, clientId: string | null): P
   if (error) return { ok: false, message: "That client doesn't exist." };
   if (!data.length) return { ok: false, message: "The client of a visit can't be changed here." };
   revalidatePath(`/checkout/${draftId}`);
+  return { ok: true };
+}
+
+// Text-to-pay: sends the client a link to pay the ticket (with a tip) on
+// their phone, instead of paying at the desk. The ticket as sent is what's
+// paid; the checkout waits for it (or the link can be canceled).
+export async function sendPaymentLink(draftId: string, ticket: Ticket, to: { channel: "sms" | "email"; address: string }): Promise<Result> {
+  const s = await session();
+  if (!s) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(draftId)) return { ok: false, message: "That checkout doesn't exist." };
+  const address = to.address.trim();
+  if (to.channel === "sms" ? !normalizePhone(address) : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+    return { ok: false, message: to.channel === "sms" ? "Enter a 10-digit phone number." : "Enter an email address." };
+  }
+  const saved = await saveTicket(draftId, ticket);
+  if (!saved.ok) return saved;
+  const { data: draft } = await s.supabase.from("sale_drafts").select("appointment_id, client_id, client:clients(first_name)").eq("id", draftId).single();
+  const [settings, memberships, staff, business] = await Promise.all([
+    loadCheckoutSettings(s.supabase, s.me.business_id),
+    draft!.client_id ? loadClientMemberships(s.supabase, draft!.client_id, true) : Promise.resolve([]),
+    s.supabase.from("staff").select("id, first_name").eq("business_id", s.me.business_id),
+    s.supabase.from("businesses").select("name").eq("id", s.me.business_id).single(),
+  ]);
+  const snapshot = linkSnapshot(
+    ticket,
+    { taxServicesBp: settings.taxServicesBp, taxRetailBp: settings.taxRetailBp, member: memberPrices(memberships) },
+    { appointmentId: draft!.appointment_id, clientId: draft!.client_id },
+    (staff.data ?? []).map((x) => ({ id: x.id, firstName: x.first_name })),
+    draft!.client?.first_name ?? null,
+  );
+  if ("problem" in snapshot) return { ok: false, message: snapshot.problem };
+  const token = randomBytes(24).toString("base64url");
+  const { error } = await s.supabase.rpc("create_payment_link", {
+    p_draft_id: draftId,
+    p_token_hash: createHash("sha256").update(token).digest("hex"),
+    p_snapshot: snapshot as never,
+    p_amount_cents: snapshot.dueCents,
+    p_channel: to.channel,
+    p_to: to.channel === "sms" ? normalizePhone(address)! : address,
+    p_hours: LINK_HOURS,
+  });
+  if (error) return { ok: false, message: message(error, "The link couldn't be sent. Try again.") };
+  const text = linkMessage(business.data!.name, snapshot.dueCents, `${siteUrl()}/pay/${token}`, to.channel);
+  // The outbox is written by the server only (texts aren't connected yet).
+  const { error: outboxError } = await createAdminClient()
+    .from("outbox_messages")
+    .insert({ business_id: s.me.business_id, channel: to.channel, to_address: to.channel === "sms" ? normalizePhone(address)! : address, subject: text.subject, body: text.body });
+  if (outboxError) throw outboxError;
+  revalidatePath(`/checkout/${draftId}`);
+  return { ok: true };
+}
+
+export async function cancelPaymentLink(linkId: string): Promise<Result> {
+  const s = await session();
+  if (!s) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(linkId)) return { ok: false, message: "That link doesn't exist." };
+  const { error } = await s.supabase.rpc("cancel_payment_link", { p_link_id: linkId });
+  if (error) return { ok: false, message: message(error, "That didn't work. Try again.") };
   return { ok: true };
 }

@@ -1363,6 +1363,56 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"payment_links": {
+                  Row: {
+                    "amount_cents": number,"business_id": string,"canceled_at": string | null,"channel": string,"client_id": string | null,"created_at": string,"created_by": string,"draft_id": string,"expires_at": string,"id": string,"location_id": string,"paid_at": string | null,"provider": string | null,"provider_reference": string | null,"sale_id": string | null,"sent_to": string,"snapshot": NonNullable<Json>,"status": string,"tip_cents": number | null,"token_hash": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount_cents": number,"business_id": string,"canceled_at"?: string | null,"channel": string,"client_id"?: string | null,"created_at"?: string,"created_by": string,"draft_id": string,"expires_at": string,"id"?: string,"location_id": string,"paid_at"?: string | null,"provider"?: string | null,"provider_reference"?: string | null,"sale_id"?: string | null,"sent_to": string,"snapshot": NonNullable<Json>,"status"?: string,"tip_cents"?: number | null,"token_hash": string
+                  }
+                  Update: {
+                    "amount_cents"?: number,"business_id"?: string,"canceled_at"?: string | null,"channel"?: string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string,"draft_id"?: string,"expires_at"?: string,"id"?: string,"location_id"?: string,"paid_at"?: string | null,"provider"?: string | null,"provider_reference"?: string | null,"sale_id"?: string | null,"sent_to"?: string,"snapshot"?: NonNullable<Json>,"status"?: string,"tip_cents"?: number | null,"token_hash"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "payment_links_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "payment_links_client_id_fkey"
+      columns: ["client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "payment_links_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "payment_links_draft_id_fkey"
+      columns: ["draft_id"]
+isOneToOne: false
+      referencedRelation: "sale_drafts"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "payment_links_location_id_fkey"
+      columns: ["location_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "payment_links_sale_id_fkey"
+      columns: ["sale_id"]
+isOneToOne: false
+      referencedRelation: "sales"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"payments": {
                   Row: {
                     "amount_cents": number,"business_id": string,"change_cents": number | null,"created_at": string,"created_by": string | null,"gift_card_id": string | null,"id": string,"location_id": string,"method": Database["public"]['Enums']["payment_method"],"package_item_id": string | null,"processor": string | null,"processor_reference": string | null,"reason": string | null,"reference": string | null,"sale_id": string,"tendered_cents": number | null
@@ -2557,6 +2607,9 @@ isOneToOne: false
 "cancel_package":
 { Args: { "p_client_package_id": string,"p_reason": string,"p_refund_method": string }; Returns: number
                            },
+"cancel_payment_link":
+{ Args: { "p_link_id": string }; Returns: undefined
+                           },
 "cancel_stocktake":
 { Args: { "p_stocktake_id": string }; Returns: undefined
                            },
@@ -2566,8 +2619,14 @@ isOneToOne: false
 "clear_count":
 { Args: { "p_product_id": string,"p_stocktake_id": string }; Returns: undefined
                            },
+"complete_payment_link":
+{ Args: { "p_link_id": string,"p_provider": string,"p_reference": string,"p_tips": Json,"p_total_cents": number }; Returns: string
+                           },
 "complete_sale":
 { Args: { "p_input": Json,"p_location_id": string }; Returns: string
+                           },
+"create_payment_link":
+{ Args: { "p_amount_cents": number,"p_channel": string,"p_draft_id": string,"p_hours": number,"p_snapshot": Json,"p_to": string,"p_token_hash": string }; Returns: string
                            },
 "delete_purchase_order":
 { Args: { "p_order_id": string }; Returns: undefined

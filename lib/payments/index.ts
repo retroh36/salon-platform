@@ -14,6 +14,7 @@ const stripeProvider: PaymentProvider = {
   label: "Stripe",
   testMode: false,
   charge: async () => ({ ok: false, reason: "Stripe isn't connected yet" }),
+  refund: async () => ({ ok: false }),
   testCards: [],
 };
 

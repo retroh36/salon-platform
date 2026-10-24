@@ -108,7 +108,9 @@ export type ScreenService = { id: string; name: string; category: string; priceF
 export type CheckoutScreenData = {
   draft: { id: string; status: "open" | "completed"; saleId: string | null; returnTo: string; appointmentId: string | null };
   ticket: Ticket;
-  client: { id: string; name: string; firstName: string; email: string | null } | null;
+  client: { id: string; name: string; firstName: string; email: string | null; phone: string | null } | null;
+  // The latest payment link sent for this checkout (text-to-pay).
+  link: { id: string; status: "open" | "paid" | "canceled"; channel: "sms" | "email"; sentTo: string; expiresAt: string; createdAt: string; amountCents: number; tipCents: number | null } | null;
   insight: { summary: string; tags: { label: string; tone: string }[] } | null;
   packages: ClientPackage[];
   // Live memberships: what they include this period, and member prices.
@@ -147,7 +149,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     loadRetailProducts(supabase, me.business_id, me.location.id),
     loadTemplates(supabase, me.business_id),
     supabase.from("services").select("id, name, category, price_cents, archived_at, service_level_prices(level, price_cents)").eq("business_id", me.business_id).is("archived_at", null).order("name"),
-    draft.client_id ? supabase.from("clients").select("id, first_name, last_name, email").eq("id", draft.client_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    draft.client_id ? supabase.from("clients").select("id, first_name, last_name, email, phone").eq("id", draft.client_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("stock_overrides").select("product_id").eq("draft_id", draft.id),
     loadPlans(supabase, me.business_id),
   ]);
@@ -180,7 +182,14 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id).filter((id) => products.some((p) => p.id === id));
   };
 
-  const client = clientRow.data ? { id: clientRow.data.id, name: fullName(clientRow.data), firstName: clientRow.data.first_name, email: clientRow.data.email } : null;
+  const client = clientRow.data ? { id: clientRow.data.id, name: fullName(clientRow.data), firstName: clientRow.data.first_name, email: clientRow.data.email, phone: clientRow.data.phone } : null;
+  const { data: link } = await supabase
+    .from("payment_links")
+    .select("id, status, channel, sent_to, expires_at, created_at, amount_cents, tip_cents")
+    .eq("draft_id", draft.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
   const ticket = parseTicket(draft.ticket);
   const visitStaff = ticket.lines.find((l) => l.kind === "service")?.kind === "service" ? (ticket.lines.find((l) => l.kind === "service") as ServiceLine).staffId : null;
 
@@ -246,6 +255,18 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     draft: { id: draft.id, status: draft.status as "open" | "completed", saleId: draft.sale_id, returnTo: draft.return_to ?? "/calendar", appointmentId: draft.appointment_id },
     ticket,
     client,
+    link: link
+      ? {
+          id: link.id,
+          status: link.status as "open" | "paid" | "canceled",
+          channel: link.channel as "sms" | "email",
+          sentTo: link.sent_to,
+          expiresAt: link.expires_at,
+          createdAt: link.created_at,
+          amountCents: link.amount_cents,
+          tipCents: link.tip_cents,
+        }
+      : null,
     insight,
     packages,
     memberships,

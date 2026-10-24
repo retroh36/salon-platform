@@ -90,6 +90,11 @@ export function PaymentPanel({
             <PayButton label="Package" disabled={!packageUsable} onClick={() => onDialog({ kind: "package" })} />
             {data.memberships.length > 0 && <PayButton label="Membership" disabled={!membershipUsable} onClick={() => onDialog({ kind: "membership" })} />}
           </div>
+          {data.client && ticket.payments.length === 0 && totals.dueCents > 0 && (
+            <Button variant="ghost" className="self-start" onClick={() => onDialog({ kind: "payment-link" })}>
+              Text a payment link instead
+            </Button>
+          )}
           {(ticket.payments.length > 0 || totals.coveredCents > 0) && (
             <ul aria-label="Payments taken" className="flex flex-col divide-y divide-line rounded-xl border border-line">
               {totals.coveredCents > 0 && (
