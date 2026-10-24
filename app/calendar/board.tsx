@@ -143,9 +143,13 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const [preview, setPreview] = useState<Preview | null>(null);
   // Conflicts with nothing to approve, dismissed for now.
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
+  // A visit just moved to another day: opened when the calendar gets there.
+  const [arriving, setArriving] = useState<string | null>(null);
+  const arrived = arriving && data.appointments[arriving] ? arriving : null;
   if (shownDate !== data.date) {
     setShownDate(data.date);
-    setSelection({ kind: "none" });
+    setSelection(arrived ? { kind: "detail", appointmentId: arrived } : { kind: "none" });
+    setArriving(null);
     setExpanded(new Set());
     setOutcome(null);
     setPreview(null);
@@ -517,6 +521,11 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const dayLink = (d: string) => (d === data.today ? "/calendar" : `/calendar?date=${d}`);
   const goTo = (d: string) => router.push(dayLink(d), { transitionTypes: [d > data.date ? "nav-forward" : "nav-back"] });
   const closeDetails = () => setSelection({ kind: "none" });
+  // A visit moved to another day: go there, with it open.
+  const openOn = (d: string, appointmentId: string) => {
+    setArriving(appointmentId);
+    router.push(dayLink(d), { transitionTypes: [d > data.date ? "nav-forward" : "nav-back"] });
+  };
 
   return (
     <div className="flex min-h-0 flex-1">
@@ -974,6 +983,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               onOpenVisit={(appointmentId) => select({ kind: "detail", appointmentId })}
               onCheckedIn={(appointmentId) => offerUndo("check_in", appointmentId)}
               onNoShow={(appointmentId) => offerUndo("no_show", appointmentId)}
+              onMoved={(date, appointmentId, message) => {
+                if (date !== data.date) openOn(date, appointmentId);
+                setDoneMessage(message);
+              }}
               team={data.columns.map((c) => ({ id: c.staffId, name: c.name }))}
               products={data.menu.products}
             />
@@ -1031,8 +1044,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               data={data}
               appointment={data.appointments[selection.appointmentId]}
               onClose={() => select({ kind: "detail", appointmentId: selection.appointmentId })}
-              onSaved={(_, message) => {
-                select({ kind: "detail", appointmentId: selection.appointmentId });
+              onSaved={(id, message, date) => {
+                if (date && date !== data.date) openOn(date, id);
+                else select({ kind: "detail", appointmentId: selection.appointmentId });
                 if (message) setDoneMessage(message);
               }}
             />

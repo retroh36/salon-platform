@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   addDays,
   containsSpan,
+  daysBetween,
+  shiftStart,
   datesBetween,
   dayView,
   formatMinute,
@@ -89,6 +91,19 @@ describe("times of day", () => {
     expect(formatMinute(h(12))).toBe("noon");
     expect(formatMinute(h(0, 15))).toBe("12:15am");
     expect(formatMinute(h(24))).toBe("midnight");
+  });
+});
+
+describe("moving to another day", () => {
+  it("counts days between dates, and shifts a start in local time across daylight saving", () => {
+    expect(daysBetween("2026-10-27", "2026-11-03")).toBe(7);
+    expect(daysBetween("2026-11-03", "2026-10-27")).toBe(-7);
+    // 2pm on Tue, Oct 27 (daylight time) to 2pm a week later (standard time).
+    const start = fromLocal("2026-10-27", h(14), CHICAGO)!;
+    expect(toLocal(shiftStart(start, CHICAGO, 7, 0)!, CHICAGO)).toEqual({ date: "2026-11-03", minute: h(14) });
+    expect(toLocal(shiftStart(start, CHICAGO, 1, 60)!, CHICAGO)).toEqual({ date: "2026-10-28", minute: h(15) });
+    // Not past midnight.
+    expect(shiftStart(start, CHICAGO, 0, h(11))).toBeNull();
   });
 });
 

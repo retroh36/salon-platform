@@ -16,7 +16,8 @@ Drag a visit on the calendar to a new time or another stylist's column.
 ## Good to know
 
 - Only visits that are booked, confirmed or checked in can be moved.
-- Moves stay on the same day. To move to another day, cancel the visit (reason **Client rescheduled**) and book the new day.
+- Dragging stays on the same day. To move to another day, see Move an appointment to another day.
+- The client and the stylists get a notice of the new time (recorded for now; texts aren't connected yet).
 - Every move is checked against the booking rules (stylist hours, double-booking, chairs, blocked time) first.
 - Moving a whole group shifts everyone by the same amount.
 - To change services or the exact time, use Edit an appointment.

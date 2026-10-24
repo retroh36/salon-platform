@@ -132,6 +132,32 @@ describe("undoing a no-show", () => {
   });
 });
 
+describe("notices for a moved visit", () => {
+  it("are recorded by the front of house, to the visit's own client and the salon's staff, from the move templates only", async () => {
+    const { appointmentId } = await visit("booked");
+    const notices = [
+      { template: "visit_moved", body: "Hi, your appointment has moved.", client_id: clientId, staff_id: null },
+      { template: "staff_visit_moved", body: "A visit has moved.", client_id: null, staff_id: SEED.staff.bridget },
+    ];
+    expect((await frontDesk.rpc("record_visit_notices", { p_appointment_id: appointmentId, p_notices: notices })).data).toBe(2);
+    const { data } = await admin.from("notifications").select("template, client_id, staff_id").eq("appointment_id", appointmentId).order("template");
+    expect(data).toEqual([
+      { template: "staff_visit_moved", client_id: null, staff_id: SEED.staff.bridget },
+      { template: "visit_moved", client_id: clientId, staff_id: null },
+    ]);
+    expect((await bridget.rpc("record_visit_notices", { p_appointment_id: appointmentId, p_notices: notices })).error?.code).toBe("42501");
+    expect((await otherOwner.rpc("record_visit_notices", { p_appointment_id: appointmentId, p_notices: notices })).error?.code).toBe("42501");
+    const { data: other } = await admin.from("clients").insert({ business_id: B, first_name: "Notice", last_name: "Other" }).select("id").single();
+    try {
+      expect((await frontDesk.rpc("record_visit_notices", { p_appointment_id: appointmentId, p_notices: [{ ...notices[0], client_id: other!.id }] })).error?.code).toBe("22023");
+    } finally {
+      await admin.from("clients").delete().eq("id", other!.id);
+    }
+    expect((await frontDesk.rpc("record_visit_notices", { p_appointment_id: appointmentId, p_notices: [{ ...notices[0], template: "anything" }] })).error?.code).toBe("22023");
+    await admin.from("notifications").delete().eq("appointment_id", appointmentId);
+  });
+});
+
 describe("calendar zoom", () => {
   it("is each person's own, and only the three levels", async () => {
     expect((await frontDesk.rpc("set_calendar_zoom", { p_zoom: "detailed" })).error).toBeNull();

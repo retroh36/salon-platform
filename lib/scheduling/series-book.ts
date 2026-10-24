@@ -9,7 +9,7 @@ import { ACTION_STATUS, isEditable, type AppointmentAction, type AppointmentStat
 import { changeStatus, moveItem, saveBooking, type BookingItemInput, type SaveResult, type StatusResult } from "./book.ts";
 import type { BookingProblem } from "./booking.ts";
 import { visitsInScope, type Scope, type SeriesEnd, type VisitLine } from "./series.ts";
-import { fromLocal, toLocal, type LocalDate } from "./time.ts";
+import { addDays, fromLocal, toLocal, type LocalDate } from "./time.ts";
 
 type Supabase = SupabaseClient<Database>;
 type Location = { id: string; timezone: string };
@@ -121,19 +121,22 @@ export async function changeSeries(
   appointmentId: string,
   scope: Scope,
   input: { clientId: string; notes: string | null; lines: VisitLine[] },
+  // Moves each visit this many days too (a new date on the edited one).
+  days = 0,
 ): Promise<VisitResult[]> {
   const series = await seriesOf(supabase, appointmentId);
   if (!series) return [{ date: "", ok: false, error: "not_found" }];
   const visits = visitsInScope(await seriesVisits(supabase, series.seriesId, location.timezone), series.index, scope);
   const results: VisitResult[] = [];
   for (const v of visits) {
-    const items = itemsFor(input.lines, v.date, location.timezone, input.lines.map((_, n) => v.items[n]?.id));
+    const date = addDays(v.date, days);
+    const items = itemsFor(input.lines, date, location.timezone, input.lines.map((_, n) => v.items[n]?.id));
     if (!items) {
-      results.push({ date: v.date, ok: false, error: "invalid" });
+      results.push({ date, ok: false, error: "invalid" });
       continue;
     }
     const saved = await saveBooking(supabase, location, { appointmentId: v.appointmentId, clientId: input.clientId, notes: input.notes, items });
-    results.push(saved.ok ? { date: v.date, ok: true, appointmentId: v.appointmentId } : failure(v.date, saved));
+    results.push(saved.ok ? { date, ok: true, appointmentId: v.appointmentId } : failure(date, saved));
   }
   return results;
 }

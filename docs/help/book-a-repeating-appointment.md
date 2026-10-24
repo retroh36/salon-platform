@@ -20,4 +20,4 @@ Book the same visit again and again, every few weeks, in one go.
 - Every visit uses the same stylist, services and time of day, unless you chose a suggestion.
 - A series can have 2 to 52 visits.
 - Booking details shows "Visit 2 of 6 · every 4 weeks" on each one.
-- Editing, moving or canceling asks whether it's for this visit only, this and following visits, or all visits in the series.
+- Editing, moving (to another time or another day) or canceling asks whether it's for this visit only, this and following visits, or all visits in the series.

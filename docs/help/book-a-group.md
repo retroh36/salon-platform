@@ -18,4 +18,4 @@ Book several people as one party, all at once or one after another.
 
 - Everyone is booked together or no one is. If one guest doesn't fit, nothing is booked and that guest's problem is shown.
 - In booking details, a group visit lists the other guests; tap a name to open their visit.
-- Dragging or canceling a group visit asks whether it's for this visit only or the whole group.
+- Dragging or canceling a group visit asks whether it's for this visit only or the whole group. **Move to another day** in **⋯** moves the whole group.

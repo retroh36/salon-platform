@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { notificationsFor, type VisitChange } from "@/lib/notifications";
+import { moveNotices, notificationsFor, type VisitChange } from "@/lib/notifications";
 
 const change = (from: [number, string], to: [number, string], client = true): VisitChange => ({
   appointmentId: "appt",
@@ -43,5 +43,37 @@ describe("notifications for a changed visit", () => {
     const walkIn = notificationsFor([change([660, "p"], [690, "p"], false)]);
     expect(walkIn.notifications.map((n) => n.template)).toEqual(["staff_schedule_change"]);
     expect(walkIn.notifications[0].body).toBe("A walk-in's Women's Cut & Style has moved from 11am to 11:30am.");
+  });
+});
+
+describe("notices when staff move a visit", () => {
+  const base = {
+    appointmentId: "a1",
+    client: { id: "c1", firstName: "Ava", fullName: "Ava Chen" },
+    salon: "Maple & Ash",
+    service: "Balayage",
+    today: "2026-10-27",
+    from: { date: "2026-10-27", minute: 600, staffId: "gil", staffFirstName: "Gil" },
+    to: { date: "2026-10-29", minute: 840, staffId: "gil", staffFirstName: "Gil" },
+  };
+
+  it("says the new day and time to the client and the stylist", () => {
+    expect(moveNotices(base)).toEqual([
+      { template: "visit_moved", clientId: "c1", body: "Hi Ava, it's Maple & Ash. Your appointment has moved from today at 10am to Thu, Oct 29 at 2pm, still with Gil. Reply or call us if that doesn't work. See you soon!" },
+      { template: "staff_visit_moved", staffId: "gil", body: "Ava Chen's Balayage has moved from today at 10am to Thu, Oct 29 at 2pm." },
+    ]);
+  });
+
+  it("on the same day, the time; with a new stylist, both stylists", () => {
+    const n = moveNotices({ ...base, today: "2026-10-20", from: { ...base.from, date: "2026-10-29" }, to: { ...base.to, staffId: "sam", staffFirstName: "Sam" } });
+    expect(n.map((x) => x.body)).toEqual([
+      "Hi Ava, it's Maple & Ash. Your appointment on Thu, Oct 29 has moved from 10am to 2pm and will be with Sam. Reply or call us if that doesn't work. See you soon!",
+      "Ava Chen's Balayage on Thu, Oct 29 at 10am has moved to Sam, Thu, Oct 29 at 2pm.",
+      "Ava Chen's Balayage on Thu, Oct 29 at 2pm is now with you (it was with Gil).",
+    ]);
+  });
+
+  it("nothing when only the chair changed", () => {
+    expect(moveNotices({ ...base, to: base.from })).toEqual([]);
   });
 });

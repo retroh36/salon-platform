@@ -2732,6 +2732,9 @@ isOneToOne: false
 "record_membership_charge":
 { Args: { "p_membership_id": string,"p_result": Json,"p_today": string }; Returns: Json
                            },
+"record_visit_notices":
+{ Args: { "p_appointment_id": string,"p_notices": Json }; Returns: number
+                           },
 "refund_sale":
 { Args: { "p_input": Json,"p_sale_id": string }; Returns: undefined
                            },

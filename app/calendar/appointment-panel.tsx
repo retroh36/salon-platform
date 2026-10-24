@@ -15,11 +15,13 @@ import type { ChecklistItem } from "@/lib/client-checks";
 import { nextStep, timerState, timerStatus, visitStatusText } from "@/lib/visit-times";
 import { formatLongDay } from "@/lib/schedule-format";
 import { LATE_MINUTES } from "@/lib/scheduling/disruptions";
-import { formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
+import { addDays, formatMinute, minuteToTime, parseTime, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { UsageLinesEditor, toUsageJson, type DraftLine } from "@/components/usage-lines";
 import type { PickerProduct } from "@/lib/inventory-load";
-import { addVisitFormula, changeGroupVisitStatus, changeVisitStatus, changeVisitStatusScoped, checkInWithPatchOverride, saveVisitNotes, undoVisitCheckIn, undoVisitNoShow } from "./actions";
+import { addVisitFormula, changeGroupVisitStatus, changeVisitStatus, changeVisitStatusScoped, checkInWithPatchOverride, moveVisitToDay, saveVisitNotes, undoVisitCheckIn, undoVisitNoShow } from "./actions";
+import { IdeasCard } from "./booking-panel";
+import type { BookingIdeas } from "@/lib/denise/ideas";
 import type { Scope } from "@/lib/scheduling/series";
 import { useNow } from "./now-line";
 import type { AppointmentDetail, BoardData } from "./types";
@@ -38,6 +40,7 @@ export function AppointmentPanel({
   onOpenVisit,
   onCheckedIn,
   onNoShow,
+  onMoved,
   team,
   products,
 }: {
@@ -60,6 +63,8 @@ export function AppointmentPanel({
   onCheckedIn: (appointmentId: string) => void;
   // Just marked a no-show from here: the calendar offers Undo too.
   onNoShow: (appointmentId: string) => void;
+  // Moved to another day (or time): the calendar follows it there.
+  onMoved: (date: LocalDate, appointmentId: string, message: string) => void;
   // Who can be named as doing a patch test.
   team: { id: string; name: string }[];
 }) {
@@ -69,6 +74,7 @@ export function AppointmentPanel({
   const [canceling, setCanceling] = useState(false);
   const [confirmingCheckIn, setConfirmingCheckIn] = useState(false);
   const [confirmingNoShow, setConfirmingNoShow] = useState(false);
+  const [moving, setMoving] = useState(false);
   const [reportingLate, setReportingLate] = useState(false);
   const [tab, setTab] = useState<"notes" | "formula" | "photos" | "history">("notes");
   // What the visit still needs before it goes ahead.
@@ -154,6 +160,7 @@ export function AppointmentPanel({
   const menuActions: MenuAction[] = [
     canReportLate && { key: "late", label: "Running late", onSelect: () => setReportingLate(true) },
     me.canBook && isEditable(status) && { key: "edit", label: "Edit booking", onSelect: onEdit },
+    me.canBook && (status === "booked" || status === "confirmed") && { key: "move", label: "Move to another day", onSelect: () => setMoving(true) },
     status === "checked_in" && me.canBook && { key: "undo_check_in", label: "Undo check-in", onSelect: undoCheckIn },
     actions.includes("no_show") && { key: "no_show", label: ACTION_LABELS.no_show, onSelect: () => setConfirmingNoShow(true) },
     status === "no_show" && me.canBook && { key: "undo_no_show", label: "Undo no-show", onSelect: undoNoShow },
@@ -342,6 +349,17 @@ export function AppointmentPanel({
               onCheckIn={checkIn}
               onOverride={overrideCheckIn}
               onCancel={() => setConfirmingCheckIn(false)}
+            />
+          ) : moving ? (
+            <MoveForm
+              appointment={appointment}
+              date={date}
+              today={today}
+              onMoved={(to, text) => {
+                setMoving(false);
+                onMoved(to, appointment.id, text);
+              }}
+              onCancel={() => setMoving(false)}
             />
           ) : confirmingNoShow ? (
             <div role="group" aria-label="Mark no-show" className="flex flex-col gap-3 rounded-lg border border-line bg-sunken/60 p-3">
@@ -674,6 +692,100 @@ function CancelForm({
           Cancel booking
         </button>
         <Button onClick={onKeep} disabled={pending}>
+          Keep it
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// Move to another day: a date and a start time; every service moves
+// together with its stylist (a repeating visit: this, following or all; a
+// group: everyone). The booking rules check it; if it doesn't fit, Denise
+// offers the nearest times that day.
+function MoveForm({
+  appointment,
+  date,
+  today,
+  onMoved,
+  onCancel,
+}: {
+  appointment: AppointmentDetail;
+  date: LocalDate;
+  today: LocalDate;
+  onMoved: (date: LocalDate, message: string) => void;
+  onCancel: () => void;
+}) {
+  const first = [...appointment.items].sort((a, b) => a.start - b.start)[0];
+  const [to, setTo] = useState<LocalDate>(addDays(date < today ? today : date, 1));
+  const [time, setTime] = useState(minuteToTime(first.start));
+  const [scope, setScope] = useState<Scope>("this");
+  const [message, setMessage] = useState<string | null>(null);
+  const [ideas, setIdeas] = useState<BookingIdeas | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <form
+      aria-label="Move to another day"
+      className="flex animate-fade-in flex-col gap-3 rounded-lg border border-line bg-sunken/60 p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const startMinute = parseTime(time);
+        if (startMinute === null) return setMessage("Choose a start time.");
+        setMessage(null);
+        setIdeas(null);
+        start(async () => {
+          const r = await moveVisitToDay({ appointmentId: appointment.id, date: to, startMinute }, scope);
+          if (r.ok) return onMoved(to, r.message);
+          setMessage(r.message);
+          // Only times with the same stylist fit this form.
+          const same = r.ideas ? { ...r.ideas, options: r.ideas.options.filter((o) => o.staffId === first.staffId) } : null;
+          setIdeas(same && same.options.length ? same : null);
+        });
+      }}
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <label className={labelClass}>
+          Date
+          <input type="date" value={to} min={today} onChange={(e) => e.target.value && setTo(e.target.value)} required className={fieldClass} />
+        </label>
+        <label className={labelClass}>
+          Starts
+          <input type="time" step={300} value={time} onChange={(e) => setTime(e.target.value)} required className={fieldClass} />
+        </label>
+      </div>
+      <p className="text-ink-muted">
+        {appointment.items.length > 1 ? "Every service moves together, " : ""}with {appointment.items.length > 1 ? "the same stylists" : first.staffName.split(" ")[0]}.
+        {appointment.group ? " The whole group moves with it." : ""}
+      </p>
+      {appointment.series && (
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="mb-1 text-sm font-medium text-ink">Move</legend>
+          {(
+            [
+              ["this", "This visit only"],
+              ["following", "This and following visits"],
+              ["all", "All visits in the series"],
+            ] as const
+          ).map(([v, label]) => (
+            <label key={v} className="flex items-center gap-2">
+              <input type="radio" name="move-scope" checked={scope === v} onChange={() => setScope(v)} />
+              {label}
+            </label>
+          ))}
+        </fieldset>
+      )}
+      {message && (
+        <p role="alert" className="flex items-start gap-2 text-danger">
+          <WarningIcon className="mt-0.5 size-4" />
+          <span>{message}</span>
+        </p>
+      )}
+      {ideas && <IdeasCard ideas={ideas} onPick={(o) => setTime(minuteToTime(o.startMinute))} />}
+      <div className="flex gap-2">
+        <Button type="submit" variant="primary" disabled={pending}>
+          Move
+        </Button>
+        <Button onClick={onCancel} disabled={pending}>
           Keep it
         </Button>
       </div>

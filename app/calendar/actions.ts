@@ -21,9 +21,11 @@ import { loadBookingContext, loadCalendarStamp } from "@/lib/scheduling/load";
 import { MAX_VISITS, planSeries, seriesDates, type Scope, type SeriesEnd } from "@/lib/scheduling/series";
 import { bookSeries, changeSeries, changeSeriesStatus, moveSeriesItem, type VisitResult } from "@/lib/scheduling/series-book";
 import { bookGroup, changeGroupStatus, moveGroupItem } from "@/lib/scheduling/group-book";
+import { moveVisitTo } from "@/lib/scheduling/move-day";
+import { recordMoveNotices, snapshotVisits } from "@/lib/move-notices";
 import { MAX_GUESTS } from "@/lib/scheduling/groups";
 import { formatDay } from "@/lib/schedule-format";
-import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn, type LocalDate } from "@/lib/scheduling/time";
+import { addDays, daysBetween, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, toLocal, todayIn, type LocalDate } from "@/lib/scheduling/time";
 import { fullName } from "@/lib/staff";
 import type { TimeEvent } from "@/lib/visit-times";
 
@@ -137,12 +139,22 @@ export async function saveVisit(input: VisitInput): Promise<SaveVisitResult> {
   });
   if (lineErrors.some((e) => e.length)) return { ok: false, message: "Fill in each service.", lineErrors };
 
-  const result = await saveBooking(supabase, me.location, {
-    appointmentId: input.appointmentId,
-    clientId: input.clientId,
-    notes: input.notes,
-    items,
-  });
+  // A group guest's day changes with the whole group.
+  if (input.appointmentId) {
+    const { data: was } = await supabase.from("appointments").select("group_id, starts_at").eq("id", input.appointmentId).maybeSingle();
+    if (was?.group_id && toLocal(new Date(was.starts_at), me.location.timezone).date !== input.date) {
+      return { ok: false, message: "A group moves together: use Move to another day in ⋯ to move everyone." };
+    }
+  }
+
+  const result = await withNotices(supabase, me.location, input.appointmentId ?? null, () =>
+    saveBooking(supabase, me.location, {
+      appointmentId: input.appointmentId,
+      clientId: input.clientId,
+      notes: input.notes,
+      items,
+    }),
+  );
   if (!result.ok) {
     return {
       ok: false,
@@ -170,6 +182,31 @@ async function ideasFor(supabase: Awaited<ReturnType<typeof getCurrentStaff>>["s
 
 export type MoveResult = { ok: true } | { ok: false; message: string };
 
+type Supabase = Awaited<ReturnType<typeof getCurrentStaff>>["supabase"];
+
+// The visits a change to this one can move: it, and the rest of its series
+// or group still to come.
+async function relatedVisits(supabase: Supabase, appointmentId: string): Promise<string[]> {
+  const { data: a } = await supabase.from("appointments").select("id, series_id, group_id").eq("id", appointmentId).maybeSingle();
+  if (!a) return [];
+  if (!a.series_id && !a.group_id) return [a.id];
+  const column = a.series_id ? "series_id" : "group_id";
+  const { data } = await supabase.from("appointments").select("id").eq(column, (a.series_id ?? a.group_id)!).in("status", ["booked", "confirmed"]);
+  return [...new Set([a.id, ...(data ?? []).map((r) => r.id)])];
+}
+
+const visitOfItem = async (supabase: Supabase, itemId: string) => (await supabase.from("appointment_items").select("appointment_id").eq("id", itemId).maybeSingle()).data?.appointment_id ?? null;
+
+// Makes a change, then records a notice to the client and each stylist for
+// every visit whose day, time or stylist it changed (like Denise's fixes).
+async function withNotices<T>(supabase: Supabase, location: { timezone: string }, appointmentId: string | null, change: () => Promise<T>): Promise<T> {
+  if (!appointmentId) return change();
+  const before = await snapshotVisits(supabase, await relatedVisits(supabase, appointmentId), location.timezone);
+  const result = await change();
+  await recordMoveNotices(supabase, location, before);
+  return result;
+}
+
 export async function moveVisitItem(input: { itemId: string; staffId: string; date: LocalDate; startMinute: number }): Promise<MoveResult> {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
@@ -177,13 +214,67 @@ export async function moveVisitItem(input: { itemId: string; staffId: string; da
   const start = Number.isInteger(input.startMinute) ? fromLocal(input.date, input.startMinute, me.location.timezone) : null;
   if (!start) return { ok: false, message: "That time doesn't exist." };
 
-  const result = await moveItem(supabase, me.location, { itemId: input.itemId, staffId: input.staffId, start });
+  const result = await withNotices(supabase, me.location, await visitOfItem(supabase, input.itemId), () => moveItem(supabase, me.location, { itemId: input.itemId, staffId: input.staffId, start }));
   if (!result.ok) {
     if (result.error === "invalid") return { ok: false, message: [...new Set(result.problems.flat().map(describeProblem))].join(" ") };
     return { ok: false, message: saveErrorMessage(result) };
   }
   refresh();
   return { ok: true };
+}
+
+export type MoveDayResult = { ok: true; message: string } | { ok: false; message: string; ideas?: BookingIdeas | null };
+
+// Moves a visit to another day and/or start time, every service together
+// (a repeating visit: this one, this and following, or all; a group: the
+// whole party). The booking rules check each; notices go to the client and
+// stylists.
+export async function moveVisitToDay(input: { appointmentId: string; date: LocalDate; startMinute: number }, scope: Scope = "this"): Promise<MoveDayResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(input.appointmentId)) return { ok: false, message: "That appointment no longer exists." };
+  if (!isLocalDate(input.date)) return { ok: false, message: "Choose a date." };
+  if (!Number.isInteger(input.startMinute) || input.startMinute < 0 || input.startMinute >= MINUTES_PER_DAY) return { ok: false, message: "Choose a start time." };
+  if (!["this", "following", "all"].includes(scope)) return { ok: false, message: "Choose which visits to move." };
+  const today = todayIn(me.location.timezone);
+  if (input.date < today) return { ok: false, message: "Choose today or a later day." };
+
+  const moved = await withNotices(supabase, me.location, input.appointmentId, () => moveVisitTo(supabase, me.location, input, scope));
+  refresh();
+  const when = `${formatDay(input.date)} at ${formatMinute(input.startMinute)}`;
+  switch (moved.kind) {
+    case "error":
+      return {
+        ok: false,
+        message:
+          moved.error === "not_movable" ? "Only visits still to come can move to another day. A checked-in visit stays where it is." : moved.error === "invalid_time" ? "That time doesn't exist that day." : "That appointment no longer exists.",
+      };
+    case "group":
+      if (moved.result.ok) return { ok: true, message: `Moved the whole group (${moved.result.moved} guest${moved.result.moved === 1 ? "" : "s"}) to ${when}.` };
+      if (moved.result.error === "invalid") {
+        const problem = moved.result.problems?.flat()[0];
+        return { ok: false, message: `The whole group doesn't fit then${problem ? `: ${describeProblem(problem)}` : "."} Nothing was moved.` };
+      }
+      return { ok: false, message: moved.result.error === "partial" ? `Someone changed the calendar at the same moment; ${moved.result.moved ?? 0} guests moved. Check the group.` : "That visit is no longer in a group." };
+    case "series": {
+      const summary = scopeSummary(moved.results, "move");
+      return summary.ok ? { ok: true, message: summary.message ?? `Moved to ${when}.` } : { ok: false, message: summary.message };
+    }
+    case "single": {
+      const r = moved.result;
+      if (r.ok) return { ok: true, message: `Moved to ${when}.` };
+      if (r.error !== "invalid") return { ok: false, message: saveErrorMessage(r) };
+      // Why, and Denise's nearest times that work that day.
+      const { data: items } = await supabase.from("appointment_items").select("service_id, staff_id, starts_at").eq("appointment_id", input.appointmentId).order("starts_at");
+      const first = items?.length ? toLocal(new Date(items[0].starts_at), me.location.timezone).minute : input.startMinute;
+      const lines = (items ?? []).map((i) => ({ serviceId: i.service_id, staffId: i.staff_id, startMinute: toLocal(new Date(i.starts_at), me.location.timezone).minute - first + input.startMinute, resource: "any" }));
+      return {
+        ok: false,
+        message: `That doesn't fit on ${formatDay(input.date)}: ${[...new Set(r.problems.flat().map(describeProblem))].join(" ")}`,
+        ideas: await ideasFor(supabase, me.location, { date: input.date, clientId: null, notes: "", lines }, r.problems),
+      };
+    }
+  }
 }
 
 export type ActionResult = { ok: true } | { ok: false; message: string };
@@ -449,7 +540,14 @@ export async function saveVisitScoped(input: VisitInput, scope: Scope): Promise<
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
   if (!isUuid(input.appointmentId) || !input.clientId || !isUuid(input.clientId)) return { ok: false, message: "Choose a client." };
-  const results = await changeSeries(supabase, me.location, input.appointmentId, scope, { clientId: input.clientId, notes: input.notes.trim() || null, lines: toLines(input.lines) });
+  if (!isLocalDate(input.date)) return { ok: false, message: "Choose a date." };
+  // A new date moves each visit in scope by the same number of days.
+  const { data: was } = await supabase.from("appointments").select("starts_at").eq("id", input.appointmentId).maybeSingle();
+  const days = was ? daysBetween(toLocal(new Date(was.starts_at), me.location.timezone).date, input.date) : 0;
+  const appointmentId = input.appointmentId;
+  const results = await withNotices(supabase, me.location, appointmentId, () =>
+    changeSeries(supabase, me.location, appointmentId, scope, { clientId: input.clientId!, notes: input.notes.trim() || null, lines: toLines(input.lines) }, days),
+  );
   refresh();
   return scopeSummary(results, "change");
 }
@@ -462,7 +560,7 @@ export async function moveVisitItemScoped(input: { itemId: string; staffId: stri
   if (!isUuid(input.itemId) || !isUuid(input.staffId) || !isLocalDate(input.date)) return { ok: false, message: "That move isn't possible." };
   const start = fromLocal(input.date, input.startMinute, me.location.timezone);
   if (!start) return { ok: false, message: "That time doesn't exist." };
-  const results = await moveSeriesItem(supabase, me.location, { itemId: input.itemId, staffId: input.staffId, start }, scope);
+  const results = await withNotices(supabase, me.location, await visitOfItem(supabase, input.itemId), () => moveSeriesItem(supabase, me.location, { itemId: input.itemId, staffId: input.staffId, start }, scope));
   refresh();
   const summary = scopeSummary(results, "move");
   return summary.ok ? { ok: true, message: summary.message } : { ok: false, message: summary.message };
@@ -540,7 +638,7 @@ export async function moveGroupVisit(input: { itemId: string; staffId: string; d
   if (!isUuid(input.itemId) || !isUuid(input.staffId) || !isLocalDate(input.date)) return { ok: false, message: "That move isn't possible." };
   const start = fromLocal(input.date, input.startMinute, me.location.timezone);
   if (!start) return { ok: false, message: "That time doesn't exist." };
-  const result = await moveGroupItem(supabase, me.location, { itemId: input.itemId, staffId: input.staffId, start });
+  const result = await withNotices(supabase, me.location, await visitOfItem(supabase, input.itemId), () => moveGroupItem(supabase, me.location, { itemId: input.itemId, staffId: input.staffId, start }));
   refresh();
   if (result.ok) return { ok: true, message: `Moved the whole group (${result.moved} guest${result.moved === 1 ? "" : "s"}).` };
   if (result.error === "invalid") {

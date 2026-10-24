@@ -112,7 +112,7 @@ test.describe("front desk", () => {
     const [foot, box] = await Promise.all([footer.boundingBox(), panel.boundingBox()]);
     expect(Math.abs(foot!.y + foot!.height - (box!.y + box!.height))).toBeLessThan(2);
     await panel.getByRole("button", { name: "More actions" }).click();
-    await expect(panel.getByRole("menu", { name: "More actions" }).getByRole("menuitem")).toHaveText(["Running late", "Edit booking", "Mark no-show", "Cancel booking"]);
+    await expect(panel.getByRole("menu", { name: "More actions" }).getByRole("menuitem")).toHaveText(["Running late", "Edit booking", "Move to another day", "Mark no-show", "Cancel booking"]);
     await page.keyboard.press("Escape");
     await expect(panel.getByRole("menu")).toHaveCount(0);
     await expect(panel).toBeVisible();

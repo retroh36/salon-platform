@@ -11,7 +11,7 @@ import { checkGroup } from "./groups.ts";
 import { loadBookingContext } from "./load.ts";
 import { itemsFor, type VisitResult } from "./series-book.ts";
 import type { VisitLine } from "./series.ts";
-import { toLocal, type LocalDate } from "./time.ts";
+import { daysBetween, shiftStart, toLocal, type LocalDate } from "./time.ts";
 
 type Supabase = SupabaseClient<Database>;
 type Location = { id: string; timezone: string };
@@ -99,14 +99,27 @@ export async function moveGroupItem(supabase: Supabase, location: Location, move
   if (!item) return { ok: false, error: "not_found" };
   const group = await membersOf(supabase, item.appointment_id);
   if (!group) return { ok: false, error: "not_found" };
+  // By the same local days and minutes (another day keeps its wall-clock
+  // times across daylight saving).
+  const from = toLocal(new Date(item.starts_at), location.timezone);
+  const to = toLocal(move.start, location.timezone);
+  const days = daysBetween(from.date, to.date);
+  const minutes = to.minute - from.minute;
   const delta = move.start.getTime() - new Date(item.starts_at).getTime();
   const members = group.members.filter(movable);
-  const placed = members.flatMap((m) =>
-    m.items.map((i) => ({ itemId: i.id, appointmentId: m.appointmentId, staffId: i.id === move.itemId ? move.staffId : i.staffId, resourceId: i.resourceId, start: new Date(i.start.getTime() + delta) })),
-  );
+  const placed: { itemId: string; appointmentId: string; staffId: string; resourceId: string | null; start: Date }[] = [];
+  for (const m of members) {
+    for (const i of m.items) {
+      const start = shiftStart(i.start, location.timezone, days, minutes);
+      if (!start) return { ok: false, error: "invalid", problems: [[{ code: "invalid_start" }]] };
+      placed.push({ itemId: i.id, appointmentId: m.appointmentId, staffId: i.id === move.itemId ? move.staffId : i.staffId, resourceId: i.resourceId, start });
+    }
+  }
 
-  const date = toLocal(move.start, location.timezone).date;
-  const ctx = await loadBookingContext(supabase, location, date, date);
+  // The days they're on and the days they're going to (the rules check the
+  // moves against both).
+  const dates = [...placed.map((p) => p.start), ...members.flatMap((m) => m.items.map((i) => i.start))].map((d) => toLocal(d, location.timezone).date).sort();
+  const ctx = await loadBookingContext(supabase, location, dates[0], dates.at(-1)!);
   const check = checkMoves(ctx, placed);
   if (!check.valid) return { ok: false, error: "invalid", problems: check.problems };
 

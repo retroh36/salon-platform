@@ -48,7 +48,8 @@ export function BookingPanel({
   start?: BookingStart;
   appointment?: AppointmentDetail;
   onClose: () => void;
-  onSaved: (appointmentId: string, message?: string) => void;
+  // date: the day it's on now (an edit can move it to another day).
+  onSaved: (appointmentId: string, message?: string, date?: string) => void;
   // Switch to blocking this time (lunch, a meeting…) instead.
   onBlockInstead?: () => void;
   // Switch to booking several people as a group.
@@ -70,6 +71,8 @@ export function BookingPanel({
       : [{ key: 0, serviceId: "", staffId: start!.staffId, startMinute: start!.startMinute, resource: "any" }],
   );
   const [notes, setNotes] = useState(appointment?.notes ?? "");
+  // The visit's day: an edit can move it to another one.
+  const [date, setDate] = useState(data.date);
   const [message, setMessage] = useState<string | null>(null);
   const [lineErrors, setLineErrors] = useState<string[][]>([]);
   const [ideas, setIdeas] = useState<BookingIdeas | null>(null);
@@ -142,7 +145,7 @@ export function BookingPanel({
     setIdeas(null);
     const input: VisitInput = {
       appointmentId: appointment?.id,
-      date: data.date,
+      date,
       clientId: client?.id ?? null,
       notes,
       lines: lines.map((l) => ({ id: l.id, serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute ?? -1, resource: l.resource, minutes: l.minutes })),
@@ -171,7 +174,7 @@ export function BookingPanel({
         return;
       }
       const result = appointment?.series && scope !== "this" ? await saveVisitScoped(input, scope) : await saveVisit(input);
-      if (result.ok) onSaved(result.appointmentId, (result as { message?: string }).message);
+      if (result.ok) onSaved(result.appointmentId, (result as { message?: string }).message ?? (date !== data.date ? `Moved to ${formatLongDay(date, false)}.` : undefined), date);
       else {
         setMessage(result.message);
         setLineErrors(result.lineErrors ?? []);
@@ -184,12 +187,12 @@ export function BookingPanel({
 
   // Patch tests: warn as soon as the client and a service that needs one
   // are chosen.
-  const patchKey = JSON.stringify([client?.id, lines.map((l) => [l.serviceId, l.startMinute])]);
+  const patchKey = JSON.stringify([client?.id, date, lines.map((l) => [l.serviceId, l.startMinute])]);
   const [patch, setPatch] = useState<{ key: string; messages: string[]; blocks: boolean } | null>(null);
   useEffect(() => {
     if (!client) return;
     let live = true;
-    patchTestWarnings(client.id, data.date, lines.filter((l) => l.serviceId && l.startMinute != null).map((l) => ({ serviceId: l.serviceId, startMinute: l.startMinute! }))).then(
+    patchTestWarnings(client.id, date, lines.filter((l) => l.serviceId && l.startMinute != null).map((l) => ({ serviceId: l.serviceId, startMinute: l.startMinute! }))).then(
       (r) => live && setPatch({ key: patchKey, ...r }),
     );
     return () => {
@@ -218,7 +221,7 @@ export function BookingPanel({
         <div className="flex items-start justify-between gap-2">
           <div>
             <h2 className="font-serif text-2xl font-semibold text-navy-900">{appointment ? "Edit booking" : "New booking"}</h2>
-            <p className="text-ink-muted">{formatLongDay(data.date)}</p>
+            <p className="text-ink-muted">{formatLongDay(date)}</p>
             {!appointment && (onBlockInstead || onGroupInstead) && (
               <p className="mt-1 flex flex-wrap gap-x-4">
                 {onGroupInstead && (
@@ -243,6 +246,31 @@ export function BookingPanel({
         )}
 
         <ClientPicker client={client} onChange={setClient} />
+
+        {appointment?.group ? (
+          <p className="text-ink-muted">To move the whole group to another day, use Move to another day in ⋯.</p>
+        ) : appointment && (
+          <label className={labelClass}>
+            Date
+            <input
+              type="date"
+              value={date}
+              min={data.today}
+              onChange={(e) => {
+                if (!e.target.value) return;
+                setPreview(null);
+                setDate(e.target.value);
+              }}
+              required
+              className={fieldClass}
+            />
+            {date !== data.date && (
+              <span className="text-xs font-normal text-ink-muted" data-testid="moving-note">
+                Moves the visit from {formatLongDay(data.date, false)} to {formatLongDay(date, false)}, with the times below.
+              </span>
+            )}
+          </label>
+        )}
 
         {patchNow && patchNow.messages.length > 0 && (
           <p role="alert" data-testid="patch-warning" className={`rounded-md border px-3 py-2 ${patchNow.blocks ? "border-danger/30 bg-danger-soft text-danger" : "border-status-late-ink/25 bg-status-late-bg text-status-late-ink"}`}>
@@ -687,7 +715,7 @@ const SHORT_BY = 5;
 
 // Denise, when the rules refuse a time: why, and the nearest times that
 // work (one click puts it in the form).
-function IdeasCard({ ideas, onPick }: { ideas: BookingIdeas; onPick: (o: BookingIdea) => void }) {
+export function IdeasCard({ ideas, onPick }: { ideas: BookingIdeas; onPick: (o: BookingIdea) => void }) {
   return (
     <section aria-label="Denise's suggestions" className="flex animate-fade-in gap-2.5 rounded-lg border border-denise-200 bg-denise-50 px-3 py-2.5" data-testid="denise-ideas">
       <DeniseFace size={24} className="mt-0.5" />

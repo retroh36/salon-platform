@@ -41,6 +41,12 @@ export function addDays(date: LocalDate, days: number): LocalDate {
   return toLocalDate(Date.UTC(y, m - 1, d + days));
 }
 
+// Whole days from one date to another (negative when `to` is earlier).
+export function daysBetween(from: LocalDate, to: LocalDate): number {
+  const [a, b] = [parseDate(from), parseDate(to)].map(([y, m, d]) => Date.UTC(y, m - 1, d));
+  return Math.round((b - a) / 86_400_000);
+}
+
 // The Monday of the week containing date.
 export function startOfWeek(date: LocalDate): LocalDate {
   return addDays(date, 1 - weekdayOf(date));
@@ -147,4 +153,13 @@ export function fromLocal(date: LocalDate, minute: number, timeZone: string): Da
 // Today's date at the location.
 export function todayIn(timeZone: string, now = new Date()): LocalDate {
   return toLocal(now, timeZone).date;
+}
+
+// A start moved by whole days and minutes in local time (so a 2pm visit
+// stays at 2pm across daylight saving); null if that time doesn't exist.
+export function shiftStart(start: Date, timeZone: string, days: number, minutes: number): Date | null {
+  const local = toLocal(start, timeZone);
+  const minute = local.minute + minutes;
+  if (minute < 0 || minute >= 24 * 60) return null;
+  return fromLocal(addDays(local.date, days), minute, timeZone);
 }
