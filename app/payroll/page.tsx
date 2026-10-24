@@ -13,6 +13,8 @@ import { loadPayroll, loadPaySettings } from "@/lib/payroll-load";
 import { formatLongDay } from "@/lib/schedule-format";
 import { todayIn } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
+import { averageTipPct, pctText, tipItems, topTippers } from "@/lib/tips";
+import { TipDetails } from "@/components/tip-details";
 
 export const metadata: Metadata = { title: "Payroll" };
 
@@ -42,6 +44,11 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
   const next = nextPeriod(settings.kind, settings.anchor, period);
   const sum = (f: (l: (typeof lines)[number]) => number) => lines.reduce((n, l) => n + f(l), 0);
   const running = period.to >= today;
+  // People with services or tips: what they were tipped, on average and by whom.
+  const tips = lines
+    .filter((l) => l.serviceCents !== 0 || l.tipCents !== 0)
+    .map((line) => ({ line, items: tipItems(line.tickets, tz), average: averageTipPct(line.tickets) }))
+    .map((t) => ({ ...t, top: topTippers(t.items, 1)[0] ?? null }));
 
   return (
     <AppShell section="payroll" me={me}>
@@ -49,9 +56,14 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
         title="Payroll"
         description={`${formatLongDay(period.from, false)} to ${formatLongDay(period.to)}${running ? " (still running)" : ""}`}
         actions={
-          <a href={`/payroll/export${query(period)}`} className={buttonClass("primary", "md")} download>
-            Export CSV
-          </a>
+          <div className="flex flex-wrap gap-2">
+            <a href={`/payroll/export${query(period)}`} className={buttonClass("primary", "md")} download>
+              Export CSV
+            </a>
+            <a href={`/payroll/export${query(period)}&detail=tips`} className={buttonClass("secondary", "md")} download>
+              Export tips CSV
+            </a>
+          </div>
         }
       />
 
@@ -159,6 +171,45 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
           </table>
         </div>
       </Card>
+
+      <Card title="Tips" titleId="tips-heading" description="Each person's tips as a share of their service sales (untipped visits included), and who tipped them the most. Tap a name for every tip." flush>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm tabular-nums" aria-label="Tips by staff member">
+            <thead>
+              <tr className="text-left text-ink-muted">
+                <th className="px-5 py-2 font-medium">Staff</th>
+                <th className="py-2 pr-3 text-right font-medium">Tips</th>
+                <th className="py-2 pr-3 text-right font-medium">Tipped visits</th>
+                <th className="py-2 pr-3 text-right font-medium">Average tip</th>
+                <th className="py-2 pr-5 font-medium">Top tipper</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tips.map(({ line, items, average, top }) => (
+                <tr key={line.staffId} className="border-t border-line" data-testid="tip-line" data-staff-id={line.staffId}>
+                  <td className="px-5 py-2">
+                    <Link href={`/payroll${query(period, line.staffId)}#tips-for`} className="font-medium text-link hover:underline">
+                      {line.name}
+                    </Link>
+                  </td>
+                  <td className="py-2 pr-3 text-right">{payMoney(line.tipCents)}</td>
+                  <td className="py-2 pr-3 text-right">{items.filter((i) => i.kind === "sale").length}</td>
+                  <td className="py-2 pr-3 text-right" data-testid="tip-average">
+                    {pctText(average)}
+                  </td>
+                  <td className="py-2 pr-5">{top ? `${top.client} · ${formatPrice(top.cents)}` : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {selected && (
+        <Card title={`${selected.name}'s tips`} titleId="tips-for" actions={<Link href={`/payroll${query(period)}`} className={pillClass(false)}>Close</Link>}>
+          <TipDetails tickets={selected.tickets} period={period} timeZone={tz} linkSales ownView={false} />
+        </Card>
+      )}
 
       {selected && (
         <Card

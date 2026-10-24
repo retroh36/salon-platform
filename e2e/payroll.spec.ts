@@ -43,6 +43,32 @@ test.describe("owner", () => {
     expect(rows.some((r) => r.includes(",Bridget "))).toBe(true);
   });
 
+  test("sees each person's tips, average tip % and top tipper, every tip for one person, and a tips CSV", async ({ page }) => {
+    await page.goto("/payroll");
+    const tips = ui(page).getByRole("table", { name: "Tips by staff member" });
+    const bridget = tips.getByTestId("tip-line").filter({ hasText: "Bridget" });
+    await expect(bridget.getByTestId("tip-average")).toHaveText(/^\d+(\.\d)?%$/);
+    await bridget.getByRole("link", { name: /Bridget/ }).click();
+    const details = ui(page).getByTestId("tip-details");
+    await expect(details.getByTestId("tips-average")).toHaveText(/^\d+(\.\d)?%$/);
+    await expect(details.getByTestId("top-tipper").first()).toBeVisible();
+    await expect(details.getByRole("list", { name: "By week" })).toBeVisible();
+    const tip = details.getByRole("table", { name: "Every tip" }).getByTestId("tip-item").first();
+    // Date, ticket, client and service, tip, tip % and how it was paid.
+    await expect(tip).toContainText(/#\d+/);
+    await expect(tip.getByRole("cell").nth(3)).toHaveText(/^\d+(\.\d)?%$|^—$/);
+    await expect(tip.getByRole("cell").nth(4)).toHaveText(/Card|Cash|Gift card/);
+
+    const download = page.waitForEvent("download");
+    await ui(page).getByRole("link", { name: "Export tips CSV" }).click();
+    const file = await download;
+    expect(file.suggestedFilename()).toMatch(/^tips-\d{4}-\d{2}-\d{2}-to-\d{4}-\d{2}-\d{2}\.csv$/);
+    const csv = await (await file.createReadStream()).toArray().then((chunks) => Buffer.concat(chunks).toString("utf8"));
+    const [header, ...rows] = csv.trimEnd().split("\r\n");
+    expect(header).toBe("Period start,Period end,Staff,Date,Ticket,Kind,Client,Services,Service amount,Tip,Tip %,Paid with");
+    expect(rows.some((r) => r.includes(",Bridget "))).toBe(true);
+  });
+
   test("sets the pay period in settings", async ({ page }) => {
     try {
       await page.goto("/settings/payroll");
@@ -84,6 +110,13 @@ test.describe("stylist", () => {
     await expect(tickets.getByTestId("pay-ticket").first()).toBeVisible();
     // No links into sales, and no payroll page.
     await expect(tickets.getByRole("link")).toHaveCount(0);
+    // Every tip of theirs, with their average and top tippers (short names).
+    await earnings.getByText(/^My tips/).click();
+    const tips = earnings.getByTestId("tip-details");
+    await expect(tips.getByTestId("tips-average")).toHaveText(/^\d+(\.\d)?%$/);
+    await expect(tips.getByTestId("top-tipper").first()).toHaveText(/^\S+ \S\./);
+    await expect(tips.getByTestId("tip-item").first()).toBeVisible();
+    await expect(tips.getByRole("link")).toHaveCount(0);
     await page.goto("/payroll");
     await expect(page).toHaveURL(/\/dashboard$/);
   });

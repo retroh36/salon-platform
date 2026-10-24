@@ -4,6 +4,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { computeSale } from "@/lib/checkout";
 import { loadPayroll } from "@/lib/payroll-load";
+import { tipItems, tipPct, tipTotals } from "@/lib/tips";
 import { admin, SEED, signIn, type Client } from "./helpers";
 
 const B = SEED.business;
@@ -146,6 +147,17 @@ describe("pay for a period", () => {
 
     // Bridget sees the same on My day as the owner does.
     expect((await loadPayroll(bridget, B, TZ, PERIOD, today, BRIDGET))[0].totalCents).toBe(pay.totalCents);
+  });
+
+  it("itemizes her tips: each with the client, service, tip % and how it was paid, adding up to her pay's tips", async () => {
+    const [pay] = await loadPayroll(bridget, B, TZ, PERIOD, today, BRIDGET);
+    const items = tipItems(pay.tickets, TZ);
+    const sold = items.filter((i) => i.kind === "sale");
+    expect(sold).toHaveLength(2);
+    for (const i of sold) expect(i).toMatchObject({ services: ["Women's Cut & Style"], tipCents: 1500, paidWith: "Card", client: expect.stringMatching(/Test$/) });
+    expect(sold[0].pct).toBe(tipPct(1500, sold[0].serviceCents));
+    expect(items.reduce((n, i) => n + i.tipCents, 0)).toBe(pay.tipCents);
+    expect(tipTotals(items, PERIOD).total.cents).toBe(pay.tipCents);
   });
 
   it("pays the front desk by the hour from their schedule", async () => {

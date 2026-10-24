@@ -13,6 +13,7 @@
 // pay.
 
 import { csvTable, dollars } from "./csv.ts";
+import { averageTipPct } from "./tips.ts";
 import { mergeIntervals, subtractIntervals } from "./scheduling/intervals.ts";
 import type { StaffSchedule } from "./scheduling/availability.ts";
 import { addDays, datesBetween, weekdayOf, type LocalDate } from "./scheduling/time.ts";
@@ -68,6 +69,8 @@ export type PayrollSale = {
   // commission_pct: the rate recorded on the line when it was sold.
   lines: { kind: "service" | "product"; staff_id: string; description: string; quantity: number; net_cents: number; commission_pct: number }[];
   tips: { staff_id: string; amount_cents: number }[];
+  // The tenders that took money (card, cash, gift card), for itemized tips.
+  payments?: { method: "card" | "cash" | "gift_card"; online: boolean }[];
   refunds: { amount_cents: number; at: string }[];
 };
 
@@ -80,11 +83,21 @@ export type Ticket = {
   at: string;
   kind: TicketKind;
   client: string | null;
+  // How the sale was paid: "Card", "Cash + Gift card", "Card online".
+  paidWith: string | null;
   serviceCents: number;
   retailCents: number;
   tipCents: number;
   lines: { description: string; kind: "service" | "product"; quantity: number; cents: number; pct: number }[];
 };
+
+const PAID_WITH = { card: "Card", card_online: "Card online", cash: "Cash", gift_card: "Gift card" } as const;
+
+export function paidWith(payments: PayrollSale["payments"]): string | null {
+  const kinds = new Set((payments ?? []).map((p) => (p.method === "card" && p.online ? "card_online" : p.method)));
+  const order = ["card", "card_online", "cash", "gift_card"] as const;
+  return order.filter((k) => kinds.has(k)).map((k) => PAID_WITH[k]).join(" + ") || null;
+}
 
 type Amounts = { serviceCents: number; retailCents: number; tipCents: number; lines: Ticket["lines"] };
 
@@ -129,7 +142,7 @@ export function ticketsFor(sales: readonly PayrollSale[], staffId: string, from:
   for (const sale of sales) {
     const own = ownShare(sale, staffId);
     if (own.lines.length === 0 && own.tipCents === 0) continue;
-    const base = { saleId: sale.id, number: sale.number, client: sale.client };
+    const base = { saleId: sale.id, number: sale.number, client: sale.client, paidWith: paidWith(sale.payments) };
     const push = (kind: TicketKind, at: string, a: Amounts) => out.push({ ...base, kind, at, ...a });
     if (within(sale.created_at)) push("sale", sale.created_at, own);
     // Refunds before a void; a void takes back what's left.
@@ -257,6 +270,7 @@ export function payrollCsv(lines: readonly PayLine[], period: PayPeriod): string
     "Retail commission %",
     "Retail commission",
     "Tips",
+    "Average tip %",
     "Hours",
     "Hourly rate",
     "Hourly pay",
@@ -274,6 +288,7 @@ export function payrollCsv(lines: readonly PayLine[], period: PayPeriod): string
     l.rates.retail.join("/"),
     dollars(l.retailCommissionCents),
     dollars(l.tipCents),
+    averageTipPct(l.tickets) ?? "",
     l.minutes === null ? "" : formatHours(l.minutes),
     l.rates.hourly.map(dollars).join("/"),
     dollars(l.hourlyPayCents),

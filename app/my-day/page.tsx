@@ -16,6 +16,8 @@ import { formatPrice } from "@/lib/services";
 import { periodContaining, previousPeriod, ratesText } from "@/lib/payroll";
 import { loadPayroll, loadPaySettings } from "@/lib/payroll-load";
 import Link from "next/link";
+import { TipDetails } from "@/components/tip-details";
+import { averageTipPct, pctText } from "@/lib/tips";
 
 export const metadata: Metadata = { title: "My day" };
 
@@ -158,6 +160,16 @@ async function MyEarnings({ supabase, me, last }: { supabase: Awaited<ReturnType
         </span>
       </p>
       <p className="mt-1 text-xs text-ink-muted">Commission is on what clients paid before tax, at your rate when each sale was made. Refunds come off in the period they happen.</p>
+      {pay.tipCents !== 0 && (
+        <details className="mt-3" data-testid="my-tips">
+          <summary className="cursor-pointer text-sm font-medium text-link">
+            My tips ({formatPrice(pay.tipCents)}, {pctText(averageTipPct(pay.tickets))} average)
+          </summary>
+          <div className="mt-3">
+            <TipDetails tickets={pay.tickets} period={period} timeZone={tz} linkSales={false} ownView />
+          </div>
+        </details>
+      )}
       {pay.tickets.length > 0 && (
         <details className="mt-3">
           <summary className="cursor-pointer text-sm font-medium text-link">Tickets behind it ({pay.tickets.length})</summary>
