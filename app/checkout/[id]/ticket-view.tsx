@@ -392,6 +392,12 @@ function LineEditor({
   const canQuantity = line.kind === "product" || (line.kind === "service" && !line.appointmentItemId && !isCovered(line));
   return (
     <div className="flex animate-fade-in flex-col gap-4 border-t border-line bg-sunken/40 px-4 py-4" aria-label={`Edit ${lineTitle(line)}`} role="group">
+      {line.kind === "service" && line.packageItemId && (
+        // Back to its price, paid like any other service (the use stays on the package).
+        <Button className="self-start" onClick={() => onUpdate({ packageItemId: null, unitPriceCents: line.basePriceCents, priceReason: "" } as Partial<TicketLine>)}>
+          Don&apos;t use the package for this
+        </Button>
+      )}
       {line.kind === "service" && line.membershipCreditId && (
         <Button className="self-start" onClick={() => onUpdate({ membershipCreditId: null } as Partial<TicketLine>)}>
           Don&apos;t use the membership for this

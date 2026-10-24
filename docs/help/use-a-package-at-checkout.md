@@ -1,6 +1,6 @@
 ---
 title: Use a package at checkout
-keywords: redeem package, use package, package use, prepaid service, series visit, punch card, use a credit, package session
+keywords: don't use package, take package off, remove package use, keep package use, redeem package, use package, package use, prepaid service, series visit, punch card, use a credit, package session
 who: owner, manager, front_desk
 open: /calendar | Open calendar
 ---
@@ -11,7 +11,8 @@ Pay for a service with one use of the client's package.
 2. Look at the service line: if the client's package covers it, it's already ticked and says **paid with package**.
 3. If it isn't (for example a service you added at checkout), tap **Package** under **Payment**.
 4. Tap the service to pay for with the package. The list shows how many uses are left.
-5. Pay anything else on the ticket as usual, then tap **Complete sale**.
+5. If the client doesn't want to use the package for it, tap the line and tap **Don't use the package for this**. It goes back to its price, and the use stays on the package.
+6. Pay anything else on the ticket as usual, then tap **Complete sale**.
 
 ## Good to know
 
