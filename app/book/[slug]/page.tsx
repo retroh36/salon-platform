@@ -8,6 +8,8 @@ import { loadSite } from "@/lib/online-booking/site";
 import { bookingSource } from "@/lib/online-booking/sources";
 import { todayIn } from "@/lib/scheduling/time";
 import { createAdminClient } from "@/lib/supabase/admin";
+import Link from "next/link";
+import { currentAccount } from "@/lib/online-booking/account";
 import { BookingFlow } from "./booking-flow";
 import { BookingFrame } from "./frame";
 
@@ -54,11 +56,26 @@ async function Booking({ params, searchParams }: { params: Promise<{ slug: strin
     );
   }
   const { site } = found;
-  const info = await loadSeo(createAdminClient(), slug);
+  const admin = createAdminClient();
+  const [info, account] = await Promise.all([loadSeo(admin, slug), currentAccount(admin, site.business.id)]);
+  // "Book this again" from their account: ?services=a,b&staff=x.
+  const services = typeof query.services === "string" ? query.services.split(",").filter((id) => /^[0-9a-f-]{36}$/.test(id)) : [];
+  const staff = typeof query.staff === "string" && /^[0-9a-f-]{36}$/.test(query.staff) ? query.staff : null;
   return (
     <BookingFrame name={site.business.name} logoUrl={site.business.logoUrl} accent={site.settings.accent}>
       {info && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdText(seoFor(info, siteUrl()).jsonLd) }} />}
-      <BookingFlow site={site} today={todayIn(site.location.timezone)} source={source} />
+      <p className="-mt-2 mb-4 text-right text-sm">
+        <Link href={`/book/${slug}/account`} className="font-medium text-(--accent) underline underline-offset-2">
+          {account ? `${account.firstName}'s account` : "My account"}
+        </Link>
+      </p>
+      <BookingFlow
+        site={site}
+        today={todayIn(site.location.timezone)}
+        source={source}
+        signedIn={account ? { firstName: account.firstName } : null}
+        start={services.length ? { serviceIds: services, staffId: staff } : null}
+      />
     </BookingFrame>
   );
 }

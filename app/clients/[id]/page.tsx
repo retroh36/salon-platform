@@ -90,7 +90,13 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
     patchSettings(supabase, me.business_id),
     loadClientInsights(supabase, me.business_id, [id]),
   ]);
-  const [packages, gallery, memberships] = await Promise.all([loadClientPackages(supabase, id), loadPhotos(supabase, me, { clientId: id }), loadClientMemberships(supabase, id)]);
+  const [packages, gallery, memberships, { data: onlineAccount }] = await Promise.all([
+    loadClientPackages(supabase, id),
+    loadPhotos(supabase, me, { clientId: id }),
+    loadClientMemberships(supabase, id),
+    // Front of house can see whether they have an account on the booking site.
+    supabase.from("client_accounts").select("last_sign_in_at").eq("client_id", id).maybeSingle(),
+  ]);
   const membershipHistory = await loadMembershipHistory(supabase, memberships.map((m) => m.id), tz);
   if (patchError) throw patchError;
   if (formsError) throw formsError;
@@ -122,6 +128,11 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
         <div className="min-w-0">
           <h1 className="font-serif text-4xl font-semibold tracking-tight text-navy-900">{fullName(client)}</h1>
           <p className="mt-1 text-ink-muted">{contact || "No contact details"}</p>
+          {onlineAccount && (
+            <p className="mt-0.5 text-sm text-ink-muted" data-testid="online-account">
+              Has an online account{onlineAccount.last_sign_in_at ? `, last signed in ${formatDate(toLocal(new Date(onlineAccount.last_sign_in_at), tz).date)}` : ""}
+            </p>
+          )}
         </div>
       </div>
 

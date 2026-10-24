@@ -343,14 +343,14 @@ isOneToOne: false
                   ]
                 },"card_requests": {
                   Row: {
-                    "appointment_id": string | null,"business_id": string,"channel": string,"client_id": string,"created_at": string,"created_by": string,"deposit_cents": number,"done_at": string | null,"expires_at": string,"id": string,"location_id": string,"sent_to": string,"status": string,"token_hash": string
+                    "appointment_id": string | null,"business_id": string,"channel": string,"client_id": string,"created_at": string,"created_by": string | null,"deposit_cents": number,"done_at": string | null,"expires_at": string,"from_account": boolean,"id": string,"location_id": string,"sent_to": string,"status": string,"token_hash": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_id"?: string | null,"business_id": string,"channel": string,"client_id": string,"created_at"?: string,"created_by": string,"deposit_cents"?: number,"done_at"?: string | null,"expires_at": string,"id"?: string,"location_id": string,"sent_to": string,"status"?: string,"token_hash": string
+                    "appointment_id"?: string | null,"business_id": string,"channel": string,"client_id": string,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"done_at"?: string | null,"expires_at": string,"from_account"?: boolean,"id"?: string,"location_id": string,"sent_to": string,"status"?: string,"token_hash": string
                   }
                   Update: {
-                    "appointment_id"?: string | null,"business_id"?: string,"channel"?: string,"client_id"?: string,"created_at"?: string,"created_by"?: string,"deposit_cents"?: number,"done_at"?: string | null,"expires_at"?: string,"id"?: string,"location_id"?: string,"sent_to"?: string,"status"?: string,"token_hash"?: string
+                    "appointment_id"?: string | null,"business_id"?: string,"channel"?: string,"client_id"?: string,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"done_at"?: string | null,"expires_at"?: string,"from_account"?: boolean,"id"?: string,"location_id"?: string,"sent_to"?: string,"status"?: string,"token_hash"?: string
                   }
                   Relationships: [
                     {
@@ -414,6 +414,32 @@ isOneToOne: false
       columns: ["location_id","business_id"]
 isOneToOne: false
       referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"client_accounts": {
+                  Row: {
+                    "business_id": string,"client_id": string,"created_at": string,"id": string,"last_sign_in_at": string | null,"verified_channel": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"client_id": string,"created_at"?: string,"id"?: string,"last_sign_in_at"?: string | null,"verified_channel": string
+                  }
+                  Update: {
+                    "business_id"?: string,"client_id"?: string,"created_at"?: string,"id"?: string,"last_sign_in_at"?: string | null,"verified_channel"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "client_accounts_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_accounts_client_id_business_id_fkey"
+      columns: ["client_id","business_id"]
+isOneToOne: false
+      referencedRelation: "clients"
       referencedColumns: ["id","business_id"]
     }
                   ]
@@ -681,6 +707,32 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "staff"
       referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"client_sessions": {
+                  Row: {
+                    "account_id": string,"business_id": string,"created_at": string,"expires_at": string,"id": string,"ip_hash": string | null,"revoked_at": string | null,"token_hash": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "account_id": string,"business_id": string,"created_at"?: string,"expires_at": string,"id"?: string,"ip_hash"?: string | null,"revoked_at"?: string | null,"token_hash": string
+                  }
+                  Update: {
+                    "account_id"?: string,"business_id"?: string,"created_at"?: string,"expires_at"?: string,"id"?: string,"ip_hash"?: string | null,"revoked_at"?: string | null,"token_hash"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "client_sessions_account_id_fkey"
+      columns: ["account_id"]
+isOneToOne: false
+      referencedRelation: "client_accounts"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_sessions_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
     }
                   ]
                 },"clients": {
@@ -1407,14 +1459,14 @@ isOneToOne: false
                   ]
                 },"online_verifications": {
                   Row: {
-                    "attempts": number,"business_id": string,"channel": string,"code_hash": string,"created_at": string,"destination": string,"expires_at": string,"id": string,"session_hash": string | null,"verified_at": string | null
+                    "attempts": number,"business_id": string,"channel": string,"code_hash": string,"created_at": string,"destination": string,"expires_at": string,"id": string,"link_hash": string | null,"session_hash": string | null,"verified_at": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "attempts"?: number,"business_id": string,"channel": string,"code_hash": string,"created_at"?: string,"destination": string,"expires_at": string,"id"?: string,"session_hash"?: string | null,"verified_at"?: string | null
+                    "attempts"?: number,"business_id": string,"channel": string,"code_hash": string,"created_at"?: string,"destination": string,"expires_at": string,"id"?: string,"link_hash"?: string | null,"session_hash"?: string | null,"verified_at"?: string | null
                   }
                   Update: {
-                    "attempts"?: number,"business_id"?: string,"channel"?: string,"code_hash"?: string,"created_at"?: string,"destination"?: string,"expires_at"?: string,"id"?: string,"session_hash"?: string | null,"verified_at"?: string | null
+                    "attempts"?: number,"business_id"?: string,"channel"?: string,"code_hash"?: string,"created_at"?: string,"destination"?: string,"expires_at"?: string,"id"?: string,"link_hash"?: string | null,"session_hash"?: string | null,"verified_at"?: string | null
                   }
                   Relationships: [
                     {
@@ -3229,6 +3281,9 @@ isOneToOne: false
                            },
 "remove_client_card":
 { Args: { "p_client_id": string }; Returns: undefined
+                           },
+"remove_own_card":
+{ Args: { "p_business_id": string,"p_client_id": string }; Returns: undefined
                            },
 "report_call_out":
 { Args: { "p_from": string,"p_staff_id": string }; Returns: string

@@ -14,24 +14,37 @@ const CODE_MINUTES = 10;
 const SESSION_MINUTES = 30;
 const MAX_ATTEMPTS = 5;
 
-export async function sendCode(admin: Admin, business: { id: string; name: string }, channel: Channel, destination: string): Promise<string> {
+// signInLink: for signing in to their account, a one-time link as well
+// as the code (made from the verification id and a secret; only the
+// secret's hash is kept).
+export async function sendCode(
+  admin: Admin,
+  business: { id: string; name: string },
+  channel: Channel,
+  destination: string,
+  signInLink?: (verificationId: string, secret: string) => string,
+): Promise<string> {
   const id = crypto.randomUUID();
   const code = newCode();
+  const secret = signInLink ? newSecret() : null;
   const { error } = await admin.from("online_verifications").insert({
     id,
     business_id: business.id,
     channel,
     destination,
     code_hash: sha256(`${id}:${code}`),
+    link_hash: secret ? sha256(secret) : null,
     expires_at: new Date(Date.now() + CODE_MINUTES * 60_000).toISOString(),
   });
   if (error) throw error;
-  const body = `${business.name}: your booking code is ${code}. It expires in ${CODE_MINUTES} minutes. If you didn't ask for it, ignore this message.`;
+  const body = signInLink
+    ? `${business.name}: your sign-in code is ${code}, or tap ${signInLink(id, secret!)} to sign in. It expires in ${CODE_MINUTES} minutes. If you didn't ask for it, ignore this message.`
+    : `${business.name}: your booking code is ${code}. It expires in ${CODE_MINUTES} minutes. If you didn't ask for it, ignore this message.`;
   const { error: outboxError } = await admin.from("outbox_messages").insert({
     business_id: business.id,
     channel,
     to_address: destination,
-    subject: channel === "email" ? `Your ${business.name} booking code` : null,
+    subject: channel === "email" ? (signInLink ? `Sign in to ${business.name}` : `Your ${business.name} booking code`) : null,
     body,
   });
   if (outboxError) throw outboxError;
@@ -63,6 +76,28 @@ export async function verifyCode(admin: Admin, businessId: string, verificationI
     .is("verified_at", null);
   if (updateError) throw updateError;
   return { ok: true, session };
+}
+
+// The one-time sign-in link: the same verification as the code, once.
+export async function verifyLink(admin: Admin, businessId: string, verificationId: string, secret: string): Promise<VerifyResult> {
+  if (!/^[0-9a-f-]{36}$/.test(verificationId) || !/^[A-Za-z0-9_-]{43}$/.test(secret)) return { ok: false, error: "expired" };
+  const { data, error } = await admin
+    .from("online_verifications")
+    .select("id, link_hash, expires_at, verified_at")
+    .eq("id", verificationId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.link_hash || data.verified_at || new Date(data.expires_at) < new Date() || data.link_hash !== sha256(secret)) return { ok: false, error: "expired" };
+  const session = newSecret();
+  const { data: claimed, error: updateError } = await admin
+    .from("online_verifications")
+    .update({ verified_at: new Date().toISOString(), session_hash: sha256(session) })
+    .eq("id", data.id)
+    .is("verified_at", null)
+    .select("id");
+  if (updateError) throw updateError;
+  return claimed.length ? { ok: true, session } : { ok: false, error: "expired" };
 }
 
 // Who a session secret belongs to, if it's still valid.

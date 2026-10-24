@@ -35,17 +35,35 @@ export const choiceClass =
   "group flex min-h-16 w-full items-center gap-4 rounded-xl border bg-surface px-4 py-3 text-left transition-[border-color,background-color,box-shadow] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 const chosen = "border-(--accent) bg-(--accent-soft) shadow-[inset_0_0_0_1px_var(--accent)]";
 const notChosen = "border-line hover:border-(--accent-line)";
-const inputClass =
+export const inputClass =
   "min-h-13 w-full rounded-xl border border-line-strong bg-surface px-4 text-base text-ink placeholder:text-ink-subtle focus:border-focus focus:ring-3 focus:ring-focus/25 focus:outline-none";
 
-export function BookingFlow({ site, today, source }: { site: BookingSite; today: LocalDate; source: BookingSource }) {
+// signedIn: a client signed in to their account books as themselves (no
+// code; the server sees the account, "account" in place of a code session).
+// start: services (and a stylist) to begin with, from "Book this again".
+export function BookingFlow({
+  site,
+  today,
+  source,
+  signedIn = null,
+  start = null,
+}: {
+  site: BookingSite;
+  today: LocalDate;
+  source: BookingSource;
+  signedIn?: { firstName: string } | null;
+  start?: { serviceIds: string[]; staffId: string | null } | null;
+}) {
   const router = useRouter();
-  const [step, setStep] = useState<Step>("services");
+  const startIds = (start?.serviceIds ?? []).filter((id) => site.services.some((s) => s.id === id && s.mode === "bookable")).slice(0, MAX_SERVICES);
+  const startStaff = startIds.length && start?.staffId && site.stylists.some((s) => s.id === start.staffId && startIds.every((id) => id in s.prices)) ? start.staffId : undefined;
+  const [step, setStep] = useState<Step>(startIds.length ? (startStaff ? "time" : "stylist") : "services");
   const [direction, setDirection] = useState<1 | -1>(1);
-  const [serviceIds, setServiceIds] = useState<string[]>([]);
-  const [staffId, setStaffId] = useState<string | null | undefined>(undefined);
+  const [serviceIds, setServiceIds] = useState<string[]>(startIds);
+  const [staffId, setStaffId] = useState<string | null | undefined>(startStaff);
   const [slot, setSlot] = useState<{ date: LocalDate; minute: number; staffIds: string[] } | null>(null);
-  const [identity, setIdentity] = useState<Identity>({ phase: "enter" });
+  const [identity, setIdentity] = useState<Identity>(signedIn ? { phase: "done", session: "account", known: true, firstName: signedIn.firstName } : { phase: "enter" });
+  const [remember, setRemember] = useState(false);
   const [details, setDetails] = useState({ firstName: "", lastName: "", phone: "", email: "", note: "" });
   const [agreed, setAgreed] = useState(false);
   // The policy for this visit (from the server), and the card entered.
@@ -134,6 +152,7 @@ export function BookingFlow({ site, today, source }: { site: BookingSite; today:
         honeypot: honeypot.current?.value ?? "",
         source,
         cardRef: needsCard ? cardRef : undefined,
+        remember: !signedIn && remember,
       });
       if (result.ok) {
         router.push(result.manageUrl);
@@ -270,6 +289,15 @@ export function BookingFlow({ site, today, source }: { site: BookingSite; today:
             agreed={agreed}
             setAgreed={setAgreed}
           />
+        )}
+        {step === "confirm" && slot && !signedIn && (
+          <label className="mt-4 flex items-start gap-3 text-sm">
+            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="mt-0.5 size-5 accent-(--accent)" />
+            <span>
+              <span className="font-medium">Keep me signed in on this device</span>
+              <span className="block text-ink-muted">Creates your account, to see and change your visits without a code next time.</span>
+            </span>
+          </label>
         )}
       </section>
 

@@ -146,6 +146,8 @@ test("a new client books two services back to back on a phone", async ({ page })
   const shaeColumn = calendar.getByRole("region", { name: "Shae Morgan", exact: true });
   await expect(shaeColumn.getByRole("button", { name: new RegExp(`Ob${RUN}New`) })).toHaveCount(0);
 
+  // Booking creates their account, so next time there's no code.
+  await flow(page).getByLabel(/^Keep me signed in on this device/).check();
   await bookIt(page);
 
   await expect(page).toHaveURL(/\/book\/maple-and-ash\/manage\/[A-Za-z0-9_-]{43}\?booked=1$/);
@@ -169,6 +171,8 @@ test("a new client books two services back to back on a phone", async ({ page })
   expect(items.every((i) => i.staff_id === SEED.staff.shae)).toBe(true);
   const { data: log } = await admin.from("online_booking_log").select("action, ip_hash").eq("appointment_id", visit!.id);
   expect(log).toEqual([{ action: "booked", ip_hash: expect.stringMatching(/^[0-9a-f]{32}$/) }]);
+  const { data: account } = await admin.from("client_accounts").select("verified_channel").eq("client_id", client!.id).single();
+  expect(account).toEqual({ verified_channel: "sms" });
 
   // The open calendar picks it up by itself, marked as booked online.
   await calendar.clock.fastForward(21_000);

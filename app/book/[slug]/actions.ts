@@ -23,6 +23,7 @@ import { patchExplanation } from "@/lib/online-booking/patch";
 import { loadManaged, canChange } from "@/lib/online-booking/manage";
 import { onlineTerms, type OnlineTerms } from "@/lib/online-booking/terms";
 import { currentProvider, providerFor } from "@/lib/payments";
+import { ACCOUNT_SESSION, accountContact, currentAccount, startAccountSession } from "@/lib/online-booking/account";
 
 const MAX_SERVICES = 4;
 const DAYS_PER_PAGE = 14;
@@ -158,6 +159,18 @@ export async function confirmCode(slug: string, verificationId: string, code: st
   };
 }
 
+// Who's booking: a client signed in to their account (the booking is for
+// their own record), or whoever confirmed a code.
+async function whoIsBooking(admin: ReturnType<typeof createAdminClient>, site: BookingSite, session: string) {
+  if (session === ACCOUNT_SESSION) {
+    const account = await currentAccount(admin, site.business.id);
+    const contact = account ? await accountContact(admin, account) : null;
+    return account && contact ? { contact, clientId: account.clientId as string | null, signedIn: true } : null;
+  }
+  const contact = await sessionContact(admin, site.business.id, session);
+  return contact ? { contact, clientId: await findClient(admin, site, contact.channel, contact.destination), signedIn: false } : null;
+}
+
 async function findClient(admin: ReturnType<typeof createAdminClient>, site: BookingSite, channel: Channel, destination: string, create?: { first: string; last: string; phone: string; email: string }) {
   const { data, error } = await admin.rpc("find_online_client", {
     p_business_id: site.business.id,
@@ -184,10 +197,9 @@ export async function reviewTerms(slug: string, session: string, serviceIds: str
   const start = isLocalDate(date) && Number.isInteger(minute) ? fromLocal(date, minute, site.location.timezone) : null;
   if (!request || !start) return { ok: false, message: "Those services can't be booked together online." };
   const admin = createAdminClient();
-  const contact = await sessionContact(admin, site.business.id, session);
-  if (!contact) return { ok: false, message: "Your code has expired. Please confirm your details again." };
-  const clientId = await findClient(admin, site, contact.channel, contact.destination);
-  const terms = await onlineTerms(admin, site, clientId, request, start);
+  const who = await whoIsBooking(admin, site, session);
+  if (!who) return { ok: false, message: "Your code has expired. Please confirm your details again." };
+  const terms = await onlineTerms(admin, site, who.clientId, request, start);
   if (!terms) return { ok: false, message: "Sorry, that time was just taken. Please pick another." };
   const provider = currentProvider();
   return {
@@ -219,6 +231,8 @@ export type BookInput = {
   source?: string;
   // The card entered on the provider's form, when one is needed.
   cardRef?: string;
+  // Keep them signed in to their account on this device afterwards.
+  remember?: boolean;
 };
 
 export type BookResult =
@@ -244,10 +258,11 @@ export async function book(slug: string, input: BookInput): Promise<BookResult> 
     return { ok: false, reason: "taken", message: "That time can't be booked online any more. Please pick another." };
   }
 
-  const contact = await sessionContact(admin, site.business.id, input.session);
-  if (!contact) return { ok: false, reason: "session", message: "Your code has expired. Please confirm your details again." };
+  const who = await whoIsBooking(admin, site, input.session);
+  if (!who) return { ok: false, reason: "session", message: "Your code has expired. Please confirm your details again." };
+  const { contact } = who;
 
-  let clientId = await findClient(admin, site, contact.channel, contact.destination);
+  let clientId = who.clientId;
   if (!clientId) {
     if (!site.settings.allowNewClients) return { ok: false, reason: "new_clients", message: `${site.business.name} isn't taking new clients online. Please call to book.` };
     const first = input.firstName?.trim() ?? "";
@@ -312,6 +327,8 @@ export async function book(slug: string, input: BookInput): Promise<BookResult> 
     }),
     confirmationMessage(admin, site, contact, start, manageUrl, terms),
   ]);
+  // "Keep me signed in": their account, made from the code they confirmed.
+  if (input.remember && !who.signedIn) await startAccountSession(admin, site.business.id, clientId!, contact.channel, site.business.slug, ipHash);
   return { ok: true, manageUrl: `${manageUrl}?booked=1` };
 }
 
