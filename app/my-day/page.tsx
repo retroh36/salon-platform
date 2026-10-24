@@ -10,6 +10,12 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { startOfLocalDay } from "@/lib/scheduling/load";
 import { addDays, formatMinute, todayIn, toLocal } from "@/lib/scheduling/time";
 import type { AppointmentStatus } from "@/lib/appointments";
+import { PayTickets } from "@/components/pay-tickets";
+import { pillClass } from "@/components/ui/page";
+import { formatPrice } from "@/lib/services";
+import { periodContaining, previousPeriod } from "@/lib/payroll";
+import { loadPayroll, loadPaySettings } from "@/lib/payroll-load";
+import Link from "next/link";
 
 export const metadata: Metadata = { title: "My day" };
 
@@ -17,16 +23,16 @@ export const metadata: Metadata = { title: "My day" };
 // for Start service, Processing, Back in chair and Finish service. The only
 // place times are tapped: the front desk just checks clients in and out.
 // Tapped times are what Denise learns from first.
-export default function MyDayPage() {
+export default function MyDayPage({ searchParams }: PageProps<"/my-day">) {
   return (
     <Suspense fallback={<LoadingShell />}>
-      <MyDay />
+      <MyDay searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function MyDay() {
-  const { supabase, staff: me } = await getCurrentStaff();
+async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams">) {
+  const [params, { supabase, staff: me }] = await Promise.all([searchParams, getCurrentStaff()]);
   if (!me) return <NotLinked />;
   const tz = me.location.timezone;
   const today = todayIn(tz);
@@ -89,6 +95,77 @@ async function MyDay() {
           })}
         </ol>
       )}
+      <MyEarnings supabase={supabase} me={me} last={params.pay === "last"} />
     </AppShell>
+  );
+}
+
+// Their own earnings only (payroll_sales gives anyone but owners and
+// managers just their own lines and tips): this pay period so far, or the
+// last one.
+async function MyEarnings({ supabase, me, last }: { supabase: Awaited<ReturnType<typeof getCurrentStaff>>["supabase"]; me: NonNullable<Awaited<ReturnType<typeof getCurrentStaff>>["staff"]>; last: boolean }) {
+  const tz = me.location.timezone;
+  const today = todayIn(tz);
+  const settings = await loadPaySettings(supabase, me.business_id);
+  const current = periodContaining(settings.kind, settings.anchor, today);
+  const period = last ? previousPeriod(settings.kind, settings.anchor, current) : { from: current.from, to: today };
+  const [pay] = await loadPayroll(supabase, me.business_id, tz, period, today, me.id);
+  if (!pay) return null;
+  const rows: [string, number, string?][] = [
+    ["Services", pay.serviceCents],
+    ["Service commission", pay.serviceCommissionCents, pay.comp.servicePct ? `${pay.comp.servicePct}%` : undefined],
+    ["Retail", pay.retailCents],
+    ["Retail commission", pay.retailCommissionCents, pay.comp.retailPct ? `${pay.comp.retailPct}%` : undefined],
+    ["Tips", pay.tipCents],
+    ...(pay.comp.hourlyRateCents !== null ? ([["Hourly pay", pay.hourlyPayCents]] as [string, number][]) : []),
+  ];
+  return (
+    <section aria-labelledby="earnings-heading" className="mx-auto mt-8 max-w-xl rounded-xl border border-line bg-surface p-4 shadow-card" data-testid="my-earnings">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 id="earnings-heading" className="font-serif text-xl font-semibold text-ink">
+            My earnings
+          </h2>
+          <p className="text-sm text-ink-muted">
+            {formatLongDay(period.from, false)} to {formatLongDay(period.to, false)}
+            {last ? "" : " so far"}
+          </p>
+        </div>
+        <nav aria-label="Earnings period" className="flex gap-2">
+          <Link href="/my-day" className={pillClass(!last)} aria-current={!last ? "page" : undefined}>
+            This period
+          </Link>
+          <Link href="/my-day?pay=last" className={pillClass(last)} aria-current={last ? "page" : undefined}>
+            Last period
+          </Link>
+        </nav>
+      </div>
+      <dl className="grid gap-x-6 gap-y-2 text-sm tabular-nums sm:grid-cols-2">
+        {rows.map(([label, cents, note]) => (
+          <div key={label} className="flex justify-between gap-2 border-b border-line pb-1.5">
+            <dt className="text-ink-muted">
+              {label}
+              {note && <span className="text-xs"> ({note})</span>}
+            </dt>
+            <dd>{formatPrice(cents)}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 flex justify-between font-semibold">
+        <span>Total pay</span>
+        <span className="tabular-nums" data-testid="my-pay-total">
+          {formatPrice(pay.totalCents)}
+        </span>
+      </p>
+      <p className="mt-1 text-xs text-ink-muted">Commission is on what clients paid before tax. Refunds come off in the period they happen.</p>
+      {pay.tickets.length > 0 && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-sm font-medium text-link">Tickets behind it ({pay.tickets.length})</summary>
+          <div className="-mx-4 mt-2">
+            <PayTickets tickets={pay.tickets} timeZone={tz} linkSales={false} label="My tickets" />
+          </div>
+        </details>
+      )}
+    </section>
   );
 }

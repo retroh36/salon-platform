@@ -475,6 +475,11 @@ select s.id, s.business_id,
 from public.staff s
 where s.business_id = 'b0000000-0000-4000-8000-000000000001' and s.role = 'stylist';
 
+-- The front desk and the manager are paid by the hour.
+insert into public.staff_compensation (staff_id, business_id, hourly_rate_cents) values
+  ('d0000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 2600),
+  ('d0000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 1800);
+
 -- ---------------------------------------------------------------------------
 -- Resources: seven chairs, Nola's barber station and a treatment room for
 -- smoothing treatments.

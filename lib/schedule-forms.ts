@@ -1,3 +1,4 @@
+import { parseDollars } from "@/lib/checkout";
 import { validateIntervals, type Interval, type IntervalError } from "@/lib/scheduling/intervals";
 import { addDays, isLocalDate, parseTime, WEEKDAYS, type LocalDate, type Weekday } from "@/lib/scheduling/time";
 
@@ -142,8 +143,8 @@ export type StaffLevel = (typeof STAFF_LEVELS)[number];
 
 export const LEVEL_LABELS: Record<StaffLevel, string> = { artisan: "Artisan", senior: "Senior", master: "Master" };
 
-export type CompensationInput = { level: StaffLevel | null; service_commission_pct: number; retail_commission_pct: number };
-export type CompensationErrors = Partial<Record<"level" | "service_commission_pct" | "retail_commission_pct", string>>;
+export type CompensationInput = { level: StaffLevel | null; service_commission_pct: number; retail_commission_pct: number; hourly_rate_cents: number | null };
+export type CompensationErrors = Partial<Record<"level" | "service_commission_pct" | "retail_commission_pct" | "hourly_rate_cents", string>>;
 
 function parsePercent(value: string): number | null {
   if (!/^\d{1,3}(\.\d{1,2})?$/.test(value)) return null;
@@ -165,7 +166,11 @@ export function parseCompensationForm(
   if (service === null) errors.service_commission_pct = "Enter a percentage from 0 to 100.";
   const retail = parsePercent(text(form, "retail_commission_pct") || "0");
   if (retail === null) errors.retail_commission_pct = "Enter a percentage from 0 to 100.";
+  // Blank: not paid by the hour.
+  const hourlyText = text(form, "hourly_rate");
+  const hourly = hourlyText === "" ? null : parseDollars(hourlyText);
+  if (hourlyText !== "" && (hourly === null || hourly > 100000)) errors.hourly_rate_cents = "Enter an hourly rate up to $1,000, or leave it empty.";
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
-  return { ok: true, value: { level, service_commission_pct: service!, retail_commission_pct: retail! } };
+  return { ok: true, value: { level, service_commission_pct: service!, retail_commission_pct: retail!, hourly_rate_cents: hourly } };
 }

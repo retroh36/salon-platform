@@ -139,26 +139,27 @@ describe("parseTimeOffForm", () => {
 
 describe("parseCompensationForm", () => {
   it("parses a level and percentages", () => {
-    expect(parseCompensationForm(form([["level", "senior"], ["service_commission_pct", "45"], ["retail_commission_pct", "12.5"]]))).toEqual({
+    expect(parseCompensationForm(form([["level", "senior"], ["service_commission_pct", "45"], ["retail_commission_pct", "12.5"], ["hourly_rate", "18.50"]]))).toEqual({
       ok: true,
-      value: { level: "senior", service_commission_pct: 45, retail_commission_pct: 12.5 },
+      value: { level: "senior", service_commission_pct: 45, retail_commission_pct: 12.5, hourly_rate_cents: 1850 },
     });
   });
 
   it("allows no level and blank percentages", () => {
     expect(parseCompensationForm(form([["level", ""]]))).toEqual({
       ok: true,
-      value: { level: null, service_commission_pct: 0, retail_commission_pct: 0 },
+      value: { level: null, service_commission_pct: 0, retail_commission_pct: 0, hourly_rate_cents: null },
     });
   });
 
   it("rejects bad values", () => {
-    expect(parseCompensationForm(form([["level", "boss"], ["service_commission_pct", "101"], ["retail_commission_pct", "-5"]]))).toEqual({
+    expect(parseCompensationForm(form([["level", "boss"], ["service_commission_pct", "101"], ["retail_commission_pct", "-5"], ["hourly_rate", "lots"]]))).toEqual({
       ok: false,
       errors: {
         level: "Choose a level.",
         service_commission_pct: "Enter a percentage from 0 to 100.",
         retail_commission_pct: "Enter a percentage from 0 to 100.",
+        hourly_rate_cents: "Enter an hourly rate up to $1,000, or leave it empty.",
       },
     });
   });

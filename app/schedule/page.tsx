@@ -14,6 +14,7 @@ import { LEVEL_LABELS, WEEKDAY_NAMES } from "@/lib/schedule-forms";
 import { dayView, type TimeOff } from "@/lib/scheduling/availability";
 import { loadLocationSchedule, loadStaffSchedules } from "@/lib/scheduling/load";
 import { addDays, datesBetween, isLocalDate, minuteToTime, startOfWeek, todayIn, WEEKDAYS } from "@/lib/scheduling/time";
+import { formatPrice } from "@/lib/services";
 import { fullName, roleLabel, sortStaff } from "@/lib/staff";
 import { decideTimeOff, deleteTimeOff, removeDayChange, saveWeeklyHours } from "./actions";
 import { CompensationForm } from "./compensation-form";
@@ -75,7 +76,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
       .order("start_minute"),
     supabase
       .from("staff_compensation")
-      .select("service_commission_pct, retail_commission_pct")
+      .select("service_commission_pct, retail_commission_pct, hourly_rate_cents")
       .eq("staff_id", target.id)
       .maybeSingle(),
     manager
@@ -346,6 +347,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
               level={target.level}
               servicePct={Number(compensation.data?.service_commission_pct ?? 0)}
               retailPct={Number(compensation.data?.retail_commission_pct ?? 0)}
+              hourlyRateCents={compensation.data?.hourly_rate_cents ?? null}
             />
           ) : (
             <dl className="flex flex-wrap gap-8 px-5 py-4 text-sm">
@@ -361,6 +363,12 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
                 <dt className="text-ink-muted">Retail commission</dt>
                 <dd className="font-semibold">{compensation.data ? `${Number(compensation.data.retail_commission_pct)}%` : "—"}</dd>
               </div>
+              {compensation.data?.hourly_rate_cents != null && (
+                <div>
+                  <dt className="text-ink-muted">Hourly rate</dt>
+                  <dd className="font-semibold">{formatPrice(compensation.data.hourly_rate_cents)}</dd>
+                </div>
+              )}
             </dl>
           )}
         </section>

@@ -27,7 +27,7 @@ test.describe("owner", () => {
     await page.goto("/dashboard");
     expect(await groups(page)).toEqual([
       ["Daily", ["Dashboard", "Calendar", "Clients"]],
-      ["Sales", ["Sales", "Gift cards", "Reports"]],
+      ["Sales", ["Sales", "Gift cards", "Reports", "Payroll"]],
       ["Salon", ["Team", "Services", "Durations", "Inventory", "Forms"]],
     ]);
     await expect(sidebar(page).getByRole("link", { name: "Settings" })).toBeVisible();

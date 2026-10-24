@@ -170,3 +170,10 @@ export const GlobeIcon = (p: IconProps) => (
     <path d="M3.5 12h17M12 3.5a13 13 0 0 1 0 17M12 3.5a13 13 0 0 0 0 17" />
   </Icon>
 );
+export const WalletIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v2.5" />
+    <rect x="4" y="7.5" width="16.5" height="12" rx="2" />
+    <path d="M16 13.5h1.5" />
+  </Icon>
+);

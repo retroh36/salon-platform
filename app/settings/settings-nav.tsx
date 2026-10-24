@@ -2,13 +2,14 @@ import Link from "next/link";
 import { pillClass } from "@/components/ui/page";
 
 // Moves between the settings pages.
-export function SettingsNav({ current }: { current: "salon" | "booking" | "checkout" | "gift-cards" | "packages" }) {
+export function SettingsNav({ current }: { current: "salon" | "booking" | "checkout" | "gift-cards" | "packages" | "payroll" }) {
   const links = [
     ["salon", "/settings", "Your salon"],
     ["booking", "/settings/booking", "Online booking"],
     ["checkout", "/settings/checkout", "Tax and receipts"],
     ["gift-cards", "/settings/gift-cards", "Gift cards"],
     ["packages", "/settings/packages", "Packages"],
+    ["payroll", "/settings/payroll", "Payroll"],
   ] as const;
   return (
     <nav aria-label="Settings" className="mb-6 flex flex-wrap gap-2">

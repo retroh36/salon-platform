@@ -174,15 +174,18 @@ test.describe("managers", () => {
 
       await form.getByLabel("Level").selectOption("senior");
       await form.getByLabel("Service commission (%)").fill("42.5");
+      await expect(form.getByLabel("Hourly rate ($)")).toHaveValue("");
+      await form.getByLabel("Hourly rate ($)").fill("15.50");
       await form.getByRole("button", { name: "Save" }).click();
       await expect(form.getByRole("status")).toHaveText("Saved.");
       await expect(ui(page).getByText("Stylist · Senior")).toBeVisible();
 
       await page.reload();
       await expect(ui(page).getByRole("form", { name: "Level and commission" }).getByLabel("Service commission (%)")).toHaveValue("42.5");
+      await expect(ui(page).getByRole("form", { name: "Level and commission" }).getByLabel("Hourly rate ($)")).toHaveValue("15.50");
     } finally {
       await admin.from("staff").update({ level: "artisan" }).eq("id", SEED.staff.shae);
-      await admin.from("staff_compensation").update({ service_commission_pct: 35 }).eq("staff_id", SEED.staff.shae);
+      await admin.from("staff_compensation").update({ service_commission_pct: 35, hourly_rate_cents: null }).eq("staff_id", SEED.staff.shae);
     }
   });
 
