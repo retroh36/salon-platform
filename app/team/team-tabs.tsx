@@ -3,14 +3,15 @@ import Link from "next/link";
 const TABS = [
   { value: "directory", href: "/team", label: "Directory" },
   { value: "schedule", href: "/schedule", label: "Schedule" },
+  { value: "goals", href: "/team/goals", label: "Goals" },
 ] as const;
 
-// The Team page's two tabs, as links: the Directory (/team) and the
-// Schedule (/schedule).
-export function TeamTabs({ current }: { current: (typeof TABS)[number]["value"] }) {
+// The Team page's tabs, as links: the Directory (/team), the Schedule
+// (/schedule) and, for owners and managers, Goals (/team/goals).
+export function TeamTabs({ current, goals = false }: { current: (typeof TABS)[number]["value"]; goals?: boolean }) {
   return (
-    <nav aria-label="Team pages" className="mb-6 flex w-full max-w-xs gap-1 rounded-lg bg-sunken p-1">
-      {TABS.map((t) => (
+    <nav aria-label="Team pages" className={`mb-6 flex w-full ${goals ? "max-w-sm" : "max-w-xs"} gap-1 rounded-lg bg-sunken p-1`}>
+      {TABS.filter((t) => goals || t.value !== "goals").map((t) => (
         <Link
           key={t.value}
           href={t.href}

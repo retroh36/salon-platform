@@ -23,6 +23,21 @@ async function client(first: string) {
   return data!.id;
 }
 
+// A stylist with nothing else on between these times, so a test visit
+// gets a lane of its own whatever the demo data has booked.
+async function freeStylist(from: Date, to: Date, except: string[]) {
+  const candidates = [SEED.staff.shae, SEED.staff.hannah, SEED.staff.sandra, SEED.staff.gil, SEED.staff.bridget].filter((id) => !except.includes(id));
+  const { data } = await admin
+    .from("appointment_items")
+    .select("staff_id, appointment:appointments!inner(status)")
+    .in("staff_id", candidates)
+    .not("appointment.status", "in", "(canceled,no_show)")
+    .lt("starts_at", to.toISOString())
+    .gt("ends_at", from.toISOString());
+  const busy = new Set(data!.map((i) => i.staff_id));
+  return candidates.find((id) => !busy.has(id))!;
+}
+
 async function book(clientId: string, service: string, start: Date, staffId = SEED.staff.lois) {
   const { data: s } = await admin.from("services").select("id, duration_minutes").eq("business_id", B).eq("name", service).single();
   const end = new Date(start.getTime() + s!.duration_minutes! * 60_000);
@@ -256,7 +271,8 @@ test.describe("front desk", () => {
     await book(ana, "Men's Cut", new Date(Date.now() - 15 * 60_000));
     await book(ben, "Men's Cut", new Date(Date.now() - 50 * 60_000));
     const cyVisit = await book(cy, "Men's Cut", new Date(Date.now() - 30 * 60_000), SEED.staff.nola);
-    await book(dee, "Men's Cut", new Date(Date.now() - 5 * 60_000), SEED.staff.shae);
+    const deeStart = new Date(Date.now() - 5 * 60_000);
+    await book(dee, "Men's Cut", deeStart, await freeStylist(deeStart, new Date(deeStart.getTime() + 30 * 60_000), [SEED.staff.lois, SEED.staff.nola]));
     await openDay(page, today);
     await page.getByTestId("denise-launcher").click();
     const card = page.getByTestId("denise-late");

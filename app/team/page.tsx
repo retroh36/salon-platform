@@ -62,7 +62,7 @@ async function Directory() {
           ) : undefined
         }
       />
-      <TeamTabs current="directory" />
+      <TeamTabs current="directory" goals={manager} />
       <section aria-labelledby="directory-heading" className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
         <h2 id="directory-heading" className="border-b border-line px-5 py-3.5 font-serif text-lg font-semibold text-ink">
           Staff <span className="font-sans text-sm font-medium text-ink-muted">({staff.length})</span>

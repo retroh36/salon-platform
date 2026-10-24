@@ -17,6 +17,10 @@ import { periodContaining, previousPeriod, ratesText } from "@/lib/payroll";
 import { loadPayroll, loadPaySettings } from "@/lib/payroll-load";
 import Link from "next/link";
 import { TipDetails } from "@/components/tip-details";
+import { GoalAlertCard, GoalCard } from "@/components/goals";
+import { AlertFrequencyPicker, GoalForm, RemoveGoal } from "@/components/goal-controls";
+import { loadMyGoals } from "@/lib/goals/mine";
+import { metricInfo } from "@/lib/goals/pacing";
 import { averageTipPct, pctText } from "@/lib/tips";
 
 export const metadata: Metadata = { title: "My day" };
@@ -97,8 +101,40 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
           })}
         </ol>
       )}
+      <MyGoalsSection supabase={supabase} me={me} />
       <MyEarnings supabase={supabase} me={me} last={params.pay === "last"} />
     </AppShell>
+  );
+}
+
+// Their own goals, paced, with Denise's alert at the top when it's due.
+async function MyGoalsSection({ supabase, me }: { supabase: Awaited<ReturnType<typeof getCurrentStaff>>["supabase"]; me: NonNullable<Awaited<ReturnType<typeof getCurrentStaff>>["staff"]> }) {
+  const goals = await loadMyGoals(supabase, me);
+  return (
+    <section aria-labelledby="goals-heading" className="mx-auto mt-8 max-w-xl" data-testid="my-goals">
+      {goals.alert && <GoalAlertCard alert={goals.alert} today={goals.today} />}
+      <div className="rounded-xl border border-line bg-surface p-4 shadow-card">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 id="goals-heading" className="font-serif text-xl font-semibold text-ink">
+            My goals
+          </h2>
+          <AlertFrequencyPicker value={goals.frequency} />
+        </div>
+        {goals.pacings.length ? (
+          <ul className="mb-3 flex flex-col gap-3">
+            {goals.pacings.map((p) => (
+              <GoalCard key={p.goal.id} pacing={p}>
+                {!p.setByOwner && <RemoveGoal goalId={p.goal.id} label={`${metricInfo(p.goal.metric).label} goal`} />}
+                {p.setByOwner && <p className="text-xs text-ink-muted">Set by the owner.</p>}
+              </GoalCard>
+            ))}
+          </ul>
+        ) : (
+          <p className="mb-3 text-sm text-ink-muted">No goals yet. Set one and Denise will keep you on pace.</p>
+        )}
+        <GoalForm fixedStaffId={me.id} />
+      </div>
+    </section>
   );
 }
 

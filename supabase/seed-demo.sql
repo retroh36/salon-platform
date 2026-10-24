@@ -904,3 +904,14 @@ union all
 select business_id, id, 'failed', fee_cents, failure_reason, null, created_at + interval '10 minutes' from fees where status = 'failed'
 union all
 select business_id, id, 'waived', fee_cents, waive_reason, 'd0000000-0000-4000-8000-000000000002'::uuid, waived_at from fees where status = 'waived';
+
+-- Goals: the owner set Bridget a monthly service revenue goal and Gil a
+-- weekly retail one; Bridget set herself a 70% rebooking goal, and Shae a
+-- quarter's new clients. Denise's check-ins: daily, Gil weekly.
+insert into public.staff_goals (business_id, staff_id, metric, period, target, set_by_owner, created_by, updated_by)
+values
+  ('b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000004', 'service_revenue', 'month', 900000, true, 'd0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000001'),
+  ('b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000004', 'rebooking_rate', 'month', 70, false, 'd0000000-0000-4000-8000-000000000004', 'd0000000-0000-4000-8000-000000000004'),
+  ('b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000005', 'retail_revenue', 'week', 30000, true, 'd0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000001'),
+  ('b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000009', 'new_clients', 'quarter', 12, false, 'd0000000-0000-4000-8000-000000000009', 'd0000000-0000-4000-8000-000000000009');
+update public.staff set goal_alerts = 'weekly' where id = 'd0000000-0000-4000-8000-000000000005';

@@ -127,7 +127,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
           </Link>
         }
       />
-      <TeamTabs current="schedule" />
+      <TeamTabs current="schedule" goals={manager} />
 
       {manager && pending.data.length > 0 && (
         <section aria-labelledby="requests-heading" className={`${cardClass} border-status-late-ink/30`}>

@@ -151,7 +151,14 @@ test.describe("stylist", () => {
     await expect(main.getByTestId("opportunity-gaps")).toHaveCount(0);
     // Only their own card, so no team row.
     await expect(main.getByTestId("team-card")).toHaveCount(0);
-    await expect(main).not.toContainText(/\$\d/);
+    // No money but their own goals.
+    await expect(main.getByTestId("dashboard-goals")).toContainText("of $9,000");
+    const elsewhere = await main.evaluate((el) => {
+      const copy = el.cloneNode(true) as HTMLElement;
+      copy.querySelector("[data-testid=dashboard-goals]")?.remove();
+      return copy.textContent ?? "";
+    });
+    expect(elsewhere).not.toMatch(/\$\d/);
     await shot(page, "stylist");
   });
 });
@@ -173,6 +180,8 @@ test.describe("Team", () => {
     await page.goto("/team");
     const tabs = ui(page).getByRole("navigation", { name: "Team pages" });
     await expect(tabs.getByRole("link", { name: "Directory" })).toHaveAttribute("aria-current", "page");
+    // Team goals are for owners and managers.
+    await expect(tabs.getByRole("link", { name: "Goals" })).toHaveCount(0);
     await expect(ui(page).getByRole("heading", { name: `Staff (${await countFor("staff", SEED.business, SEED.location)})` })).toBeVisible();
     await expect(ui(page).getByText("Bridget Callahan(you)")).toBeVisible();
     await tabs.getByRole("link", { name: "Schedule" }).click();
