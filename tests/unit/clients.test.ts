@@ -119,8 +119,17 @@ describe("parseClientForm", () => {
         sms_opt_in: true,
         email_opt_in: false,
         consent_signed_on: "2026-01-15",
+        birth_month: null,
+        birth_day: null,
       },
     });
+  });
+
+  it("takes a birthday as a month and day, or none", () => {
+    expect(parseClientForm(form({ first_name: "A", birth_month: "2", birth_day: "29" }), TODAY)).toMatchObject({ ok: true, value: { birth_month: 2, birth_day: 29 } });
+    for (const bad of [{ birth_month: "4", birth_day: "31" }, { birth_month: "4" }, { birth_day: "3" }, { birth_month: "13", birth_day: "1" }] as Record<string, string>[]) {
+      expect(parseClientForm(form({ first_name: "A", ...bad }), TODAY)).toEqual({ ok: false, errors: { birthday: "Choose a month and a day that exists." } });
+    }
   });
 
   it("only needs a first name", () => {

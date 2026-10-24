@@ -32,7 +32,8 @@ export async function runMembershipBilling(admin: Admin, options: { businessId?:
     const today = todayIn(m.location.timezone, now);
     const maybe =
       (m.status === "active" && (m.current_period_end <= today || (m.cancels_on ?? "9999") <= today || (m.pause_from ?? "9999") <= today)) ||
-      (m.status === "past_due" && (!m.next_retry_at || new Date(m.next_retry_at) <= now)) ||
+      // (A minute's grace for the database's clock; it decides what's due.)
+      (m.status === "past_due" && (!m.next_retry_at || Date.parse(m.next_retry_at) <= now.getTime() + 60_000)) ||
       (m.status === "paused" && m.resume_on !== null && m.resume_on <= today);
     if (!maybe) continue;
     summary.checked += 1;

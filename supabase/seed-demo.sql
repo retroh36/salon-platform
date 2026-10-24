@@ -717,6 +717,15 @@ insert into public.membership_events (business_id, membership_id, kind, detail, 
 select business_id, id, 'payment_failed', 'The card was declined', now() - interval '20 hours'
 from public.client_memberships where business_id = 'b0000000-0000-4000-8000-000000000001' and status = 'past_due';
 
+-- Birthdays for most clients (three of them today, and some who said yes
+-- to texts or emails), and the salon's review pages, for automations.
+update public.clients set birth_month = 1 + pg_temp.rnd('bm' || id) % 12, birth_day = 1 + pg_temp.rnd('bd' || id) % 28
+where business_id = 'b0000000-0000-4000-8000-000000000001' and pg_temp.rnd('bday' || id) % 5 < 3;
+update public.clients set birth_month = extract(month from (now() at time zone 'America/Chicago'))::smallint, birth_day = extract(day from (now() at time zone 'America/Chicago'))::smallint
+where id in (select id from public.clients where business_id = 'b0000000-0000-4000-8000-000000000001' and (sms_opt_in or email_opt_in) order by id offset 40 limit 3);
+update public.businesses set google_review_url = 'https://g.page/r/maple-and-ash-demo/review', yelp_url = 'https://www.yelp.com/biz/maple-and-ash-hair-studio-demo'
+where id = 'b0000000-0000-4000-8000-000000000001';
+
 -- Gift cards: bought ones with what's left on them, a few promotional and
 -- one expired; some belong to today's clients.
 create temp table seed_cards as

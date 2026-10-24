@@ -2,7 +2,7 @@ import Link from "next/link";
 import { pillClass } from "@/components/ui/page";
 
 // Moves between the settings pages.
-export function SettingsNav({ current }: { current: "salon" | "booking" | "checkout" | "gift-cards" | "packages" | "memberships" | "payroll" | "data" }) {
+export function SettingsNav({ current }: { current: "salon" | "booking" | "checkout" | "gift-cards" | "packages" | "memberships" | "automations" | "payroll" | "data" }) {
   const links = [
     ["salon", "/settings", "Your salon"],
     ["booking", "/settings/booking", "Online booking"],
@@ -10,6 +10,7 @@ export function SettingsNav({ current }: { current: "salon" | "booking" | "check
     ["gift-cards", "/settings/gift-cards", "Gift cards"],
     ["packages", "/settings/packages", "Packages"],
     ["memberships", "/settings/memberships", "Memberships"],
+    ["automations", "/settings/automations", "Automations"],
     ["payroll", "/settings/payroll", "Payroll"],
     ["data", "/settings/data", "Your data"],
   ] as const;

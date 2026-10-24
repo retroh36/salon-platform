@@ -84,9 +84,14 @@ export type ClientInput = {
   sms_opt_in: boolean;
   email_opt_in: boolean;
   consent_signed_on: string | null;
+  birth_month: number | null;
+  birth_day: number | null;
 };
 
-export type ClientFormErrors = Partial<Record<"first_name" | "email" | "phone" | "consent_signed_on", string>>;
+export type ClientFormErrors = Partial<Record<"first_name" | "email" | "phone" | "consent_signed_on" | "birthday", string>>;
+
+export const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 function isRealDate(value: string): boolean {
   if (!DATE.test(value)) return false;
@@ -97,7 +102,8 @@ function isRealDate(value: string): boolean {
 
 // Form fields: first_name, last_name, email, phone, preferred_staff_id,
 // preferences, notes, allergies, sms_opt_in, email_opt_in, consent_signed
-// (checkbox), consent_signed_on (date). `today` is the location's date.
+// (checkbox), consent_signed_on (date), birth_month and birth_day (both or
+// neither). `today` is the location's date.
 export function parseClientForm(
   form: FormLike,
   today: string,
@@ -121,6 +127,19 @@ export function parseClientForm(
     else if (consent_signed_on > today) errors.consent_signed_on = "The date can't be in the future.";
   }
 
+  // A birthday: month and day (the year isn't asked for).
+  const month = text(form, "birth_month");
+  const day = text(form, "birth_day");
+  let birth_month: number | null = null;
+  let birth_day: number | null = null;
+  if (month || day) {
+    birth_month = Number(month);
+    birth_day = Number(day);
+    if (!Number.isInteger(birth_month) || birth_month < 1 || birth_month > 12 || !Number.isInteger(birth_day) || birth_day < 1 || birth_day > DAYS_IN_MONTH[birth_month - 1]) {
+      errors.birthday = "Choose a month and a day that exists.";
+    }
+  }
+
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
   return {
@@ -137,6 +156,8 @@ export function parseClientForm(
       sms_opt_in: form.get("sms_opt_in") !== null,
       email_opt_in: form.get("email_opt_in") !== null,
       consent_signed_on,
+      birth_month,
+      birth_day,
     },
   };
 }

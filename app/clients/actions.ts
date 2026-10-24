@@ -25,7 +25,9 @@ export type ClientFormFields = Record<
   | "preferences"
   | "notes"
   | "allergies"
-  | "consent_signed_on",
+  | "consent_signed_on"
+  | "birth_month"
+  | "birth_day",
   string
 > & { sms_opt_in: boolean; email_opt_in: boolean; consent_signed: boolean };
 
@@ -134,6 +136,8 @@ function readClientFields(formData: FormData): ClientFormFields {
     notes: get("notes"),
     allergies: get("allergies"),
     consent_signed_on: get("consent_signed_on"),
+    birth_month: get("birth_month"),
+    birth_day: get("birth_day"),
     sms_opt_in: formData.get("sms_opt_in") !== null,
     email_opt_in: formData.get("email_opt_in") !== null,
     consent_signed: formData.get("consent_signed") !== null,

@@ -6,6 +6,7 @@ import { Field, inputClass, submitWithoutReset } from "@/components/form";
 import { buttonClass } from "@/components/ui/button";
 import { checkboxClass, selectClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
+import { MONTHS } from "@/lib/clients";
 import { saveClient, type ClientFormFields } from "./actions";
 
 export type StylistOption = { id: string; name: string };
@@ -52,6 +53,26 @@ export function ClientForm({
           </Field>
           <Field label="Email" error={errors.email}>
             <input name="email" type="email" defaultValue={fields.email} autoComplete="off" className={inputClass} />
+          </Field>
+          <Field label="Birthday (optional)" error={errors.birthday}>
+            <div className="flex gap-2">
+              <select name="birth_month" aria-label="Birthday month" defaultValue={fields.birth_month} className={`${selectClass} flex-1`}>
+                <option value="">Month</option>
+                {MONTHS.map((m, i) => (
+                  <option key={m} value={i + 1}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              <select name="birth_day" aria-label="Birthday day" defaultValue={fields.birth_day} className={`${selectClass} w-24!`}>
+                <option value="">Day</option>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
           </Field>
           <div className="flex flex-wrap gap-6 sm:col-span-2">
             <label className={checkLabel}>

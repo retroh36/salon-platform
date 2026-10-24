@@ -23,6 +23,8 @@ const EMPTY: ClientFormFields = {
   notes: "",
   allergies: "",
   consent_signed_on: "",
+  birth_month: "",
+  birth_day: "",
   sms_opt_in: false,
   email_opt_in: false,
   consent_signed: false,

@@ -20,7 +20,7 @@ import { formatPrice } from "@/lib/services";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { loadPhotos } from "@/lib/photos-load";
-import { canEditClients, formatDate } from "@/lib/clients";
+import { canEditClients, formatDate, MONTHS } from "@/lib/clients";
 import { isUuid } from "@/lib/ids";
 import { BackLink } from "@/components/ui/back-link";
 import { formatAmount, productName } from "@/lib/inventory";
@@ -300,6 +300,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
               empty="No preference"
             />
             <Detail label="Preferences" value={client.preferences} />
+            <Detail label="Birthday" value={client.birth_month && client.birth_day ? `${MONTHS[client.birth_month - 1]} ${client.birth_day}` : null} />
             <Detail label="Notes" value={client.notes} wide />
             <Detail
               label="Consent form"
@@ -342,6 +343,8 @@ function toFields(client: {
   consent_signed_on: string | null;
   sms_opt_in: boolean;
   email_opt_in: boolean;
+  birth_month: number | null;
+  birth_day: number | null;
 }): ClientFormFields {
   return {
     first_name: client.first_name,
@@ -356,6 +359,8 @@ function toFields(client: {
     sms_opt_in: client.sms_opt_in,
     email_opt_in: client.email_opt_in,
     consent_signed: client.consent_signed_on !== null,
+    birth_month: client.birth_month ? String(client.birth_month) : "",
+    birth_day: client.birth_day ? String(client.birth_day) : "",
   };
 }
 
