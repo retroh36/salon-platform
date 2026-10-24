@@ -8,7 +8,7 @@ A salon can't open its doors without its calendar, so its data has to survive a 
 | --- | --- | --- |
 | Everything salons enter: clients, visits, formulas, sales, payments, gift cards, packages, stock, settings, the AI action log, logins | Supabase Postgres (`public`, `private`, `auth` schemas) | Yes |
 | File metadata (which file belongs to which salon) | Supabase Postgres (`storage` schema) | Yes |
-| The files themselves: salon logos, stylist photos, before and after photos | Supabase Storage buckets `salon-logos`, `staff-photos`, `visit-photos` | **No** (see [Files](#files-storage)) |
+| The files themselves: salon logos, stylist photos, before and after photos | Supabase Storage buckets `salon-logos`, `staff-photos`, `visit-photos` | **No**: they have their own nightly backup (see [Files](#files-storage)) |
 | Card details | Stripe only (never stored here) | Not applicable |
 | Code | GitHub; Vercel builds every push | Git history |
 | Secrets (`SUPABASE_SECRET_KEY`, `ANTHROPIC_API_KEY`, `CRON_SECRET`, `PHOREST_*`) | Vercel environment settings and `.env.local` | No, on purpose; keep a copy in the team's password manager |
@@ -37,10 +37,13 @@ Restoring the database doesn't touch Storage, and vice versa.
 
 ## Files (Storage)
 
-Supabase's database backups don't include the files in Storage buckets; they only include the `storage.objects` rows that point at them. Logos and stylist photos can be uploaded again, but **before and after photos can't be replaced**, so they need a backup of their own:
+Supabase's database backups don't include the files in Storage buckets; they only include the `storage.objects` rows that point at them. Before and after photos can't be replaced, so the files have their own backup (`lib/photo-backup.ts`):
 
-- Copy the buckets every night to separate object storage in another account (an S3 or R2 bucket with versioning on and no public access), using the service role key from a scheduled job. The `visit-photos` copy must stay private: it holds client photos.
-- Until that job exists, this is a known gap (`docs/backlog.md`, Operations).
+- **Every night** (the `maestra-photo-backup` job, below) new and changed files in `visit-photos`, `staff-photos` and `salon-logos` are copied to a private backup bucket, at `<bucket>/<path>`. Only the service role can read or write it (no storage policies).
+- **Where:** set `PHOTO_BACKUP_SUPABASE_URL` and `PHOTO_BACKUP_SECRET_KEY` (and optionally `PHOTO_BACKUP_BUCKET`) in Vercel to copy into a bucket in a **separate Supabase project**, ideally in another organization, so losing this project doesn't lose the photos. Create a private bucket there first (default name `photo-backups`). Without those settings, the copy goes to the `photo-backups` bucket in this project, which protects against deleted files but not against losing the project.
+- **Deleted photos:** a file deleted here stays in the backup for 30 days, so a mistake can be undone, then it's removed from the backup too, so a client's photo doesn't outlive its deletion. The backup keeps a `_manifest.json` of what's waiting to be removed.
+- **Restoring:** `npm run photos -- restore` puts back every file that's in the backup but missing here; add a prefix to restore only part, e.g. `npm run photos -- restore visit-photos/<business id>/`. Restoring never overwrites a file that's still here. After restoring into a new project, restore the database first, so the `visit_photos` rows point at the files.
+- **By hand:** `npm run photos -- backup` copies now; `npm run photos -- verify` checks every file has an identical copy (by SHA-256) and lists any that don't.
 
 ## The owners' own copy: "Your data is yours"
 
@@ -59,6 +62,8 @@ npm run backup:drill   # scripts/backup-drill.sh
 
 The drill dumps the local database the way a backup does (the `public`, `private`, `auth` and `storage` schemas), restores it into a scratch database, and checks that every table came back with the same number of rows, and that row level security, its policies, the database functions and triggers all came back too. It prints table names and counts only, never data, and drops the scratch database afterwards. It fails if anything differs or the restore reports an error (other than Supabase's own default privileges, which a plain role can't restore and which the app doesn't rely on).
 
+Then it checks the photo backup (`scripts/photo-backup-drill.ts`), with a test file of its own (never a real photo): the backup copies it byte for byte; after it's deleted here it's still in the backup and restores identical; 30 days after a deletion it's gone from the backup; and every real file has an identical copy.
+
 Last run: 2026-10-23, passed: 104 tables, 24,078 rows, 67 tables with row level security, 125 policies, 100 functions.
 
 **Every quarter: a real restore of production.**
@@ -66,12 +71,40 @@ Last run: 2026-10-23, passed: 104 tables, 24,078 rows, 67 tables with row level 
 1. Restore the latest production backup (or PITR to a recent minute) into a **new, temporary** Supabase project; never over production.
 2. Compare row counts with production for the main tables (`clients`, `appointments`, `sales`, `payments`, `gift_cards`, `client_packages`) using the counting query in `scripts/backup-drill.sh`; they should match, allowing for what happened since the backup.
 3. Point a local checkout at it (`.env.local`) and open the calendar, a client and a sale.
-4. Write the date and result below, then delete the temporary project.
+4. Run `npm run photos -- verify` against production (it reads only), and restore one photo into the temporary project's bucket to see it open.
+5. Write the date and result below, then delete the temporary project.
 
 ## Record
 
 | Date | Check | Result | By |
 | --- | --- | --- | --- |
 | 2026-10-23 | Local drill (`npm run backup:drill`) | Passed: all 104 tables, RLS, policies and functions restored | Claude (set-up) |
+| 2026-10-23 | Local drill with the photo backup | Passed: copied, kept after deletion, restored byte for byte, removed after 30 days | Claude (set-up) |
+| | Production: `PHOTO_BACKUP_*` pointing at a separate project, and the first `npm run photos -- verify` | To do when production is set up | |
 | | Hosted project: plan, PITR window and retention confirmed in the dashboard | To do when production is set up | |
 | | First quarterly production restore | To do | |
+
+## Scheduled jobs
+
+The database runs them (Supabase's scheduler, `pg_cron`), so they work on any Vercel plan, including the free one (whose own cron jobs are limited). Each job calls one of the app's endpoints, `/api/cron/<job>`, through `pg_net`, with `CRON_SECRET` as a bearer token; the endpoints refuse anything else. The jobs and their schedule are in `supabase/migrations/…_scheduled_jobs.sql`.
+
+| Job | Endpoint | When (UTC) | Chicago | What it does |
+| --- | --- | --- | --- | --- |
+| `maestra-photo-backup` | `/api/cron/photo-backup` | 07:00 daily | 1 or 2am | Copies new and changed Storage files to the backup |
+| `maestra-insights` | `/api/cron/insights` | 08:00 daily | 2 or 3am | Recalculates what Denise has learned for every salon |
+| `maestra-risk-check` | `/api/cron/risk` | 09:00 daily | 3 or 4am | Denise's risk check on each location's day: fixes for visits likely to run over, waiting for staff to approve |
+| `maestra-memberships` | `/api/cron/memberships` | 10:00 daily | 4 or 5am | Membership renewals, retries of failed payments, pauses and endings that start |
+| `maestra-risk-check-morning` | `/api/cron/risk` | 12:00 daily | 6 or 7am | The risk check again, with the night's online bookings, before the salon opens |
+| `maestra-automations` | `/api/cron/automations` | :15 every hour | | Rebook reminders, win-back, birthday and review messages that are due (each salon's sending hours, 9am to 8pm local, are checked in the app) |
+
+Appointment reminders (texts before a visit) don't exist yet; they come with texts and email. When they do, they'll be one more job here.
+
+**Setting up an environment** (once for production, once for any preview project that should run jobs):
+
+1. Set `CRON_SECRET` (at least 16 random characters) in the app's environment (Vercel → Settings → Environment Variables), and redeploy.
+2. With that project's `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SECRET_KEY` and the same `CRON_SECRET` in your environment, run `npm run jobs -- configure https://<the app's address>`. This stores the address and secret in the project's Vault; nothing else holds them.
+3. `npm run jobs -- run insights` starts one now; `npm run jobs -- status` shows every job, its schedule and its last runs. `npm run jobs -- off` stops them calling the app.
+
+Until it's configured, the jobs run but do nothing. Locally they're off; run the same jobs by hand with `npm run insights`, `npm run photos -- backup`, or the "Run renewals now" and "Send due messages now" buttons.
+
+**If a job fails:** `npm run jobs -- status` shows whether the database ran it; the request and the app's answer are in `net._http_response` for a while, and the endpoint's errors are in the app's logs (Vercel → Logs). Each job must finish within the plan's time limit for a function; the insights job is the longest, so watch it as salons are added. Every job is safe to run again: renewals and messages are recorded once, and copies skip what's already backed up.

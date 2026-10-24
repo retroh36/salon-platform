@@ -8,7 +8,7 @@ import { buttonClass } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { Card, PageHeader, pillClass } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
-import { formatHours, nextPeriod, previousPeriod, requestedPeriod, type PayPeriod } from "@/lib/payroll";
+import { formatHours, nextPeriod, previousPeriod, ratesText, requestedPeriod, type PayPeriod } from "@/lib/payroll";
 import { loadPayroll, loadPaySettings } from "@/lib/payroll-load";
 import { formatLongDay } from "@/lib/schedule-format";
 import { todayIn } from "@/lib/scheduling/time";
@@ -84,8 +84,9 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
             Show
           </button>
           <p className="basis-full text-xs text-ink-muted">
-            Commission is on sales after discounts, before tax, at each person&apos;s current rates (Team → Schedule). Refunds and voids are taken back in the period they
-            happen. Hours come from their schedule, less approved time off{running ? ", up to today" : ""}.
+            Commission is on sales after discounts, before tax, at the rate each person had when each sale was made (changing a rate on Team → Schedule only affects
+            sales from then on). Refunds and voids are taken back at the same rate, in the period they happen. Hours come from their schedule, less approved time off
+            {running ? ", up to today" : ""}, at the hourly rate in effect each day.
             {me.role === "owner" && (
               <>
                 {" "}
@@ -125,17 +126,17 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
                   <td className="py-2 pr-3 text-right">{payMoney(l.serviceCents)}</td>
                   <td className="py-2 pr-3 text-right">
                     {payMoney(l.serviceCommissionCents)}
-                    {l.comp.servicePct > 0 && <span className="block text-xs text-ink-muted">{l.comp.servicePct}%</span>}
+                    {l.rates.service.length > 0 && <span className="block text-xs text-ink-muted">{ratesText(l.rates.service, (v) => `${v}%`)}</span>}
                   </td>
                   <td className="py-2 pr-3 text-right">{payMoney(l.retailCents)}</td>
                   <td className="py-2 pr-3 text-right">
                     {payMoney(l.retailCommissionCents)}
-                    {l.comp.retailPct > 0 && <span className="block text-xs text-ink-muted">{l.comp.retailPct}%</span>}
+                    {l.rates.retail.length > 0 && <span className="block text-xs text-ink-muted">{ratesText(l.rates.retail, (v) => `${v}%`)}</span>}
                   </td>
                   <td className="py-2 pr-3 text-right">{payMoney(l.tipCents)}</td>
                   <td className="py-2 pr-3 text-right">
                     {l.minutes === null ? "—" : formatHours(l.minutes)}
-                    {l.comp.hourlyRateCents !== null && <span className="block text-xs text-ink-muted">at {formatPrice(l.comp.hourlyRateCents)}/h</span>}
+                    {l.rates.hourly.length > 0 && <span className="block text-xs text-ink-muted">at {ratesText(l.rates.hourly, (c) => `${formatPrice(c)}/h`)}</span>}
                   </td>
                   <td className="py-2 pr-5 text-right font-semibold" data-testid="pay-total">
                     {formatPrice(l.totalCents)}

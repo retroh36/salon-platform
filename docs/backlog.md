@@ -49,5 +49,6 @@ Known gaps to pick up later. Move an item into a task when it's scheduled.
 
 ## Operations
 
-- [ ] **Back up Storage files.** Database backups don't include files. Copy the `visit-photos`, `staff-photos` and `salon-logos` buckets nightly to private, versioned object storage in another account (`docs/operations.md`).
+- [ ] **Photo backups to a separate project.** The nightly Storage backup is built (`lib/photo-backup.ts`); point it at a bucket in a separate Supabase project (`PHOTO_BACKUP_SUPABASE_URL`, `docs/operations.md`) when production is set up.
+- [ ] **Configure scheduled jobs in production.** `CRON_SECRET` in Vercel, then `npm run jobs -- configure` against the production project (`docs/operations.md`).
 - [ ] **Confirm the hosted backups.** When the production Supabase project is set up: a paid plan, Point-in-Time Recovery on, retention of 7+ days, and two owners with 2FA; then the first quarterly restore (`docs/operations.md`).

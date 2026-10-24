@@ -1677,14 +1677,14 @@ isOneToOne: false
                   ]
                 },"sale_items": {
                   Row: {
-                    "appointment_item_id": string | null,"booked_price_cents": number | null,"business_id": string,"client_package_id": string | null,"description": string,"discount_cents": number,"gift_card_id": string | null,"id": string,"kind": Database["public"]['Enums']["sale_item_kind"],"line_discount_cents": number,"line_discount_reason": string | null,"member_discount_cents": number,"membership_credit_id": string | null,"membership_id": string | null,"package_item_id": string | null,"position": number,"price_reason": string | null,"product_id": string | null,"quantity": number,"returned_quantity": number,"sale_id": string,"service_id": string | null,"staff_id": string | null,"tax_cents": number,"total_cents": number,"unit_price_cents": number
+                    "appointment_item_id": string | null,"booked_price_cents": number | null,"business_id": string,"client_package_id": string | null,"commission_pct": number | null,"description": string,"discount_cents": number,"gift_card_id": string | null,"id": string,"kind": Database["public"]['Enums']["sale_item_kind"],"line_discount_cents": number,"line_discount_reason": string | null,"member_discount_cents": number,"membership_credit_id": string | null,"membership_id": string | null,"package_item_id": string | null,"position": number,"price_reason": string | null,"product_id": string | null,"quantity": number,"returned_quantity": number,"sale_id": string,"service_id": string | null,"staff_id": string | null,"tax_cents": number,"total_cents": number,"unit_price_cents": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id": string,"client_package_id"?: string | null,"description": string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["sale_item_kind"],"line_discount_cents"?: number,"line_discount_reason"?: string | null,"member_discount_cents"?: number,"membership_credit_id"?: string | null,"membership_id"?: string | null,"package_item_id"?: string | null,"position": number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id": string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents": number,"unit_price_cents": number
+                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id": string,"client_package_id"?: string | null,"commission_pct"?: number | null,"description": string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["sale_item_kind"],"line_discount_cents"?: number,"line_discount_reason"?: string | null,"member_discount_cents"?: number,"membership_credit_id"?: string | null,"membership_id"?: string | null,"package_item_id"?: string | null,"position": number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id": string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents": number,"unit_price_cents": number
                   }
                   Update: {
-                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id"?: string,"client_package_id"?: string | null,"description"?: string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["sale_item_kind"],"line_discount_cents"?: number,"line_discount_reason"?: string | null,"member_discount_cents"?: number,"membership_credit_id"?: string | null,"membership_id"?: string | null,"package_item_id"?: string | null,"position"?: number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id"?: string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents"?: number,"unit_price_cents"?: number
+                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id"?: string,"client_package_id"?: string | null,"commission_pct"?: number | null,"description"?: string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["sale_item_kind"],"line_discount_cents"?: number,"line_discount_reason"?: string | null,"member_discount_cents"?: number,"membership_credit_id"?: string | null,"membership_id"?: string | null,"package_item_id"?: string | null,"position"?: number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id"?: string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents"?: number,"unit_price_cents"?: number
                   }
                   Relationships: [
                     {
@@ -2021,6 +2021,38 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "staff"
       referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"staff_compensation_history": {
+                  Row: {
+                    "business_id": string,"changed_by": string | null,"created_at": string,"effective_from": string,"hourly_rate_cents": number | null,"id": string,"retail_commission_pct": number,"service_commission_pct": number,"staff_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"changed_by"?: string | null,"created_at"?: string,"effective_from": string,"hourly_rate_cents"?: number | null,"id"?: string,"retail_commission_pct": number,"service_commission_pct": number,"staff_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"changed_by"?: string | null,"created_at"?: string,"effective_from"?: string,"hourly_rate_cents"?: number | null,"id"?: string,"retail_commission_pct"?: number,"service_commission_pct"?: number,"staff_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "staff_compensation_history_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "staff_compensation_history_changed_by_fkey"
+      columns: ["changed_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "staff_compensation_history_staff_id_fkey"
+      columns: ["staff_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
     }
                   ]
                 },"staff_schedule_overrides": {
@@ -2625,6 +2657,9 @@ isOneToOne: false
 "complete_sale":
 { Args: { "p_input": Json,"p_location_id": string }; Returns: string
                            },
+"configure_scheduled_jobs":
+{ Args: { "p_app_url": string,"p_secret": string }; Returns: undefined
+                           },
 "create_payment_link":
 { Args: { "p_amount_cents": number,"p_channel": string,"p_draft_id": string,"p_hours": number,"p_snapshot": Json,"p_to": string,"p_token_hash": string }; Returns: string
                            },
@@ -2715,6 +2750,9 @@ isOneToOne: false
 "retry_membership_payment":
 { Args: { "p_membership_id": string }; Returns: undefined
                            },
+"run_scheduled_job_now":
+{ Args: { "p_path": string }; Returns: number
+                           },
 "save_appointment":
 { Args: { "p_appointment_id": string,"p_client_id": string,"p_expected_version": number,"p_items": Json,"p_location_id": string,"p_notes": string }; Returns: string
                            },
@@ -2738,6 +2776,9 @@ isOneToOne: false
                            },
 "save_service":
 { Args: { "p_active_minutes": number,"p_business_id": string,"p_category": string,"p_description": string,"p_finishing_minutes": number,"p_name": string,"p_price_cents": number,"p_processing_minutes": number,"p_service_id": string,"p_staff": Json }; Returns: string
+                           },
+"scheduled_jobs_status":
+{ Args: Record<PropertyKey, never>; Returns: Json
                            },
 "send_purchase_order":
 { Args: { "p_order_id": string }; Returns: undefined

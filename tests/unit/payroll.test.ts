@@ -6,6 +6,8 @@ import {
   payrollCsv,
   periodContaining,
   previousPeriod,
+  hourlyPay,
+  rateOn,
   requestedPeriod,
   scheduledMinutes,
   ticketsFor,
@@ -28,9 +30,10 @@ function sale(over: Partial<PayrollSale> = {}): PayrollSale {
     voided_at: null,
     client: "Ava Test",
     lines: [
-      { kind: "service", staff_id: A, description: "Cut", quantity: 1, net_cents: 8000 },
-      { kind: "product", staff_id: A, description: "Shampoo", quantity: 1, net_cents: 2000 },
-      { kind: "product", staff_id: B, description: "Spray", quantity: 1, net_cents: 1000 },
+      // Each at the rate recorded when it was sold.
+      { kind: "service", staff_id: A, description: "Cut", quantity: 1, net_cents: 8000, commission_pct: 45 },
+      { kind: "product", staff_id: A, description: "Shampoo", quantity: 1, net_cents: 2000, commission_pct: 15 },
+      { kind: "product", staff_id: B, description: "Spray", quantity: 1, net_cents: 1000, commission_pct: 10 },
     ],
     tips: [{ staff_id: A, amount_cents: 1000 }],
     refunds: [],
@@ -83,7 +86,7 @@ describe("tickets behind the pay", () => {
     const sameDay = sale({ voided_at: "2026-10-07T17:00:00Z" });
     const tickets = ticketsFor([sameDay], A, from, to);
     expect(tickets.map((t) => t.kind)).toEqual(["sale", "void"]);
-    const pay = payLine({ staffId: A, name: "Ana", role: "Stylist" }, { servicePct: 40, retailPct: 10, hourlyRateCents: null }, tickets, null);
+    const pay = payLine({ staffId: A, name: "Ana", role: "Stylist" }, tickets, null);
     expect(pay).toMatchObject({ serviceCents: 0, retailCents: 0, tipCents: 0, totalCents: 0 });
 
     // Paid last period, a quarter refunded, then voided this period.
@@ -94,21 +97,40 @@ describe("tickets behind the pay", () => {
 });
 
 describe("pay", () => {
-  it("adds commission on the period's totals, tips, and hourly pay from scheduled hours", () => {
-    const tickets = ticketsFor([sale(), sale({ id: "s2", number: 1002 })], A, from, to);
-    const pay = payLine({ staffId: A, name: "Ana Test", role: "Stylist" }, { servicePct: 45, retailPct: 15, hourlyRateCents: 1500 }, tickets, 600);
+  it("pays each line at the rate recorded when it was sold, plus tips and hourly pay", () => {
+    // The second sale was made after a raise to 50%.
+    const raised = sale({ id: "s2", number: 1002, lines: sale().lines.map((l) => (l.kind === "service" ? { ...l, commission_pct: 50 } : l)) });
+    const tickets = ticketsFor([sale(), raised], A, from, to);
+    const pay = payLine({ staffId: A, name: "Ana Test", role: "Stylist" }, tickets, { minutes: 600, payCents: 15000, rates: [1500] });
     expect(pay).toMatchObject({
       serviceCents: 16000,
-      serviceCommissionCents: 7200,
+      serviceCommissionCents: 3600 + 4000,
       retailCents: 4000,
       retailCommissionCents: 600,
       tipCents: 2000,
       minutes: 600,
       hourlyPayCents: 15000,
-      totalCents: 7200 + 600 + 2000 + 15000,
+      totalCents: 7600 + 600 + 2000 + 15000,
+      rates: { service: [45, 50], retail: [15], hourly: [1500] },
     });
-    // Not hourly: no hours, no hourly pay.
-    expect(payLine({ staffId: A, name: "Ana", role: "Stylist" }, { servicePct: 0, retailPct: 0, hourlyRateCents: null }, [], 600)).toMatchObject({ minutes: null, hourlyPayCents: 0, totalCents: 0 });
+    // A refund takes back at the rate it was paid at.
+    const refunded = ticketsFor([sale({ created_at: "2026-09-30T16:00:00Z", refunds: [{ amount_cents: 3000, at: "2026-10-10T16:00:00Z" }] })], A, from, to);
+    expect(payLine({ staffId: A, name: "Ana", role: "Stylist" }, refunded, null)).toMatchObject({ serviceCommissionCents: -900, retailCommissionCents: -75, minutes: null, hourlyPayCents: 0 });
+  });
+
+  it("pays hours at the rate in effect each day", () => {
+    const schedule = { weekly: { 1: [{ start: 540, end: 1020 }], 2: [{ start: 540, end: 1020 }] }, overrides: {}, timeOff: [] };
+    // $18/h, then $20/h from Tuesday the 13th; hourly only from the start.
+    const history = [
+      { from: null, hourlyRateCents: 1800 },
+      { from: "2026-10-13", hourlyRateCents: 2000 },
+    ];
+    // Mon 5th, Tue 6th, Mon 12th at $18; Tue 13th at $20 (8h each).
+    expect(hourlyPay(schedule, "2026-10-05", "2026-10-13", history)).toEqual({ minutes: 4 * 480, payCents: 3 * 8 * 1800 + 8 * 2000, rates: [1800, 2000] });
+    expect(rateOn(history, "2026-10-12")).toBe(1800);
+    // Moved to commission on the 13th: only the days before are hourly.
+    expect(hourlyPay(schedule, "2026-10-05", "2026-10-13", [history[0], { from: "2026-10-13", hourlyRateCents: null }])).toEqual({ minutes: 3 * 480, payCents: 3 * 8 * 1800, rates: [1800] });
+    expect(hourlyPay(schedule, "2026-10-05", "2026-10-13", [{ from: null, hourlyRateCents: null }])).toBeNull();
   });
 
   it("counts scheduled hours: one-off changes over weekly hours, less approved time off", () => {
@@ -128,7 +150,7 @@ describe("pay", () => {
   });
 
   it("exports a row per person in dollars, safe for spreadsheets", () => {
-    const pay = payLine({ staffId: A, name: '=Evil "Ana", Jr', role: "Stylist" }, { servicePct: 45, retailPct: 15, hourlyRateCents: 1800 }, ticketsFor([sale()], A, from, to), 450);
+    const pay = payLine({ staffId: A, name: '=Evil "Ana", Jr', role: "Stylist" }, ticketsFor([sale()], A, from, to), { minutes: 450, payCents: 13500, rates: [1800] });
     const csv = payrollCsv([pay], { from: "2026-10-05", to: "2026-10-18" });
     const [header, row] = csv.trimEnd().split("\r\n");
     expect(header).toBe(

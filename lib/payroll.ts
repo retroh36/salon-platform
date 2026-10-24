@@ -7,7 +7,10 @@
 // in the period it was voided, taking back whatever was left. So a sale
 // paid in one period and refunded in the next is paid, then clawed back,
 // and nothing is ever paid twice. Commission is worked out on the period's
-// totals, ex tax and after discounts, at the staff member's current rates.
+// lines, ex tax and after discounts, at the rate recorded on each line when
+// the sale was made (a refund or void takes back at the same rate); hourly
+// pay at the rate in effect each day. Changing a rate never changes past
+// pay.
 
 import { csvTable, dollars } from "./csv.ts";
 import { mergeIntervals, subtractIntervals } from "./scheduling/intervals.ts";
@@ -62,7 +65,8 @@ export type PayrollSale = {
   total_cents: number;
   voided_at: string | null;
   client: string | null;
-  lines: { kind: "service" | "product"; staff_id: string; description: string; quantity: number; net_cents: number }[];
+  // commission_pct: the rate recorded on the line when it was sold.
+  lines: { kind: "service" | "product"; staff_id: string; description: string; quantity: number; net_cents: number; commission_pct: number }[];
   tips: { staff_id: string; amount_cents: number }[];
   refunds: { amount_cents: number; at: string }[];
 };
@@ -79,13 +83,13 @@ export type Ticket = {
   serviceCents: number;
   retailCents: number;
   tipCents: number;
-  lines: { description: string; kind: "service" | "product"; quantity: number; cents: number }[];
+  lines: { description: string; kind: "service" | "product"; quantity: number; cents: number; pct: number }[];
 };
 
 type Amounts = { serviceCents: number; retailCents: number; tipCents: number; lines: Ticket["lines"] };
 
 function ownShare(sale: PayrollSale, staffId: string): Amounts {
-  const lines = sale.lines.filter((l) => l.staff_id === staffId).map((l) => ({ description: l.description, kind: l.kind, quantity: l.quantity, cents: l.net_cents }));
+  const lines = sale.lines.filter((l) => l.staff_id === staffId).map((l) => ({ description: l.description, kind: l.kind, quantity: l.quantity, cents: l.net_cents, pct: Number(l.commission_pct) }));
   return {
     serviceCents: lines.filter((l) => l.kind === "service").reduce((n, l) => n + l.cents, 0),
     retailCents: lines.filter((l) => l.kind === "product").reduce((n, l) => n + l.cents, 0),
@@ -144,28 +148,57 @@ export function ticketsFor(sales: readonly PayrollSale[], staffId: string, from:
   return out.sort((a, b) => a.at.localeCompare(b.at));
 }
 
-// Scheduled minutes between two dates (inclusive): their hours each day
-// (a one-off change, else their weekly hours) less approved time off.
-export function scheduledMinutes(schedule: StaffSchedule, from: LocalDate, to: LocalDate): number {
-  if (to < from) return 0;
-  let minutes = 0;
-  for (const date of datesBetween(from, to)) {
-    const hours = mergeIntervals(schedule.overrides[date] ?? schedule.weekly[weekdayOf(date)] ?? []);
-    const off = schedule.timeOff
-      .filter((t) => t.status === "approved" && date >= t.startsOn && date <= t.endsOn)
-      .map((t) => (t.startMinute != null && t.endMinute != null ? { start: t.startMinute, end: t.endMinute } : { start: 0, end: 1440 }));
-    minutes += subtractIntervals(hours, off).reduce((n, i) => n + i.end - i.start, 0);
-  }
-  return minutes;
+// Scheduled minutes on a day: their hours (a one-off change, else their
+// weekly hours) less approved time off.
+function minutesOn(schedule: StaffSchedule, date: LocalDate): number {
+  const hours = mergeIntervals(schedule.overrides[date] ?? schedule.weekly[weekdayOf(date)] ?? []);
+  const off = schedule.timeOff
+    .filter((t) => t.status === "approved" && date >= t.startsOn && date <= t.endsOn)
+    .map((t) => (t.startMinute != null && t.endMinute != null ? { start: t.startMinute, end: t.endMinute } : { start: 0, end: 1440 }));
+  return subtractIntervals(hours, off).reduce((n, i) => n + i.end - i.start, 0);
 }
 
-export type Compensation = { servicePct: number; retailPct: number; hourlyRateCents: number | null };
+// Scheduled minutes between two dates (inclusive).
+export function scheduledMinutes(schedule: StaffSchedule, from: LocalDate, to: LocalDate): number {
+  return to < from ? 0 : datesBetween(from, to).reduce((n, d) => n + minutesOn(schedule, d), 0);
+}
+
+// Someone's pay history, oldest first: from a date (null: from the start)
+// the hourly rate (null: not paid by the hour).
+export type RateHistory = { from: LocalDate | null; hourlyRateCents: number | null }[];
+
+export const rateOn = (history: RateHistory, date: LocalDate) => [...history].reverse().find((h) => h.from === null || h.from <= date)?.hourlyRateCents ?? null;
+
+export type Hours = { minutes: number; payCents: number; rates: number[] };
+
+// Hourly pay between two dates: each day's scheduled minutes at the rate in
+// effect that day. Null for someone never paid by the hour in the period.
+export function hourlyPay(schedule: StaffSchedule, from: LocalDate, to: LocalDate, history: RateHistory): Hours | null {
+  if (to < from) return null;
+  let minutes = 0;
+  let pay = 0;
+  const rates = new Set<number>();
+  let hourly = false;
+  for (const date of datesBetween(from, to)) {
+    const rate = rateOn(history, date);
+    if (rate === null) continue;
+    hourly = true;
+    rates.add(rate);
+    const m = minutesOn(schedule, date);
+    minutes += m;
+    pay += (m * rate) / 60;
+  }
+  return hourly ? { minutes, payCents: Math.round(pay), rates: [...rates].sort((a, b) => a - b) } : null;
+}
+
+// The rates a pay line was worked out at (several if they changed).
+export type RatesUsed = { service: number[]; retail: number[]; hourly: number[] };
 
 export type PayLine = {
   staffId: string;
   name: string;
   role: string;
-  comp: Compensation;
+  rates: RatesUsed;
   serviceCents: number;
   serviceCommissionCents: number;
   retailCents: number;
@@ -178,27 +211,35 @@ export type PayLine = {
   tickets: Ticket[];
 };
 
-export function payLine(person: { staffId: string; name: string; role: string }, comp: Compensation, tickets: Ticket[], minutes: number | null): PayLine {
+const unique = (values: number[]) => [...new Set(values)].sort((a, b) => a - b);
+
+export function payLine(person: { staffId: string; name: string; role: string }, tickets: Ticket[], hours: Hours | null): PayLine {
+  const lines = tickets.flatMap((t) => t.lines);
+  const of = (kind: "service" | "product") => lines.filter((l) => l.kind === kind);
   const serviceCents = tickets.reduce((n, t) => n + t.serviceCents, 0);
   const retailCents = tickets.reduce((n, t) => n + t.retailCents, 0);
   const tipCents = tickets.reduce((n, t) => n + t.tipCents, 0);
-  const serviceCommissionCents = Math.round((serviceCents * comp.servicePct) / 100);
-  const retailCommissionCents = Math.round((retailCents * comp.retailPct) / 100);
-  const hourly = comp.hourlyRateCents !== null && minutes !== null ? Math.round((minutes * comp.hourlyRateCents) / 60) : 0;
+  // Each line at its own rate, rounded once for the period.
+  const serviceCommissionCents = Math.round(of("service").reduce((n, l) => n + (l.cents * l.pct) / 100, 0));
+  const retailCommissionCents = Math.round(of("product").reduce((n, l) => n + (l.cents * l.pct) / 100, 0));
+  const hourly = hours?.payCents ?? 0;
   return {
     ...person,
-    comp,
+    rates: { service: unique(of("service").map((l) => l.pct)), retail: unique(of("product").map((l) => l.pct)), hourly: hours?.rates ?? [] },
     serviceCents,
     serviceCommissionCents,
     retailCents,
     retailCommissionCents,
     tipCents,
-    minutes: comp.hourlyRateCents !== null ? minutes : null,
+    minutes: hours?.minutes ?? null,
     hourlyPayCents: hourly,
     totalCents: serviceCommissionCents + retailCommissionCents + tipCents + hourly,
     tickets,
   };
 }
+
+// "45%", or "45% then 50%" after a change.
+export const ratesText = (values: number[], format: (v: number) => string) => values.map(format).join(", ");
 
 export const formatHours = (minutes: number) => (minutes / 60).toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
 
@@ -227,14 +268,14 @@ export function payrollCsv(lines: readonly PayLine[], period: PayPeriod): string
     l.name,
     l.role,
     dollars(l.serviceCents),
-    l.comp.servicePct,
+    l.rates.service.join("/"),
     dollars(l.serviceCommissionCents),
     dollars(l.retailCents),
-    l.comp.retailPct,
+    l.rates.retail.join("/"),
     dollars(l.retailCommissionCents),
     dollars(l.tipCents),
     l.minutes === null ? "" : formatHours(l.minutes),
-    l.comp.hourlyRateCents === null ? "" : dollars(l.comp.hourlyRateCents),
+    l.rates.hourly.map(dollars).join("/"),
     dollars(l.hourlyPayCents),
     dollars(l.totalCents),
   ]);

@@ -159,3 +159,34 @@ describe("pay for a period", () => {
     expect(everyone.find((l) => l.staffId === SHAE)!.minutes).toBeNull();
   });
 });
+
+describe("commission history", () => {
+  it("keeps a closed pay period's pay when someone's rates change; new sales get the new rate", async () => {
+    const started = new Date(Date.now() - 1000).toISOString();
+    const { data: was } = await admin.from("staff_compensation").select("staff_id, service_commission_pct, retail_commission_pct, hourly_rate_cents").in("staff_id", [BRIDGET, SAM]);
+    const before = await loadPayroll(owner, B, TZ, PERIOD, today);
+    const pick = (lines: typeof before) => lines.filter((l) => l.staffId === BRIDGET || l.staffId === SAM).map((l) => [l.staffId, l.serviceCommissionCents, l.retailCommissionCents, l.hourlyPayCents, l.totalCents]);
+    try {
+      // A manager changes Bridget's commission and Sam's hourly rate.
+      expect((await manager.from("staff_compensation").update({ service_commission_pct: 20, retail_commission_pct: 5 }).eq("staff_id", BRIDGET).select()).error).toBeNull();
+      expect((await manager.from("staff_compensation").update({ hourly_rate_cents: 3000 }).eq("staff_id", SAM).select()).error).toBeNull();
+      const after = await loadPayroll(owner, B, TZ, PERIOD, today);
+      expect(pick(after)).toEqual(pick(before));
+      // The change is on record, with who made it.
+      const { data: history } = await admin.from("staff_compensation_history").select("service_commission_pct, changed_by").eq("staff_id", BRIDGET).gte("created_at", started);
+      expect(history).toEqual([{ service_commission_pct: 20, changed_by: SEED.staff.manager }]);
+      // A sale from now on is paid at the new rate.
+      const saleId = await sell();
+      const { data: lines } = await admin.from("sale_items").select("kind, commission_pct").eq("sale_id", saleId).eq("staff_id", BRIDGET).order("position");
+      expect(lines!.map((l) => [l.kind, Number(l.commission_pct)])).toEqual([
+        ["service", 20],
+        ["product", 5],
+      ]);
+      // Stylists see only their own history.
+      expect((await bridget.from("staff_compensation_history").select("staff_id").neq("staff_id", BRIDGET)).data).toEqual([]);
+    } finally {
+      for (const w of was!) await admin.from("staff_compensation").update(w).eq("staff_id", w.staff_id);
+      await admin.from("staff_compensation_history").delete().in("staff_id", [BRIDGET, SAM]).gte("created_at", started);
+    }
+  });
+});

@@ -2,7 +2,9 @@
 # Backup drill (docs/operations.md): dumps the local database the way a
 # backup would (the app's schemas: public, private, auth, storage), restores
 # it into a scratch database, and checks every table came back with the
-# same number of rows. Prints table names and counts only, never data.
+# same number of rows; then checks the Storage file backup
+# (scripts/photo-backup-drill.ts). Prints table names and counts only,
+# never data.
 # Needs local Supabase running (npx supabase start).
 set -euo pipefail
 
@@ -61,3 +63,6 @@ else
   cat /tmp/backup-drill-diff.txt
   exit 1
 fi
+
+echo "Checking the photo backup…"
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/photo-backup-drill.ts

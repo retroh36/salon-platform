@@ -13,7 +13,7 @@ import type { AppointmentStatus } from "@/lib/appointments";
 import { PayTickets } from "@/components/pay-tickets";
 import { pillClass } from "@/components/ui/page";
 import { formatPrice } from "@/lib/services";
-import { periodContaining, previousPeriod } from "@/lib/payroll";
+import { periodContaining, previousPeriod, ratesText } from "@/lib/payroll";
 import { loadPayroll, loadPaySettings } from "@/lib/payroll-load";
 import Link from "next/link";
 
@@ -113,11 +113,11 @@ async function MyEarnings({ supabase, me, last }: { supabase: Awaited<ReturnType
   if (!pay) return null;
   const rows: [string, number, string?][] = [
     ["Services", pay.serviceCents],
-    ["Service commission", pay.serviceCommissionCents, pay.comp.servicePct ? `${pay.comp.servicePct}%` : undefined],
+    ["Service commission", pay.serviceCommissionCents, ratesText(pay.rates.service, (v) => `${v}%`) || undefined],
     ["Retail", pay.retailCents],
-    ["Retail commission", pay.retailCommissionCents, pay.comp.retailPct ? `${pay.comp.retailPct}%` : undefined],
+    ["Retail commission", pay.retailCommissionCents, ratesText(pay.rates.retail, (v) => `${v}%`) || undefined],
     ["Tips", pay.tipCents],
-    ...(pay.comp.hourlyRateCents !== null ? ([["Hourly pay", pay.hourlyPayCents]] as [string, number][]) : []),
+    ...(pay.minutes !== null ? ([["Hourly pay", pay.hourlyPayCents, ratesText(pay.rates.hourly, (c) => `${formatPrice(c)}/h`)]] as [string, number, string][]) : []),
   ];
   return (
     <section aria-labelledby="earnings-heading" className="mx-auto mt-8 max-w-xl rounded-xl border border-line bg-surface p-4 shadow-card" data-testid="my-earnings">
@@ -157,7 +157,7 @@ async function MyEarnings({ supabase, me, last }: { supabase: Awaited<ReturnType
           {formatPrice(pay.totalCents)}
         </span>
       </p>
-      <p className="mt-1 text-xs text-ink-muted">Commission is on what clients paid before tax. Refunds come off in the period they happen.</p>
+      <p className="mt-1 text-xs text-ink-muted">Commission is on what clients paid before tax, at your rate when each sale was made. Refunds come off in the period they happen.</p>
       {pay.tickets.length > 0 && (
         <details className="mt-3">
           <summary className="cursor-pointer text-sm font-medium text-link">Tickets behind it ({pay.tickets.length})</summary>

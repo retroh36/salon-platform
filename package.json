@@ -17,7 +17,9 @@
     "test:e2e": "playwright test",
     "eval:denise": "vitest run --project eval",
     "import:phorest:dry-run": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/phorest-dry-run.ts",
-    "backup:drill": "./scripts/backup-drill.sh"
+    "backup:drill": "./scripts/backup-drill.sh",
+    "photos": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/photos.ts",
+    "jobs": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/jobs.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.1.0",
