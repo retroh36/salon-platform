@@ -65,6 +65,15 @@ export function CheckoutSettingsForm({ initial }: { initial: CheckoutSettingsInp
         </label>
       </fieldset>
 
+      <fieldset className="flex flex-col gap-3">
+        <legend className="mb-2 font-serif text-lg font-semibold">Cash drawer</legend>
+        <p className="text-sm text-ink-muted">The cash the drawer starts each day with. The close-out on Reports counts it in what should be there, and you can change it for a day there.</p>
+        <label className={`${labelClass} max-w-xs`}>
+          Starting float ($)
+          <input inputMode="decimal" value={s.cashFloat} onChange={(e) => setS({ ...s, cashFloat: e.target.value })} className={fieldClass} />
+        </label>
+      </fieldset>
+
       <Button type="submit" variant="primary" disabled={pending} className="self-start">
         Save
       </Button>

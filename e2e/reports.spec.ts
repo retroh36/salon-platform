@@ -1,4 +1,5 @@
 import { todayIn } from "@/lib/scheduling/time";
+import { formatPrice } from "@/lib/services";
 import { admin, SEED } from "../tests/db/helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
@@ -28,16 +29,18 @@ test.describe("owner", () => {
     await expect(main.getByTestId("report-period")).not.toHaveText(before!);
     await expect(main.getByTestId("gift-cards-sold")).toHaveText(/^\$[\d,.]+$/);
 
-    // Count the drawer: $5 more than expected.
-    const expected = (await main.getByTestId("expected-cash").textContent())!;
-    const cents = Math.round(Number(expected.replace(/[$,]/g, "")) * 100);
+    // Count the drawer, which started with a $100 float: $5 more than expected.
     await waitForHydration(page, "form[aria-label='Close out the day'] input");
     const form = main.getByRole("form", { name: "Close out the day" });
+    const cashOnly = Math.round(Number((await main.getByTestId("expected-cash").textContent())!.replace(/[$,]/g, "")) * 100);
+    await form.getByLabel("Starting float ($)").fill("100");
+    await expect(main.getByTestId("expected-cash")).toHaveText(formatPrice(cashOnly + 10000));
+    const cents = cashOnly + 10000;
     await form.getByLabel("Cash counted ($)").fill(((cents + 500) / 100).toFixed(2));
     await form.getByRole("button", { name: "Save count" }).click();
     await expect(form.getByRole("status")).toHaveText("Saved. The drawer is $5 over.");
-    const { data } = await admin.from("cash_closeouts").select("expected_cents, counted_cents").eq("location_id", L).eq("day", todayIn("America/Chicago")).single();
-    expect(data).toEqual({ expected_cents: cents, counted_cents: cents + 500 });
+    const { data } = await admin.from("cash_closeouts").select("expected_cents, counted_cents, float_cents").eq("location_id", L).eq("day", todayIn("America/Chicago")).single();
+    expect(data).toEqual({ expected_cents: cents, counted_cents: cents + 500, float_cents: 10000 });
   });
 });
 

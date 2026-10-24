@@ -56,7 +56,7 @@ describe("what's owed", () => {
 
 describe("closing out the day", () => {
   it("works out the expected cash itself, saves the count, and is for owners only", async () => {
-    const close = await loadCloseout(owner, { id: L, timezone: TZ }, today);
+    const close = await loadCloseout(owner, B, { id: L, timezone: TZ }, today);
     expect((await manager.rpc("save_closeout", { p_location_id: L, p_day: today, p_counted_cents: 1000, p_note: "" })).error?.code).toBe("42501");
     const { data: difference, error } = await owner.rpc("save_closeout", { p_location_id: L, p_day: today, p_counted_cents: close.expectedCashCents + 500, p_note: "Found a $5 tip" });
     expect(error).toBeNull();
@@ -64,6 +64,25 @@ describe("closing out the day", () => {
     const { data: saved } = await owner.from("cash_closeouts").select("expected_cents, counted_cents, note").eq("location_id", L).eq("day", today).single();
     expect(saved).toEqual({ expected_cents: close.expectedCashCents, counted_cents: close.expectedCashCents + 500, note: "Found a $5 tip" });
     expect((await manager.from("cash_closeouts").select("id").eq("location_id", L)).data).toEqual([]);
+  });
+
+  it("counts the starting float: the salon's usual one, or the day's", async () => {
+    await admin.from("cash_closeouts").delete().eq("location_id", L).eq("day", today);
+    expect((await owner.rpc("set_checkout_settings", { p_business_id: B, p_settings: { cash_float_cents: 15000 } })).error).toBeNull();
+    try {
+      const close = await loadCloseout(owner, B, { id: L, timezone: TZ }, today);
+      expect(close).toMatchObject({ floatCents: 15000, usualFloatCents: 15000, expectedCashCents: 15000 + close.cashNetCents });
+      // The usual float, when the day's isn't given.
+      expect((await owner.rpc("save_closeout", { p_location_id: L, p_day: today, p_counted_cents: close.expectedCashCents, p_note: "" })).data).toBe(0);
+      // A different float for the day: $100 less expected.
+      expect((await owner.rpc("save_closeout", { p_location_id: L, p_day: today, p_counted_cents: close.expectedCashCents, p_note: "", p_float_cents: 5000 })).data).toBe(10000);
+      // It sticks for the day.
+      expect((await loadCloseout(owner, B, { id: L, timezone: TZ }, today)).floatCents).toBe(5000);
+      expect((await owner.rpc("save_closeout", { p_location_id: L, p_day: today, p_counted_cents: 0, p_note: "", p_float_cents: -1 })).error?.code).toBe("22023");
+    } finally {
+      await owner.rpc("set_checkout_settings", { p_business_id: B, p_settings: { cash_float_cents: 0 } });
+      await admin.from("cash_closeouts").delete().eq("location_id", L).eq("day", today);
+    }
   });
 });
 

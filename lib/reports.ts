@@ -69,14 +69,18 @@ const tenderOf = (p: PaymentRow): Tender => (p.method === "card" && p.processor 
 // cards taken online (renewals, payment links) apart from the desk's
 // terminal. The cash that should be in the drawer is the net cash (change
 // given is already left out of the amounts).
-export function closeout(payments: readonly PaymentRow[]) {
+// The day's money by tender, and the cash that should be in the drawer: the
+// starting float plus cash taken, less cash refunds and voids (as
+// save_closeout works it out).
+export function closeout(payments: readonly PaymentRow[], floatCents = 0) {
   const byMethod = TENDERS.map((method) => {
     const rows = payments.filter((p) => tenderOf(p) === method);
     const taken = rows.filter((p) => p.amount_cents > 0).reduce((n, p) => n + p.amount_cents, 0);
     const refunded = -rows.filter((p) => p.amount_cents < 0).reduce((n, p) => n + p.amount_cents, 0);
     return { method, takenCents: taken, refundedCents: refunded, netCents: taken - refunded };
   });
-  return { byMethod, expectedCashCents: byMethod.find((m) => m.method === "cash")!.netCents, netCents: byMethod.reduce((n, m) => n + m.netCents, 0) };
+  const cashNetCents = byMethod.find((m) => m.method === "cash")!.netCents;
+  return { byMethod, floatCents, cashNetCents, expectedCashCents: floatCents + cashNetCents, netCents: byMethod.reduce((n, m) => n + m.netCents, 0) };
 }
 
 export type RebookRow = { staff_id: string | null; rebooked: boolean };

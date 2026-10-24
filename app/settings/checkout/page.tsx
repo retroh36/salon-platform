@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Card, PageHeader } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
+import { centsToInput } from "@/lib/services";
 import { SettingsNav } from "../settings-nav";
 import { CheckoutSettingsForm } from "./checkout-settings";
 
@@ -25,13 +26,13 @@ async function CheckoutSettings() {
   if (me.role !== "owner") redirect("/dashboard");
   const { data: b, error } = await supabase
     .from("businesses")
-    .select("tax_rate_services_bp, tax_rate_retail_bp, discount_roles, discount_max_percent, receipt_footer, receipt_show_stylists")
+    .select("tax_rate_services_bp, tax_rate_retail_bp, discount_roles, discount_max_percent, receipt_footer, receipt_show_stylists, cash_float_cents")
     .eq("id", me.business_id)
     .single();
   if (error) throw error;
   return (
     <AppShell section="settings" me={me}>
-      <PageHeader title="Settings" description="Tax, discounts and receipts at checkout." />
+      <PageHeader title="Settings" description="Tax, discounts, receipts and the cash drawer." />
       <SettingsNav current="checkout" />
       <Card>
         <CheckoutSettingsForm
@@ -42,6 +43,7 @@ async function CheckoutSettings() {
             discountMaxPercent: String(b.discount_max_percent),
             receiptFooter: b.receipt_footer ?? "",
             receiptShowStylists: b.receipt_show_stylists,
+            cashFloat: centsToInput(b.cash_float_cents),
           }}
         />
       </Card>

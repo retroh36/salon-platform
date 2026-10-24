@@ -77,6 +77,11 @@ describe("closing out the day", () => {
     expect(c.byMethod.find((m) => m.method === "membership")!.netCents).toBe(4500);
     expect(c.expectedCashCents).toBe(0);
   });
+
+  it("starts the drawer from the float", () => {
+    const c = closeout([{ method: "cash", amount_cents: 4500 }, { method: "cash", amount_cents: -500 }], 15000);
+    expect(c).toMatchObject({ floatCents: 15000, cashNetCents: 4000, expectedCashCents: 19000 });
+  });
 });
 
 describe("rebooked at checkout", () => {

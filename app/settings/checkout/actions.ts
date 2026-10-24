@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentStaff } from "@/lib/auth";
+import { parseDollars } from "@/lib/checkout";
 import type { StaffRole } from "@/lib/staff";
 
 export type CheckoutSettingsInput = {
@@ -11,6 +12,8 @@ export type CheckoutSettingsInput = {
   discountMaxPercent: string;
   receiptFooter: string;
   receiptShowStylists: boolean;
+  // The cash the drawer starts each day with, in dollars.
+  cashFloat: string;
 };
 
 export type SettingsResult = { ok: true; message: string } | { ok: false; message: string };
@@ -32,10 +35,12 @@ export async function saveCheckoutSettings(input: CheckoutSettingsInput): Promis
   const max = Number(input.discountMaxPercent);
   if (!Number.isInteger(max) || max < 0 || max > 100) return { ok: false, message: "Enter a discount limit from 0 to 100%." };
   if (input.receiptFooter.length > 500) return { ok: false, message: "Keep the receipt note under 500 characters." };
+  const float = parseDollars(input.cashFloat || "0");
+  if (float === null || float > 1_000_000) return { ok: false, message: "Enter a starting float up to $10,000." };
   const roles = [...new Set<StaffRole>(["owner", ...input.discountRoles.filter((r) => r === "manager" || r === "front_desk")])];
   const { error } = await supabase.rpc("set_checkout_settings", {
     p_business_id: me.business_id,
-    p_settings: { tax_rate_services_bp: services, tax_rate_retail_bp: retail, discount_roles: roles, discount_max_percent: max, receipt_footer: input.receiptFooter, receipt_show_stylists: input.receiptShowStylists },
+    p_settings: { tax_rate_services_bp: services, tax_rate_retail_bp: retail, discount_roles: roles, discount_max_percent: max, receipt_footer: input.receiptFooter, receipt_show_stylists: input.receiptShowStylists, cash_float_cents: float },
   });
   if (error?.code === "42501") return { ok: false, message: "Only owners can change these settings." };
   if (error) throw error;

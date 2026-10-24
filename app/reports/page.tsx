@@ -65,7 +65,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
     loadGiftCardLiability(supabase, me.business_id),
     loadUnusedPackages(supabase, me.business_id),
     loadGiftCardActivity(supabase, me.business_id, range.from, range.to, tz),
-    loadCloseout(supabase, me.location, day),
+    loadCloseout(supabase, me.business_id, me.location, day),
     loadRebooking(supabase, me.location, range.from, range.to),
     supabase.from("staff").select("id, first_name, last_name").eq("business_id", me.business_id),
     loadMembershipRows(supabase, me.business_id, tz),
@@ -299,20 +299,16 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
             </tr>
           </tbody>
         </table>
-        <p className="mb-3">
-          Cash expected in the drawer: <strong className="tabular-nums" data-testid="expected-cash">{formatPrice(close.expectedCashCents)}</strong>
-          {close.saved && (
-            <span className="text-ink-muted" data-testid="closeout-saved">
-              {" "}
-              · counted {formatPrice(close.saved.counted_cents)}
-              {close.saved.counted_cents === close.saved.expected_cents
-                ? ", matches"
-                : `, ${formatPrice(Math.abs(close.saved.counted_cents - close.saved.expected_cents))} ${close.saved.counted_cents > close.saved.expected_cents ? "over" : "short"}`}
-              {close.saved.staff ? ` (${close.saved.staff.first_name})` : ""}
-            </span>
-          )}
-        </p>
-        <CloseoutForm key={day} day={day} counted={close.saved?.counted_cents ?? null} note={close.saved?.note ?? ""} />
+        {close.saved && (
+          <p className="mb-3 text-ink-muted" data-testid="closeout-saved">
+            Counted {formatPrice(close.saved.counted_cents)} against {formatPrice(close.saved.expected_cents)} expected
+            {close.saved.counted_cents === close.saved.expected_cents
+              ? ": matches"
+              : `: ${formatPrice(Math.abs(close.saved.counted_cents - close.saved.expected_cents))} ${close.saved.counted_cents > close.saved.expected_cents ? "over" : "short"}`}
+            {close.saved.staff ? ` (${close.saved.staff.first_name})` : ""}
+          </p>
+        )}
+        <CloseoutForm key={day} day={day} cashNetCents={close.cashNetCents} floatCents={close.floatCents} counted={close.saved?.counted_cents ?? null} note={close.saved?.note ?? ""} />
       </Card>
     </AppShell>
   );

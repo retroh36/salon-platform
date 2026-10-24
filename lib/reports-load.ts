@@ -74,7 +74,7 @@ export async function loadGiftCardActivity(supabase: Supabase, businessId: strin
   return giftCardActivity(events.map((e) => ({ kind: e.kind, amount_cents: e.amount_cents, card_kind: e.card.kind })));
 }
 
-export async function loadCloseout(supabase: Supabase, location: { id: string; timezone: string }, day: LocalDate) {
+export async function loadCloseout(supabase: Supabase, businessId: string, location: { id: string; timezone: string }, day: LocalDate) {
   const [payments, { data: saved, error }] = await Promise.all([
     all<{ method: Database["public"]["Enums"]["payment_method"]; amount_cents: number; processor: string | null }>((from, to) =>
       supabase
@@ -86,10 +86,13 @@ export async function loadCloseout(supabase: Supabase, location: { id: string; t
         .order("id")
         .range(from, to),
     ),
-    supabase.from("cash_closeouts").select("expected_cents, counted_cents, note, closed_at, staff:staff(first_name)").eq("location_id", location.id).eq("day", day).maybeSingle(),
+    supabase.from("cash_closeouts").select("expected_cents, counted_cents, float_cents, note, closed_at, staff:staff(first_name)").eq("location_id", location.id).eq("day", day).maybeSingle(),
   ]);
   if (error) throw error;
-  return { ...closeout(payments), saved };
+  // The day's float as counted, else the salon's usual one.
+  const { data: b, error: bError } = await supabase.from("businesses").select("cash_float_cents").eq("id", businessId).single();
+  if (bError) throw bError;
+  return { ...closeout(payments, saved?.float_cents ?? b.cash_float_cents), usualFloatCents: b.cash_float_cents, saved };
 }
 
 // Visits checked out in a period (not voided) and whether the client left
