@@ -726,6 +726,10 @@ where id in (select id from public.clients where business_id = 'b0000000-0000-40
 update public.businesses set google_review_url = 'https://g.page/r/maple-and-ash-demo/review', yelp_url = 'https://www.yelp.com/biz/maple-and-ash-hair-studio-demo'
 where id = 'b0000000-0000-4000-8000-000000000001';
 
+-- Where the online bookings came from (the tag on the link they followed).
+update public.appointments set online_source = (array['google', 'google', 'google', 'google', 'instagram', 'instagram', 'instagram', 'facebook', 'website', 'direct', 'direct', 'rebook'])[1 + pg_temp.rnd('src' || id) % 12]
+where business_id = 'b0000000-0000-4000-8000-000000000001' and source = 'online';
+
 -- Gift cards: bought ones with what's left on them, a few promotional and
 -- one expired; some belong to today's clients.
 create temp table seed_cards as

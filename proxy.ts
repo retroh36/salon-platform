@@ -7,8 +7,9 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Everything except static files, images and the web manifest (link
-    // previews and "Add to Home Screen" fetch these signed out).
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // Everything except static files, images, the web manifest, robots.txt
+    // and the sitemap (link previews, "Add to Home Screen" and search
+    // engines fetch these signed out).
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

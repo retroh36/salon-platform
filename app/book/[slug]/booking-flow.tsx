@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import type { BookingSite, SiteService, SiteStylist } from "@/lib/online-booking/site";
 import { depositFor, describeDeposit } from "@/lib/online-booking/settings";
+import type { BookingSource } from "@/lib/online-booking/sources";
 import { LEVEL_LABELS } from "@/lib/schedule-forms";
 import { formatMinute, type LocalDate } from "@/lib/scheduling/time";
 import { formatMinutes, formatPrice, formatPriceRange } from "@/lib/services";
@@ -37,7 +38,7 @@ const notChosen = "border-line hover:border-(--accent-line)";
 const inputClass =
   "min-h-13 w-full rounded-xl border border-line-strong bg-surface px-4 text-base text-ink placeholder:text-ink-subtle focus:border-focus focus:ring-3 focus:ring-focus/25 focus:outline-none";
 
-export function BookingFlow({ site, today }: { site: BookingSite; today: LocalDate }) {
+export function BookingFlow({ site, today, source }: { site: BookingSite; today: LocalDate; source: BookingSource }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("services");
   const [direction, setDirection] = useState<1 | -1>(1);
@@ -116,6 +117,7 @@ export function BookingFlow({ site, today }: { site: BookingSite; today: LocalDa
         note: details.note,
         agreed,
         honeypot: honeypot.current?.value ?? "",
+        source,
       });
       if (result.ok) {
         router.push(result.manageUrl);

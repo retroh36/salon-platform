@@ -27,6 +27,8 @@ export type OnlineBookingInput = {
   request: VisitRequest;
   start: Date;
   manageTokenHash: string;
+  // Where a new booking came from (lib/online-booking/sources.ts).
+  source?: string;
 };
 
 export type OnlineBookResult =
@@ -58,6 +60,7 @@ export async function bookOnline(admin: Supabase, location: Location, input: Onl
       p_items: items.map((i) => ({ id: null, service_id: i.serviceId, staff_id: i.staffId, resource_id: i.resourceId, starts_at: i.start.toISOString() })),
       p_expected_version: version.data.calendar_version,
       p_manage_token_hash: input.manageTokenHash,
+      p_source: input.source ?? (null as never),
     });
     if (error?.code === "40001") continue;
     if (error?.code === "P0002") return { ok: false, error: "not_found" };

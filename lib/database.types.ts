@@ -235,14 +235,14 @@ isOneToOne: false
                   ]
                 },"appointments": {
                   Row: {
-                    "business_id": string,"cancel_reason": string | null,"canceled_at": string | null,"checked_in_at": string | null,"checked_out_at": string | null,"client_id": string | null,"created_at": string,"created_by": string | null,"deposit_cents": number,"ends_at": string,"group_id": string | null,"id": string,"location_id": string,"manage_token_hash": string | null,"notes": string | null,"series_id": string | null,"series_index": number | null,"source": Database["public"]['Enums']["appointment_source"],"starts_at": string,"status": Database["public"]['Enums']["appointment_status"],"updated_at": string,"updated_by": string | null
+                    "business_id": string,"cancel_reason": string | null,"canceled_at": string | null,"checked_in_at": string | null,"checked_out_at": string | null,"client_id": string | null,"created_at": string,"created_by": string | null,"deposit_cents": number,"ends_at": string,"group_id": string | null,"id": string,"location_id": string,"manage_token_hash": string | null,"notes": string | null,"online_source": string | null,"series_id": string | null,"series_index": number | null,"source": Database["public"]['Enums']["appointment_source"],"starts_at": string,"status": Database["public"]['Enums']["appointment_status"],"updated_at": string,"updated_by": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"checked_in_at"?: string | null,"checked_out_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"ends_at": string,"group_id"?: string | null,"id"?: string,"location_id": string,"manage_token_hash"?: string | null,"notes"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at": string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
+                    "business_id": string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"checked_in_at"?: string | null,"checked_out_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"ends_at": string,"group_id"?: string | null,"id"?: string,"location_id": string,"manage_token_hash"?: string | null,"notes"?: string | null,"online_source"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at": string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
                   }
                   Update: {
-                    "business_id"?: string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"checked_in_at"?: string | null,"checked_out_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"ends_at"?: string,"group_id"?: string | null,"id"?: string,"location_id"?: string,"manage_token_hash"?: string | null,"notes"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at"?: string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
+                    "business_id"?: string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"checked_in_at"?: string | null,"checked_out_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"ends_at"?: string,"group_id"?: string | null,"id"?: string,"location_id"?: string,"manage_token_hash"?: string | null,"notes"?: string | null,"online_source"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at"?: string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
                   }
                   Relationships: [
                     {
@@ -1177,14 +1177,14 @@ isOneToOne: false
                   ]
                 },"online_booking_log": {
                   Row: {
-                    "action": string,"appointment_id": string | null,"business_id": string,"client_id": string | null,"created_at": string,"id": string,"ip_hash": string | null,"user_agent": string | null
+                    "action": string,"appointment_id": string | null,"business_id": string,"client_id": string | null,"created_at": string,"id": string,"ip_hash": string | null,"source": string | null,"user_agent": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "action": string,"appointment_id"?: string | null,"business_id": string,"client_id"?: string | null,"created_at"?: string,"id"?: string,"ip_hash"?: string | null,"user_agent"?: string | null
+                    "action": string,"appointment_id"?: string | null,"business_id": string,"client_id"?: string | null,"created_at"?: string,"id"?: string,"ip_hash"?: string | null,"source"?: string | null,"user_agent"?: string | null
                   }
                   Update: {
-                    "action"?: string,"appointment_id"?: string | null,"business_id"?: string,"client_id"?: string | null,"created_at"?: string,"id"?: string,"ip_hash"?: string | null,"user_agent"?: string | null
+                    "action"?: string,"appointment_id"?: string | null,"business_id"?: string,"client_id"?: string | null,"created_at"?: string,"id"?: string,"ip_hash"?: string | null,"source"?: string | null,"user_agent"?: string | null
                   }
                   Relationships: [
                     {
@@ -2728,7 +2728,7 @@ isOneToOne: false
 { Args: { "p_business_id": string,"p_input": Json,"p_plan_id": string }; Returns: string
                            },
 "save_online_appointment":
-{ Args: { "p_appointment_id": string,"p_client_id": string,"p_expected_version": number,"p_items": Json,"p_location_id": string,"p_manage_token_hash": string,"p_notes": string }; Returns: string
+{ Args: { "p_appointment_id": string,"p_client_id": string,"p_expected_version": number,"p_items": Json,"p_location_id": string,"p_manage_token_hash": string,"p_notes": string,"p_source"?: string }; Returns: string
                            },
 "save_package_template":
 { Args: { "p_input": Json,"p_template_id": string }; Returns: string

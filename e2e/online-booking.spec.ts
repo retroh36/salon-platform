@@ -32,8 +32,8 @@ test.afterAll(async () => {
 const flow = (page: Page) => page.getByTestId("booking-flow");
 const cont = (page: Page) => flow(page).getByRole("button", { name: "Continue" });
 
-async function open(page: Page) {
-  await page.goto(`/book/${SLUG}`);
+async function open(page: Page, query = "") {
+  await page.goto(`/book/${SLUG}${query}`);
   await waitForHydration(page, "[data-testid=booking-flow] button[aria-pressed]");
 }
 
@@ -182,10 +182,11 @@ test("a new client books two services back to back on a phone", async ({ page })
   await desk.close();
 });
 
-test("a returning client confirms with a code and is matched to their profile", async ({ page }) => {
+test("a returning client confirms with a code and is matched to their profile (and where they came from is kept)", async ({ page }) => {
   // A seeded client (their ids start e0000000-) with a phone number.
   const { data: client } = await admin.from("clients").select("id, first_name, phone").eq("business_id", B).not("phone", "is", null).gte("id", "e0000000-0000-4000-8000-000000000000").lte("id", "e0000000-ffff-4fff-bfff-ffffffffffff").order("id").limit(1).single();
-  await open(page);
+  // From the salon's Google listing.
+  await open(page, "?src=google");
   await chooseServices(page, ["Men's Cut"]);
   await chooseStylist(page, "No preference");
   await chooseFirstTime(page);
@@ -197,8 +198,8 @@ test("a returning client confirms with a code and is matched to their profile", 
   await bookIt(page);
   await expect(page.getByRole("heading", { name: /You’re booked/ })).toBeVisible();
 
-  const { data: visits } = await admin.from("appointments").select("id").eq("client_id", client!.id).eq("source", "online").gte("created_at", new Date(Date.now() - 60_000).toISOString());
-  expect(visits).toHaveLength(1);
+  const { data: visits } = await admin.from("appointments").select("id, online_source").eq("client_id", client!.id).eq("source", "online").gte("created_at", new Date(Date.now() - 60_000).toISOString());
+  expect(visits).toEqual([{ id: expect.any(String), online_source: "google" }]);
   await admin.from("appointments").delete().in("id", visits!.map((v) => v.id));
 });
 

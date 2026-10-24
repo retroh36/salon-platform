@@ -2,6 +2,7 @@
 // reads, settings RLS, and booking through the same rules as the calendar,
 // including two people trying to book the same time.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { loadBookingSources } from "@/lib/reports-load";
 import { sha256 } from "@/lib/online-booking/security";
 import { bookOnline, cancelOnline, patchTestProblems } from "@/lib/scheduling/online-book";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
@@ -147,6 +148,18 @@ describe("booking online", () => {
     const second = await bookOnline(admin, location, { clientId, notes: `${RUN} np2`, request: visit(null), start: at(15), manageTokenHash: hash("np2") });
     expect(first.ok && second.ok).toBe(true);
     expect(first.ok && second.ok && first.items[0].staffId !== second.items[0].staffId).toBe(true);
+  });
+
+  it("records where a new booking came from (a reschedule keeps it), for Reports", async () => {
+    const booked = await bookOnline(admin, location, { clientId, notes: `${RUN} src`, request: visit(SEED.staff.nola), start: at(16), manageTokenHash: hash("src"), source: "instagram" });
+    if (!booked.ok) throw new Error("not booked");
+    const source = async () => (await admin.from("appointments").select("online_source").eq("id", booked.appointmentId).single()).data!.online_source;
+    expect(await source()).toBe("instagram");
+    const moved = await bookOnline(admin, location, { appointmentId: booked.appointmentId, clientId, notes: `${RUN} src`, request: visit(SEED.staff.nola), start: at(16, 30), manageTokenHash: hash("src"), source: "google" });
+    expect(moved.ok).toBe(true);
+    expect(await source()).toBe("instagram");
+    const report = await loadBookingSources(owner, location, todayIn(TZ), todayIn(TZ));
+    expect(report.sources.find((r) => r.source === "instagram")!.bookings).toBeGreaterThanOrEqual(1);
   });
 
   it("reschedules and cancels only with the booking's own link", async () => {

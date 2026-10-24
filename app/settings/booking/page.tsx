@@ -8,7 +8,8 @@ import { siteUrl } from "@/lib/branding";
 import { DEFAULT_ACCENT, slugify } from "@/lib/online-booking/settings";
 import { sortCategories } from "@/lib/services";
 import { SettingsNav } from "../settings-nav";
-import { BookingLink, BookingRulesForm, ServicesOnlineForm } from "./booking-settings";
+import { shareLinks } from "@/lib/online-booking/sources";
+import { BookingLink, BookingRulesForm, ServicesOnlineForm, ShareLinks } from "./booking-settings";
 
 export const metadata: Metadata = { title: "Online booking" };
 
@@ -43,6 +44,13 @@ async function BookingSettings() {
       <div>
         <Card title="Your booking site" titleId="site-heading" description="Share the link, or put a Book button on your website.">
           <BookingLink url={`${siteUrl()}/book/${slug}`} name={business.name} live={Boolean(s?.enabled && business.slug)} />
+        </Card>
+        <Card
+          title="Booking links for Google and social"
+          titleId="share-heading"
+          description="Add your booking link where clients find you. Each place gets its own link, so Reports can show where your online bookings come from."
+        >
+          <ShareLinks links={shareLinks(`${siteUrl()}/book/${slug}`)} />
         </Card>
         <Card title="Rules and look" titleId="rules-heading">
           <BookingRulesForm

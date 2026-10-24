@@ -8,7 +8,7 @@ import { getCurrentStaff } from "@/lib/auth";
 import { TENDER_LABELS } from "@/lib/reports";
 import { membershipReport } from "@/lib/memberships";
 import { loadMembershipRows } from "@/lib/memberships-load";
-import { loadCloseout, loadGiftCardActivity, loadGiftCardLiability, loadRebooking, loadUnusedPackages } from "@/lib/reports-load";
+import { loadBookingSources, loadCloseout, loadGiftCardActivity, loadGiftCardLiability, loadRebooking, loadUnusedPackages } from "@/lib/reports-load";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, isLocalDate, todayIn } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
@@ -61,7 +61,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
   const period: Period = typeof params.period === "string" && params.period in PERIODS ? (params.period as Period) : "this_month";
   const day = typeof params.day === "string" && isLocalDate(params.day) && params.day <= today ? params.day : today;
   const range = rangeOf(period, today);
-  const [liability, packages, activity, close, rebooking, staff, membershipRows] = await Promise.all([
+  const [liability, packages, activity, close, rebooking, staff, membershipRows, sources] = await Promise.all([
     loadGiftCardLiability(supabase, me.business_id),
     loadUnusedPackages(supabase, me.business_id),
     loadGiftCardActivity(supabase, me.business_id, range.from, range.to, tz),
@@ -69,6 +69,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
     loadRebooking(supabase, me.location, range.from, range.to),
     supabase.from("staff").select("id, first_name, last_name").eq("business_id", me.business_id),
     loadMembershipRows(supabase, me.business_id, tz),
+    loadBookingSources(supabase, me.location, range.from, range.to),
   ]);
   const members = membershipReport(membershipRows, range.from, range.to);
   const staffName = new Map((staff.data ?? []).map((s) => [s.id, `${s.first_name} ${s.last_name}`]));
@@ -81,7 +82,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
 
   return (
     <AppShell section="reports" me={me}>
-      <PageHeader title="Reports" description="What you owe in gift cards and packages, gift card activity, memberships, rebooking, and closing out the day." />
+      <PageHeader title="Reports" description="What you owe in gift cards and packages, gift card activity, memberships, where online bookings came from, rebooking, and closing out the day." />
 
       <Card title="What you owe in services" titleId="owed-heading" description="Gift card balances and unused package uses are services clients have paid for and not had yet.">
         <dl className="grid gap-5 sm:grid-cols-3" data-testid="liabilities">
@@ -165,6 +166,37 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
                   <td className="py-1.5">{p.name}</td>
                   <td className="py-1.5 text-right">{p.members}</td>
                   <td className="py-1.5 text-right">{formatPrice(p.mrrCents)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      <Card
+        title="Where online bookings came from"
+        titleId="sources-heading"
+        description={`Booked online ${formatLongDay(range.from, false)} to ${formatLongDay(range.to, false)}, by the link they followed (Settings → Online booking has a link for each place).`}
+      >
+        {sources.total === 0 ? (
+          <p className="text-sm text-ink-muted">No online bookings in this period.</p>
+        ) : (
+          <table className="w-full text-sm tabular-nums" aria-label="Online bookings by source">
+            <thead>
+              <tr className="text-left text-ink-muted">
+                <th className="py-1 font-medium">From</th>
+                <th className="py-1 text-right font-medium">Bookings</th>
+                <th className="py-1 text-right font-medium">Came in</th>
+                <th className="py-1 text-right font-medium">Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sources.sources.map((src) => (
+                <tr key={src.source} className="border-t border-line" data-testid="booking-source" data-source={src.source}>
+                  <td className="py-1.5">{src.label}</td>
+                  <td className="py-1.5 text-right">{src.bookings}</td>
+                  <td className="py-1.5 text-right">{src.completed}</td>
+                  <td className="py-1.5 text-right">{formatPrice(src.revenueCents)}</td>
                 </tr>
               ))}
             </tbody>

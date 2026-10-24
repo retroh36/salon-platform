@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { startOfLocalDay } from "@/lib/scheduling/load";
 import { addDays, type LocalDate } from "@/lib/scheduling/time";
+import { bookingSourcesReport } from "@/lib/online-booking/sources";
 import { closeout, giftCardActivity, giftCardLiability, rebookingAtCheckout, unusedPackageValue, type CardRow, type PackageItemRow } from "./reports";
 
 type Supabase = SupabaseClient<Database>;
@@ -111,6 +112,29 @@ export async function loadRebooking(supabase: Supabase, location: { id: string; 
     sales.map((s) => ({
       staff_id: [...s.sale_items].filter((i) => i.kind === "service").sort((a, b) => a.position - b.position)[0]?.staff_id ?? null,
       rebooked: s.rebook_appointment_id !== null,
+    })),
+  );
+}
+
+// Online bookings made in a period, by where they came from (the tag on
+// the link they followed), with what the visits brought in once checked out.
+export async function loadBookingSources(supabase: Supabase, location: { id: string; timezone: string }, from: LocalDate, to: LocalDate) {
+  const rows = await all<{ online_source: string | null; status: string; sales: { status: string; total_cents: number; tax_cents: number; tip_cents: number; refunded_cents: number }[] }>((f, t) =>
+    supabase
+      .from("appointments")
+      .select("online_source, status, sales!sales_appointment_id_fkey(status, total_cents, tax_cents, tip_cents, refunded_cents)")
+      .eq("location_id", location.id)
+      .eq("source", "online")
+      .gte("created_at", startOfLocalDay(from, location.timezone).toISOString())
+      .lt("created_at", startOfLocalDay(addDays(to, 1), location.timezone).toISOString())
+      .order("id")
+      .range(f, t) as never,
+  );
+  return bookingSourcesReport(
+    rows.map((r) => ({
+      source: r.online_source,
+      completed: r.status === "completed",
+      revenueCents: r.sales.filter((s) => s.status !== "voided").reduce((n, s) => n + Math.max(0, s.total_cents - s.tax_cents - s.tip_cents - s.refunded_cents), 0),
     })),
   );
 }

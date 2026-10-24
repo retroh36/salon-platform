@@ -8,6 +8,7 @@
 // logged.
 
 import { siteUrl } from "@/lib/branding";
+import { isBookingSource } from "@/lib/online-booking/sources";
 import { normalEmail, phoneDigits, formatPhone } from "@/lib/online-booking/contact";
 import { sendCode, sessionContact, verifyCode, type Channel } from "@/lib/online-booking/codes";
 import { hashKey, newSecret, requestInfo, sha256, withinLimits } from "@/lib/online-booking/security";
@@ -182,6 +183,8 @@ export type BookInput = {
   note?: string;
   agreed: boolean;
   honeypot: string;
+  // Where they came from (?src= on the link they followed).
+  source?: string;
 };
 
 export type BookResult =
@@ -231,6 +234,7 @@ export async function book(slug: string, input: BookInput): Promise<BookResult> 
     request,
     start,
     manageTokenHash: sha256(token),
+    source: isBookingSource(input.source) ? input.source : "direct",
   });
   if (!result.ok) {
     if (result.error === "patch_test") {
@@ -241,7 +245,15 @@ export async function book(slug: string, input: BookInput): Promise<BookResult> 
 
   const manageUrl = `/book/${site.business.slug}/manage/${token}`;
   await Promise.all([
-    admin.from("online_booking_log").insert({ business_id: site.business.id, appointment_id: result.appointmentId, client_id: clientId, action: "booked", ip_hash: ipHash, user_agent: userAgent }),
+    admin.from("online_booking_log").insert({
+      business_id: site.business.id,
+      appointment_id: result.appointmentId,
+      client_id: clientId,
+      action: "booked",
+      ip_hash: ipHash,
+      user_agent: userAgent,
+      source: isBookingSource(input.source) ? input.source : "direct",
+    }),
     confirmationMessage(admin, site, contact, start, manageUrl),
   ]);
   return { ok: true, manageUrl: `${manageUrl}?booked=1` };

@@ -6,6 +6,7 @@ import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components
 import { Alert } from "@/components/ui/page";
 import { contrast } from "@/lib/color";
 import { accentReadable, ONLINE_MODE_LABELS, type DepositKind, type OnlineMode } from "@/lib/online-booking/settings";
+import type { ShareLink } from "@/lib/online-booking/sources";
 import { saveBookingSettings, saveServicesOnline, type BookingSettingsState } from "./actions";
 
 function Result({ state }: { state: BookingSettingsState }) {
@@ -249,5 +250,43 @@ export function ServicesOnlineForm({ services }: { services: ServiceRow[] }) {
         </Button>
       </div>
     </form>
+  );
+}
+
+// Booking links for Google, Instagram, Facebook and the salon's website:
+// each tagged, so Reports show where online bookings came from, with the
+// steps to add it there.
+export function ShareLinks({ links }: { links: ShareLink[] }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const copy = async (source: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(source);
+    } catch {
+      setCopied(null);
+    }
+  };
+  return (
+    <ul className="flex flex-col gap-5" aria-label="Booking links">
+      {links.map((l) => (
+        <li key={l.source} className="flex flex-col gap-2" data-testid="share-link" data-source={l.source}>
+          <span id={`share-${l.source}`} className="font-medium">
+            {l.label}
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <input readOnly value={l.url} aria-labelledby={`share-${l.source}`} className={`${fieldClass} min-w-64 flex-1 font-mono text-sm`} onFocus={(e) => e.currentTarget.select()} />
+            <Button onClick={() => copy(l.source, l.url)}>{copied === l.source ? "Copied" : "Copy link"}</Button>
+          </div>
+          <details>
+            <summary className="cursor-pointer text-sm font-medium text-link">How to add it</summary>
+            <ol className="mt-2 ml-5 flex list-decimal flex-col gap-1 text-sm text-ink-muted">
+              {l.steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          </details>
+        </li>
+      ))}
+    </ul>
   );
 }
