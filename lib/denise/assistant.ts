@@ -17,7 +17,7 @@ import { checkAppointment, describeProblem, durationMinutes, pickResource, stret
 import { findOpenings } from "@/lib/scheduling/openings";
 import { formatMinute, fromLocal, isLocalDate, parseTime, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { converse, modelFor, VOICE, type ClaudeClient, type ConverseHooks, type ToolRunner } from "./claude";
-import { SALES_PERIODS, type Knowledge, type SalesPeriod } from "./knowledge";
+import { POLICY_PERIODS, SALES_PERIODS, type Knowledge, type PolicyPeriod, type SalesPeriod } from "./knowledge";
 import type { StaffRole } from "@/lib/staff";
 import type { BookingSuggestion, HelpLink } from "./types";
 
@@ -130,7 +130,19 @@ const TOOLS: Anthropic.Tool[] = [
 const noInput = { type: "object" as const, properties: {}, required: [], additionalProperties: false as const };
 
 // Read-only lookups of what Denise has learned, and her fixes.
-const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes" | "giftCards" | "packages", Anthropic.Tool> = {
+const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes" | "giftCards" | "packages" | "policy", Anthropic.Tool> = {
+  policy: {
+    name: "late_cancellations",
+    description:
+      "Late cancellations and no-shows under the salon's cancellation policy for a period: who (first names), the visit date and what happened to the fee (charged, waived, didn't go through; amounts only for owners and managers), and the repeat offenders. Front desk, managers and owners.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: { period: { type: "string", enum: ["this_month", "last_month", "last_30_days"] } },
+      required: ["period"],
+      additionalProperties: false,
+    },
+  },
   giftCards: {
     name: "gift_card_balances",
     description: "What the salon owes in gift cards: purchased balances still on cards (services owed), promotional credit out (no cash value) and balances on expired cards. Owners only.",
@@ -365,6 +377,7 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
         ...(k.fixes ? [KNOWLEDGE_TOOLS.fixes] : []),
         ...(k.giftCards ? [KNOWLEDGE_TOOLS.giftCards] : []),
         ...(k.packages ? [KNOWLEDGE_TOOLS.packages] : []),
+        ...(k.policy ? [KNOWLEDGE_TOOLS.policy] : []),
       ]
     : [];
 
@@ -397,6 +410,10 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
       case "unused_packages":
         if (!k.packages) return "Package totals are for owners.";
         return JSON.stringify(await k.packages(typeof input.limit === "number" ? input.limit : 5));
+      case "late_cancellations":
+        if (!k.policy) return "Late cancellations are for the front desk, managers and owners.";
+        if (!POLICY_PERIODS.includes(input.period as PolicyPeriod)) return `Choose a period: ${POLICY_PERIODS.join(", ")}.`;
+        return JSON.stringify(await k.policy(input.period as PolicyPeriod));
       case "propose_fixes": {
         if (!k.fixes) return "Only the front desk, managers and owners can approve fixes.";
         const date = dayOf(input.date);
@@ -459,6 +476,8 @@ export function toolStatus(name: string, input: unknown, c: Pick<AssistantContex
       return "Adding up gift card balances…";
     case "unused_packages":
       return "Finding unused packages…";
+    case "late_cancellations":
+      return "Looking at late cancellations and no-shows…";
     case "how_to":
       return "Looking it up in the help guide…";
     default:

@@ -4,6 +4,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import { cancelFee, policyText, visitTerms } from "@/lib/policy";
+import { loadPolicy } from "@/lib/policy-load";
 import type { VisitRequest } from "@/lib/scheduling/online";
 import { sha256 } from "./security";
 import type { BookingSite } from "./site";
@@ -19,6 +21,9 @@ export type ManagedBooking = {
   end: Date;
   items: { serviceId: string; serviceName: string; staffId: string; staffName: string; start: Date; priceCents: number }[];
   depositCents: number;
+  // Paid ahead (online or by a card link).
+  depositPaidCents: number;
+  bookedAt: Date;
   // The same services with the same stylist (or anyone, if they differ).
   request: VisitRequest;
 };
@@ -28,7 +33,7 @@ export async function loadManaged(admin: SupabaseClient<Database>, site: Booking
   const { data, error } = await admin
     .from("appointments")
     .select(
-      "id, client_id, status, notes, starts_at, ends_at, deposit_cents, client:clients(first_name), appointment_items(service_id, staff_id, starts_at, price_cents, service:services(name), staff:staff(first_name))",
+      "id, client_id, status, notes, starts_at, ends_at, created_at, deposit_cents, deposit_paid_cents, client:clients(first_name), appointment_items(service_id, staff_id, starts_at, price_cents, service:services(name), staff:staff(first_name))",
     )
     .eq("business_id", site.business.id)
     .eq("manage_token_hash", sha256(token))
@@ -49,6 +54,8 @@ export async function loadManaged(admin: SupabaseClient<Database>, site: Booking
     end: new Date(data.ends_at),
     items,
     depositCents: data.deposit_cents,
+    depositPaidCents: data.deposit_paid_cents,
+    bookedAt: new Date(data.created_at),
     request: {
       serviceIds: items.map((i) => i.serviceId),
       staffId: staffIds.length === 1 ? staffIds[0] : null,
@@ -60,4 +67,22 @@ export async function loadManaged(admin: SupabaseClient<Database>, site: Booking
 // Clients can cancel or reschedule online until the salon's cutoff.
 export function canChange(site: BookingSite, booking: Pick<ManagedBooking, "status" | "start">, now = new Date()): boolean {
   return ["booked", "confirmed"].includes(booking.status) && booking.start.getTime() - now.getTime() >= site.settings.cancelCutoffHours * 3_600_000;
+}
+
+// What canceling now would cost under the salon's policy (the database
+// works out the same when it's canceled), and the policy as it reads for
+// this visit.
+export async function cancelTerms(admin: SupabaseClient<Database>, site: BookingSite, booking: ManagedBooking, now = new Date()): Promise<{ feeCents: number; lines: string[]; cardLabel: string | null }> {
+  const policy = await loadPolicy(admin, site.business.id);
+  const staffIds = new Set(booking.items.map((i) => i.staffId));
+  const stylists = policy.stylists.filter((p) => staffIds.has(p.staffId));
+  const visitCents = booking.items.reduce((sum, i) => sum + i.priceCents, 0);
+  const terms = visitTerms(policy.settings, stylists, visitCents, booking.depositPaidCents);
+  const { feeCents } = cancelFee(terms, { startsAt: booking.start, bookedAt: booking.bookedAt, depositPaidCents: booking.depositPaidCents }, now, "Canceled online by the client");
+  const { data: card } = await admin.from("client_cards").select("label").eq("client_id", booking.clientId).is("removed_at", null).maybeSingle();
+  return {
+    feeCents,
+    lines: policyText(policy.settings, { stylists, visitCents, depositCents: booking.depositPaidCents, extra: policy.extra, salon: site.business.name }),
+    cardLabel: card?.label ?? null,
+  };
 }

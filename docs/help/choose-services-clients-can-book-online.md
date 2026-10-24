@@ -17,6 +17,6 @@ Pick, service by service, what clients can book themselves, what needs a consult
 ## Good to know
 
 - **Consultation first** services show a **Request a consultation** button on the booking site. It books the service you chose under **"Request a consultation" books** in **Rules and look**; if that's set to nothing, clients are asked to call.
-- Deposits are shown to clients, but online payment isn't set up yet: the booking site says **Payments coming soon** and nothing is charged. Take the deposit at the salon.
+- Clients pay the deposit online when they book (test cards for now: no real money moves yet). It counts toward checkout, and toward the fee if they cancel late or don't show.
 - Services that need a patch test can't be booked online until the client's patch test is in order; they need to call.
 - Clients see a price range across stylists until they pick one, using each stylist's own or level price.

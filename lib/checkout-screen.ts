@@ -9,6 +9,7 @@ import { memberPrices, type MemberPrices } from "@/lib/memberships";
 import { creditFor, loadClientMemberships, loadPlans, type ClientMembership, type MembershipPlan } from "@/lib/memberships-load";
 import { isUsable, loadClientPackages, loadTemplates, packageFor, withPackages, type ClientPackage, type PackageTemplate } from "@/lib/packages";
 import { currentProvider } from "@/lib/payments";
+import { DEPOSIT_REFERENCE } from "@/lib/policy";
 import { suggestRebook, weeksUntilNext, type RebookSuggestion } from "@/lib/rebook";
 import { loadCheckoutSettings, loadRetailProducts, type CheckoutProduct, type CheckoutSettings } from "@/lib/sales";
 import { formatDay } from "@/lib/schedule-format";
@@ -40,7 +41,7 @@ export async function startCheckout(supabase: Supabase, me: Me, options: { appoi
     if (open) return open.id;
     const { data: a } = await supabase
       .from("appointments")
-      .select("id, status, client_id, location_id, appointment_items(id, starts_at, service_id, staff_id, price_cents, service:services(name), staff:staff(level))")
+      .select("id, status, client_id, location_id, deposit_paid_cents, deposit_outcome, appointment_items(id, starts_at, service_id, staff_id, price_cents, service:services(name), staff:staff(level))")
       .eq("id", options.appointmentId)
       .maybeSingle();
     if (!a || a.location_id !== me.location.id || !["booked", "confirmed", "checked_in"].includes(a.status)) return null;
@@ -79,7 +80,7 @@ export async function startCheckout(supabase: Supabase, me: Me, options: { appoi
       });
     const { data, error } = await supabase
       .from("sale_drafts")
-      .insert({ business_id: me.business_id, location_id: me.location.id, appointment_id: a.id, client_id: a.client_id, ticket: { ...EMPTY_TICKET, lines } as never, return_to: returnTo, created_by: me.id })
+      .insert({ business_id: me.business_id, location_id: me.location.id, appointment_id: a.id, client_id: a.client_id, ticket: { ...EMPTY_TICKET, lines, payments: depositPayment(a) } as never, return_to: returnTo, created_by: me.id })
       .select("id")
       .single();
     // Someone else just opened it: use theirs.
@@ -100,6 +101,11 @@ export async function startCheckout(supabase: Supabase, me: Me, options: { appoi
     .single();
   if (error) throw error;
   return data.id;
+}
+
+// A deposit the client paid ahead, taken off the bill.
+function depositPayment(a: { deposit_paid_cents: number; deposit_outcome: string | null }): Ticket["payments"] {
+  return a.deposit_paid_cents > 0 && a.deposit_outcome === null ? [{ key: "deposit", method: "card", amountCents: a.deposit_paid_cents, reference: DEPOSIT_REFERENCE }] : [];
 }
 
 export type ScreenStaff = { id: string; firstName: string; name: string; level: StaffLevel | null; color: string | null };

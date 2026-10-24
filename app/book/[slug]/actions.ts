@@ -21,6 +21,8 @@ import { formatMinute } from "@/lib/scheduling/time";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { patchExplanation } from "@/lib/online-booking/patch";
 import { loadManaged, canChange } from "@/lib/online-booking/manage";
+import { onlineTerms, type OnlineTerms } from "@/lib/online-booking/terms";
+import { currentProvider, providerFor } from "@/lib/payments";
 
 const MAX_SERVICES = 4;
 const DAYS_PER_PAGE = 14;
@@ -169,6 +171,36 @@ async function findClient(admin: ReturnType<typeof createAdminClient>, site: Boo
   return data as string | null;
 }
 
+export type TermsResult =
+  | { ok: true; lines: string[]; cardNeeded: boolean; depositCents: number; cardOnFile: string | null; testMode: boolean; cards: { ref: string; label: string; outcome: string }[] }
+  | { ok: false; message: string };
+
+// The policy for this visit, before the client agrees: its text with this
+// visit's amounts, and whether a card (and a deposit) is needed.
+export async function reviewTerms(slug: string, session: string, serviceIds: string[], staffId: string | null, date: string, minute: number): Promise<TermsResult> {
+  const site = await openSite(slug);
+  if (!site) return { ok: false, message: "Online booking isn't available right now." };
+  const request = visitRequest(site, serviceIds, staffId);
+  const start = isLocalDate(date) && Number.isInteger(minute) ? fromLocal(date, minute, site.location.timezone) : null;
+  if (!request || !start) return { ok: false, message: "Those services can't be booked together online." };
+  const admin = createAdminClient();
+  const contact = await sessionContact(admin, site.business.id, session);
+  if (!contact) return { ok: false, message: "Your code has expired. Please confirm your details again." };
+  const clientId = await findClient(admin, site, contact.channel, contact.destination);
+  const terms = await onlineTerms(admin, site, clientId, request, start);
+  if (!terms) return { ok: false, message: "Sorry, that time was just taken. Please pick another." };
+  const provider = currentProvider();
+  return {
+    ok: true,
+    lines: terms.lines,
+    cardNeeded: terms.cardNeeded,
+    depositCents: terms.depositCents,
+    cardOnFile: terms.cardOnFile?.label ?? null,
+    testMode: provider.testMode,
+    cards: provider.testCards.map((c) => ({ ref: c.ref, label: c.label, outcome: c.outcome })),
+  };
+}
+
 export type BookInput = {
   session: string;
   serviceIds: string[];
@@ -185,11 +217,13 @@ export type BookInput = {
   honeypot: string;
   // Where they came from (?src= on the link they followed).
   source?: string;
+  // The card entered on the provider's form, when one is needed.
+  cardRef?: string;
 };
 
 export type BookResult =
   | { ok: true; manageUrl: string }
-  | { ok: false; message: string; reason?: "taken" | "patch_test" | "session" | "details" | "new_clients"; serviceIds?: string[] };
+  | { ok: false; message: string; reason?: "taken" | "patch_test" | "session" | "details" | "new_clients" | "card"; serviceIds?: string[] };
 
 export async function book(slug: string, input: BookInput): Promise<BookResult> {
   const site = await openSite(slug);
@@ -200,7 +234,7 @@ export async function book(slug: string, input: BookInput): Promise<BookResult> 
     return { ok: false, message: "Too many bookings from here. Please call the salon." };
   }
   if (input.honeypot) return { ok: false, message: "Something went wrong. Please call the salon." };
-  if (!input.agreed) return { ok: false, message: "Please read and accept the cancellation policy." };
+  if (!input.agreed) return { ok: false, message: "Please read and agree to the cancellation policy." };
 
   const request = visitRequest(site, input.serviceIds, input.staffId);
   if (!request) return { ok: false, message: "Those services can't be booked together online." };
@@ -226,7 +260,20 @@ export async function book(slug: string, input: BookInput): Promise<BookResult> 
     clientId = await findClient(admin, site, contact.channel, contact.destination, { first, last, phone: formatPhone(phone), email });
   }
 
+  // The policy for this visit, as the client was shown it; the card is
+  // saved (and any deposit taken) before the booking is confirmed.
+  const terms = await onlineTerms(admin, site, clientId!, request, start);
+  if (!terms) return { ok: false, reason: "taken", message: "Sorry, that time was just taken. Please pick another." };
   const token = newSecret();
+  const card = await cardFor(terms, input.cardRef);
+  if (!card.ok) return { ok: false, reason: "card", message: card.message };
+  let deposit: { amount_cents: number; provider: string; reference: string } | null = null;
+  if (terms.depositCents > 0 && card.charge) {
+    const charged = await providerFor(card.charge.provider).charge({ amountCents: terms.depositCents, paymentMethodRef: card.charge.ref, description: "Deposit", idempotencyKey: `deposit:${sha256(token)}` });
+    if (!charged.ok) return { ok: false, reason: "card", message: `${charged.reason}. You haven't been charged; try another card.` };
+    deposit = { amount_cents: terms.depositCents, provider: card.charge.provider, reference: charged.reference };
+  }
+
   const note = input.note?.trim().slice(0, 500);
   const result = await bookOnline(admin, { id: site.location.id, timezone: site.location.timezone }, {
     clientId: clientId!,
@@ -237,11 +284,20 @@ export async function book(slug: string, input: BookInput): Promise<BookResult> 
     source: isBookingSource(input.source) ? input.source : "direct",
   });
   if (!result.ok) {
+    if (deposit) await providerFor(deposit.provider).refund(deposit.reference);
     if (result.error === "patch_test") {
       return { ok: false, reason: "patch_test", serviceIds: result.serviceIds, message: patchExplanation(site, result.state) };
     }
     return { ok: false, reason: "taken", message: "Sorry, that time was just taken. Please pick another." };
   }
+  // What they agreed to and when, the card, and the deposit.
+  const { error: consentError } = await admin.rpc("record_online_card", {
+    p_appointment_id: result.appointmentId,
+    p_card: (card.save ?? null) as never,
+    p_consent: { policy_text: terms.lines.join("\n"), terms: { ...terms.terms, deposit_cents: terms.depositCents, visit_cents: terms.visitCents }, ip_hash: ipHash },
+    p_deposit: deposit as never,
+  });
+  if (consentError) throw consentError;
 
   const manageUrl = `/book/${site.business.slug}/manage/${token}`;
   await Promise.all([
@@ -254,7 +310,7 @@ export async function book(slug: string, input: BookInput): Promise<BookResult> 
       user_agent: userAgent,
       source: isBookingSource(input.source) ? input.source : "direct",
     }),
-    confirmationMessage(admin, site, contact, start, manageUrl),
+    confirmationMessage(admin, site, contact, start, manageUrl, terms),
   ]);
   return { ok: true, manageUrl: `${manageUrl}?booked=1` };
 }
@@ -265,6 +321,7 @@ async function confirmationMessage(
   contact: { channel: Channel; destination: string },
   start: Date,
   manageUrl: string,
+  terms: OnlineTerms,
 ) {
   const local = toLocal(start, site.location.timezone);
   const when = `${new Date(`${local.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })} at ${formatMinute(local.minute)}`;
@@ -273,8 +330,25 @@ async function confirmationMessage(
     channel: contact.channel,
     to_address: contact.destination,
     subject: contact.channel === "email" ? `You're booked at ${site.business.name}` : null,
-    body: `${site.business.name}: you're booked for ${when}. View, change or cancel: ${siteUrl()}${manageUrl}`,
+    body: `${site.business.name}: you're booked for ${when}.${terms.depositCents ? ` Deposit paid: $${(terms.depositCents / 100).toFixed(2)}.` : ""} View, change or cancel: ${siteUrl()}${manageUrl}\n\nOur cancellation policy: ${terms.lines.join(" ")}`,
   });
+}
+
+// The card for a booking that needs one: one entered now (saved with the
+// provider), or the one on file. A deposit is charged to it.
+async function cardFor(
+  terms: OnlineTerms,
+  cardRef: string | undefined,
+): Promise<{ ok: true; save?: { provider: string; ref: string; label: string }; charge?: { provider: string; ref: string } } | { ok: false; message: string }> {
+  if (cardRef) {
+    const provider = currentProvider();
+    const saved = await provider.saveCard(cardRef);
+    if (!saved.ok) return { ok: false, message: `${saved.reason}.` };
+    return { ok: true, save: { provider: provider.id, ref: saved.card.ref, label: saved.card.label }, charge: { provider: provider.id, ref: saved.card.ref } };
+  }
+  if (terms.cardOnFile) return { ok: true, charge: { provider: terms.cardOnFile.provider, ref: terms.cardOnFile.ref } };
+  if (terms.cardNeeded) return { ok: false, message: "Add a card to hold your booking." };
+  return { ok: true };
 }
 
 export type ManageResult = { ok: true } | { ok: false; message: string };

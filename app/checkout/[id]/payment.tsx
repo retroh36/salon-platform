@@ -9,6 +9,7 @@ import { parseDollars, tipFor, TIP_PERCENTS } from "@/lib/checkout";
 import type { CheckoutScreenData } from "@/lib/checkout-screen";
 import { creditFor } from "@/lib/memberships-load";
 import { packageFor } from "@/lib/packages";
+import { DEPOSIT_REFERENCE } from "@/lib/policy";
 import { formatPrice } from "@/lib/services";
 import { formatMinute } from "@/lib/scheduling/time";
 import { servicesFor, totalsOf, type Rates, type Ticket } from "@/lib/ticket";
@@ -106,17 +107,19 @@ export function PaymentPanel({
               {ticket.payments.map((p, i) => (
                 <li key={p.key} className="flex items-center gap-2 px-3 py-2" data-testid="payment-line">
                   <span className="min-w-0 flex-1">
-                    {METHOD[p.method]}
+                    {p.method === "card" && p.reference === DEPOSIT_REFERENCE ? "Deposit paid ahead" : METHOD[p.method]}
                     <span className="block text-xs text-ink-muted">
                       {p.method === "cash" && p.tenderedCents > p.amountCents ? `${formatPrice(p.tenderedCents)} given · ${formatPrice(p.tenderedCents - p.amountCents)} change` : ""}
-                      {p.method === "card" && p.reference ? `…${p.reference}` : ""}
+                      {p.method === "card" && p.reference ? (p.reference === DEPOSIT_REFERENCE ? "Card, taken online" : `…${p.reference}`) : ""}
                       {p.method === "gift_card" ? `…${p.code.slice(-4)} · ${formatPrice(p.balanceCents - p.amountCents)} left on it` : ""}
                     </span>
                   </span>
                   <span className="font-semibold tabular-nums">{formatPrice(p.amountCents)}</span>
-                  <IconButton label={`Remove payment ${i + 1}`} size="sm" onClick={() => onRemovePayment(p.key)}>
-                    <CloseIcon className="size-4" />
-                  </IconButton>
+                  {!(p.method === "card" && p.reference === DEPOSIT_REFERENCE) && (
+                    <IconButton label={`Remove payment ${i + 1}`} size="sm" onClick={() => onRemovePayment(p.key)}>
+                      <CloseIcon className="size-4" />
+                    </IconButton>
+                  )}
                 </li>
               ))}
             </ul>

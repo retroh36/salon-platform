@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { getCurrentStaff } from "@/lib/auth";
 import { loadDashboard, type DashboardMe } from "@/lib/dashboard-load";
+import { FeeNotices } from "./fee-notices";
 import { MembershipNotices } from "./membership-notices";
 import { toLocal, todayIn } from "@/lib/scheduling/time";
 import { AskBar } from "./ask-bar";
@@ -74,6 +75,7 @@ async function Body({ me }: { me: DashboardMe }) {
       {data.newSalon && <Welcome owner={data.role === "owner"} />}
       {data.denise && <DeniseCard initial={data.denise} today={data.today} canBook={!stylist} seesMoney={data.seesMoney} />}
       {!stylist && <MembershipNotices businessId={me.business_id} />}
+      {!stylist && <FeeNotices businessId={me.business_id} seesMoney={data.seesMoney} />}
       {data.me && <MyDaySections me={data.me} />}
       <Glance data={data} lastWeek={lastWeek} />
       <LiveSections initial={data.live} mineOnly={stylist} />

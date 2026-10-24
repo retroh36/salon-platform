@@ -12,6 +12,19 @@ function Icon({ className = "size-5", children }: IconProps & { children: React.
   );
 }
 
+export const ShieldIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 3.5 5 6v5.5c0 4.2 2.9 7.6 7 9 4.1-1.4 7-4.8 7-9V6z" />
+    <path d="m9 12 2.2 2.2L15.5 10" />
+  </Icon>
+);
+export const TargetIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <circle cx="12" cy="12" r="4.5" />
+    <circle cx="12" cy="12" r="0.75" />
+  </Icon>
+);
 export const CalendarIcon = (p: IconProps) => (
   <Icon {...p}>
     <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />

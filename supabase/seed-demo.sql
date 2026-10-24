@@ -359,6 +359,9 @@ $$;
 -- (Set updated_at by hand to when each change happened, rather than the
 -- reset time.)
 alter table public.appointments disable trigger appointments_set_updated_at;
+-- (The history's late cancellations and no-shows get their fees below, as
+-- the policy would have charged them.)
+alter table public.appointments disable trigger appointments_policy_fee;
 
 update public.appointments a
 set status = x.status,
@@ -761,6 +764,7 @@ update public.gift_card_events e set created_at = g.created_at + case when e.kin
 from public.gift_cards g where e.card_id = g.id;
 
 alter table public.appointments enable trigger appointments_set_updated_at;
+alter table public.appointments enable trigger appointments_policy_fee;
 
 -- Blocked time: lunches and a break that repeat, and a one-off training
 -- session. Days where a seeded client is already booked over a repeating
@@ -813,3 +817,90 @@ from (values
   (50, array['Men''s Cut'], '{}'::uuid[], 0, 10, array['evening'], null, 1)
 ) as w(client_offset, services, staff, from_days, to_days, windows, notes, waiting_days)
 cross join lateral (select id from public.clients where business_id = 'b0000000-0000-4000-8000-000000000001' order by id offset w.client_offset limit 1) c;
+
+-- The cancellation policy: a card for new clients, 48 hours' notice, $40
+-- to cancel late, half the visit for a no-show, and repeat offenders (2 in
+-- 6 months) pay a 50% deposit. Gil is stricter: 72 hours, and $80 for a
+-- no-show.
+insert into public.policy_settings (business_id, card_required, cancel_window_hours, late_cancel_fee_kind, late_cancel_fee_amount, no_show_fee_kind, no_show_fee_amount,
+  repeat_count, repeat_months, repeat_action, repeat_deposit_percent, updated_by)
+values ('b0000000-0000-4000-8000-000000000001', 'new_clients', 48, 'fixed', 4000, 'percent', 50, 2, 6, 'deposit', 50, 'd0000000-0000-4000-8000-000000000001');
+insert into public.staff_policies (staff_id, business_id, cancel_window_hours, no_show_fee_kind, no_show_fee_amount)
+values ('d0000000-0000-4000-8000-000000000005', 'b0000000-0000-4000-8000-000000000001', 72, 'fixed', 8000);
+
+-- Cards on file: about two clients in three who've been in, each with the
+-- policy they agreed to (online, or by a link from the desk). A few cards
+-- get declined.
+with agreed as (
+  insert into public.policy_consents (business_id, client_id, policy_text, terms, channel, agreed_at)
+  select c.business_id, c.id,
+    E'Please give Maple & Ash Hair Studio at least 2 days'' notice if you need to cancel.\nCanceling with less notice costs $40.\nNot showing up costs 50% of the visit.\nYour card is saved securely with the payment provider and only charged under this policy. You''ll get a receipt if it is.',
+    '{"windowHours": 48, "lateCancel": {"kind": "fixed", "amount": 4000}, "noShow": {"kind": "percent", "amount": 50}}',
+    case when pg_temp.rnd('ch' || c.id) % 3 = 0 then 'link' else 'online' end,
+    now() - make_interval(days => 100 + pg_temp.rnd('agreed' || c.id) % 60)
+  from public.clients c
+  where c.business_id = 'b0000000-0000-4000-8000-000000000001' and pg_temp.rnd('card' || c.id) % 100 < 66
+    and exists (select 1 from public.appointments a where a.client_id = c.id and a.status = 'completed')
+  returning id, business_id, client_id, agreed_at
+)
+insert into public.client_cards (business_id, client_id, provider, payment_method_ref, label, consent_id, created_at)
+select business_id, client_id, 'test',
+  case when pg_temp.rnd('declines' || client_id) % 100 < 6 then 'test_visa_0002' else 'test_visa_4242' end,
+  case when pg_temp.rnd('declines' || client_id) % 100 < 6 then 'Visa …0002' else 'Visa …4242' end,
+  id, agreed_at
+from agreed;
+
+-- The history's no-shows, and late cancellations by the client (inside 48
+-- hours), with the fee the policy charged: from the card on file, waived by
+-- a manager now and then, declined on a few cards, or waiting for a card.
+with incidents as (
+  select a.id as appointment_id, a.business_id, a.location_id, a.client_id, a.updated_at as at,
+    case when a.status = 'no_show' then 'no_show' else 'late_cancel' end as kind,
+    (select coalesce(sum(i.price_cents), 0) from public.appointment_items i where i.appointment_id = a.id)::int as visit,
+    exists (select 1 from public.appointment_items i where i.appointment_id = a.id and i.staff_id = 'd0000000-0000-4000-8000-000000000005') as with_gil,
+    cc.label as card
+  from public.appointments a
+  left join public.client_cards cc on cc.client_id = a.client_id and cc.removed_at is null and cc.created_at <= a.updated_at
+  where a.business_id = 'b0000000-0000-4000-8000-000000000001' and a.client_id is not null and a.starts_at < now()
+    and (a.status = 'no_show'
+      or (a.status = 'canceled' and a.cancel_reason in ('Client canceled', 'Client is sick') and pg_temp.rnd(a.id || ':late') % 100 < 40))
+),
+priced as (
+  select *,
+    case when kind = 'no_show' then case when with_gil then greatest(8000, round(visit * 0.5)::int) else round(visit * 0.5)::int end
+         else least(4000, visit) end as fee,
+    case
+      when card is null then 'no_card'
+      when card = 'Visa …0002' then 'failed'
+      when pg_temp.rnd(appointment_id || ':waive') % 100 < 15 then 'waived'
+      else 'charged' end as status
+  from incidents
+),
+fees as (
+  insert into public.policy_fees (business_id, location_id, appointment_id, client_id, kind, fee_cents, status, attempts, provider, provider_reference, card_label,
+    failure_reason, charged_at, waived_at, waived_by, waive_reason, receipt_sent_at, created_at, updated_at)
+  select business_id, location_id, appointment_id, client_id, kind, fee, status,
+    case when status in ('charged', 'failed') then 1 else 0 end,
+    case when status = 'charged' then 'test' end,
+    case when status = 'charged' then 'test_ch_seed' || substr(md5(appointment_id::text), 1, 16) end,
+    card,
+    case when status = 'failed' then 'The card was declined' end,
+    case when status = 'charged' then at + interval '10 minutes' end,
+    case when status = 'waived' then at + interval '2 hours' end,
+    case when status = 'waived' then 'd0000000-0000-4000-8000-000000000002'::uuid end,
+    case when status = 'waived' then (array['Family emergency', 'First time, let it go', 'Our booking mix-up', 'Car accident on the way'])[1 + pg_temp.rnd(appointment_id || ':why') % 4] end,
+    case when status = 'charged' then at + interval '10 minutes' end,
+    at, at
+  from priced
+  returning id, business_id, status, fee_cents, card_label, waive_reason, created_at, charged_at, waived_at, failure_reason
+)
+insert into public.policy_fee_events (business_id, fee_id, kind, amount_cents, detail, staff_id, created_at)
+select business_id, id, 'assessed', fee_cents, null, 'd0000000-0000-4000-8000-000000000003'::uuid, created_at from fees
+union all
+select business_id, id, 'charged', fee_cents, card_label, null, charged_at from fees where status = 'charged'
+union all
+select business_id, id, 'receipt', null, null, null, charged_at from fees where status = 'charged'
+union all
+select business_id, id, 'failed', fee_cents, failure_reason, null, created_at + interval '10 minutes' from fees where status = 'failed'
+union all
+select business_id, id, 'waived', fee_cents, waive_reason, 'd0000000-0000-4000-8000-000000000002'::uuid, waived_at from fees where status = 'waived';

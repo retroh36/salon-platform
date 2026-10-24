@@ -222,6 +222,7 @@ function knowledge(overrides: Partial<Knowledge> = {}): Knowledge & Record<strin
     fixes: vi.fn(async (date: string) => ({ date, problems: [] })),
     giftCards: vi.fn(async () => ({ purchased_balance_dollars: 1250, cards_with_a_balance: 14 })),
     packages: vi.fn(async () => ({ unused_value_dollars: 640, clients: [{ first_name: "Ava", uses_left: ["3 Blowout"] }] })),
+    policy: vi.fn(async (period: string) => ({ period, late_cancellations: 2, incidents: [{ first_name: "Liam", what: "Late cancellation" }] })),
     ...overrides,
   } as never;
 }
@@ -243,10 +244,12 @@ describe("Ask Denise's knowledge", () => {
     const desk = names(knowledge({ giftCards: null, packages: null }));
     expect(desk).not.toContain("gift_card_balances");
     expect(desk).not.toContain("unused_packages");
-    // A stylist: no sales and no fixes to approve.
-    const stylist = names(knowledge({ sales: null, fixes: null, giftCards: null, packages: null }));
+    expect(desk).toContain("late_cancellations");
+    // A stylist: no sales, no fixes to approve and no one's cancellations.
+    const stylist = names(knowledge({ sales: null, fixes: null, giftCards: null, packages: null, policy: null }));
     expect(stylist).not.toContain("sales_summary");
     expect(stylist).not.toContain("propose_fixes");
+    expect(stylist).not.toContain("late_cancellations");
     // Without knowledge, just the booking tools.
     expect(names()).toEqual(["list_services", "list_stylists", "find_openings", "propose_booking"]);
   });

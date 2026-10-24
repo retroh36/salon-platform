@@ -15,6 +15,7 @@ const stripeProvider: PaymentProvider = {
   testMode: false,
   charge: async () => ({ ok: false, reason: "Stripe isn't connected yet" }),
   refund: async () => ({ ok: false }),
+  saveCard: async () => ({ ok: false, reason: "Stripe isn't connected yet" }),
   testCards: [],
 };
 
@@ -24,7 +25,7 @@ export function providerFor(id: string): PaymentProvider {
   return PROVIDERS[id] ?? testProvider;
 }
 
-// The provider new memberships and payment links use.
+// The provider new memberships, payment links, cards on file and fees use.
 export function currentProvider(env: Record<string, string | undefined> = process.env): PaymentProvider {
   return env.STRIPE_SECRET_KEY ? stripeProvider : testProvider;
 }

@@ -31,5 +31,11 @@ export const testProvider: PaymentProvider = {
   testMode: true,
   charge: async (request) => testCharge(request),
   refund: async (reference) => ({ ok: reference.startsWith("test_ch_") }),
+  // Every test card saves (like a real provider, a card can save and still
+  // be declined when it's charged later).
+  saveCard: async (ref) => {
+    const card = TEST_CARDS.find((c) => c.ref === ref);
+    return card ? { ok: true, card: { ref: card.ref, label: card.label } } : { ok: false, reason: "Choose a card" };
+  },
   testCards: TEST_CARDS,
 };

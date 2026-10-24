@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { canChange, loadManaged } from "@/lib/online-booking/manage";
+import { canChange, cancelTerms, loadManaged } from "@/lib/online-booking/manage";
 import { loadSite } from "@/lib/online-booking/site";
 import { toLocal, todayIn } from "@/lib/scheduling/time";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -30,6 +30,7 @@ async function Manage({ params, searchParams }: { params: Promise<{ slug: string
   if (!booking) notFound();
   const tz = site.location.timezone;
   const start = toLocal(booking.start, tz);
+  const policy = await cancelTerms(admin, site, booking);
 
   return (
     <BookingFrame name={site.business.name} logoUrl={site.business.logoUrl} accent={site.settings.accent}>
@@ -46,7 +47,10 @@ async function Manage({ params, searchParams }: { params: Promise<{ slug: string
           endMinute: toLocal(booking.end, tz).minute,
           items: booking.items.map((i) => ({ name: i.serviceName, stylist: i.staffName, priceCents: i.priceCents })),
           depositCents: booking.depositCents,
+          depositPaidCents: booking.depositPaidCents,
           canChange: canChange(site, booking),
+          cancelFeeCents: policy.feeCents,
+          cardLabel: policy.cardLabel,
         }}
         salon={{
           name: site.business.name,
@@ -54,7 +58,7 @@ async function Manage({ params, searchParams }: { params: Promise<{ slug: string
           address: site.location.address,
           phone: site.location.phone,
           cutoffHours: site.settings.cancelCutoffHours,
-          policy: site.settings.cancellationPolicy,
+          policy: policy.lines,
         }}
       />
     </BookingFrame>

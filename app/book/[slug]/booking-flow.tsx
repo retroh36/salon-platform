@@ -4,12 +4,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import type { BookingSite, SiteService, SiteStylist } from "@/lib/online-booking/site";
-import { depositFor, describeDeposit } from "@/lib/online-booking/settings";
+import { describeDeposit } from "@/lib/online-booking/settings";
 import type { BookingSource } from "@/lib/online-booking/sources";
 import { LEVEL_LABELS } from "@/lib/schedule-forms";
 import { formatMinute, type LocalDate } from "@/lib/scheduling/time";
 import { formatMinutes, formatPrice, formatPriceRange } from "@/lib/services";
-import { book, confirmCode, findTimes, requestCode, type DayTimes } from "./actions";
+import { book, confirmCode, findTimes, requestCode, reviewTerms, type DayTimes, type TermsResult } from "./actions";
 import { DateStrip, TimeGrid, longDate } from "./times";
 
 type Step = "services" | "stylist" | "time" | "details" | "confirm";
@@ -48,6 +48,9 @@ export function BookingFlow({ site, today, source }: { site: BookingSite; today:
   const [identity, setIdentity] = useState<Identity>({ phase: "enter" });
   const [details, setDetails] = useState({ firstName: "", lastName: "", phone: "", email: "", note: "" });
   const [agreed, setAgreed] = useState(false);
+  // The policy for this visit (from the server), and the card entered.
+  const [loaded, setLoaded] = useState<{ key: string; terms: TermsResult } | null>(null);
+  const [cardRef, setCardRef] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [blockedServices, setBlockedServices] = useState<string[]>([]);
   const [pending, startTransition] = useTransition();
@@ -70,17 +73,11 @@ export function BookingFlow({ site, today, source }: { site: BookingSite; today:
   };
   const visitStylists = slot && staffId === null ? slot.staffIds.map((id) => site.stylists.find((s) => s.id === id)!) : stylist ? [stylist] : null;
   const prices = serviceIds.length ? priceRange(serviceIds, visitStylists?.length === 1 ? visitStylists : stylist ? [stylist] : null) : [];
-  const deposit =
-    visitStylists?.length === 1
-      ? selected.reduce((sum, s) => sum + depositFor(s.depositKind, s.depositAmount, visitStylists[0].prices[s.id]), 0)
-      : selected.reduce((sum, s) => {
-          const lowest = Math.min(...site.stylists.filter((st) => s.id in st.prices).map((st) => st.prices[s.id]));
-          return sum + depositFor(s.depositKind, s.depositAmount, lowest);
-        }, 0);
-
   const go = (next: Step) => {
     setDirection(STEPS.indexOf(next) > STEPS.indexOf(step) ? 1 : -1);
     setNotice(null);
+    // Agreeing is for the policy as shown for this exact visit.
+    if (next === "confirm") setAgreed(false);
     setStep(next);
   };
 
@@ -95,6 +92,24 @@ export function BookingFlow({ site, today, source }: { site: BookingSite; today:
     heading.current?.focus({ preventScroll: true });
     window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }, [step]);
+
+  // The policy is worked out for this exact visit when it's reviewed.
+  const review = identity.phase === "done" && slot && step === "confirm" ? `${identity.session}|${serviceIds.join(",")}|${staffId}|${slot.date}|${slot.minute}` : null;
+  useEffect(() => {
+    if (!review || identity.phase !== "done" || !slot) return;
+    let live = true;
+    reviewTerms(site.business.slug, identity.session, serviceIds, staffId ?? null, slot.date, slot.minute).then((t) => {
+      if (!live) return;
+      setLoaded({ key: review, terms: t });
+      if (t.ok) setCardRef(t.cards[0]?.ref ?? "");
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `review` holds everything it depends on.
+  }, [review]);
+  const terms = loaded && loaded.key === review ? loaded.terms : null;
+  const needsCard = terms?.ok === true && terms.cardNeeded && !terms.cardOnFile;
 
   const toggleService = (id: string) => {
     setBlockedServices([]);
@@ -118,6 +133,7 @@ export function BookingFlow({ site, today, source }: { site: BookingSite; today:
         agreed,
         honeypot: honeypot.current?.value ?? "",
         source,
+        cardRef: needsCard ? cardRef : undefined,
       });
       if (result.ok) {
         router.push(result.manageUrl);
@@ -248,7 +264,9 @@ export function BookingFlow({ site, today, source }: { site: BookingSite; today:
             stylists={visitStylists ?? []}
             noPreference={staffId === null}
             total={prices}
-            deposit={deposit}
+            terms={terms}
+            cardRef={cardRef}
+            setCardRef={setCardRef}
             agreed={agreed}
             setAgreed={setAgreed}
           />
@@ -266,8 +284,8 @@ export function BookingFlow({ site, today, source }: { site: BookingSite; today:
           </p>
         )}
         {step === "confirm" ? (
-          <button type="button" className={primaryButton} disabled={!agreed || pending} onClick={submit}>
-            {pending ? "Booking…" : "Book appointment"}
+          <button type="button" className={primaryButton} disabled={!agreed || pending || terms?.ok !== true} onClick={submit}>
+            {pending ? "Booking…" : terms?.ok && terms.depositCents > 0 ? `Pay ${formatPrice(terms.depositCents)} deposit and book` : "Book appointment"}
           </button>
         ) : (
           // On the details step, the code form has its own button until it's done.
@@ -695,7 +713,9 @@ function ConfirmStep({
   stylists,
   noPreference,
   total,
-  deposit,
+  terms,
+  cardRef,
+  setCardRef,
   agreed,
   setAgreed,
 }: {
@@ -705,11 +725,14 @@ function ConfirmStep({
   stylists: SiteStylist[];
   noPreference: boolean;
   total: number[];
-  deposit: number;
+  terms: TermsResult | null;
+  cardRef: string;
+  setCardRef: (v: string) => void;
   agreed: boolean;
   setAgreed: (v: boolean) => void;
 }) {
   const single = stylists.length === 1 ? stylists[0] : null;
+  const card = terms?.ok && terms.cardNeeded;
   return (
     <div className="flex flex-col gap-5">
       <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
@@ -747,31 +770,68 @@ function ConfirmStep({
         )}
       </div>
 
-      {deposit > 0 && (
-        <div className="rounded-xl border border-line bg-surface px-4 py-4" data-testid="deposit">
-          <p className="flex justify-between font-semibold text-ink">
-            <span>Deposit</span>
-            <span className="tabular-nums">{formatPrice(deposit)}</span>
-          </p>
-          <p className="mt-2 rounded-lg bg-sunken px-3 py-2 text-sm text-ink-muted">
-            <span className="font-semibold text-ink">Payments coming soon.</span> Online payment isn&rsquo;t set up yet, so nothing is charged now; the salon will
-            take your deposit.
-          </p>
-        </div>
-      )}
-
-      <section aria-labelledby="policy-heading" className="rounded-xl border border-line bg-surface px-4 py-4">
-        <h2 id="policy-heading" className="font-semibold text-ink">
-          Cancellation policy
-        </h2>
-        <p className="mt-1 text-sm whitespace-pre-line text-ink-muted">
-          {site.settings.cancellationPolicy || `Please let us know at least ${site.settings.cancelCutoffHours} hours ahead if you can't make it.`}
+      {terms === null ? (
+        <p className="text-sm text-ink-muted" aria-busy="true">
+          Getting the cancellation policy…
         </p>
-        <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-ink">
-          <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="size-5 accent-(--accent)" />
-          I&rsquo;ve read the cancellation policy
-        </label>
-      </section>
+      ) : !terms.ok ? (
+        <p role="alert" className="font-medium text-danger">
+          {terms.message}
+        </p>
+      ) : (
+        <>
+          <section aria-labelledby="policy-heading" className="rounded-xl border border-line bg-surface px-4 py-4" data-testid="policy">
+            <h2 id="policy-heading" className="font-semibold text-ink">
+              Cancellation policy
+            </h2>
+            <div className="mt-1 flex flex-col gap-1.5 text-sm text-ink-muted">
+              {terms.lines.map((line) => (
+                <p key={line} className="whitespace-pre-line">
+                  {line}
+                </p>
+              ))}
+            </div>
+          </section>
+
+          {terms.depositCents > 0 && (
+            <div className="rounded-xl border border-line bg-surface px-4 py-4" data-testid="deposit">
+              <p className="flex justify-between font-semibold text-ink">
+                <span>Deposit, paid now</span>
+                <span className="tabular-nums">{formatPrice(terms.depositCents)}</span>
+              </p>
+              <p className="mt-1 text-sm text-ink-muted">It comes off your bill at the visit.</p>
+            </div>
+          )}
+
+          {card && (
+            <section aria-labelledby="card-heading" className="rounded-xl border border-line bg-surface px-4 py-4">
+              <h2 id="card-heading" className="font-semibold text-ink">
+                {terms.cardOnFile ? "Your card on file" : "Card to hold your booking"}
+              </h2>
+              {terms.cardOnFile ? (
+                <p className="mt-1 text-sm text-ink-muted">{terms.cardOnFile}</p>
+              ) : terms.testMode ? (
+                <label className="mt-2 flex flex-col gap-1 text-sm font-medium text-ink">
+                  Card (test mode: nothing is charged)
+                  <select value={cardRef} onChange={(e) => setCardRef(e.target.value)} className={inputClass}>
+                    {terms.cards.map((c) => (
+                      <option key={c.ref} value={c.ref}>
+                        {c.label} ({c.outcome.toLowerCase()})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <p className="mt-2 text-xs text-ink-subtle">Card details go to the payment provider; {site.business.name} never sees or stores them.</p>
+            </section>
+          )}
+
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-ink">
+            <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="size-5 shrink-0 accent-(--accent)" />
+            {card ? "I agree to the cancellation policy and to my card being saved for it" : "I agree to the cancellation policy"}
+          </label>
+        </>
+      )}
     </div>
   );
 }

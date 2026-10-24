@@ -25,6 +25,7 @@ import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn
 import { visitWarnings } from "@/lib/client-checks";
 import { fullName, sortForCalendar } from "@/lib/staff";
 import { CalendarBoard } from "./board";
+import { loadVisitPolicies } from "@/lib/policy-visits";
 import type { AppointmentDetail, BlockData, BoardData, ColumnData } from "./types";
 
 export const metadata: Metadata = { title: "Calendar" };
@@ -56,7 +57,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     supabase
       .from("appointment_items")
       .select(
-        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, price_cents, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, checked_in_at, checked_out_at, created_at, updated_at, created_by, updated_by, series_id, series_index, series:appointment_series(interval_weeks), group:appointment_groups(id, label), client:clients(id, first_name, last_name, phone, email, allergies, preferences))",
+        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, price_cents, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, checked_in_at, checked_out_at, created_at, updated_at, created_by, updated_by, deposit_cents, deposit_paid_cents, starts_at, series_id, series_index, series:appointment_series(interval_weeks), group:appointment_groups(id, label), client:clients(id, first_name, last_name, phone, email, allergies, preferences))",
       )
       .eq("location_id", me.location.id)
       .lt("starts_at", dayEnd.toISOString())
@@ -194,6 +195,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       pastVisits: [],
       pastFormulas: [],
       membership: null,
+      policy: null,
       log: [],
       group: a.group ? { ...a.group, members: [] } : null,
       series: a.series_id ? { id: a.series_id, index: a.series_index!, count: seriesCounts.get(a.series_id) ?? 1, intervalWeeks: a.series?.interval_weeks ?? 1 } : null,
@@ -256,6 +258,27 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       items: a.items.map((i) => ({ serviceId: i.serviceId, start: fromLocal(date, i.start, tz) ?? dayStart })),
     }));
   for (const [id, w] of await visitWarnings(supabase, me.business_id, toCheck, tz)) appointments[id].warnings = w;
+
+  // The cancellation policy on each visit (front of house): a card or
+  // deposit still needed, the client's strikes, a no-show's fee.
+  if (canBook(me.role)) {
+    const rows = new Map(items.map((row) => [row.appointment_id, row.appointment]));
+    const visits = Object.values(appointments)
+      .filter((a) => a.client)
+      .map((a) => ({
+        id: a.id,
+        clientId: a.client!.id,
+        status: a.status,
+        serviceIds: a.items.map((i) => i.serviceId),
+        staffIds: [...new Set(a.items.map((i) => i.staffId))],
+        visitCents: a.items.reduce((sum, i) => sum + i.priceCents, 0),
+        serviceDepositCents: rows.get(a.id)?.deposit_cents ?? 0,
+        depositPaidCents: rows.get(a.id)?.deposit_paid_cents ?? 0,
+        bookedAt: rows.get(a.id)?.created_at ?? "",
+        startsAt: rows.get(a.id)?.starts_at ?? "",
+      }));
+    for (const [id, p] of await loadVisitPolicies(supabase, me.business_id, me.role, visits)) appointments[id].policy = p;
+  }
 
   // The sale each checked-out visit was paid on (front of house only: RLS).
   const checkedOut = Object.values(appointments).filter((a) => a.status === "completed").map((a) => a.id);

@@ -17,10 +17,14 @@ type Booking = {
   endMinute: number;
   items: { name: string; stylist: string; priceCents: number }[];
   depositCents: number;
+  depositPaidCents: number;
   canChange: boolean;
+  // What canceling now costs under the policy.
+  cancelFeeCents: number;
+  cardLabel: string | null;
 };
 
-type Salon = { name: string; location: string; address: string | null; phone: string | null; cutoffHours: number; policy: string };
+type Salon = { name: string; location: string; address: string | null; phone: string | null; cutoffHours: number; policy: string[] };
 
 // The client's booking: what, when, with whom, and (until the salon's
 // cutoff) cancel or move it. Nothing internal is shown.
@@ -85,9 +89,9 @@ export function ManageView({ slug, token, justBooked, today, booking, salon }: {
           <span>Total</span>
           <span className="tabular-nums">{formatPrice(total)}</span>
         </div>
-        {booking.depositCents > 0 && (
-          <p className="border-t border-line px-4 py-3 text-sm text-ink-muted">
-            Deposit {formatPrice(booking.depositCents)}: payments are coming soon, so the salon will take it.
+        {booking.depositPaidCents > 0 && (
+          <p className="border-t border-line px-4 py-3 text-sm text-ink-muted" data-testid="deposit-paid">
+            Deposit paid: {formatPrice(booking.depositPaidCents)}. It comes off your bill at the visit.
           </p>
         )}
       </div>
@@ -119,7 +123,23 @@ export function ManageView({ slug, token, justBooked, today, booking, salon }: {
       {mode === "cancel" && (
         <div role="dialog" aria-label="Cancel booking" className="flex flex-col gap-3 rounded-xl border border-danger/25 bg-surface p-4 animate-pop-in">
           <p className="font-semibold">Cancel this booking?</p>
-          {salon.policy && <p className="text-sm whitespace-pre-line text-ink-muted">{salon.policy}</p>}
+          {booking.cancelFeeCents > 0 ? (
+            <p className="rounded-lg bg-sunken px-3 py-2 text-sm font-medium text-ink" data-testid="cancel-fee">
+              It&rsquo;s inside the cancellation window, so canceling now costs {formatPrice(booking.cancelFeeCents)}
+              {booking.depositPaidCents > 0
+                ? booking.cancelFeeCents > booking.depositPaidCents
+                  ? `: your ${formatPrice(booking.depositPaidCents)} deposit, and the rest charged to ${booking.cardLabel ?? "your card on file"}.`
+                  : ", kept from your deposit."
+                : ` (charged to ${booking.cardLabel ?? "your card on file"}).`}
+            </p>
+          ) : (
+            booking.depositPaidCents > 0 && <p className="text-sm text-ink-muted">Your {formatPrice(booking.depositPaidCents)} deposit will be refunded to your card.</p>
+          )}
+          <div className="flex flex-col gap-1 text-sm text-ink-muted">
+            {salon.policy.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+          </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <button type="button" className={`${primaryButton} bg-danger!`} onClick={cancel} disabled={pending}>
               {pending ? "Canceling…" : "Yes, cancel it"}

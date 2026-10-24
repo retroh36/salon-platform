@@ -718,8 +718,7 @@ insert into public.online_booking_settings (
   cancellation_policy, consultation_service_id, accent_color, welcome
 )
 select 'b0000000-0000-4000-8000-000000000001', true, 60, 120, true, 24,
-       'Plans change, we understand. Please cancel or reschedule at least 24 hours ahead, online or by phone. '
-       || 'Late cancellations and missed appointments may be charged 50% of the service.',
+       'Plans change, we understand. You can cancel or reschedule online, with the link in your confirmation, or by phone.',
        (select id from public.services where business_id = 'b0000000-0000-4000-8000-000000000001' and name = 'Color Consultation'),
        '#6b3f2a', 'Book your next visit with our team. We can''t wait to see you.';
 

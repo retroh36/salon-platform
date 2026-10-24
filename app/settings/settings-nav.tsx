@@ -6,10 +6,11 @@ import type { StaffRole } from "@/lib/staff";
 export const MANAGER_SETTINGS = ["automations"] as const;
 
 // Moves between the settings pages (managers see only theirs).
-export function SettingsNav({ current, role = "owner" }: { current: "salon" | "booking" | "checkout" | "gift-cards" | "packages" | "memberships" | "automations" | "payroll" | "data"; role?: StaffRole }) {
+export function SettingsNav({ current, role = "owner" }: { current: "salon" | "booking" | "policies" | "checkout" | "gift-cards" | "packages" | "memberships" | "automations" | "payroll" | "data"; role?: StaffRole }) {
   const links = [
     ["salon", "/settings", "Your salon"],
     ["booking", "/settings/booking", "Online booking"],
+    ["policies", "/settings/policies", "Policies"],
     ["checkout", "/settings/checkout", "Tax and receipts"],
     ["gift-cards", "/settings/gift-cards", "Gift cards"],
     ["packages", "/settings/packages", "Packages"],

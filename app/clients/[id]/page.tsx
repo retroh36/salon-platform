@@ -12,6 +12,7 @@ import { loadClientPackages, withPackages } from "@/lib/packages";
 import { PackagesList } from "./packages/packages-card";
 import { PhotoGallery } from "@/components/visit-photos";
 import { MembershipList, type MembershipHistory } from "./memberships/membership-card";
+import { PolicyCard } from "./policy-card";
 import { historyText } from "@/lib/memberships";
 import { loadClientMemberships } from "@/lib/memberships-load";
 import { currentProvider } from "@/lib/payments";
@@ -153,6 +154,8 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
           />
         </Card>
       )}
+
+      {canTakePayments(me.role) && <PolicyCard supabase={supabase} businessId={me.business_id} role={me.role} client={client} tz={tz} />}
 
       {client.allergies && (
         <div

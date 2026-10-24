@@ -16,7 +16,7 @@ import { DeniseFace } from "@/components/denise";
 import type { BookingIdea, BookingIdeas } from "@/lib/denise/ideas";
 import { packageFor, usesLeft, type ClientPackage } from "@/lib/packages";
 import type { Scope } from "@/lib/scheduling/series";
-import { clientPackagesFor, patchTestWarnings, findClients, previewSeries, quickAddClient, saveSeries, saveVisit, saveVisitScoped, type ClientOption, type SeriesPreviewVisit, type VisitInput } from "./actions";
+import { clientPackagesFor, clientPolicyNote, patchTestWarnings, findClients, previewSeries, quickAddClient, saveSeries, saveVisit, saveVisitScoped, type ClientOption, type SeriesPreviewVisit, type VisitInput } from "./actions";
 import type { AppointmentDetail, BoardData } from "./types";
 
 export type BookingStart = { staffId: string; startMinute: number };
@@ -216,6 +216,18 @@ export function BookingPanel({
   }, [client]);
   const clientPackages = client && packages?.clientId === client.id ? packages.list : [];
 
+  // Denise flags a repeat offender under the cancellation policy.
+  const [policyNote, setPolicyNote] = useState<{ clientId: string; text: string | null } | null>(null);
+  useEffect(() => {
+    if (!client) return;
+    let live = true;
+    clientPolicyNote(client.id).then((text) => live && setPolicyNote({ clientId: client.id, text }));
+    return () => {
+      live = false;
+    };
+  }, [client]);
+  const policyText = client && policyNote?.clientId === client.id ? policyNote.text : null;
+
   return (
       <form onSubmit={submit} className="flex flex-col gap-5 py-2 text-sm" aria-label={appointment ? "Edit booking" : "New booking"}>
         <div className="flex items-start justify-between gap-2">
@@ -277,6 +289,13 @@ export function BookingPanel({
             <strong className="font-semibold">Patch test:</strong> {patchNow.messages.join(" ")}{" "}
             {patchNow.blocks ? "The salon requires a valid patch test, so this can't be booked yet." : "You can still book; check with the client."}
           </p>
+        )}
+
+        {policyText && (
+          <div role="note" className="flex items-start gap-2 rounded-md border border-denise-200 bg-denise-50 px-2.5 py-2 text-sm text-denise-900" data-testid="denise-policy">
+            <DeniseFace size={22} />
+            <p className="flex-1">{policyText}</p>
+          </div>
         )}
 
         {lines.map((l, n) => {

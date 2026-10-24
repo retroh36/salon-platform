@@ -15,9 +15,12 @@ import type { ClientInsight } from "@/lib/insights/clients";
 import type { ClientSpend } from "@/lib/insights/describe";
 import { loadAllClientInsights, loadClientInsights, loadDurations, loadSalonInsight } from "@/lib/insights/read";
 import { startOfLocalDay } from "@/lib/scheduling/load";
-import { addDays, formatMinute, startOfWeek, toLocal, type LocalDate } from "@/lib/scheduling/time";
+import { addDays, formatMinute, fromLocal, startOfWeek, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import type { StaffRole } from "@/lib/staff";
 import { loadGiftCardLiability, loadUnusedPackages } from "@/lib/reports-load";
+import { FEE_KIND_LABELS, FEE_STATUS_LABELS, type FeeStatus } from "@/lib/policy";
+import { loadPolicy } from "@/lib/policy-load";
+import { repeatOffenders } from "@/lib/policy-report";
 import { scanDay, type Viewer } from "./scan";
 
 type Supabase = SupabaseClient<Database>;
@@ -39,7 +42,13 @@ export type Knowledge = {
   // Owners only: what's owed on gift cards and unused packages.
   giftCards: (() => Promise<unknown>) | null;
   packages: ((limit: number) => Promise<unknown>) | null;
+  // The front of house: late cancellations and no-shows under the policy
+  // (fee amounts for owners and managers).
+  policy: ((period: PolicyPeriod) => Promise<unknown>) | null;
 };
+
+export type PolicyPeriod = "this_month" | "last_month" | "last_30_days";
+export const POLICY_PERIODS: PolicyPeriod[] = ["this_month", "last_month", "last_30_days"];
 
 const WEEKDAY = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const pct = (rate: number | null | undefined) => (rate === null || rate === undefined ? null : Math.round(rate * 100));
@@ -302,6 +311,49 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
             };
           }
         : null,
+
+    policy: frontOfHouse
+      ? async (period) => {
+          const monthStart = `${me.today.slice(0, 7)}-01` as LocalDate;
+          const range =
+            period === "this_month"
+              ? { from: monthStart, to: addDays(me.today, 1) }
+              : period === "last_month"
+                ? { from: `${addDays(monthStart, -1).slice(0, 7)}-01` as LocalDate, to: monthStart }
+                : { from: addDays(me.today, -29), to: addDays(me.today, 1) };
+          const policy = await loadPolicy(supabase, me.businessId);
+          const since = new Date();
+          since.setUTCMonth(since.getUTCMonth() - policy.settings.repeatMonths);
+          const select = "id, kind, fee_cents, from_deposit_cents, status, created_at, client_id, client:clients(first_name, last_name), appointment:appointments(starts_at)";
+          const [inPeriod, recent] = await Promise.all([
+            supabase.from("policy_fees").select(select).eq("business_id", me.businessId).neq("status", "voided")
+              .gte("created_at", fromLocal(range.from, 0, tz)!.toISOString()).lt("created_at", fromLocal(range.to, 0, tz)!.toISOString()).order("created_at"),
+            supabase.from("policy_fees").select(select).eq("business_id", me.businessId).gte("created_at", since.toISOString()),
+          ]);
+          if (inPeriod.error) throw inPeriod.error;
+          if (recent.error) throw recent.error;
+          const money = canManage(me.role);
+          const offenders = repeatOffenders(
+            recent.data.map((f) => ({ id: f.id, kind: f.kind as "late_cancel" | "no_show", feeCents: f.fee_cents, fromDepositCents: f.from_deposit_cents, status: f.status, createdAt: f.created_at, clientId: f.client_id, clientName: f.client.first_name })),
+            policy.settings.repeatCount,
+          );
+          return {
+            period,
+            late_cancellations: inPeriod.data.filter((f) => f.kind === "late_cancel").length,
+            no_shows: inPeriod.data.filter((f) => f.kind === "no_show").length,
+            // First names only.
+            incidents: inPeriod.data.map((f) => ({
+              first_name: f.client.first_name,
+              what: FEE_KIND_LABELS[f.kind as "late_cancel" | "no_show"],
+              visit_date: dateOf(f.appointment.starts_at),
+              fee: FEE_STATUS_LABELS[f.status as FeeStatus],
+              ...(money ? { fee_dollars: dollars(f.fee_cents) } : {}),
+            })),
+            repeat_offenders: offenders.map((o) => ({ first_name: o.clientName, strikes: o.strikes })),
+            rule: `${policy.settings.repeatCount}+ in ${policy.settings.repeatMonths} months is a repeat offender${policy.settings.repeatAction === "off" ? "" : policy.settings.repeatAction === "prepay" ? ", who pays for the visit up front" : `, who pays a ${policy.settings.repeatDepositPercent}% deposit`}.`,
+          };
+        }
+      : null,
 
     fixes: frontOfHouse
       ? async (date) => {

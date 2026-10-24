@@ -25,8 +25,11 @@ export interface PaymentProvider {
   // Charges a saved card (or one the client enters on a payment page).
   charge(request: ChargeRequest): Promise<ChargeResult>;
   // Gives a charge back in full (when what it paid for couldn't be
-  // completed).
+  // completed, or a fee is waived).
   refund(reference: string): Promise<{ ok: boolean }>;
+  // Saves a card the client entered on the provider's own form, for
+  // charging later under the salon's policy: its token and label.
+  saveCard(ref: string): Promise<{ ok: true; card: SavedCard } | { ok: false; reason: string }>;
   // Cards staff can choose in test mode (a real provider saves the card
   // on its own reader or page instead).
   testCards: readonly (SavedCard & { outcome: string })[];

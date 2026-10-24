@@ -28,6 +28,8 @@ import { formatDay } from "@/lib/schedule-format";
 import { addDays, daysBetween, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, toLocal, todayIn, type LocalDate } from "@/lib/scheduling/time";
 import { fullName } from "@/lib/staff";
 import type { TimeEvent } from "@/lib/visit-times";
+import { repeatOffenderNote } from "@/lib/policy";
+import { clientStanding, loadPolicy } from "@/lib/policy-load";
 
 export type ClientOption = { id: string; name: string; phone: string | null; allergies: string | null };
 
@@ -595,6 +597,25 @@ export async function patchTestWarnings(clientId: string, date: LocalDate, lines
   if (!items.length) return { messages: [], blocks: false };
   const warnings = (await visitWarnings(supabase, me.business_id, [{ appointmentId: "new", clientId, start: items[0].start, items }])).get("new");
   return { messages: warnings?.patch ?? [], blocks: warnings?.patchBlocks ?? false };
+}
+
+// Denise's heads-up for a repeat offender being booked (front of house).
+export async function clientPolicyNote(clientId: string): Promise<string | null> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canBook(me.role) || !isUuid(clientId)) return null;
+  const [policy, standing, { data: client }, { data: first }] = await Promise.all([
+    loadPolicy(supabase, me.business_id),
+    clientStanding(supabase, clientId),
+    supabase.from("clients").select("first_name").eq("id", clientId).single(),
+    supabase.from("policy_fees").select("created_at").eq("client_id", clientId).not("status", "in", "(waived,voided)").order("created_at").limit(1),
+  ]);
+  if (standing.action === "off" || !client) return null;
+  // Only strikes in the window count; the first of them gives "since May".
+  const windowStart = new Date();
+  windowStart.setUTCMonth(windowStart.getUTCMonth() - standing.months);
+  const firstAt = first?.[0]?.created_at && new Date(first[0].created_at) > windowStart ? new Date(first[0].created_at) : windowStart;
+  const since = firstAt.toLocaleDateString("en-US", { month: "long", timeZone: me.location.timezone });
+  return repeatOffenderNote(client.first_name, { strikes: standing.strikes, action: standing.action }, policy.settings, since, standing.hasCard);
 }
 
 export type GroupInput = { label: string; date: LocalDate; notes: string; guests: { clientId: string | null; lines: VisitLineInput[] }[] };

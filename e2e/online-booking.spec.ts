@@ -95,9 +95,11 @@ async function verify(page: Page, phoneNumber: string) {
   await flow(page).getByRole("button", { name: "Confirm" }).click();
 }
 
+// Agrees to the policy (and, for a new client, to their card being saved:
+// the salon asks new clients for one) and books.
 async function bookIt(page: Page) {
-  await flow(page).getByLabel("I’ve read the cancellation policy").check();
-  await flow(page).getByRole("button", { name: "Book appointment" }).click();
+  await flow(page).getByLabel(/^I agree to the cancellation policy/).check();
+  await flow(page).getByRole("button", { name: /^Book appointment$|deposit and book$/ }).click();
 }
 
 test("a new client books two services back to back on a phone", async ({ page }) => {
@@ -220,13 +222,13 @@ test("two people can't book the same time: the second is told and picks again", 
     await flow(p).getByLabel("First name").fill(`Ob${RUN}Race${i}`);
     await flow(p).getByLabel("Email").fill(`ob-race${i}-${RUN}@example.com`);
     await cont(p).click();
-    await flow(p).getByLabel("I’ve read the cancellation policy").check();
+    await flow(p).getByLabel(/^I agree to the cancellation policy/).check();
   }
   expect(picked[0]).toEqual(picked[1]);
 
-  await first.getByRole("button", { name: "Book appointment" }).click();
+  await first.getByRole("button", { name: /^Book appointment$/ }).click();
   await expect(first.getByRole("heading", { name: /You’re booked/ })).toBeVisible();
-  await second.getByRole("button", { name: "Book appointment" }).click();
+  await second.getByRole("button", { name: /^Book appointment$/ }).click();
   await expect(flow(second).getByRole("alert")).toHaveText("Sorry, that time was just taken. Please pick another.");
   await expect(flow(second).getByRole("heading", { name: "Pick a date and time" })).toBeVisible();
   // The time is no longer offered.
@@ -311,6 +313,54 @@ test("services that need a consultation offer one instead, with deposits shown",
   await correction.getByRole("button", { name: "Request a consultation" }).click();
   await expect(flow(page).getByRole("button", { name: /^Color Consultation/ })).toHaveAttribute("aria-pressed", "true");
   await expect(flow(page).getByRole("button", { name: /^Balayage/ })).toContainText("25% deposit");
+});
+
+test("a new client reads the policy, agrees, saves a card and pays the deposit before it's booked", async ({ page }) => {
+  await open(page);
+  await chooseServices(page, ["Bridal Trial"]);
+  await chooseStylist(page, "No preference");
+  await chooseFirstTime(page, 0, 3);
+  await verify(page, newPhone());
+  await flow(page).getByLabel("First name").fill(`Ob${RUN}Bride`);
+  await flow(page).getByLabel("Email").fill(`ob-bride-${RUN}@example.com`);
+  await cont(page).click();
+
+  // The policy in plain language, with this visit's amounts.
+  const policy = flow(page).getByTestId("policy");
+  await expect(policy).toContainText("at least 2 days' notice");
+  await expect(policy).toContainText("Canceling with less notice costs $40.");
+  await expect(policy).toContainText(/Not showing up costs 50% of the visit \(\$\d+\)\./);
+  await expect(flow(page).getByTestId("deposit")).toContainText("$50");
+  await expect(flow(page).getByRole("heading", { name: "Card to hold your booking" })).toBeVisible();
+  const book = flow(page).getByRole("button", { name: "Pay $50 deposit and book" });
+  await expect(book).toBeDisabled();
+
+  // A declined card: nothing booked, nothing charged.
+  await flow(page).getByLabel(/^Card \(test mode/).selectOption("test_visa_0002");
+  await flow(page).getByLabel("I agree to the cancellation policy and to my card being saved for it").check();
+  await book.click();
+  await expect(flow(page).getByRole("alert")).toContainText("The card was declined. You haven't been charged; try another card.");
+  const { data: client } = await admin.from("clients").select("id").eq("business_id", B).eq("first_name", `Ob${RUN}Bride`).single();
+  created.push(client!.id);
+  expect((await admin.from("appointments").select("id").eq("client_id", client!.id)).data).toEqual([]);
+
+  await flow(page).getByLabel(/^Card \(test mode/).selectOption("test_visa_4242");
+  await flow(page).getByRole("button", { name: "Pay $50 deposit and book" }).click();
+  await expect(page.getByRole("heading", { name: /You’re booked/ })).toBeVisible();
+
+  // The card, what they agreed to and the deposit are all recorded.
+  const visit = (await admin.from("appointments").select("deposit_paid_cents, deposit_reference").eq("client_id", client!.id).single()).data!;
+  expect(visit.deposit_paid_cents).toBe(5000);
+  expect(visit.deposit_reference).toBeTruthy();
+  const card = (await admin.from("client_cards").select("label, consent:policy_consents(policy_text, channel)").eq("client_id", client!.id).single()).data!;
+  expect(card.label).toBe("Visa …4242");
+  expect(card.consent).toMatchObject({ channel: "online" });
+  expect(card.consent.policy_text).toContain("Canceling with less notice costs $40.");
+  // The confirmation includes the policy.
+  const outbox = await page.context().newPage();
+  await outbox.goto("/dev/outbox");
+  await expect(outbox.getByTestId("outbox-message").filter({ hasText: "you're booked for" }).first()).toContainText("Canceling with less notice costs $40.");
+  await outbox.close();
 });
 
 test("a bad manage link or salon shows nothing", async ({ page }) => {

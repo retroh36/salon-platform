@@ -56,6 +56,10 @@ describe("finding the page", () => {
     ["how do I void a sale", "Void a sale"],
     ["sell a membership", "Sell a membership"],
     ["download all our data", "Download all your data"],
+    ["how do I charge a no-show fee", "Charge a no-show or late cancellation fee"],
+    ["waive the late cancel fee", "Waive a cancellation or no-show fee"],
+    ["send a card link", "Ask a client for a card on file"],
+    ["set our cancellation policy", "Set up your cancellation policy"],
   ])("%s → %s", (question, title) => {
     expect(searchHelp(pages, question)[0]?.title).toBe(title);
   });

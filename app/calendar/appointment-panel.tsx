@@ -13,6 +13,8 @@ import { VisitPhotosTab } from "@/components/visit-photos";
 import { ACTION_LABELS, allowedActions, CANCEL_REASONS, canEditNotes, isEditable, MAX_NOTES, STATUS_LABELS, type AppointmentAction } from "@/lib/appointments";
 import type { ChecklistItem } from "@/lib/client-checks";
 import { nextStep, timerState, timerStatus, visitStatusText } from "@/lib/visit-times";
+import { CardLinkButton, FeeControls } from "@/components/policy-controls";
+import { cancelFee, type VisitTerms } from "@/lib/policy";
 import { formatLongDay } from "@/lib/schedule-format";
 import { LATE_MINUTES } from "@/lib/scheduling/disruptions";
 import { addDays, formatMinute, minuteToTime, parseTime, toLocal, type LocalDate } from "@/lib/scheduling/time";
@@ -260,6 +262,7 @@ export function AppointmentPanel({
               <span>{appointment.membership.text}</span>
             </p>
           )}
+          {appointment.policy && client && <PolicyInfo appointment={appointment} firstName={firstName} />}
           {appointment.series && (
             <p className="flex items-center gap-1.5 text-ink-muted" data-testid="series-info">
               <svg aria-hidden viewBox="0 0 24 24" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.75}>
@@ -366,6 +369,18 @@ export function AppointmentPanel({
               <p className="text-ink">
                 Mark {firstName} as a no-show? Their time opens up for other bookings. You can undo it if they turn up.
               </p>
+              {appointment.policy && appointment.policy.terms.noShowCents > 0 && (
+                <p className="text-ink" data-testid="no-show-fee">
+                  The no-show fee is {formatPrice(appointment.policy.terms.noShowCents)}
+                  {appointment.policy.depositPaidCents > 0
+                    ? appointment.policy.terms.noShowCents > appointment.policy.depositPaidCents
+                      ? `: the deposit, and the rest charged to ${appointment.policy.cardLabel ?? "the card on file"} in 10 minutes.`
+                      : ", kept from the deposit."
+                    : appointment.policy.cardLabel
+                      ? `, charged to ${appointment.policy.cardLabel} in 10 minutes.`
+                      : "; there's no card on file, so it's recorded to collect later."}
+                </p>
+              )}
               <div className="flex gap-2">
                 <Button variant="danger" disabled={pending} onClick={() => run("no_show")}>
                   Mark no-show
@@ -388,6 +403,7 @@ export function AppointmentPanel({
             />
           ) : canceling ? (
             <CancelForm
+              policy={appointment.policy}
               pending={pending}
               series={Boolean(appointment.series)}
               group={Boolean(appointment.group)}
@@ -626,12 +642,14 @@ function NotesForm({ appointmentId, initial, editable }: { appointmentId: string
 const NOTES_SAVE_DELAY = 800;
 
 function CancelForm({
+  policy,
   pending,
   series,
   group,
   onCancel,
   onKeep,
 }: {
+  policy: { terms: VisitTerms; bookedAt: string; startsAt: string; depositPaidCents: number; cardLabel: string | null } | null;
   pending: boolean;
   series: boolean;
   group: boolean;
@@ -641,6 +659,10 @@ function CancelForm({
   const [reason, setReason] = useState("");
   const [detail, setDetail] = useState("");
   const [scope, setScope] = useState<Scope | "group">("this");
+  // What canceling now costs the client, when it's them who canceled.
+  const fee = policy
+    ? cancelFee(policy.terms, { startsAt: new Date(policy.startsAt), bookedAt: new Date(policy.bookedAt), depositPaidCents: policy.depositPaidCents }, new Date(), reason).feeCents
+    : 0;
   return (
     <form
       aria-label="Cancel booking"
@@ -665,6 +687,12 @@ function CancelForm({
         </span>
         <input value={detail} onChange={(e) => setDetail(e.target.value)} maxLength={300} className={fieldClass} />
       </label>
+      {fee > 0 && (
+        <p className="text-sm text-ink" data-testid="late-cancel-fee">
+          It&rsquo;s inside the {policy!.terms.windowHours}-hour window: the late-cancellation fee is {formatPrice(fee)}
+          {policy!.depositPaidCents >= fee ? ", kept from the deposit." : policy!.cardLabel ? `, charged to ${policy!.cardLabel}.` : "; there's no card on file."} Anyone allowed can waive it after.
+        </p>
+      )}
       {(series || group) && (
         <fieldset className="flex flex-col gap-1.5">
           <legend className="mb-1 text-sm font-medium text-ink">Cancel</legend>
@@ -1139,6 +1167,42 @@ function CheckInWarning({
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+// The cancellation policy on the visit (front of house): a card or deposit
+// still needed, with a secure link to send; the client's strikes; a
+// no-show's fee and what happened to it.
+function PolicyInfo({ appointment, firstName }: { appointment: AppointmentDetail; firstName: string }) {
+  const p = appointment.policy!;
+  const client = appointment.client!;
+  const strikes = p.strikes > 0 && `${p.strikes} late cancellation${p.strikes === 1 ? "" : "s"} or no-show${p.strikes === 1 ? "" : "s"} in the last ${p.months} months`;
+  if (p.fee)
+    return (
+      <div data-testid="policy-info">
+        <FeeControls fee={p.fee} canWaive={p.canWaive} canRetry />
+      </div>
+    );
+  if (!p.cardNeeded && !p.depositNeededCents)
+    return p.cardLabel || strikes ? (
+      <p className="text-ink-muted" data-testid="policy-info">
+        {[p.cardLabel && `${p.cardLabel} on file`, strikes].filter(Boolean).join(" · ")}
+      </p>
+    ) : null;
+  return (
+    <div className="flex flex-col gap-2" data-testid="policy-info">
+      <p className="font-medium text-status-late-ink" data-testid="card-needed">
+        {p.depositNeededCents > 0 ? `Deposit needed: ${formatPrice(p.depositNeededCents)}` : "Card needed to hold this booking"}
+        {p.linkOut && <span className="font-normal text-ink-muted"> · link sent</span>}
+      </p>
+      {(strikes || p.depositNeededCents > 0) && (
+        <p className="text-ink-muted">
+          {strikes ? `${firstName} has ${strikes}` : `${firstName}'s visit needs a deposit`}
+          {p.repeatAction === "prepay" ? ", so the salon asks for the whole visit up front." : p.repeatAction === "deposit" ? ", so the salon asks for a deposit." : "."}
+        </p>
+      )}
+      <CardLinkButton clientId={client.id} appointmentId={appointment.id} phone={client.phone} email={client.email} depositCents={p.depositNeededCents} sent={p.linkOut} />
     </div>
   );
 }

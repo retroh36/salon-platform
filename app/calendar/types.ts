@@ -2,6 +2,7 @@
 // since midnight on the day shown, at the location.
 
 import type { DurationBasis } from "@/lib/insights/durations";
+import type { VisitPolicy } from "@/lib/policy-visits";
 import type { AppointmentStatus } from "@/lib/appointments";
 import type { VisitWarnings } from "@/lib/client-checks";
 import type { PickerProduct } from "@/lib/inventory-load";
@@ -115,6 +116,9 @@ export type AppointmentDetail = {
   // Their membership: "Blowout Club member · 1 Blowout left", or a failed
   // payment (no benefits until it's paid).
   membership: { name: string; status: "active" | "past_due" | "paused"; text: string } | null;
+  // The cancellation policy on the visit (front of house only): a card or
+  // deposit still needed, the client's strikes, a no-show's fee.
+  policy: VisitPolicy | null;
   // What's happened to the visit, oldest first, after bookedBy: checked in
   // without a patch test, check-ins undone ("Check-in undone by Sam Rivera · …").
   log: string[];

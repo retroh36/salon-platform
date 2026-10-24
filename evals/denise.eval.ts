@@ -1,4 +1,4 @@
-// Ask Denise, evaluated: 34 realistic questions from the front desk,
+// Ask Denise, evaluated: 35 realistic questions from the front desk,
 // the owner and a stylist (10 of them "how do I…?", answered from the help
 // guide in docs/help/), asked of the real Claude API against the demo
 // data (npm run seed:demo). Each case checks which tools she used and that
@@ -419,6 +419,28 @@ const CASES: Case[] = [
       return { someone: data![0]?.client_package.client?.first_name ?? null };
     },
     check: (a) => (/package/i.test(a) ? null : "should talk about packages"),
+  },
+  {
+    question: "Who's cancelled late this month?",
+    as: "front_desk",
+    tools: ["late_cancellations"],
+    facts: async () => {
+      const month = new Date().toISOString().slice(0, 7);
+      const { data } = await admin
+        .from("policy_fees")
+        .select("client:clients(first_name)")
+        .eq("business_id", B)
+        .eq("kind", "late_cancel")
+        .neq("status", "voided")
+        .gte("created_at", `${month}-01`);
+      return { names: [...new Set(data!.map((f) => f.client.first_name))].join("|") };
+    },
+    check: (a, f) => {
+      if (/\$\d/.test(a)) return "the front desk shouldn't get fee amounts";
+      const names = String(f.names ?? "").split("|").filter(Boolean);
+      if (!names.length) return /no one|nobody|none|no late/i.test(a) ? null : "should say no one has";
+      return has(a, ...names) ? null : `should name someone who did (${names.length} clients)`;
+    },
   },
   howToCase("How do I ring up a gift card?", "front_desk", "Sell a gift card", says(/gift card/i, "should mention the Gift card button")),
   howToCase("A client wants to pay with their gift card. What do I do?", "front_desk", "Pay with a gift card", says(/gift card/i, "should mention paying by gift card")),

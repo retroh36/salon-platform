@@ -2,11 +2,11 @@ import Link from "next/link";
 import { logout } from "@/app/login/actions";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
-import { BoxIcon, CalendarIcon, ChartIcon, GiftIcon, ReceiptIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, UserIcon, WalletIcon } from "@/components/ui/icons";
+import { BoxIcon, CalendarIcon, ChartIcon, GiftIcon, ReceiptIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, ShieldIcon, UserIcon, WalletIcon } from "@/components/ui/icons";
 import { SalonMark } from "@/components/ui/salon-mark";
 import { roleLabel, type StaffRole } from "@/lib/staff";
 
-export type Section = "dashboard" | "my-day" | "calendar" | "sales" | "gift-cards" | "reports" | "payroll" | "clients" | "team" | "services" | "durations" | "inventory" | "forms" | "settings";
+export type Section = "dashboard" | "my-day" | "calendar" | "sales" | "gift-cards" | "reports" | "payroll" | "policy" | "clients" | "team" | "services" | "durations" | "inventory" | "forms" | "settings";
 
 type NavItem = {
   section: Section;
@@ -38,6 +38,7 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
       { section: "gift-cards", href: "/gift-cards", label: "Gift cards", Icon: GiftIcon, frontOfHouse: true },
       { section: "reports", href: "/reports", label: "Reports", Icon: ChartIcon, ownersOnly: true },
       { section: "payroll", href: "/payroll", label: "Payroll", Icon: WalletIcon, managersOnly: true },
+      { section: "policy", href: "/policy", label: "Policy", Icon: ShieldIcon, managersOnly: true },
     ],
   },
   {
