@@ -84,7 +84,7 @@ test.describe("front desk", () => {
     await admin.from("time_blocks").insert({ business_id: B, location_id: L, staff_id: SHAE, kind: "meeting", note: "Team meeting", start_minute: 600, end_minute: 660, on_date: DAY });
     // A client at 9 with Shae, dragged into their meeting.
     const { data: client } = await admin.from("clients").select("id").eq("business_id", B).order("id").limit(1).single();
-    const { data: s } = await admin.from("services").select("id, duration_minutes, active_minutes, price_cents").eq("name", "Men's Cut").single();
+    const { data: s } = await admin.from("services").select("id, duration_minutes, active_minutes, price_cents").eq("business_id", B).eq("name", "Men's Cut").single();
     const end = new Date(at(9).getTime() + s!.duration_minutes! * 60_000).toISOString();
     const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: client!.id, starts_at: at(9).toISOString(), ends_at: end }).select("id").single();
     await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: s!.id, staff_id: SHAE, starts_at: at(9).toISOString(), ends_at: end, active_minutes: s!.active_minutes, price_cents: s!.price_cents });

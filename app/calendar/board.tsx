@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { createContext, startTransition, useCallback, useContext, useEffect, useLayoutEffect, useOptimistic, useRef, useState, ViewTransition } from "react";
+import { fitCookie, mergeOrder, moveItem, nameVariants, offColumns, viewColumns, viewCookie, viewKey, type ViewKey } from "@/lib/calendar-views";
 import { DeniseFace } from "@/components/denise";
-import { Avatar, initials } from "@/components/ui/avatar";
+import { Avatar } from "@/components/ui/avatar";
 import { LEVEL_BG, LevelBadge } from "@/components/ui/level";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { FitText } from "@/components/ui/fit-text";
-import { CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, MoreIcon, PlusIcon, SendIcon } from "@/components/ui/icons";
+import { CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, GripIcon, MoreIcon, PlusIcon, SendIcon } from "@/components/ui/icons";
 import { Listbox } from "@/components/ui/listbox";
 import { Segmented } from "@/components/ui/segmented";
 import { Tabs } from "@/components/ui/tabs";
@@ -33,6 +34,8 @@ import { BookingPanel, type BookingStart } from "./booking-panel";
 import { WalkInPanel } from "./walk-in-panel";
 import { GroupPanel } from "./group-panel";
 import { NowLine, useNow } from "./now-line";
+import { OffChip, ViewEditor, type Department } from "./views";
+import { saveCalendarView, setCalendarOrder } from "./view-actions";
 import type { BlockData, BoardData, ColumnData, TimeBlockData } from "./types";
 
 // How tall time is drawn (px per minute), from the zoom; blocks read it.
@@ -48,6 +51,14 @@ const MOVE_STEP = 5;
 const SLOT_STEP = 15;
 // Pointer travel before a press counts as a drag rather than a click.
 const DRAG_THRESHOLD = 5;
+// Dragging near the grid's left or right edge scrolls it sideways (many
+// columns): how close, in px, and how far each move scrolls at most.
+const EDGE_ZONE = 72;
+const EDGE_STEP = 24;
+// A column's narrowest before the grid scrolls sideways, and with Fit all.
+const COLUMN_MIN = "9.5rem";
+// Remembered for a year, on this device.
+const COOKIE_AGE = 60 * 60 * 24 * 365;
 
 type Selection =
   | { kind: "none" }
@@ -124,14 +135,12 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.date]);
 
-  // What the right panel shows, and which off-duty stylists are expanded.
-  // Both reset when the day changes.
+  // What the right panel shows; it resets when the day changes.
   const [shownDate, setShownDate] = useState(data.date);
   // A link from the Dashboard can ask for a booking, a stylist's column or
   // Denise's panel (data.focus).
   const linked = data.focus.appointmentId && data.appointments[data.focus.appointmentId] ? data.focus.appointmentId : null;
   const [selection, setSelection] = useState<Selection>(linked ? { kind: "detail", appointmentId: linked } : { kind: "none" });
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set(data.focus.staffId ? [data.focus.staffId] : []));
   // Denise: her view of the day (for the board's data she last looked at),
   // and what she's doing.
   const [denise, setDenise] = useState<{ state: DeniseState; for: BoardData } | null>(null);
@@ -150,7 +159,6 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     setShownDate(data.date);
     setSelection(arrived ? { kind: "detail", appointmentId: arrived } : { kind: "none" });
     setArriving(null);
-    setExpanded(new Set());
     setOutcome(null);
     setPreview(null);
   }
@@ -161,7 +169,28 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // What Denise has that hasn't been looked at in her panel yet.
   const [unseen, setUnseen] = useState<ReadonlySet<string>>(new Set());
 
-  const [department, setDepartment] = useState<"all" | ServiceFamily>("all");
+  // Who's shown: everyone, a department or a saved view (the last used on
+  // this device), with or without the people off that day; and Fit all.
+  const [view, setViewState] = useState<ViewKey>(data.initialView);
+  const [showOff, setShowOff] = useState(false);
+  const [fitAll, setFitAllState] = useState(me.fitAll);
+  const remember = (name: string, value: string) => {
+    document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${COOKIE_AGE}; samesite=lax`;
+  };
+  const setView = (next: ViewKey) => {
+    setViewState(next);
+    remember(viewCookie(me.staffId), next);
+  };
+  const setFitAll = (on: boolean) => {
+    setFitAllState(on);
+    remember(fitCookie(me.staffId), on ? "1" : "0");
+  };
+  // The view being made or changed (null: a new one).
+  const [editing, setEditing] = useState<{ viewId: string | null } | null>(null);
+  // A column header being dragged to a new place, and the order shown
+  // while the new one saves.
+  const [columnDrag, setColumnDrag] = useState<{ staffId: string; to: number } | null>(null);
+  const [savedOrder, setSavedOrder] = useOptimistic<string[] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
   // Just checked in or marked a no-show: a toast with Undo, for UNDO_MS.
@@ -234,7 +263,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // Someone using the side panel (a booking, the walk-ins, a visit's
   // details): Denise's badge calls rather than taking the panel over.
   const busyWith = useRef<Selection["kind"]>("none");
-  busyWith.current = panelOpen ? selection.kind : "none";
+  useEffect(() => {
+    busyWith.current = panelOpen ? selection.kind : "none";
+  });
   const showDenise = useCallback((state: DeniseState, forData: BoardData) => {
     setDenise({ state, for: forData });
     const keys = deniseKeys(state);
@@ -370,8 +401,11 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // Stylists who do any service in the chosen department.
   const offersFamily = (c: ColumnData, f: ServiceFamily) =>
     data.menu.services.some((s) => s.family === f && !s.archived && s.id in (data.menu.offers[c.staffId] ?? {}));
-  const columns = department === "all" ? data.columns : data.columns.filter((c) => offersFamily(c, department));
   const departments = FAMILIES.filter((f) => data.columns.some((c) => offersFamily(c, f)));
+  const currentView = data.views.find((v) => viewKey(v.id) === view) ?? null;
+  // The view's stylists, in its order (or the salon's), as just reordered.
+  const ordered = (list: ColumnData[]) => (savedOrder ? [...list].sort((a, b) => savedOrder.indexOf(a.staffId) - savedOrder.indexOf(b.staffId)) : list);
+  const inView = ordered(viewColumns(data.columns, view, data.views, offersFamily));
 
   const placed = (b: BlockData): BlockData => {
     const m = moves[b.itemId];
@@ -380,19 +414,83 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     return { ...b, staffId: m.staffId, start: b.start + shift, end: b.end + shift, segments: b.segments.map((s) => ({ ...s, start: s.start + shift, end: s.end + shift })) };
   };
   const blocks = data.blocks.map(placed);
+  // Who's off that day is hidden (unless asked for), except anyone with a
+  // booking, a stylist a link asked for, or one Denise's fix would move a
+  // client to.
+  const off = offColumns(inView, new Set(data.blocks.map((b) => b.staffId)));
+  const keep = new Set([data.focus.staffId, ...(previewOption?.moves ?? []).map((m) => m.to.staffId)]);
+  const hidden = showOff ? new Set<string>() : new Set(off.filter((c) => !keep.has(c.staffId)).map((c) => c.staffId));
+  const shownColumns = inView.filter((c) => !hidden.has(c.staffId));
+  const columns = columnDrag ? moveItem(shownColumns, shownColumns.findIndex((c) => c.staffId === columnDrag.staffId), columnDrag.to) : shownColumns;
+  // Fit all: in Compact, every column squeezes on screen, names shortened.
+  const squeezed = fitAll && zoom === "compact";
   const canMove = (b: BlockData) => me.canBook && isEditable(b.status);
   const selectedAppointment = selection.kind === "detail" || selection.kind === "edit" ? selection.appointmentId : null;
   const selectedGroup = selectedAppointment ? (data.appointments[selectedAppointment]?.group?.id ?? null) : null;
 
-  // Off-duty stylists with nothing booked fold to a thin column.
-  const collapsed = (c: ColumnData) => !c.working && !expanded.has(c.staffId) && !blocks.some((b) => b.staffId === c.staffId);
-  const toggle = (staffId: string, show: boolean) =>
-    setExpanded((all) => {
-      const next = new Set(all);
-      if (show) next.add(staffId);
-      else next.delete(staffId);
-      return next;
+  // Who can drag a column header: owners, for the salon's order (on
+  // everyone or a department); anyone, for a view of their own (owners,
+  // shared views too).
+  const canReorder = currentView ? currentView.editable : me.role === "owner";
+  const headerRefs = useRef(new Map<string, HTMLElement>());
+
+  // Scrolls the grid sideways while something is dragged near its edge.
+  function edgeScroll(clientX: number) {
+    const el = gridRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const left = r.left + 64;
+    if (clientX > r.right - EDGE_ZONE) el.scrollLeft += Math.ceil((EDGE_STEP * (clientX - (r.right - EDGE_ZONE))) / EDGE_ZONE);
+    else if (clientX < left + EDGE_ZONE) el.scrollLeft -= Math.ceil((EDGE_STEP * (left + EDGE_ZONE - clientX)) / EDGE_ZONE);
+  }
+
+  // Dragging a header by its grip: the columns make room as it goes, and
+  // the new order saves on letting go (followed on the window, since the
+  // header moves in the page).
+  function onHeaderGrip(e: React.PointerEvent, staffId: string) {
+    if (e.button !== 0 || columnDrag) return;
+    e.preventDefault();
+    const pointerId = e.pointerId;
+    const before = shownColumns.map((c) => c.staffId);
+    let to = before.indexOf(staffId);
+    setColumnDrag({ staffId, to });
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      edgeScroll(ev.clientX);
+      to = before.filter((id) => id !== staffId).filter((id) => {
+        const r = headerRefs.current.get(id)?.getBoundingClientRect();
+        return r && ev.clientX > r.left + r.width / 2;
+      }).length;
+      setColumnDrag({ staffId, to });
+    };
+    const onEnd = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+      setColumnDrag(null);
+      const after = moveItem(before, before.indexOf(staffId), to);
+      if (ev.type === "pointerup" && after.some((id, i) => id !== before[i])) saveOrder(before, after);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onEnd);
+    window.addEventListener("pointercancel", onEnd);
+  }
+
+  // Saves a new order for the columns shown: the view's own, or the
+  // salon's (the others shown elsewhere keep their places).
+  function saveOrder(before: string[], after: string[]) {
+    setNotice(null);
+    const all = currentView ? currentView.staffIds : data.columns.map((c) => c.staffId);
+    const next = mergeOrder(all, before, after);
+    startTransition(async () => {
+      setSavedOrder(next);
+      const result = currentView
+        ? await saveCalendarView({ id: currentView.id, name: currentView.name, staffIds: next, shared: currentView.shared })
+        : await setCalendarOrder(next);
+      if (!result.ok) setNotice(`Couldn't save the new order: ${"message" in result ? result.message : ""}`);
     });
+  }
 
   function columnAt(clientX: number): string | null {
     for (const [staffId, el] of columnRefs.current) {
@@ -425,6 +523,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     const dx = e.clientX - d.x;
     const dy = e.clientY - d.y;
     if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    edgeScroll(e.clientX);
     const shift = Math.round(dy / PX_PER_MINUTE / MOVE_STEP) * MOVE_STEP;
     const start = Math.min(Math.max(d.fromStart + shift, range.start), range.end - d.length);
     const next = { ...d, moved: true, start, staffId: columnAt(e.clientX) ?? d.staffId };
@@ -516,7 +615,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   }
 
   const gridColumns = {
-    gridTemplateColumns: `4rem ${columns.map((c) => (collapsed(c) ? "2.75rem" : "minmax(8.5rem, 1fr)")).join(" ")}`,
+    gridTemplateColumns: `4rem repeat(${columns.length}, minmax(${squeezed ? "0px" : COLUMN_MIN}, 1fr))`,
   };
   const dayLink = (d: string) => (d === data.today ? "/calendar" : `/calendar?date=${d}`);
   const goTo = (d: string) => router.push(dayLink(d), { transitionTypes: [d > data.date ? "nav-forward" : "nav-back"] });
@@ -599,23 +698,44 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             <DatePicker value={data.date} today={data.today} onChange={goTo} label="Go to date" />
           </nav>
           <Listbox
-            label="Department"
-            value={department}
-            onChange={setDepartment}
-            className="w-52"
+            label="Department or view"
+            value={currentView || !view.startsWith("view:") ? view : "all"}
+            onChange={(next: string) => {
+              if (next === "action:new") setEditing({ viewId: null });
+              else if (next === "action:edit") setEditing({ viewId: currentView!.id });
+              else setView(next as ViewKey);
+            }}
+            className="w-56"
             options={[
               { value: "all", label: "All departments" },
               ...departments.map((f) => ({
                 value: f,
                 label: FAMILY_LABELS[f],
+                group: "Departments",
                 icon: (
                   <span data-family={f} aria-hidden className="h-3 w-3 shrink-0 rounded-[3px] border-l-[3px] border-(--fam-accent) bg-(--fam-fill)" />
                 ),
               })),
+              ...data.views.filter((v) => v.shared).map((v) => ({ value: viewKey(v.id), label: v.name, group: "Views for everyone" })),
+              ...data.views.filter((v) => !v.shared).map((v) => ({ value: viewKey(v.id), label: v.name, group: "My views" })),
+              ...(currentView?.editable ? [{ value: "action:edit", label: `Edit ${currentView.name}…`, group: "Views", action: true }] : []),
+              { value: "action:new", label: "New view…", group: "Views", action: true, icon: <PlusIcon className="size-4 text-ink-muted" /> },
             ]}
           />
+          {off.length > 0 && <OffChip off={off} shown={showOff} onShow={setShowOff} isToday={data.date === data.today} />}
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <Segmented label="Zoom" value={zoom} onChange={setZoom} options={ZOOMS.map((z) => ({ value: z, label: ZOOM_LABELS[z] }))} />
+            {zoom === "compact" && (
+              <button
+                type="button"
+                aria-pressed={fitAll}
+                title="Squeeze every stylist on screen"
+                onClick={() => setFitAll(!fitAll)}
+                className={buttonClass(fitAll ? "primary" : "secondary", "md")}
+              >
+                Fit all
+              </button>
+            )}
             <Segmented
               label="View"
               value="day"
@@ -647,60 +767,80 @@ export function CalendarBoard({ data }: { data: BoardData }) {
         )}
 
         <ViewTransition key={data.date} enter={DAY_SLIDE} exit={DAY_SLIDE} default="none">
-          <div ref={gridRef} className="overflow-auto rounded-xl border border-line bg-surface shadow-card lg:min-h-0 lg:flex-1" data-testid="calendar-grid" data-zoom={zoom} data-px-per-minute={PX_PER_MINUTE}>
+          <div
+            ref={gridRef}
+            // Sideways swipes scroll the stylists, never the browser back a page.
+            className="overflow-auto overscroll-x-contain rounded-xl border border-line bg-surface shadow-card lg:min-h-0 lg:flex-1"
+            data-testid="calendar-grid"
+            data-zoom={zoom}
+            data-px-per-minute={PX_PER_MINUTE}
+            data-fit-all={squeezed || undefined}
+          >
             <ScaleContext value={PX_PER_MINUTE}>
             {columns.length === 0 ? (
-              <p className="p-6 text-ink-muted">No one in this department works here. Choose another department.</p>
+              off.length > 0 ? (
+                <div className="flex flex-col items-start gap-3 p-6">
+                  <p className="text-ink-muted">{data.openLabel === "Salon closed" ? "The salon is closed" : "No one here is working"}{data.date === data.today ? " today" : " this day"}.</p>
+                  <Button onClick={() => setShowOff(true)}>Show them anyway</Button>
+                </div>
+              ) : (
+                <p className="p-6 text-ink-muted">No one in this department works here. Choose another department.</p>
+              )
             ) : (
               // Columns share the width; below their minimum the grid scrolls.
               <div className="min-w-fit">
                 <div data-grid-header className="sticky top-0 z-30 grid border-b border-line-strong bg-surface" style={gridColumns}>
                   <div className="sticky left-0 z-10 bg-surface" />
-                  {columns.map((c) =>
-                    collapsed(c) ? (
-                      <button
+                  {columns.map((c) => (
+                      <div
                         key={c.staffId}
-                        type="button"
-                        aria-expanded={false}
-                        aria-label={`Show ${c.name} (${c.hoursLabel.toLowerCase()})`}
-                        title={`${c.name} · ${c.hoursLabel}`}
-                        onClick={() => toggle(c.staffId, true)}
-                        className="flex flex-col items-center justify-center gap-1 border-l border-line bg-sunken/60 py-3 text-xs font-semibold text-ink-muted transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
+                        ref={(el) => {
+                          if (el) headerRefs.current.set(c.staffId, el);
+                          else headerRefs.current.delete(c.staffId);
+                        }}
+                        className={`relative flex min-w-0 animate-fade-in flex-col gap-1.5 border-l border-line py-3 ${squeezed ? "px-1.5" : "px-3"} ${columnDrag?.staffId === c.staffId ? "z-10 bg-navy-100 shadow-lift" : ""}`}
+                        data-column-header
+                        data-level={c.level ?? undefined}
                       >
-                        {initials(c.name)}
-                        <ChevronRightIcon className="size-3.5" />
-                      </button>
-                    ) : (
-                      <div key={c.staffId} className="relative flex min-w-0 animate-fade-in flex-col gap-1.5 border-l border-line px-3 py-3" data-column-header data-level={c.level ?? undefined}>
                         {c.level && <span aria-hidden data-testid="level-bar" className={`absolute inset-x-0 top-0 h-1 ${LEVEL_BG[c.level]}`} />}
+                        {canReorder && !squeezed && (
+                          <span
+                            aria-hidden
+                            data-column-grip
+                            title="Drag to change the order"
+                            onPointerDown={(e) => onHeaderGrip(e, c.staffId)}
+                            className="absolute top-1 left-1/2 flex h-4 w-8 -translate-x-1/2 cursor-grab touch-none items-center justify-center rounded text-ink-subtle opacity-60 hover:bg-sunken hover:opacity-100 active:cursor-grabbing"
+                          >
+                            <GripIcon className="size-3.5 rotate-90" />
+                          </span>
+                        )}
                         <div className="flex min-w-0 items-center gap-2.5">
-                          <Avatar name={c.name} color={c.color} level={c.level} />
+                          {/* Squeezed (Fit all), the avatar goes so the name fits. */}
+                          {!squeezed && <Avatar name={c.name} color={c.color} level={c.level} />}
                           <div className="min-w-0 flex-1">
-                            <FitText variants={[c.name, `${c.firstName} ${c.name.split(" ").at(-1)![0]}.`, c.firstName]} className="pr-6 font-semibold" />
+                            <span title={squeezed ? `${c.name} · ${c.booked}` : c.name} className="block">
+                              <FitText variants={nameVariants(c.name, c.firstName, squeezed)} className={`font-semibold ${!squeezed && c.working && data.date >= data.today && (me.canBook || me.staffId === c.staffId) ? "pr-6" : ""}`} />
+                            </span>
                             {/* One line, the full hours on hover. */}
                             <div title={c.hoursLabel} data-testid="column-hours" className="truncate text-xs leading-4 whitespace-nowrap text-ink-muted">
-                              {c.hoursShort}
+                              {c.working ? c.hoursShort : c.offReason}
                             </div>
                           </div>
-                          {!c.working && expanded.has(c.staffId) && (
-                            <IconButton label={`Hide ${c.name}`} size="sm" onClick={() => toggle(c.staffId, false)}>
-                              <ChevronLeftIcon className="size-4" />
-                            </IconButton>
-                          )}
                         </div>
                         {/* Their day at a glance, across the column: shortened to
                             fit, never cut off, with the full text on hover. */}
-                        <div title={c.booked} className="text-sm text-ink-muted" data-testid="booked-summary">
-                          <FitText variants={summaryVariants(c.booked)} />
-                        </div>
-                        {c.working && data.date >= data.today && (me.canBook || me.staffId === c.staffId) && (
+                        {!squeezed && (
+                          <div title={c.booked} className="text-sm text-ink-muted" data-testid="booked-summary">
+                            <FitText variants={summaryVariants(c.booked)} />
+                          </div>
+                        )}
+                        {!squeezed && c.working && data.date >= data.today && (me.canBook || me.staffId === c.staffId) && (
                           <div className="absolute top-1.5 right-1">
                             <OutMenu column={c} date={data.date} today={data.today} onMarkOut={markOut} />
                           </div>
                         )}
                       </div>
-                    ),
-                  )}
+                  ))}
                 </div>
 
                 <div className="relative grid" style={gridColumns} data-range-start={range.start}>
@@ -721,17 +861,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                     ))}
                   </div>
 
-                  {columns.map((c) =>
-                    collapsed(c) ? (
-                      <section
-                        key={c.staffId}
-                        aria-label={c.name}
-                        data-collapsed
-                        onClick={() => toggle(c.staffId, true)}
-                        className="cursor-pointer border-l border-line bg-sunken/80"
-                        style={{ height, backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, rgb(23 39 59 / 0.04) 6px 12px)" }}
-                      />
-                    ) : (
+                  {columns.map((c) => (
                       <section
                         key={c.staffId}
                         ref={(el) => {
@@ -770,7 +900,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                           <div
                             key={`${t.start}-${t.label}`}
                             data-time-off
-                            className="absolute inset-x-1 z-0 rounded-md border border-line-strong bg-sunken px-2 py-1 text-xs font-medium text-ink-muted"
+                            className="absolute inset-x-1 z-0 truncate rounded-md border border-line-strong bg-sunken px-2 py-1 text-xs font-medium text-ink-muted"
                             style={{ top: y(t.start), height: (t.end - t.start) * PX_PER_MINUTE }}
                           >
                             Time off: {t.label}
@@ -822,6 +952,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                               stylist={data.columns.find((c) => c.staffId === b.staffId)?.name ?? ""}
                               onHint={(details, rect) => setHint(details && !dragRef.current ? { id: b.itemId, details, rect } : null)}
                               settling={settling === b.itemId}
+                              squeezed={squeezed}
                               onSettled={() => setSettling(null)}
                               onPointerDown={(e) => {
                                 setHint(null);
@@ -842,8 +973,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                           )}
                         </ul>
                       </section>
-                    ),
-                  )}
+                  ))}
 
                   <div className="pointer-events-none absolute inset-y-0 right-0 left-16">
                     <NowLine date={data.date} timeZone={data.timeZone} startMinute={range.start} endMinute={range.end} pxPerMinute={PX_PER_MINUTE} />
@@ -858,7 +988,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
         {/* The key, with Denise's face at the end of the row while her panel
             is closed (so she never sits on top of the calendar). */}
         <div className="flex items-center gap-4">
-          <CalendarKey />
+          <CalendarKey families={FAMILIES.filter((f) => f !== "other" && data.menu.services.some((s) => s.family === f && !s.archived))} />
           <DeniseLauncher
             hidden={panelOpen}
             count={attention}
@@ -872,6 +1002,27 @@ export function CalendarBoard({ data }: { data: BoardData }) {
       </div>
 
       {hint && <BlockHint {...hint} />}
+
+      {editing && (
+        <ViewEditor
+          view={editing.viewId ? (data.views.find((v) => v.id === editing.viewId) ?? null) : null}
+          // A new view starts from the department or view on screen.
+          start={view === "all" ? [] : inView.map((c) => c.staffId)}
+          team={data.columns}
+          departments={departments.map((f): Department => ({ label: FAMILY_LABELS[f], staffIds: data.columns.filter((c) => offersFamily(c, f)).map((c) => c.staffId) }))}
+          views={data.views}
+          canShare={me.role === "owner"}
+          onClose={() => setEditing(null)}
+          onSaved={(id) => {
+            setEditing(null);
+            setView(viewKey(id));
+          }}
+          onDeleted={() => {
+            setEditing(null);
+            setView("all");
+          }}
+        />
+      )}
 
       {undoable && (
         <div
@@ -1403,7 +1554,7 @@ function FixGhost({ block, y }: { block: Placed & { lane: number; lanes: number 
 
 // A small "Key" button under the calendar, opening what the colors,
 // statuses and level badges mean.
-function CalendarKey() {
+function CalendarKey({ families }: { families: ServiceFamily[] }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -1431,7 +1582,7 @@ function CalendarKey() {
           <section className="flex flex-col gap-2">
             <h3 className="text-xs font-semibold tracking-wider text-ink uppercase">Services</h3>
             <ul aria-label="Service families" className="flex flex-col gap-1.5">
-              {FAMILIES.filter((f) => f !== "other").map((f) => (
+              {families.map((f) => (
                 <li key={f} className="flex items-center gap-2" data-family={f}>
                   <span aria-hidden className={`${swatch} border-l-[3px] border-(--fam-accent) bg-(--fam-fill)`} />
                   {FAMILY_LABELS[f]}
@@ -1640,6 +1791,7 @@ function AppointmentBlock({
   settling,
   onSettled,
   onOpen,
+  squeezed,
   ...pointer
 }: {
   block: BlockData & { lane: number; lanes: number };
@@ -1660,6 +1812,8 @@ function AppointmentBlock({
   settling: boolean;
   onSettled: () => void;
   onOpen: () => void;
+  // Fit all: a narrow column, so just the name (the rest is in the tooltip).
+  squeezed: boolean;
   onPointerDown: (e: React.PointerEvent) => void;
   onPointerMove: (e: React.PointerEvent) => void;
   onPointerUp: (e: React.PointerEvent) => void;
@@ -1692,8 +1846,9 @@ function AppointmentBlock({
   }
   // Leftover room lets a long service name wrap rather than shorten.
   if (show.service && room >= LINE) show.serviceLines = 2;
+  if (squeezed) show.service = show.time = false;
   // A short block puts the time on the name line.
-  const timeOnName = show.name && !show.time;
+  const timeOnName = show.name && !show.time && !squeezed;
   // The name comes first; in a block shared with another lane there's no
   // room for the lateness too (it's in the tooltip).
   const showLate = late && block.lanes === 1;

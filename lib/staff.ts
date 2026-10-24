@@ -31,3 +31,11 @@ export function sortStaff<T extends SortableStaff>(staff: readonly T[]): T[] {
       fullName(a).localeCompare(fullName(b)),
   );
 }
+
+// The calendar's default column order: the salon's own (staff
+// calendar_position, set by owners), then anyone not placed yet in the
+// usual order.
+export function sortForCalendar<T extends SortableStaff & { calendar_position: number | null }>(staff: readonly T[]): T[] {
+  const place = (s: T) => s.calendar_position ?? Number.MAX_SAFE_INTEGER;
+  return sortStaff(staff).sort((a, b) => place(a) - place(b));
+}

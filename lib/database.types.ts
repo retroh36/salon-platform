@@ -303,6 +303,44 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"calendar_views": {
+                  Row: {
+                    "business_id": string,"created_at": string,"created_by": string | null,"id": string,"location_id": string,"name": string,"owner_staff_id": string | null,"staff_ids": (string)[],"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id": string,"name": string,"owner_staff_id"?: string | null,"staff_ids": (string)[],"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id"?: string,"name"?: string,"owner_staff_id"?: string | null,"staff_ids"?: (string)[],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "calendar_views_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "calendar_views_created_by_business_id_fkey"
+      columns: ["created_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "calendar_views_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "calendar_views_owner_staff_id_business_id_fkey"
+      columns: ["owner_staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"cash_closeouts": {
                   Row: {
                     "business_id": string,"closed_at": string,"closed_by": string | null,"counted_cents": number,"day": string,"expected_cents": number,"float_cents": number,"id": string,"location_id": string,"note": string | null
@@ -1979,14 +2017,14 @@ isOneToOne: false
                   ]
                 },"staff": {
                   Row: {
-                    "business_id": string,"calendar_zoom": string,"color": string | null,"created_at": string,"email": string | null,"first_name": string,"id": string,"is_active": boolean,"last_name": string,"level": Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone": string | null,"photo_path": string | null,"role": Database["public"]['Enums']["staff_role"],"updated_at": string,"user_id": string | null
+                    "business_id": string,"calendar_position": number | null,"calendar_zoom": string,"color": string | null,"created_at": string,"email": string | null,"first_name": string,"id": string,"is_active": boolean,"last_name": string,"level": Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone": string | null,"photo_path": string | null,"role": Database["public"]['Enums']["staff_role"],"updated_at": string,"user_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"first_name": string,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone"?: string | null,"photo_path"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
+                    "business_id": string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"first_name": string,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone"?: string | null,"photo_path"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
                   }
                   Update: {
-                    "business_id"?: string,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"first_name"?: string,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id"?: string,"phone"?: string | null,"photo_path"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
+                    "business_id"?: string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"first_name"?: string,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id"?: string,"phone"?: string | null,"photo_path"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -2663,6 +2701,9 @@ isOneToOne: false
 "create_payment_link":
 { Args: { "p_amount_cents": number,"p_channel": string,"p_draft_id": string,"p_hours": number,"p_snapshot": Json,"p_to": string,"p_token_hash": string }; Returns: string
                            },
+"delete_calendar_view":
+{ Args: { "p_view_id": string }; Returns: undefined
+                           },
 "delete_purchase_order":
 { Args: { "p_order_id": string }; Returns: undefined
                            },
@@ -2762,6 +2803,9 @@ isOneToOne: false
 "save_automation":
 { Args: { "p_business_id": string,"p_input": Json,"p_kind": string }; Returns: undefined
                            },
+"save_calendar_view":
+{ Args: { "p_location_id": string,"p_name": string,"p_shared": boolean,"p_staff_ids": (string)[],"p_view_id": string }; Returns: string
+                           },
 "save_closeout":
 { Args: { "p_counted_cents": number,"p_day": string,"p_float_cents"?: number,"p_location_id": string,"p_note": string }; Returns: number
                            },
@@ -2800,6 +2844,9 @@ isOneToOne: false
                            },
 "set_appointment_status":
 { Args: { "p_appointment_id": string,"p_reason": string,"p_status": Database["public"]['Enums']["appointment_status"] }; Returns: undefined
+                           },
+"set_calendar_order":
+{ Args: { "p_business_id": string,"p_staff_ids": (string)[] }; Returns: undefined
                            },
 "set_calendar_zoom":
 { Args: { "p_zoom": string }; Returns: undefined

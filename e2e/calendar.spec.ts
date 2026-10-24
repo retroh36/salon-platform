@@ -115,8 +115,11 @@ test.describe("front desk", () => {
 
   test("sees a column per stylist with their hours", async ({ page }) => {
     await openDay(page, QUIET_TUESDAY);
-    const headers = ["Shae Morgan", "Hannah Novak", "Nola Brennan", "Gil Navarro", "Bridget Callahan", "Sandra Whitfield", "Lois Park"];
+    const headers = ["Shae Morgan", "Nola Brennan", "Bridget Callahan", "Sandra Whitfield"];
     for (const name of headers) await expect(column(page, name)).toBeVisible();
+    // Hannah, Gil and Lois don't work Tuesdays: they're behind the chip.
+    for (const name of ["Hannah Novak", "Gil Navarro", "Lois Park"]) await expect(column(page, name)).toHaveCount(0);
+    await expect(ui(page).getByTestId("off-chip")).toHaveText("3 off");
     // Owner, manager and front desk don't take clients.
     await expect(column(page, "Olivia Bennett")).toHaveCount(0);
     await expect(column(page, "Sam Rivera")).toHaveCount(0);
@@ -213,14 +216,17 @@ test.describe("front desk", () => {
     await openDay(page, QUIET_TUESDAY);
     // Bridget: 1-2pm lunch and after 6pm, in a 9am-7pm day.
     await expect(column(page, "Bridget Callahan").locator("[data-off-hours]")).toHaveCount(2);
-    // Hannah doesn't work Tuesdays: the column folds to initials until opened.
-    await expect(column(page, "Hannah Novak")).toHaveAttribute("data-collapsed");
-    await waitForHydration(page, "[data-block]");
-    await ui(page).getByRole("button", { name: "Show Hannah Novak (not working)" }).click();
+    // Hannah doesn't work Tuesdays: she's off the calendar, in the "off" list.
+    await expect(column(page, "Hannah Novak")).toHaveCount(0);
+    await waitForHydration(page, "[data-testid=off-chip]");
+    await ui(page).getByTestId("off-chip").click();
+    const off = ui(page).getByRole("dialog", { name: "Off this day" });
+    await expect(off.getByRole("listitem").filter({ hasText: "Hannah Novak" })).toContainText("Day off");
+    await off.getByLabel("Show them on the calendar anyway").check();
     await expect(column(page, "Hannah Novak").locator("[data-off-hours]")).toHaveCount(1);
     await expect(column(page, "Hannah Novak").getByRole("list")).toBeEmpty();
-    await ui(page).getByRole("button", { name: "Hide Hannah Novak" }).click();
-    await expect(column(page, "Hannah Novak")).toHaveAttribute("data-collapsed");
+    await off.getByLabel("Show them on the calendar anyway").uncheck();
+    await expect(column(page, "Hannah Novak")).toHaveCount(0);
 
     // Hannah's dentist appointment next Thursday afternoon.
     await openDay(page, addDays(nextMonday, 3));
@@ -229,7 +235,10 @@ test.describe("front desk", () => {
     // Mondays the salon is closed.
     await openDay(page, nextMonday);
     await expect(ui(page).getByText("Salon closed")).toBeVisible();
-    await expect(ui(page).getByRole("button", { name: /^Show .* \(not working\)$/ })).toHaveCount(7);
+    await expect(ui(page).getByText("The salon is closed this day.")).toBeVisible();
+    await expect(ui(page).getByTestId("off-chip")).toHaveText("7 off");
+    await ui(page).getByRole("button", { name: "Show them anyway" }).click();
+    await expect(ui(page).locator("[data-staff-id]")).toHaveCount(7);
   });
 
   test("moves between days", async ({ page }) => {
@@ -284,19 +293,21 @@ test.describe("design", () => {
   test("filters stylists by department", async ({ page }) => {
     await openDay(page, QUIET_TUESDAY);
     await waitForHydration(page, "[aria-haspopup=listbox]");
-    const department = ui(page).getByRole("button", { name: /^Department/ });
-    await expect(department).toHaveAccessibleName("Department All departments");
+    const department = ui(page).getByRole("button", { name: /^Department or view/ });
+    await expect(department).toHaveAccessibleName("Department or view All departments");
     await department.click();
-    await ui(page).getByRole("listbox", { name: "Department" }).getByRole("option", { name: "Color" }).click();
-    await expect(department).toHaveAccessibleName("Department Color");
-    for (const name of ["Nola Brennan", "Gil Navarro", "Bridget Callahan", "Sandra Whitfield", "Lois Park"]) await expect(column(page, name)).toBeVisible();
+    await ui(page).getByRole("listbox", { name: "Department or view" }).getByRole("option", { name: "Color" }).click();
+    await expect(department).toHaveAccessibleName("Department or view Color");
+    for (const name of ["Nola Brennan", "Bridget Callahan", "Sandra Whitfield"]) await expect(column(page, name)).toBeVisible();
     await expect(column(page, "Hannah Novak")).toHaveCount(0);
+    // Gil and Lois do color too, but are off Tuesdays.
+    await expect(ui(page).getByTestId("off-chip")).toHaveText("2 off");
     await expect(column(page, "Shae Morgan")).toHaveCount(0);
     // By keyboard too.
     await department.press("ArrowDown");
     await page.keyboard.press("Home");
     await page.keyboard.press("Enter");
-    await expect(department).toHaveAccessibleName("Department All departments");
+    await expect(department).toHaveAccessibleName("Department or view All departments");
     await expect(column(page, "Shae Morgan")).toBeVisible();
   });
 

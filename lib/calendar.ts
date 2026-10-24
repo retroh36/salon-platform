@@ -5,19 +5,22 @@
 import { subtractIntervals, type Interval } from "@/lib/scheduling/intervals";
 import { formatMinute, MINUTES_PER_DAY } from "@/lib/scheduling/time";
 
-export type ServiceFamily = "color" | "cut" | "finish" | "treatment" | "other";
+export type ServiceFamily = "color" | "cut" | "finish" | "treatment" | "nails" | "skin" | "other";
 
 // Families share a calendar color: peach for color work, lavender for cuts,
-// green for glosses, blow-dries and styling, blue for treatments.
+// green for glosses, blow-dries and styling, teal for treatments, rose for
+// nails and sky blue for skin (facials, brows, lashes, waxing).
 export const FAMILY_LABELS: Record<ServiceFamily, string> = {
   color: "Color",
   cut: "Cuts",
   finish: "Gloss & blowouts",
   treatment: "Treatments",
+  nails: "Nails",
+  skin: "Skin",
   other: "Other",
 };
 
-export const FAMILIES: ServiceFamily[] = ["color", "cut", "finish", "treatment", "other"];
+export const FAMILIES: ServiceFamily[] = ["color", "cut", "finish", "treatment", "nails", "skin", "other"];
 
 // A salon names its own categories, so this goes by keywords. A gloss or
 // toner counts as finishing even when it's filed under Color.
@@ -26,6 +29,8 @@ export function serviceFamily(category: string, serviceName = ""): ServiceFamily
   const text = category.toLowerCase();
   if (/colou?r|highlight|lowlight|balayage|foil|bleach/.test(text)) return "color";
   if (/cut|fade|barber|trim|beard/.test(text)) return "cut";
+  if (/nail|mani|pedi|polish|acrylic/.test(text)) return "nails";
+  if (/skin|facial|peel|brow|lash|wax|esthetic|derma/.test(text)) return "skin";
   if (/blow|styl|updo|finish|gloss/.test(text)) return "finish";
   if (/treat|mask|keratin|condition|scalp|smooth/.test(text)) return "treatment";
   return "other";

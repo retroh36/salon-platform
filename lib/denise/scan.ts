@@ -76,12 +76,16 @@ export async function loadDay(supabase: Supabase, viewer: Viewer, date: LocalDat
   };
 }
 
+const LEARNED_BATCH = 80;
+
 // How long each stylist on the day really takes for the services booked.
 async function loadLearnedTimes(supabase: Supabase, ctx: Day["ctx"]): Promise<Map<string, LearnedTime>> {
   const keys = [...new Set(ctx.booked.map((b) => `${b.staffId}:${b.serviceId}`))];
   const learned = new Map<string, LearnedTime>();
-  for (let i = 0; i < keys.length; i += 150) {
-    const { data, error } = await supabase.from("insights").select("key, data").eq("kind", "duration").in("key", keys.slice(i, i + 150));
+  // Each key is two ids (about 75 characters in the address), so 80 at a
+  // time keeps the request under the API's 8 KB limit on a busy day.
+  for (let i = 0; i < keys.length; i += LEARNED_BATCH) {
+    const { data, error } = await supabase.from("insights").select("key, data").eq("kind", "duration").in("key", keys.slice(i, i + LEARNED_BATCH));
     if (error) throw error;
     for (const r of data) {
       const d = r.data as { medianMinutes: number; trusted: boolean; basis?: LearnedTime["basis"] };

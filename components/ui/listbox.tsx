@@ -4,7 +4,10 @@ import { useEffect, useId, useRef, useState } from "react";
 import { buttonClass } from "@/components/ui/button";
 import { ChevronDownIcon } from "@/components/ui/icons";
 
-export type ListboxOption<T extends string> = { value: T; label: string; icon?: React.ReactNode };
+// `group` puts a small heading above the first option of each group
+// ("Saved views"); `action` marks an option that does something (opens a
+// form) rather than being a choice, so it's never shown as chosen.
+export type ListboxOption<T extends string> = { value: T; label: string; icon?: React.ReactNode; group?: string; action?: boolean };
 
 // A dropdown that matches the design (in place of a native select). The
 // button names the choice; the list opens below. Arrow keys move, Enter or
@@ -28,7 +31,7 @@ export function Listbox<T extends string>({
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLUListElement>(null);
-  const current = options.find((o) => o.value === value) ?? options[0];
+  const current = options.find((o) => o.value === value && !o.action) ?? options[0];
 
   function show() {
     setActive(Math.max(0, options.findIndex((o) => o.value === value)));
@@ -50,6 +53,11 @@ export function Listbox<T extends string>({
     document.addEventListener("pointerdown", onDown);
     return () => document.removeEventListener("pointerdown", onDown);
   }, [open]);
+
+  // A long list scrolls; keep the active option in view.
+  useEffect(() => {
+    if (open) document.getElementById(`${id}-option-${active}`)?.scrollIntoView({ block: "nearest" });
+  }, [open, active, id]);
 
   function onListKey(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -104,11 +112,18 @@ export function Listbox<T extends string>({
           aria-label={label}
           aria-activedescendant={`${id}-option-${active}`}
           onKeyDown={onListKey}
-          className="absolute top-full left-0 z-50 mt-2 min-w-full origin-top animate-pop-in overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-lift focus:outline-none"
+          className="absolute top-full left-0 z-50 mt-2 max-h-[min(70vh,32rem)] min-w-full origin-top animate-pop-in overflow-y-auto rounded-xl border border-line bg-surface p-1 shadow-lift focus:outline-none"
         >
-          {options.map((o, i) => {
-            const selected = o.value === value;
-            return (
+          {options.flatMap((o, i) => {
+            const selected = o.value === value && !o.action;
+            const heading =
+              o.group && o.group !== options[i - 1]?.group ? (
+                <li key={`group:${o.group}`} role="presentation" className="px-3 pt-2.5 pb-1 text-xs font-semibold tracking-wide text-ink-subtle uppercase">
+                  {o.group}
+                </li>
+              ) : null;
+            return [
+              heading,
               <li
                 key={o.value}
                 id={`${id}-option-${i}`}
@@ -127,8 +142,8 @@ export function Listbox<T extends string>({
                     <path d="m5 12.5 4.5 4.5L19 7.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 )}
-              </li>
-            );
+              </li>,
+            ];
           })}
         </ul>
       )}

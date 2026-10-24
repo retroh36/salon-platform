@@ -66,7 +66,7 @@ function deltaE(a: string, b: string, sim?: Matrix): number {
 
 const SURFACES = ["canvas", "surface", "sunken"];
 const LEVELS = ["level-master", "level-senior", "level-artisan"];
-const FILLS = ["peach-fill", "lavender-fill", "sage-fill", "teal-fill", "sand-fill"];
+const FILLS = ["peach-fill", "lavender-fill", "sage-fill", "teal-fill", "rose-fill", "sky-fill", "sand-fill"];
 const VISITS = ["visit-here", "visit-done", "visit-off"];
 const STATUSES = ["booked", "confirmed", "checked-in", "completed", "late", "no-show"];
 
@@ -146,7 +146,7 @@ describe("design tokens", () => {
   });
 
   it("gives family accents and the current-time line 3:1 against the page (non-text)", () => {
-    for (const accent of ["peach-accent", "lavender-accent", "sage-accent", "teal-accent", "now", "denise-500"]) {
+    for (const accent of ["peach-accent", "lavender-accent", "sage-accent", "teal-accent", "rose-accent", "sky-accent", "now", "denise-500"]) {
       expect(contrast(color(accent), color("surface"))).toBeGreaterThanOrEqual(3);
     }
   });

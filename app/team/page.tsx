@@ -49,9 +49,16 @@ async function Directory() {
         description={`Everyone at ${me.location.name}.`}
         actions={
           canManageMember(me, null) ? (
-            <Link href="/team/new" className={buttonClass("primary", "md")}>
-              Add team member
-            </Link>
+            <>
+              {me.role === "owner" && (
+                <Link href="/team/order" className={buttonClass("secondary", "md")}>
+                  Calendar order
+                </Link>
+              )}
+              <Link href="/team/new" className={buttonClass("primary", "md")}>
+                Add team member
+              </Link>
+            </>
           ) : undefined
         }
       />

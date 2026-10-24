@@ -8,6 +8,9 @@ export const AUTH = {
   manager: "e2e/.auth/manager.json",
   frontDesk: "e2e/.auth/front-desk.json",
   stylist: "e2e/.auth/stylist.json",
+  // Harbor & Vine, the large demo salon.
+  largeOwner: "e2e/.auth/large-owner.json",
+  largeFrontDesk: "e2e/.auth/large-front-desk.json",
 };
 
 // Fails the test if the page logs a console error or throws. In dev this

@@ -20,6 +20,14 @@ setup("sign in as front desk", async ({ page }) => {
   await page.context().storageState({ path: AUTH.frontDesk });
 });
 
+setup("sign in at the large salon", async ({ page }) => {
+  await signIn(page, "owner@harborvine.test");
+  await page.context().storageState({ path: AUTH.largeOwner });
+  await page.context().clearCookies();
+  await signIn(page, "frontdesk@harborvine.test");
+  await page.context().storageState({ path: AUTH.largeFrontDesk });
+});
+
 setup("sign in as stylist", async ({ page }) => {
   await signIn(page, "bridget@mapleandash.test");
   await page.context().storageState({ path: AUTH.stylist });

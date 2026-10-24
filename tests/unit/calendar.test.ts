@@ -24,11 +24,22 @@ describe("service families", () => {
     expect(serviceFamily("Barbering")).toBe("cut");
     expect(serviceFamily("Hair styling")).toBe("finish");
     expect(serviceFamily("Scalp care")).toBe("treatment");
-    expect(serviceFamily("Nails")).toBe("other");
+    expect(serviceFamily("Bridal")).toBe("other");
+  });
+
+  it("knows nails and skin", () => {
+    expect(serviceFamily("Nails")).toBe("nails");
+    expect(serviceFamily("Manicures & pedicures")).toBe("nails");
+    expect(serviceFamily("Skin")).toBe("skin");
+    expect(serviceFamily("Facials")).toBe("skin");
+    expect(serviceFamily("Brows & lashes")).toBe("skin");
+    expect(serviceFamily("Waxing")).toBe("skin");
+    // A skin fade is a cut.
+    expect(serviceFamily("Cuts", "Skin Fade")).toBe("cut");
   });
 
   it("labels every family", () => {
-    expect(FAMILIES.map((f) => FAMILY_LABELS[f])).toEqual(["Color", "Cuts", "Gloss & blowouts", "Treatments", "Other"]);
+    expect(FAMILIES.map((f) => FAMILY_LABELS[f])).toEqual(["Color", "Cuts", "Gloss & blowouts", "Treatments", "Nails", "Skin", "Other"]);
   });
 });
 

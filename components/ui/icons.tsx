@@ -177,3 +177,14 @@ export const WalletIcon = (p: IconProps) => (
     <path d="M16 13.5h1.5" />
   </Icon>
 );
+// Six dots: something you can drag to reorder.
+export const GripIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" strokeWidth={3} />
+  </Icon>
+);
+export const ChevronUpIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="m6 15 6-6 6 6" />
+  </Icon>
+);

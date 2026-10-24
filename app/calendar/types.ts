@@ -6,6 +6,7 @@ import type { AppointmentStatus } from "@/lib/appointments";
 import type { VisitWarnings } from "@/lib/client-checks";
 import type { PickerProduct } from "@/lib/inventory-load";
 import type { CalendarZoom, ServiceFamily } from "@/lib/calendar";
+import type { CalendarView, ViewKey } from "@/lib/calendar-views";
 import type { StaffLevel } from "@/lib/schedule-forms";
 import type { ItemTimes } from "@/lib/visit-times";
 import type { StaffRole } from "@/lib/staff";
@@ -23,8 +24,11 @@ export type ColumnData = {
   booked: string;
   level: StaffLevel | null;
   color: string | null;
-  // On shift and the salon is open; others collapse to a thin column.
+  // On shift and the salon is open. Others are hidden behind the "off
+  // today" chip (unless they have bookings), with why: "Day off",
+  // "Vacation · Family trip", "Salon closed".
   working: boolean;
+  offReason: string | null;
   hoursLabel: string;
   // The same on one line: "9–1, 2–6".
   hoursShort: string;
@@ -174,7 +178,13 @@ export type BoardData = {
   timeBlocks: TimeBlockData[];
   appointments: Record<string, AppointmentDetail>;
   menu: Menu;
-  me: { staffId: string; role: StaffRole; canBook: boolean; zoom: CalendarZoom };
+  // fitAll: squeeze every column on screen (Compact zoom), remembered on
+  // this device.
+  me: { staffId: string; role: StaffRole; canBook: boolean; zoom: CalendarZoom; fitAll: boolean };
+  // Saved views (shared, and this person's own), and the one to open on:
+  // the last used on this device.
+  views: CalendarView[];
+  initialView: ViewKey;
   // See loadCalendarStamp: the board reloads when it changes.
   stamp: string;
   // What a link asked to show (from the Dashboard): a stylist's column,

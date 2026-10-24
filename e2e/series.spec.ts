@@ -48,7 +48,7 @@ test("books a series, with Denise's suggestion for a date that doesn't fit", asy
   await newClient("Mae");
   // Bridget's already taken at 10 on the third date.
   const other = await newClient("Taken");
-  const { data: s } = await admin.from("services").select("id, duration_minutes, active_minutes, price_cents").eq("name", "Women's Cut & Style").single();
+  const { data: s } = await admin.from("services").select("id, duration_minutes, active_minutes, price_cents").eq("business_id", B).eq("name", "Women's Cut & Style").single();
   const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: other, starts_at: at(DATES[2], 10).toISOString(), ends_at: at(DATES[2], 11).toISOString() }).select("id").single();
   await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: s!.id, staff_id: BRIDGET, starts_at: at(DATES[2], 10).toISOString(), ends_at: at(DATES[2], 11).toISOString(), active_minutes: 60, price_cents: 0 });
 
@@ -88,7 +88,7 @@ test("books a series, with Denise's suggestion for a date that doesn't fit", asy
 
 test("moves and cancels this and following visits", async ({ page }) => {
   const client = await newClient("Ivy");
-  const { data: s } = await admin.from("services").select("id").eq("name", "Women's Cut & Style").single();
+  const { data: s } = await admin.from("services").select("id").eq("business_id", B).eq("name", "Women's Cut & Style").single();
   const { data: series } = await admin.from("appointment_series").insert({ business_id: B, location_id: L, client_id: client, interval_weeks: 2, occurrences: 4 }).select("id").single();
   for (const [i, d] of DATES.entries()) {
     const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: client, starts_at: at(d, 10).toISOString(), ends_at: at(d, 11).toISOString(), series_id: series!.id, series_index: i + 1 }).select("id").single();

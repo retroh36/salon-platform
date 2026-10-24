@@ -31,6 +31,13 @@ export const SEED = {
     lois: "d0000000-0000-4000-8000-000000000010",
   },
   staffCount: 10,
+  // The second, larger demo salon (supabase/seed-large.sql): 35 stylists.
+  large: {
+    business: "b1000000-0000-4000-8000-000000000001",
+    location: "c1000000-0000-4000-8000-000000000001",
+    owner: "d1000000-0000-4000-8000-000000000001",
+    stylists: 35,
+  },
 };
 
 const options = { auth: { persistSession: false, autoRefreshToken: false } };

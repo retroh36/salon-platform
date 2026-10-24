@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { isUuid } from "@/lib/ids";
+import { cookies } from "next/headers";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { canBook, type AppointmentStatus } from "@/lib/appointments";
 import { getCurrentStaff } from "@/lib/auth";
-import { bookedSummary, compactHours, gridRange, isZoom, offHours, serviceFamily } from "@/lib/calendar";
+import { bookedSummary, compactHours, FAMILIES, gridRange, isZoom, offHours, serviceFamily } from "@/lib/calendar";
+import { fitCookie, offReason, viewCookie, viewKey, type CalendarView, type ViewKey } from "@/lib/calendar-views";
 import { formatAmount, productName } from "@/lib/inventory";
 import { loadBackBarProducts } from "@/lib/inventory-load";
 import { formatDay, formatIntervals } from "@/lib/schedule-format";
@@ -21,7 +23,7 @@ import { loadMembershipsByClient, type ClientMembership } from "@/lib/membership
 import { loadPackagesByClient, withPackages } from "@/lib/packages";
 import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn, toLocal, WEEKDAYS, type LocalDate } from "@/lib/scheduling/time";
 import { visitWarnings } from "@/lib/client-checks";
-import { fullName, sortStaff } from "@/lib/staff";
+import { fullName, sortForCalendar } from "@/lib/staff";
 import { CalendarBoard } from "./board";
 import type { AppointmentDetail, BlockData, BoardData, ColumnData } from "./types";
 
@@ -36,7 +38,7 @@ export default function CalendarPage({ searchParams }: PageProps<"/calendar">) {
 }
 
 async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchParams">) {
-  const [params, { supabase, staff: me }] = await Promise.all([searchParams, getCurrentStaff()]);
+  const [params, { supabase, staff: me }, jar] = await Promise.all([searchParams, getCurrentStaff(), cookies()]);
   if (!me) return <NotLinked />;
 
   const tz = me.location.timezone;
@@ -48,9 +50,9 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   // Read before the calendar, so a change made while it loads still shows
   // as new.
   const stamp = await loadCalendarStamp(supabase, me.location.id);
-  const [staffResult, itemsResult, servicesResult, resourcesResult, location] = await Promise.all([
+  const [staffResult, itemsResult, servicesResult, resourcesResult, location, viewsResult] = await Promise.all([
     // Everyone in the business, for "booked by" names; columns are this location's.
-    supabase.from("staff").select("id, first_name, last_name, role, level, color, is_active, location_id"),
+    supabase.from("staff").select("id, first_name, last_name, role, level, color, is_active, location_id, calendar_position"),
     supabase
       .from("appointment_items")
       .select(
@@ -65,8 +67,11 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     supabase.from("services").select("id, name, category, duration_minutes, price_cents, archived_at, service_level_prices(level, price_cents)").order("name"),
     supabase.from("resources").select("id, name").eq("location_id", me.location.id).eq("is_active", true).order("sort_order"),
     loadLocationSchedule(supabase, me.location),
+    // Shared views and this person's own (RLS).
+    supabase.from("calendar_views").select("id, name, staff_ids, owner_staff_id").eq("location_id", me.location.id).order("name"),
   ]);
   if (staffResult.error) throw staffResult.error;
+  if (viewsResult.error) throw viewsResult.error;
   if (itemsResult.error) throw itemsResult.error;
   if (servicesResult.error) throw servicesResult.error;
   if (resourcesResult.error) throw resourcesResult.error;
@@ -104,7 +109,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
 
   // A column for everyone who takes clients, or has any that day.
   const busyToday = new Set(items.map((i) => i.staff_id));
-  const columnStaff = sortStaff(team.filter((s) => (offers.get(s.id)?.size ?? 0) > 0 || busyToday.has(s.id)));
+  const columnStaff = sortForCalendar(team.filter((s) => (offers.get(s.id)?.size ?? 0) > 0 || busyToday.has(s.id)));
   const staffById = new Map(staffResult.data.map((s) => [s.id, s]));
   const servicesById = new Map(
     servicesResult.data.map((s) => [s.id, { price_cents: s.price_cents, levelPrices: levelPricesFrom(s.service_level_prices) }]),
@@ -364,9 +369,12 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   const weekHours = WEEKDAYS.flatMap((d) => location.weekly[d] ?? []);
   const range = gridRange(open, weekHours, blocks);
 
+  const reasonOf = (t: { reason?: string; note?: string | null }) => [REASON_LABELS[t.reason as TimeOffReason] ?? "Time off", t.note].filter(Boolean).join(" · ");
   const columns: ColumnData[] = columnStaff.map((s) => {
     const day = dayView(schedules.get(s.id)!, location, date);
     const approved = day.timeOff.filter((t) => t.status === "approved");
+    const allDay = approved.find((t) => t.startMinute == null);
+    const working = !allDay && intersectIntervals(day.hours, day.open).length > 0;
     return {
       staffId: s.id,
       name: fullName(s),
@@ -378,7 +386,8 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       ),
       level: s.level,
       color: s.color,
-      working: !approved.some((t) => t.startMinute == null) && intersectIntervals(day.hours, day.open).length > 0,
+      working,
+      offReason: working ? null : offReason({ timeOff: allDay ? reasonOf(allDay) : null, salonOpen: open.length > 0, hasHours: day.hours.length > 0 }),
       hoursLabel: approved.some((t) => t.startMinute == null) ? "Time off" : day.hours.length ? formatIntervals(day.hours) : "Not working",
       hoursShort: approved.some((t) => t.startMinute == null) ? "Time off" : day.hours.length ? compactHours(day.hours) : "Not working",
       offHours: offHours(range, intersectIntervals(day.hours, day.open)),
@@ -386,11 +395,23 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
         .map((t) => ({
           start: Math.max(t.startMinute ?? range.start, range.start),
           end: Math.min(t.endMinute ?? range.end, range.end),
-          label: [REASON_LABELS[t.reason as TimeOffReason] ?? "Time off", t.note].filter(Boolean).join(" · "),
+          label: reasonOf(t),
         }))
         .filter((t) => t.start < t.end),
     };
   });
+
+  const views: CalendarView[] = viewsResult.data.map((v) => ({
+    id: v.id,
+    name: v.name,
+    staffIds: v.staff_ids,
+    shared: v.owner_staff_id === null,
+    editable: v.owner_staff_id === me.id || (v.owner_staff_id === null && me.role === "owner"),
+  }));
+  // The view this person last used on this device, if it's still there.
+  const lastView = jar.get(viewCookie(me.id))?.value;
+  const initialView: ViewKey =
+    lastView && ((FAMILIES as readonly string[]).includes(lastView) || views.some((v) => viewKey(v.id) === lastView)) ? (lastView as ViewKey) : "all";
 
   const data: BoardData = {
     stamp,
@@ -449,7 +470,9 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       resources: resourcesResult.data,
       products,
     },
-    me: { staffId: me.id, role: me.role, canBook: canBook(me.role), zoom: isZoom(me.calendar_zoom) ? me.calendar_zoom : "comfortable" },
+    me: { staffId: me.id, role: me.role, canBook: canBook(me.role), zoom: isZoom(me.calendar_zoom) ? me.calendar_zoom : "comfortable", fitAll: jar.get(fitCookie(me.id))?.value === "1" },
+    views,
+    initialView,
   };
 
   return (

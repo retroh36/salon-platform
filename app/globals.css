@@ -53,6 +53,10 @@
   --color-teal-accent: #3b9b93;
   --color-sand-fill: #ede5dd;
   --color-sand-accent: #a08870;
+  --color-rose-fill: #f9dde6;
+  --color-rose-accent: #c94f7c;
+  --color-sky-fill: #dce8f8;
+  --color-sky-accent: #4a7fc1;
 
   /* Stylist levels: a ring and badge on the avatar and a bar along the top
      of their calendar column (graphics, so 3:1 against the page). Gold,
@@ -243,6 +247,14 @@
 [data-family="treatment"] {
   --fam-fill: var(--color-teal-fill);
   --fam-accent: var(--color-teal-accent);
+}
+[data-family="nails"] {
+  --fam-fill: var(--color-rose-fill);
+  --fam-accent: var(--color-rose-accent);
+}
+[data-family="skin"] {
+  --fam-fill: var(--color-sky-fill);
+  --fam-accent: var(--color-sky-accent);
 }
 [data-family="other"] {
   --fam-fill: var(--color-sand-fill);
