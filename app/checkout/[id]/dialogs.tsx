@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { Sheet } from "@/components/ui/sheet";
-import { parseDollars, quickCash } from "@/lib/checkout";
+import { discountLimitWarning, parseDollars, quickCash } from "@/lib/checkout";
 import type { CheckoutScreenData } from "@/lib/checkout-screen";
 import { cardProblem } from "@/lib/gift-cards";
 import { benefitsText, periodName, priceText } from "@/lib/memberships";
@@ -406,7 +406,7 @@ function SaleDiscount({ data, ticket, onChange, onClose }: Props) {
         Reason
         <input value={reason} onChange={(e) => setReason(e.target.value)} className={`${fieldClass} h-12`} maxLength={300} required={v > 0} />
       </label>
-      {kind === "percent" && v > data.settings.discountMaxPercent && <Problem text={`The most anyone can take off is ${data.settings.discountMaxPercent}%.`} />}
+      {allowed && discountLimitWarning(data.role, kind, v, data.settings.discountMaxPercent) && <Problem text={discountLimitWarning(data.role, kind, v, data.settings.discountMaxPercent)!} />}
       <div className="flex gap-2">
         <Button type="submit" variant="primary" size="lg" disabled={!allowed && v > 0}>
           {v > 0 ? "Apply discount" : "No discount"}

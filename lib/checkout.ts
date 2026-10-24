@@ -97,6 +97,13 @@ export function discountAllowed(role: string, settings: { roles: readonly string
   return { ok: true };
 }
 
+// The warning in the discount dialog: the percent limit only binds the
+// front desk (owners and managers can give any discount), so only they see it.
+export function discountLimitWarning(role: string, kind: "percent" | "amount", value: number, maxPercent: number): string | null {
+  if (role === "owner" || role === "manager") return null;
+  return kind === "percent" && value > maxPercent ? `You can give up to ${maxPercent}% off. Ask a manager for more.` : null;
+}
+
 // "8.25%" from basis points.
 export function formatRate(bp: number): string {
   return `${(bp / 100).toFixed(2).replace(/\.?0+$/, "")}%`;

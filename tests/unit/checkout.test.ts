@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeSale, discountAllowed, discountCents, formatRate, parseDollars, paymentStatus, priceLines } from "@/lib/checkout";
+import { computeSale, discountAllowed, discountLimitWarning, discountCents, formatRate, parseDollars, paymentStatus, priceLines } from "@/lib/checkout";
 
 const service = (cents: number, taxBp = 0) => ({ grossCents: cents, taxBp, discountable: true });
 const retail = (cents: number, taxBp = 1025) => ({ grossCents: cents, taxBp, discountable: true });
@@ -53,6 +53,13 @@ describe("who may discount", () => {
     expect(discountAllowed("manager", settings, 5000, 10000)).toEqual({ ok: true });
     expect(discountAllowed("front_desk", { ...settings, roles: ["owner"] }, 100, 10000)).toMatchObject({ ok: false });
     expect(discountAllowed("front_desk", { ...settings, roles: ["owner"] }, 0, 10000)).toEqual({ ok: true });
+  });
+
+  it("warns only the front desk about the percent limit", () => {
+    expect(discountLimitWarning("front_desk", "percent", 15, 10)).toBe("You can give up to 10% off. Ask a manager for more.");
+    expect(discountLimitWarning("front_desk", "percent", 10, 10)).toBeNull();
+    expect(discountLimitWarning("manager", "percent", 50, 10)).toBeNull();
+    expect(discountLimitWarning("owner", "percent", 100, 10)).toBeNull();
   });
 });
 

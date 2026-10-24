@@ -18,7 +18,7 @@ Take money off one line or the whole sale, with a reason.
 
 - Every discount needs a reason.
 - Who can discount is set by the owner in Settings, under **Tax and receipts**. Owners always can; managers and the front desk only if turned on.
-- The front desk can take off up to a set percent of the sale; managers and owners have no limit.
+- The front desk can take off up to a set percent of the sale, and sees the limit as they type a percent; managers and owners have no limit and see no warning.
 - Member prices come off by themselves and don't count against the limit.
 - Gift cards, and services paid with a package or membership, can't be discounted.
 
