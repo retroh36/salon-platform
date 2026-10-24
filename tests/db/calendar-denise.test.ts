@@ -1,4 +1,5 @@
-// Undoing a check-in (who can, what it clears, the record it leaves), each
+// Undoing a check-in (who can, what it clears, the record it leaves) and a
+// no-show, each
 // person's calendar zoom, and dismissing items from Denise's brief and panel.
 // Run with `npm run test:db` after `npm run seed:demo`.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -98,6 +99,36 @@ describe("undoing a check-in", () => {
     const { appointmentId } = await visit("booked");
     const { error } = await owner.from("appointment_events").insert({ business_id: B, appointment_id: appointmentId, kind: "check_in_undone" });
     expect(error?.code).toBe("42501");
+  });
+});
+
+describe("undoing a no-show", () => {
+  const status = async (id: string) => (await admin.from("appointments").select("status").eq("id", id).single()).data!.status;
+  const version = async () => (await admin.from("locations").select("calendar_version").eq("id", L).single()).data!.calendar_version;
+
+  it("goes back to what it was (confirmed here), with who marked and undid it", async () => {
+    const { appointmentId } = await visit("booked");
+    await admin.from("appointments").update({ status: "confirmed" }).eq("id", appointmentId);
+    expect((await frontDesk.rpc("set_appointment_status", { p_appointment_id: appointmentId, p_status: "no_show", p_reason: "" })).error).toBeNull();
+    expect((await frontDesk.rpc("undo_no_show", { p_appointment_id: appointmentId, p_expected_version: await version() })).error).toBeNull();
+    expect(await status(appointmentId)).toBe("confirmed");
+    const { data: events } = await frontDesk.from("appointment_events").select("kind, staff_id, detail").eq("appointment_id", appointmentId).order("created_at");
+    expect(events).toEqual([
+      { kind: "no_show", staff_id: SEED.staff.frontDesk, detail: { from: "confirmed" } },
+      { kind: "no_show_undone", staff_id: SEED.staff.frontDesk, detail: { to: "confirmed" } },
+    ]);
+  });
+
+  it("refuses a stale calendar, stylists, other salons, and visits that aren't no-shows", async () => {
+    const { appointmentId } = await visit("booked");
+    await admin.from("appointments").update({ status: "no_show" }).eq("id", appointmentId);
+    const v = await version();
+    expect((await frontDesk.rpc("undo_no_show", { p_appointment_id: appointmentId, p_expected_version: v - 1 })).error?.code).toBe("40001");
+    expect((await bridget.rpc("undo_no_show", { p_appointment_id: appointmentId, p_expected_version: v })).error?.code).toBe("42501");
+    expect((await otherOwner.rpc("undo_no_show", { p_appointment_id: appointmentId, p_expected_version: v })).error?.code).toBe("42501");
+    expect(await status(appointmentId)).toBe("no_show");
+    const booked = await visit("booked");
+    expect((await owner.rpc("undo_no_show", { p_appointment_id: booked.appointmentId, p_expected_version: v })).error?.code).toBe("55000");
   });
 });
 

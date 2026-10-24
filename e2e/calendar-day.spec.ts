@@ -292,7 +292,9 @@ test.describe("front desk", () => {
     await expect(ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Dee`) }).locator("[data-attention=late]")).toHaveText(/^\+\d+m$|^$/);
 
     await line("Cy").getByRole("button", { name: "Mark no-show" }).click();
+    await line("Cy").getByRole("button", { name: "Yes, no-show" }).click();
     await expect(line("Cy")).toHaveCount(0);
+    await expect(page.getByTestId("no-show-toast")).toContainText("is marked a no-show.");
     await expect.poll(() => status(cyVisit)).toBe("no_show");
 
     await line("Ana").getByRole("button", { name: `Dismiss ${PREFIX}Ana Test` }).click();

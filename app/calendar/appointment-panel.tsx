@@ -19,7 +19,7 @@ import { formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { UsageLinesEditor, toUsageJson, type DraftLine } from "@/components/usage-lines";
 import type { PickerProduct } from "@/lib/inventory-load";
-import { addVisitFormula, changeGroupVisitStatus, changeVisitStatus, changeVisitStatusScoped, checkInWithPatchOverride, saveVisitNotes, undoVisitCheckIn } from "./actions";
+import { addVisitFormula, changeGroupVisitStatus, changeVisitStatus, changeVisitStatusScoped, checkInWithPatchOverride, saveVisitNotes, undoVisitCheckIn, undoVisitNoShow } from "./actions";
 import type { Scope } from "@/lib/scheduling/series";
 import { useNow } from "./now-line";
 import type { AppointmentDetail, BoardData } from "./types";
@@ -37,6 +37,7 @@ export function AppointmentPanel({
   onCheckout,
   onOpenVisit,
   onCheckedIn,
+  onNoShow,
   team,
   products,
 }: {
@@ -57,6 +58,8 @@ export function AppointmentPanel({
   onOpenVisit: (appointmentId: string) => void;
   // Just checked in from here: the calendar offers Undo for a few seconds.
   onCheckedIn: (appointmentId: string) => void;
+  // Just marked a no-show from here: the calendar offers Undo too.
+  onNoShow: (appointmentId: string) => void;
   // Who can be named as doing a patch test.
   team: { id: string; name: string }[];
 }) {
@@ -65,6 +68,7 @@ export function AppointmentPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [canceling, setCanceling] = useState(false);
   const [confirmingCheckIn, setConfirmingCheckIn] = useState(false);
+  const [confirmingNoShow, setConfirmingNoShow] = useState(false);
   const [reportingLate, setReportingLate] = useState(false);
   const [tab, setTab] = useState<"notes" | "formula" | "photos" | "history">("notes");
   // What the visit still needs before it goes ahead.
@@ -93,6 +97,10 @@ export function AppointmentPanel({
             : await changeVisitStatusScoped(appointment.id, action, scope, reason, detail);
       if (!result.ok) setMessage(result.message);
       else if (action === "check_in") onCheckedIn(appointment.id);
+      else if (action === "no_show") {
+        setConfirmingNoShow(false);
+        onNoShow(appointment.id);
+      }
       else if (action === "cancel") {
         // Canceled visits leave the calendar; Denise looks at the time freed.
         onClose();
@@ -126,6 +134,14 @@ export function AppointmentPanel({
     });
   }
 
+  function undoNoShow() {
+    setMessage(null);
+    startTransition(async () => {
+      const result = await undoVisitNoShow(appointment.id);
+      if (!result.ok) setMessage(result.message);
+    });
+  }
+
   function primary() {
     if (!step) return;
     if (step.kind === "check_out") return onCheckout();
@@ -139,7 +155,8 @@ export function AppointmentPanel({
     canReportLate && { key: "late", label: "Running late", onSelect: () => setReportingLate(true) },
     me.canBook && isEditable(status) && { key: "edit", label: "Edit booking", onSelect: onEdit },
     status === "checked_in" && me.canBook && { key: "undo_check_in", label: "Undo check-in", onSelect: undoCheckIn },
-    actions.includes("no_show") && { key: "no_show", label: ACTION_LABELS.no_show, onSelect: () => run("no_show") },
+    actions.includes("no_show") && { key: "no_show", label: ACTION_LABELS.no_show, onSelect: () => setConfirmingNoShow(true) },
+    status === "no_show" && me.canBook && { key: "undo_no_show", label: "Undo no-show", onSelect: undoNoShow },
     actions.includes("cancel") && { key: "cancel", label: ACTION_LABELS.cancel, danger: true, onSelect: () => setCanceling(true) },
   ].filter((a): a is MenuAction => Boolean(a));
   const checkedOutNote = status === "completed" && me.canBook;
@@ -326,6 +343,20 @@ export function AppointmentPanel({
               onOverride={overrideCheckIn}
               onCancel={() => setConfirmingCheckIn(false)}
             />
+          ) : confirmingNoShow ? (
+            <div role="group" aria-label="Mark no-show" className="flex flex-col gap-3 rounded-lg border border-line bg-sunken/60 p-3">
+              <p className="text-ink">
+                Mark {firstName} as a no-show? Their time opens up for other bookings. You can undo it if they turn up.
+              </p>
+              <div className="flex gap-2">
+                <Button variant="danger" disabled={pending} onClick={() => run("no_show")}>
+                  Mark no-show
+                </Button>
+                <Button variant="ghost" disabled={pending} onClick={() => setConfirmingNoShow(false)}>
+                  Not yet
+                </Button>
+              </div>
+            </div>
           ) : reportingLate ? (
             <RunningLateForm
               appointment={appointment}

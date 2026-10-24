@@ -14,7 +14,7 @@ import { isUuid } from "@/lib/ids";
 import { isZoom, type CalendarZoom } from "@/lib/calendar";
 import { isUsable, loadClientPackages, type ClientPackage } from "@/lib/packages";
 import { loadBackBarProducts } from "@/lib/inventory-load";
-import { changeStatus, checkInPatchOverride, moveItem, saveBooking, saveNotes, undoCheckIn, type BookingItemInput, type SaveResult } from "@/lib/scheduling/book";
+import { changeStatus, checkInPatchOverride, moveItem, saveBooking, saveNotes, undoCheckIn, undoNoShow, type BookingItemInput, type SaveResult } from "@/lib/scheduling/book";
 import { describeProblem, type BookingProblem } from "@/lib/scheduling/booking";
 import { bookingIdeas, type BookingIdeas } from "@/lib/denise/ideas";
 import { loadBookingContext, loadCalendarStamp } from "@/lib/scheduling/load";
@@ -242,6 +242,28 @@ export async function undoVisitCheckIn(appointmentId: string): Promise<ActionRes
       not_allowed: "Only a checked-in visit can go back to booked. After checkout, void the sale instead.",
       needs_reason: "",
       forbidden: NOT_ALLOWED,
+    };
+    return { ok: false, message: messages[result.error] };
+  }
+  refresh();
+  return { ok: true };
+}
+
+// Takes back a no-show (front of house), if the time is still free.
+export async function undoVisitNoShow(appointmentId: string): Promise<ActionResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(appointmentId)) return { ok: false, message: "That appointment no longer exists." };
+  const result = await undoNoShow(supabase, me.location, appointmentId);
+  if (!result.ok) {
+    if (result.error === "invalid") return { ok: false, message: `That time isn't free any more: ${[...new Set(result.problems.map(describeProblem))].join(" ")} Book them again instead.` };
+    if (result.error === "patch_test") return { ok: false, message: result.message };
+    const messages = {
+      not_found: "That appointment no longer exists.",
+      not_allowed: "Only a no-show can be taken back.",
+      needs_reason: "",
+      forbidden: NOT_ALLOWED,
+      busy: "The calendar is busy. Try again.",
     };
     return { ok: false, message: messages[result.error] };
   }

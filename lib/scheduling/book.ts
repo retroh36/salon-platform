@@ -263,6 +263,41 @@ export async function undoCheckIn(supabase: Supabase, appointmentId: string): Pr
   return { ok: true };
 }
 
+// A no-show marked by mistake, or a client who turned up after all: back to
+// booked (or confirmed, as it was). The no-show freed its time, so the
+// visit is checked against the booking rules again first; if someone's
+// been booked in since, it's refused with what's in the way.
+export type UndoNoShowResult = StatusResult | { ok: false; error: "invalid"; problems: BookingProblem[] } | { ok: false; error: "busy" };
+
+export async function undoNoShow(supabase: Supabase, location: Location, appointmentId: string): Promise<UndoNoShowResult> {
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    const version = await supabase.from("locations").select("calendar_version").eq("id", location.id).single();
+    if (version.error) throw version.error;
+    const visit = await loadAppointment(supabase, appointmentId);
+    if (!visit) return { ok: false, error: "not_found" };
+    if (visit.status !== "no_show") return { ok: false, error: "not_allowed" };
+    const dates = visit.items.map((i) => toLocal(i.start, location.timezone).date).sort();
+    const ctx = await loadBookingContext(supabase, location, dates[0], dates.at(-1)!);
+    const own = new Set(visit.items.map((i) => i.id));
+    const calendar = { ...ctx, booked: ctx.booked.filter((b) => !b.id || !own.has(b.id)) };
+    const accepted: BookedItem[] = [];
+    const problems: BookingProblem[] = [];
+    for (const i of visit.items) {
+      const check = checkItem(calendar, { id: i.id, serviceId: i.serviceId, staffId: i.staffId, resourceId: i.resourceId, start: i.start, timing: i }, accepted);
+      if (check.valid) accepted.push(check.item);
+      else problems.push(...check.problems);
+    }
+    if (problems.length) return { ok: false, error: "invalid", problems };
+    const { error } = await supabase.rpc("undo_no_show", { p_appointment_id: appointmentId, p_expected_version: version.data.calendar_version });
+    if (error?.code === "40001") continue;
+    if (error?.code === "42501") return { ok: false, error: "forbidden" };
+    if (error?.code === "55000") return { ok: false, error: "not_allowed" };
+    if (error) throw error;
+    return { ok: true };
+  }
+  return { ok: false, error: "busy" };
+}
+
 export async function saveNotes(supabase: Supabase, appointmentId: string, notes: string): Promise<{ ok: boolean }> {
   const { error } = await supabase.rpc("set_appointment_notes", { p_appointment_id: appointmentId, p_notes: notes });
   if (error?.code === "42501") return { ok: false };

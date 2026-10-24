@@ -21,7 +21,7 @@ import { LEVEL_LABELS, STAFF_LEVELS } from "@/lib/schedule-forms";
 import { BLOCK_LABELS } from "@/lib/scheduling/blocks";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, toLocal } from "@/lib/scheduling/time";
-import { calendarStamp, changeVisitStatus, moveGroupVisit, saveCalendarZoom, moveVisitItem, moveVisitItemScoped, undoVisitCheckIn } from "./actions";
+import { calendarStamp, changeVisitStatus, moveGroupVisit, saveCalendarZoom, moveVisitItem, moveVisitItemScoped, undoVisitCheckIn, undoVisitNoShow } from "./actions";
 import type { Scope } from "@/lib/scheduling/series";
 import { moveBlock } from "./block-actions";
 import { BlockPanel, repeatLabel } from "./block-panel";
@@ -41,8 +41,8 @@ const usePpm = () => useContext(ScaleContext);
 // Pinch distance (as a ratio) and ctrl + scroll travel for one zoom step.
 const PINCH_STEP = 1.3;
 const WHEEL_STEP = 60;
-// How long "Undo" stays on the toast after a check-in.
-const CHECK_IN_UNDO_MS = 10_000;
+// How long "Undo" stays on the toast after a check-in or a no-show.
+const UNDO_MS = 10_000;
 // Moves snap to 5 minutes; a click on an empty slot to the quarter hour.
 const MOVE_STEP = 5;
 const SLOT_STEP = 15;
@@ -160,13 +160,15 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const [department, setDepartment] = useState<"all" | ServiceFamily>("all");
   const [notice, setNotice] = useState<string | null>(null);
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
-  // Just checked in: a toast with Undo, for CHECK_IN_UNDO_MS.
-  const [checkedIn, setCheckedIn] = useState<{ appointmentId: string; name: string; at: number } | null>(null);
+  // Just checked in or marked a no-show: a toast with Undo, for UNDO_MS.
+  const [undoable, setUndoable] = useState<{ kind: "check_in" | "no_show"; appointmentId: string; name: string; at: number } | null>(null);
   useEffect(() => {
-    if (!checkedIn) return;
-    const timer = setTimeout(() => setCheckedIn(null), CHECK_IN_UNDO_MS);
+    if (!undoable) return;
+    const timer = setTimeout(() => setUndoable(null), UNDO_MS);
     return () => clearTimeout(timer);
-  }, [checkedIn]);
+  }, [undoable]);
+  const offerUndo = (kind: "check_in" | "no_show", appointmentId: string, name?: string) =>
+    setUndoable({ kind, appointmentId, name: name ?? data.appointments[appointmentId]?.client?.name.split(" ")[0] ?? "The client", at: Date.now() });
   // The tooltip for a short block: its details and where it is.
   const [hint, setHint] = useState<{ id: string; details: string[]; rect: DOMRect } | null>(null);
   // A drag of a repeating visit, waiting for "this / following / all".
@@ -862,21 +864,21 @@ export function CalendarBoard({ data }: { data: BoardData }) {
 
       {hint && <BlockHint {...hint} />}
 
-      {checkedIn && (
+      {undoable && (
         <div
           role="status"
-          data-testid="check-in-toast"
+          data-testid={undoable.kind === "check_in" ? "check-in-toast" : "no-show-toast"}
           className="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 animate-toast-in items-center gap-4 rounded-xl bg-navy-900 px-5 py-3 text-white shadow-lift"
         >
-          <span>{checkedIn.name} is checked in.</span>
+          <span>{undoable.kind === "check_in" ? `${undoable.name} is checked in.` : `${undoable.name} is marked a no-show.`}</span>
           <button
             type="button"
             className="font-semibold text-denise-200 underline underline-offset-2 hover:text-white"
             onClick={() => {
-              const { appointmentId } = checkedIn;
-              setCheckedIn(null);
+              const { kind, appointmentId } = undoable;
+              setUndoable(null);
               startTransition(async () => {
-                const result = await undoVisitCheckIn(appointmentId);
+                const result = kind === "check_in" ? await undoVisitCheckIn(appointmentId) : await undoVisitNoShow(appointmentId);
                 if (!result.ok) setNotice(result.message);
               });
             }}
@@ -941,11 +943,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                 setDismissed((all) => new Set(all).add(n.id));
                 startTransition(async () => {
                   const result = await changeVisitStatus(n.appointmentId, "no_show");
-                  setOutcome(
-                    result.ok
-                      ? { message: `Marked ${n.clientName} as a no-show.`, error: false, undoActionId: null }
-                      : { message: result.message ?? "That didn't work. Try again from the booking.", error: true, undoActionId: null },
-                  );
+                  if (result.ok) offerUndo("no_show", n.appointmentId, n.clientName.split(" ")[0]);
+                  else setOutcome({ message: result.message ?? "That didn't work. Try again from the booking.", error: true, undoActionId: null });
                   if (!result.ok)
                     setDismissed((all) => {
                       const next = new Set(all);
@@ -973,7 +972,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               // eslint-disable-next-line @next/next/no-location-assign-relative-destination
               onCheckout={() => window.location.assign(`/checkout/new?appointment=${selection.appointmentId}&from=${encodeURIComponent(window.location.pathname + window.location.search)}`)}
               onOpenVisit={(appointmentId) => select({ kind: "detail", appointmentId })}
-              onCheckedIn={(appointmentId) => setCheckedIn({ appointmentId, name: data.appointments[appointmentId]?.client?.name.split(" ")[0] ?? "The client", at: Date.now() })}
+              onCheckedIn={(appointmentId) => offerUndo("check_in", appointmentId)}
+              onNoShow={(appointmentId) => offerUndo("no_show", appointmentId)}
               team={data.columns.map((c) => ({ id: c.staffId, name: c.name }))}
               products={data.menu.products}
             />

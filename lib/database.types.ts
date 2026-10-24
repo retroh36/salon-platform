@@ -2846,6 +2846,9 @@ isOneToOne: false
 "undo_duration_action":
 { Args: { "p_action_id": string }; Returns: undefined
                            },
+"undo_no_show":
+{ Args: { "p_appointment_id": string,"p_expected_version": number }; Returns: undefined
+                           },
 "undo_reorder_draft":
 { Args: { "p_action_id": string }; Returns: undefined
                            },

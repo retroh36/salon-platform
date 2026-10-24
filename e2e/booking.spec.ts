@@ -256,8 +256,41 @@ test.describe("front desk", () => {
     await openDay(page);
     await column(page, "Shae Morgan").getByRole("button", { name: new RegExp(`${PREFIX}Eli Test`) }).click();
     await moreAction(panel(page), "Mark no-show");
+    // Asked first.
+    const confirm = panel(page).getByRole("group", { name: "Mark no-show" });
+    await expect(confirm).toContainText(`Mark ${PREFIX}Eli as a no-show?`);
+    await confirm.getByRole("button", { name: "Not yet" }).click();
+    expect((await appointment(id)).status).toBe("booked");
+    await moreAction(panel(page), "Mark no-show");
+    await panel(page).getByRole("group", { name: "Mark no-show" }).getByRole("button", { name: "Mark no-show" }).click();
     await expect(panel(page).locator("[data-status]")).toHaveText("No-show");
     await expect(column(page, "Shae Morgan").getByRole("button", { name: new RegExp(`${PREFIX}Eli Test.*No-show$`) })).toBeVisible();
+    expect((await appointment(id)).status).toBe("no_show");
+    // Undo on the toast puts it back.
+    await page.getByTestId("no-show-toast").getByRole("button", { name: "Undo" }).click();
+    await expect(panel(page).locator("[data-status]")).toHaveText("Booked");
+    expect((await appointment(id)).status).toBe("booked");
+    // And later from "⋯".
+    await moreAction(panel(page), "Mark no-show");
+    await panel(page).getByRole("group", { name: "Mark no-show" }).getByRole("button", { name: "Mark no-show" }).click();
+    await expect(panel(page).locator("[data-status]")).toHaveText("No-show");
+    await moreAction(panel(page), "Undo no-show");
+    await expect(panel(page).locator("[data-status]")).toHaveText("Booked");
+    const { data: events } = await admin.from("appointment_events").select("kind").eq("appointment_id", id).order("created_at");
+    expect(events!.map((e) => e.kind)).toEqual(["no_show", "no_show_undone", "no_show", "no_show_undone"]);
+  });
+
+  test("won't undo a no-show once its time has been booked", async ({ page }) => {
+    const id = await seedVisit(await newClient("Gus"), [{ service: "Men's Cut", staff: SHAE, start: at(11) }]);
+    await openDay(page);
+    await column(page, "Shae Morgan").getByRole("button", { name: new RegExp(`${PREFIX}Gus Test`) }).click();
+    await moreAction(panel(page), "Mark no-show");
+    await panel(page).getByRole("group", { name: "Mark no-show" }).getByRole("button", { name: "Mark no-show" }).click();
+    await expect(panel(page).locator("[data-status]")).toHaveText("No-show");
+    // Someone takes the time.
+    await seedVisit(await newClient("Hal"), [{ service: "Men's Cut", staff: SHAE, start: at(11) }]);
+    await moreAction(panel(page), "Undo no-show");
+    await expect(panel(page).getByRole("alert")).toContainText("That time isn't free any more");
     expect((await appointment(id)).status).toBe("no_show");
   });
 

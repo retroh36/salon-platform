@@ -87,6 +87,8 @@ export function DenisePanel({
   const openings = state?.openings ?? [];
   const pose: Pose = working ? "think" : conflicts.length ? "point" : "wave";
   const isToday = data.date === data.today;
+  // A not-arrived client whose "Mark no-show" was tapped: asked first.
+  const [confirmingNoShow, setConfirmingNoShow] = useState<string | null>(null);
 
   // Her latest words in view.
   const end = useRef<HTMLDivElement>(null);
@@ -163,11 +165,22 @@ export function DenisePanel({
                   <Button size="xs" onClick={() => onOpen(n.appointmentId)}>
                     Open
                   </Button>
-                  {data.me.canBook && (
-                    <Button size="xs" variant="ghost" onClick={() => onNoShow(n)}>
-                      Mark no-show
-                    </Button>
-                  )}
+                  {data.me.canBook &&
+                    (confirmingNoShow === n.id ? (
+                      // Asked first: a no-show frees their time (Undo follows on the toast).
+                      <>
+                        <Button size="xs" variant="danger" onClick={() => onNoShow(n)}>
+                          Yes, no-show
+                        </Button>
+                        <Button size="xs" variant="ghost" onClick={() => setConfirmingNoShow(null)}>
+                          Not yet
+                        </Button>
+                      </>
+                    ) : (
+                      <Button size="xs" variant="ghost" onClick={() => setConfirmingNoShow(n.id)}>
+                        Mark no-show
+                      </Button>
+                    ))}
                 </span>
                 {data.me.canBook && (
                   <IconButton label={`Dismiss ${n.clientName}`} size="xs" variant="ghost" className="absolute top-1.5 right-1.5" onClick={() => onDismissNotice(n.id)}>
