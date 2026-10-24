@@ -9,6 +9,7 @@ import { CheckCircleIcon, ChevronDownIcon, GlobeIcon, MoreIcon, PhoneIcon, Warni
 import { Tabs } from "@/components/ui/tabs";
 import { PatchTestForm } from "@/app/clients/patch-test-form";
 import { ClientInsightLine } from "@/components/client-insight-line";
+import { VisitPhotosTab } from "@/components/visit-photos";
 import { ACTION_LABELS, allowedActions, CANCEL_REASONS, canEditNotes, isEditable, MAX_NOTES, STATUS_LABELS, type AppointmentAction } from "@/lib/appointments";
 import type { ChecklistItem } from "@/lib/client-checks";
 import { nextStep, timerState, timerStatus, visitStatusText } from "@/lib/visit-times";
@@ -65,7 +66,7 @@ export function AppointmentPanel({
   const [canceling, setCanceling] = useState(false);
   const [confirmingCheckIn, setConfirmingCheckIn] = useState(false);
   const [reportingLate, setReportingLate] = useState(false);
-  const [tab, setTab] = useState<"notes" | "formula" | "history">("notes");
+  const [tab, setTab] = useState<"notes" | "formula" | "photos" | "history">("notes");
   // What the visit still needs before it goes ahead.
   const checklist = client && (status === "booked" || status === "confirmed" || status === "checked_in") ? (appointment.warnings?.checklist ?? []) : [];
   const outstanding = checklist.filter((c) => !c.done);
@@ -151,8 +152,8 @@ export function AppointmentPanel({
         <header className="flex items-center gap-3">
           <Avatar name={client?.name ?? appointment.group?.label ?? "Walk in"} size="lg" />
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1">
-              <h3 className="min-w-0 truncate font-serif text-xl font-semibold" data-testid="client-name">
+            <div className="flex items-start gap-1">
+              <h3 className="min-w-0 font-serif text-xl font-semibold text-pretty wrap-anywhere" data-testid="client-name">
                 {client ? (
                   <Link href={`/clients/${client.id}`} className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-focus">
                     {client.name}
@@ -273,6 +274,7 @@ export function AppointmentPanel({
             tabs={[
               { value: "notes", label: "Notes" },
               { value: "formula", label: "Formula" },
+              { value: "photos", label: "Photos" },
               { value: "history", label: "History" },
             ]}
           >
@@ -288,6 +290,8 @@ export function AppointmentPanel({
               </div>
             ) : tab === "formula" ? (
               <FormulaSection appointment={appointment} date={date} products={products} canRecord={canRecordFormula && Boolean(client)} />
+            ) : tab === "photos" ? (
+              <VisitPhotosTab key={appointment.id} appointmentId={appointment.id} today={today} />
             ) : (
               <VisitHistory appointment={appointment} />
             )}

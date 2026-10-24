@@ -10,6 +10,8 @@ import { describeClient } from "@/lib/insights/describe";
 import { loadClientInsights } from "@/lib/insights/read";
 import { loadClientPackages, withPackages } from "@/lib/packages";
 import { PackagesList } from "./packages/packages-card";
+import { PhotoGallery } from "@/components/visit-photos";
+import { loadPhotos } from "@/lib/photos-load";
 import { canEditClients, formatDate } from "@/lib/clients";
 import { isUuid } from "@/lib/ids";
 import { BackLink } from "@/components/ui/back-link";
@@ -49,7 +51,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
   const [{ data: client, error }, { data: formulas, error: formulaError }, { data: items, error: itemError }, products] = await Promise.all([
     supabase
       .from("clients")
-      .select("*, preferred:staff(first_name, last_name, is_active)")
+      .select("*, preferred:staff!clients_preferred_staff_id_business_id_fkey(first_name, last_name, is_active)")
       .eq("id", id)
       .maybeSingle(),
     supabase
@@ -79,7 +81,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
     patchSettings(supabase, me.business_id),
     loadClientInsights(supabase, me.business_id, [id]),
   ]);
-  const packages = await loadClientPackages(supabase, id);
+  const [packages, gallery] = await Promise.all([loadClientPackages(supabase, id), loadPhotos(supabase, me, { clientId: id })]);
   if (patchError) throw patchError;
   if (formsError) throw formsError;
   if (teamError) throw teamError;
@@ -242,6 +244,18 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
             ))}
           </ol>
         )}
+      </Card>
+
+      <Card
+        titleId="photos-heading"
+        title={
+          <>
+            Before and after <span className="font-sans text-base font-normal text-ink-muted">({gallery.photos.length})</span>
+          </>
+        }
+        description="Saved to each visit. Only your salon can see them."
+      >
+        <PhotoGallery clientId={client.id} photos={gallery.photos} consent={gallery.consent} today={today} />
       </Card>
 
       <h2 className="mb-3 font-serif text-2xl font-semibold text-navy-900">Details</h2>

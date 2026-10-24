@@ -102,7 +102,7 @@ export async function checkOut(panel: Locator) {
 }
 
 // One of booking details' tabs: Notes, Formula or History.
-export async function visitTab(panel: Locator, name: "Notes" | "Formula" | "History") {
+export async function visitTab(panel: Locator, name: "Notes" | "Formula" | "Photos" | "History") {
   await panel.getByRole("tab", { name, exact: true }).click();
 }
 

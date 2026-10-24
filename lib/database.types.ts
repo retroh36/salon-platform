@@ -521,14 +521,14 @@ isOneToOne: false
                   ]
                 },"clients": {
                   Row: {
-                    "allergies": string | null,"business_id": string,"consent_signed_on": string | null,"created_at": string,"email": string | null,"email_opt_in": boolean,"first_name": string,"id": string,"last_name": string,"notes": string | null,"phone": string | null,"phone_digits": string | null,"preferences": string | null,"preferred_staff_id": string | null,"search_name": string | null,"sms_opt_in": boolean,"updated_at": string
+                    "allergies": string | null,"business_id": string,"consent_signed_on": string | null,"created_at": string,"email": string | null,"email_opt_in": boolean,"first_name": string,"id": string,"last_name": string,"notes": string | null,"phone": string | null,"phone_digits": string | null,"photo_consent_by": string | null,"photo_consent_on": string | null,"preferences": string | null,"preferred_staff_id": string | null,"search_name": string | null,"sms_opt_in": boolean,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "allergies"?: string | null,"business_id": string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"first_name": string,"id"?: string,"last_name"?: string,"notes"?: string | null,"phone"?: string | null,"phone_digits"?: never,"preferences"?: string | null,"preferred_staff_id"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"updated_at"?: string
+                    "allergies"?: string | null,"business_id": string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"first_name": string,"id"?: string,"last_name"?: string,"notes"?: string | null,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"updated_at"?: string
                   }
                   Update: {
-                    "allergies"?: string | null,"business_id"?: string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"first_name"?: string,"id"?: string,"last_name"?: string,"notes"?: string | null,"phone"?: string | null,"phone_digits"?: never,"preferences"?: string | null,"preferred_staff_id"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"updated_at"?: string
+                    "allergies"?: string | null,"business_id"?: string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"first_name"?: string,"id"?: string,"last_name"?: string,"notes"?: string | null,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -536,6 +536,12 @@ isOneToOne: false
       columns: ["business_id"]
 isOneToOne: false
       referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "clients_photo_consent_by_fkey"
+      columns: ["photo_consent_by"]
+isOneToOne: false
+      referencedRelation: "staff"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "clients_preferred_staff_id_business_id_fkey"
@@ -2045,6 +2051,56 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"visit_photos": {
+                  Row: {
+                    "appointment_id": string,"business_id": string,"client_id": string,"created_at": string,"created_by": string | null,"id": string,"kind": string,"marketing_marked_at": string | null,"marketing_marked_by": string | null,"marketing_ok": boolean,"staff_id": string | null,"storage_path": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "appointment_id": string,"business_id": string,"client_id": string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"kind": string,"marketing_marked_at"?: string | null,"marketing_marked_by"?: string | null,"marketing_ok"?: boolean,"staff_id"?: string | null,"storage_path": string
+                  }
+                  Update: {
+                    "appointment_id"?: string,"business_id"?: string,"client_id"?: string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"kind"?: string,"marketing_marked_at"?: string | null,"marketing_marked_by"?: string | null,"marketing_ok"?: boolean,"staff_id"?: string | null,"storage_path"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "visit_photos_appointment_id_fkey"
+      columns: ["appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "visit_photos_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "visit_photos_client_id_fkey"
+      columns: ["client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "visit_photos_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "visit_photos_marketing_marked_by_fkey"
+      columns: ["marketing_marked_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "visit_photos_staff_id_fkey"
+      columns: ["staff_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"waitlist_entries": {
                   Row: {
                     "appointment_id": string | null,"business_id": string,"client_id": string,"created_at": string,"created_by": string | null,"from_date": string,"id": string,"location_id": string,"notes": string | null,"service_ids": (string)[],"staff_ids": (string)[],"status": Database["public"]['Enums']["waitlist_status"],"to_date": string,"updated_at": string,"windows": (string)[]
@@ -2148,6 +2204,9 @@ isOneToOne: false
             "add_formula":
 { Args: { "p_appointment_item_id": string,"p_client_id": string,"p_formula": string,"p_lines": Json,"p_notes": string,"p_visit_date": string }; Returns: string
                            },
+"add_visit_photo":
+{ Args: { "p_appointment_id": string,"p_kind": string,"p_path": string }; Returns: string
+                           },
 "adjust_gift_card":
 { Args: { "p_card_id": string,"p_change_cents": number,"p_reason": string }; Returns: number
                            },
@@ -2191,6 +2250,9 @@ isOneToOne: false
                            },
 "delete_purchase_order":
 { Args: { "p_order_id": string }; Returns: undefined
+                           },
+"delete_visit_photo":
+{ Args: { "p_photo_id": string }; Returns: string
                            },
 "dismiss_denise_item":
 { Args: { "p_day": string,"p_key": string,"p_location_id": string }; Returns: undefined
@@ -2299,6 +2361,12 @@ isOneToOne: false
                            },
 "set_payroll_settings":
 { Args: { "p_anchor": string,"p_business_id": string,"p_pay_period": string }; Returns: undefined
+                           },
+"set_photo_consent":
+{ Args: { "p_client_id": string,"p_on": string }; Returns: undefined
+                           },
+"set_photo_marketing":
+{ Args: { "p_ok": boolean,"p_photo_id": string }; Returns: undefined
                            },
 "set_service_level_prices":
 { Args: { "p_prices": Json,"p_service_id": string }; Returns: undefined

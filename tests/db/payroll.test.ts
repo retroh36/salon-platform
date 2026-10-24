@@ -41,9 +41,9 @@ async function sell(): Promise<string> {
     .single();
   const total = computeSale(
     [
-      { grossCents: 10000, taxBp: b!.tax_rate_services_bp, discountable: true },
-      { grossCents: product!.price_cents, taxBp: b!.tax_rate_retail_bp, discountable: true },
-      { grossCents: product!.price_cents, taxBp: b!.tax_rate_retail_bp, discountable: true },
+      { grossCents: 10000, taxBp: b!.tax_rate_services_bp ?? 0, discountable: true },
+      { grossCents: product!.price_cents ?? 0, taxBp: b!.tax_rate_retail_bp ?? 0, discountable: true },
+      { grossCents: product!.price_cents ?? 0, taxBp: b!.tax_rate_retail_bp ?? 0, discountable: true },
     ],
     null,
     [1500],

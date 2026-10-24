@@ -117,8 +117,8 @@ test.describe("front desk", () => {
     await expect(panel.getByRole("menu")).toHaveCount(0);
     await expect(panel).toBeVisible();
 
-    // Notes · Formula · History.
-    await expect(panel.getByRole("tab")).toHaveText(["Notes", "Formula", "History"]);
+    // Notes · Formula · Photos · History.
+    await expect(panel.getByRole("tab")).toHaveText(["Notes", "Formula", "Photos", "History"]);
     await expect(panel.getByRole("tabpanel", { name: "Notes" })).toContainText("Likes it quiet");
     await expect(panel.getByRole("button", { name: "Save notes" })).toHaveCount(0);
     await panel.getByRole("tab", { name: "History" }).click();
@@ -236,8 +236,9 @@ test.describe("front desk", () => {
     const grid = ui(page).getByTestId("calendar-grid");
     const [g, line, header] = await Promise.all([grid.boundingBox(), now.boundingBox(), ui(page).locator("[data-grid-header]").boundingBox()]);
     const third = header!.y + header!.height + (g!.y + g!.height - header!.y - header!.height) / 3;
-    // Unless it's so early the grid can't scroll up that far.
-    if ((await grid.evaluate((el) => el.scrollTop)) > 0) expect(Math.abs(line!.y - third)).toBeLessThan(40);
+    // Unless it's so early or late the grid can't scroll that far.
+    const scroll = await grid.evaluate((el) => ({ top: el.scrollTop, max: el.scrollHeight - el.clientHeight }));
+    if (scroll.top > 0 && scroll.top < scroll.max - 1) expect(Math.abs(line!.y - third)).toBeLessThan(40);
     // The stylist header and the time column stay put as it scrolls.
     await grid.evaluate((el) => (el.scrollTop += 200));
     expect((await ui(page).locator("[data-grid-header]").boundingBox())!.y).toBeCloseTo(header!.y, 0);
@@ -348,8 +349,9 @@ for (const viewport of [
           await denise.click();
           await expectNone(`${visit}: Denise's line open`);
         }
-        for (const tab of ["Formula", "History", "Notes"] as const) {
+        for (const tab of ["Formula", "Photos", "History", "Notes"] as const) {
           await panel.getByRole("tab", { name: tab, exact: true }).click();
+          if (tab === "Photos") await expect(panel.getByText("Loading photos…")).toHaveCount(0);
           await expectNone(`${visit}: ${tab}`);
         }
         const more = panel.getByRole("button", { name: "More actions" });
