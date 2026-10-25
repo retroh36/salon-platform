@@ -357,6 +357,26 @@ describe("status", () => {
     expect((await book(frontDesk, [item("Women's Cut & Style", BRIDGET, at(10))])).ok).toBe(true);
   });
 
+  it("only makes the changes the app allows, even called directly, and a repeat tap changes nothing", async () => {
+    const booked = await book(frontDesk, [item("Women's Cut & Style", BRIDGET, at(10))]);
+    const id = booked.ok ? booked.appointmentId : "";
+    expect(await changeStatus(frontDesk, id, "cancel", "Client is sick")).toEqual({ ok: true });
+    // A canceled visit can't come back as booked (its time may be someone else's now) or be checked in.
+    for (const status of ["booked", "checked_in", "completed"] as const) {
+      expect((await frontDesk.rpc("set_appointment_status", { p_appointment_id: id, p_status: status, p_reason: "" })).error?.code).toBe("55000");
+    }
+    expect((await appointment(id)).status).toBe("canceled");
+    // Checked out (the sale took it there) stays checked out, whatever a stale tab sends.
+    const other = await book(frontDesk, [item("Women's Cut & Style", BRIDGET, at(12))]);
+    const done = other.ok ? other.appointmentId : "";
+    await changeStatus(frontDesk, done, "check_in");
+    // Tapped twice: still checked in, once.
+    expect((await frontDesk.rpc("set_appointment_status", { p_appointment_id: done, p_status: "checked_in", p_reason: "" })).error).toBeNull();
+    await changeStatus(frontDesk, done, "check_out");
+    expect((await frontDesk.rpc("set_appointment_status", { p_appointment_id: done, p_status: "canceled", p_reason: "Stale" })).error?.code).toBe("55000");
+    expect((await appointment(done)).status).toBe("completed");
+  });
+
   it("marks a no-show, freeing the time", async () => {
     const booked = await book(frontDesk, [item("Women's Cut & Style", BRIDGET, at(10))]);
     const id = booked.ok ? booked.appointmentId : "";

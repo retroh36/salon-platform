@@ -250,6 +250,8 @@ export async function changeStatus(
   });
   if (rpcError?.code === "42501") return { ok: false, error: "forbidden" };
   if (isPatchTestBlock(rpcError)) return { ok: false, error: "patch_test", message: rpcError!.message };
+  // It changed since it was read (checked out at the desk, say).
+  if (rpcError?.code === "55000" && rpcError.hint === "status") return { ok: false, error: "not_allowed" };
   if (rpcError) throw rpcError;
   return { ok: true };
 }
