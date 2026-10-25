@@ -20,7 +20,7 @@ export default function SuppliersPage() {
 async function Suppliers() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
-  const { data: suppliers, error } = await supabase.from("suppliers").select("*, products(count)").order("name");
+  const { data: suppliers, error } = await supabase.from("suppliers").select("*, products(id)").order("name");
   if (error) throw error;
   return (
     <AppShell section="inventory" me={me}>
@@ -37,7 +37,7 @@ async function Suppliers() {
                 <span className="min-w-52 flex-1 font-semibold text-ink">{s.name}</span>
                 <span className="text-sm text-ink-muted">{[s.email, s.phone, s.account_number && `Account ${s.account_number}`].filter(Boolean).join(" · ")}</span>
                 <span className="w-40 text-sm text-ink-muted">
-                  {s.lead_time_days} {s.lead_time_days === 1 ? "day" : "days"} to deliver · {s.products[0]?.count ?? 0} products
+                  {s.lead_time_days} {s.lead_time_days === 1 ? "day" : "days"} to deliver · {s.products.length} products
                 </span>
                 {s.notes && <p className="w-full text-sm text-ink-muted">{s.notes}</p>}
               </li>

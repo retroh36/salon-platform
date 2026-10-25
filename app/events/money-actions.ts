@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentStaff } from "@/lib/auth";
 import { siteUrl } from "@/lib/branding";
 import { chargeDuePayments, runEventBilling } from "@/lib/events/billing";
+import { loadEventMoney } from "@/lib/events/load";
 import { CARD_LINK_DAYS, cardLinkMessage, MEMBER_LINK_DAYS, memberLinkMessage, PROPOSAL_LINK_DAYS, proposalMessage } from "@/lib/events/messages";
 import { memberShare } from "@/lib/events/pricing";
 import { settingsFrom } from "@/lib/events/types";
@@ -68,8 +69,9 @@ export async function sendMemberLink(memberId: string, channel: "sms" | "email",
   if (!address(channel, to)) return { ok: false, message: channel === "sms" ? "Enter a 10-digit mobile number." : "Enter an email address like name@example.com." };
   const blocked = await blockedReason(createAdminClient(), channel, to.trim(), null);
   if (blocked) return { ok: false, message: blocked };
-  const { data: m } = await supabase.from("event_members").select("name, price_cents, event:events(id, title)").eq("id", memberId).maybeSingle();
+  const { data: m } = await supabase.from("event_members").select("name, event:events(id, title)").eq("id", memberId).maybeSingle();
   if (!m) return { ok: false, message: "They're no longer in the party." };
+  const { members: prices } = await loadEventMoney(supabase, [m.event.id]);
   const [{ data: s }, { data: b }] = await Promise.all([
     supabase.from("event_settings").select("*").eq("business_id", me.business_id).single(),
     supabase.from("businesses").select("tax_rate_services_bp").eq("id", me.business_id).single(),
@@ -80,7 +82,7 @@ export async function sendMemberLink(memberId: string, channel: "sms" | "email",
   if (error?.code === "42501") return { ok: false, message: NOT_ALLOWED };
   if (error?.code === "55000") return { ok: false, message: `${error.message}.` };
   if (error) throw error;
-  const share = memberShare(m.price_cents, settingsFrom(s!), b!.tax_rate_services_bp);
+  const share = memberShare(prices.get(memberId) ?? 0, settingsFrom(s!), b!.tax_rate_services_bp);
   await outbox(me.business_id, channel, to.trim(), memberLinkMessage(me.location.business.name, m.name, m.event.title, share, `${siteUrl()}/event/${token}`, channel));
   refresh(m.event.id);
   return { ok: true, message: `Pay link sent to ${to.trim()}.` };

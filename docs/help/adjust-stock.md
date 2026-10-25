@@ -19,4 +19,4 @@ Correct the stock of one product, for breakage, samples or mistakes.
 - Every change is listed under **History** on the product, with the reason.
 - To count everything on the shelves, use a stocktake instead. See "Do a stocktake".
 - Sales, service use and deliveries change stock by themselves; you don't need to adjust for them.
-- Front desk and stylists can see stock but can't adjust it.
+- Front desk and stylists can see stock but can't adjust it. Stylists see what's on hand, not what stock costs or its history.

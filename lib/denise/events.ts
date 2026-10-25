@@ -9,6 +9,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import { loadEventMoney } from "@/lib/events/load";
 import { PAYMENT_LABELS } from "@/lib/events/messages";
 import { EVENT_STATUS_LABELS } from "@/lib/events/types";
 import { formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
@@ -38,7 +39,9 @@ export function eventLabel(e: Pick<Row, "title" | "client" | "event_members">): 
 
 export function eventKnowledge(supabase: Supabase, me: { businessId: string; timezone: string; money: boolean; today: LocalDate }, sayDate: (date: LocalDate) => string) {
   const tz = me.timezone;
-  const SELECT = "id, title, status, event_date, ready_by, on_location, total_cents, client:clients(first_name), event_members(party_role, name), event_tasks(staff_id)";
+  const SELECT = "id, title, status, event_date, ready_by, on_location, client:clients(first_name), event_members(party_role, name), event_tasks(staff_id)";
+  // Totals and deposits are the front of house's (loadEventMoney).
+  const moneyOf = async (ids: string[]) => (me.money ? (await loadEventMoney(supabase, ids)).events : new Map<string, { total_cents: number; deposit_cents: number }>());
 
   return {
     // "2027-06": every event that month, lost ones apart.
@@ -56,6 +59,7 @@ export function eventKnowledge(supabase: Supabase, me: { businessId: string; tim
       if (payments.error) throw payments.error;
       const names = new Map(staff.data.map((s) => [s.id, s.first_name]));
       const live = data.filter((e) => e.status !== "lost");
+      const money = await moneyOf(live.map((e) => e.id));
       return {
         month,
         events: live.map((e) => ({
@@ -68,7 +72,7 @@ export function eventKnowledge(supabase: Supabase, me: { businessId: string; tim
           team: [...new Set(e.event_tasks.flatMap((t) => (t.staff_id && names.has(t.staff_id) ? [names.get(t.staff_id)!] : [])))],
           ...(me.money
             ? {
-                total_dollars: dollars(e.total_cents),
+                total_dollars: dollars(money.get(e.id)?.total_cents ?? 0),
                 left_to_collect_dollars: dollars(payments.data.filter((p) => p.event_id === e.id && (p.status === "scheduled" || p.status === "failed")).reduce((n, p) => n + p.amount_cents, 0)),
               }
             : {}),
@@ -88,7 +92,7 @@ export function eventKnowledge(supabase: Supabase, me: { businessId: string; tim
       const ids = clients.map((c) => c.id);
       const { data, error } = await supabase
         .from("events")
-        .select(`${SELECT}, deposit_cents, event_payments(kind, member_name, amount_cents, status, due_on, paid_at)`)
+        .select(`${SELECT}, event_payments(kind, member_name, amount_cents, status, due_on, paid_at)`)
         .eq("business_id", me.businessId)
         .neq("status", "lost")
         .or([`title.ilike.%${q}%`, ...(ids.length ? [`client_id.in.(${ids.join(",")})`] : [])].join(","))
@@ -96,6 +100,7 @@ export function eventKnowledge(supabase: Supabase, me: { businessId: string; tim
         .limit(3);
       if (error) throw error;
       if (!data.length) return { matches: [], note: "No event matches that name." };
+      const money = await moneyOf(data.map((e) => e.id));
       return {
         matches: data.map((e) => {
           const payments = e.event_payments.filter((p) => p.status !== "canceled").sort((a, b) => a.due_on.localeCompare(b.due_on));
@@ -105,11 +110,11 @@ export function eventKnowledge(supabase: Supabase, me: { businessId: string; tim
             event: eventLabel(e as unknown as Row),
             date: sayDate(e.event_date),
             status: EVENT_STATUS_LABELS[e.status],
-            total_dollars: dollars(e.total_cents),
+            total_dollars: dollars(money.get(e.id)?.total_cents ?? 0),
             paid_dollars: dollars(paid),
             left_to_collect_dollars: dollars(owed.reduce((n, p) => n + p.amount_cents, 0)),
             // Before it's booked, nothing is scheduled: the deposit is what books it.
-            ...(e.status === "inquiry" || e.status === "proposal_sent" ? { deposit_to_book_dollars: dollars(e.deposit_cents) } : {}),
+            ...(e.status === "inquiry" || e.status === "proposal_sent" ? { deposit_to_book_dollars: dollars(money.get(e.id)?.deposit_cents ?? 0) } : {}),
             payments: payments.map((p) => ({
               what: p.kind === "member" ? `${firstWord(p.member_name) ?? "A party member"}'s share` : PAYMENT_LABELS[p.kind as keyof typeof PAYMENT_LABELS],
               dollars: dollars(p.amount_cents),

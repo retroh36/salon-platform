@@ -4,15 +4,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { toLocal } from "@/lib/scheduling/time";
+import { loadEventMoney } from "./load";
 import type { ReportEvent } from "./report";
 
 export async function loadEventReportRows(supabase: SupabaseClient<Database>, businessId: string, timeZone: string): Promise<ReportEvent[]> {
   const { data, error } = await supabase
     .from("events")
-    .select("id, status, event_date, created_at, booked_at, total_cents, deposit_cents, event_payments(kind, status, amount_cents, paid_at)")
+    .select("id, status, event_date, created_at, booked_at, event_payments(kind, status, amount_cents, paid_at)")
     .eq("business_id", businessId)
     .limit(5000);
   if (error) throw error;
+  const money = (await loadEventMoney(supabase, data.map((e) => e.id))).events;
   const day = (iso: string) => toLocal(new Date(iso), timeZone).date;
   return data.map((e) => ({
     id: e.id,
@@ -20,8 +22,8 @@ export async function loadEventReportRows(supabase: SupabaseClient<Database>, bu
     date: e.event_date,
     createdOn: day(e.created_at),
     bookedOn: e.booked_at ? day(e.booked_at) : null,
-    totalCents: e.total_cents,
-    depositCents: e.deposit_cents,
+    totalCents: money.get(e.id)?.total_cents ?? 0,
+    depositCents: money.get(e.id)?.deposit_cents ?? 0,
     payments: e.event_payments.map((p) => ({ kind: p.kind, status: p.status, amountCents: p.amount_cents, paidOn: p.paid_at ? day(p.paid_at) : null })),
   }));
 }

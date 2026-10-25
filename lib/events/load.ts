@@ -117,7 +117,7 @@ export type EventDetail = {
 };
 
 export const EVENT_COLUMNS =
-  "id, title, status, lost_reason, event_date, ready_by, venue_name, venue_address, on_location, travel_miles, travel_minutes, notes, look_notes, sale_id, source, billing, inquiry_party_size, inquiry_services, subtotal_cents, travel_fee_cents, early_fee_cents, service_charge_cents, tax_cents, total_cents, main_cents, deposit_cents, created_at, status_changed_at, client:clients(id, first_name, last_name, phone, email), members:event_members(id, position, name, party_role, package_id, package_name, price_cents, hair_minutes, makeup_minutes, pays_own, email, phone), tasks:event_tasks(id, member_id, kind, role, lane, staff_id, starts_at, ends_at)";
+  "id, title, status, lost_reason, event_date, ready_by, venue_name, venue_address, on_location, travel_miles, travel_minutes, notes, look_notes, sale_id, source, billing, inquiry_party_size, inquiry_services, created_at, status_changed_at, client:clients(id, first_name, last_name, phone, email), members:event_members(id, position, name, party_role, package_id, package_name, hair_minutes, makeup_minutes, pays_own, email, phone), tasks:event_tasks(id, member_id, kind, role, lane, staff_id, starts_at, ends_at)";
 
 type EventRow = {
   id: string;
@@ -198,10 +198,32 @@ export function eventFrom(e: EventRow, timeZone: string): EventDetail {
   };
 }
 
+// An event's money (its totals and each member's price) is the front of
+// house's, read through event_money and event_member_prices; anyone else
+// gets none, and it shows as $0.
+type Money = Pick<EventRow, "subtotal_cents" | "travel_fee_cents" | "early_fee_cents" | "service_charge_cents" | "tax_cents" | "total_cents" | "main_cents" | "deposit_cents">;
+const NO_MONEY: Money = { subtotal_cents: 0, travel_fee_cents: 0, early_fee_cents: 0, service_charge_cents: 0, tax_cents: 0, total_cents: 0, main_cents: 0, deposit_cents: 0 };
+
+export async function loadEventMoney(supabase: Client, eventIds: string[]): Promise<{ events: Map<string, Money>; members: Map<string, number> }> {
+  if (!eventIds.length) return { events: new Map(), members: new Map() };
+  const [money, prices] = await Promise.all([supabase.rpc("event_money", { p_event_ids: eventIds }), supabase.rpc("event_member_prices", { p_event_ids: eventIds })]);
+  if (money.error) throw money.error;
+  if (prices.error) throw prices.error;
+  return {
+    events: new Map(money.data.map(({ event_id, ...m }) => [event_id, m])),
+    members: new Map(prices.data.map((p) => [p.member_id, p.price_cents])),
+  };
+}
+
 export async function loadEvent(supabase: Client, id: string, timeZone: string): Promise<EventDetail | null> {
-  const { data, error } = await supabase.from("events").select(EVENT_COLUMNS).eq("id", id).maybeSingle();
+  const [{ data, error }, money] = await Promise.all([supabase.from("events").select(EVENT_COLUMNS).eq("id", id).maybeSingle(), loadEventMoney(supabase, [id])]);
   if (error) throw error;
-  return data ? eventFrom(data as unknown as EventRow, timeZone) : null;
+  if (!data) return null;
+  const row = data as unknown as Omit<EventRow, keyof Money> & { members: Omit<EventRow["members"][number], "price_cents">[] };
+  return eventFrom(
+    { ...row, ...(money.events.get(id) ?? NO_MONEY), members: row.members.map((m) => ({ ...m, price_cents: money.members.get(m.id) ?? 0 })) },
+    timeZone,
+  );
 }
 
 export type EventSummary = {
@@ -224,12 +246,13 @@ export type EventSummary = {
 export async function loadEventList(supabase: Client, businessId: string, timeZone: string, from: string): Promise<EventSummary[]> {
   const { data, error } = await supabase
     .from("events")
-    .select("id, title, status, lost_reason, event_date, ready_by, total_cents, on_location, venue_name, source, status_changed_at, inquiry_party_size, client:clients(first_name, last_name), members:event_members(count)")
+    .select("id, title, status, lost_reason, event_date, ready_by, on_location, venue_name, source, status_changed_at, inquiry_party_size, client:clients(first_name, last_name), members:event_members(id)")
     .eq("business_id", businessId)
     .gte("event_date", from)
     .order("event_date")
     .limit(500);
   if (error) throw error;
+  const money = await loadEventMoney(supabase, data.map((e) => e.id));
   return data.map((e) => ({
     id: e.id,
     title: e.title,
@@ -237,8 +260,8 @@ export async function loadEventList(supabase: Client, businessId: string, timeZo
     date: e.event_date,
     readyBy: e.ready_by ? toLocal(new Date(e.ready_by), timeZone).minute : null,
     clientName: e.client ? `${e.client.first_name} ${e.client.last_name}`.trim() : null,
-    partySize: (e.members as unknown as { count: number }[])[0]?.count || e.inquiry_party_size || 0,
-    totalCents: e.total_cents,
+    partySize: e.members.length || e.inquiry_party_size || 0,
+    totalCents: money.events.get(e.id)?.total_cents ?? 0,
     onLocation: e.on_location,
     venueName: e.venue_name,
     source: e.source,

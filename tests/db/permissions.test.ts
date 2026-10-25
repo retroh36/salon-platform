@@ -284,3 +284,45 @@ describe("the shared iPad's PINs", () => {
     expect(gone).toBeNull();
   });
 });
+
+describe("salon money stylists never see", () => {
+  it("what stock costs the salon: no cost on products, no stock history; the front of house reads costs through product_costs", async () => {
+    expect((await bridget.from("products").select("id, cost_cents").limit(1)).error?.code).toBe("42501");
+    expect((await bridget.from("products").select("*").limit(1)).error?.code).toBe("42501");
+    const { data: products } = await bridget.from("products").select("id, name, price_cents").eq("business_id", B);
+    expect(products!.length).toBeGreaterThan(5);
+    expect((await bridget.rpc("product_costs")).data).toEqual([]);
+    expect((await bridget.from("stock_movements").select("id").eq("business_id", B)).data).toEqual([]);
+    const { data: costs } = await frontDesk.rpc("product_costs");
+    const { data: real } = await admin.from("products").select("id, cost_cents").eq("business_id", B);
+    expect(new Map(costs!.map((c) => [c.product_id, c.cost_cents]))).toEqual(new Map(real!.map((p) => [p.id, p.cost_cents])));
+    expect((await frontDesk.from("stock_movements").select("id").eq("business_id", B).limit(1)).data).toHaveLength(1);
+  });
+
+  it("an event's money and party prices, even on events they're on; the front of house reads them through event_money", async () => {
+    const { data: task } = await admin.from("event_tasks").select("event_id").eq("staff_id", SEED.staff.bridget).limit(1).single();
+    const id = task!.event_id;
+    expect((await bridget.from("events").select("id, title").eq("id", id).single()).data?.id).toBe(id);
+    for (const column of ["total_cents", "deposit_cents", "main_cents", "card_label"]) expect((await bridget.from("events").select(`id, ${column}`).eq("id", id)).error?.code, column).toBe("42501");
+    expect((await bridget.from("event_members").select("id, price_cents").eq("event_id", id)).error?.code).toBe("42501");
+    expect((await bridget.rpc("event_money", { p_event_ids: [id] })).data).toEqual([]);
+    expect((await bridget.rpc("event_member_prices", { p_event_ids: [id] })).data).toEqual([]);
+    const { data: e } = await admin.from("events").select("total_cents, deposit_cents").eq("id", id).single();
+    const { data: money } = await frontDesk.rpc("event_money", { p_event_ids: [id] });
+    expect(money).toEqual([expect.objectContaining({ event_id: id, total_cents: e!.total_cents, deposit_cents: e!.deposit_cents })]);
+    expect((await frontDesk.rpc("event_member_prices", { p_event_ids: [id] })).data!.length).toBeGreaterThan(0);
+  });
+
+  it("package history and uses only for clients in their own book", async () => {
+    const { data: all } = await admin.from("client_packages").select("id, client_id").eq("business_id", B);
+    const { data: seen } = await bridget.from("client_packages").select("id");
+    const mine = new Set(seen!.map((p) => p.id));
+    expect(all!.length).toBeGreaterThan(mine.size);
+    const { data: events } = await bridget.from("package_events").select("client_package_id");
+    const { data: uses } = await bridget.from("client_package_items").select("client_package_id");
+    for (const r of [...events!, ...uses!]) expect(mine.has(r.client_package_id)).toBe(true);
+    const { count } = await frontDesk.from("client_package_items").select("id", { count: "exact", head: true }).eq("business_id", B);
+    const { count: total } = await admin.from("client_package_items").select("id", { count: "exact", head: true }).eq("business_id", B);
+    expect(count).toBe(total);
+  });
+});

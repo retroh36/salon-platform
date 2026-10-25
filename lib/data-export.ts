@@ -7,6 +7,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { csvTable, dollars, type Cell } from "@/lib/csv";
+import { loadCosts, PRODUCT_COLUMNS } from "@/lib/inventory-load";
 import { minuteToTime, toLocal } from "@/lib/scheduling/time";
 import { zip } from "@/lib/zip";
 
@@ -40,7 +41,7 @@ export async function exportFiles(supabase: Supabase, businessId: string, timeZo
     const l = toLocal(new Date(String(iso)), timeZone);
     return `${l.date} ${minuteToTime(l.minute)}`;
   };
-  const [clients, staff, services, appointments, items, formulas, formulaProducts, sales, saleItems, payments, tips, products, stock, suppliers, cards, cardEvents, packages, packageItems] =
+  const [clients, staff, services, appointments, items, formulas, formulaProducts, sales, saleItems, payments, tips, products, stock, suppliers, cards, cardEvents, packages, packageItems, costs] =
     await Promise.all([
       rows(supabase, "clients", businessId),
       rows(supabase, "staff", businessId, "id, first_name, last_name, email, phone, role, level, is_active, created_at"),
@@ -53,13 +54,14 @@ export async function exportFiles(supabase: Supabase, businessId: string, timeZo
       rows(supabase, "sale_items", businessId),
       rows(supabase, "payments", businessId, "id, sale_id, method, amount_cents, tendered_cents, change_cents, reference, reason, created_at"),
       rows(supabase, "sale_tips", businessId, "*", ["sale_id", "staff_id"]),
-      rows(supabase, "products", businessId),
+      rows(supabase, "products", businessId, PRODUCT_COLUMNS),
       rows(supabase, "stock_levels", businessId),
       rows(supabase, "suppliers", businessId),
       rows(supabase, "gift_cards", businessId),
       rows(supabase, "gift_card_events", businessId),
       rows(supabase, "client_packages", businessId),
       rows(supabase, "client_package_items", businessId),
+      loadCosts(supabase),
     ]);
 
   const byId = (list: Row[]) => new Map(list.map((r) => [r.id as string, r]));
@@ -203,7 +205,7 @@ export async function exportFiles(supabase: Supabase, businessId: string, timeZo
         s(p.type),
         s(p.unit),
         n(p.size),
-        dollars(n(p.cost_cents)),
+        dollars(costs.get(p.id as string) ?? 0),
         dollars(n(p.price_cents)),
         supplierName.get(p.supplier_id as string) ?? null,
         s(p.shelf),

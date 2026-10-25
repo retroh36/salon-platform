@@ -2544,11 +2544,11 @@ isOneToOne: false
                   }
                   Relationships: [
                     {
-      foreignKeyName: "sale_drafts_appointment_id_fkey"
-      columns: ["appointment_id"]
+      foreignKeyName: "sale_drafts_appointment_id_business_id_fkey"
+      columns: ["appointment_id","business_id"]
 isOneToOne: false
       referencedRelation: "appointments"
-      referencedColumns: ["id"]
+      referencedColumns: ["id","business_id"]
     },{
       foreignKeyName: "sale_drafts_business_id_fkey"
       columns: ["business_id"]
@@ -2556,11 +2556,11 @@ isOneToOne: false
       referencedRelation: "businesses"
       referencedColumns: ["id"]
     },{
-      foreignKeyName: "sale_drafts_client_id_fkey"
-      columns: ["client_id"]
+      foreignKeyName: "sale_drafts_client_id_business_id_fkey"
+      columns: ["client_id","business_id"]
 isOneToOne: false
       referencedRelation: "clients"
-      referencedColumns: ["id"]
+      referencedColumns: ["id","business_id"]
     },{
       foreignKeyName: "sale_drafts_created_by_business_id_fkey"
       columns: ["created_by","business_id"]
@@ -2574,11 +2574,11 @@ isOneToOne: false
       referencedRelation: "locations"
       referencedColumns: ["id","business_id"]
     },{
-      foreignKeyName: "sale_drafts_sale_id_fkey"
-      columns: ["sale_id"]
+      foreignKeyName: "sale_drafts_sale_id_business_id_fkey"
+      columns: ["sale_id","business_id"]
 isOneToOne: false
       referencedRelation: "sales"
-      referencedColumns: ["id"]
+      referencedColumns: ["id","business_id"]
     }
                   ]
                 },"sale_events": {
@@ -3006,11 +3006,11 @@ isOneToOne: false
                   }
                   Relationships: [
                     {
-      foreignKeyName: "staff_compensation_plan_id_fkey"
-      columns: ["plan_id"]
+      foreignKeyName: "staff_compensation_plan_id_business_id_fkey"
+      columns: ["plan_id","business_id"]
 isOneToOne: false
       referencedRelation: "commission_plans"
-      referencedColumns: ["id"]
+      referencedColumns: ["id","business_id"]
     },{
       foreignKeyName: "staff_compensation_staff_id_business_id_fkey"
       columns: ["staff_id","business_id"]
@@ -3850,6 +3850,16 @@ isOneToOne: false
 "dismiss_denise_item":
 { Args: { "p_day": string,"p_key": string,"p_location_id": string }; Returns: undefined
                            },
+"event_member_prices":
+{ Args: { "p_event_ids": (string)[] }; Returns: {
+              "event_id": string,"member_id": string,"price_cents": number
+            }[]
+                           },
+"event_money":
+{ Args: { "p_event_ids": (string)[] }; Returns: {
+              "deposit_cents": number,"early_fee_cents": number,"event_id": string,"main_cents": number,"service_charge_cents": number,"subtotal_cents": number,"tax_cents": number,"total_cents": number,"travel_fee_cents": number
+            }[]
+                           },
 "find_online_client":
 { Args: { "p_business_id": string,"p_email": string,"p_first_name": string,"p_last_name": string,"p_phone": string,"p_phone_digits": string }; Returns: string
                            },
@@ -3900,6 +3910,11 @@ isOneToOne: false
                            },
 "payroll_sales":
 { Args: { "p_business_id": string,"p_from": string,"p_staff_id"?: string,"p_to": string }; Returns: Json
+                           },
+"product_costs":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "cost_cents": number,"product_id": string
+            }[]
                            },
 "receive_purchase_order":
 { Args: { "p_lines": Json,"p_order_id": string }; Returns: Database["public"]['Enums']["purchase_order_status"]

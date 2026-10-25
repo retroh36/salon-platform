@@ -15,25 +15,36 @@ export type StockRow = InventoryRow & {
   reorder_quantity: number;
 };
 
+// Every column of a product staff can read (its cost is read with loadCosts).
+export const PRODUCT_COLUMNS = "id, business_id, supplier_id, brand, line, name, sku, barcode, type, unit, size, price_cents, shelf, is_active, created_at, updated_at";
+
+// What each product costs the salon. Only the front of house can read it
+// (product_costs): anyone else gets none, and costs show as $0.
+export async function loadCosts(supabase: Supabase): Promise<Map<string, number>> {
+  const { data, error } = await supabase.rpc("product_costs");
+  if (error) throw error;
+  return new Map(data.map((c) => [c.product_id, c.cost_cents]));
+}
+
 // Every product (active first, by brand, line and name) with its stock here.
 export async function loadInventory(supabase: Supabase, locationId: string, { includeInactive = false } = {}): Promise<StockRow[]> {
   let query = supabase
     .from("products")
     .select(
-      "id, brand, line, name, sku, barcode, type, unit, size, cost_cents, price_cents, shelf, is_active, supplier:suppliers(id, name), stock_levels(location_id, on_hand, reorder_point, reorder_quantity)",
+      "id, brand, line, name, sku, barcode, type, unit, size, price_cents, shelf, is_active, supplier:suppliers(id, name), stock_levels(location_id, on_hand, reorder_point, reorder_quantity)",
     )
     .order("brand")
     .order("line", { nullsFirst: true })
     .order("name");
   if (!includeInactive) query = query.eq("is_active", true);
-  const { data, error } = await query;
+  const [{ data, error }, costs] = await Promise.all([query, loadCosts(supabase)]);
   if (error) throw error;
   // Shades in natural order: 4N before 10N.
   const order = (p: { brand: string; line: string | null; name: string }) => [p.brand, p.line ?? "", p.name].join("\u0000");
   data.sort((a, b) => order(a).localeCompare(order(b), "en", { numeric: true, sensitivity: "base" }));
   return data.map(({ stock_levels, ...p }) => {
     const level = stock_levels.find((l) => l.location_id === locationId);
-    return { ...p, on_hand: level?.on_hand ?? 0, reorder_point: level?.reorder_point ?? 0, reorder_quantity: level?.reorder_quantity ?? 1 };
+    return { ...p, cost_cents: costs.get(p.id) ?? 0, on_hand: level?.on_hand ?? 0, reorder_point: level?.reorder_point ?? 0, reorder_quantity: level?.reorder_quantity ?? 1 };
   });
 }
 

@@ -5,6 +5,7 @@ import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { BackLink } from "@/components/ui/back-link";
 import { Badge, Card, EmptyState, listClass, PageHeader, rowClass } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
+import { loadCosts } from "@/lib/inventory-load";
 import { isUuid } from "@/lib/ids";
 import { canManageInventory, formatAmount, productName, stockValueCents } from "@/lib/inventory";
 import { formatDay } from "@/lib/schedule-format";
@@ -27,18 +28,19 @@ async function Stocktake({ params }: Pick<PageProps<"/inventory/count/[id]">, "p
   if (!me) return <NotLinked />;
   if (!canManageInventory(me.role)) redirect("/inventory");
   if (!isUuid(id)) notFound();
-  const { data: s, error } = await supabase
-    .from("stocktakes")
-    .select(
-      "*, finisher:staff!stocktakes_finished_by_business_id_fkey(first_name), stocktake_counts(expected, counted, product:products(id, brand, line, name, unit, size, cost_cents))",
-    )
-    .eq("id", id)
-    .maybeSingle();
+  const [{ data: s, error }, costs] = await Promise.all([
+    supabase
+      .from("stocktakes")
+      .select("*, finisher:staff!stocktakes_finished_by_business_id_fkey(first_name), stocktake_counts(expected, counted, product:products(id, brand, line, name, unit, size))")
+      .eq("id", id)
+      .maybeSingle(),
+    loadCosts(supabase),
+  ]);
   if (error) throw error;
   if (!s) notFound();
   if (s.status === "in_progress") redirect("/inventory/count");
 
-  const counts = [...s.stocktake_counts].sort((a, b) => Math.abs(stockValueCents(b.expected - b.counted, b.product)) - Math.abs(stockValueCents(a.expected - a.counted, a.product)));
+  const counts = s.stocktake_counts.map((c) => ({ ...c, product: { ...c.product, cost_cents: costs.get(c.product.id) ?? 0 } })).sort((a, b) => Math.abs(stockValueCents(b.expected - b.counted, b.product)) - Math.abs(stockValueCents(a.expected - a.counted, a.product)));
   const summary = summarize(counts);
   const when = (at: string) => {
     const local = toLocal(new Date(at), me.location.timezone);

@@ -9,6 +9,7 @@ import { getCurrentStaff } from "@/lib/auth";
 import { canManageInventory, canReceiveOrders, describeStock, filterInventory, formatAmount, isLow, productName, readFilter, stockValueCents, TYPE_LABELS } from "@/lib/inventory";
 import { loadInventory } from "@/lib/inventory-load";
 import { formatPrice } from "@/lib/services";
+import { isFrontOfHouse } from "@/lib/staff";
 import { DeniseReorders } from "./denise-reorders";
 import { InventoryFilters } from "./inventory-filters";
 
@@ -34,6 +35,8 @@ async function Inventory({ searchParams }: Pick<PageProps<"/inventory">, "search
   const totalValue = all.reduce((sum, p) => sum + stockValueCents(p.on_hand, p), 0);
   const shownValue = rows.reduce((sum, p) => sum + stockValueCents(p.on_hand, p), 0);
   const manage = canManageInventory(me.role);
+  // What stock cost is the front of house's; stylists see what's on hand.
+  const costs = isFrontOfHouse(me.role);
 
   return (
     <AppShell section="inventory" me={me}>
@@ -41,7 +44,13 @@ async function Inventory({ searchParams }: Pick<PageProps<"/inventory">, "search
         title="Inventory"
         description={
           <>
-            {all.length} products · <span data-testid="stock-value">{formatPrice(totalValue)}</span> in stock at cost
+            {all.length} products
+            {costs && (
+              <>
+                {" · "}
+                <span data-testid="stock-value">{formatPrice(totalValue)}</span> in stock at cost
+              </>
+            )}
           </>
         }
         actions={
@@ -89,7 +98,7 @@ async function Inventory({ searchParams }: Pick<PageProps<"/inventory">, "search
       <InventoryFilters filter={filter} brands={brands} />
 
       <p className="mb-3 text-sm text-ink-muted" aria-live="polite">
-        {rows.length === all.length ? `${rows.length} products` : `${rows.length} of ${all.length} products · ${formatPrice(shownValue)} at cost`}
+        {rows.length === all.length ? `${rows.length} products` : `${rows.length} of ${all.length} products${costs ? ` · ${formatPrice(shownValue)} at cost` : ""}`}
       </p>
 
       <Card flush>
@@ -101,7 +110,7 @@ async function Inventory({ searchParams }: Pick<PageProps<"/inventory">, "search
               <span className="flex-1">Product</span>
               <span className="w-36 text-right">On hand</span>
               <span className="w-28 text-right">Reorder at</span>
-              <span className="w-24 text-right">Value</span>
+              {costs && <span className="w-24 text-right">Value</span>}
             </div>
             <ul className={listClass} aria-label="Products">
               {rows.map((p) => {
@@ -128,7 +137,7 @@ async function Inventory({ searchParams }: Pick<PageProps<"/inventory">, "search
                         <span className="md:hidden">Reorder at </span>
                         {p.reorder_point > 0 ? formatAmount(p.reorder_point, p.unit) : "—"}
                       </span>
-                      <span className="ml-auto text-sm font-medium text-ink tabular-nums md:ml-0 md:w-24 md:text-right">{formatPrice(stockValueCents(p.on_hand, p))}</span>
+                      {costs && <span className="ml-auto text-sm font-medium text-ink tabular-nums md:ml-0 md:w-24 md:text-right">{formatPrice(stockValueCents(p.on_hand, p))}</span>}
                     </Link>
                   </li>
                 );

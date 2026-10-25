@@ -23,7 +23,9 @@ import {
 } from "@/lib/inventory";
 import { formatDay } from "@/lib/schedule-format";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
+import { loadCosts, PRODUCT_COLUMNS } from "@/lib/inventory-load";
 import { formatPrice } from "@/lib/services";
+import { isFrontOfHouse } from "@/lib/staff";
 import { AdjustForm, SettingsForm } from "./stock-actions";
 
 export const metadata: Metadata = { title: "Product" };
@@ -49,10 +51,11 @@ async function Product({ params }: Pick<PageProps<"/inventory/[id]">, "params">)
   if (!me) return <NotLinked />;
   if (!isUuid(id)) notFound();
 
-  const [{ data: product, error }, { data: movements, error: movementError }] = await Promise.all([
+  // Cost and stock history are the front of house's (none for anyone else).
+  const [{ data: found, error }, { data: movements, error: movementError }, costs] = await Promise.all([
     supabase
       .from("products")
-      .select("*, supplier:suppliers(id, name, lead_time_days), stock_levels(location_id, on_hand, reorder_point, reorder_quantity)")
+      .select(`${PRODUCT_COLUMNS}, supplier:suppliers(id, name, lead_time_days), stock_levels(location_id, on_hand, reorder_point, reorder_quantity)`)
       .eq("id", id)
       .maybeSingle(),
     supabase
@@ -62,10 +65,13 @@ async function Product({ params }: Pick<PageProps<"/inventory/[id]">, "params">)
       .eq("location_id", me.location.id)
       .order("created_at", { ascending: false })
       .limit(50),
+    loadCosts(supabase),
   ]);
   if (error) throw error;
   if (movementError) throw movementError;
-  if (!product) notFound();
+  if (!found) notFound();
+  const product = { ...found, cost_cents: costs.get(found.id) ?? 0 };
+  const frontOfHouse = isFrontOfHouse(me.role);
 
   const level = product.stock_levels.find((l) => l.location_id === me.location.id);
   const onHand = level?.on_hand ?? 0;
@@ -117,13 +123,15 @@ async function Product({ params }: Pick<PageProps<"/inventory/[id]">, "params">)
               Orders {level?.reorder_quantity ?? 1} {containerName(product, (level?.reorder_quantity ?? 1) !== 1)} at a time
             </dd>
           </div>
-          <div>
-            <dt className="text-sm text-ink-muted">Value at cost</dt>
-            <dd className="text-lg font-medium text-ink">{formatPrice(stockValueCents(onHand, product))}</dd>
-            <dd className="text-sm text-ink-muted">
-              {formatPrice(product.cost_cents)} per {product.unit === "unit" ? "unit" : `${formatAmount(product.size, product.unit)} ${containerName(product)}`}
-            </dd>
-          </div>
+          {frontOfHouse && (
+            <div>
+              <dt className="text-sm text-ink-muted">Value at cost</dt>
+              <dd className="text-lg font-medium text-ink">{formatPrice(stockValueCents(onHand, product))}</dd>
+              <dd className="text-sm text-ink-muted">
+                {formatPrice(product.cost_cents)} per {product.unit === "unit" ? "unit" : `${formatAmount(product.size, product.unit)} ${containerName(product)}`}
+              </dd>
+            </div>
+          )}
           {product.price_cents !== null && (
             <div>
               <dt className="text-sm text-ink-muted">Retail price</dt>
@@ -152,34 +160,36 @@ async function Product({ params }: Pick<PageProps<"/inventory/[id]">, "params">)
         </Card>
       )}
 
-      <Card title="History" titleId="history-heading" flush>
-        {movements.length === 0 ? (
-          <EmptyState>No stock changes yet.</EmptyState>
-        ) : (
-          <ol className={listClass} aria-label="Stock history">
-            {movements.map((m) => (
-              <li key={m.id} className={`${rowClass} flex flex-wrap items-center gap-x-4 gap-y-1`}>
-                <Badge tone={REASON_TONES[m.reason]} className="w-28 justify-center">
-                  {REASON_LABELS[m.reason]}
-                </Badge>
-                <span className={`w-24 font-medium tabular-nums ${m.change < 0 ? "text-ink" : "text-status-confirmed-ink"}`}>
-                  {m.change > 0 ? "+" : "−"}
-                  {formatAmount(Math.abs(m.change), product.unit)}
-                </span>
-                <span className="w-28 text-sm text-ink-muted tabular-nums">→ {formatAmount(m.on_hand_after, product.unit)}</span>
-                <span className="min-w-40 flex-1 text-sm text-ink">
-                  {m.note}
-                  {m.unit_cost_cents !== null && <span className="text-ink-muted"> · {formatPrice(m.unit_cost_cents)} each</span>}
-                </span>
-                <span className="text-sm text-ink-muted">
-                  {when(m.created_at)}
-                  {m.creator && ` · ${m.creator.first_name}`}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </Card>
+      {frontOfHouse && (
+        <Card title="History" titleId="history-heading" flush>
+          {movements.length === 0 ? (
+            <EmptyState>No stock changes yet.</EmptyState>
+          ) : (
+            <ol className={listClass} aria-label="Stock history">
+              {movements.map((m) => (
+                <li key={m.id} className={`${rowClass} flex flex-wrap items-center gap-x-4 gap-y-1`}>
+                  <Badge tone={REASON_TONES[m.reason]} className="w-28 justify-center">
+                    {REASON_LABELS[m.reason]}
+                  </Badge>
+                  <span className={`w-24 font-medium tabular-nums ${m.change < 0 ? "text-ink" : "text-status-confirmed-ink"}`}>
+                    {m.change > 0 ? "+" : "−"}
+                    {formatAmount(Math.abs(m.change), product.unit)}
+                  </span>
+                  <span className="w-28 text-sm text-ink-muted tabular-nums">→ {formatAmount(m.on_hand_after, product.unit)}</span>
+                  <span className="min-w-40 flex-1 text-sm text-ink">
+                    {m.note}
+                    {m.unit_cost_cents !== null && <span className="text-ink-muted"> · {formatPrice(m.unit_cost_cents)} each</span>}
+                  </span>
+                  <span className="text-sm text-ink-muted">
+                    {when(m.created_at)}
+                    {m.creator && ` · ${m.creator.first_name}`}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Card>
+      )}
     </AppShell>
   );
 }
