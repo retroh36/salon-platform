@@ -20,10 +20,12 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? "github" : "list",
+  // Failures' evidence is also copied out of test-results/ (e2e/keep-failures.ts).
+  reporter: [[process.env.CI ? "github" : "list"], ["./e2e/keep-failures.ts"]],
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: "retain-on-failure",
+    screenshot: "only-on-failure",
   },
   projects: [
     { name: "setup", testMatch: /auth\.setup\.ts/ },
