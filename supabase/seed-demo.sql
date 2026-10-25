@@ -1005,3 +1005,21 @@ values
   ('b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000005', 'retail_revenue', 'week', 30000, true, 'd0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000001'),
   ('b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000009', 'new_clients', 'quarter', 12, false, 'd0000000-0000-4000-8000-000000000009', 'd0000000-0000-4000-8000-000000000009');
 update public.staff set goal_alerts = 'weekly' where id = 'd0000000-0000-4000-8000-000000000005';
+
+-- Openings this afternoon: a client of Shae's and one of Hannah's canceled
+-- a couple of days ago (one each, so their days still look busy), leaving
+-- open time for the last-minute special and Denise's ideas.
+with picked as (
+  select a.id, row_number() over (partition by i.staff_id order by a.starts_at) as n
+  from public.appointments a
+  join public.appointment_items i on i.appointment_id = a.id
+  where a.business_id = 'b0000000-0000-4000-8000-000000000001' and a.status in ('booked', 'confirmed')
+    and i.staff_id in ('d0000000-0000-4000-8000-000000000009', 'd0000000-0000-4000-8000-000000000006')
+    and a.starts_at >= now() + interval '2 hours'
+    and (a.starts_at at time zone 'America/Chicago')::date = (now() at time zone 'America/Chicago')::date
+    and a.group_id is null and a.series_id is null
+    and not exists (select 1 from public.appointment_items j where j.appointment_id = a.id and j.staff_id <> i.staff_id)
+)
+update public.appointments a set status = 'canceled', cancel_reason = 'Client canceled', canceled_at = now() - interval '2 days'
+from picked p
+where a.id = p.id and p.n = 1;

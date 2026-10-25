@@ -11,6 +11,7 @@ const eslintConfig = defineConfig([
     ".next/**",
     // The browser tests' dev server (playwright.config.ts).
     ".next-e2e/**",
+    ".next-screenshots/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

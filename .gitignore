@@ -47,3 +47,7 @@ yarn-error.log*
 /.next-e2e/
 /evals/denise-report.txt
 /e2e/screenshots/
+
+# marketing screenshots (npm run screenshots) and their build
+/screenshots/
+/.next-screenshots/

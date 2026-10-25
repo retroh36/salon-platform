@@ -19,7 +19,8 @@
     "import:phorest:dry-run": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/phorest-dry-run.ts",
     "backup:drill": "./scripts/backup-drill.sh",
     "photos": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/photos.ts",
-    "jobs": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/jobs.ts"
+    "jobs": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/jobs.ts",
+    "screenshots": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/screenshots.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.1.0",
