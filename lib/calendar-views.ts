@@ -4,6 +4,7 @@
 // the board and the calendar page use it.
 
 import type { ServiceFamily } from "@/lib/calendar";
+import { firstLetter } from "@/lib/initial";
 
 // A column's stylist, as far as choosing columns goes.
 export type ShownColumn = { staffId: string; working: boolean };
@@ -94,7 +95,7 @@ export function viewProblems(name: string, staffIds: readonly string[], otherNam
 export function nameVariants(name: string, firstName: string, squeezed: boolean): string[] {
   const parts = name.split(" ").filter(Boolean);
   const last = parts.length > 1 ? parts.at(-1)! : "";
-  const variants = [name, last ? `${firstName} ${last[0]}.` : firstName, firstName];
-  if (squeezed) variants.push(parts.map((p) => p[0]).join("").slice(0, 3).toUpperCase());
+  const variants = [name, last ? `${firstName} ${firstLetter(last)}.` : firstName, firstName];
+  if (squeezed) variants.push(parts.slice(0, 3).map(firstLetter).join("").toUpperCase());
   return [...new Set(variants)];
 }

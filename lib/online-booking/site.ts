@@ -9,6 +9,7 @@ import type { StaffLevel } from "@/lib/schedule-forms";
 import { formatPhone } from "./contact";
 import { DEFAULT_ACCENT, type DepositKind } from "./settings";
 import { levelPricesFrom, sortCategories, stylistPrice } from "@/lib/services";
+import { firstLetter } from "@/lib/initial";
 
 type Admin = SupabaseClient<Database>;
 
@@ -101,7 +102,7 @@ export async function loadSite(admin: Admin, slug: string): Promise<SiteLookup> 
     .map((s) => ({
       id: s.id,
       firstName: s.first_name,
-      displayName: s.last_name ? `${s.first_name} ${s.last_name[0]}.` : s.first_name,
+      displayName: s.last_name ? `${s.first_name} ${firstLetter(s.last_name)}.` : s.first_name,
       level: s.level,
       color: s.color,
       photoUrl: staffPhotoUrl(s.photo_path),

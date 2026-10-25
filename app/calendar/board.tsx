@@ -37,6 +37,7 @@ import { NowLine, useNow } from "./now-line";
 import { OffChip, ViewEditor, type Department } from "./views";
 import { saveCalendarView, setCalendarOrder } from "./view-actions";
 import type { BlockData, BoardData, ColumnData, TimeBlockData } from "./types";
+import { firstLetter } from "@/lib/initial";
 
 // How tall time is drawn (px per minute), from the zoom; blocks read it.
 const ScaleContext = createContext(ZOOM_PX_PER_MINUTE.comfortable);
@@ -1898,7 +1899,7 @@ function AppointmentBlock({
   const ranges = timeRangeVariants(block.start, block.end);
   const names = timeOnName
     ? ranges.map((r) => `${first} · ${r}`)
-    : [block.clientName, ...(rest.length ? [`${first} ${rest.at(-1)![0]}.`, first] : [])];
+    : [block.clientName, ...(rest.length ? [`${first} ${firstLetter(rest.at(-1)!)}.`, first] : [])];
   // The visit's other services, when stylists share it.
   const others = block.parts.filter((p) => p.start !== block.start || p.service !== block.service);
   // Everything about the visit, for the tooltip.

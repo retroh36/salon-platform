@@ -4,13 +4,14 @@ import type { PayPeriod, Ticket } from "@/lib/payroll";
 import { formatDay } from "@/lib/schedule-format";
 import { formatPrice } from "@/lib/services";
 import { averageTipPct, pctText, tipItems, tipTotals, topTippers, type TipItem, type TipTotal } from "@/lib/tips";
+import { firstLetter } from "@/lib/initial";
 
 const KIND_LABELS = { sale: null, refund: "Refund", void: "Voided" } as const;
 
 // "Ava T." for a stylist's own view; full names for owners and managers.
 const shortName = (name: string) => {
   const [first, ...rest] = name.split(" ");
-  return rest.length ? `${first} ${rest[rest.length - 1][0]}.` : first;
+  return rest.length ? `${first} ${firstLetter(rest[rest.length - 1])}.` : first;
 };
 
 function Totals({ label, rows, day }: { label: string; rows: TipTotal[]; day: boolean }) {

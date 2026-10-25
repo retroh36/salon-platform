@@ -1,12 +1,13 @@
 import type { StaffLevel } from "@/lib/schedule-forms";
 import { LEVEL_RING, LevelBadge } from "./level";
+import { firstLetter } from "@/lib/initial";
 
 // Initials in a soft circle, tinted with the person's calendar color. A
 // stylist's level shows as a colored ring around it, with a badge in the
 // corner (a star, two dots or one) so it isn't color alone.
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts.at(-1)![0] : "")).toUpperCase() || "?";
+  return (firstLetter(parts[0] ?? "") + (parts.length > 1 ? firstLetter(parts.at(-1)!) : "")).toUpperCase() || "?";
 }
 
 const SIZES = { sm: "size-8 text-xs", md: "size-10 text-sm", lg: "size-14 text-lg font-serif", xl: "size-20 text-2xl font-serif" };

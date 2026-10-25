@@ -17,6 +17,7 @@ import { loadEventRisks } from "@/lib/events/risks-load";
 import { addDays, formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import type { ConflictView, WaitlistOpening } from "./types";
+import { firstLetter } from "@/lib/initial";
 
 type Supabase = SupabaseClient<Database>;
 
@@ -67,7 +68,7 @@ export function withoutDismissed(f: BriefFacts, dismissed: ReadonlySet<string>):
   };
 }
 
-const shortName = (c: { first_name: string; last_name: string }) => `${c.first_name}${c.last_name ? ` ${c.last_name[0]}.` : ""}`;
+const shortName = (c: { first_name: string; last_name: string }) => `${c.first_name}${c.last_name ? ` ${firstLetter(c.last_name)}.` : ""}`;
 
 export async function briefFacts(
   supabase: Supabase,

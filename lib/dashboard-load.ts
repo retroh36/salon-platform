@@ -26,6 +26,7 @@ import { can } from "@/lib/permissions";
 import { isFrontOfHouse, sortStaff, type StaffRole } from "@/lib/staff";
 import { loadWaitlist } from "@/lib/waitlist-load";
 import { compare, dayCounts, LATE_UNTIL, fullness, gapsWorthFilling, rightNow, stylistToday, type DayCounts, type DayVisit, type StylistToday } from "./dashboard";
+import { firstLetter } from "@/lib/initial";
 
 type Supabase = SupabaseClient<Database>;
 
@@ -105,7 +106,7 @@ export type DashboardData = {
 const FRONT_OF_HOUSE: StaffRole[] = ["owner", "manager", "front_desk"];
 const WEEKDAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-const shortName = (c: { first_name: string; last_name: string } | null) => (c ? `${c.first_name}${c.last_name ? ` ${c.last_name[0]}.` : ""}` : "Walk-in");
+const shortName = (c: { first_name: string; last_name: string } | null) => (c ? `${c.first_name}${c.last_name ? ` ${firstLetter(c.last_name)}.` : ""}` : "Walk-in");
 
 // Every service on the location's visits that day, canceled ones included
 // (for the counts).

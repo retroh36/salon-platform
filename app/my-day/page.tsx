@@ -24,6 +24,7 @@ import { metricInfo } from "@/lib/goals/pacing";
 import { averageTipPct, pctText } from "@/lib/tips";
 import { loadLiveEarnings } from "@/lib/earnings-load";
 import { LiveEarningsCard } from "./live-earnings";
+import { firstLetter } from "@/lib/initial";
 
 export const metadata: Metadata = { title: "My day" };
 
@@ -82,7 +83,7 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
         <ol className="mx-auto flex max-w-xl flex-col gap-3" aria-label="Today's services">
           {visits.map((i) => {
             const client = i.appointment.client;
-            const name = client ? `${client.first_name}${client.last_name ? ` ${client.last_name[0]}.` : ""}` : "Walk-in";
+            const name = client ? `${client.first_name}${client.last_name ? ` ${firstLetter(client.last_name)}.` : ""}` : "Walk-in";
             const status = i.appointment.status as AppointmentStatus;
             const start = toLocal(new Date(i.starts_at), tz).minute;
             return (
