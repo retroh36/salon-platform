@@ -34,7 +34,10 @@ export async function archivePromotion(id: string): Promise<Result> {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me || !can(me, "settings")) return { ok: false, message: "Only owners and managers can end promotions." };
   const { error } = await supabase.rpc("archive_promotion", { p_promotion_id: id });
-  if (error) return { ok: false, message: `${error.message}.` };
+  if (error) {
+    if (["22023", "42501", "P0002"].includes(error.code)) return { ok: false, message: `${error.message}.` };
+    throw error;
+  }
   revalidatePath("/promotions");
   return { ok: true };
 }

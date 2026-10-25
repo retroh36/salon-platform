@@ -39,7 +39,10 @@ export async function addVisitPhoto(appointmentId: string, kind: PhotoKind, form
   if (error) {
     await supabase.storage.from(PHOTO_BUCKET).remove([path]);
     if (error.code === "42501") return { ok: false, message: "You can't add photos to this visit." };
-    return { ok: false, message: error.message };
+    // Our own messages are written for staff; anything else is logged, not shown.
+    if (error.code === "22023") return { ok: false, message: error.message };
+    console.error(`[photos] couldn't save a photo: ${error.code ?? "?"} ${error.message}`);
+    return { ok: false, message: "Couldn't save that photo. Try again." };
   }
   revalidatePath(`/clients/${visit.client_id}`);
   return { ok: true, message: kind === "before" ? "Before photo saved." : "After photo saved." };
