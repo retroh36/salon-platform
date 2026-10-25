@@ -3,10 +3,15 @@
 // tips, the visit checked out, the payment marked as taken online), once
 // only, never after it expires, and canceled if the desk takes payment.
 import { createHash, randomBytes } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { linkSnapshot, linkTotal, type LinkSnapshot } from "@/lib/payment-links";
 import { EMPTY_TICKET, type Ticket } from "@/lib/ticket";
+import { testProvider } from "@/lib/payments/test-provider";
 import { admin, SEED, signIn, type Client } from "./helpers";
+
+// payLink learns from the visit after the response; nothing to do here.
+vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: () => {} }));
+const { payLink } = await import("@/app/pay/[token]/actions");
 
 const B = SEED.business;
 const L = SEED.location;
@@ -116,5 +121,17 @@ describe("payment links", () => {
     expect(error).toBeNull();
     expect((await admin.from("payment_links").select("status").eq("id", linkId!).single()).data!.status).toBe("canceled");
     expect((await admin.rpc("complete_payment_link", { p_link_id: linkId!, p_tips: [] as never, p_total_cents: snapshot.dueCents, p_provider: "test", p_reference: "x" })).error?.hint).toBe("used");
+  });
+
+  it("paid twice at once (two tabs), charges once and never refunds the payment that went through", async () => {
+    const { draftId, snapshot } = await checkout();
+    const { data: linkId, token } = await send(frontDesk, draftId, snapshot);
+    const refund = vi.spyOn(testProvider, "refund");
+    const results = await Promise.all([payLink(token, {}, "test_visa_4242"), payLink(token, {}, "test_visa_4242")]);
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    const { data: link } = await admin.from("payment_links").select("status, provider_reference").eq("id", linkId!).single();
+    expect(link!.status).toBe("paid");
+    expect(refund).not.toHaveBeenCalledWith(link!.provider_reference);
+    refund.mockRestore();
   });
 });

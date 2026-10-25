@@ -10,6 +10,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export type EventLinkResult = { ok: true; message: string } | { ok: false; message: string };
 
+// Whether a charge is the one the event has on record (paid at the same
+// moment in another tab with the same card gives the same charge): if so,
+// it paid and stays.
+async function recorded(admin: ReturnType<typeof createAdminClient>, reference: string) {
+  const { data } = await admin.from("event_payments").select("id").eq("provider_reference", reference).limit(1);
+  return (data ?? []).length > 0;
+}
+
 const CHANGED = "The proposal changed since you opened it. Reload the page to see it again.";
 
 // The client agreed to the terms: the card is saved with the provider and
@@ -43,7 +51,7 @@ export async function acceptProposal(token: string, input: { typedName: string; 
     p_input: { typed_name: name, total_cents: link.totals.totalCents, ip_hash: ipHash, card: { provider: provider.id, ref: saved.card.ref, label: saved.card.label }, deposit: charge },
   });
   if (error) {
-    if (charge) await provider.refund(charge.reference);
+    if (charge && !(await recorded(admin, charge.reference))) await provider.refund(charge.reference);
     if (error.hint === "used") return { ok: false, message: "You've already agreed. Thank you." };
     if (error.hint === "changed") return { ok: false, message: CHANGED };
     if (error.hint === "expired") return { ok: false, message: `This link is no longer active. Ask ${link.salon.name} for a new one.` };
@@ -80,7 +88,7 @@ export async function payShare(token: string, input: { cardRef: string; shownCen
     p_payment: { amount_cents: link.member.shareCents, provider: provider.id, reference: result.reference, card_label: saved.card.label },
   });
   if (error) {
-    await provider.refund(result.reference);
+    if (!(await recorded(admin, result.reference))) await provider.refund(result.reference);
     if (error.hint === "used") return { ok: false, message: "Your share is already paid. Thank you." };
     if (error.hint === "changed") return { ok: false, message: "Your share changed since you opened the page. Reload it to see it again." };
     return { ok: false, message: `We couldn't take the payment, and you haven't been charged. Please let ${link.salon.name} know.` };

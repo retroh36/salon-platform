@@ -36,7 +36,10 @@ export async function completeCardLink(token: string, cardRef: string, agreed: b
     p_deposit: deposit as never,
   });
   if (error) {
-    if (deposit) await provider.refund(deposit.reference);
+    // Done at the same moment in another tab with the same card: that's
+    // the deposit on record, so it stays.
+    const { data: recorded } = deposit ? await admin.from("appointments").select("id").eq("deposit_reference", deposit.reference).maybeSingle() : { data: null };
+    if (deposit && !recorded) await provider.refund(deposit.reference);
     if (error.hint === "used") return { ok: false, message: "Your card is already saved. Thank you!" };
     if (error.hint === "expired") return { ok: false, message: `This link has expired. Ask ${link.salon.name} for a new one.` };
     return { ok: false, message: `We couldn't save your card, and you haven't been charged. Please let ${link.salon.name} know.` };

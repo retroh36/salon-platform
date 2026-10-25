@@ -31,7 +31,10 @@ export async function payLink(token: string, tips: Record<string, number>, cardR
   if (!charge.ok) return { ok: false, message: `${charge.reason}. You haven't been charged; try another card.` };
   const { error } = await admin.rpc("complete_payment_link", { p_link_id: link.id, p_tips: chosen as never, p_total_cents: total, p_provider: provider.id, p_reference: charge.reference });
   if (error) {
-    await provider.refund(charge.reference);
+    // Paid at the same moment in another tab: the same card gives the same
+    // charge, and it's the one that paid, so it stays.
+    const { data: recorded } = await admin.from("payment_links").select("id").eq("provider_reference", charge.reference).maybeSingle();
+    if (!recorded) await provider.refund(charge.reference);
     if (error.hint === "used") return { ok: false, message: "This has already been paid. Thank you!" };
     if (error.hint === "expired") return { ok: false, message: "This link has expired. Ask the salon for a new one." };
     return { ok: false, message: "We couldn't take this payment, and you haven't been charged. Please let the salon know." };
