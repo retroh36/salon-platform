@@ -44,9 +44,17 @@ export async function bookWaitlistEntry(supabase: Supabase, location: Location, 
   const lines = chainLines(ctx, entry.service_ids, staffId, startMinute);
   const items = lines && itemsFor(lines, date, location.timezone);
   if (!items) return { ok: false, message: "One of those services isn't offered any more." };
-  const saved = await saveBooking(supabase, location, { clientId: entry.client_id, notes: entry.notes, items });
-  if (!saved.ok) return { ok: false, message: failed(saved) };
-  const { error: updateError } = await supabase.from("waitlist_entries").update({ status: "booked", appointment_id: saved.appointmentId }).eq("id", entryId);
+  // Claimed first, so two people booking them at once make one visit.
+  if (!(await claim(supabase, "waitlist_entries", entryId))) return { ok: false, message: "That client is no longer on the waitlist." };
+  const saved = await saveBooking(supabase, location, { clientId: entry.client_id, notes: entry.notes, items }).catch(async (e) => {
+    await release(supabase, "waitlist_entries", entryId);
+    throw e;
+  });
+  if (!saved.ok) {
+    await release(supabase, "waitlist_entries", entryId);
+    return { ok: false, message: failed(saved) };
+  }
+  const { error: updateError } = await supabase.from("waitlist_entries").update({ appointment_id: saved.appointmentId }).eq("id", entryId);
   if (updateError) throw updateError;
   const first = entry.client.first_name;
   return {
@@ -86,6 +94,24 @@ export async function bookWalkIn(supabase: Supabase, location: Location & { busi
   const walkIn = queue.find((w) => w.id === walkInId);
   if (!walkIn) return { ok: false, message: "That walk-in isn't waiting any more." };
   if (!walkIn.estimate) return { ok: false, message: "No one who does that service is free today." };
+  if (!(await claim(supabase, "walk_ins", walkInId))) return { ok: false, message: "That walk-in isn't waiting any more." };
+  try {
+    const outcome = await bookClaimedWalkIn(supabase, location, { ...walkIn, estimate: walkIn.estimate }, today);
+    if (!outcome.ok) await release(supabase, "walk_ins", walkInId);
+    return outcome;
+  } catch (e) {
+    await release(supabase, "walk_ins", walkInId);
+    throw e;
+  }
+}
+
+async function bookClaimedWalkIn(
+  supabase: Supabase,
+  location: Location & { businessId: string },
+  walkIn: WalkInRow & { estimate: NonNullable<WalkInRow["estimate"]> },
+  today: LocalDate,
+): Promise<BookOutcome> {
+  const walkInId = walkIn.id;
 
   const phone = walkIn.phone ? normalizePhone(walkIn.phone) : null;
   let clientId: string | null = null;
@@ -112,11 +138,23 @@ export async function bookWalkIn(supabase: Supabase, location: Location & { busi
   if (!items) return { ok: false, message: "That service isn't offered any more." };
   const saved = await saveBooking(supabase, location, { clientId, notes: "Walk-in", items });
   if (!saved.ok) return { ok: false, message: failed(saved) };
-  const { error } = await supabase.from("walk_ins").update({ status: "booked", appointment_id: saved.appointmentId, client_id: clientId }).eq("id", walkInId);
+  const { error } = await supabase.from("walk_ins").update({ appointment_id: saved.appointmentId, client_id: clientId }).eq("id", walkInId);
   if (error) throw error;
   return {
     ok: true,
     appointmentId: saved.appointmentId,
     message: `Booked ${walkIn.name} with ${await staffName(supabase, walkIn.estimate.staffId)} at ${formatMinute(walkIn.estimate.start)}.`,
   };
+}
+
+// Takes a waiting walk-in or waitlist entry for booking, if it's still
+// waiting (only one of two at once gets it); release puts it back.
+async function claim(supabase: Supabase, table: "walk_ins" | "waitlist_entries", id: string): Promise<boolean> {
+  const { data, error } = await supabase.from(table).update({ status: "booked" }).eq("id", id).eq("status", "waiting").select("id");
+  if (error) throw error;
+  return data.length > 0;
+}
+
+async function release(supabase: Supabase, table: "walk_ins" | "waitlist_entries", id: string) {
+  await supabase.from(table).update({ status: "waiting" }).eq("id", id).is("appointment_id", null);
 }

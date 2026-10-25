@@ -144,8 +144,13 @@ describe("walk-ins", () => {
       ["Walky Second", BRIDGET, 720, 118],
     ]);
 
-    const booked = await bookWalkIn(frontDesk, location, queue[0].id, DAY, now);
+    // Two iPads tap Book at once: one visit, not two.
+    const both = await Promise.all([bookWalkIn(frontDesk, location, queue[0].id, DAY, now), bookWalkIn(frontDesk, location, queue[0].id, DAY, now)]);
+    const [booked, twice] = [both.find((b) => b.ok), both.find((b) => !b.ok)];
     expect(booked).toMatchObject({ ok: true, message: "Booked Walky First with Bridget at 11am." });
+    expect(twice).toEqual({ ok: false, message: "That walk-in isn't waiting any more." });
+    const { data: theirs } = await admin.from("appointments").select("id, client:clients!inner(first_name, last_name)").eq("location_id", L).eq("client.last_name", "First").eq("client.first_name", "Walky");
+    expect(theirs).toHaveLength(1);
     const { data: w } = await admin.from("walk_ins").select("status, client:clients(first_name, last_name, phone)").eq("id", queue[0].id).single();
     expect(w).toEqual({ status: "booked", client: { first_name: "Walky", last_name: "First", phone: "(999) 555-0111" } });
     expect((await walkInQueueFor(frontDesk, location, DAY, now)).map((x) => [x.name, x.estimate?.start])).toEqual([["Walky Second", 720]]);
