@@ -234,3 +234,21 @@ test("the connection drops as the sale completes: it says so, and tapping again 
   // The dropped request is the browser's one complaint.
   pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !/ERR_INTERNET_DISCONNECTED|Failed to fetch|Failed to load resource/.test(e)));
 });
+
+test("offline, going back keeps the checkout open and says so, so the ticket isn't lost", async ({ page, pageErrors }) => {
+  const { appointmentId } = await visit("Ollie");
+  const co = await openCheckout(page, { appointmentId, from: `/calendar?date=${DAY}` });
+  const here = page.url();
+  await page.context().setOffline(true);
+  await co.addProduct("shine");
+  await expect(co.lines).toHaveCount(3);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("checkout-blocked")).toContainText("The ticket isn't saved: check the connection");
+  expect(page.url()).toBe(here);
+  await page.context().setOffline(false);
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(`/calendar?date=${DAY}`);
+  await openCheckout(page, { appointmentId });
+  await expect(checkout(page).ticket).toContainText("Shine Spray");
+  pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !/ERR_INTERNET_DISCONNECTED|Failed to fetch|Failed to load resource/.test(e)));
+});

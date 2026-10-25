@@ -67,10 +67,14 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
   // Save as the ticket changes (after a short pause).
   const latest = useRef(ticket);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Whether the ticket is saved (false when there's no connection).
   const flush = useCallback(async () => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
-    await saveTicket(data.draft.id, latest.current);
+    return saveTicket(data.draft.id, latest.current).then(
+      () => true,
+      () => false,
+    );
   }, [data.draft.id]);
   const change = useCallback(
     (next: Ticket | ((t: Ticket) => Ticket)) => {
@@ -84,14 +88,16 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => {
         timer.current = null;
-        saveTicket(data.draft.id, latest.current);
+        // Offline, it's saved on the next change, on leaving, or by Complete sale.
+        saveTicket(data.draft.id, latest.current).catch(() => {});
       }, SAVE_DELAY_MS);
     },
     [data.draft.id],
   );
 
   const back = useCallback(async () => {
-    await flush();
+    // Leaving with the ticket unsaved would lose it: stay, and say why.
+    if (!(await flush())) return setMessage("The ticket isn't saved: check the connection, then go back again.");
     router.push(data.draft.returnTo);
   }, [flush, router, data.draft.returnTo]);
 

@@ -16,3 +16,4 @@ If a page can't load or can't finish what you asked, it says "Something went wro
 - Anything already saved stays saved.
 - An old or mistyped link says "We can't find that page", with **Go to the Dashboard**.
 - Denise's own messages have references too ("Ref D-…"), which work the same way.
+- Without a connection, visit notes say "Notes not saved", and save when you type again once it's back.

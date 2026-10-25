@@ -369,7 +369,7 @@ test.describe("front desk", () => {
 test.describe("stylists", () => {
   test.use({ storageState: AUTH.stylist });
 
-  test("see only their own book, and only edit notes on their visits", async ({ page }) => {
+  test("see only their own book, and only edit notes on their visits", async ({ page, pageErrors }) => {
     const mine = await seedVisit(await newClient("Jo"), [{ service: "Women's Cut & Style", staff: BRIDGET, start: at(10) }]);
     await seedVisit(await newClient("Kit"), [{ service: "All-Over Color", staff: SANDRA, start: at(10) }]);
     await openDay(page);
@@ -393,11 +393,22 @@ test.describe("stylists", () => {
     await expect(notes.getByRole("status")).toHaveText("Notes saved.");
     await expect(panel(page).getByRole("button", { name: /Edit|Check in|Cancel/ })).toHaveCount(0);
     expect(await appointment(mine)).toMatchObject({ notes: "Wants a fringe", updated_by: BRIDGET });
+    // Offline, it says the notes aren't saved, and saves them once back.
+    await page.context().setOffline(true);
+    await notes.getByLabel("Visit notes").fill("Wants a fringe, and a gloss");
+    await expect(notes).toContainText("Notes not saved: check the connection");
+    await page.context().setOffline(false);
+    await notes.getByLabel("Visit notes").press("End");
+    await notes.getByLabel("Visit notes").pressSequentially(".");
+    await expect(notes.getByRole("status")).toHaveText("Notes saved.");
+    expect((await appointment(mine)).notes).toBe("Wants a fringe, and a gloss.");
     await page.getByRole("button", { name: "Close panel" }).click();
 
     // Dragging does nothing.
     await drag(page, block, "Bridget Callahan", 60);
     await expect(block).toHaveAccessibleName(/^10am–11am/);
     expect((await appointment(mine)).appointment_items[0].starts_at).toBe(at(10).toISOString().replace(".000Z", "+00:00"));
+    // Going offline is the browser's one complaint.
+    pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !/ERR_INTERNET_DISCONNECTED|Failed to fetch|Failed to load resource/.test(e)));
   });
 });

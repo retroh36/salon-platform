@@ -22,3 +22,4 @@ Start checkout for a visit from the calendar.
 ## If it doesn't work
 
 - "We couldn't reach the server…" after **Complete sale**: check the Wi-Fi, then tap **Complete sale** again. If the sale had already gone through, it shows as done; it's never recorded twice.
+- "The ticket isn't saved: check the connection…" when you go back: the checkout stays open so nothing is lost. Once the Wi-Fi is back, go back again.

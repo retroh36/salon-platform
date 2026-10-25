@@ -604,11 +604,15 @@ function NotesForm({ appointmentId, initial, editable }: { appointmentId: string
       clearTimeout(timer.current);
       if (value === saved.current) return;
       setState({ kind: "saving" });
-      void saveVisitNotes(appointmentId, value).then((r) => {
-        if (!r.ok) return setState({ kind: "error", message: r.message });
-        saved.current = value;
-        if (latest.current === value) setState({ kind: "saved" });
-      });
+      void saveVisitNotes(appointmentId, value).then(
+        (r) => {
+          if (!r.ok) return setState({ kind: "error", message: r.message });
+          saved.current = value;
+          if (latest.current === value) setState({ kind: "saved" });
+        },
+        // No answer (offline): say so; they save the next time you type or leave the box.
+        () => setState({ kind: "error", message: "Notes not saved: check the connection. They'll save when you type again." }),
+      );
     },
     [appointmentId],
   );
