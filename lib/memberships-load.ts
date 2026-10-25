@@ -76,7 +76,8 @@ export type ClientMembership = {
   cardLabel: string | null;
   provider: string;
   failedAttempts: number;
-  nextRetryAt: string | null;
+  // The day a failed payment is tried again, at the salon.
+  nextRetryOn: LocalDate | null;
   pauseFrom: LocalDate | null;
   resumeOn: LocalDate | null;
   cancelsOn: LocalDate | null;
@@ -86,10 +87,11 @@ export type ClientMembership = {
 };
 
 const SELECT =
-  "id, client_id, plan_id, name, status, price_cents, interval_unit, interval_count, service_discount_pct, retail_discount_pct, min_term_periods, cancel_notice_days, allow_pause, max_pause_periods, started_on, anchor_on, periods_paid, current_period_start, current_period_end, card_label, provider, failed_attempts, next_retry_at, pause_from, resume_on, cancels_on, cancel_reason, membership_credits(id, service_id, period_start, allowance, used, service:services(name))";
+  "id, client_id, plan_id, name, status, price_cents, interval_unit, interval_count, service_discount_pct, retail_discount_pct, min_term_periods, cancel_notice_days, allow_pause, max_pause_periods, started_on, anchor_on, periods_paid, current_period_start, current_period_end, card_label, provider, failed_attempts, next_retry_at, pause_from, resume_on, cancels_on, cancel_reason, location:locations(timezone), membership_credits(id, service_id, period_start, allowance, used, service:services(name))";
 
 type Row = Database["public"]["Tables"]["client_memberships"]["Row"] & {
   membership_credits: { id: string; service_id: string; period_start: string; allowance: number; used: number; service: { name: string } }[];
+  location: { timezone: string };
 };
 
 function toMembership(r: Row): ClientMembership {
@@ -115,7 +117,7 @@ function toMembership(r: Row): ClientMembership {
     cardLabel: r.card_label,
     provider: r.provider,
     failedAttempts: r.failed_attempts,
-    nextRetryAt: r.next_retry_at,
+    nextRetryOn: r.next_retry_at ? toLocal(new Date(r.next_retry_at), r.location.timezone).date : null,
     pauseFrom: r.pause_from,
     resumeOn: r.resume_on,
     cancelsOn: r.cancels_on,

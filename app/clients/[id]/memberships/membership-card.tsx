@@ -91,7 +91,7 @@ function whenText(m: ClientMembership): string {
       return `Paused until ${formatDate(m.resumeOn!)}, when it renews${card}.`;
     case "past_due":
       return `The payment due ${formatDate(m.currentPeriodEnd)} didn't go through (${m.failedAttempts} ${m.failedAttempts === 1 ? "try" : "tries"}).${
-        m.nextRetryAt ? ` Next try ${formatDate(m.nextRetryAt.slice(0, 10))}.` : ""
+        m.nextRetryOn ? ` Next try ${formatDate(m.nextRetryOn)}.` : ""
       } No member benefits until it's paid.`;
     default:
       if (m.cancelsOn) return `Ends ${formatDate(m.cancelsOn)}, as asked; no more payments.`;

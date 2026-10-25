@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { formatDate } from "@/lib/clients";
 import { priceText, type IntervalUnit } from "@/lib/memberships";
+import { toLocal } from "@/lib/scheduling/time";
 import { fullName } from "@/lib/staff";
 
 // The front of house: membership payments that didn't go through, so
@@ -12,7 +13,7 @@ export async function MembershipNotices({ businessId }: { businessId: string }) 
   const { supabase } = await getCurrentStaff();
   const { data } = await supabase
     .from("client_memberships")
-    .select("id, name, price_cents, interval_unit, interval_count, failed_attempts, next_retry_at, client:clients(id, first_name, last_name)")
+    .select("id, name, price_cents, interval_unit, interval_count, failed_attempts, next_retry_at, location:locations(timezone), client:clients(id, first_name, last_name)")
     .eq("business_id", businessId)
     .eq("status", "past_due")
     .order("next_retry_at")
@@ -28,7 +29,7 @@ export async function MembershipNotices({ businessId }: { businessId: string }) 
             </Link>
             <span className="text-ink-muted">
               {m.name}, {priceText(m.price_cents, m.interval_unit as IntervalUnit, m.interval_count)} · {m.failed_attempts} {m.failed_attempts === 1 ? "try" : "tries"}
-              {m.next_retry_at ? ` · next try ${formatDate(m.next_retry_at.slice(0, 10))}` : ""}
+              {m.next_retry_at ? ` · next try ${formatDate(toLocal(new Date(m.next_retry_at), m.location.timezone).date)}` : ""}
             </span>
           </li>
         ))}

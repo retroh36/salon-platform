@@ -245,6 +245,18 @@ describe("billing", () => {
     expect((await admin.from("client_memberships").select("cancel_reason").eq("id", declined.membership.id).single()).data!.cancel_reason).toBe("Payment failed 4 times");
   });
 
+  it("retries on the day it said, whatever time the run is that day", async () => {
+    // The nightly run fails a card just after it starts; the next night's
+    // run starts a few seconds earlier in the day, and must still retry.
+    const c = await client("Rue");
+    const { membership: m } = await join(c, plans.club, "test_visa_0002");
+    await dueToday(m.id);
+    expect(await runMembershipBilling(admin, { membershipId: m.id })).toMatchObject({ failed: 1 });
+    // "Tomorrow" has come, but the run is a little earlier than the failure was.
+    await admin.from("client_memberships").update({ next_retry_at: new Date(Date.now() + 30 * 60_000).toISOString() }).eq("id", m.id);
+    expect(await runMembershipBilling(admin, { membershipId: m.id })).toMatchObject({ checked: 1, failed: 1 });
+  });
+
   it("pauses from the end of the period and resumes with a new period, paid then", async () => {
     const c = await client("Kim");
     const { membership: m } = await join(c, plans.club);
