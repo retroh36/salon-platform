@@ -78,11 +78,19 @@ async function Sales({
     .order("created_at", { ascending: false });
   if (error) throw error;
 
-  // Money in by tender, net of refunds and voids.
+  // Money in by tender that day, net of the refunds and voids given that
+  // day (whichever day their sale was), so it matches the drawer and the
+  // day's close-out on Reports.
+  const { data: paid, error: paidError } = await supabase
+    .from("payments")
+    .select("method, amount_cents")
+    .eq("location_id", me.location.id)
+    .gte("created_at", startOfLocalDay(date, tz).toISOString())
+    .lt("created_at", startOfLocalDay(addDays(date, 1), tz).toISOString());
+  if (paidError) throw paidError;
   const byTender = new Map<PaymentMethod, number>();
-  for (const s of sales)
-    for (const p of s.payments)
-      byTender.set(p.method, (byTender.get(p.method) ?? 0) + p.amount_cents);
+  for (const p of paid)
+    byTender.set(p.method, (byTender.get(p.method) ?? 0) + p.amount_cents);
   const net = [...byTender.values()].reduce((n, c) => n + c, 0);
 
   return (
@@ -129,7 +137,7 @@ async function Sales({
       <Card
         title="Taken"
         titleId="taken-heading"
-        description="By how it was paid, after refunds and voids."
+        description={`By how it was paid, after the refunds and voids given ${date === today ? "today" : "that day"}.`}
       >
         <dl
           className="grid grid-cols-2 gap-3 sm:grid-cols-6"

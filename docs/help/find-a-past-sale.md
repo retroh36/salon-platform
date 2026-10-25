@@ -14,7 +14,7 @@ Look up a sale from today or an earlier day.
 
 ## Good to know
 
-- The **Taken** card at the top shows the day's money by how it was paid (cash, card, gift card, package, membership), after refunds and voids.
+- The **Taken** card at the top shows the money that came in that day by how it was paid (cash, card, gift card, package, membership), less the refunds and voids given that day, whichever day their sale was. It matches the day's close-out on Reports.
 - Status shows **Paid**, **Part refunded**, **Refunded** or **Voided**.
 - Sales are listed on the day they were completed.
 - From a sale, managers and owners can refund or void it: see Refund a sale and Void a sale.
