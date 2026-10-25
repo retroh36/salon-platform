@@ -18,6 +18,7 @@ Record a patch test once it's been done, so color services can go ahead.
 ## Good to know
 
 - Record it after the test is done, not before. A test can't be dated in the future.
+- Stylists record patch tests for their own clients (anyone booked with them); the front desk, managers and owners for anyone.
 - The profile says whether the client's patch test is valid today. Past tests are listed with their result.
 - Which services need a patch test, how long one lasts, and whether a missing one blocks booking are set by the owner (see Set patch test rules).
 - If the salon requires one and it's missing, the client can't be booked or checked in. A manager or owner can check them in anyway with a reason.

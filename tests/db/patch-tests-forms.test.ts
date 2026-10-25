@@ -45,8 +45,11 @@ afterAll(async () => {
 });
 
 describe("patch tests", () => {
-  it("any staff member records one; everyone in the salon sees them, no one else; no edits", async () => {
-    const { error } = await bridget.from("client_patch_tests").insert({ business_id: B, client_id: clientId, tested_at: new Date(Date.now() - 3_600_000).toISOString(), products: "6N + 20 vol", result: "no_reaction", performed_by: SEED.staff.bridget });
+  it("the front desk records one (a stylist only for their own clients); everyone in the salon sees them, no one else; no edits", async () => {
+    const test = { business_id: B, client_id: clientId, tested_at: new Date(Date.now() - 3_600_000).toISOString(), products: "6N + 20 vol", result: "no_reaction" as const, performed_by: SEED.staff.bridget };
+    // Patchy isn't in Bridget's book yet.
+    expect((await bridget.from("client_patch_tests").insert(test)).error?.code).toBe("42501");
+    const { error } = await frontDesk.from("client_patch_tests").insert(test);
     expect(error).toBeNull();
     expect((await frontDesk.from("client_patch_tests").select("id").eq("client_id", clientId)).data).toHaveLength(1);
     expect((await otherOwner.from("client_patch_tests").select("id").eq("client_id", clientId)).data).toHaveLength(0);
