@@ -7,8 +7,9 @@ const PUBLIC_PATHS = ["/login"];
 // and opt-out links, the dev outbox (which shows nothing in production), and
 // scheduled jobs (which check their own secret), and the link in invite and
 // password reset emails (which signs them in), and the shared iPad's PIN
-// screen (which checks the device itself).
-const OPEN_PATHS = ["/book", "/dev/outbox", "/api/cron", "/api/messages/inbound", "/unsubscribe", "/pay", "/card", "/event", "/auth/confirm", "/switch"];
+// screen (which checks the device itself), and error reports from the
+// error page (which log only).
+const OPEN_PATHS = ["/book", "/api/client-error", "/dev/outbox", "/api/cron", "/api/messages/inbound", "/unsubscribe", "/pay", "/card", "/event", "/auth/confirm", "/switch"];
 // Set on a device marked as shared (lib/shared-device.ts).
 const DEVICE_COOKIE = "maestra_device";
 
