@@ -12,8 +12,8 @@ const RULES: PlanRules = {
   ],
   retail: [{ fromCents: 0, pct: 10 }],
   tierPeriod: "month",
+  tierStyle: "marginal",
   backbar: { kind: "fixed", cents: 300 },
-  rent: null,
 };
 const sale = (id: string, at: string, cents: number, tip: number): PayrollSale => ({
   id,

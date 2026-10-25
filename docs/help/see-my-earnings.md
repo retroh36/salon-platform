@@ -18,7 +18,7 @@ Stylists can see what they've earned today, this week and this pay period on My 
 
 ## Good to know
 
-- Commission is on what clients paid before tax, at your rate or plan when each sale was made. Tiers count everything you've sold since they started again.
+- Commission is on what clients paid before tax, at your rate or plan when each sale was made. Tiers count everything you've sold since they started again. On a retroactive plan, reaching a tier lifts everything you've sold that period to the new rate, and the next-tier line says about how much that adds.
 - An estimate is only a guide; the real figure is set at checkout.
 - Refunds come off in the period they happen.
 - Your average tip is your tips as a share of your service sales, untipped visits included.

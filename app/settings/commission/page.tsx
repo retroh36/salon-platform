@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Card, PageHeader } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
-import { MODE_LABELS, NEW_PLAN, parseRules, planInput, planSummary } from "@/lib/commission";
+import { MODE_LABELS, NEW_PLAN, parseRules, planInput, planSummary, tierExample } from "@/lib/commission";
 import { can } from "@/lib/permissions";
 import { fullName } from "@/lib/staff";
 import { SettingsNav } from "../settings-nav";
@@ -52,7 +52,7 @@ async function Commission() {
     <AppShell section="settings" me={me}>
       <PageHeader
         title="Settings"
-        description="How each person is paid: commission (flat or in tiers), hourly or booth rent. Changes apply to sales from then on; past pay never changes."
+        description="How each person is paid: commission (flat or in tiers) or hourly. Changes apply to sales from then on; past pay never changes."
       />
       <SettingsNav current="commission" me={me} />
       {list.map((p) => (
@@ -65,7 +65,12 @@ async function Commission() {
             </>
           }
           titleId={`plan-${p.id}`}
-          description={`${MODE_LABELS[p.rules.mode]} · ${planSummary(p.rules)}`}
+          description={
+            <>
+              {MODE_LABELS[p.rules.mode]} · {planSummary(p.rules)}
+              {tierExample(p.rules) && <span className="block text-xs">For example, {tierExample(p.rules)}</span>}
+            </>
+          }
           actions={<ArchivePlan planId={p.id} name={p.name} />}
           data-testid="commission-plan"
         >
@@ -77,7 +82,7 @@ async function Commission() {
           </details>
         </Card>
       ))}
-      <Card title="Add a plan" titleId="new-plan-heading" description="Tiers pay each dollar at the rate of the tier it falls in, so moving up never costs anyone.">
+      <Card title="Add a plan" titleId="new-plan-heading" description="Tiers can be marginal (each dollar at its tier's rate) or retroactive (reaching a tier pays all the period's sales at its rate).">
         <PlanEditor planId={null} initial={NEW_PLAN} />
       </Card>
       <Card title="Who's on which plan" titleId="team-plans-heading" description="Anyone not on a plan is paid at their own rates, set on Team → Schedule." flush>

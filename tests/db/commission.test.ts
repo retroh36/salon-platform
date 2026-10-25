@@ -58,8 +58,8 @@ const RULES = {
   ],
   retail: [{ from_cents: 0, pct: 15 }],
   tier_period: "month",
+  tier_style: "marginal",
   backbar: { kind: "fixed", value: 300 },
-  rent: null,
 };
 
 beforeAll(async () => {
@@ -85,7 +85,10 @@ describe("who changes plans", () => {
     expect((await save(gil, RULES)).error?.code).toBe("42501");
     expect((await save(owner, { ...RULES, service: [{ from_cents: 100, pct: 40 }] })).error?.code).toBe("22023");
     expect((await save(owner, { ...RULES, service: [{ from_cents: 0, pct: 40 }, { from_cents: 0, pct: 45 }] })).error?.code).toBe("22023");
+    // Booth rent is gone, and every plan says how its tiers pay.
     expect((await save(owner, { ...RULES, mode: "booth_rent" })).error?.code).toBe("22023");
+    expect((await save(owner, { ...RULES, rent: { cents: 35000, per: "week" } })).error?.code).toBe("22023");
+    expect((await save(owner, { ...RULES, tier_style: "cliff" })).error?.code).toBe("22023");
     const { data: id, error } = await save(manager, RULES);
     expect(error).toBeNull();
     // Nobody's on it, so it can go; Senior tiers can't while Gil is on it.
@@ -124,6 +127,16 @@ describe("who changes plans", () => {
   });
 });
 
+describe("booth rent", () => {
+  it("is gone: no booth rent plans, and nobody on one", async () => {
+    const { data } = await admin.from("commission_plan_versions").select("id, rules");
+    expect(data!.filter((v) => (v.rules as { mode: string }).mode === "booth_rent")).toEqual([]);
+    expect(data!.every((v) => !("rent" in (v.rules as object)))).toBe(true);
+    const { data: plans } = await admin.from("commission_plans").select("name");
+    expect(plans!.map((p) => p.name)).not.toContain("Booth rent");
+  });
+});
+
 describe("tiers on real sales", () => {
   it("records the plan version on each line", async () => {
     const { data } = await admin.from("sale_items").select("commission_version_id, commission_pct").in("sale_id", made);
@@ -143,10 +156,23 @@ describe("tiers on real sales", () => {
     expect(own.totalCents).toBe(pay.totalCents);
   });
 
-  it("never changes past pay when the plan changes", async () => {
+  it("never changes past pay when the plan changes, rates or tier style", async () => {
     const before = (await loadPayroll(owner, B, TZ, PERIOD, today, GIL))[0].totalCents;
-    expect((await owner.rpc("save_commission_plan", { p_business_id: B, p_plan_id: TIERS, p_name: "Senior tiers", p_rules: { ...RULES, service: [{ from_cents: 0, pct: 60 }] } as never, p_default: false })).error).toBeNull();
-    expect((await loadPayroll(owner, B, TZ, PERIOD, today, GIL))[0].totalCents).toBe(before);
+    for (const rules of [{ ...RULES, service: [{ from_cents: 0, pct: 60 }] }, { ...RULES, tier_style: "retroactive" }]) {
+      expect((await owner.rpc("save_commission_plan", { p_business_id: B, p_plan_id: TIERS, p_name: "Senior tiers", p_rules: rules as never, p_default: false })).error).toBeNull();
+      expect((await loadPayroll(owner, B, TZ, PERIOD, today, GIL))[0].totalCents).toBe(before);
+    }
+  });
+
+  it("retroactive: the cut that crosses $4,000 also lifts the month's color to 45%", async () => {
+    // The plan is retroactive now (above); June 2020 is sold under it.
+    await sell("2020-06-03T16:00:00Z", 390_000, 0);
+    await sell("2020-06-12T16:00:00Z", 20_000, 0);
+    const [pay] = await loadPayroll(owner, B, TZ, { from: "2020-06-10", to: "2020-06-20" }, today, GIL);
+    // $200 at 45% plus 5 points on the $3,900, on what's left after the $3 fee.
+    expect(pay.serviceCommissionCents).toBe(Math.round((9_000 + 19_500) * (19_700 / 20_000)));
+    // May, sold under the marginal version, still pays as it did.
+    expect((await loadPayroll(owner, B, TZ, PERIOD, today, GIL))[0].serviceCommissionCents).toBe(Math.round(8_500 * (19_700 / 20_000)));
   });
 });
 

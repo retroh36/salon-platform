@@ -20,4 +20,4 @@ Set the service and retail commission and the hourly rate for a team member.
 - Hourly pay uses the rate in effect on each day, so a raise mid-period is split correctly.
 - Payroll shows the rates used, for example "45%, 50%" after a change.
 - Team members can see their own rates on the same page, but can't change them.
-- For tiers, a back-bar fee or booth rent, put the person on a plan on Settings → Commission. Their own rates then apply only if they come off the plan; the hourly rate always applies.
+- For tiers or a back-bar fee, put the person on a plan on Settings → Commission. Their own rates then apply only if they come off the plan; the hourly rate always applies.

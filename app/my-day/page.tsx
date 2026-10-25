@@ -173,7 +173,6 @@ async function MyEarnings({ supabase, me, last }: { supabase: Awaited<ReturnType
     ["Retail commission", pay.retailCommissionCents, ratesText(pay.rates.retail, (v) => `${v}%`) || undefined],
     ...(pay.feeCents !== 0 ? ([["Back-bar fees (taken off services first)", -pay.feeCents]] as [string, number][]) : []),
     ["Tips", pay.tipCents],
-    ...(pay.rentCents !== 0 ? ([["Booth rent", -pay.rentCents]] as [string, number][]) : []),
     ...(pay.minutes !== null ? ([["Hourly pay", pay.hourlyPayCents, ratesText(pay.rates.hourly, (c) => `${formatPrice(c)}/h`)]] as [string, number, string][]) : []),
   ];
   return (

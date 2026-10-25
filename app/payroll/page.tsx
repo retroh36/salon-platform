@@ -155,7 +155,6 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
                   </td>
                   <td className="py-2 pr-5 text-right font-semibold" data-testid="pay-total">
                     {formatPrice(l.totalCents)}
-                    {l.rentCents !== 0 && <span className="block text-xs font-normal text-ink-muted">after {formatPrice(l.rentCents)} booth rent</span>}
                   </td>
                 </tr>
               ))}

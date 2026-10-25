@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { Alert, listClass } from "@/components/ui/page";
-import { MODE_LABELS, type PayMode, type PlanInput } from "@/lib/commission";
+import { MODE_LABELS, parsePlanInput, STYLE_LABELS, tierExample, type PayMode, type PlanInput, type TierStyle } from "@/lib/commission";
 import { archiveCommissionPlan, saveCommissionPlan, setStaffPlan, type PlanResult } from "./actions";
 
 type Rows = PlanInput["service"];
@@ -49,7 +49,10 @@ export function PlanEditor({ planId, initial }: { planId: string | null; initial
   const [p, setP] = useState(initial);
   const [result, setResult] = useState<PlanResult | null>(null);
   const [pending, start] = useTransition();
-  const tiered = p.service.length > 1 || p.retail.length > 1;
+  const tiered = (p.mode === "commission" && p.service.length > 1) || p.retail.length > 1;
+  // The preview, from the same calculation payroll uses (once the form reads).
+  const parsed = parsePlanInput(p.name.trim() ? p : { ...p, name: "Preview" });
+  const example = parsed.ok ? tierExample(parsed.rules) : null;
   return (
     <form
       aria-label={planId ? `Edit ${initial.name}` : "New plan"}
@@ -80,34 +83,33 @@ export function PlanEditor({ planId, initial }: { planId: string | null; initial
         </label>
       </div>
       {p.mode === "hourly" && <p className="text-sm text-ink-muted">Paid by the hour at each person&rsquo;s own rate (Team → Schedule), plus retail commission.</p>}
-      {p.mode === "booth_rent" && (
-        <>
-          <p className="text-sm text-ink-muted">Booth renters keep what their services and retail bring in (less any back-bar fee) and owe rent, taken off their pay.</p>
-          <div className="flex flex-wrap gap-4">
-            <label className={labelClass}>
-              Rent ($)
-              <input value={p.rentAmount} onChange={(e) => setP({ ...p, rentAmount: e.target.value })} inputMode="decimal" className={`${fieldClass} w-32!`} />
-            </label>
-            <label className={labelClass}>
-              Due
-              <select value={p.rentPer} onChange={(e) => setP({ ...p, rentPer: e.target.value as "week" | "month" })} className={`${selectClass} w-36!`}>
-                <option value="week">Every week</option>
-                <option value="month">Every month</option>
-              </select>
-            </label>
-          </div>
-        </>
-      )}
       {p.mode === "commission" && <TierRows label="Services" rows={p.service} onChange={(service) => setP({ ...p, service })} />}
-      {p.mode !== "booth_rent" && <TierRows label="Retail" rows={p.retail} onChange={(retail) => setP({ ...p, retail })} />}
-      {p.mode !== "booth_rent" && tiered && (
-        <label className={labelClass}>
-          Tiers start again
-          <select value={p.tierPeriod} onChange={(e) => setP({ ...p, tierPeriod: e.target.value as PlanInput["tierPeriod"] })} className={`${selectClass} w-48!`}>
-            <option value="pay_period">Each pay period</option>
-            <option value="month">Each month</option>
-          </select>
-        </label>
+      <TierRows label="Retail" rows={p.retail} onChange={(retail) => setP({ ...p, retail })} />
+      {tiered && (
+        <div className="flex flex-wrap items-end gap-4">
+          <label className={labelClass}>
+            How tiers pay
+            <select value={p.tierStyle} onChange={(e) => setP({ ...p, tierStyle: e.target.value as TierStyle })} className={`${selectClass} w-96!`}>
+              {(Object.keys(STYLE_LABELS) as TierStyle[]).map((k) => (
+                <option key={k} value={k}>
+                  {STYLE_LABELS[k]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={labelClass}>
+            Tiers start again
+            <select value={p.tierPeriod} onChange={(e) => setP({ ...p, tierPeriod: e.target.value as PlanInput["tierPeriod"] })} className={`${selectClass} w-48!`}>
+              <option value="pay_period">Each pay period</option>
+              <option value="month">Each month</option>
+            </select>
+          </label>
+        </div>
+      )}
+      {example && (
+        <p className="text-sm text-ink-muted" data-testid="tier-example">
+          For example, {example}
+        </p>
       )}
       {p.mode !== "hourly" && (
         <div className="flex flex-wrap items-end gap-4">

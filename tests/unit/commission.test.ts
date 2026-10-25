@@ -5,7 +5,7 @@ import {
   parseRules,
   payLines,
   planSummary,
-  rentFor,
+  tierExample,
   rulesJson,
   tierAt,
   tieredCommission,
@@ -24,8 +24,8 @@ const plan = (over: Partial<PlanRules> = {}): PlanRules => ({
   service: TIERS,
   retail: [{ fromCents: 0, pct: 10 }],
   tierPeriod: "month",
+  tierStyle: "marginal",
   backbar: { kind: "none" },
-  rent: null,
   ...over,
 });
 const line = (at: string, cents: number, over: Partial<PayInput> = {}): PayInput => ({ at, kind: "service", cents, soldCents: cents, quantity: 1, pct: 0, versionId: "v1", ...over });
@@ -72,6 +72,34 @@ describe("tiers", () => {
   });
 });
 
+describe("retroactive tiers", () => {
+  const retro = plan({ tierStyle: "retroactive" });
+
+  it("pays the window's sales at the tier reached, so the crossing sale lifts the earlier ones", () => {
+    expect(tieredCommission(TIERS, 390_000, "retroactive")).toBe(156_000);
+    expect(tieredCommission(TIERS, 410_000, "retroactive")).toBe(184_500);
+    const [a, b] = payLines([line("2026-10-02", 390_000), line("2026-10-03", 20_000)], () => retro, byMonth);
+    expect(a.commissionCents).toBe(156_000);
+    // The $200 at 45%, plus 5 points more on the $3,900 already sold.
+    expect(b.commissionCents).toBe(9_000 + 19_500);
+    // Marginal pays the same $200 sale only $85.
+    expect(payLines([line("2026-10-02", 390_000), line("2026-10-03", 20_000)], () => plan(), byMonth)[1].commissionCents).toBe(8_500);
+  });
+
+  it("takes the lift back when a refund drops them below the tier", () => {
+    const [, , refund] = payLines([line("2026-10-02", 390_000), line("2026-10-03", 20_000), line("2026-10-05", -20_000)], () => retro, byMonth);
+    expect(refund.commissionCents).toBe(-(9_000 + 19_500));
+  });
+
+  it("says what reaching the next tier is worth, in each style", () => {
+    expect(nextTierText("service", retro, 358_800)).toBe("You're $412 from 45% on services (this month), which lifts everything this month to 45%: about $180 more.");
+    expect(nextTierText("service", plan(), 358_800)).toBe("You're $412 from 45% on services (this month).");
+    expect(tierExample(plan())).toBe("$5,000 in services in a month pays $2,050 before back-bar fees.");
+    expect(tierExample(retro)).toBe("$5,000 in services in a month pays $2,250 before back-bar fees.");
+    expect(tierExample(plan({ service: [{ fromCents: 0, pct: 40 }] }))).toBeNull();
+  });
+});
+
 describe("deductions and modes", () => {
   it("takes the back-bar fee off a service before commission", () => {
     expect(backbarFee({ kind: "fixed", cents: 300 }, 10_000, 1)).toBe(300);
@@ -88,26 +116,20 @@ describe("deductions and modes", () => {
     expect(refund).toMatchObject({ feeCents: -150, commissionCents: -1_940 });
   });
 
-  it("hourly pays no service commission; booth renters keep their sales less the fee", () => {
+  it("hourly pays no service commission, but does pay retail", () => {
     expect(payLines([line("2026-10-02", 10_000)], () => plan({ mode: "hourly" }), byMonth)[0]).toMatchObject({ feeCents: 0, commissionCents: 0 });
     expect(payLines([line("2026-10-02", 5_000, { kind: "product" })], () => plan({ mode: "hourly" }), byMonth)[0].commissionCents).toBe(500);
-    const booth = plan({ mode: "booth_rent", rent: { cents: 60_000, per: "week" }, backbar: { kind: "percent", pct: 5 } });
-    expect(payLines([line("2026-10-02", 10_000)], () => booth, byMonth)[0]).toMatchObject({ feeCents: 500, commissionCents: 9_500 });
-  });
-
-  it("works out rent by the day", () => {
-    expect(rentFor(["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09", "2026-10-10", "2026-10-11"], () => ({ cents: 70_000, per: "week" }))).toBeCloseTo(70_000);
-    // A month's rent over its own days: all of February, then a day of March.
-    const feb = Array.from({ length: 28 }, (_, i) => `2026-02-${String(i + 1).padStart(2, "0")}`);
-    expect(rentFor([...feb, "2026-03-01"], () => ({ cents: 155_000, per: "month" }))).toBeCloseTo(155_000 + 5_000);
-    expect(rentFor(feb, () => null)).toBe(0);
   });
 
   it("reads and writes the stored shape, and describes a plan", () => {
     const rules = plan({ backbar: { kind: "fixed", cents: 300 } });
     expect(parseRules(JSON.parse(JSON.stringify(rulesJson(rules))))).toEqual(rules);
-    expect(planSummary(rules)).toBe("Services 40% to $4,000, 45% to $8,000, then 50%; retail 10%, $3 back-bar fee per service; tiers start again each month");
-    expect(planSummary(plan({ mode: "booth_rent", rent: { cents: 120_000, per: "month" } }))).toBe("Booth rent: $1,200 a month; keeps their sales");
+    expect(planSummary(rules)).toBe("Services 40% to $4,000, 45% to $8,000, then 50%; retail 10%, $3 back-bar fee per service; each dollar at its tier's rate, starting again each month");
+    expect(planSummary(plan({ tierStyle: "retroactive", tierPeriod: "pay_period" }))).toBe(
+      "Services 40% to $4,000, 45% to $8,000, then 50%; retail 10%; reaching a tier pays all of the pay period's sales at its rate, starting again each pay period",
+    );
+    // Old versions saved before tier styles were marginal.
+    expect(parseRules({ ...rulesJson(rules), tier_style: undefined }).tierStyle).toBe("marginal");
   });
 });
 
@@ -128,7 +150,7 @@ describe("payroll pays plan lines the same way", () => {
   const periodOf = (d: string) => periodContaining("semi_monthly", "2026-01-05", d);
   const dayOf = (iso: string) => iso.slice(0, 10);
 
-  it("counts the month's earlier sales toward the tiers, and takes off fees and rent", () => {
+  it("counts the month's earlier sales toward the tiers, and takes off fees", () => {
     const sales = [sale("s1", "2026-10-10T15:00:00Z", 390_000), sale("s2", "2026-10-20T15:00:00Z", 20_000)];
     const period = { from: "2026-10-16", to: "2026-10-31" };
     const earliest = windowsFrom(period, periodOf);
@@ -146,10 +168,5 @@ describe("payroll pays plan lines the same way", () => {
     expect(pay.tickets[0].lines[0].pay).toMatchObject({ feeCents: 300, pct: 42.5 });
   });
 
-  it("charges booth rent for the days they rented", () => {
-    const booth: PlanVersion[] = [{ id: "v2", planId: "p2", name: "Booth", rules: plan({ mode: "booth_rent", rent: { cents: 70_000, per: "week" } }), createdAt: "2026-01-01T00:00:00Z" }];
-    const context = planContext({ versions: booth, dayOf, periodOf, rentDays: ["2026-10-01", "2026-10-02", "2026-10-03"], planOn: (d) => (d >= "2026-10-02" ? "p2" : null) });
-    const pay = payLine({ staffId: A, name: "Ana", role: "Stylist" }, [], null, context);
-    expect(pay).toMatchObject({ rentCents: 20_000, totalCents: -20_000 });
-  });
+
 });

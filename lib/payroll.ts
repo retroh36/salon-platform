@@ -10,10 +10,10 @@
 // lines, ex tax and after discounts, at the rate recorded on each line when
 // the sale was made (a refund or void takes back at the same rate), or by
 // the plan version it was sold under (./commission.ts: tiers, back-bar
-// fees, booth rent); hourly pay at the rate in effect each day. Changing a
+// fees, marginal or retroactive tiers); hourly pay at the rate in effect each day. Changing a
 // rate or a plan never changes past pay.
 
-import { monthStart, payLines, rentFor, type Basis, type LinePay, type PayInput, type PlanRules } from "./commission.ts";
+import { monthStart, payLines, type Basis, type LinePay, type PayInput, type PlanRules } from "./commission.ts";
 import { csvTable, dollars } from "./csv.ts";
 import { averageTipPct } from "./tips.ts";
 import { mergeIntervals, subtractIntervals } from "./scheduling/intervals.ts";
@@ -236,19 +236,16 @@ export type PayLine = {
   // Scheduled minutes, for people paid by the hour (else null).
   minutes: number | null;
   hourlyPayCents: number;
-  // Booth rent owed for the period (taken off their pay).
-  rentCents: number;
   totalCents: number;
   tickets: Ticket[];
 };
 
-// How plan lines are paid (./commission.ts payLines), and booth rent owed.
+// How plan lines are paid (./commission.ts payLines).
 export type PlanContext = {
   rulesFor: Parameters<typeof payLines>[1];
   windowOf: Parameters<typeof payLines>[2];
   prior?: Parameters<typeof payLines>[3];
   planName?: (versionId: string) => string | null;
-  rentCents?: number;
 };
 
 // A saved plan version (commission_rules).
@@ -269,16 +266,12 @@ export function windowsFrom(period: PayPeriod, periodOf: (date: LocalDate) => Pa
 
 // How someone's plan lines are paid in a period: by their version's rules,
 // with what already counted toward each tier window (`before`: their
-// tickets from the earliest window's start to the period's), and booth
-// rent for `rentDays` from the plan they were on each day (`planOn`), at
-// that plan's rules then.
+// tickets from the earliest window's start to the period's).
 export function planContext(opts: {
   versions: readonly PlanVersion[];
   dayOf: (iso: string) => LocalDate;
   periodOf: (date: LocalDate) => PayPeriod;
   before?: readonly Ticket[];
-  rentDays?: readonly LocalDate[];
-  planOn?: (date: LocalDate) => string | null;
 }): PlanContext {
   const byId = new Map(opts.versions.map((v) => [v.id, v]));
   const rulesFor = (id: string) => byId.get(id)?.rules ?? null;
@@ -294,25 +287,11 @@ export function planContext(opts: {
       prior.set(w, b);
     }
   }
-  const versionOn = (planId: string, date: LocalDate) => {
-    const of = opts.versions.filter((v) => v.planId === planId);
-    return [...of].reverse().find((v) => opts.dayOf(v.createdAt) <= date) ?? of[0] ?? null;
-  };
-  const rentCents = opts.rentDays && opts.planOn
-    ? Math.round(
-        rentFor(opts.rentDays, (date) => {
-          const plan = opts.planOn!(date);
-          const v = plan ? versionOn(plan, date) : null;
-          return v && v.rules.mode === "booth_rent" ? v.rules.rent : null;
-        }),
-      )
-    : 0;
   return {
     rulesFor,
     windowOf,
     prior: (w) => ({ ...(prior.get(w) ?? { service: 0, product: 0 }) }),
     planName: (id) => byId.get(id)?.name ?? null,
-    rentCents,
   };
 }
 
@@ -336,7 +315,6 @@ export function payLine(person: { staffId: string; name: string; role: string },
   const retailCommissionCents = Math.round(of("product").reduce((n, l) => n + l.pay!.commissionCents, 0));
   const feeCents = Math.round(lines.reduce((n, l) => n + l.pay!.feeCents, 0));
   const hourly = hours?.payCents ?? 0;
-  const rent = plans.rentCents ?? 0;
   const planNames = [...new Set(lines.map((l) => (l.versionId ? (plans.planName?.(l.versionId) ?? null) : null)).filter((x): x is string => x !== null))];
   return {
     ...person,
@@ -349,8 +327,7 @@ export function payLine(person: { staffId: string; name: string; role: string },
     tipCents,
     minutes: hours?.minutes ?? null,
     hourlyPayCents: hourly,
-    rentCents: rent,
-    totalCents: serviceCommissionCents + retailCommissionCents + tipCents + hourly - rent,
+    totalCents: serviceCommissionCents + retailCommissionCents + tipCents + hourly,
     tickets: priced,
   };
 }
@@ -379,7 +356,6 @@ export function payrollCsv(lines: readonly PayLine[], period: PayPeriod): string
     "Hourly rate",
     "Hourly pay",
     "Back-bar fees",
-    "Booth rent",
     "Plan",
     "Total pay",
   ];
@@ -400,7 +376,6 @@ export function payrollCsv(lines: readonly PayLine[], period: PayPeriod): string
     l.rates.hourly.map(dollars).join("/"),
     dollars(l.hourlyPayCents),
     dollars(l.feeCents),
-    dollars(l.rentCents),
     l.rates.plans.join("/"),
     dollars(l.totalCents),
   ]);
