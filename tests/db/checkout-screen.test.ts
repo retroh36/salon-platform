@@ -193,3 +193,24 @@ describe("rebooking at checkout", () => {
     expect((await admin.from("sales").select("rebook_appointment_id").eq("id", saleId!).single()).data!.rebook_appointment_id).toBe(next.appointmentId);
   });
 });
+
+describe("best sellers for the quick-add tiles", () => {
+  const since = new Date(Date.now() - 90 * 86_400_000).toISOString();
+
+  it("come from the last 90 days of sales for the front desk, though it can only read today's sales itself", async () => {
+    const { data: all } = await admin.from("sale_items").select("product_id, sale:sales!inner(status, created_at, location_id)").eq("kind", "product").eq("sale.location_id", L).neq("sale.status", "voided").gte("sale.created_at", since);
+    const expected = new Set(all!.flatMap((r) => (r.product_id ? [r.product_id] : [])));
+    expect(expected.size).toBeGreaterThan(3);
+    const { data, error } = await frontDesk.rpc("best_sellers", { p_location_id: L, p_since: since });
+    expect(error).toBeNull();
+    expect(new Set(data!.map((r) => r.product_id))).toEqual(expected);
+    // The demo's sales are on earlier days, which the desk can't read.
+    const { data: own } = await frontDesk.from("sale_items").select("product_id, sale:sales!inner(created_at)").eq("kind", "product").lt("sale.created_at", new Date(Date.now() - 2 * 86_400_000).toISOString());
+    expect(own).toHaveLength(0);
+  });
+
+  it("are for the front of house of that salon only", async () => {
+    expect((await stylist.rpc("best_sellers", { p_location_id: L, p_since: since })).data).toEqual([]);
+    expect((await otherOwner.rpc("best_sellers", { p_location_id: L, p_since: since })).data).toEqual([]);
+  });
+});

@@ -3766,6 +3766,11 @@ isOneToOne: false
 "attach_online_promotion":
 { Args: { "p_appointment_id": string,"p_promotion_id": string }; Returns: undefined
                            },
+"best_sellers":
+{ Args: { "p_location_id": string,"p_since": string }; Returns: {
+              "product_id": string,"quantity": number,"staff_id": string
+            }[]
+                           },
 "cancel_membership":
 { Args: { "p_membership_id": string,"p_now": boolean,"p_reason": string }; Returns: string
                            },

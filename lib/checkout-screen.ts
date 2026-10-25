@@ -203,7 +203,9 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
 
   // Best sellers (last 90 days), and the visit stylist's favorites.
   const since = startOfLocalDay(addDays(today, -90), tz).toISOString();
-  const { data: sold } = await supabase.from("sale_items").select("product_id, quantity, staff_id, sale:sales!inner(status, created_at)").eq("kind", "product").neq("sale.status", "voided").gte("sale.created_at", since);
+  // From best_sellers: the front desk can't read past sales themselves.
+  const { data: sold, error: soldError } = await supabase.rpc("best_sellers", { p_location_id: me.location.id, p_since: since });
+  if (soldError) throw soldError;
   const rank = (rows: { product_id: string | null; quantity: number }[]) => {
     const totals = new Map<string, number>();
     for (const r of rows) if (r.product_id) totals.set(r.product_id, (totals.get(r.product_id) ?? 0) + r.quantity);
