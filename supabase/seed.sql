@@ -492,6 +492,25 @@ insert into public.staff_compensation (staff_id, business_id, hourly_rate_cents)
   ('d0000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 1800),
   ('d0000000-0000-4000-8000-000000000011', 'b0000000-0000-4000-8000-000000000001', 1600);
 
+-- Commission plans (Settings → Commission): Gil is on tiers that start
+-- again each month, with a back-bar fee; the booth rent plan is ready for
+-- a renter. Everyone else stays on their own rates above.
+insert into public.commission_plans (id, business_id, name) values
+  ('e1000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'Senior tiers'),
+  ('e1000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'Booth rent');
+insert into public.commission_plan_versions (id, business_id, plan_id, rules, created_at) values
+  ('e2000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'e1000000-0000-4000-8000-000000000001',
+   '{"mode": "commission", "service": [{"from_cents": 0, "pct": 40}, {"from_cents": 400000, "pct": 45}, {"from_cents": 800000, "pct": 50}],
+     "retail": [{"from_cents": 0, "pct": 15}], "tier_period": "month", "backbar": {"kind": "fixed", "value": 300}, "rent": null}', now() - interval '2 years'),
+  ('e2000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'e1000000-0000-4000-8000-000000000002',
+   '{"mode": "booth_rent", "service": [{"from_cents": 0, "pct": 0}], "retail": [{"from_cents": 0, "pct": 0}], "tier_period": "pay_period",
+     "backbar": {"kind": "none"}, "rent": {"cents": 35000, "per": "week"}}', now() - interval '2 years');
+update public.commission_plans set current_version_id = ('e2' || substr(id::text, 3))::uuid where business_id = 'b0000000-0000-4000-8000-000000000001';
+update public.staff_compensation set plan_id = 'e1000000-0000-4000-8000-000000000001' where staff_id = 'd0000000-0000-4000-8000-000000000005';
+-- On it from the start, like everyone's first rates.
+delete from public.staff_compensation_history where staff_id = 'd0000000-0000-4000-8000-000000000005' and effective_from <> '-infinity';
+update public.staff_compensation_history set plan_id = 'e1000000-0000-4000-8000-000000000001' where staff_id = 'd0000000-0000-4000-8000-000000000005';
+
 -- Demo PINs for the shared iPad (see the top of this file).
 insert into public.staff_pins (staff_id, business_id, pin_hash)
 select p.staff_id, 'b0000000-0000-4000-8000-000000000001', extensions.crypt(p.pin, extensions.gen_salt('bf', 8))

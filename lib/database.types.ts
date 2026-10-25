@@ -767,6 +767,64 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"commission_plan_versions": {
+                  Row: {
+                    "business_id": string,"created_at": string,"created_by": string | null,"id": string,"plan_id": string,"rules": NonNullable<Json>
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"plan_id": string,"rules": NonNullable<Json>
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"plan_id"?: string,"rules"?: NonNullable<Json>
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "commission_plan_versions_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "commission_plan_versions_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "commission_plan_versions_plan_id_business_id_fkey"
+      columns: ["plan_id","business_id"]
+isOneToOne: false
+      referencedRelation: "commission_plans"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"commission_plans": {
+                  Row: {
+                    "archived_at": string | null,"business_id": string,"created_at": string,"current_version_id": string | null,"id": string,"is_default": boolean,"name": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "archived_at"?: string | null,"business_id": string,"created_at"?: string,"current_version_id"?: string | null,"id"?: string,"is_default"?: boolean,"name": string
+                  }
+                  Update: {
+                    "archived_at"?: string | null,"business_id"?: string,"created_at"?: string,"current_version_id"?: string | null,"id"?: string,"is_default"?: boolean,"name"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "commission_plans_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "commission_plans_current_version_id_fkey"
+      columns: ["current_version_id"]
+isOneToOne: false
+      referencedRelation: "commission_plan_versions"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"data_exports": {
                   Row: {
                     "business_id": string,"bytes": number,"created_at": string,"id": string,"row_counts": NonNullable<Json>,"staff_id": string | null
@@ -2017,14 +2075,14 @@ isOneToOne: false
                   ]
                 },"sale_items": {
                   Row: {
-                    "appointment_item_id": string | null,"booked_price_cents": number | null,"business_id": string,"client_package_id": string | null,"commission_pct": number | null,"description": string,"discount_cents": number,"gift_card_id": string | null,"id": string,"kind": Database["public"]['Enums']["sale_item_kind"],"line_discount_cents": number,"line_discount_reason": string | null,"member_discount_cents": number,"membership_credit_id": string | null,"membership_id": string | null,"package_item_id": string | null,"position": number,"price_reason": string | null,"product_id": string | null,"quantity": number,"returned_quantity": number,"sale_id": string,"service_id": string | null,"staff_id": string | null,"tax_cents": number,"total_cents": number,"unit_price_cents": number
+                    "appointment_item_id": string | null,"booked_price_cents": number | null,"business_id": string,"client_package_id": string | null,"commission_pct": number | null,"commission_version_id": string | null,"description": string,"discount_cents": number,"gift_card_id": string | null,"id": string,"kind": Database["public"]['Enums']["sale_item_kind"],"line_discount_cents": number,"line_discount_reason": string | null,"member_discount_cents": number,"membership_credit_id": string | null,"membership_id": string | null,"package_item_id": string | null,"position": number,"price_reason": string | null,"product_id": string | null,"quantity": number,"returned_quantity": number,"sale_id": string,"service_id": string | null,"staff_id": string | null,"tax_cents": number,"total_cents": number,"unit_price_cents": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id": string,"client_package_id"?: string | null,"commission_pct"?: number | null,"description": string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["sale_item_kind"],"line_discount_cents"?: number,"line_discount_reason"?: string | null,"member_discount_cents"?: number,"membership_credit_id"?: string | null,"membership_id"?: string | null,"package_item_id"?: string | null,"position": number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id": string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents": number,"unit_price_cents": number
+                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id": string,"client_package_id"?: string | null,"commission_pct"?: number | null,"commission_version_id"?: string | null,"description": string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["sale_item_kind"],"line_discount_cents"?: number,"line_discount_reason"?: string | null,"member_discount_cents"?: number,"membership_credit_id"?: string | null,"membership_id"?: string | null,"package_item_id"?: string | null,"position": number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id": string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents": number,"unit_price_cents": number
                   }
                   Update: {
-                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id"?: string,"client_package_id"?: string | null,"commission_pct"?: number | null,"description"?: string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["sale_item_kind"],"line_discount_cents"?: number,"line_discount_reason"?: string | null,"member_discount_cents"?: number,"membership_credit_id"?: string | null,"membership_id"?: string | null,"package_item_id"?: string | null,"position"?: number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id"?: string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents"?: number,"unit_price_cents"?: number
+                    "appointment_item_id"?: string | null,"booked_price_cents"?: number | null,"business_id"?: string,"client_package_id"?: string | null,"commission_pct"?: number | null,"commission_version_id"?: string | null,"description"?: string,"discount_cents"?: number,"gift_card_id"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["sale_item_kind"],"line_discount_cents"?: number,"line_discount_reason"?: string | null,"member_discount_cents"?: number,"membership_credit_id"?: string | null,"membership_id"?: string | null,"package_item_id"?: string | null,"position"?: number,"price_reason"?: string | null,"product_id"?: string | null,"quantity"?: number,"returned_quantity"?: number,"sale_id"?: string,"service_id"?: string | null,"staff_id"?: string | null,"tax_cents"?: number,"total_cents"?: number,"unit_price_cents"?: number
                   }
                   Relationships: [
                     {
@@ -2038,6 +2096,12 @@ isOneToOne: false
       columns: ["client_package_id"]
 isOneToOne: false
       referencedRelation: "client_packages"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "sale_items_commission_version_id_fkey"
+      columns: ["commission_version_id"]
+isOneToOne: false
+      referencedRelation: "commission_plan_versions"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "sale_items_gift_card_id_fkey"
@@ -2383,17 +2447,23 @@ isOneToOne: false
                   ]
                 },"staff_compensation": {
                   Row: {
-                    "business_id": string,"hourly_rate_cents": number | null,"retail_commission_pct": number,"service_commission_pct": number,"staff_id": string,"updated_at": string
+                    "business_id": string,"hourly_rate_cents": number | null,"plan_id": string | null,"retail_commission_pct": number,"service_commission_pct": number,"staff_id": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"hourly_rate_cents"?: number | null,"retail_commission_pct"?: number,"service_commission_pct"?: number,"staff_id": string,"updated_at"?: string
+                    "business_id": string,"hourly_rate_cents"?: number | null,"plan_id"?: string | null,"retail_commission_pct"?: number,"service_commission_pct"?: number,"staff_id": string,"updated_at"?: string
                   }
                   Update: {
-                    "business_id"?: string,"hourly_rate_cents"?: number | null,"retail_commission_pct"?: number,"service_commission_pct"?: number,"staff_id"?: string,"updated_at"?: string
+                    "business_id"?: string,"hourly_rate_cents"?: number | null,"plan_id"?: string | null,"retail_commission_pct"?: number,"service_commission_pct"?: number,"staff_id"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
+      foreignKeyName: "staff_compensation_plan_id_fkey"
+      columns: ["plan_id"]
+isOneToOne: false
+      referencedRelation: "commission_plans"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "staff_compensation_staff_id_business_id_fkey"
       columns: ["staff_id","business_id"]
 isOneToOne: false
@@ -2403,14 +2473,14 @@ isOneToOne: false
                   ]
                 },"staff_compensation_history": {
                   Row: {
-                    "business_id": string,"changed_by": string | null,"created_at": string,"effective_from": string,"hourly_rate_cents": number | null,"id": string,"retail_commission_pct": number,"service_commission_pct": number,"staff_id": string
+                    "business_id": string,"changed_by": string | null,"created_at": string,"effective_from": string,"hourly_rate_cents": number | null,"id": string,"plan_id": string | null,"retail_commission_pct": number,"service_commission_pct": number,"staff_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"changed_by"?: string | null,"created_at"?: string,"effective_from": string,"hourly_rate_cents"?: number | null,"id"?: string,"retail_commission_pct": number,"service_commission_pct": number,"staff_id": string
+                    "business_id": string,"changed_by"?: string | null,"created_at"?: string,"effective_from": string,"hourly_rate_cents"?: number | null,"id"?: string,"plan_id"?: string | null,"retail_commission_pct": number,"service_commission_pct": number,"staff_id": string
                   }
                   Update: {
-                    "business_id"?: string,"changed_by"?: string | null,"created_at"?: string,"effective_from"?: string,"hourly_rate_cents"?: number | null,"id"?: string,"retail_commission_pct"?: number,"service_commission_pct"?: number,"staff_id"?: string
+                    "business_id"?: string,"changed_by"?: string | null,"created_at"?: string,"effective_from"?: string,"hourly_rate_cents"?: number | null,"id"?: string,"plan_id"?: string | null,"retail_commission_pct"?: number,"service_commission_pct"?: number,"staff_id"?: string
                   }
                   Relationships: [
                     {
@@ -2424,6 +2494,12 @@ isOneToOne: false
       columns: ["changed_by"]
 isOneToOne: false
       referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "staff_compensation_history_plan_id_fkey"
+      columns: ["plan_id"]
+isOneToOne: false
+      referencedRelation: "commission_plans"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "staff_compensation_history_staff_id_fkey"
@@ -3118,6 +3194,9 @@ isOneToOne: false
 "approve_stock_override":
 { Args: { "p_draft_id": string,"p_product_id": string }; Returns: undefined
                            },
+"archive_commission_plan":
+{ Args: { "p_plan_id": string }; Returns: undefined
+                           },
 "cancel_membership":
 { Args: { "p_membership_id": string,"p_now": boolean,"p_reason": string }; Returns: string
                            },
@@ -3152,6 +3231,9 @@ isOneToOne: false
                            },
 "client_policy_standing":
 { Args: { "p_client_id": string }; Returns: Json
+                           },
+"commission_rules":
+{ Args: { "p_business_id": string,"p_staff_id"?: string }; Returns: Json
                            },
 "complete_card_request":
 { Args: { "p_card": Json,"p_consent": Json,"p_deposit": Json,"p_request_id": string }; Returns: undefined
@@ -3318,6 +3400,9 @@ isOneToOne: false
 "save_closeout":
 { Args: { "p_counted_cents": number,"p_day": string,"p_float_cents"?: number,"p_location_id": string,"p_note": string }; Returns: number
                            },
+"save_commission_plan":
+{ Args: { "p_business_id": string,"p_default": boolean,"p_name": string,"p_plan_id": string,"p_rules": Json }; Returns: string
+                           },
 "save_membership_plan":
 { Args: { "p_business_id": string,"p_input": Json,"p_plan_id": string }; Returns: string
                            },
@@ -3410,6 +3495,9 @@ isOneToOne: false
                            },
 "set_staff_active":
 { Args: { "p_active": boolean,"p_staff_id": string }; Returns: undefined
+                           },
+"set_staff_commission_plan":
+{ Args: { "p_plan_id": string,"p_staff_id": string }; Returns: undefined
                            },
 "set_staff_day_override":
 { Args: { "p_business_id": string,"p_hours": Json,"p_on_date": string,"p_staff_id": string }; Returns: undefined

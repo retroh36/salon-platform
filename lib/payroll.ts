@@ -8,10 +8,12 @@
 // paid in one period and refunded in the next is paid, then clawed back,
 // and nothing is ever paid twice. Commission is worked out on the period's
 // lines, ex tax and after discounts, at the rate recorded on each line when
-// the sale was made (a refund or void takes back at the same rate); hourly
-// pay at the rate in effect each day. Changing a rate never changes past
-// pay.
+// the sale was made (a refund or void takes back at the same rate), or by
+// the plan version it was sold under (./commission.ts: tiers, back-bar
+// fees, booth rent); hourly pay at the rate in effect each day. Changing a
+// rate or a plan never changes past pay.
 
+import { monthStart, payLines, rentFor, type Basis, type LinePay, type PayInput, type PlanRules } from "./commission.ts";
 import { csvTable, dollars } from "./csv.ts";
 import { averageTipPct } from "./tips.ts";
 import { mergeIntervals, subtractIntervals } from "./scheduling/intervals.ts";
@@ -67,7 +69,8 @@ export type PayrollSale = {
   voided_at: string | null;
   client: string | null;
   // commission_pct: the rate recorded on the line when it was sold.
-  lines: { kind: "service" | "product"; staff_id: string; description: string; quantity: number; net_cents: number; commission_pct: number }[];
+  // commission_version_id: the plan version it was sold under, if any.
+  lines: { kind: "service" | "product"; staff_id: string; description: string; quantity: number; net_cents: number; commission_pct: number; commission_version_id?: string | null }[];
   tips: { staff_id: string; amount_cents: number }[];
   // The tenders that took money (card, cash, gift card), for itemized tips.
   payments?: { method: "card" | "cash" | "gift_card"; online: boolean }[];
@@ -88,7 +91,9 @@ export type Ticket = {
   serviceCents: number;
   retailCents: number;
   tipCents: number;
-  lines: { description: string; kind: "service" | "product"; quantity: number; cents: number; pct: number }[];
+  // soldCents: what the whole line sold for (to share a back-bar fee);
+  // pay: what it earned, once a pay line has worked it out.
+  lines: { description: string; kind: "service" | "product"; quantity: number; cents: number; pct: number; versionId: string | null; soldCents: number; pay?: LinePay }[];
 };
 
 const PAID_WITH = { card: "Card", card_online: "Card online", cash: "Cash", gift_card: "Gift card" } as const;
@@ -102,7 +107,15 @@ export function paidWith(payments: PayrollSale["payments"]): string | null {
 type Amounts = { serviceCents: number; retailCents: number; tipCents: number; lines: Ticket["lines"] };
 
 function ownShare(sale: PayrollSale, staffId: string): Amounts {
-  const lines = sale.lines.filter((l) => l.staff_id === staffId).map((l) => ({ description: l.description, kind: l.kind, quantity: l.quantity, cents: l.net_cents, pct: Number(l.commission_pct) }));
+  const lines = sale.lines.filter((l) => l.staff_id === staffId).map((l) => ({
+      description: l.description,
+      kind: l.kind,
+      quantity: l.quantity,
+      cents: l.net_cents,
+      pct: Number(l.commission_pct),
+      versionId: l.commission_version_id ?? null,
+      soldCents: l.net_cents,
+    }));
   return {
     serviceCents: lines.filter((l) => l.kind === "service").reduce((n, l) => n + l.cents, 0),
     retailCents: lines.filter((l) => l.kind === "product").reduce((n, l) => n + l.cents, 0),
@@ -204,8 +217,9 @@ export function hourlyPay(schedule: StaffSchedule, from: LocalDate, to: LocalDat
   return hourly ? { minutes, payCents: Math.round(pay), rates: [...rates].sort((a, b) => a - b) } : null;
 }
 
-// The rates a pay line was worked out at (several if they changed).
-export type RatesUsed = { service: number[]; retail: number[]; hourly: number[] };
+// The rates a pay line was worked out at (several if they changed), and
+// the plans behind it.
+export type RatesUsed = { service: number[]; retail: number[]; hourly: number[]; plans: string[] };
 
 export type PayLine = {
   staffId: string;
@@ -216,38 +230,128 @@ export type PayLine = {
   serviceCommissionCents: number;
   retailCents: number;
   retailCommissionCents: number;
+  // Back-bar fees taken off services before commission.
+  feeCents: number;
   tipCents: number;
   // Scheduled minutes, for people paid by the hour (else null).
   minutes: number | null;
   hourlyPayCents: number;
+  // Booth rent owed for the period (taken off their pay).
+  rentCents: number;
   totalCents: number;
   tickets: Ticket[];
 };
 
+// How plan lines are paid (./commission.ts payLines), and booth rent owed.
+export type PlanContext = {
+  rulesFor: Parameters<typeof payLines>[1];
+  windowOf: Parameters<typeof payLines>[2];
+  prior?: Parameters<typeof payLines>[3];
+  planName?: (versionId: string) => string | null;
+  rentCents?: number;
+};
+
+// A saved plan version (commission_rules).
+export type PlanVersion = { id: string; planId: string; name: string; rules: PlanRules; createdAt: string };
+
+// Tiers start again each pay period or each month; a window is named by
+// the day it starts.
+export function tierWindow(rules: PlanRules, date: LocalDate, periodOf: (date: LocalDate) => PayPeriod): string {
+  return rules.tierPeriod === "month" ? `month:${monthStart(date)}` : `period:${periodOf(date).from}`;
+}
+
+// The earliest day a tier window counting toward this period could start.
+export function windowsFrom(period: PayPeriod, periodOf: (date: LocalDate) => PayPeriod): LocalDate {
+  const p = periodOf(period.from).from;
+  const m = monthStart(period.from);
+  return p < m ? p : m;
+}
+
+// How someone's plan lines are paid in a period: by their version's rules,
+// with what already counted toward each tier window (`before`: their
+// tickets from the earliest window's start to the period's), and booth
+// rent for `rentDays` from the plan they were on each day (`planOn`), at
+// that plan's rules then.
+export function planContext(opts: {
+  versions: readonly PlanVersion[];
+  dayOf: (iso: string) => LocalDate;
+  periodOf: (date: LocalDate) => PayPeriod;
+  before?: readonly Ticket[];
+  rentDays?: readonly LocalDate[];
+  planOn?: (date: LocalDate) => string | null;
+}): PlanContext {
+  const byId = new Map(opts.versions.map((v) => [v.id, v]));
+  const rulesFor = (id: string) => byId.get(id)?.rules ?? null;
+  const windowOf = (at: string, rules: PlanRules) => tierWindow(rules, opts.dayOf(at), opts.periodOf);
+  const prior = new Map<string, Basis>();
+  for (const t of opts.before ?? []) {
+    for (const l of t.lines) {
+      const rules = l.versionId ? rulesFor(l.versionId) : null;
+      if (!rules) continue;
+      const w = windowOf(t.at, rules);
+      const b = prior.get(w) ?? { service: 0, product: 0 };
+      b[l.kind] += l.cents;
+      prior.set(w, b);
+    }
+  }
+  const versionOn = (planId: string, date: LocalDate) => {
+    const of = opts.versions.filter((v) => v.planId === planId);
+    return [...of].reverse().find((v) => opts.dayOf(v.createdAt) <= date) ?? of[0] ?? null;
+  };
+  const rentCents = opts.rentDays && opts.planOn
+    ? Math.round(
+        rentFor(opts.rentDays, (date) => {
+          const plan = opts.planOn!(date);
+          const v = plan ? versionOn(plan, date) : null;
+          return v && v.rules.mode === "booth_rent" ? v.rules.rent : null;
+        }),
+      )
+    : 0;
+  return {
+    rulesFor,
+    windowOf,
+    prior: (w) => ({ ...(prior.get(w) ?? { service: 0, product: 0 }) }),
+    planName: (id) => byId.get(id)?.name ?? null,
+    rentCents,
+  };
+}
+
+const NO_PLANS: PlanContext = { rulesFor: () => null, windowOf: () => "" };
+
 const unique = (values: number[]) => [...new Set(values)].sort((a, b) => a - b);
 
-export function payLine(person: { staffId: string; name: string; role: string }, tickets: Ticket[], hours: Hours | null): PayLine {
-  const lines = tickets.flatMap((t) => t.lines);
+export function payLine(person: { staffId: string; name: string; role: string }, tickets: Ticket[], hours: Hours | null, plans: PlanContext = NO_PLANS): PayLine {
+  const inputs: PayInput[] = tickets.flatMap((t) => t.lines.map((l) => ({ at: t.at, kind: l.kind, cents: l.cents, soldCents: l.soldCents, quantity: l.quantity, pct: l.pct, versionId: l.versionId })));
+  const paid = payLines(inputs, plans.rulesFor, plans.windowOf, plans.prior);
+  let n = 0;
+  const priced = tickets.map((t) => ({ ...t, lines: t.lines.map((l) => ({ ...l, pay: paid[n++] })) }));
+  const lines = priced.flatMap((t) => t.lines);
   const of = (kind: "service" | "product") => lines.filter((l) => l.kind === kind);
+  const own = (kind: "service" | "product") => of(kind).filter((l) => !l.versionId || !plans.rulesFor(l.versionId));
   const serviceCents = tickets.reduce((n, t) => n + t.serviceCents, 0);
   const retailCents = tickets.reduce((n, t) => n + t.retailCents, 0);
   const tipCents = tickets.reduce((n, t) => n + t.tipCents, 0);
-  // Each line at its own rate, rounded once for the period.
-  const serviceCommissionCents = Math.round(of("service").reduce((n, l) => n + (l.cents * l.pct) / 100, 0));
-  const retailCommissionCents = Math.round(of("product").reduce((n, l) => n + (l.cents * l.pct) / 100, 0));
+  // Each line at its own rate or plan, rounded once for the period.
+  const serviceCommissionCents = Math.round(of("service").reduce((n, l) => n + l.pay!.commissionCents, 0));
+  const retailCommissionCents = Math.round(of("product").reduce((n, l) => n + l.pay!.commissionCents, 0));
+  const feeCents = Math.round(lines.reduce((n, l) => n + l.pay!.feeCents, 0));
   const hourly = hours?.payCents ?? 0;
+  const rent = plans.rentCents ?? 0;
+  const planNames = [...new Set(lines.map((l) => (l.versionId ? (plans.planName?.(l.versionId) ?? null) : null)).filter((x): x is string => x !== null))];
   return {
     ...person,
-    rates: { service: unique(of("service").map((l) => l.pct)), retail: unique(of("product").map((l) => l.pct)), hourly: hours?.rates ?? [] },
+    rates: { service: unique(own("service").map((l) => l.pct)), retail: unique(own("product").map((l) => l.pct)), hourly: hours?.rates ?? [], plans: planNames },
     serviceCents,
     serviceCommissionCents,
     retailCents,
     retailCommissionCents,
+    feeCents,
     tipCents,
     minutes: hours?.minutes ?? null,
     hourlyPayCents: hourly,
-    totalCents: serviceCommissionCents + retailCommissionCents + tipCents + hourly,
-    tickets,
+    rentCents: rent,
+    totalCents: serviceCommissionCents + retailCommissionCents + tipCents + hourly - rent,
+    tickets: priced,
   };
 }
 
@@ -274,6 +378,9 @@ export function payrollCsv(lines: readonly PayLine[], period: PayPeriod): string
     "Hours",
     "Hourly rate",
     "Hourly pay",
+    "Back-bar fees",
+    "Booth rent",
+    "Plan",
     "Total pay",
   ];
   const rows = lines.map((l) => [
@@ -292,6 +399,9 @@ export function payrollCsv(lines: readonly PayLine[], period: PayPeriod): string
     l.minutes === null ? "" : formatHours(l.minutes),
     l.rates.hourly.map(dollars).join("/"),
     dollars(l.hourlyPayCents),
+    dollars(l.feeCents),
+    dollars(l.rentCents),
+    l.rates.plans.join("/"),
     dollars(l.totalCents),
   ]);
   return csvTable(header, rows);

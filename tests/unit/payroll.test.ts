@@ -154,9 +154,9 @@ describe("pay", () => {
     const csv = payrollCsv([pay], { from: "2026-10-05", to: "2026-10-18" });
     const [header, row] = csv.trimEnd().split("\r\n");
     expect(header).toBe(
-      "Period start,Period end,Staff,Role,Service sales,Service commission %,Service commission,Retail sales,Retail commission %,Retail commission,Tips,Average tip %,Hours,Hourly rate,Hourly pay,Total pay",
+      "Period start,Period end,Staff,Role,Service sales,Service commission %,Service commission,Retail sales,Retail commission %,Retail commission,Tips,Average tip %,Hours,Hourly rate,Hourly pay,Back-bar fees,Booth rent,Plan,Total pay",
     );
-    expect(row).toBe(`2026-10-05,2026-10-18,"'=Evil ""Ana"", Jr",Stylist,80.00,45,36.00,20.00,15,3.00,10.00,12.5,7.5,18.00,135.00,184.00`);
+    expect(row).toBe(`2026-10-05,2026-10-18,"'=Evil ""Ana"", Jr",Stylist,80.00,45,36.00,20.00,15,3.00,10.00,12.5,7.5,18.00,135.00,0.00,0.00,,184.00`);
   });
 });
 

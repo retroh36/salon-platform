@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { can } from "@/lib/permissions";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Avatar, initials } from "@/components/ui/avatar";
@@ -76,7 +77,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
       .order("start_minute"),
     supabase
       .from("staff_compensation")
-      .select("service_commission_pct, retail_commission_pct, hourly_rate_cents")
+      .select("service_commission_pct, retail_commission_pct, hourly_rate_cents, plan_id")
       .eq("staff_id", target.id)
       .maybeSingle(),
     manager
@@ -340,6 +341,22 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
           <h3 id="pay-heading" className={`${cardHeadClass} ${cardTitleClass}`}>
             Level and commission
           </h3>
+          {compensation.data?.plan_id && (
+            <p className="px-5 pt-4 text-sm text-ink-muted" data-testid="on-plan">
+              Paid on a commission plan
+              {can(me, "payroll") ? (
+                <>
+                  {" "}
+                  (
+                  <Link href="/settings/commission" className="text-link hover:underline">
+                    Settings → Commission
+                  </Link>
+                  )
+                </>
+              ) : null}
+              . The rates below apply only off a plan; the hourly rate always applies.
+            </p>
+          )}
           {manager ? (
             <CompensationForm
               key={target.id}

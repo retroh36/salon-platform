@@ -22,6 +22,8 @@ import { AlertFrequencyPicker, GoalForm, RemoveGoal } from "@/components/goal-co
 import { loadMyGoals } from "@/lib/goals/mine";
 import { metricInfo } from "@/lib/goals/pacing";
 import { averageTipPct, pctText } from "@/lib/tips";
+import { loadLiveEarnings } from "@/lib/earnings-load";
+import { LiveEarningsCard } from "./live-earnings";
 
 export const metadata: Metadata = { title: "My day" };
 
@@ -111,10 +113,15 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
           })}
         </ol>
       )}
+      {me.role !== "assistant" && <LiveEarningsSection supabase={supabase} me={me} />}
       {me.role !== "assistant" && <MyGoalsSection supabase={supabase} me={me} />}
       <MyEarnings supabase={supabase} me={me} last={params.pay === "last"} />
     </AppShell>
   );
+}
+
+async function LiveEarningsSection({ supabase, me }: { supabase: Awaited<ReturnType<typeof getCurrentStaff>>["supabase"]; me: NonNullable<Awaited<ReturnType<typeof getCurrentStaff>>["staff"]> }) {
+  return <LiveEarningsCard live={await loadLiveEarnings(supabase, me)} />;
 }
 
 // Their own goals, paced, with Denise's alert at the top when it's due.
@@ -164,7 +171,9 @@ async function MyEarnings({ supabase, me, last }: { supabase: Awaited<ReturnType
     ["Service commission", pay.serviceCommissionCents, ratesText(pay.rates.service, (v) => `${v}%`) || undefined],
     ["Retail", pay.retailCents],
     ["Retail commission", pay.retailCommissionCents, ratesText(pay.rates.retail, (v) => `${v}%`) || undefined],
+    ...(pay.feeCents !== 0 ? ([["Back-bar fees (taken off services first)", -pay.feeCents]] as [string, number][]) : []),
     ["Tips", pay.tipCents],
+    ...(pay.rentCents !== 0 ? ([["Booth rent", -pay.rentCents]] as [string, number][]) : []),
     ...(pay.minutes !== null ? ([["Hourly pay", pay.hourlyPayCents, ratesText(pay.rates.hourly, (c) => `${formatPrice(c)}/h`)]] as [string, number, string][]) : []),
   ];
   return (
@@ -205,7 +214,9 @@ async function MyEarnings({ supabase, me, last }: { supabase: Awaited<ReturnType
           {formatPrice(pay.totalCents)}
         </span>
       </p>
-      <p className="mt-1 text-xs text-ink-muted">Commission is on what clients paid before tax, at your rate when each sale was made. Refunds come off in the period they happen.</p>
+      <p className="mt-1 text-xs text-ink-muted">
+        Commission is on what clients paid before tax, at your rate{pay.rates.plans.length ? ` or plan (${pay.rates.plans.join(", ")})` : ""} when each sale was made. Refunds come off in the period they happen.
+      </p>
       {pay.tipCents !== 0 && (
         <details className="mt-3" data-testid="my-tips">
           <summary className="cursor-pointer text-sm font-medium text-link">
