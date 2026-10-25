@@ -176,6 +176,33 @@ describe("canceling", () => {
     );
   });
 
+  it("never pays out twice: a package whose sale was refunded cancels with nothing more back", async () => {
+    const two = await template({ name: `${PREFIX} 2 blowouts`, price_cents: 8000, items: [{ service_id: blowout.id, quantity: 2 }] });
+    const { data: saleId } = await sell(frontDesk, { client_id: clientId, lines: [{ kind: "package", template_id: two }], payments: [{ method: "card", amount_cents: 8000 }] });
+    const packageId = (await admin.from("client_packages").select("id").eq("sale_id", saleId!).single()).data!.id;
+    expect((await manager.rpc("refund_sale", { p_sale_id: saleId!, p_input: { reason: "Changed mind", payments: [{ method: "card", amount_cents: 8000 }] } as never })).error).toBeNull();
+    const { data: refunded, error } = await manager.rpc("cancel_package", { p_client_package_id: packageId, p_reason: "Refunded", p_refund_method: "cash" });
+    expect(error).toBeNull();
+    expect(refunded).toBe(0);
+    const { data: out } = await admin.from("payments").select("amount_cents").eq("sale_id", saleId!).lt("amount_cents", 0);
+    expect(out!.reduce((n, p) => n + p.amount_cents, 0)).toBe(-8000);
+  });
+
+  it("package uses can't come back as gift card money either", async () => {
+    const one = await template({ name: `${PREFIX} 1 blowout`, price_cents: 4000, items: [{ service_id: blowout.id, quantity: 1 }] });
+    const { data: saleId } = await sell(frontDesk, { client_id: otherClientId, lines: [{ kind: "package", template_id: one }], payments: [{ method: "card", amount_cents: 4000 }] });
+    const packageId = (await admin.from("client_packages").select("id").eq("sale_id", saleId!).single()).data!.id;
+    const v = await visit(otherClientId, BRIDGET, 17);
+    const { data: covered } = await sell(frontDesk, { appointment_id: v.appointmentId, lines: [{ kind: "service", appointment_item_id: v.itemId, package_item_id: (await itemFor(packageId, blowout.id)).id }], payments: [] });
+    const code = `${PREFIX.toUpperCase()}GIFT`.replace(/[^A-Z0-9]/g, "").padEnd(12, "X");
+    await admin.from("gift_cards").insert({ business_id: B, code, kind: "purchased", initial_cents: 1000, balance_cents: 1000 });
+    const { data: sale } = await admin.from("sales").select("total_cents").eq("id", covered!).single();
+    const { error } = await manager.rpc("refund_sale", { p_sale_id: covered!, p_input: { reason: "Unhappy", payments: [{ method: "gift_card", code, amount_cents: sale!.total_cents }] } as never });
+    expect(error?.code).toBe("22023");
+    expect((await admin.from("gift_cards").select("balance_cents").eq("business_id", B).eq("code", code).single()).data!.balance_cents).toBe(1000);
+    await admin.from("gift_cards").delete().eq("business_id", B).eq("code", code);
+  });
+
   it("everyone at the salon sees clients' packages; nobody changes them directly", async () => {
     const { data } = await stylist.from("client_packages").select("id").eq("client_id", clientId);
     expect(data!.length).toBeGreaterThan(0);
