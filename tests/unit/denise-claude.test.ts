@@ -99,6 +99,11 @@ describe("explaining fixes", () => {
     expect(await explainFixes(fakeClient([text(JSON.stringify({ explanations: ["Only one."] }))]).client, facts)).toEqual(["Only one.", null]);
     expect(await explainFixes(fakeClient([{ content: [], stop_reason: "refusal" }]).client, facts)).toEqual([null, null]);
   });
+
+  it("leaves out an explanation that assumes someone's gender", async () => {
+    const { client } = fakeClient([text(JSON.stringify({ explanations: ["Grace keeps her slot with Priya.", "Ethan is free at 11, so they keep their time."] }))]);
+    expect(await explainFixes(client, facts)).toEqual([null, "Ethan is free at 11, so they keep their time."]);
+  });
 });
 
 describe("Ask Denise", () => {

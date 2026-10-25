@@ -72,7 +72,7 @@ export const VOICE =
 
 const EXPLAIN_SYSTEM = `${VOICE}
 
-You'll get a list of schedule fixes the salon's scheduler has already worked out and checked. For each one, write one or two short sentences explaining to the front desk why it works, from the facts given: who moves where and why that's the least disruption. Don't invent facts, don't promise anything to clients, and don't repeat the problem word for word. Return one explanation per fix, in order.`;
+You'll get a list of schedule fixes the salon's scheduler has already worked out and checked. For each one, write one or two short sentences explaining to the front desk why it works, from the facts given: who moves where and why that's the least disruption. Don't invent facts, don't promise anything to clients, and don't repeat the problem word for word. Use names, never he, she, him, his, her or hers ("so Olivia keeps the same time", not "so she keeps her slot"). Return one explanation per fix, in order.`;
 
 function textOf(content: Anthropic.ContentBlock[]): string {
   return content
@@ -116,9 +116,12 @@ export async function explainFixes(client: ClaudeClient, facts: FixFacts[]): Pro
   const list = Array.isArray(parsed.explanations) ? parsed.explanations : [];
   return facts.map((_, i) => {
     const text = list[i];
-    return typeof text === "string" && text.trim() ? text.trim().slice(0, 500) : null;
+    // One that assumes anyone's gender isn't shown (the fix still is).
+    return typeof text === "string" && text.trim() && !GENDERED.test(text) ? text.trim().slice(0, 500) : null;
   });
 }
+
+const GENDERED = /\b(he|she|him|his|her|hers|himself|herself)\b/i;
 
 export type ToolRunner = {
   tools: Anthropic.Tool[];
