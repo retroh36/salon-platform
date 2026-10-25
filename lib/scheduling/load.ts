@@ -241,7 +241,7 @@ export async function loadCalendarStamp(supabase: Supabase, locationId: string):
 export async function loadBlocks(supabase: Supabase, locationId: string): Promise<TimeBlock[]> {
   const { data, error } = await supabase
     .from("time_blocks")
-    .select("id, staff_id, kind, note, start_minute, end_minute, on_date, repeat_weekdays, starts_on, ends_on, time_block_skips(on_date)")
+    .select("id, staff_id, kind, note, start_minute, end_minute, on_date, repeat_weekdays, starts_on, ends_on, event_id, time_block_skips(on_date)")
     .eq("location_id", locationId);
   if (error) throw error;
   return data.map((b) => ({
@@ -256,6 +256,7 @@ export async function loadBlocks(supabase: Supabase, locationId: string): Promis
     startsOn: b.starts_on,
     endsOn: b.ends_on,
     skips: b.time_block_skips.map((s) => s.on_date),
+    eventId: b.event_id,
   }));
 }
 

@@ -14,6 +14,7 @@ export const isEventToken = (token: string) => /^[A-Za-z0-9_-]{43}$/.test(token)
 
 export type EventLink = {
   id: string;
+  eventId: string;
   businessId: string;
   kind: "proposal" | "member" | "card";
   status: "open" | "done" | "canceled";
@@ -67,6 +68,7 @@ export async function loadEventLink(admin: Admin, token: string): Promise<EventL
   const firstStart = e.tasks.length ? Math.min(...e.tasks.map((t) => Date.parse(t.starts_at))) : null;
   return {
     id: l.id,
+    eventId: e.id,
     businessId: e.business_id,
     kind: l.kind as EventLink["kind"],
     status: l.status as EventLink["status"],

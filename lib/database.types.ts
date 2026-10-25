@@ -235,14 +235,14 @@ isOneToOne: false
                   ]
                 },"appointments": {
                   Row: {
-                    "business_id": string,"cancel_reason": string | null,"canceled_at": string | null,"checked_in_at": string | null,"checked_out_at": string | null,"client_id": string | null,"created_at": string,"created_by": string | null,"deposit_cents": number,"deposit_outcome": string | null,"deposit_paid_cents": number,"deposit_provider": string | null,"deposit_reference": string | null,"ends_at": string,"group_id": string | null,"id": string,"location_id": string,"manage_token_hash": string | null,"notes": string | null,"online_source": string | null,"promotion_id": string | null,"series_id": string | null,"series_index": number | null,"source": Database["public"]['Enums']["appointment_source"],"starts_at": string,"status": Database["public"]['Enums']["appointment_status"],"updated_at": string,"updated_by": string | null
+                    "business_id": string,"cancel_reason": string | null,"canceled_at": string | null,"checked_in_at": string | null,"checked_out_at": string | null,"client_id": string | null,"created_at": string,"created_by": string | null,"deposit_cents": number,"deposit_outcome": string | null,"deposit_paid_cents": number,"deposit_provider": string | null,"deposit_reference": string | null,"ends_at": string,"event_id": string | null,"group_id": string | null,"id": string,"location_id": string,"manage_token_hash": string | null,"notes": string | null,"online_source": string | null,"promotion_id": string | null,"series_id": string | null,"series_index": number | null,"source": Database["public"]['Enums']["appointment_source"],"starts_at": string,"status": Database["public"]['Enums']["appointment_status"],"updated_at": string,"updated_by": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"checked_in_at"?: string | null,"checked_out_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"deposit_outcome"?: string | null,"deposit_paid_cents"?: number,"deposit_provider"?: string | null,"deposit_reference"?: string | null,"ends_at": string,"group_id"?: string | null,"id"?: string,"location_id": string,"manage_token_hash"?: string | null,"notes"?: string | null,"online_source"?: string | null,"promotion_id"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at": string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
+                    "business_id": string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"checked_in_at"?: string | null,"checked_out_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"deposit_outcome"?: string | null,"deposit_paid_cents"?: number,"deposit_provider"?: string | null,"deposit_reference"?: string | null,"ends_at": string,"event_id"?: string | null,"group_id"?: string | null,"id"?: string,"location_id": string,"manage_token_hash"?: string | null,"notes"?: string | null,"online_source"?: string | null,"promotion_id"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at": string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
                   }
                   Update: {
-                    "business_id"?: string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"checked_in_at"?: string | null,"checked_out_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"deposit_outcome"?: string | null,"deposit_paid_cents"?: number,"deposit_provider"?: string | null,"deposit_reference"?: string | null,"ends_at"?: string,"group_id"?: string | null,"id"?: string,"location_id"?: string,"manage_token_hash"?: string | null,"notes"?: string | null,"online_source"?: string | null,"promotion_id"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at"?: string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
+                    "business_id"?: string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"checked_in_at"?: string | null,"checked_out_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"deposit_outcome"?: string | null,"deposit_paid_cents"?: number,"deposit_provider"?: string | null,"deposit_reference"?: string | null,"ends_at"?: string,"event_id"?: string | null,"group_id"?: string | null,"id"?: string,"location_id"?: string,"manage_token_hash"?: string | null,"notes"?: string | null,"online_source"?: string | null,"promotion_id"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at"?: string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
                   }
                   Relationships: [
                     {
@@ -263,6 +263,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "staff"
       referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "appointments_event_fk"
+      columns: ["event_id"]
+isOneToOne: false
+      referencedRelation: "events"
+      referencedColumns: ["id"]
     },{
       foreignKeyName: "appointments_group_id_business_id_fkey"
       columns: ["group_id","business_id"]
@@ -1345,14 +1351,14 @@ isOneToOne: false
                   ]
                 },"events": {
                   Row: {
-                    "billing": string,"booked_at": string | null,"business_id": string,"card_label": string | null,"card_provider": string | null,"card_ref": string | null,"client_id": string | null,"created_at": string,"created_by": string | null,"deposit_cents": number,"early_fee_cents": number,"event_date": string,"id": string,"inquiry_party_size": number | null,"inquiry_services": string | null,"location_id": string,"lost_reason": string | null,"main_cents": number,"notes": string | null,"on_location": boolean,"ready_by": string | null,"service_charge_cents": number,"source": string,"status": Database["public"]['Enums']["event_status"],"status_changed_at": string,"subtotal_cents": number,"tax_cents": number,"title": string,"total_cents": number,"travel_fee_cents": number,"travel_miles": number,"travel_minutes": number,"updated_at": string,"venue_address": string | null,"venue_name": string | null
+                    "billing": string,"booked_at": string | null,"business_id": string,"card_label": string | null,"card_provider": string | null,"card_ref": string | null,"client_id": string | null,"created_at": string,"created_by": string | null,"deposit_cents": number,"early_fee_cents": number,"event_date": string,"id": string,"inquiry_party_size": number | null,"inquiry_services": string | null,"location_id": string,"look_notes": string | null,"lost_reason": string | null,"main_cents": number,"notes": string | null,"on_location": boolean,"ready_by": string | null,"sale_id": string | null,"service_charge_cents": number,"source": string,"status": Database["public"]['Enums']["event_status"],"status_changed_at": string,"subtotal_cents": number,"tax_cents": number,"title": string,"total_cents": number,"travel_fee_cents": number,"travel_miles": number,"travel_minutes": number,"updated_at": string,"venue_address": string | null,"venue_name": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "billing"?: string,"booked_at"?: string | null,"business_id": string,"card_label"?: string | null,"card_provider"?: string | null,"card_ref"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"early_fee_cents"?: number,"event_date": string,"id"?: string,"inquiry_party_size"?: number | null,"inquiry_services"?: string | null,"location_id": string,"lost_reason"?: string | null,"main_cents"?: number,"notes"?: string | null,"on_location"?: boolean,"ready_by"?: string | null,"service_charge_cents"?: number,"source"?: string,"status"?: Database["public"]['Enums']["event_status"],"status_changed_at"?: string,"subtotal_cents"?: number,"tax_cents"?: number,"title": string,"total_cents"?: number,"travel_fee_cents"?: number,"travel_miles"?: number,"travel_minutes"?: number,"updated_at"?: string,"venue_address"?: string | null,"venue_name"?: string | null
+                    "billing"?: string,"booked_at"?: string | null,"business_id": string,"card_label"?: string | null,"card_provider"?: string | null,"card_ref"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"early_fee_cents"?: number,"event_date": string,"id"?: string,"inquiry_party_size"?: number | null,"inquiry_services"?: string | null,"location_id": string,"look_notes"?: string | null,"lost_reason"?: string | null,"main_cents"?: number,"notes"?: string | null,"on_location"?: boolean,"ready_by"?: string | null,"sale_id"?: string | null,"service_charge_cents"?: number,"source"?: string,"status"?: Database["public"]['Enums']["event_status"],"status_changed_at"?: string,"subtotal_cents"?: number,"tax_cents"?: number,"title": string,"total_cents"?: number,"travel_fee_cents"?: number,"travel_miles"?: number,"travel_minutes"?: number,"updated_at"?: string,"venue_address"?: string | null,"venue_name"?: string | null
                   }
                   Update: {
-                    "billing"?: string,"booked_at"?: string | null,"business_id"?: string,"card_label"?: string | null,"card_provider"?: string | null,"card_ref"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"early_fee_cents"?: number,"event_date"?: string,"id"?: string,"inquiry_party_size"?: number | null,"inquiry_services"?: string | null,"location_id"?: string,"lost_reason"?: string | null,"main_cents"?: number,"notes"?: string | null,"on_location"?: boolean,"ready_by"?: string | null,"service_charge_cents"?: number,"source"?: string,"status"?: Database["public"]['Enums']["event_status"],"status_changed_at"?: string,"subtotal_cents"?: number,"tax_cents"?: number,"title"?: string,"total_cents"?: number,"travel_fee_cents"?: number,"travel_miles"?: number,"travel_minutes"?: number,"updated_at"?: string,"venue_address"?: string | null,"venue_name"?: string | null
+                    "billing"?: string,"booked_at"?: string | null,"business_id"?: string,"card_label"?: string | null,"card_provider"?: string | null,"card_ref"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"early_fee_cents"?: number,"event_date"?: string,"id"?: string,"inquiry_party_size"?: number | null,"inquiry_services"?: string | null,"location_id"?: string,"look_notes"?: string | null,"lost_reason"?: string | null,"main_cents"?: number,"notes"?: string | null,"on_location"?: boolean,"ready_by"?: string | null,"sale_id"?: string | null,"service_charge_cents"?: number,"source"?: string,"status"?: Database["public"]['Enums']["event_status"],"status_changed_at"?: string,"subtotal_cents"?: number,"tax_cents"?: number,"title"?: string,"total_cents"?: number,"travel_fee_cents"?: number,"travel_miles"?: number,"travel_minutes"?: number,"updated_at"?: string,"venue_address"?: string | null,"venue_name"?: string | null
                   }
                   Relationships: [
                     {
@@ -1379,6 +1385,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "locations"
       referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "events_sale_id_fkey"
+      columns: ["sale_id"]
+isOneToOne: false
+      referencedRelation: "sales"
+      referencedColumns: ["id"]
     }
                   ]
                 },"form_templates": {
@@ -3509,14 +3521,14 @@ isOneToOne: false
                   ]
                 },"time_blocks": {
                   Row: {
-                    "business_id": string,"created_at": string,"created_by": string | null,"end_minute": number,"ends_on": string | null,"id": string,"kind": Database["public"]['Enums']["time_block_kind"],"location_id": string,"note": string | null,"on_date": string | null,"repeat_weekdays": (number)[] | null,"staff_id": string,"start_minute": number,"starts_on": string | null,"updated_at": string
+                    "business_id": string,"created_at": string,"created_by": string | null,"end_minute": number,"ends_on": string | null,"event_id": string | null,"id": string,"kind": Database["public"]['Enums']["time_block_kind"],"location_id": string,"note": string | null,"on_date": string | null,"repeat_weekdays": (number)[] | null,"staff_id": string,"start_minute": number,"starts_on": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"created_at"?: string,"created_by"?: string | null,"end_minute": number,"ends_on"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["time_block_kind"],"location_id": string,"note"?: string | null,"on_date"?: string | null,"repeat_weekdays"?: (number)[] | null,"staff_id": string,"start_minute": number,"starts_on"?: string | null,"updated_at"?: string
+                    "business_id": string,"created_at"?: string,"created_by"?: string | null,"end_minute": number,"ends_on"?: string | null,"event_id"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["time_block_kind"],"location_id": string,"note"?: string | null,"on_date"?: string | null,"repeat_weekdays"?: (number)[] | null,"staff_id": string,"start_minute": number,"starts_on"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "business_id"?: string,"created_at"?: string,"created_by"?: string | null,"end_minute"?: number,"ends_on"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["time_block_kind"],"location_id"?: string,"note"?: string | null,"on_date"?: string | null,"repeat_weekdays"?: (number)[] | null,"staff_id"?: string,"start_minute"?: number,"starts_on"?: string | null,"updated_at"?: string
+                    "business_id"?: string,"created_at"?: string,"created_by"?: string | null,"end_minute"?: number,"ends_on"?: string | null,"event_id"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["time_block_kind"],"location_id"?: string,"note"?: string | null,"on_date"?: string | null,"repeat_weekdays"?: (number)[] | null,"staff_id"?: string,"start_minute"?: number,"starts_on"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -3530,6 +3542,12 @@ isOneToOne: false
       columns: ["created_by","business_id"]
 isOneToOne: false
       referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "time_blocks_event_fk"
+      columns: ["event_id","business_id"]
+isOneToOne: false
+      referencedRelation: "events"
       referencedColumns: ["id","business_id"]
     },{
       foreignKeyName: "time_blocks_location_id_business_id_fkey"
@@ -3698,6 +3716,9 @@ isOneToOne: false
             "accept_event_proposal":
 { Args: { "p_input": Json,"p_link_id": string }; Returns: undefined
                            },
+"add_event_photo":
+{ Args: { "p_event_id": string,"p_path": string }; Returns: string
+                           },
 "add_formula":
 { Args: { "p_appointment_item_id": string,"p_client_id": string,"p_formula": string,"p_lines": Json,"p_notes": string,"p_visit_date": string }; Returns: string
                            },
@@ -3791,6 +3812,9 @@ isOneToOne: false
 "complete_card_request":
 { Args: { "p_card": Json,"p_consent": Json,"p_deposit": Json,"p_request_id": string }; Returns: undefined
                            },
+"complete_event":
+{ Args: { "p_event_id": string }; Returns: string
+                           },
 "complete_payment_link":
 { Args: { "p_link_id": string,"p_provider": string,"p_reference": string,"p_tips": Json,"p_total_cents": number }; Returns: string
                            },
@@ -3841,6 +3865,9 @@ isOneToOne: false
                            },
 "keep_membership":
 { Args: { "p_membership_id": string }; Returns: undefined
+                           },
+"link_event_trial":
+{ Args: { "p_appointment_id": string,"p_event_id": string }; Returns: undefined
                            },
 "log_data_export":
 { Args: { "p_business_id": string,"p_bytes": number,"p_row_counts": Json }; Returns: string
@@ -3923,6 +3950,9 @@ isOneToOne: false
 "reject_ai_action":
 { Args: { "p_action_id": string }; Returns: undefined
                            },
+"release_event_staff":
+{ Args: { "p_event_id": string,"p_staff_ids": (string)[] }; Returns: undefined
+                           },
 "remove_client_card":
 { Args: { "p_client_id": string }; Returns: undefined
                            },
@@ -3973,6 +4003,9 @@ isOneToOne: false
                            },
 "save_event_inquiry":
 { Args: { "p_business_id": string,"p_input": Json }; Returns: string
+                           },
+"save_event_look":
+{ Args: { "p_event_id": string,"p_notes": string }; Returns: undefined
                            },
 "save_event_package":
 { Args: { "p_input": Json,"p_package_id": string }; Returns: string
@@ -4175,7 +4208,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","client_package_status": "active"|"canceled"|"refunded","deposit_kind": "none"|"fixed"|"percent","disruption_kind": "overrun"|"client_late"|"call_out","event_party_role": "bride"|"bridesmaid"|"maid_of_honor"|"mother"|"flower_girl"|"groom"|"guest","event_status": "inquiry"|"proposal_sent"|"booked"|"trial_done"|"completed"|"lost","fee_kind": "none"|"fixed"|"percent"|"deposit","form_requirement": "none"|"first_visit"|"services","gift_card_kind": "purchased"|"promotional","gift_card_status": "active"|"voided","membership_status": "active"|"past_due"|"paused"|"canceled","notification_status": "pending"|"sent"|"canceled","online_service_mode": "bookable"|"consultation"|"off","patch_test_result": "no_reaction"|"reaction","payment_method": "cash"|"card"|"gift_card"|"package"|"membership","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","sale_item_kind": "service"|"product"|"gift_card"|"gift_card_reload"|"package"|"membership","sale_status": "completed"|"partly_refunded"|"refunded"|"voided","staff_level": "artisan"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist"|"assistant","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
+            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","client_package_status": "active"|"canceled"|"refunded","deposit_kind": "none"|"fixed"|"percent","disruption_kind": "overrun"|"client_late"|"call_out","event_party_role": "bride"|"bridesmaid"|"maid_of_honor"|"mother"|"flower_girl"|"groom"|"guest","event_status": "inquiry"|"proposal_sent"|"booked"|"trial_done"|"completed"|"lost","fee_kind": "none"|"fixed"|"percent"|"deposit","form_requirement": "none"|"first_visit"|"services","gift_card_kind": "purchased"|"promotional","gift_card_status": "active"|"voided","membership_status": "active"|"past_due"|"paused"|"canceled","notification_status": "pending"|"sent"|"canceled","online_service_mode": "bookable"|"consultation"|"off","patch_test_result": "no_reaction"|"reaction","payment_method": "cash"|"card"|"gift_card"|"package"|"membership","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","sale_item_kind": "service"|"product"|"gift_card"|"gift_card_reload"|"package"|"membership","sale_status": "completed"|"partly_refunded"|"refunded"|"voided","staff_level": "artisan"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist"|"assistant","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal"|"event","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -4295,7 +4328,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"client_package_status": ["active", "canceled", "refunded"],"deposit_kind": ["none", "fixed", "percent"],"disruption_kind": ["overrun", "client_late", "call_out"],"event_party_role": ["bride", "bridesmaid", "maid_of_honor", "mother", "flower_girl", "groom", "guest"],"event_status": ["inquiry", "proposal_sent", "booked", "trial_done", "completed", "lost"],"fee_kind": ["none", "fixed", "percent", "deposit"],"form_requirement": ["none", "first_visit", "services"],"gift_card_kind": ["purchased", "promotional"],"gift_card_status": ["active", "voided"],"membership_status": ["active", "past_due", "paused", "canceled"],"notification_status": ["pending", "sent", "canceled"],"online_service_mode": ["bookable", "consultation", "off"],"patch_test_result": ["no_reaction", "reaction"],"payment_method": ["cash", "card", "gift_card", "package", "membership"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"sale_item_kind": ["service", "product", "gift_card", "gift_card_reload", "package", "membership"],"sale_status": ["completed", "partly_refunded", "refunded", "voided"],"staff_level": ["artisan", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist", "assistant"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
+            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"client_package_status": ["active", "canceled", "refunded"],"deposit_kind": ["none", "fixed", "percent"],"disruption_kind": ["overrun", "client_late", "call_out"],"event_party_role": ["bride", "bridesmaid", "maid_of_honor", "mother", "flower_girl", "groom", "guest"],"event_status": ["inquiry", "proposal_sent", "booked", "trial_done", "completed", "lost"],"fee_kind": ["none", "fixed", "percent", "deposit"],"form_requirement": ["none", "first_visit", "services"],"gift_card_kind": ["purchased", "promotional"],"gift_card_status": ["active", "voided"],"membership_status": ["active", "past_due", "paused", "canceled"],"notification_status": ["pending", "sent", "canceled"],"online_service_mode": ["bookable", "consultation", "off"],"patch_test_result": ["no_reaction", "reaction"],"payment_method": ["cash", "card", "gift_card", "package", "membership"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"sale_item_kind": ["service", "product", "gift_card", "gift_card_reload", "package", "membership"],"sale_status": ["completed", "partly_refunded", "refunded", "voided"],"staff_level": ["artisan", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist", "assistant"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal", "event"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
           }
         }
 } as const

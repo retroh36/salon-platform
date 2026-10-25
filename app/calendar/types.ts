@@ -178,6 +178,9 @@ export type TimeBlockData = {
   weekdays: number[] | null;
   startsOn: LocalDate | null;
   endsOn: LocalDate | null;
+  // An event's hold (kind "event"): its page, and the travel each way
+  // inside the block (on-location events). Null for those who can't see it.
+  event?: { id: string; title: string; travelMinutes: number } | null;
 };
 
 export type BoardData = {

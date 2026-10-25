@@ -50,7 +50,7 @@ async function EditEvent({ params }: Pick<PageProps<"/events/[id]/edit">, "param
           {event.inquiryServices ? `, ${event.inquiryServices}` : ""}. I&rsquo;ve started the party from that; change anything.
         </Alert>
       )}
-      <EventBuilder eventId={id} initial={stateFromEvent(event, packages, settings)} packages={packages} settings={settings} taxBp={taxBp} team={team} today={today} partyLocked={locked} />
+      <EventBuilder eventId={id} initial={stateFromEvent(event, packages, settings)} packages={packages} settings={settings} taxBp={taxBp} team={team} today={today} partyLocked={locked} booked={event.status === "booked" || event.status === "trial_done"} />
     </AppShell>
   );
 }

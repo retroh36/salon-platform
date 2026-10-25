@@ -6,6 +6,7 @@ import { claudeClient } from "@/lib/denise/claude";
 import { failureRef, logDeniseError } from "@/lib/denise/errors";
 import { describeEvent } from "@/lib/denise/event-draft";
 import { metered } from "@/lib/denise/usage";
+import { eventClashes } from "@/lib/events/clashes";
 import { builderProblems, memberKey, saveInput, timelineMembers, timelineOf, type BuilderState } from "@/lib/events/builder";
 import { draftFrom, type EventDraft } from "@/lib/events/describe";
 import { loadEventSettings, loadPackages } from "@/lib/events/load";
@@ -53,6 +54,11 @@ export async function checkTeam(eventId: string | null, date: string, spans: Lan
   const ctx = await loadBookingContext(s.supabase, s.me.location, date, date);
   // This event's own hold on the calendar doesn't count against it.
   const own = new Set<string>();
+  if (eventId && isUuid(eventId)) {
+    const { data, error } = await s.supabase.from("time_blocks").select("id").eq("event_id", eventId);
+    if (error) throw error;
+    for (const b of data) own.add(b.id);
+  }
   const { data: team, error } = await s.supabase.from("staff").select("id, event_roles").eq("location_id", s.me.location.id).eq("is_active", true).filter("event_roles", "neq", "{}");
   if (error) throw error;
   const out: TeamCheck = {};
@@ -96,6 +102,23 @@ export async function saveEvent(eventId: string | null, state: BuilderState): Pr
   if (problems.length) return { ok: false, message: problems[0] };
   const tasks = timelineOf(state, packages, settings);
   if (state.tasks && !tasksFit(state.tasks, state, packages)) return { ok: false, message: "The timeline doesn't match the party any more. Tap Work it out again." };
+  // A booked event holds its team's time: nobody on it can be busy then.
+  if (eventId) {
+    const { data: current } = await s.supabase.from("events").select("status").eq("id", eventId).maybeSingle();
+    if (current && ["booked", "trial_done"].includes(current.status)) {
+      const clashes = await eventClashes(s.supabase, s.me.location, {
+        eventId,
+        date: state.date,
+        tasks: tasks.map((t) => ({ ...t, staffId: state.team[laneKey(t)] ?? null })),
+        travelMinutes: state.onLocation ? state.travelMinutes : 0,
+      });
+      if (clashes.length) {
+        const { data: names } = await s.supabase.from("staff").select("id, first_name").in("id", clashes.map((c) => c.staffId));
+        const c = clashes[0];
+        return { ok: false, message: `${names?.find((n) => n.id === c.staffId)?.first_name ?? "Someone on the team"} ${c.text} then. Choose someone else or move the timeline.` };
+      }
+    }
+  }
   const { data, error } = await s.supabase.rpc("save_event", { p_event_id: eventId!, p_input: saveInput(state, tasks, tz) as never });
   if (error) {
     if (["22023", "42501", "P0002", "55000"].includes(error.code ?? "")) return { ok: false, message: `${error.message}.` };

@@ -417,7 +417,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // Who's off that day is hidden (unless asked for), except anyone with a
   // booking, a stylist a link asked for, or one Denise's fix would move a
   // client to.
-  const off = offColumns(inView, new Set(data.blocks.map((b) => b.staffId)));
+  // Booked with a client, or at an event: on the calendar even on a day off.
+  const off = offColumns(inView, new Set([...data.blocks.map((b) => b.staffId), ...data.timeBlocks.filter((b) => b.kind === "event").map((b) => b.staffId)]));
   const keep = new Set([data.focus.staffId, ...(previewOption?.moves ?? []).map((m) => m.to.staffId)]);
   const hidden = showOff ? new Set<string>() : new Set(off.filter((c) => !keep.has(c.staffId)).map((c) => c.staffId));
   const shownColumns = inView.filter((c) => !hidden.has(c.staffId));
@@ -572,7 +573,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // Whose time this person can block: anyone's for the front of house,
   // their own for stylists.
   const blockStaff = me.canBook ? data.columns.map((c) => c.staffId) : data.columns.some((c) => c.staffId === me.staffId) ? [me.staffId] : [];
-  const canEditBlock = (b: TimeBlockData) => blockStaff.includes(b.staffId);
+  // Event holds change only with their event.
+  const canEditBlock = (b: TimeBlockData) => b.kind !== "event" && blockStaff.includes(b.staffId);
   const timeBlocks = data.timeBlocks.map((b) => ({ ...b, ...blockMoves[`${b.blockId}:${b.start}`] }));
 
   function onBlockPointerDown(e: React.PointerEvent, b: TimeBlockData, mode: "move" | "resize") {
@@ -912,6 +914,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                           .filter((b) => b.staffId === c.staffId)
                           .map((b) => {
                             const live = blockDrag && blockDrag.block.blockId === b.blockId ? { ...b, start: blockDrag.start, end: blockDrag.end } : b;
+                            if (b.kind === "event") return <EventHoldBox key={`${b.blockId}:${b.start}`} block={b} y={y} columnName={c.name} />;
                             return (
                               <TimeBlockBox
                                 key={`${b.blockId}:${b.start}`}
@@ -1657,6 +1660,42 @@ function segmentStyle(kind: string, visit: Visit): React.CSSProperties {
 
 // Blocked time in a stylist's column: neutral, under appointments, and
 // not bookable. Drag to move it; drag its bottom edge to resize.
+// An event's hold on a team member's day, as one block: the event's name
+// and time (call time to done, with travel each way hatched at the ends on
+// location). It opens the event; it moves only with the event.
+function EventHoldBox({ block, y, columnName }: { block: TimeBlockData; y: (minute: number) => number; columnName: string }) {
+  const PX_PER_MINUTE = usePpm();
+  const height = (block.end - block.start) * PX_PER_MINUTE;
+  const time = `${formatMinute(block.start)}–${formatMinute(block.end)}`;
+  const title = block.event?.title ?? block.note ?? "Event";
+  const travel = block.event?.travelMinutes ?? 0;
+  const label = [`Event: ${title}`, time, travel ? `including ${travel} minutes' travel each way` : null, columnName].filter(Boolean).join(", ");
+  const hatch = "repeating-linear-gradient(45deg, transparent 0 4px, rgb(23 39 59 / 0.12) 4px 8px)";
+  const body = (
+    <>
+      {travel > 0 && <span aria-hidden data-travel className="absolute inset-x-0 top-0" style={{ height: travel * PX_PER_MINUTE, backgroundImage: hatch }} />}
+      {travel > 0 && <span aria-hidden data-travel className="absolute inset-x-0 bottom-0" style={{ height: travel * PX_PER_MINUTE, backgroundImage: hatch }} />}
+      <span className="relative block truncate font-semibold text-ink" style={{ marginTop: travel > 0 && height > 60 ? travel * PX_PER_MINUTE : 0 }}>
+        {title}
+      </span>
+      {height >= 34 && <span className="relative block truncate text-block-ink-muted">{time}</span>}
+      {height >= 50 && travel > 0 && <span className="relative block truncate text-block-ink-muted">Travel {travel}m each way</span>}
+    </>
+  );
+  const className =
+    "absolute inset-x-1 z-[5] overflow-hidden rounded-md border-l-4 border-lavender-accent bg-lavender-fill px-2 py-1 text-xs focus-visible:outline-2 focus-visible:outline-focus";
+  const style = { top: y(block.start), height };
+  return block.event ? (
+    <Link href={`/events/${block.event.id}`} aria-label={label} title={label} data-time-block="event" className={className} style={style}>
+      {body}
+    </Link>
+  ) : (
+    <div aria-label={label} title={label} data-time-block="event" className={className} style={style}>
+      {body}
+    </div>
+  );
+}
+
 function TimeBlockBox({
   block,
   y,

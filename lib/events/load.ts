@@ -95,6 +95,8 @@ export type EventDetail = {
   travelMiles: number;
   travelMinutes: number;
   notes: string | null;
+  lookNotes: string | null;
+  saleId: string | null;
   source: "desk" | "denise" | "online";
   billing: "main" | "split";
   inquiryPartySize: number | null;
@@ -115,7 +117,7 @@ export type EventDetail = {
 };
 
 export const EVENT_COLUMNS =
-  "id, title, status, lost_reason, event_date, ready_by, venue_name, venue_address, on_location, travel_miles, travel_minutes, notes, source, billing, inquiry_party_size, inquiry_services, subtotal_cents, travel_fee_cents, early_fee_cents, service_charge_cents, tax_cents, total_cents, main_cents, deposit_cents, created_at, status_changed_at, client:clients(id, first_name, last_name, phone, email), members:event_members(id, position, name, party_role, package_id, package_name, price_cents, hair_minutes, makeup_minutes, pays_own, email, phone), tasks:event_tasks(id, member_id, kind, role, lane, staff_id, starts_at, ends_at)";
+  "id, title, status, lost_reason, event_date, ready_by, venue_name, venue_address, on_location, travel_miles, travel_minutes, notes, look_notes, sale_id, source, billing, inquiry_party_size, inquiry_services, subtotal_cents, travel_fee_cents, early_fee_cents, service_charge_cents, tax_cents, total_cents, main_cents, deposit_cents, created_at, status_changed_at, client:clients(id, first_name, last_name, phone, email), members:event_members(id, position, name, party_role, package_id, package_name, price_cents, hair_minutes, makeup_minutes, pays_own, email, phone), tasks:event_tasks(id, member_id, kind, role, lane, staff_id, starts_at, ends_at)";
 
 type EventRow = {
   id: string;
@@ -130,6 +132,8 @@ type EventRow = {
   travel_miles: number;
   travel_minutes: number;
   notes: string | null;
+  look_notes: string | null;
+  sale_id: string | null;
   source: string;
   billing: string;
   inquiry_party_size: number | null;
@@ -168,6 +172,8 @@ export function eventFrom(e: EventRow, timeZone: string): EventDetail {
     travelMiles: Number(e.travel_miles),
     travelMinutes: e.travel_minutes,
     notes: e.notes,
+    lookNotes: e.look_notes,
+    saleId: e.sale_id,
     source: e.source as EventDetail["source"],
     billing: e.billing as EventDetail["billing"],
     inquiryPartySize: e.inquiry_party_size,

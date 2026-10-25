@@ -5,8 +5,9 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { BackLink } from "@/components/ui/back-link";
 import { buttonClass } from "@/components/ui/button";
-import { Badge, Card, PageHeader } from "@/components/ui/page";
+import { Alert, Badge, Card, PageHeader } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
+import { eventClashes } from "@/lib/events/clashes";
 import { loadEvent, loadEventSettings, loadEventTeam, loadTaxBp } from "@/lib/events/load";
 import { PAYMENT_LABELS } from "@/lib/events/messages";
 import { memberShare, paymentSchedule } from "@/lib/events/pricing";
@@ -18,6 +19,7 @@ import { formatMinute, toLocal, todayIn } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { isFrontOfHouse } from "@/lib/staff";
 import { formatEventDay } from "../format";
+import { CompleteEvent, LookNotes, LookPhotoUpload, TrialBooker } from "./day";
 import { CardLinkSender, MemberLinkSender, ProposalSender, RetryPayment, StatusControls } from "./money";
 
 export const metadata: Metadata = { title: "Event" };
@@ -49,12 +51,30 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
     loadTaxBp(supabase, me.business_id),
   ]);
   if (!event) notFound();
+  const holds = event.status === "booked" || event.status === "trial_done";
+  const [trials, history, clashes] = await Promise.all([
+    supabase.from("appointments").select("id, starts_at, status, items:appointment_items(staff_id)").eq("event_id", id).neq("status", "canceled").order("starts_at"),
+    desk ? supabase.from("event_history").select("id, kind, detail, created_at, staff:staff(first_name)").eq("event_id", id).order("created_at", { ascending: false }).limit(30) : Promise.resolve({ data: [] }),
+    // Whether the team is still free, by the booking rules (the event's own
+    // hold left out).
+    desk && event.date >= todayIn(tz) && event.status !== "completed" && event.status !== "lost"
+      ? eventClashes(supabase, me.location, { eventId: id, date: event.date, tasks: event.tasks, travelMinutes: event.onLocation ? event.travelMinutes : 0 })
+      : Promise.resolve([]),
+  ]);
   const nameOf = new Map(event.members.map((m) => [m.id, m.name]));
   const staffName = (sid: string | null) => team.find((t) => t.id === sid)?.firstName ?? null;
   const spans = laneSpans(event.tasks);
-  const signed = photos.data?.length
+  const signedUrls = photos.data?.length
     ? ((await supabase.storage.from("event-photos").createSignedUrls(photos.data.map((p) => p.storage_path), 3600)).data ?? [])
     : [];
+  const signed = (photos.data ?? []).map((p, i) => ({ kind: p.kind, signedUrl: signedUrls[i]?.signedUrl ?? null }));
+  const inspiration = signed.filter((p) => p.kind === "inspiration");
+  const look = signed.filter((p) => p.kind === "look");
+  const today = todayIn(tz);
+  const trialDay = (iso: string) => {
+    const local = toLocal(new Date(iso), tz);
+    return `${formatLongDay(local.date, false)} at ${formatMinute(local.minute)}`;
+  };
 
   return (
     <AppShell section="events" me={me} wide>
@@ -84,11 +104,35 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
                 Edit event
               </Link>
             )}
+            {event.tasks.length > 0 && (
+              <Link href={`/events/${id}/sheet`} className={buttonClass("secondary", "md")}>
+                Day-of sheet
+              </Link>
+            )}
+            {desk && holds && event.date <= today && <CompleteEvent eventId={id} />}
             {desk && <StatusControls eventId={id} status={event.status} />}
           </>
         }
       />
       {event.status === "lost" && event.lostReason && <p className="-mt-2 mb-4 text-ink-muted">Lost: {event.lostReason}</p>}
+      {event.status === "completed" && event.saleId && desk && (
+        <p className="-mt-2 mb-4 text-ink-muted">
+          Completed.{" "}
+          <Link href={`/sales/${event.saleId}`} className="text-link underline underline-offset-2">
+            See the sale
+          </Link>{" "}
+          for the team&rsquo;s work and tips.
+        </p>
+      )}
+      {clashes.length > 0 && (
+        <div className="mb-4">
+          <Alert>
+            <span data-testid="team-clash">
+              {clashes.map((c) => `${staffName(c.staffId) ?? "Someone"} ${c.text} during this event`).join(". ")}. {holds ? "Choose someone else in Edit event." : "Choose someone else before it's booked."}
+            </span>
+          </Alert>
+        </div>
+      )}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <Card title={`Party (${event.members.length || event.inquiryPartySize || 0})`} titleId="party" flush>
@@ -147,21 +191,72 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
               <p className="px-5 py-4 text-ink-muted">No timeline yet. Add the party and the ready-by time in Edit event.</p>
             )}
           </Card>
-          {(event.notes || signed.length > 0) && (
-            <Card title="Notes and inspiration" titleId="notes">
-              {event.notes && <p className="whitespace-pre-line">{event.notes}</p>}
-              {signed.length > 0 && (
-                <ul className="mt-3 grid grid-cols-3 gap-2" aria-label="Inspiration photos">
-                  {signed.map((p) =>
-                    p.signedUrl ? (
-                      <li key={p.signedUrl}>
-                        {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed link */}
-                        <img src={p.signedUrl} alt="Inspiration" className="aspect-square w-full rounded-lg object-cover" />
+          {(event.status !== "inquiry" || trials.data?.length) && event.status !== "lost" ? (
+            <Card title="Trial" titleId="trial">
+              <div className="flex flex-col gap-3">
+                {trials.data?.length ? (
+                  <ul className="flex flex-col gap-1 text-sm" data-testid="trials">
+                    {trials.data.map((t) => (
+                      <li key={t.id} className="flex flex-wrap items-baseline justify-between gap-2">
+                        <span>
+                          <span className="font-medium">{trialDay(t.starts_at)}</span>
+                          {staffName(t.items[0]?.staff_id ?? null) && <span className="text-ink-muted"> with {staffName(t.items[0]?.staff_id ?? null)}</span>}
+                          <span className="text-ink-muted"> · {t.status === "completed" ? "Done" : t.status === "no_show" ? "Missed" : "Booked"}</span>
+                        </span>
+                        {desk && (
+                          <Link href={`/calendar?date=${toLocal(new Date(t.starts_at), tz).date}&open=${t.id}`} className="text-link underline underline-offset-2">
+                            Open on the calendar
+                          </Link>
+                        )}
                       </li>
-                    ) : null,
-                  )}
-                </ul>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-ink-muted">No trial booked yet. Checking the trial out marks the event Trial done.</p>
+                )}
+                {desk && holds && !trials.data?.some((t) => t.status !== "completed" && t.status !== "no_show") && (
+                  <TrialBooker eventId={id} defaultDate={trialDefault(event.date, today)} minDate={today} />
+                )}
+              </div>
+            </Card>
+          ) : null}
+          <Card title="The look" titleId="look">
+            <div className="flex flex-col gap-4">
+              <LookNotes eventId={id} initial={event.lookNotes ?? ""} />
+              <div className="flex flex-col gap-2">
+                <h3 className="text-sm font-medium">Photos of the look</h3>
+                {look.length > 0 && <PhotoGrid photos={look} label="Photos of the look" alt="The look" />}
+                {event.status !== "lost" && <LookPhotoUpload eventId={id} />}
+              </div>
+              {inspiration.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-sm font-medium">Their inspiration</h3>
+                  <PhotoGrid photos={inspiration} label="Inspiration photos" alt="Inspiration" />
+                </div>
               )}
+            </div>
+          </Card>
+          {event.notes && (
+            <Card title="Notes" titleId="notes">
+              <p className="whitespace-pre-line">{event.notes}</p>
+            </Card>
+          )}
+          {desk && (history.data?.length ?? 0) > 0 && (
+            <Card title="History" titleId="history" flush>
+              <ul className="divide-y divide-line text-sm" data-testid="history">
+                {history.data!.map((h) => (
+                  <li key={h.id} className="flex flex-wrap justify-between gap-x-3 px-5 py-2">
+                    <span>
+                      {HISTORY_TEXT[h.kind] ?? h.kind.replace(/_/g, " ")}
+                      {h.detail && <span className="text-ink-muted"> · {h.detail}</span>}
+                    </span>
+                    <span className="text-ink-muted">
+                      {formatLongDay(toLocal(new Date(h.created_at), tz).date, false)}
+                      {h.staff?.first_name && ` · ${h.staff.first_name}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </Card>
           )}
         </div>
@@ -197,6 +292,48 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
         )}
       </div>
     </AppShell>
+  );
+}
+
+// A month before the event (or soon, when it's close).
+function trialDefault(eventDate: string, today: string): string {
+  const d = new Date(`${eventDate}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 30);
+  const iso = d.toISOString().slice(0, 10);
+  return iso > today ? iso : today;
+}
+
+const HISTORY_TEXT: Record<string, string> = {
+  created: "Created",
+  changed: "Changed",
+  proposal_sent: "Proposal sent",
+  booked: "Booked",
+  member_link_sent: "Pay link sent",
+  card_link_sent: "Card link sent",
+  payment_paid: "Payment taken",
+  payment_failed: "Payment didn't go through",
+  payment_retried: "Payment tried again",
+  trial_booked: "Trial booked",
+  trial_done: "Trial done",
+  look_saved: "Look notes changed",
+  team_released: "Team changed",
+  completed: "Completed",
+  lost: "Lost",
+  reopened: "Reopened",
+};
+
+function PhotoGrid({ photos, label, alt }: { photos: { signedUrl: string | null }[]; label: string; alt: string }) {
+  return (
+    <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4" aria-label={label}>
+      {photos.map((p, i) =>
+        p.signedUrl ? (
+          <li key={i}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- short-lived signed link */}
+            <img src={p.signedUrl} alt={alt} className="aspect-square w-full rounded-lg object-cover" />
+          </li>
+        ) : null,
+      )}
+    </ul>
   );
 }
 
@@ -291,7 +428,7 @@ function Money({
                 <span className="min-w-0">
                   <span className="font-medium">{PAYMENT_LABELS[p.kind as keyof typeof PAYMENT_LABELS]}</span>
                   <span className="block text-ink-muted">
-                    {p.status === "paid" && p.paid_at ? `Paid ${day(p.paid_at)}${p.card_label ? ` · ${p.card_label}` : ""}` : p.status === "failed" ? `${PAYMENT_STATUS.failed}${p.failure_reason ? `: ${p.failure_reason}` : ""}` : `Due ${formatLongDay(p.due_on, false)}`}
+                    {p.status === "paid" && p.paid_at ? `Paid ${day(p.paid_at)}${p.card_label ? ` · ${p.card_label.replace(" ", "\u00a0")}` : ""}` : p.status === "failed" ? `${PAYMENT_STATUS.failed}${p.failure_reason ? `: ${p.failure_reason}` : ""}` : `Due ${formatLongDay(p.due_on, false)}`}
                   </span>
                 </span>
                 <span className="flex flex-col items-end gap-1">

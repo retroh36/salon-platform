@@ -93,6 +93,15 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   ]);
   if (formulaResult.error) throw formulaResult.error;
 
+  // Events holding time today (those this person can see).
+  const eventIds = [...new Set(timeBlocks.filter((b) => b.eventId && occurrences(b, date, date).length).map((b) => b.eventId!))];
+  const events = new Map<string, { id: string; title: string; travelMinutes: number }>();
+  if (eventIds.length) {
+    const { data, error } = await supabase.from("events").select("id, title, on_location, travel_minutes").in("id", eventIds);
+    if (error) throw error;
+    for (const e of data) events.set(e.id, { id: e.id, title: e.title, travelMinutes: e.on_location ? e.travel_minutes : 0 });
+  }
+
   // How many visits each series on the day has.
   const seriesIds = [...new Set(items.map((i) => i.appointment.series_id).filter((id): id is string => !!id))];
   const seriesCounts = new Map<string, number>();
@@ -404,7 +413,9 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
 
   const open = dayView({ weekly: {}, overrides: {}, timeOff: [] }, location, date).open;
   const weekHours = WEEKDAYS.flatMap((d) => location.weekly[d] ?? []);
-  const range = gridRange(open, weekHours, blocks);
+  // The grid stretches for events too (an early wedding call time).
+  const eventHolds = timeBlocks.filter((b) => b.kind === "event").flatMap((b) => occurrences(b, date, date));
+  const range = gridRange(open, weekHours, [...blocks, ...eventHolds]);
 
   const reasonOf = (t: { reason?: string; note?: string | null }) => [REASON_LABELS[t.reason as TimeOffReason] ?? "Time off", t.note].filter(Boolean).join(" · ");
   const columns: ColumnData[] = columnStaff.map((s) => {
@@ -479,6 +490,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
         weekdays: b.weekdays,
         startsOn: b.startsOn,
         endsOn: b.endsOn,
+        event: b.eventId ? (events.get(b.eventId) ?? null) : undefined,
       })),
     ),
     appointments,

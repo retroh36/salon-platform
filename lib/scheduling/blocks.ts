@@ -10,7 +10,9 @@ import { busyDuring, type BookingContext } from "./booking.ts";
 import type { LocalDate } from "./time.ts";
 import { addDays, datesBetween, fromLocal, isLocalDate, parseTime, weekdayOf } from "./time.ts";
 
-export type TimeBlockKind = "lunch" | "break" | "training" | "meeting" | "personal";
+// "event" is an event's hold on its team's time: written only by the event
+// (…_event_day.sql), never in the block form, and never moved by Denise.
+export type TimeBlockKind = "lunch" | "break" | "training" | "meeting" | "personal" | "event";
 
 export const BLOCK_KINDS: TimeBlockKind[] = ["lunch", "break", "training", "meeting", "personal"];
 
@@ -20,6 +22,7 @@ export const BLOCK_LABELS: Record<TimeBlockKind, string> = {
   training: "Training",
   meeting: "Meeting",
   personal: "Personal",
+  event: "Event",
 };
 
 // Denise may shift these (by up to MAX_BLOCK_SHIFT minutes) to fit a fix;
@@ -41,6 +44,8 @@ export type TimeBlock = {
   startsOn: LocalDate | null;
   endsOn: LocalDate | null;
   skips: LocalDate[];
+  // An event's hold on its team's time.
+  eventId?: string | null;
 };
 
 // One day of a block.

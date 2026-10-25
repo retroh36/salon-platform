@@ -2,6 +2,7 @@
 
 import { after } from "next/server";
 import { chargeDuePayments, runEventBilling } from "@/lib/events/billing";
+import { releaseBusyTeam } from "@/lib/events/clashes";
 import { loadEventLink } from "@/lib/events/links";
 import { requestInfo } from "@/lib/online-booking/security";
 import { currentProvider } from "@/lib/payments";
@@ -47,6 +48,13 @@ export async function acceptProposal(token: string, input: { typedName: string; 
     if (error.hint === "changed") return { ok: false, message: CHANGED };
     if (error.hint === "expired") return { ok: false, message: `This link is no longer active. Ask ${link.salon.name} for a new one.` };
     return { ok: false, message: `We couldn't book it, and you haven't been charged. Please let ${link.salon.name} know.` };
+  }
+  // Nobody on the team is double-booked: anyone who's become busy since
+  // the proposal comes off the event, and the desk is told.
+  try {
+    await releaseBusyTeam(admin, link.eventId);
+  } catch (e) {
+    console.error("[events] couldn't check the team after booking", e instanceof Error ? e.message : "unknown");
   }
   // The receipt (and anything already due, when the event is close).
   after(() => runEventBilling(createAdminClient(), { businessId: link.businessId }));

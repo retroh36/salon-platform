@@ -126,6 +126,24 @@ export function reverseTimeline(input: TimelineInput): TimelineTask[] {
   return tasks.sort((a, b) => a.start - b.start || a.role.localeCompare(b.role) || a.lane - b.lane);
 }
 
+// A task dragged to a new start and/or another artist doing the same work,
+// in 5-minute steps, keeping its length. Touch-ups don't move on their
+// own: they follow the lanes that have work, at the end of the day.
+export function moveTask(tasks: readonly TimelineTask[], index: number, to: { start: number; lane?: number }, lanes: Lanes): TimelineTask[] {
+  const task = tasks[index];
+  if (!task || task.kind === "touch_up") return [...tasks];
+  const lane = Math.min(Math.max(to.lane ?? task.lane, 1), Math.max(lanes[task.role], 1));
+  const start = Math.max(0, Math.round(to.start / 5) * 5);
+  const moved = tasks.map((t, i) => (i === index ? { ...t, start, end: start + (task.end - task.start), lane } : t));
+  const touchUp = tasks.find((t) => t.kind === "touch_up");
+  const work = moved.filter((t) => t.kind !== "touch_up");
+  if (!touchUp) return work.sort(byStart);
+  const used = new Map(work.map((t) => [laneKey(t), { role: t.role, lane: t.lane }]));
+  return [...work, ...[...used.values()].map((l) => ({ member: null, kind: "touch_up" as const, role: l.role, lane: l.lane, start: touchUp.start, end: touchUp.end }))].sort(byStart);
+}
+
+const byStart = (a: TimelineTask, b: TimelineTask) => a.start - b.start || a.role.localeCompare(b.role) || a.lane - b.lane;
+
 // The lanes a timeline uses, each with its call time (setting up before
 // its first person) and when it's done.
 export type LaneSpan = Lane & { call: number; first: number; end: number };
@@ -242,7 +260,7 @@ export function staffClash(
   const touches = (s: { start: number; end: number }) => s.start < span.end && span.start < s.end;
   if (ctx.booked.some((b) => b.staffId === staff.id && staffBusySpans(b).some(touches))) return "booked";
   const blocks = (ctx.blocks ?? []).filter((b) => b.staffId === staff.id && !eventBlockIds.has(b.blockId) && touches({ start: b.start.getTime(), end: b.end.getTime() }));
-  if (blocks.some((b) => (b.kind as string) === "event")) return "other_event";
+  if (blocks.some((b) => b.kind === "event")) return "other_event";
   if (blocks.length) return "blocked";
   return null;
 }

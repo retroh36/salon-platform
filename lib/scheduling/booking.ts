@@ -335,6 +335,7 @@ const BLOCKED_MESSAGES: Record<TimeBlockKind, string> = {
   training: "The stylist is in training then.",
   meeting: "The stylist is in a meeting then.",
   personal: "The stylist has blocked out that time.",
+  event: "The stylist is at an event then.",
 };
 
 const PATCH_MESSAGES: Record<Exclude<PatchState, "ok">, string> = {

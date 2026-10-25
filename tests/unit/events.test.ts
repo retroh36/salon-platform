@@ -1,6 +1,7 @@
 // Bridal and events: the reverse timeline across several artists, its
 // checks, pricing and the payment schedule, and reading a one-line
-// description (our parser, and Denise's Claude with the call mocked).
+// description (our parser, and Denise's Claude with the call mocked),
+// dragging the timeline, the calendar hold and the day-of sheet.
 import { describe, expect, it, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import { builderProblems, priceOf, saveInput, timelineOf, type BuilderState } from "@/lib/events/builder";
@@ -11,8 +12,9 @@ import { pipelineColumn } from "@/lib/events/pipeline";
 import { DEFAULT_EVENT_SETTINGS, type EventPackage } from "@/lib/events/types";
 import { checkedDescription, describeEvent, withoutContacts } from "@/lib/denise/event-draft";
 import type { ClaudeClient } from "@/lib/denise/claude";
-import { laneSpans, reverseTimeline, staffClash, suggestLanes, suggestTeam, timelineProblems, type TimelineMember } from "@/lib/scheduling/events";
-import type { BookingContext } from "@/lib/scheduling/booking";
+import { laneSpans, moveTask, reverseTimeline, staffClash, suggestLanes, suggestTeam, timelineProblems, type TimelineMember } from "@/lib/scheduling/events";
+import { checkItem, describeProblem, type BookingContext } from "@/lib/scheduling/booking";
+import { daySheet } from "@/lib/events/day-sheet";
 
 const S = DEFAULT_EVENT_SETTINGS;
 const PACKAGES: EventPackage[] = [
@@ -421,5 +423,126 @@ describe("messages about events", () => {
     for (const m of [proposalMessage("S", "A", "T", "u", "sms"), memberLinkMessage("S", "A", "T", 1, "u", "sms"), cardLinkMessage("S", "A", "T", "u", "sms"), reminderMessage("S", "A", "T", "second", 1, "d", null), receiptMessage("S", "A", "T", "Deposit", 1, null, 0)]) {
       expect(m.body).not.toContain("!");
     }
+  });
+});
+
+describe("dragging the timeline", () => {
+  const lanes = { hair: 2, makeup: 1 };
+  const tasks = reverseTimeline({ readyBy: READY, members: [bride, maid("2"), maid("3")], lanes, bufferMinutes: 10, touchUpMinutes: 15 });
+  const index = (member: string, kind: string) => tasks.findIndex((t) => t.member === member && t.kind === kind);
+
+  it("moves a bar in 5-minute steps, keeping its length", () => {
+    const i = index("2", "hair");
+    const moved = moveTask(tasks, i, { start: tasks[i].start - 33 }, lanes);
+    const t = moved.find((x) => x.member === "2" && x.kind === "hair")!;
+    expect(t.start).toBe(Math.round((tasks[i].start - 33) / 5) * 5);
+    expect(t.end - t.start).toBe(45);
+  });
+
+  it("moves to another artist doing the same work, never to the other kind of work, and touch-ups follow", () => {
+    const i = index("1", "hair");
+    const lane = tasks[i].lane === 1 ? 2 : 1;
+    const moved = moveTask(tasks, i, { start: tasks[i].start, lane }, lanes);
+    expect(moved.find((x) => x.member === "1" && x.kind === "hair")!.lane).toBe(lane);
+    expect(moved.find((x) => x.member === "1" && x.kind === "hair")!.role).toBe("hair");
+    // Past the last artist: stays within the lanes there are.
+    expect(moveTask(tasks, i, { start: tasks[i].start, lane: 9 }, lanes).find((x) => x.member === "1" && x.kind === "hair")!.lane).toBe(2);
+    expect(moved.filter((t) => t.kind === "touch_up").map((t) => `${t.role}-${t.lane}`).sort()).toEqual([...new Set(moved.filter((t) => t.kind !== "touch_up").map((t) => `${t.role}-${t.lane}`))].sort());
+  });
+
+  it("is checked again as it moves: a clash, a person in two chairs, past the ready-by time", () => {
+    const hair2 = index("2", "hair");
+    const other = tasks.find((t) => t.kind === "hair" && t.member !== "2")!;
+    // Onto someone else's time with the same artist.
+    expect(timelineProblems(moveTask(tasks, hair2, { start: other.start, lane: other.lane }, lanes), READY, "1").map((p) => p.code)).toContain("lane_overlap");
+    // Hair into their own makeup.
+    const makeup2 = tasks[index("2", "makeup")];
+    expect(timelineProblems(moveTask(tasks, hair2, { start: makeup2.start }, lanes), READY, "1").map((p) => p.code)).toEqual(expect.arrayContaining(["member_overlap"]));
+    // The bride past the ready-by time.
+    const brideMakeup = index("1", "makeup");
+    expect(timelineProblems(moveTask(tasks, brideMakeup, { start: READY }, lanes), READY, "1").map((p) => p.code)).toContain("after_ready_by");
+    // And a free move stays fine.
+    const first = tasks.filter((t) => t.kind !== "touch_up").sort((a, b) => a.start - b.start)[0];
+    expect(timelineProblems(moveTask(tasks, tasks.indexOf(first), { start: first.start - 30 }, lanes), READY, "1")).toEqual([]);
+  });
+
+  it("can't drag touch-ups", () => {
+    const i = tasks.findIndex((t) => t.kind === "touch_up");
+    expect(moveTask(tasks, i, { start: 0 }, lanes)).toEqual(tasks);
+  });
+});
+
+describe("an event on the calendar", () => {
+  it("keeps clients off the team's hold, like any blocked time", () => {
+    const date = "2026-11-14";
+    const at = (minute: number) => new Date(Date.UTC(2026, 10, 14, 6, 0) + minute * 60_000);
+    const ctx: BookingContext = {
+      location: { timeZone: "America/Chicago", weekly: { 6: [{ start: 0, end: 1440 }] } },
+      services: new Map([["cut", { id: "cut", activeMinutes: 45, processingMinutes: 0, finishingMinutes: 0, archived: false, resourceTypes: [] } as never]]),
+      resources: new Map(),
+      staff: new Map([["s1", { id: "s1", isActive: true, schedule: { weekly: { 6: [{ start: 0, end: 1440 }] }, overrides: {}, timeOff: [] }, serviceIds: new Set(["cut"]) }]]),
+      booked: [],
+      blocks: [{ blockId: "hold", date, staffId: "s1", kind: "event", start: at(480), end: at(840) }],
+    };
+    const during = checkItem(ctx, { serviceId: "cut", staffId: "s1", start: at(600) });
+    expect(during.valid).toBe(false);
+    if (!during.valid) {
+      expect(during.problems).toContainEqual(expect.objectContaining({ code: "staff_blocked", kind: "event" }));
+      expect(describeProblem(during.problems.find((p) => p.code === "staff_blocked")!)).toBe("The stylist is at an event then.");
+    }
+    expect(checkItem(ctx, { serviceId: "cut", staffId: "s1", start: at(840) }).valid).toBe(true);
+  });
+});
+
+describe("the day-of sheet", () => {
+  const event = {
+    title: "Rossi wedding",
+    onLocation: true,
+    venueName: "The Drake",
+    venueAddress: "140 E Walton Pl, Chicago",
+    travelMinutes: 30,
+    readyBy: 14 * 60,
+    lookNotes: "Low textured bun",
+    notes: "Park in the loading dock",
+    members: [
+      { id: "m1", position: 1, name: "Mia", partyRole: "bride" as const, packageId: "bride", packageName: "Bride hair + makeup", priceCents: 45000, hairMinutes: 90, makeupMinutes: 75, paysOwn: false, email: null, phone: null },
+      { id: "m2", position: 2, name: "Ana", partyRole: "bridesmaid" as const, packageId: "bm-hair", packageName: "Bridesmaid hair", priceCents: 12000, hairMinutes: 45, makeupMinutes: 0, paysOwn: false, email: null, phone: null },
+    ],
+    tasks: [
+      { id: "t1", memberId: "m2", kind: "hair" as const, role: "hair" as const, lane: 1, staffId: "bridget", start: 600, end: 645 },
+      { id: "t2", memberId: "m1", kind: "hair" as const, role: "hair" as const, lane: 1, staffId: "bridget", start: 655, end: 745 },
+      { id: "t3", memberId: "m1", kind: "makeup" as const, role: "makeup" as const, lane: 1, staffId: null, start: 745, end: 820 },
+      { id: "t4", memberId: null, kind: "touch_up" as const, role: "hair" as const, lane: 1, staffId: "bridget", start: 825, end: 840 },
+    ],
+  };
+  const sheet = daySheet(event, (id) => (id === "bridget" ? "Bridget" : null));
+
+  it("gives each artist their leave, call and done times and who they do", () => {
+    expect(sheet.where).toBe("The Drake, 140 E Walton Pl, Chicago");
+    expect(sheet.readyBy).toBe("2pm");
+    expect(sheet.artists).toEqual([
+      { name: "Bridget", roles: ["hair"], leave: "9:15am", call: "9:45am", done: "2pm", people: ["Ana", "Mia"] },
+      { name: "Makeup 1", roles: ["makeup"], leave: "11:40am", call: "12:10pm", done: "1:40pm", people: ["Mia"] },
+    ]);
+    expect(sheet.unassigned).toBe(1);
+  });
+
+  it("lists the running order, then touch-ups, the party and the look", () => {
+    expect(sheet.order).toEqual([
+      { time: "10am–10:45am", who: "Ana", what: "Hair", artist: "Bridget" },
+      { time: "10:55am–12:25pm", who: "Mia", what: "Hair", artist: "Bridget" },
+      { time: "12:25pm–1:40pm", who: "Mia", what: "Makeup", artist: "Makeup 1" },
+      { time: "1:45pm–2pm", who: "Everyone", what: "Touch-ups", artist: "Whole team" },
+    ]);
+    expect(sheet.party).toEqual([
+      { name: "Mia", role: "Bride", packageName: "Bride hair + makeup" },
+      { name: "Ana", role: "Bridesmaid", packageName: "Bridesmaid hair" },
+    ]);
+    expect(sheet.look).toBe("Low textured bun");
+  });
+
+  it("has no leave time in the salon", () => {
+    expect(daySheet({ ...event, onLocation: false }, () => "Bridget").artists.every((a) => a.leave === null)).toBe(true);
+    expect(daySheet({ ...event, onLocation: false }, () => "Bridget").where).toBe("In the salon");
   });
 });

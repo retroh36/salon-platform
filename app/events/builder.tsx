@@ -30,6 +30,9 @@ export type BuilderProps = {
   today: LocalDate;
   // Past the cutoff on a booked event, and not a manager: the party is locked.
   partyLocked: boolean;
+  // Booked: the payments are already scheduled (on the event page), so no
+  // "if booked today" preview.
+  booked?: boolean;
 };
 
 const QUICK_ADD: PartyRole[] = ["bridesmaid", "maid_of_honor", "mother", "flower_girl", "guest"];
@@ -41,7 +44,7 @@ const formatDay = (date: LocalDate) =>
 // fill it in), adjust anything, and save. The total, deposit, payment
 // schedule and timeline update as you go; the team for each artist lane is
 // suggested from who's free that day.
-export function EventBuilder({ eventId, initial, packages, settings, taxBp, team, today, partyLocked }: BuilderProps) {
+export function EventBuilder({ eventId, initial, packages, settings, taxBp, team, today, partyLocked, booked = false }: BuilderProps) {
   const router = useRouter();
   const [state, setState] = useState<BuilderState>(initial);
   const [line, setLine] = useState("");
@@ -338,53 +341,6 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
           {!active.length && <p className="mt-3 text-ink-muted">There are no event packages yet. An owner sets them up on Settings → Bridal and events.</p>}
         </Card>
 
-        <Card title="Notes" titleId="event-notes">
-          <textarea aria-label="Notes" value={state.notes} onChange={(e) => update({ notes: e.target.value })} rows={3} maxLength={4000} className={fieldClass} placeholder="Inspiration, allergies to products, parking…" />
-        </Card>
-      </div>
-
-      <aside className="flex flex-col gap-6 lg:sticky lg:top-6 lg:self-start" aria-label="Total and timeline">
-        <Card title="Total" titleId="event-total">
-          <dl className="flex flex-col gap-1.5 text-sm" data-testid="event-total">
-            <Line label={`Packages (${state.members.length})`} cents={price.subtotalCents} />
-            {price.travelFeeCents > 0 && <Line label="Travel" cents={price.travelFeeCents} />}
-            {price.earlyFeeCents > 0 && <Line label={`Early start (${price.earlyFeeCents / Math.max(settings.earlyStartFeeCents, 1)} ${price.earlyFeeCents / Math.max(settings.earlyStartFeeCents, 1) === 1 ? "artist" : "artists"})`} cents={price.earlyFeeCents} />}
-            {price.serviceChargeCents > 0 && <Line label={`Service charge (${settings.serviceChargePct}%)`} cents={price.serviceChargeCents} />}
-            {price.taxCents > 0 && <Line label="Tax" cents={price.taxCents} />}
-            <div className="mt-1 flex justify-between border-t border-line pt-2 text-base font-semibold">
-              <dt>Total</dt>
-              <dd className="tabular-nums" data-testid="total">
-                {formatPrice(price.totalCents)}
-              </dd>
-            </div>
-            {price.ownCents > 0 && <Line label="Paid by the party, by link" cents={price.ownCents} />}
-            <div className="flex justify-between font-semibold">
-              <dt>
-                Deposit to book ({settings.depositPct}%{settings.depositRefundable ? "" : ", non-refundable"})
-              </dt>
-              <dd className="tabular-nums" data-testid="deposit">
-                {formatPrice(price.depositCents)}
-              </dd>
-            </div>
-          </dl>
-          {schedule.length > 0 && (
-            <div className="mt-4">
-              <h3 className="text-xs font-semibold tracking-wide text-ink-muted uppercase">If booked today</h3>
-              <ul className="mt-1 flex flex-col gap-1 text-sm" data-testid="schedule">
-                {schedule.map((p) => (
-                  <li key={p.kind} className="flex justify-between gap-2">
-                    <span>
-                      {SCHEDULED_LABELS[p.kind]} · {p.dueOn === today ? "to book" : formatDay(p.dueOn)}
-                    </span>
-                    <span className="tabular-nums">{formatPrice(p.amountCents)}</span>
-                  </li>
-                ))}
-              </ul>
-              {state.date && <p className="mt-2 text-xs text-ink-muted">Party changes until {formatDay(headcountCutoff(state.date, settings))}.</p>}
-            </div>
-          )}
-        </Card>
-
         <Card title="Timeline" titleId="event-timeline">
           {state.readyBy == null || !state.members.length ? (
             <p className="text-ink-muted">Add the party and the ready-by time, and I&rsquo;ll plan the day backward from it.</p>
@@ -403,7 +359,7 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
                   const options = team.filter((t) => t.eventRoles.includes(span.role));
                   return (
                     <li key={key} className="flex flex-col gap-1" data-testid="lane">
-                      <label className="flex items-center justify-between gap-2 text-sm font-medium">
+                      <label className="grid grid-cols-[9rem_minmax(0,16rem)] items-center gap-3 text-sm font-medium">
                         <span>
                           {span.role === "hair" ? "Hair" : "Makeup"} {span.lane} · call {formatMinute(span.call)}
                         </span>
@@ -414,7 +370,7 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
                             manual.current.add(key);
                             update({ team: { ...state.team, [key]: e.target.value || null } });
                           }}
-                          className={`${selectClass} h-10 w-44`}
+                          className={`${selectClass} h-10`}
                         >
                           <option value="">Not chosen</option>
                           {options.map((t) => (
@@ -441,7 +397,9 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
               )}
               <TimelineEditor
                 tasks={tasks}
+                lanes={state.lanes}
                 readyBy={state.readyBy}
+                problemsOf={(next) => timelineProblems(next, state.readyBy!, brideAt >= 0 ? memberKey(brideAt) : null).map((p) => describeTimelineProblem(p, nameOf))}
                 nameOf={nameOf}
                 staffOf={(span) => team.find((t) => t.id === state.team[laneKey(span)])?.firstName ?? null}
                 onChange={(next) => update({ tasks: next })}
@@ -455,6 +413,53 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
                   ))}
                 </ul>
               )}
+            </div>
+          )}
+        </Card>
+
+        <Card title="Notes" titleId="event-notes">
+          <textarea aria-label="Notes" value={state.notes} onChange={(e) => update({ notes: e.target.value })} rows={3} maxLength={4000} className={fieldClass} placeholder="Inspiration, allergies to products, parking…" />
+        </Card>
+      </div>
+
+      <aside className="flex flex-col gap-6 lg:sticky lg:top-6 lg:self-start" aria-label="Total">
+        <Card title="Total" titleId="event-total">
+          <dl className="flex flex-col gap-1.5 text-sm" data-testid="event-total">
+            <Line label={`Packages (${state.members.length})`} cents={price.subtotalCents} />
+            {price.travelFeeCents > 0 && <Line label="Travel" cents={price.travelFeeCents} />}
+            {price.earlyFeeCents > 0 && <Line label={`Early start (${price.earlyFeeCents / Math.max(settings.earlyStartFeeCents, 1)} ${price.earlyFeeCents / Math.max(settings.earlyStartFeeCents, 1) === 1 ? "artist" : "artists"})`} cents={price.earlyFeeCents} />}
+            {price.serviceChargeCents > 0 && <Line label={`Service charge (${settings.serviceChargePct}%)`} cents={price.serviceChargeCents} />}
+            {price.taxCents > 0 && <Line label="Tax" cents={price.taxCents} />}
+            <div className="mt-1 flex justify-between border-t border-line pt-2 text-base font-semibold">
+              <dt>Total</dt>
+              <dd className="tabular-nums" data-testid="total">
+                {formatPrice(price.totalCents)}
+              </dd>
+            </div>
+            {price.ownCents > 0 && <Line label="Paid by the party, by link" cents={price.ownCents} />}
+            <div className="flex justify-between font-semibold">
+              <dt>
+                Deposit to book ({settings.depositPct}%{settings.depositRefundable ? "" : ", non-refundable"})
+              </dt>
+              <dd className="tabular-nums" data-testid="deposit">
+                {formatPrice(price.depositCents)}
+              </dd>
+            </div>
+          </dl>
+          {schedule.length > 0 && !booked && (
+            <div className="mt-4">
+              <h3 className="text-xs font-semibold tracking-wide text-ink-muted uppercase">If booked today</h3>
+              <ul className="mt-1 flex flex-col gap-1 text-sm" data-testid="schedule">
+                {schedule.map((p) => (
+                  <li key={p.kind} className="flex justify-between gap-2">
+                    <span>
+                      {SCHEDULED_LABELS[p.kind]} · {p.dueOn === today ? "to book" : formatDay(p.dueOn)}
+                    </span>
+                    <span className="tabular-nums">{formatPrice(p.amountCents)}</span>
+                  </li>
+                ))}
+              </ul>
+              {state.date && <p className="mt-2 text-xs text-ink-muted">Party changes until {formatDay(headcountCutoff(state.date, settings))}.</p>}
             </div>
           )}
         </Card>
