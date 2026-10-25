@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { promoRatesFor } from "@/lib/promotions-load";
 import { todayIn } from "@/lib/scheduling/time";
 import { EMPTY_TICKET, saleInput, totalsOf, type Ticket, type TicketLine } from "@/lib/ticket";
-import { admin, SEED, signIn, type Client } from "./helpers";
+import { admin, SEED, signIn, throwawayStylist, type Client } from "./helpers";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -87,6 +87,9 @@ beforeAll(async () => {
   await admin.from("stock_levels").insert({ business_id: B, location_id: L, product_id: productId, on_hand: 100 });
 });
 
+// Stylists of the last-minute specials' own visits.
+const stylists: Awaited<ReturnType<typeof throwawayStylist>>[] = [];
+
 afterAll(async () => {
   await admin.from("appointments").delete().in("client_id", clients);
   await admin.from("sales").delete().in("client_id", clients);
@@ -94,6 +97,7 @@ afterAll(async () => {
   await admin.from("clients").delete().in("id", clients);
   await admin.from("stock_levels").delete().eq("product_id", productId);
   await admin.from("products").delete().eq("id", productId);
+  for (const st of stylists) await st.remove();
 });
 
 describe("setting them up", () => {
@@ -200,7 +204,12 @@ describe("at checkout", () => {
 });
 
 describe("last-minute specials", () => {
-  async function visit(clientId: string, staffId: string, serviceId: string, bookedHoursAhead: number) {
+  // Checked in two hours from now, when the demo calendar is busy: each with
+  // a stylist of its own at that level (Gil is Master, Lois Senior).
+  async function visit(clientId: string, level: "senior" | "master", serviceId: string, bookedHoursAhead: number) {
+    const own = await throwawayStylist(level === "master" ? "Gil" : "Lois", level);
+    stylists.push(own);
+    const staffId = own.id;
     const start = new Date(Date.now() + 2 * 3_600_000);
     const { data: a } = await admin
       .from("appointments")
@@ -212,39 +221,39 @@ describe("last-minute specials", () => {
       .insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: serviceId, staff_id: staffId, starts_at: start.toISOString(), ends_at: new Date(start.getTime() + 3_600_000).toISOString(), active_minutes: 60, price_cents: 12_000 })
       .select("id")
       .single();
-    return { appointmentId: a!.id, itemId: item!.id };
+    return { appointmentId: a!.id, itemId: item!.id, staffId };
   }
-  const line = (v: { itemId: string }, staffId: string, serviceId: string): TicketLine => ({ ...(service(staffId, 12_000, serviceId) as Extract<TicketLine, { kind: "service" }>), appointmentItemId: v.itemId, priceReason: "" });
+  const line = (v: { itemId: string; staffId: string }, serviceId: string): TicketLine => ({ ...(service(v.staffId, 12_000, serviceId) as Extract<TicketLine, { kind: "service" }>), appointmentItemId: v.itemId, priceReason: "" });
 
   it("covers visits booked within its hours, never Master color", async () => {
     const special = await promo("Late", { kind: "last_minute", hours_ahead: 48, percent: 15, exclusions: [{ level: "master", category: "Color" }] });
     // Master (Gil) color: not covered.
     const c1 = await client("Spec1");
-    const v1 = await visit(c1, SEED.staff.gil, colorId, 3);
-    expect((await sell(frontDesk, c1, [line(v1, SEED.staff.gil, colorId)], [special], {}, v1.appointmentId)).error?.message).toBe(`${TAG} Late doesn't cover anything on this sale`);
+    const v1 = await visit(c1, "master", colorId, 3);
+    expect((await sell(frontDesk, c1, [line(v1, colorId)], [special], {}, v1.appointmentId)).error?.message).toBe(`${TAG} Late doesn't cover anything on this sale`);
     // Senior (Lois) color, booked 3 hours ahead: 15% off.
     const c2 = await client("Spec2");
-    const v2 = await visit(c2, SEED.staff.lois, colorId, 3);
-    const ok = await sell(frontDesk, c2, [line(v2, SEED.staff.lois, colorId)], [special], {}, v2.appointmentId);
+    const v2 = await visit(c2, "senior", colorId, 3);
+    const ok = await sell(frontDesk, c2, [line(v2, colorId)], [special], {}, v2.appointmentId);
     expect(ok.error).toBeNull();
     expect(ok.totals.promoDiscountCents).toBe(1800);
     const { data: r } = await admin.from("promotion_redemptions").select("source, last_minute").eq("sale_id", ok.saleId!).single();
     expect(r).toEqual({ source: "special", last_minute: true });
     // Booked three days ahead: not last minute.
     const c3 = await client("Spec3");
-    const v3 = await visit(c3, SEED.staff.lois, cutId, 72);
-    expect((await sell(frontDesk, c3, [line(v3, SEED.staff.lois, cutId)], [special], {}, v3.appointmentId)).error?.message).toBe(`${TAG} Late is for visits booked within 48 hours of starting.`);
+    const v3 = await visit(c3, "senior", cutId, 72);
+    expect((await sell(frontDesk, c3, [line(v3, cutId)], [special], {}, v3.appointmentId)).error?.message).toBe(`${TAG} Late is for visits booked within 48 hours of starting.`);
   });
 
   it("from online booking: held on the visit, counted in the limits, and taken off at checkout", async () => {
     const id = await promo("Online", { code: `${TAG}WEB`, percent: 10, max_uses: 1 });
     const c = await client("Web");
-    const v = await visit(c, SEED.staff.lois, cutId, 1);
+    const v = await visit(c, "senior", cutId, 1);
     expect((await frontDesk.rpc("attach_online_promotion", { p_appointment_id: v.appointmentId, p_promotion_id: id })).error).not.toBeNull();
     expect((await admin.rpc("attach_online_promotion", { p_appointment_id: v.appointmentId, p_promotion_id: id })).error).toBeNull();
     // The visit holds the only use.
     expect((await sell(frontDesk, null, [service(SEED.staff.hannah)], [id])).error?.hint).toBe("promotion");
-    const done = await sell(frontDesk, c, [line(v, SEED.staff.lois, cutId)], [id], {}, v.appointmentId);
+    const done = await sell(frontDesk, c, [line(v, cutId)], [id], {}, v.appointmentId);
     expect(done.error).toBeNull();
     expect((await admin.from("promotion_redemptions").select("source").eq("sale_id", done.saleId!).single()).data!.source).toBe("online");
   });

@@ -81,9 +81,11 @@ describe("patch tests", () => {
   it("refuses check-in without one when the salon blocks, unless a manager or owner overrides with a reason", async () => {
     const manager = await signIn("manager@mapleandash.test");
     const { data: c } = await admin.from("clients").insert({ business_id: B, first_name: "Gate", last_name: "Test" }).select("id").single();
+    // Each at its own hour: the database never double-books Bridget.
+    let made = 0;
     const visit = async () => {
       const day = "2031-09-16";
-      const start = fromLocal(day, 600, TZ)!;
+      const start = fromLocal(day, 600 + 60 * made++, TZ)!;
       const end = new Date(start.getTime() + 45 * 60_000);
       const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: c!.id, starts_at: start.toISOString(), ends_at: end.toISOString() }).select("id").single();
       const { data: i } = await admin

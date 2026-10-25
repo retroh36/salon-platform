@@ -4,7 +4,7 @@
 // Run with `npm run test:db` after `npm run seed:demo`.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { undoCheckIn } from "@/lib/scheduling/book";
-import { fromLocal } from "@/lib/scheduling/time";
+import { addDays, fromLocal } from "@/lib/scheduling/time";
 import { admin, createOtherSalon, SEED, signIn, type Client } from "./helpers";
 
 const B = SEED.business;
@@ -13,14 +13,18 @@ const TZ = "America/Chicago";
 // In the past, so checked-in visits don't look upcoming to the seed checks
 // running alongside.
 const DAY = "2025-09-10";
-const at = (h: number) => fromLocal(DAY, h * 60, TZ)!;
 
 let owner: Client, frontDesk: Client, bridget: Client;
 let otherOwner: Client;
 let clientId: string;
 let serviceId: string;
 
+// Each on a day of its own, 10 to 11: the database never double-books
+// Bridget.
+let visits = 0;
 async function visit(status: "checked_in" | "completed" | "booked") {
+  const day = addDays(DAY, ++visits);
+  const at = (h: number) => fromLocal(day, h * 60, TZ)!;
   const { data: a, error } = await admin
     .from("appointments")
     .insert({ business_id: B, location_id: L, client_id: clientId, starts_at: at(10).toISOString(), ends_at: at(11).toISOString(), status, checked_in_at: status === "booked" ? null : at(10).toISOString() })

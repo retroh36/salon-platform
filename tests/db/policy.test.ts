@@ -10,12 +10,20 @@ import { createHash, randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runPolicyCharges } from "@/lib/policy-billing";
 import { cancelFee, DEFAULT_POLICY, visitTerms, type PolicySettings } from "@/lib/policy";
-import { admin, SEED, signIn, type Client } from "./helpers";
+import { admin, SEED, signIn, throwawayStylist, type Client } from "./helpers";
 
 const B = SEED.business;
 const L = SEED.location;
 const BRIDGET = SEED.staff.bridget;
-const GIL = SEED.staff.gil;
+// Fixture visits are set up around now, so each gets a stylist of its own
+// (the demo calendar is busy then); GIL is the one with stricter rules.
+const stylists: Awaited<ReturnType<typeof throwawayStylist>>[] = [];
+const newStylist = async () => {
+  const s = await throwawayStylist(`${TAG}Sty`);
+  stylists.push(s);
+  return s.id;
+};
+let GIL: string;
 const TAG = `Pol${Date.now().toString(36)}`;
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -75,7 +83,7 @@ async function saveCard(clientId: string, ref: string) {
   expect(error).toBeNull();
 }
 
-// A $100 cut with Bridget (or someone else), hoursAhead from now, booked
+// A $100 cut with a stylist of its own (or the one given), hoursAhead from now, booked
 // bookedDaysAgo days ago.
 async function visit(clientId: string, opts: { hoursAhead: number; bookedDaysAgo?: number; staffId?: string; depositCents?: number }) {
   const start = new Date(Date.now() + opts.hoursAhead * HOUR);
@@ -97,7 +105,7 @@ async function visit(clientId: string, opts: { hoursAhead: number; bookedDaysAgo
     .select("id")
     .single();
   expect(error).toBeNull();
-  await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: cut, staff_id: opts.staffId ?? BRIDGET, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: 60, price_cents: 10000 });
+  await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: cut, staff_id: opts.staffId ?? (await newStylist()), starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: 60, price_cents: 10000 });
   return a!.id;
 }
 
@@ -118,10 +126,15 @@ beforeAll(async () => {
   await admin.from("staff_policies").delete().eq("business_id", B);
   cut = (await admin.from("services").select("id").eq("business_id", B).eq("name", "Women's Cut & Style").single()).data!.id;
   expect((await owner.rpc("save_policy_settings", { p_business_id: B, p: POLICY })).error).toBeNull();
+  GIL = await newStylist();
 });
 
 afterAll(async () => {
-  for (const c of clients) await admin.from("appointments").delete().eq("client_id", c);
+  for (const c of clients) {
+    await admin.from("sales").delete().eq("client_id", c);
+    await admin.from("appointments").delete().eq("client_id", c);
+  }
+  for (const s of stylists) await s.remove();
   await admin.from("clients").delete().in("id", clients);
   await admin.from("policy_settings").delete().eq("business_id", B);
   if (savedPolicy) await admin.from("policy_settings").insert(savedPolicy as never);

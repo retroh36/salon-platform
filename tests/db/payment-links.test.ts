@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { linkSnapshot, linkTotal, type LinkSnapshot } from "@/lib/payment-links";
 import { EMPTY_TICKET, type Ticket } from "@/lib/ticket";
 import { testProvider } from "@/lib/payments/test-provider";
-import { admin, SEED, signIn, type Client } from "./helpers";
+import { admin, SEED, signIn, throwawayStylist, type Client } from "./helpers";
 
 // payLink learns from the visit after the response; nothing to do here.
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: () => {} }));
@@ -15,7 +15,9 @@ const { payLink } = await import("@/app/pay/[token]/actions");
 
 const B = SEED.business;
 const L = SEED.location;
-const BRIDGET = SEED.staff.bridget;
+// The visits are checked in now, when the demo calendar is busy: each gets
+// a stylist of its own, called Bridget on the ticket.
+const stylists: Awaited<ReturnType<typeof throwawayStylist>>[] = [];
 const TAG = `Pl${Date.now().toString(36)}`;
 
 let frontDesk: Client;
@@ -24,6 +26,9 @@ const clients: string[] = [];
 
 // A checked-in $100 cut with Bridget, and its open checkout with a ticket.
 async function checkout() {
+  const own = await throwawayStylist("Bridget");
+  stylists.push(own);
+  const BRIDGET = own.id;
   const { data: c } = await admin.from("clients").insert({ business_id: B, first_name: `${TAG}Pia`, last_name: "Test", phone: "(312) 555-0199" }).select("id").single();
   clients.push(c!.id);
   const { data: cut } = await admin.from("services").select("id").eq("business_id", B).eq("name", "Women's Cut & Style").single();
@@ -43,7 +48,7 @@ async function checkout() {
   expect(error).toBeNull();
   const { data: b } = await admin.from("businesses").select("tax_rate_services_bp, tax_rate_retail_bp").eq("id", B).single();
   const snapshot = linkSnapshot(ticket, { taxServicesBp: b!.tax_rate_services_bp ?? 0, taxRetailBp: b!.tax_rate_retail_bp ?? 0, member: null }, { appointmentId: a!.id, clientId: c!.id }, [{ id: BRIDGET, firstName: "Bridget" }], "Pia") as LinkSnapshot;
-  return { appointmentId: a!.id, draftId: draft!.id, snapshot };
+  return { appointmentId: a!.id, draftId: draft!.id, snapshot, BRIDGET };
 }
 
 async function send(c: Client, draftId: string, snapshot: LinkSnapshot) {
@@ -62,6 +67,7 @@ afterAll(async () => {
     await admin.from("appointments").delete().eq("client_id", c);
   }
   await admin.from("clients").delete().in("id", clients);
+  for (const s of stylists) await s.remove();
 });
 
 describe("payment links", () => {
@@ -81,7 +87,7 @@ describe("payment links", () => {
   });
 
   it("completes the sale when paid, as the sender: tips, the visit checked out, the card taken online; once only", async () => {
-    const { appointmentId, draftId, snapshot } = await checkout();
+    const { appointmentId, draftId, snapshot, BRIDGET } = await checkout();
     const { data: linkId } = await send(frontDesk, draftId, snapshot);
     const tips = [{ staff_id: BRIDGET, amount_cents: 2000 }];
     const { data: saleId, error } = await admin.rpc("complete_payment_link", { p_link_id: linkId!, p_tips: tips as never, p_total_cents: linkTotal(snapshot, tips), p_provider: "test", p_reference: "test_ch_abc" });

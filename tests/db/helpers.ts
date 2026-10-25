@@ -117,6 +117,22 @@ export async function createOtherSalon() {
   };
 }
 
+// A stylist of their own for a test's fixture visits, written straight into
+// the tables: the database never double-books anyone, so visits set up at
+// "now" can't share a seeded stylist with the demo calendar. Delete the
+// visits first, then call remove().
+export async function throwawayStylist(firstName: string, level: "artisan" | "senior" | "master" | null = null) {
+  const { data, error } = await admin.from("staff").insert({ business_id: SEED.business, location_id: SEED.location, first_name: firstName, role: "stylist", level }).select("id").single();
+  if (error) throw error;
+  return {
+    id: data.id,
+    async remove() {
+      const { error: e } = await admin.from("staff").delete().eq("id", data.id);
+      if (e) throw e;
+    },
+  };
+}
+
 // The default seed has a clear calendar; the tests need the demo month.
 export async function requireDemoData() {
   const { count, error } = await admin.from("appointments").select("id", { count: "exact", head: true }).eq("business_id", SEED.business);

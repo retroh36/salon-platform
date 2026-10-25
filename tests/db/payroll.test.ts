@@ -26,14 +26,17 @@ const sales: Record<"kept" | "voidedSoon" | "voidedLater", string> = { kept: "",
 
 // A $100 cut with Bridget (a visit of its own), a product she sold and one
 // Shae sold, and a $15 tip for Bridget, paid by card.
+let sold = 0;
 async function sell(): Promise<string> {
   const [{ data: cut }, { data: product }, { data: b }] = await Promise.all([
     admin.from("services").select("id").eq("business_id", B).eq("name", "Women's Cut & Style").single(),
     admin.from("products").select("id, price_cents").eq("id", productId).single(),
     admin.from("businesses").select("tax_rate_services_bp, tax_rate_retail_bp").eq("id", B).single(),
   ]);
-  const start = "2020-03-03T16:00:00Z";
-  const end = "2020-03-03T17:00:00Z";
+  // Each an hour after the last: Bridget is never booked twice.
+  const start = new Date(Date.parse("2020-03-03T16:00:00Z") + sold * 3_600_000).toISOString();
+  const end = new Date(Date.parse(start) + 3_600_000).toISOString();
+  sold++;
   const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: clientId, starts_at: start, ends_at: end, status: "checked_in" }).select("id").single();
   const { data: item } = await admin
     .from("appointment_items")

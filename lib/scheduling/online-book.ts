@@ -62,7 +62,8 @@ export async function bookOnline(admin: Supabase, location: Location, input: Onl
       p_manage_token_hash: input.manageTokenHash,
       p_source: input.source ?? (null as never),
     });
-    if (error?.code === "40001") continue;
+    // A stale calendar, or a clash the database caught (23P01): check again.
+    if (error?.code === "40001" || error?.code === "23P01") continue;
     if (error?.code === "P0002") return { ok: false, error: "not_found" };
     if (error) throw error;
     return { ok: true, appointmentId: data, items };

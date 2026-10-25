@@ -48,7 +48,9 @@ async function service(name: string) {
 }
 
 // A visit straight into the database (as an import would, rules unchecked).
-async function seed(clientId: string, staffId: string, start: Date, name = "Women's Cut & Style", status: "booked" | "checked_in" = "booked") {
+// `imported`: brought in from another system as it was, so the database
+// lets it clash (only an import can double-book).
+async function seed(clientId: string, staffId: string, start: Date, name = "Women's Cut & Style", status: "booked" | "checked_in" = "booked", imported = false) {
   const s = await service(name);
   const end = new Date(start.getTime() + s.duration_minutes! * 60_000).toISOString();
   const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: clientId, starts_at: start.toISOString(), ends_at: end, created_by: FRONT_DESK, status }).select("id").single();
@@ -64,6 +66,7 @@ async function seed(clientId: string, staffId: string, start: Date, name = "Wome
     processing_minutes: s.processing_minutes,
     finishing_minutes: s.finishing_minutes,
     price_cents: s.price_cents,
+    imported,
   });
   expect(error).toBeNull();
   return a!.id;
@@ -245,8 +248,8 @@ test.describe("running late", () => {
 
 test.describe("on the calendar", () => {
   test("a double-booking (from an import) gets fixes", async ({ page }) => {
-    await seed(await newClient("Ann"), BRIDGET, at(10));
-    await seed(await newClient("Bea"), BRIDGET, at(10, 30));
+    await seed(await newClient("Ann"), BRIDGET, at(10), undefined, "booked", true);
+    await seed(await newClient("Bea"), BRIDGET, at(10, 30), undefined, "booked", true);
     await openDay(page);
     const panel = denisePanel(page);
     await expect(panel).toContainText("Bridget is double-booked");

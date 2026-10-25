@@ -62,9 +62,11 @@ describe("learning from the demo history", () => {
     // A finished one-service visit and a two-service one, both untapped.
     const blowout = await serviceId("Blowout");
     const cut = await serviceId("Women's Cut & Style");
-    const day = new Date(Date.now() - 3 * 86_400_000);
-    day.setUTCHours(15, 0, 0, 0);
-    const visit = async (services: string[], minutes: number) => {
+    // 4am at the salon three days ago, before anything in the demo calendar.
+    const first = new Date(Date.now() - 3 * 86_400_000);
+    first.setUTCHours(9, 0, 0, 0);
+    const visit = async (services: string[], minutes: number, hoursLater = 0) => {
+      const day = new Date(first.getTime() + hoursLater * 3_600_000);
       const end = new Date(day.getTime() + 45 * services.length * 60_000);
       const { data: a } = await admin
         .from("appointments")
@@ -90,7 +92,7 @@ describe("learning from the demo history", () => {
     // Every visit counted, outliers included.
     const total = (d: DurationInsight | undefined) => (d ? d.visits + d.outliers : 0);
     const was = total(await before());
-    const ids = [await visit([blowout], 50), await visit([blowout, cut], 300)];
+    const ids = [await visit([blowout], 50), await visit([blowout, cut], 300, 1)];
     try {
       await recomputeForVisit(admin, ids[0]);
       const now = await before();

@@ -188,7 +188,8 @@ export async function saveBooking(supabase: Supabase, location: Location, input:
       })),
       p_expected_version: version.data.calendar_version,
     });
-    if (error?.code === "40001") continue;
+    // A stale calendar, or a clash the database caught (23P01): check again.
+    if (error?.code === "40001" || error?.code === "23P01") continue;
     if (error?.code === "42501") return { ok: false, error: "forbidden" };
     // Not found, or a client, stylist, service or chair from elsewhere.
     if (error?.code === "P0002" || error?.code === "23503") return { ok: false, error: "not_found" };
@@ -309,7 +310,8 @@ export async function undoNoShow(supabase: Supabase, location: Location, appoint
     }
     if (problems.length) return { ok: false, error: "invalid", problems };
     const { error } = await supabase.rpc("undo_no_show", { p_appointment_id: appointmentId, p_expected_version: version.data.calendar_version });
-    if (error?.code === "40001") continue;
+    // A stale calendar, or a clash the database caught (23P01): check again.
+    if (error?.code === "40001" || error?.code === "23P01") continue;
     if (error?.code === "42501") return { ok: false, error: "forbidden" };
     if (error?.code === "55000") return { ok: false, error: "not_allowed" };
     if (error) throw error;

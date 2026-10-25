@@ -124,7 +124,8 @@ describe("booking", () => {
   });
 
   it("says when every chair is taken", async () => {
-    // Every chair busy 10-10:30 (set up directly; no stylists needed).
+    // Every chair busy 10-10:30 (set up directly), each with its own
+    // stylist: the database never lets one stylist hold seven chairs.
     const { data: a } = await admin
       .from("appointments")
       .insert({ business_id: B, location_id: SEED.location, starts_at: at(10).toISOString(), ends_at: at(10, 30).toISOString() })
@@ -132,13 +133,13 @@ describe("booking", () => {
       .single();
     created.push(a!.id);
     const { error } = await admin.from("appointment_items").insert(
-      [1, 2, 3, 4, 5, 6, 7].map((n) => ({
+      [GIL, SHAE, SEED.staff.hannah, SEED.staff.nola, SEED.staff.sandra, SEED.staff.lois, MANAGER].map((staffId, i) => ({
         business_id: B,
         location_id: SEED.location,
         appointment_id: a!.id,
         service_id: services.get("Men's Cut")!,
-        staff_id: GIL,
-        resource_id: CHAIR(n),
+        staff_id: staffId,
+        resource_id: CHAIR(i + 1),
         starts_at: at(10).toISOString(),
         ends_at: at(10, 30).toISOString(),
         active_minutes: 30,

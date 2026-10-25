@@ -60,6 +60,7 @@ afterEach(async () => {
 
 afterAll(async () => {
   await admin.from("stock_movements").delete().in("product_id", [tube, bottle]);
+  await admin.from("stock_levels").delete().in("product_id", [tube, bottle]);
   await admin.from("products").delete().eq("brand", RUN);
   await admin.from("suppliers").delete().eq("id", supplier);
   await other?.cleanup();
@@ -135,7 +136,8 @@ describe("Denise's reorders", () => {
     await admin.from("stock_levels").upsert({ business_id: B, location_id: L, product_id: tube, on_hand: 60, reorder_point: 60, reorder_quantity: 4 }, { onConflict: "location_id,product_id" });
     const ids: string[] = [];
     for (const [i, days] of [2, 3, 3, 4].entries()) {
-      const start = fromLocal(addDays(today, days), (6 + i) * 60, TZ)!;
+      // Early, before the salon's day, and apart: never over Bridget's own.
+      const start = fromLocal(addDays(today, days), (1 + 2 * i) * 60, TZ)!;
       const end = new Date(start.getTime() + service!.duration_minutes! * 60_000);
       const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: client!.id, starts_at: start.toISOString(), ends_at: end.toISOString(), status: "confirmed" }).select("id").single();
       const { data: it } = await admin
@@ -153,6 +155,9 @@ describe("Denise's reorders", () => {
   async function cleanWeek(ids: string[]) {
     await admin.from("client_formulas").delete().eq("formula", `${RUN} formula`);
     await admin.from("appointments").delete().in("id", ids);
+    // Everything of the run's clients, even a visit a failed setup left.
+    const { data: theirs } = await admin.from("clients").select("id").eq("first_name", `${RUN} Client`);
+    await admin.from("appointments").delete().in("client_id", (theirs ?? []).map((c) => c.id));
     await admin.from("clients").delete().eq("first_name", `${RUN} Client`);
     await admin.from("stock_movements").delete().eq("product_id", tube);
     await admin.from("stock_levels").delete().eq("product_id", tube);

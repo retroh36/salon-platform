@@ -267,7 +267,8 @@ export async function applyAction(supabase: Supabase, location: Location, action
       p_expected_version: version.data.calendar_version,
       p_client_id: options.clientId ?? null!,
     });
-    if (rpcErr?.code === "40001") continue;
+    // A stale calendar, or a clash the database caught (23P01): check again.
+    if (rpcErr?.code === "40001" || rpcErr?.code === "23P01") continue;
     const known = rpcError(rpcErr?.code);
     if (known) return { ok: false, error: known };
     if (rpcErr) throw rpcErr;
@@ -301,7 +302,8 @@ export async function undoAction(supabase: Supabase, location: Location, actionI
     }
 
     const { error: rpcErr } = await supabase.rpc("undo_ai_action", { p_action_id: actionId, p_expected_version: version.data.calendar_version });
-    if (rpcErr?.code === "40001") continue;
+    // A stale calendar, or a clash the database caught (23P01): check again.
+    if (rpcErr?.code === "40001" || rpcErr?.code === "23P01") continue;
     const known = rpcError(rpcErr?.code);
     if (known) return { ok: false, error: known };
     if (rpcErr) throw rpcErr;
