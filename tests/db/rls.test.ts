@@ -86,6 +86,26 @@ describe("tenant isolation", () => {
   });
 });
 
+describe("salon links the database keeps", () => {
+  it("a checkout draft can't point at another salon's visit, client or sale, and a team member can't be on another salon's commission plan", async () => {
+    const { data: theirClient } = await admin.from("clients").insert({ business_id: other.businessId, first_name: "Elsewhere", last_name: "Client" }).select("id").single();
+    const { data: ourVisit } = await admin.from("appointments").select("id").eq("business_id", SEED_BUSINESS).limit(1).single();
+    const { data: ourSale } = await admin.from("sales").select("id").eq("business_id", SEED_BUSINESS).limit(1).single();
+    const draft = { business_id: other.businessId, location_id: other.locationId, ticket: {} };
+    for (const wrong of [{ client_id: theirClient!.id, appointment_id: ourVisit!.id }, { sale_id: ourSale!.id }]) {
+      const { error } = await admin.from("sale_drafts").insert({ ...draft, ...wrong });
+      expect(error?.code, JSON.stringify(wrong)).toBe("23503");
+    }
+    // Our client on their draft, too.
+    const { data: ourClient } = await admin.from("clients").select("id").eq("business_id", SEED_BUSINESS).limit(1).single();
+    expect((await admin.from("sale_drafts").insert({ ...draft, client_id: ourClient!.id })).error?.code).toBe("23503");
+
+    const { data: plan } = await admin.from("commission_plans").select("id").eq("business_id", SEED_BUSINESS).limit(1).single();
+    const { error } = await admin.from("staff_compensation").upsert({ business_id: other.businessId, staff_id: other.staffId, plan_id: plan!.id });
+    expect(error?.code).toBe("23503");
+  });
+});
+
 describe("roles", () => {
   it("stylists can view staff but not change them", async () => {
     const { data } = await stylist.from("staff").select("id");
