@@ -371,6 +371,11 @@ describe("card links", () => {
     const hash = createHash("sha256").update(token).digest("hex");
     const send = (who: Client) => who.rpc("create_card_request", { p_client_id: c, p_appointment_id: a, p_token_hash: hash, p_deposit_cents: 2500, p_channel: "email", p_to: "ria@example.com", p_hours: 72 });
     expect((await send(stylist)).error?.code).toBe("42501");
+    // A deposit can't be more than the visit costs, or asked for without a visit.
+    const ask = (deposit: number, appointment: string | null) =>
+      frontDesk.rpc("create_card_request", { p_client_id: c, p_appointment_id: appointment as never, p_token_hash: createHash("sha256").update(randomBytes(8)).digest("hex"), p_deposit_cents: deposit, p_channel: "email", p_to: "ria@example.com", p_hours: 72 });
+    expect((await ask(500_000, a)).error?.code).toBe("22023");
+    expect((await ask(2500, null)).error?.code).toBe("22023");
     const { data: requestId, error } = await send(frontDesk);
     expect(error).toBeNull();
     const consent = { policy_text: "Please give us 48 hours' notice.", terms: { window_hours: 48 }, ip_hash: "a".repeat(64) };
