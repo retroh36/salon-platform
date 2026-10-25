@@ -3,7 +3,7 @@
 // Run with `npm run test:db` after `npx supabase db reset`.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { applyAction, recordProposals, rejectAction, undoAction, type Proposal, type ProposalOption } from "@/lib/scheduling/ai-actions";
-import { changeStatus, moveItem, saveBooking, type BookingItemInput } from "@/lib/scheduling/book";
+import { changeStatus, moveItem, saveBooking, saveNotes, type BookingItemInput } from "@/lib/scheduling/book";
 import { fromLocal } from "@/lib/scheduling/time";
 import { admin, createOtherSalon, SEED, signIn, type Client } from "./helpers";
 
@@ -300,6 +300,21 @@ describe("applying and undoing", () => {
     appointments.push(created);
     expect(await changeStatus(frontDesk, created, "check_in")).toEqual({ ok: true });
     expect(await undoAction(frontDesk, location, id)).toEqual({ ok: false, error: "stale" });
+  });
+
+  it("won't undo a booking that's been worked on since, so nothing added to it is lost", async () => {
+    const proposal: Proposal = {
+      changes: [],
+      book: { clientId, items: [{ serviceId: services.get("Women's Cut & Style")!, staffId: BRIDGET, resourceId: null, start: at(17) }] },
+    };
+    const [id] = await recordProposals(frontDesk, SEED.location, { feature: "ask_denise", subject: null, options: [option("Cut", proposal)] });
+    oneOffs.push(id);
+    expect(await applyAction(frontDesk, location, id)).toEqual({ ok: true });
+    const created = ((await action(id))!.previous_state as { created_appointment_id: string }).created_appointment_id;
+    appointments.push(created);
+    expect((await saveNotes(frontDesk, created, "Wants a fringe too")).ok).toBe(true);
+    expect(await undoAction(frontDesk, location, id)).toEqual({ ok: false, error: "stale" });
+    expect((await admin.from("appointments").select("notes").eq("id", created).single()).data!.notes).toBe("Wants a fringe too");
   });
 
   it("refuses a save made against an out-of-date calendar", async () => {
