@@ -13,6 +13,7 @@ import { PackagesList } from "./packages/packages-card";
 import { PhotoGallery } from "@/components/visit-photos";
 import { MembershipList, type MembershipHistory } from "./memberships/membership-card";
 import { PolicyCard } from "./policy-card";
+import { MessagesCard } from "./messages-card";
 import { historyText } from "@/lib/memberships";
 import { loadClientMemberships } from "@/lib/memberships-load";
 import { currentProvider } from "@/lib/payments";
@@ -167,6 +168,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
       )}
 
       {canTakePayments(me.role) && <PolicyCard supabase={supabase} businessId={me.business_id} role={me.role} client={client} tz={tz} />}
+      {canTakePayments(me.role) && <MessagesCard supabase={supabase} clientId={client.id} firstName={client.first_name} tz={tz} />}
 
       {client.allergies && (
         <div
@@ -324,10 +326,10 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
             <Detail
               label="Messages"
               value={
-                [client.sms_opt_in && "Texts OK", client.email_opt_in && "Marketing emails OK"].filter(Boolean).join(" · ") ||
+                [client.sms_opt_in && !client.sms_stopped_at && "Offers by text OK", client.email_opt_in && "Offers by email OK"].filter(Boolean).join(" · ") ||
                 null
               }
-              empty="No marketing"
+              empty="No offers"
             />
           </dl>
         </Card>

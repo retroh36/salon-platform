@@ -337,6 +337,18 @@ from r
 cross join lateral (select (select a from first_names)[(r.h->>'first')::int % 80 + 1] as first_name) f
 cross join lateral (select (select a from last_names)[(r.h->>'last')::int % 60 + 1] as last_name) l;
 
+-- Message consent (lib/messaging/): Bella Carter replied STOP to a text a
+-- month ago, so visit messages go to her by email ("No texts — call or
+-- email"); Carter Lee used an unsubscribe link, so no offers by email, but
+-- reminders still come.
+insert into public.sms_suppressions (phone_digits, stopped_at, keyword) values ('3125550108', now() - interval '30 days', 'STOP');
+select set_config('maestra.consent_source', 'sms_keyword', false), set_config('maestra.consent_detail', 'STOP', false);
+update public.clients set sms_stopped_at = now() - interval '30 days', sms_opt_in = false where id = 'e0000000-0000-4000-8000-000000000008';
+select set_config('maestra.consent_source', 'unsubscribe_link', false), set_config('maestra.consent_detail', 'rebook', false);
+update public.clients set email_opt_in = false where id = 'e0000000-0000-4000-8000-00000000000d';
+select set_config('maestra.consent_source', '', false), set_config('maestra.consent_detail', '', false);
+update public.client_consent_events set created_at = now() - interval '30 days' where client_id in ('e0000000-0000-4000-8000-000000000008', 'e0000000-0000-4000-8000-00000000000d') and source <> 'system';
+
 -- ---------------------------------------------------------------------------
 -- Color formula history for about a third of clients, written by the
 -- colorists (Bridget, Sandra, Gil), roughly every 6 to 8 weeks.

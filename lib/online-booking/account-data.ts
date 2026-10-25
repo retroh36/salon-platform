@@ -17,6 +17,8 @@ export type AccountVisit = {
   items: { serviceId: string; service: string; staffId: string; stylist: string; priceCents: number }[];
 };
 
+export type MessagePrefs = { sms: boolean; email: boolean; visitSms: boolean; visitEmail: boolean; stopped: boolean };
+
 export type AccountData = {
   firstName: string;
   contact: { email: string | null; phone: string | null };
@@ -25,7 +27,8 @@ export type AccountData = {
   giftCards: { last4: string; balanceCents: number; expiresAt: string | null }[];
   packages: { name: string; expiresAt: string | null; left: { service: string; uses: number }[] }[];
   card: { label: string; since: string } | null;
-  messages: { sms: boolean; email: boolean };
+  // Offers (sms, email) and messages about their visits, and whether they replied STOP.
+  messages: MessagePrefs;
   // The last finished visit's services and stylist, to book again.
   rebook: { serviceIds: string[]; staffId: string | null; label: string } | null;
 };
@@ -36,7 +39,7 @@ export async function loadAccount(admin: Admin, account: Account, now = new Date
   const { clientId, businessId } = account;
   const visitColumns = "id, status, starts_at, ends_at, appointment_items(service_id, staff_id, starts_at, price_cents, service:services(name), staff:staff(first_name))";
   const [client, upcoming, past, cards, packages, card] = await Promise.all([
-    admin.from("clients").select("first_name, email, phone, sms_opt_in, email_opt_in").eq("id", clientId).eq("business_id", businessId).single(),
+    admin.from("clients").select("first_name, email, phone, sms_opt_in, email_opt_in, appointment_sms_ok, appointment_email_ok, sms_stopped_at").eq("id", clientId).eq("business_id", businessId).single(),
     admin
       .from("appointments")
       .select(visitColumns)
@@ -89,7 +92,7 @@ export async function loadAccount(admin: Admin, account: Account, now = new Date
       .map((p) => ({ name: p.name, expiresAt: p.expires_at, left: p.client_package_items.filter((i) => i.used < i.total).map((i) => ({ service: i.service.name, uses: i.total - i.used })) }))
       .filter((p) => p.left.length > 0),
     card: card.data ? { label: card.data.label, since: card.data.created_at } : null,
-    messages: { sms: c.sms_opt_in, email: c.email_opt_in },
+    messages: { sms: c.sms_opt_in, email: c.email_opt_in, visitSms: c.appointment_sms_ok, visitEmail: c.appointment_email_ok, stopped: Boolean(c.sms_stopped_at) },
     rebook: last ? { serviceIds: last.items.map((i) => i.serviceId), staffId: stylists.length === 1 ? stylists[0] : null, label: rebookLabel(last) } : null,
   };
 }

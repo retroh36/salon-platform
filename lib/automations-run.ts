@@ -76,10 +76,10 @@ export async function runAutomations(admin: Admin, options: { businessId?: strin
     const bookingUrl = `${siteUrl()}/book/${b.slug}`;
 
     // Clients who've said yes to texts or marketing email.
-    const clients = await paged<{ id: string; first_name: string; phone: string | null; email: string | null; sms_opt_in: boolean; email_opt_in: boolean; birth_month: number | null; birth_day: number | null }>((from, to) =>
+    const clients = await paged<{ id: string; first_name: string; phone: string | null; email: string | null; sms_opt_in: boolean; email_opt_in: boolean; sms_stopped_at: string | null; birth_month: number | null; birth_day: number | null }>((from, to) =>
       admin
         .from("clients")
-        .select("id, first_name, phone, email, sms_opt_in, email_opt_in, birth_month, birth_day")
+        .select("id, first_name, phone, email, sms_opt_in, email_opt_in, sms_stopped_at, birth_month, birth_day")
         .eq("business_id", businessId)
         .or("sms_opt_in.eq.true,email_opt_in.eq.true")
         .order("id")
@@ -121,7 +121,7 @@ export async function runAutomations(admin: Admin, options: { businessId?: strin
     const stylist = new Map((staff.data ?? []).map((s) => [s.id, s.first_name]));
 
     const send = async (a: Automation, c: (typeof clients)[number], cycleKey: string, appointmentId: string | null, preferredStaffId: string | null) => {
-      const to = channelFor({ phone: c.phone, email: c.email, smsOptIn: c.sms_opt_in, emailOptIn: c.email_opt_in }, a.settings.prefer ?? "sms");
+      const to = channelFor({ phone: c.phone, email: c.email, smsOptIn: c.sms_opt_in && !c.sms_stopped_at, emailOptIn: c.email_opt_in }, a.settings.prefer ?? "sms");
       if (!to) return false;
       const values = {
         first_name: c.first_name,

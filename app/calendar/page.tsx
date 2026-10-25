@@ -1,3 +1,4 @@
+import { allowedChannels, consentOf, noTextsFlag } from "@/lib/messaging/consent";
 import type { Metadata } from "next";
 import { isUuid } from "@/lib/ids";
 import { cookies } from "next/headers";
@@ -58,7 +59,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     supabase
       .from("appointment_items")
       .select(
-        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, price_cents, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, checked_in_at, checked_out_at, created_at, updated_at, created_by, updated_by, deposit_cents, deposit_paid_cents, starts_at, series_id, series_index, series:appointment_series(interval_weeks), group:appointment_groups(id, label), client:clients(id, first_name, last_name, phone, email, allergies, preferences))",
+        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, price_cents, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, checked_in_at, checked_out_at, created_at, updated_at, created_by, updated_by, deposit_cents, deposit_paid_cents, starts_at, series_id, series_index, series:appointment_series(interval_weeks), group:appointment_groups(id, label), client:clients(id, first_name, last_name, phone, email, allergies, preferences, appointment_sms_ok, appointment_email_ok, sms_opt_in, email_opt_in, sms_stopped_at))",
       )
       .eq("location_id", me.location.id)
       .lt("starts_at", dayEnd.toISOString())
@@ -183,7 +184,19 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       checkedOutAt: a.checked_out_at,
       notes: a.notes ?? "",
       client: client
-        ? { id: client.id, name: fullName(client), phone: client.phone, email: client.email, allergies: client.allergies, preferences: client.preferences }
+        ? {
+            id: client.id,
+            name: fullName(client),
+            phone: client.phone,
+            email: client.email,
+            allergies: client.allergies,
+            preferences: client.preferences,
+            messages: {
+              appointment: allowedChannels(consentOf(client), "appointment"),
+              marketing: allowedChannels(consentOf(client), "marketing"),
+              noTexts: noTextsFlag(consentOf(client)),
+            },
+          }
         : null,
       items: [],
       bookedBy: bookedLine(a),
@@ -437,6 +450,9 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   const initialView: ViewKey =
     lastView && ((FAMILIES as readonly string[]).includes(lastView) || views.some((v) => viewKey(v.id) === lastView)) ? (lastView as ViewKey) : "all";
 
+  // Who may write their own messages to clients (owners always).
+  const { data: business } = await supabase.from("businesses").select("free_text_roles").eq("id", me.business_id).single();
+  const freeText = me.role === "owner" || Boolean(business?.free_text_roles.includes(me.role));
   const data: BoardData = {
     stamp,
     focus: {
@@ -494,7 +510,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       resources: resourcesResult.data,
       products,
     },
-    me: { staffId: me.id, role: me.role, canBook: canBook(me.role), canArrange: can(me, "settings"), zoom: isZoom(me.calendar_zoom) ? me.calendar_zoom : "comfortable", fitAll: jar.get(fitCookie(me.id))?.value === "1" },
+    me: { staffId: me.id, role: me.role, canBook: canBook(me.role), canArrange: can(me, "settings"), freeText, zoom: isZoom(me.calendar_zoom) ? me.calendar_zoom : "comfortable", fitAll: jar.get(fitCookie(me.id))?.value === "1" },
     views,
     initialView,
   };

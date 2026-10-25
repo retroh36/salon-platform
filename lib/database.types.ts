@@ -291,14 +291,14 @@ isOneToOne: false
                   ]
                 },"businesses": {
                   Row: {
-                    "ai_daily_token_limit": number,"auto_lock_minutes": number,"cash_float_cents": number,"created_at": string,"discount_max_percent": number,"discount_roles": (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months": number | null,"gift_card_presets_cents": (number)[],"google_review_url": string | null,"id": string,"logo_path": string | null,"name": string,"next_sale_number": number,"patch_test_enforcement": string,"patch_test_min_hours": number,"patch_test_valid_days": number,"pay_period": string,"pay_period_anchor": string,"plan": string,"promo_card_expiry_days": number,"receipt_footer": string | null,"receipt_show_stylists": boolean,"settings": NonNullable<Json>,"slug": string | null,"tax_rate_retail_bp": number,"tax_rate_services_bp": number,"updated_at": string,"yelp_url": string | null
+                    "ai_daily_token_limit": number,"auto_lock_minutes": number,"cash_float_cents": number,"created_at": string,"discount_max_percent": number,"discount_roles": (Database["public"]['Enums']["staff_role"])[],"free_text_roles": (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months": number | null,"gift_card_presets_cents": (number)[],"google_review_url": string | null,"id": string,"logo_path": string | null,"name": string,"next_sale_number": number,"patch_test_enforcement": string,"patch_test_min_hours": number,"patch_test_valid_days": number,"pay_period": string,"pay_period_anchor": string,"plan": string,"promo_card_expiry_days": number,"receipt_footer": string | null,"receipt_show_stylists": boolean,"settings": NonNullable<Json>,"slug": string | null,"tax_rate_retail_bp": number,"tax_rate_services_bp": number,"updated_at": string,"yelp_url": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "ai_daily_token_limit"?: number,"auto_lock_minutes"?: number,"cash_float_cents"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_presets_cents"?: (number)[],"google_review_url"?: string | null,"id"?: string,"logo_path"?: string | null,"name": string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"pay_period"?: string,"pay_period_anchor"?: string,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"updated_at"?: string,"yelp_url"?: string | null
+                    "ai_daily_token_limit"?: number,"auto_lock_minutes"?: number,"cash_float_cents"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"free_text_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_presets_cents"?: (number)[],"google_review_url"?: string | null,"id"?: string,"logo_path"?: string | null,"name": string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"pay_period"?: string,"pay_period_anchor"?: string,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"updated_at"?: string,"yelp_url"?: string | null
                   }
                   Update: {
-                    "ai_daily_token_limit"?: number,"auto_lock_minutes"?: number,"cash_float_cents"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_presets_cents"?: (number)[],"google_review_url"?: string | null,"id"?: string,"logo_path"?: string | null,"name"?: string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"pay_period"?: string,"pay_period_anchor"?: string,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"updated_at"?: string,"yelp_url"?: string | null
+                    "ai_daily_token_limit"?: number,"auto_lock_minutes"?: number,"cash_float_cents"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"free_text_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_presets_cents"?: (number)[],"google_review_url"?: string | null,"id"?: string,"logo_path"?: string | null,"name"?: string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"pay_period"?: string,"pay_period_anchor"?: string,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"updated_at"?: string,"yelp_url"?: string | null
                   }
                   Relationships: [
                     
@@ -475,6 +475,38 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"client_consent_events": {
+                  Row: {
+                    "business_id": string,"channel": string,"client_id": string,"created_at": string,"detail": string | null,"granted": boolean,"id": string,"purpose": string,"source": string,"staff_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"channel": string,"client_id": string,"created_at"?: string,"detail"?: string | null,"granted": boolean,"id"?: string,"purpose": string,"source": string,"staff_id"?: string | null
+                  }
+                  Update: {
+                    "business_id"?: string,"channel"?: string,"client_id"?: string,"created_at"?: string,"detail"?: string | null,"granted"?: boolean,"id"?: string,"purpose"?: string,"source"?: string,"staff_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "client_consent_events_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_consent_events_client_id_fkey"
+      columns: ["client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_consent_events_staff_id_fkey"
+      columns: ["staff_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"client_forms": {
                   Row: {
                     "answers": NonNullable<Json>,"business_id": string,"client_id": string,"collected_by": string | null,"fields": NonNullable<Json>,"id": string,"signature": string | null,"signed_at": string,"template_id": string | null,"template_name": string
@@ -598,6 +630,50 @@ isOneToOne: false
       columns: ["sale_id"]
 isOneToOne: false
       referencedRelation: "sales"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"client_messages": {
+                  Row: {
+                    "appointment_id": string | null,"body": string,"business_id": string,"channel": string,"client_id": string,"created_at": string,"id": string,"outbox_id": string | null,"purpose": string,"sent_by": string | null,"subject": string | null,"template": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "appointment_id"?: string | null,"body": string,"business_id": string,"channel": string,"client_id": string,"created_at"?: string,"id"?: string,"outbox_id"?: string | null,"purpose": string,"sent_by"?: string | null,"subject"?: string | null,"template": string
+                  }
+                  Update: {
+                    "appointment_id"?: string | null,"body"?: string,"business_id"?: string,"channel"?: string,"client_id"?: string,"created_at"?: string,"id"?: string,"outbox_id"?: string | null,"purpose"?: string,"sent_by"?: string | null,"subject"?: string | null,"template"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "client_messages_appointment_id_fkey"
+      columns: ["appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_messages_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_messages_client_id_fkey"
+      columns: ["client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_messages_outbox_id_fkey"
+      columns: ["outbox_id"]
+isOneToOne: false
+      referencedRelation: "outbox_messages"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_messages_sent_by_fkey"
+      columns: ["sent_by"]
+isOneToOne: false
+      referencedRelation: "staff"
       referencedColumns: ["id"]
     }
                   ]
@@ -737,14 +813,14 @@ isOneToOne: false
                   ]
                 },"clients": {
                   Row: {
-                    "allergies": string | null,"birth_day": number | null,"birth_month": number | null,"business_id": string,"consent_signed_on": string | null,"created_at": string,"email": string | null,"email_opt_in": boolean,"first_name": string,"id": string,"last_name": string,"notes": string | null,"phone": string | null,"phone_digits": string | null,"photo_consent_by": string | null,"photo_consent_on": string | null,"preferences": string | null,"preferred_staff_id": string | null,"search_name": string | null,"sms_opt_in": boolean,"updated_at": string
+                    "allergies": string | null,"appointment_email_ok": boolean,"appointment_sms_ok": boolean,"birth_day": number | null,"birth_month": number | null,"business_id": string,"consent_signed_on": string | null,"created_at": string,"email": string | null,"email_opt_in": boolean,"first_name": string,"id": string,"last_name": string,"notes": string | null,"phone": string | null,"phone_digits": string | null,"photo_consent_by": string | null,"photo_consent_on": string | null,"preferences": string | null,"preferred_staff_id": string | null,"search_name": string | null,"sms_opt_in": boolean,"sms_stopped_at": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "allergies"?: string | null,"birth_day"?: number | null,"birth_month"?: number | null,"business_id": string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"first_name": string,"id"?: string,"last_name"?: string,"notes"?: string | null,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"updated_at"?: string
+                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id": string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"first_name": string,"id"?: string,"last_name"?: string,"notes"?: string | null,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "allergies"?: string | null,"birth_day"?: number | null,"birth_month"?: number | null,"business_id"?: string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"first_name"?: string,"id"?: string,"last_name"?: string,"notes"?: string | null,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"updated_at"?: string
+                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id"?: string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"first_name"?: string,"id"?: string,"last_name"?: string,"notes"?: string | null,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -2413,6 +2489,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"sms_suppressions": {
+                  Row: {
+                    "keyword": string,"phone_digits": string,"stopped_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "keyword": string,"phone_digits": string,"stopped_at"?: string
+                  }
+                  Update: {
+                    "keyword"?: string,"phone_digits"?: string,"stopped_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"staff": {
                   Row: {
                     "assists_staff_id": string | null,"business_id": string,"calendar_position": number | null,"calendar_zoom": string,"color": string | null,"created_at": string,"email": string | null,"first_name": string,"goal_alert_seen_on": string | null,"goal_alerts": string,"id": string,"is_active": boolean,"last_name": string,"level": Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone": string | null,"photo_path": string | null,"role": Database["public"]['Enums']["staff_role"],"updated_at": string,"user_id": string | null
@@ -3436,6 +3526,9 @@ isOneToOne: false
 "seen_goal_alert":
 { Args: { "p_milestones": Json,"p_on": string }; Returns: undefined
                            },
+"send_client_message":
+{ Args: { "p_appointment_id": string,"p_body": string,"p_channel": string,"p_opt_out_hash"?: string,"p_purpose": string,"p_subject": string,"p_template": string }; Returns: string
+                           },
 "send_purchase_order":
 { Args: { "p_order_id": string }; Returns: undefined
                            },
@@ -3465,6 +3558,12 @@ isOneToOne: false
                            },
 "set_checkout_settings":
 { Args: { "p_business_id": string,"p_settings": Json }; Returns: undefined
+                           },
+"set_client_consent":
+{ Args: { "p_changes": Json,"p_client_id": string,"p_detail"?: string,"p_source": string }; Returns: undefined
+                           },
+"set_free_text_roles":
+{ Args: { "p_business_id": string,"p_roles": (string)[] }; Returns: undefined
                            },
 "set_gift_card_settings":
 { Args: { "p_business_id": string,"p_expiry_months": number,"p_presets": (number)[],"p_promo_days": number }; Returns: undefined
@@ -3513,6 +3612,9 @@ isOneToOne: false
                            },
 "shared_device":
 { Args: { "p_token_hash": string }; Returns: Json
+                           },
+"sms_keyword":
+{ Args: { "p_body": string,"p_phone_digits": string }; Returns: string
                            },
 "staff_permission_list":
 { Args: { "p_staff_id": string }; Returns: {

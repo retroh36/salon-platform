@@ -1,6 +1,7 @@
 // What the server page hands the interactive calendar. Times are minutes
 // since midnight on the day shown, at the location.
 
+import type { Channel } from "@/lib/messaging/consent";
 import type { DurationBasis } from "@/lib/insights/durations";
 import type { VisitPolicy } from "@/lib/policy-visits";
 import type { AppointmentStatus } from "@/lib/appointments";
@@ -94,7 +95,16 @@ export type AppointmentDetail = {
   checkedInAt: string | null;
   checkedOutAt: string | null;
   notes: string;
-  client: { id: string; name: string; phone: string | null; email: string | null; allergies: string | null; preferences: string | null } | null;
+  client: {
+    id: string;
+    name: string;
+    phone: string | null;
+    email: string | null;
+    allergies: string | null;
+    preferences: string | null;
+    // Where messages can reach them (lib/messaging/consent.ts), and "No texts — call or email".
+    messages: { appointment: Channel[]; marketing: Channel[]; noTexts: string | null };
+  } | null;
   items: ItemDetail[];
   // "Booked by Sam Rivera · Tue, Oct 6, 2:15pm" / "Booked online · …"
   bookedBy: string;
@@ -185,7 +195,8 @@ export type BoardData = {
   // fitAll: squeeze every column on screen (Compact zoom), remembered on
   // this device.
   // canArrange: the salon's column order and shared views (the settings permission).
-  me: { staffId: string; role: StaffRole; canBook: boolean; canArrange: boolean; zoom: CalendarZoom; fitAll: boolean };
+  // freeText: may write their own messages to clients (Settings → Messages).
+  me: { staffId: string; role: StaffRole; canBook: boolean; canArrange: boolean; freeText: boolean; zoom: CalendarZoom; fitAll: boolean };
   // Saved views (shared, and this person's own), and the one to open on:
   // the last used on this device.
   views: CalendarView[];

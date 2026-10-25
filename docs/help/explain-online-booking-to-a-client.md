@@ -18,6 +18,7 @@ What a client sees on your booking site, so you can walk them through it on the 
 
 - The code expires in 10 minutes; they can tap **Send a new code**.
 - Texts and email aren't connected yet, so codes and confirmations don't reach clients' phones for now. Ask an owner before promising a client a code by text.
+- On **Review and book**, texts about their appointments are ticked (they can untick it), and offers and news are unticked unless they choose them.
 - New clients can book only if the salon allows it; otherwise they're asked to call.
 - Deposits are paid online when they book, with test cards for now (no real money moves yet).
 - To change or cancel, see Help a client change or cancel an online booking.

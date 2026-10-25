@@ -1,5 +1,6 @@
 "use server";
 
+import { blockedReason } from "@/lib/messaging/send";
 import { createHash, randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
@@ -170,6 +171,9 @@ export async function sendPaymentLink(draftId: string, ticket: Ticket, to: { cha
   const saved = await saveTicket(draftId, ticket);
   if (!saved.ok) return saved;
   const { data: draft } = await s.supabase.from("sale_drafts").select("appointment_id, client_id, client:clients(first_name)").eq("id", draftId).single();
+  // Never a text to a number that replied STOP, or on a channel they turned off.
+  const blocked = await blockedReason(createAdminClient(), to.channel, address, draft!.client_id ? { id: draft!.client_id, firstName: draft!.client?.first_name ?? "The client" } : null);
+  if (blocked) return { ok: false, message: blocked };
   const [settings, memberships, staff, business] = await Promise.all([
     loadCheckoutSettings(s.supabase, s.me.business_id),
     draft!.client_id ? loadClientMemberships(s.supabase, draft!.client_id, true) : Promise.resolve([]),

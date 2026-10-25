@@ -169,14 +169,15 @@ export async function addCard(slug: string): Promise<{ ok: false; message: strin
   redirect(`/card/${token}`);
 }
 
-export async function saveMessagePreferences(slug: string, prefs: { sms: boolean; email: boolean }): Promise<AccountResult> {
+// Their message choices, logged as from their account.
+export async function saveMessagePreferences(slug: string, prefs: { sms: boolean; email: boolean; visitSms: boolean; visitEmail: boolean }): Promise<AccountResult> {
   const s = await signedIn(slug);
   if (!s) return { ok: false, message: "Please sign in again." };
-  const { error } = await s.admin
-    .from("clients")
-    .update({ sms_opt_in: Boolean(prefs.sms), email_opt_in: Boolean(prefs.email) })
-    .eq("id", s.account.clientId)
-    .eq("business_id", s.site.business.id);
+  const { error } = await s.admin.rpc("set_client_consent", {
+    p_client_id: s.account.clientId,
+    p_changes: { sms_opt_in: Boolean(prefs.sms), email_opt_in: Boolean(prefs.email), appointment_sms_ok: Boolean(prefs.visitSms), appointment_email_ok: Boolean(prefs.visitEmail) },
+    p_source: "client_account",
+  });
   if (error) throw error;
   return { ok: true, message: "Saved." };
 }

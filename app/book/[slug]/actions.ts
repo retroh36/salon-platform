@@ -7,6 +7,9 @@
 // a honeypot field for bots. Every booking, change and cancellation is
 // logged.
 
+import { APPOINTMENT_TEXTS_CONSENT, MARKETING_CONSENT } from "@/lib/messaging/consent";
+import { appointmentChannel } from "@/lib/messaging/send";
+import { withStopLine } from "@/lib/messaging/templates";
 import { siteUrl } from "@/lib/branding";
 import { isBookingSource } from "@/lib/online-booking/sources";
 import { normalEmail, phoneDigits, formatPhone } from "@/lib/online-booking/contact";
@@ -233,6 +236,11 @@ export type BookInput = {
   cardRef?: string;
   // Keep them signed in to their account on this device afterwards.
   remember?: boolean;
+  // Their answers at review: texts about their appointments (a no turns
+  // them off), and offers (a yes turns them on; leaving it unticked keeps
+  // what they said before).
+  appointmentTexts?: boolean;
+  offers?: boolean;
 };
 
 export type BookResult =
@@ -325,29 +333,56 @@ export async function book(slug: string, input: BookInput): Promise<BookResult> 
       user_agent: userAgent,
       source: isBookingSource(input.source) ? input.source : "direct",
     }),
-    confirmationMessage(admin, site, contact, start, manageUrl, terms),
+    recordConsent(admin, clientId!, input),
   ]);
+  // After their answers, so a no to texts (or a STOP) sends it by email.
+  await confirmationMessage(admin, site, clientId!, contact, start, manageUrl, terms);
   // "Keep me signed in": their account, made from the code they confirmed.
   if (input.remember && !who.signedIn) await startAccountSession(admin, site.business.id, clientId!, contact.channel, site.business.slug, ipHash);
   return { ok: true, manageUrl: `${manageUrl}?booked=1` };
 }
 
+// What the client ticked at review, logged as from online booking with
+// the wording they saw.
+async function recordConsent(admin: ReturnType<typeof createAdminClient>, clientId: string, input: BookInput) {
+  const changes: Record<string, boolean> = {};
+  const said: string[] = [];
+  if (typeof input.appointmentTexts === "boolean") {
+    changes.appointment_sms_ok = input.appointmentTexts;
+    said.push(`${input.appointmentTexts ? "Yes" : "No"}: ${APPOINTMENT_TEXTS_CONSENT}`);
+  }
+  if (input.offers) {
+    changes.sms_opt_in = true;
+    changes.email_opt_in = true;
+    said.push(`Yes: ${MARKETING_CONSENT}`);
+  }
+  if (!said.length) return;
+  const { error } = await admin.rpc("set_client_consent", { p_client_id: clientId, p_changes: changes, p_source: "online_booking", p_detail: said.join("\n") });
+  if (error) throw error;
+}
+
+// The confirmation, by the channel they confirmed with if they get visit
+// messages there, else the other (a STOP on texts goes to email).
 async function confirmationMessage(
   admin: ReturnType<typeof createAdminClient>,
   site: BookingSite,
+  clientId: string,
   contact: { channel: Channel; destination: string },
   start: Date,
   manageUrl: string,
   terms: OnlineTerms,
 ) {
+  const to = await appointmentChannel(admin, clientId, contact.channel);
+  if (!to) return;
   const local = toLocal(start, site.location.timezone);
   const when = `${new Date(`${local.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })} at ${formatMinute(local.minute)}`;
+  const body = `${site.business.name}: you're booked for ${when}.${terms.depositCents ? ` Deposit paid: $${(terms.depositCents / 100).toFixed(2)}.` : ""} View, change or cancel: ${siteUrl()}${manageUrl}\n\nOur cancellation policy: ${terms.lines.join(" ")}`;
   await admin.from("outbox_messages").insert({
     business_id: site.business.id,
-    channel: contact.channel,
-    to_address: contact.destination,
-    subject: contact.channel === "email" ? `You're booked at ${site.business.name}` : null,
-    body: `${site.business.name}: you're booked for ${when}.${terms.depositCents ? ` Deposit paid: $${(terms.depositCents / 100).toFixed(2)}.` : ""} View, change or cancel: ${siteUrl()}${manageUrl}\n\nOur cancellation policy: ${terms.lines.join(" ")}`,
+    channel: to.channel,
+    to_address: to.channel === "sms" ? phoneDigits(to.to) ?? to.to : to.to,
+    subject: to.channel === "email" ? `You're booked at ${site.business.name}` : null,
+    body: to.channel === "sms" ? withStopLine(body) : body,
   });
 }
 

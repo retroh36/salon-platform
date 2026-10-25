@@ -8,6 +8,8 @@
 // outbox), refunds for fees waived after charging, and deposits to give
 // back (a visit the salon canceled, or the client canceled in good time).
 
+import { channelFor, consentOf } from "./messaging/consent.ts";
+import { withStopLine } from "./messaging/templates.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types.ts";
 import { providerFor } from "./payments/index.ts";
@@ -54,7 +56,7 @@ export async function runPolicyCharges(admin: Admin, options: { businessId?: str
 async function sendReceipts(admin: Admin, options: { businessId?: string; feeId?: string }): Promise<number> {
   let query = admin
     .from("policy_fees")
-    .select("id, business_id, kind, fee_cents, from_deposit_cents, card_label, appointment:appointments(starts_at), client:clients(email, phone), business:businesses(name), location:locations(timezone)")
+    .select("id, business_id, kind, fee_cents, from_deposit_cents, card_label, appointment:appointments(starts_at), client:clients(email, phone, appointment_sms_ok, appointment_email_ok, sms_opt_in, email_opt_in, sms_stopped_at), business:businesses(name), location:locations(timezone)")
     .eq("status", "charged")
     .is("receipt_sent_at", null)
     .gt("fee_cents", 0);
@@ -64,15 +66,16 @@ async function sendReceipts(admin: Admin, options: { businessId?: string; feeId?
   if (error) throw error;
   let sent = 0;
   for (const f of data) {
-    const to = f.client.email ?? f.client.phone;
-    if (to) {
+    // By email if they get emails about visits, else by text (never after a STOP).
+    const dest = channelFor(consentOf(f.client), "appointment", "email");
+    if (dest) {
+      const { channel, to } = dest;
       const local = toLocal(new Date(f.appointment.starts_at), f.location.timezone);
       const when = new Date(`${local.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
       const receipt = feeReceipt(f.business.name, f.kind as "late_cancel" | "no_show", f.fee_cents, f.card_label, f.from_deposit_cents, when);
-      const channel = f.client.email ? "email" : "sms";
       const { error: outError } = await admin
         .from("outbox_messages")
-        .insert({ business_id: f.business_id, channel, to_address: to, subject: channel === "email" ? receipt.subject : null, body: receipt.body });
+        .insert({ business_id: f.business_id, channel, to_address: to, subject: channel === "email" ? receipt.subject : null, body: channel === "sms" ? withStopLine(receipt.body) : receipt.body });
       if (outError) throw outError;
     }
     const { error: markError } = await admin.rpc("record_fee_receipt", { p_fee_id: f.id });

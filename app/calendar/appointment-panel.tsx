@@ -1,5 +1,6 @@
 "use client";
 
+import { MessageClientForm } from "./message-client";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
@@ -78,6 +79,8 @@ export function AppointmentPanel({
   const [confirmingNoShow, setConfirmingNoShow] = useState(false);
   const [moving, setMoving] = useState(false);
   const [reportingLate, setReportingLate] = useState(false);
+  const [messaging, setMessaging] = useState(false);
+  const [sentNote, setSentNote] = useState<string | null>(null);
   const [tab, setTab] = useState<"notes" | "formula" | "photos" | "history">("notes");
   // What the visit still needs before it goes ahead.
   const checklist = client && (status === "booked" || status === "confirmed" || status === "checked_in") ? (appointment.warnings?.checklist ?? []) : [];
@@ -92,6 +95,8 @@ export function AppointmentPanel({
   // The front of house, or a stylist on the visit, can say it's running late.
   const canReportLate = date >= today && isEditable(status) && (me.canBook || items.some((i) => i.staffId === me.staffId));
   // On the day (or after): the front of house, or a stylist on the visit.
+  // Message client: an upcoming visit, from the front of house or a stylist on it.
+  const canMessage = Boolean(client) && date >= today && isEditable(status) && (me.canBook || items.some((i) => i.staffId === me.staffId));
   const canRecordFormula = date <= today && status !== "canceled" && status !== "no_show" && (me.canBook || items.some((i) => i.staffId === me.staffId));
 
   function run(action: AppointmentAction, reason = "", detail = "", scope: Scope | "group" = "this") {
@@ -161,6 +166,7 @@ export function AppointmentPanel({
   const several = items.length > 1;
   const menuActions: MenuAction[] = [
     canReportLate && { key: "late", label: "Running late", onSelect: () => setReportingLate(true) },
+    canMessage && { key: "message", label: "Message client", onSelect: () => (setSentNote(null), setMessaging(true)) },
     me.canBook && isEditable(status) && { key: "edit", label: "Edit booking", onSelect: onEdit },
     me.canBook && (status === "booked" || status === "confirmed") && { key: "move", label: "Move to another day", onSelect: () => setMoving(true) },
     status === "checked_in" && me.canBook && { key: "undo_check_in", label: "Undo check-in", onSelect: undoCheckIn },
@@ -199,6 +205,11 @@ export function AppointmentPanel({
             <p data-testid="visit-status" data-status={status} className="truncate text-ink-muted">
               {visitStatusText(status, STATUS_LABELS, appointment, timeZone)}
             </p>
+            {client?.messages.noTexts && (
+              <p className="text-sm font-medium text-status-late-ink" data-testid="no-texts">
+                {client.messages.noTexts}
+              </p>
+            )}
           </div>
         </header>
 
@@ -343,6 +354,11 @@ export function AppointmentPanel({
               <span>{message}</span>
             </p>
           )}
+          {sentNote && !messaging && (
+            <p role="status" className="text-ink-muted" data-testid="message-sent">
+              {sentNote}
+            </p>
+          )}
           {confirmingCheckIn ? (
             <CheckInWarning
               firstName={firstName}
@@ -390,6 +406,18 @@ export function AppointmentPanel({
                 </Button>
               </div>
             </div>
+          ) : messaging && client ? (
+            <MessageClientForm
+              appointmentId={appointment.id}
+              firstName={firstName}
+              channels={client.messages}
+              freeText={me.freeText}
+              onSent={(note) => {
+                setMessaging(false);
+                setSentNote(note);
+              }}
+              onCancel={() => setMessaging(false)}
+            />
           ) : reportingLate ? (
             <RunningLateForm
               appointment={appointment}

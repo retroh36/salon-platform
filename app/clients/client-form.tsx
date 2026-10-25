@@ -77,11 +77,11 @@ export function ClientForm({
           <div className="flex flex-wrap gap-6 sm:col-span-2">
             <label className={checkLabel}>
               <input type="checkbox" name="sms_opt_in" defaultChecked={fields.sms_opt_in} className={checkboxClass} />
-              Texts OK (reminders and offers)
+              Offers by text OK
             </label>
             <label className={checkLabel}>
               <input type="checkbox" name="email_opt_in" defaultChecked={fields.email_opt_in} className={checkboxClass} />
-              Marketing emails OK
+              Offers by email OK
             </label>
           </div>
         </section>

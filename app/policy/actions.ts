@@ -6,6 +6,7 @@
 // off file. The database checks who may do each; charging and refunds run
 // with the service role straight after (lib/policy-billing.ts).
 
+import { blockedReason } from "@/lib/messaging/send";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { canBook } from "@/lib/appointments";
@@ -37,6 +38,11 @@ export async function sendCardLink(input: { clientId: string; appointmentId: str
   if (!isUuid(input.clientId) || (input.appointmentId && !isUuid(input.appointmentId))) return { ok: false, message: "That client no longer exists." };
   const to = input.channel === "sms" ? phoneDigits(input.to) : normalEmail(input.to);
   if (!to) return { ok: false, message: input.channel === "sms" ? "Enter a 10-digit mobile number." : "Enter an email address like name@example.com." };
+
+  // Never a text to a number that replied STOP, or on a channel they turned off.
+  const { data: who } = await supabase.from("clients").select("first_name").eq("id", input.clientId).maybeSingle();
+  const blocked = await blockedReason(createAdminClient(), input.channel, to, who ? { id: input.clientId, firstName: who.first_name } : null);
+  if (blocked) return { ok: false, message: blocked };
 
   // The deposit is worked out here, never taken from the browser.
   let deposit = 0;

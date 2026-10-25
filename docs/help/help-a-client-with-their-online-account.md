@@ -19,6 +19,7 @@ Clients can have their own account on the salon's booking site, to see and chang
 - **Change or cancel** shows the cancellation policy and any fee before anything changes, and only until the salon's cutoff.
 - Cards are kept by the payment provider; nobody sees the number. Test cards only for now.
 - A client's profile says "Has an online account" once they've made one.
+- Under **Messages** they choose texts and emails **About your visits** and **Offers and news** separately; every change shows in **Consent history** on their profile.
 - Codes go to the outbox for now, until texts and email are connected.
 
 ## If it doesn't work

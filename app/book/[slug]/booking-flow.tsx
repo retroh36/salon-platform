@@ -1,5 +1,6 @@
 "use client";
 
+import { APPOINTMENT_TEXTS_CONSENT, MARKETING_CONSENT } from "@/lib/messaging/consent";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
@@ -64,6 +65,9 @@ export function BookingFlow({
   const [slot, setSlot] = useState<{ date: LocalDate; minute: number; staffIds: string[] } | null>(null);
   const [identity, setIdentity] = useState<Identity>(signedIn ? { phase: "done", session: "account", known: true, firstName: signedIn.firstName } : { phase: "enter" });
   const [remember, setRemember] = useState(false);
+  // Texts about their appointments (on unless they untick it) and offers (off unless they tick it).
+  const [appointmentTexts, setAppointmentTexts] = useState(true);
+  const [offers, setOffers] = useState(false);
   const [details, setDetails] = useState({ firstName: "", lastName: "", phone: "", email: "", note: "" });
   const [agreed, setAgreed] = useState(false);
   // The policy for this visit (from the server), and the card entered.
@@ -153,6 +157,8 @@ export function BookingFlow({
         source,
         cardRef: needsCard ? cardRef : undefined,
         remember: !signedIn && remember,
+        appointmentTexts,
+        offers,
       });
       if (result.ok) {
         router.push(result.manageUrl);
@@ -287,6 +293,10 @@ export function BookingFlow({
             cardRef={cardRef}
             setCardRef={setCardRef}
             agreed={agreed}
+            appointmentTexts={appointmentTexts}
+            setAppointmentTexts={setAppointmentTexts}
+            offers={offers}
+            setOffers={setOffers}
             setAgreed={setAgreed}
           />
         )}
@@ -746,6 +756,10 @@ function ConfirmStep({
   setCardRef,
   agreed,
   setAgreed,
+  appointmentTexts,
+  setAppointmentTexts,
+  offers,
+  setOffers,
 }: {
   site: BookingSite;
   selected: SiteService[];
@@ -757,6 +771,10 @@ function ConfirmStep({
   cardRef: string;
   setCardRef: (v: string) => void;
   agreed: boolean;
+  appointmentTexts: boolean;
+  setAppointmentTexts: (on: boolean) => void;
+  offers: boolean;
+  setOffers: (on: boolean) => void;
   setAgreed: (v: boolean) => void;
 }) {
   const single = stylists.length === 1 ? stylists[0] : null;
@@ -859,6 +877,19 @@ function ConfirmStep({
             {card ? "I agree to the cancellation policy and to my card being saved for it" : "I agree to the cancellation policy"}
           </label>
         </>
+      )}
+      {terms?.ok === true && (
+        <fieldset className="flex flex-col gap-1">
+          <legend className="sr-only">Messages</legend>
+          <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm text-ink">
+            <input type="checkbox" checked={appointmentTexts} onChange={(e) => setAppointmentTexts(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-(--accent)" />
+            {APPOINTMENT_TEXTS_CONSENT}
+          </label>
+          <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm text-ink">
+            <input type="checkbox" checked={offers} onChange={(e) => setOffers(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-(--accent)" />
+            {MARKETING_CONSENT}
+          </label>
+        </fieldset>
       )}
     </div>
   );

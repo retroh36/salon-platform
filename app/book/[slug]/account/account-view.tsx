@@ -299,30 +299,38 @@ export function AccountView({
         <h2 id="messages-heading" className={headingClass}>
           Messages
         </h2>
-        <p className="mt-1 text-sm text-ink-muted">Offers and reminders to come back. Messages about your visits always reach you.</p>
-        <div className="mt-3 flex flex-col gap-2 text-sm">
-          {(
-            [
-              ["sms", "Texts"],
-              ["email", "Emails"],
-            ] as const
-          ).map(([key, label]) => (
-            <label key={key} className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                className="size-5 accent-(--accent)"
-                checked={messages[key]}
-                disabled={pending}
-                onChange={(e) => {
-                  const next = { ...messages, [key]: e.target.checked };
-                  setMessages(next);
-                  run(() => saveMessagePreferences(slug, next));
-                }}
-              />
-              {label} with offers and news
-            </label>
-          ))}
-        </div>
+        {messages.stopped && (
+          <p className="mt-1 text-sm text-ink" data-testid="texts-stopped">
+            You replied STOP, so we don&rsquo;t text you. Text START to us to get texts about your visits again.
+          </p>
+        )}
+        {(
+          [
+            ["About your visits", "Confirmations, reminders and changes.", [["visitSms", "Texts"], ["visitEmail", "Emails"]]],
+            ["Offers and news", "Offers and reminders to come back. Turning these off never stops messages about your visits.", [["sms", "Texts"], ["email", "Emails"]]],
+          ] as const
+        ).map(([title, note, boxes]) => (
+          <fieldset key={title} className="mt-3 flex flex-col gap-2 text-sm">
+            <legend className="font-medium">{title}</legend>
+            <p className="text-ink-muted">{note}</p>
+            {boxes.map(([key, label]) => (
+              <label key={key} className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  className="size-5 accent-(--accent)"
+                  checked={messages[key] && !(messages.stopped && label === "Texts")}
+                  disabled={pending || (messages.stopped && label === "Texts")}
+                  onChange={(e) => {
+                    const next = { ...messages, [key]: e.target.checked };
+                    setMessages(next);
+                    run(() => saveMessagePreferences(slug, next));
+                  }}
+                />
+                {label}
+              </label>
+            ))}
+          </fieldset>
+        ))}
       </section>
 
       {data.past.length > 0 && (
