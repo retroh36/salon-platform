@@ -21,7 +21,7 @@
 --   ari@mapleandash.test         assistant (to Bridget)
 --
 -- PINs for the shared front-desk iPad (Settings → Shared devices):
--- owner 2580, manager 3691, front desk 4826, Bridget 5937, Ari 7193.
+-- owner 258014, manager 369147, front desk 4826, Bridget 5937, Ari 7193.
 
 -- ---------------------------------------------------------------------------
 -- Auth users
@@ -523,8 +523,8 @@ update public.staff_compensation_history set plan_id = 'e1000000-0000-4000-8000-
 insert into public.staff_pins (staff_id, business_id, pin_hash)
 select p.staff_id, 'b0000000-0000-4000-8000-000000000001', extensions.crypt(p.pin, extensions.gen_salt('bf', 8))
 from (values
-  ('d0000000-0000-4000-8000-000000000001'::uuid, '2580'),
-  ('d0000000-0000-4000-8000-000000000002'::uuid, '3691'),
+  ('d0000000-0000-4000-8000-000000000001'::uuid, '258014'),
+  ('d0000000-0000-4000-8000-000000000002'::uuid, '369147'),
   ('d0000000-0000-4000-8000-000000000003'::uuid, '4826'),
   ('d0000000-0000-4000-8000-000000000004'::uuid, '5937'),
   ('d0000000-0000-4000-8000-000000000011'::uuid, '7193')

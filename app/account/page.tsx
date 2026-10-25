@@ -30,7 +30,7 @@ async function Account() {
     <AppShell section="account" me={me}>
       <PageHeader title="Your account" description={`${me.first_name}, ${roleLabel(me.role).toLowerCase()} at ${me.location.business?.name ?? "the salon"}.`} />
       <Card title="Your PIN" titleId="pin-heading" description="For switching in on the salon's shared iPad without your password.">
-        <PinForm hasPin={(withPins ?? []).includes(me.id)} />
+        <PinForm hasPin={(withPins ?? []).includes(me.id)} digits={me.role === "owner" || me.role === "manager" ? 6 : 4} />
       </Card>
       <Card title="Password" titleId="password-heading">
         <Link href="/account/password" className="text-sm font-medium text-link hover:underline">

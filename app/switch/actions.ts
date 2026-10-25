@@ -31,6 +31,7 @@ export async function switchUser(_prev: SwitchState, formData: FormData): Promis
   const result = data as { ok: boolean; reason?: string; left?: number; email?: string };
   if (!result.ok) {
     if (result.reason === "locked") return { error: "Too many wrong PINs. Try again in 5 minutes, or sign in with your password.", staffId };
+    if (result.reason === "needs_six") return { error: "Owners and managers use a 6-digit PIN. Sign in with your password and set one on Your account.", staffId };
     if (result.reason === "wrong") return { error: result.left === 1 ? "That PIN isn't right. One more try before a short lockout." : "That PIN isn't right.", staffId };
     return { error: "That person can't switch in here.", staffId: "" };
   }

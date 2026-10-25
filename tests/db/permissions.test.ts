@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addDays, todayIn } from "@/lib/scheduling/time";
 import { startOfLocalDay } from "@/lib/scheduling/load";
-import { admin, DEFAULT_PERMISSIONS, SEED, signIn, type Client } from "./helpers";
+import { admin, DEFAULT_PERMISSIONS, SEED, signIn, sql, type Client } from "./helpers";
 
 // Roles and per-person permissions (migration …_permissions.sql): what
 // each role can and can't reach, owners' toggles, stylists' and assistants'
@@ -251,6 +251,23 @@ describe("the shared iPad's PINs", () => {
       const { error } = await bridget.rpc("set_my_pin", { p_business_id: B, p_pin: pin });
       expect(error?.code).toBe("22023");
     }
+  });
+
+  it("asks owners and managers for 6 digits, and won't take an older shorter one at the switch", async () => {
+    const { error: four } = await manager.rpc("set_my_pin", { p_business_id: B, p_pin: "3691" });
+    expect(four).toMatchObject({ code: "22023", message: "Owners and managers use 6 digits." });
+    expect((await owner.rpc("set_my_pin", { p_business_id: B, p_pin: "25801" })).error?.code).toBe("22023");
+    expect((await manager.rpc("set_my_pin", { p_business_id: B, p_pin: "369147" })).error).toBeNull();
+    expect((await admin.rpc("check_staff_pin", { p_token_hash: hash, p_staff_id: SEED.staff.manager, p_pin: "369147" })).data).toMatchObject({ ok: true });
+    // One saved before the rule: right, but too short.
+    sql(`update public.staff_pins set pin_hash = extensions.crypt('3691', extensions.gen_salt('bf', 4)) where staff_id = '${SEED.staff.manager}'`);
+    try {
+      expect((await admin.rpc("check_staff_pin", { p_token_hash: hash, p_staff_id: SEED.staff.manager, p_pin: "3691" })).data).toEqual({ ok: false, reason: "needs_six" });
+    } finally {
+      await manager.rpc("set_my_pin", { p_business_id: B, p_pin: "369147" });
+    }
+    // Everyone else keeps 4.
+    expect((await bridget.rpc("set_my_pin", { p_business_id: B, p_pin: "5937" })).error).toBeNull();
   });
 
   it("checks PINs only with the service role, and returns the login to sign in", async () => {
