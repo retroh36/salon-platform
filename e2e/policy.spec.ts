@@ -95,6 +95,9 @@ test("a new client's booking needs a card: the desk sends a link, the client agr
   const card = (await admin.from("client_cards").select("label, consent:policy_consents(channel, policy_text)").eq("client_id", clientId).single()).data!;
   expect(card).toMatchObject({ label: "Visa …4242", consent: { channel: "link" } });
   expect(card.consent.policy_text).toContain("Canceling with less notice costs $40.");
+  // Nothing on the desk's calendar still loading (the card link's action,
+  // the refresh after it, Denise), so navigating away cuts nothing off.
+  await page.waitForLoadState("networkidle");
   const again = await openVisit(page, v);
   await expect(again.getByTestId("policy-info")).toContainText("Visa …4242 on file");
   await expect(again.getByTestId("card-needed")).toHaveCount(0);
