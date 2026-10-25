@@ -25,8 +25,8 @@ async function Settings() {
   if (!me) return <NotLinked />;
   if (!can(me, "settings")) redirect("/dashboard");
   const business = me.location.business;
-  // Usage is counted by UTC day (the database's current_date).
-  const today = todayIn("UTC");
+  // Usage is counted by the salon's day (private.business_today).
+  const today = todayIn(me.location.timezone);
   const since = addDays(today, -6);
   const [{ data: usage, error }, { data: limits, error: limitError }] = await Promise.all([
     supabase.from("ai_usage").select("day, feature, requests, input_tokens, output_tokens").eq("business_id", me.business_id).gte("day", since),

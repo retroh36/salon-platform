@@ -15,8 +15,8 @@ See how much Denise's thinking is used, and cap it per day.
 
 ## Good to know
 
-- At the limit, Denise switches to plain wording until the next day. Everything still works: fixes, the morning brief and the calendar.
+- At the limit, Denise switches to plain wording until midnight at the salon. Everything still works: fixes, the morning brief and the calendar.
 - Set it to 0 to keep her to plain wording all the time.
 - **Connected: No: plain wording only** means her thinking isn't set up for this salon, whatever the limit.
-- Usage is counted by day in UTC, so "today" may roll over in the evening for you.
+- Usage is counted by the salon's day: the limit starts again at midnight at the salon.
 - Limits go up to 50,000,000 tokens a day.
