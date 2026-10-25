@@ -195,6 +195,32 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"appointment_manage_links": {
+                  Row: {
+                    "appointment_id": string,"business_id": string,"created_at": string,"id": string,"token_hash": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "appointment_id": string,"business_id": string,"created_at"?: string,"id"?: string,"token_hash": string
+                  }
+                  Update: {
+                    "appointment_id"?: string,"business_id"?: string,"created_at"?: string,"id"?: string,"token_hash"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "appointment_manage_links_appointment_id_fkey"
+      columns: ["appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "appointment_manage_links_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"appointment_series": {
                   Row: {
                     "business_id": string,"client_id": string | null,"created_at": string,"created_by": string | null,"ends_on": string | null,"id": string,"interval_weeks": number,"location_id": string,"occurrences": number | null
@@ -235,14 +261,14 @@ isOneToOne: false
                   ]
                 },"appointments": {
                   Row: {
-                    "business_id": string,"cancel_reason": string | null,"canceled_at": string | null,"checked_in_at": string | null,"checked_out_at": string | null,"client_id": string | null,"created_at": string,"created_by": string | null,"deposit_cents": number,"deposit_outcome": string | null,"deposit_paid_cents": number,"deposit_provider": string | null,"deposit_reference": string | null,"ends_at": string,"event_id": string | null,"group_id": string | null,"id": string,"location_id": string,"manage_token_hash": string | null,"notes": string | null,"online_source": string | null,"promotion_id": string | null,"series_id": string | null,"series_index": number | null,"source": Database["public"]['Enums']["appointment_source"],"starts_at": string,"status": Database["public"]['Enums']["appointment_status"],"updated_at": string,"updated_by": string | null
+                    "business_id": string,"cancel_reason": string | null,"canceled_at": string | null,"checked_in_at": string | null,"checked_out_at": string | null,"client_id": string | null,"created_at": string,"created_by": string | null,"deposit_cents": number,"deposit_outcome": string | null,"deposit_paid_cents": number,"deposit_provider": string | null,"deposit_reference": string | null,"ends_at": string,"event_id": string | null,"group_id": string | null,"id": string,"location_id": string,"notes": string | null,"online_source": string | null,"promotion_id": string | null,"series_id": string | null,"series_index": number | null,"source": Database["public"]['Enums']["appointment_source"],"starts_at": string,"status": Database["public"]['Enums']["appointment_status"],"updated_at": string,"updated_by": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"checked_in_at"?: string | null,"checked_out_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"deposit_outcome"?: string | null,"deposit_paid_cents"?: number,"deposit_provider"?: string | null,"deposit_reference"?: string | null,"ends_at": string,"event_id"?: string | null,"group_id"?: string | null,"id"?: string,"location_id": string,"manage_token_hash"?: string | null,"notes"?: string | null,"online_source"?: string | null,"promotion_id"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at": string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
+                    "business_id": string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"checked_in_at"?: string | null,"checked_out_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"deposit_outcome"?: string | null,"deposit_paid_cents"?: number,"deposit_provider"?: string | null,"deposit_reference"?: string | null,"ends_at": string,"event_id"?: string | null,"group_id"?: string | null,"id"?: string,"location_id": string,"notes"?: string | null,"online_source"?: string | null,"promotion_id"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at": string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
                   }
                   Update: {
-                    "business_id"?: string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"checked_in_at"?: string | null,"checked_out_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"deposit_outcome"?: string | null,"deposit_paid_cents"?: number,"deposit_provider"?: string | null,"deposit_reference"?: string | null,"ends_at"?: string,"event_id"?: string | null,"group_id"?: string | null,"id"?: string,"location_id"?: string,"manage_token_hash"?: string | null,"notes"?: string | null,"online_source"?: string | null,"promotion_id"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at"?: string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
+                    "business_id"?: string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"checked_in_at"?: string | null,"checked_out_at"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"deposit_outcome"?: string | null,"deposit_paid_cents"?: number,"deposit_provider"?: string | null,"deposit_reference"?: string | null,"ends_at"?: string,"event_id"?: string | null,"group_id"?: string | null,"id"?: string,"location_id"?: string,"notes"?: string | null,"online_source"?: string | null,"promotion_id"?: string | null,"series_id"?: string | null,"series_index"?: number | null,"source"?: Database["public"]['Enums']["appointment_source"],"starts_at"?: string,"status"?: Database["public"]['Enums']["appointment_status"],"updated_at"?: string,"updated_by"?: string | null
                   }
                   Relationships: [
                     {
@@ -3750,6 +3776,9 @@ isOneToOne: false
                            },
 "add_inquiry_photos":
 { Args: { "p_event_id": string,"p_paths": (string)[] }; Returns: undefined
+                           },
+"add_manage_link":
+{ Args: { "p_appointment_id": string,"p_business_id": string,"p_client_id": string,"p_token_hash": string }; Returns: undefined
                            },
 "add_visit_photo":
 { Args: { "p_appointment_id": string,"p_kind": string,"p_path": string }; Returns: string

@@ -28,15 +28,20 @@ export type ManagedBooking = {
   request: VisitRequest;
 };
 
+// Any of the visit's links opens it: the confirmation's, or a newer one
+// from the client's account.
 export async function loadManaged(admin: SupabaseClient<Database>, site: BookingSite, token: string): Promise<ManagedBooking | null> {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
+  const { data: link, error: linkError } = await admin.from("appointment_manage_links").select("appointment_id").eq("business_id", site.business.id).eq("token_hash", sha256(token)).maybeSingle();
+  if (linkError) throw linkError;
+  if (!link) return null;
   const { data, error } = await admin
     .from("appointments")
     .select(
       "id, client_id, status, notes, starts_at, ends_at, created_at, deposit_cents, deposit_paid_cents, client:clients(first_name), appointment_items(service_id, staff_id, starts_at, price_cents, service:services(name), staff:staff(first_name))",
     )
     .eq("business_id", site.business.id)
-    .eq("manage_token_hash", sha256(token))
+    .eq("id", link.appointment_id)
     .maybeSingle();
   if (error) throw error;
   if (!data || !data.client_id) return null;

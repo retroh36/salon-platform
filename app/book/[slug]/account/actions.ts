@@ -121,17 +121,12 @@ export async function signOut(slug: string): Promise<void> {
 
 // Change or cancel a visit: their own visit's page, where the policy and
 // any fee are shown before anything changes. A fresh link for it (the
-// one in their confirmation stops working).
+// one in their confirmation keeps working too).
 export async function openVisit(slug: string, appointmentId: string): Promise<{ ok: false; message: string } | never> {
   const s = await signedIn(slug);
   if (!s || !/^[0-9a-f-]{36}$/.test(appointmentId) || !(await ownsVisit(s.admin, s.account, appointmentId))) return { ok: false, message: "Please sign in again." };
   const token = newSecret();
-  const { error } = await s.admin
-    .from("appointments")
-    .update({ manage_token_hash: sha256(token) })
-    .eq("id", appointmentId)
-    .eq("client_id", s.account.clientId)
-    .eq("business_id", s.site.business.id);
+  const { error } = await s.admin.rpc("add_manage_link", { p_appointment_id: appointmentId, p_client_id: s.account.clientId, p_business_id: s.site.business.id, p_token_hash: sha256(token) });
   if (error) throw error;
   redirect(`/book/${slug}/manage/${token}`);
 }

@@ -153,9 +153,9 @@ describe("booking online", () => {
     const wednesday = fromLocal(addDays(DAY, 1), 11 * 60, TZ)!;
     const result = await bookOnline(admin, location, { clientId, notes: `${RUN} one`, request: visit(SEED.staff.gil), start: wednesday, manageTokenHash: hash("one") });
     expect(result.ok).toBe(true);
-    const { data } = await admin.from("appointments").select("source, created_by, manage_token_hash, appointment_items(staff_id, price_cents, resource_id)").eq("id", result.ok ? result.appointmentId : "").single();
+    const { data } = await admin.from("appointments").select("source, created_by, appointment_manage_links(token_hash), appointment_items(staff_id, price_cents, resource_id)").eq("id", result.ok ? result.appointmentId : "").single();
     // Gil is a Master: $45 menu price, $50 (rounded from 1.15 times) for Masters.
-    expect(data).toMatchObject({ source: "online", created_by: null, manage_token_hash: hash("one") });
+    expect(data).toMatchObject({ source: "online", created_by: null, appointment_manage_links: [{ token_hash: hash("one") }] });
     expect(data!.appointment_items).toEqual([{ staff_id: SEED.staff.gil, price_cents: 5000, resource_id: expect.any(String) }]);
   });
 
@@ -219,6 +219,21 @@ describe("booking online", () => {
     expect(done).toEqual({ status: "canceled", cancel_reason: "Canceled online by the client" });
     // Canceled visits can't be moved online.
     expect(await bookOnline(admin, location, { appointmentId: booked.appointmentId, clientId, notes: null, request: visit(SEED.staff.nola), start: at(13, 30), manageTokenHash: hash("move") })).toEqual({ ok: false, error: "not_found" });
+  });
+
+  it("keeps every link a visit was given: the confirmation's still works after a newer one", async () => {
+    const booked = await bookOnline(admin, location, { clientId, notes: `${RUN} links`, request: visit(SEED.staff.nola), start: at(11), manageTokenHash: hash("first") });
+    if (!booked.ok) throw new Error("not booked");
+    // From the client's account: a fresh link, only for their own visit.
+    expect((await admin.rpc("add_manage_link", { p_appointment_id: booked.appointmentId, p_client_id: crypto.randomUUID(), p_business_id: B, p_token_hash: hash("theirs") })).error?.code).toBe("P0002");
+    expect((await frontDesk.rpc("add_manage_link", { p_appointment_id: booked.appointmentId, p_client_id: clientId, p_business_id: B, p_token_hash: hash("desk") })).error?.code).toBe("42501");
+    expect((await admin.rpc("add_manage_link", { p_appointment_id: booked.appointmentId, p_client_id: clientId, p_business_id: B, p_token_hash: hash("second") })).error).toBeNull();
+    // Nobody signed in sees the links.
+    expect((await frontDesk.from("appointment_manage_links").select("id")).data ?? []).toEqual([]);
+    // The old link moves it, the new one cancels it.
+    expect((await bookOnline(admin, location, { appointmentId: booked.appointmentId, clientId, notes: `${RUN} links`, request: visit(SEED.staff.nola), start: at(11, 30), manageTokenHash: hash("first") })).ok).toBe(true);
+    expect(await cancelOnline(admin, booked.appointmentId, hash("second"))).toEqual({ ok: true });
+    expect((await admin.from("appointment_manage_links").select("token_hash").eq("appointment_id", booked.appointmentId)).data!.map((l) => l.token_hash).sort()).toEqual([hash("first"), hash("second")].sort());
   });
 
   it("refuses times outside the stylist's hours", async () => {

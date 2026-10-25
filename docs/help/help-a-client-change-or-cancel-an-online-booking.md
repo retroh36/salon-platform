@@ -14,6 +14,7 @@ Clients who booked online can move or cancel their own visit from the page they 
 ## Good to know
 
 - After the cutoff (set by the owner in **Cancel or change online until (hours before)**), the page says changes are by phone. Make the change for them on the calendar.
+- Every link a client has been sent for the visit keeps working: the one in the first confirmation, and any newer one from **My account** (**Change or cancel**).
 - Texts and email aren't connected yet, so the confirmation with this link doesn't reach clients for now. They can still call, and you can change the booking on the calendar.
 - A moved booking keeps its services; the page also has **Book another visit**.
 - Online bookings show a globe in booking details' **History** tab.
