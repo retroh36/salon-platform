@@ -62,7 +62,13 @@ export async function completeCheckout(draftId: string, ticket: Ticket): Promise
   if (!s) return { ok: false, message: NOT_ALLOWED };
   if (!isUuid(draftId)) return { ok: false, message: "That checkout doesn't exist." };
   const saved = await saveTicket(draftId, ticket);
-  if (!saved.ok) return saved;
+  if (!saved.ok) {
+    // Completed already: a second tap, or a retry after the answer was
+    // lost on the way back. It's the same sale, so say it went through.
+    const { data: done } = await s.supabase.from("sale_drafts").select("status, sale_id").eq("id", draftId).maybeSingle();
+    if (done?.status === "completed" && done.sale_id) return { ok: true, saleId: done.sale_id };
+    return saved;
+  }
   const { data: draft } = await s.supabase.from("sale_drafts").select("appointment_id, client_id").eq("id", draftId).single();
   const { data: saleId, error } = await s.supabase.rpc("complete_sale", {
     p_location_id: s.me.location.id,
@@ -75,7 +81,15 @@ export async function completeCheckout(draftId: string, ticket: Ticket): Promise
   if (draft!.appointment_id) after(() => recomputeForVisit(createAdminClient(), draft!.appointment_id!));
   // Digital gift cards go out by email.
   const { data: cards } = await s.supabase.from("gift_cards").select("id, recipient_email").eq("sale_id", saleId).not("recipient_email", "is", null);
-  for (const card of cards ?? []) await sendGiftCard(card.id, card.recipient_email!);
+  // The sale has gone through: an email that can't be sent is logged,
+  // never a failed checkout (the card and its code are on Gift cards).
+  for (const card of cards ?? []) {
+    try {
+      await sendGiftCard(card.id, card.recipient_email!);
+    } catch (e) {
+      console.error(`[checkout] couldn't send a digital gift card: ${e instanceof Error ? e.message : "unknown"}`);
+    }
+  }
   return { ok: true, saleId };
 }
 

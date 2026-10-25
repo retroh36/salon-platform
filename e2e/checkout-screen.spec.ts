@@ -211,3 +211,26 @@ test("Escape goes back with nothing lost, and the ticket is there when it's open
   await expect(co.lines).toHaveCount(3);
   await expect(checkout(page).ticket).toContainText("Shine Spray");
 });
+
+test("the connection drops as the sale completes: it says so, and tapping again shows it done, recorded once", async ({ page, pageErrors }) => {
+  const { data: spray } = await admin.from("products").select("id").eq("brand", PREFIX).eq("name", "Shine Spray").single();
+  const co = await openCheckout(page, { productId: spray!.id, from: "/sales" });
+  const draftId = page.url().split("/").pop()!;
+  await co.cash();
+  // The server completes the sale, but the answer never gets back.
+  let dropped = false;
+  await page.route(`**/checkout/${draftId}`, async (route) => {
+    if (route.request().method() !== "POST" || dropped || !(route.request().postData() ?? "").includes("payments")) return route.continue();
+    dropped = true;
+    await route.fetch();
+    await route.abort("internetdisconnected");
+  });
+  await co.payment.getByRole("button", { name: /^Complete sale/ }).click();
+  await expect(co.payment.getByRole("alert")).toContainText("We couldn't reach the server");
+  await co.payment.getByRole("button", { name: /^Complete sale/ }).click();
+  await expect(page.getByTestId("checkout-success")).toBeVisible();
+  const { data: sales } = await admin.from("sale_items").select("sale_id").eq("product_id", spray!.id);
+  expect(new Set(sales!.map((s) => s.sale_id)).size).toBe(1);
+  // The dropped request is the browser's one complaint.
+  pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !/ERR_INTERNET_DISCONNECTED|Failed to fetch|Failed to load resource/.test(e)));
+});

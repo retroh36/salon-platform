@@ -203,7 +203,10 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
   function complete() {
     setMessage(null);
     startTransition(async () => {
-      const result = await completeCheckout(data.draft.id, latest.current);
+      const result = await completeCheckout(data.draft.id, latest.current).catch(() => null);
+      // No answer (the connection dropped): trying again is safe, since a
+      // sale that went through comes back as done.
+      if (!result) return setMessage("We couldn't reach the server, so we don't know yet if the sale went through. Check the connection and tap Complete sale again: it won't be recorded twice.");
       if (!result.ok) return setMessage(result.message);
       setDone({ saleId: result.saleId });
     });
