@@ -12,8 +12,10 @@ import { can } from "@/lib/permissions";
 import { loadOpeningIdeas, specialDraft } from "@/lib/promotion-ideas-load";
 import { promotionSummary, type PromoKind } from "@/lib/promotions";
 import { loadPromotions, promotionUses } from "@/lib/promotions-load";
+import { loadPromotionResults } from "@/lib/reports-load";
 import { formatDay } from "@/lib/schedule-format";
-import { todayIn, toLocal } from "@/lib/scheduling/time";
+import { formatPrice } from "@/lib/services";
+import { addDays, todayIn, toLocal } from "@/lib/scheduling/time";
 import { isFrontOfHouse } from "@/lib/staff";
 import { EndPromotion } from "./end-promotion";
 import { SendSpecial } from "./send-special";
@@ -30,9 +32,12 @@ export default function PromotionsPage() {
 
 const KIND: Record<PromoKind, string> = { code: "Code", automatic: "Automatic", last_minute: "Last-minute special" };
 
-// The front of house: live promotions (owners and managers set them up),
-// and Denise's ideas for open time: openings soon, with regulars who'd fit
-// them and a message to send (our template, never AI-written).
+// The front of house: live promotions (owners and managers set them up,
+// and those who see Reports get each one's last 90 days), and Denise's
+// ideas for open time: openings soon, with regulars who'd fit them and a
+// message to send (our template, never AI-written).
+
+const RESULT_DAYS = 90;
 async function Promotions() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
@@ -47,7 +52,11 @@ async function Promotions() {
     supabase.from("businesses").select("free_text_roles").eq("id", me.business_id).single(),
   ]);
   const canWrite = me.role === "owner" || Boolean(business?.free_text_roles.includes(me.role));
-  const uses = await promotionUses(supabase, rules.map((r) => r.id), null, null);
+  const [uses, results] = await Promise.all([
+    promotionUses(supabase, rules.map((r) => r.id), null, null),
+    can(me, "reports") ? loadPromotionResults(supabase, me.business_id, addDays(today, 1 - RESULT_DAYS), today, me.location.timezone) : Promise.resolve(null),
+  ]);
+  const resultOf = new Map((results ?? []).map((r) => [r.promotionId, r]));
   const { data: services } = await supabase.from("services").select("id, name").eq("business_id", me.business_id);
   const names = { services: Object.fromEntries((services ?? []).map((s) => [s.id, s.name])), staff: Object.fromEntries((staff ?? []).map((s) => [s.id, s.first_name])) };
   const sending = canSendAt(toLocal(now, me.location.timezone).minute);
@@ -141,6 +150,7 @@ async function Promotions() {
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
+                  {results && <ResultLine result={resultOf.get(r.id)} lastMinute={r.kind === "last_minute"} />}
                 </div>
                 {manage && (
                   <div className="flex gap-2">
@@ -156,5 +166,24 @@ async function Promotions() {
         )}
       </Card>
     </AppShell>
+  );
+}
+
+// "Last 90 days: 58 sales · $5,210 in sales · $547.50 off · 58 openings
+// filled · 4 first visits" (Reports' figures, for those who see Reports).
+function ResultLine({ result, lastMinute }: { result: Awaited<ReturnType<typeof loadPromotionResults>>[number] | undefined; lastMinute: boolean }) {
+  if (!result) return <p className="mt-1 text-sm text-ink-muted" data-testid="promotion-results">Not used in the last {RESULT_DAYS} days.</p>;
+  const parts = [
+    `${result.redemptions} ${result.redemptions === 1 ? "sale" : "sales"}`,
+    `${formatPrice(result.revenueCents)} in sales`,
+    `${formatPrice(result.discountCents)} off`,
+    lastMinute && `${result.gapsFilled} ${result.gapsFilled === 1 ? "opening" : "openings"} filled`,
+    `${result.newClients} first ${result.newClients === 1 ? "visit" : "visits"}`,
+  ].filter(Boolean);
+  return (
+    <p className="mt-1 text-sm text-ink" data-testid="promotion-results">
+      <span className="text-ink-muted">Last {RESULT_DAYS} days: </span>
+      {parts.join(" · ")}
+    </p>
   );
 }

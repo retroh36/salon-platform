@@ -61,6 +61,9 @@ test.describe("owner", () => {
     await form.getByRole("button", { name: "Create promotion" }).click();
     await expect(page).toHaveURL(/\/promotions$/);
     await expect(ui(page).getByTestId("promotion-row").filter({ hasText: `Retail ${RUN}` })).toContainText(`Code ${CODE}`);
+    // How each did, from the same figures as Reports.
+    await expect(ui(page).getByTestId("promotion-row").filter({ hasText: `Retail ${RUN}` }).getByTestId("promotion-results")).toHaveText("Not used in the last 90 days.");
+    await expect(ui(page).getByTestId("promotion-row").filter({ hasText: "Last-minute 15%" }).getByTestId("promotion-results")).toHaveText(/^Last 90 days: \d+ sales · \$[\d,.]+ in sales · \$[\d,.]+ off · \d+ openings filled · \d+ first visits?$/);
   });
 });
 
@@ -110,8 +113,9 @@ test.describe("front desk", () => {
     await page.goto("/promotions");
     await expect(ui(page).getByTestId("promotion-row").filter({ hasText: "Last-minute 15%" })).toContainText("15% off services · open time in the next 48 hours · never Master color");
     await expect(ui(page).getByTestId("opening-ideas")).toContainText("Ideas for open time");
-    // Setting them up is for owners and managers.
+    // Setting them up, and how they did, are for owners and managers.
     await expect(ui(page).getByRole("link", { name: "New promotion" })).toHaveCount(0);
+    await expect(ui(page).getByTestId("promotion-results")).toHaveCount(0);
   });
 });
 

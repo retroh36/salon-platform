@@ -550,6 +550,94 @@ from seed_sales s
 join public.stock_movements m on m.appointment_id = s.appointment_id and m.reason = 'sale'
 join public.products p on p.id = m.product_id;
 
+
+-- Promotions used over the history, as checkout applied them: the
+-- last-minute special (15%) on the service lines of visits booked within 48
+-- hours of starting, in the last 60 days, never Master stylists' color;
+-- Welcome 15 on new clients' first visits since it started; and $10 off
+-- retail on sales of $60 or more that had neither (those two don't go with
+-- other promotions). Each line keeps its discount and its tax on what's
+-- left, as complete_sale works them out; every use is recorded.
+create temp table seed_redemptions (sale_id uuid, promotion_id uuid, source text, discount_cents int, last_minute boolean);
+
+with special as (select id, name from public.promotions where business_id = 'b0000000-0000-4000-8000-000000000001' and name = 'Last-minute 15%'),
+covered as (
+  select si.id, s.sale_id
+  from seed_sales s
+  join public.appointments a on a.id = s.appointment_id
+  join public.sale_items si on si.sale_id = s.sale_id and si.kind = 'service'
+  join public.services sv on sv.id = si.service_id
+  join public.staff st on st.id = si.staff_id
+  where a.starts_at - a.created_at <= interval '48 hours' and s.at > now() - interval '60 days'
+    and not (st.level = 'master' and sv.category = 'Color')
+),
+discounted as (
+  update public.sale_items si set promo_discount_cents = round(si.unit_price_cents * si.quantity * 0.15)::int,
+    line_discount_cents = round(si.unit_price_cents * si.quantity * 0.15)::int, line_discount_reason = sp.name,
+    total_cents = si.unit_price_cents * si.quantity - round(si.unit_price_cents * si.quantity * 0.15)::int
+  from covered c, special sp
+  where si.id = c.id
+  returning si.sale_id, si.promo_discount_cents, sp.id as promotion_id
+)
+insert into seed_redemptions
+select sale_id, promotion_id, 'special', sum(promo_discount_cents)::int, true from discounted group by sale_id, promotion_id;
+
+-- New clients: their first visit was in the last three months, and they
+-- were added when they first booked.
+with welcome as (select id, name, starts_on from public.promotions where business_id = 'b0000000-0000-4000-8000-000000000001' and code = 'WELCOME15'),
+firsts as (
+  select s.sale_id, a.client_id, a.created_at as booked_at
+  from seed_sales s
+  join public.appointments a on a.id = s.appointment_id
+  cross join welcome w
+  where a.starts_at > now() - interval '90 days' and a.created_at::date >= w.starts_on
+    and not exists (select 1 from public.appointments p where p.client_id = a.client_id and p.starts_at < a.starts_at and p.status <> 'canceled')
+    and not exists (select 1 from public.client_formulas f where f.client_id = a.client_id)
+    and not exists (select 1 from seed_redemptions r where r.sale_id = s.sale_id)
+    and pg_temp.rnd('welcome' || a.client_id) % 100 < 60
+),
+added as (
+  update public.clients c set created_at = f.booked_at - interval '5 minutes' from firsts f where c.id = f.client_id returning c.id
+),
+discounted as (
+  update public.sale_items si set promo_discount_cents = round(si.unit_price_cents * si.quantity * 0.15)::int,
+    line_discount_cents = round(si.unit_price_cents * si.quantity * 0.15)::int, line_discount_reason = w.name,
+    total_cents = si.unit_price_cents * si.quantity - round(si.unit_price_cents * si.quantity * 0.15)::int
+  from firsts f, welcome w
+  where si.sale_id = f.sale_id and si.kind = 'service'
+  returning si.sale_id, si.promo_discount_cents, w.id as promotion_id
+)
+insert into seed_redemptions
+select sale_id, promotion_id, 'code', sum(promo_discount_cents)::int, false from discounted group by sale_id, promotion_id;
+
+with retail_promo as (select id, name from public.promotions where business_id = 'b0000000-0000-4000-8000-000000000001' and name = 'Retail $10 off $60'),
+lines as (
+  select distinct on (si.sale_id) si.id, si.sale_id, least(1000, si.unit_price_cents * si.quantity) as off
+  from public.sale_items si
+  join seed_sales s on s.sale_id = si.sale_id
+  where si.kind = 'product'
+    and (select sum(x.unit_price_cents * x.quantity) from public.sale_items x where x.sale_id = si.sale_id) >= 6000
+    and not exists (select 1 from seed_redemptions r where r.sale_id = si.sale_id)
+  order by si.sale_id, si.position
+),
+discounted as (
+  update public.sale_items si set promo_discount_cents = l.off, line_discount_cents = l.off, line_discount_reason = rp.name,
+    tax_cents = round((si.unit_price_cents * si.quantity - l.off) * 1025 / 10000.0)::int,
+    total_cents = si.unit_price_cents * si.quantity - l.off + round((si.unit_price_cents * si.quantity - l.off) * 1025 / 10000.0)::int
+  from lines l, retail_promo rp
+  where si.id = l.id
+  returning si.sale_id, si.promo_discount_cents, rp.id as promotion_id
+)
+insert into seed_redemptions
+select sale_id, promotion_id, 'automatic', promo_discount_cents, false from discounted;
+
+insert into public.promotion_redemptions (business_id, promotion_id, sale_id, appointment_id, client_id, source, discount_cents, first_visit, last_minute, applied_by, created_at)
+select 'b0000000-0000-4000-8000-000000000001', r.promotion_id, r.sale_id, s.appointment_id, s.client_id, r.source, r.discount_cents,
+       not exists (select 1 from public.appointments p join public.appointments a on a.id = s.appointment_id
+                   where p.client_id = s.client_id and p.starts_at < a.starts_at and p.status = 'completed'),
+       r.last_minute, 'd0000000-0000-4000-8000-000000000003', s.at
+from seed_redemptions r join seed_sales s on s.sale_id = r.sale_id;
+
 -- Rebooked at checkout: most visits whose client already has their next
 -- one within ten weeks (some stylists rebook more than others).
 update public.sales x set rebook_appointment_id = n.id
@@ -578,10 +666,11 @@ cross join lateral (
 where pg_temp.rnd('tip' || s.appointment_id) % 100 < 60 and x.tip > 0;
 
 update public.sales v set
-  subtotal_cents = t.subtotal, tax_cents = t.tax, tip_cents = t.tips, total_cents = t.subtotal + t.tax + t.tips
+  subtotal_cents = t.subtotal, discount_cents = t.discount, tax_cents = t.tax, tip_cents = t.tips, total_cents = t.subtotal - t.discount + t.tax + t.tips
 from (
   select s.sale_id,
          coalesce((select sum(unit_price_cents * quantity) from public.sale_items where sale_id = s.sale_id), 0)::int as subtotal,
+         coalesce((select sum(line_discount_cents) from public.sale_items where sale_id = s.sale_id), 0)::int as discount,
          coalesce((select sum(tax_cents) from public.sale_items where sale_id = s.sale_id), 0)::int as tax,
          coalesce((select sum(amount_cents) from public.sale_tips where sale_id = s.sale_id), 0)::int as tips
   from seed_sales s

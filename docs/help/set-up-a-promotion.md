@@ -21,6 +21,7 @@ A promotion takes a percent or an amount off what it covers: as a code, by itsel
 - Specials show a badge on the times they cover on your booking site, and come off at checkout.
 - A promotion can't be used with another discount unless you tick **Can be used with other promotions and discounts**.
 - Member prices come off first, then promotions, then any discount staff give.
+- Owners and managers see under each promotion how it did in the last 90 days: sales, what they brought in, what the discount cost, openings filled and first visits. Reports has the same for any period.
 - **Edit** changes it from now on; **End** stops it being used, and it stays in Reports.
 
 ## If it doesn't work
