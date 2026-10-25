@@ -9,7 +9,8 @@ import { briefItemKey, creditText, type BriefFacts } from "@/lib/denise/brief";
 // Shown per section before "See all".
 const TOP = 3;
 
-type Row = { key: string; href: string; title: string; detail: string };
+// `label` names the row for its dismiss button when titles repeat.
+type Row = { key: string; href: string; title: string; detail: string; label?: string };
 
 // Denise's morning brief in sections: what might go wrong today and who to
 // look out for, each item linking to the visit, client or product, and
@@ -63,6 +64,14 @@ export function BriefSections({ brief, today }: { brief: BriefFacts; today: stri
       rows: brief.credits.map((c) => ({ key: briefItemKey.credit(c), href: `/clients/${c.clientId}`, title: c.client, detail: creditText(c) })),
       total: brief.credits.length,
       empty: "No one today has package uses or gift card money.",
+    },
+    {
+      id: "events",
+      title: "Events coming up",
+      rows: brief.events.map((e) => ({ key: briefItemKey.event(e), href: `/events/${e.eventId}`, title: e.title, detail: e.detail, label: `${e.title}: ${e.detail}` })),
+      total: brief.events.length,
+      seeAll: "/events",
+      empty: "Every event coming up is in order.",
     },
   ];
 
@@ -126,7 +135,7 @@ function BriefSection({
               </Link>
               <button
                 type="button"
-                aria-label={`Dismiss ${r.title}`}
+                aria-label={`Dismiss ${r.label ?? r.title}`}
                 title="Dismiss"
                 onClick={() => onDismiss(r.key)}
                 className="flex size-7 shrink-0 items-center justify-center rounded-md text-ink-subtle transition-colors duration-(--motion-fast) hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"

@@ -1,6 +1,7 @@
 // Denise's morning brief: today's risks, likely no-shows, clients due back
 // who aren't booked, openings worth filling from the waitlist, stock running
-// low for today's services, and clients coming in with credit. Every fact is
+// low for today's services, clients coming in with credit, and what could go
+// wrong with the events coming up (lib/events/risks.ts). Every fact is
 // worked out here from the data and what she's learned (lib/insights/); the
 // Dashboard lays it out in sections, each item linking to the client,
 // booking or product (and dismissable: briefItemKey).
@@ -11,6 +12,8 @@ import type { ClientInsight } from "@/lib/insights/clients";
 import { loadAllClientInsights } from "@/lib/insights/read";
 import { startOfLocalDay } from "@/lib/scheduling/load";
 import { isUsable, loadPackagesByClient, usesLeft } from "@/lib/packages";
+import type { EventRisk } from "@/lib/events/risks";
+import { loadEventRisks } from "@/lib/events/risks-load";
 import { addDays, formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import type { ConflictView, WaitlistOpening } from "./types";
@@ -35,6 +38,9 @@ export type BriefFacts = {
   // Clients coming in today with uses left on a package or money on a gift
   // card, so the desk can mention it.
   credits: { clientId: string; appointmentId: string; client: string; packages: string[]; giftCardCents: number }[];
+  // Balances unpaid a week out, trials not booked a month out, the
+  // headcount cutoff, the team's time off and clashes, artists not chosen.
+  events: EventRisk[];
 };
 
 // The key an item is dismissed by (denise_dismissals), per section.
@@ -44,6 +50,7 @@ export const briefItemKey = {
   due: (d: BriefFacts["dueNotBooked"]["top"][number]) => `due:${d.clientId}`,
   stock: (p: BriefFacts["lowStock"][number]) => `stock:${p.productId}`,
   credit: (c: BriefFacts["credits"][number]) => `credit:${c.clientId}`,
+  event: (e: EventRisk) => e.key,
 };
 
 // The brief without what's been dismissed today.
@@ -56,6 +63,7 @@ export function withoutDismissed(f: BriefFacts, dismissed: ReadonlySet<string>):
     dueNotBooked: { total: f.dueNotBooked.total - (f.dueNotBooked.top.length - top.length), top },
     lowStock: f.lowStock.filter((p) => !dismissed.has(briefItemKey.stock(p))),
     credits: f.credits.filter((c) => !dismissed.has(briefItemKey.credit(c))),
+    events: f.events.filter((e) => !dismissed.has(briefItemKey.event(e))),
   };
 }
 
@@ -68,7 +76,7 @@ export async function briefFacts(
   scan: { conflicts: ConflictView[]; openings: WaitlistOpening[] },
 ): Promise<BriefFacts> {
   const tz = where.location.timezone;
-  const [{ data: items, error }, insights] = await Promise.all([
+  const [{ data: items, error }, insights, events] = await Promise.all([
     supabase
       .from("appointment_items")
       .select("id, service_id, starts_at, appointment:appointments!inner(id, status, client:clients(id, first_name, last_name))")
@@ -78,6 +86,7 @@ export async function briefFacts(
       .in("appointment.status", ["booked", "confirmed", "checked_in"])
       .order("starts_at"),
     loadAllClientInsights(supabase, where.businessId),
+    loadEventRisks(supabase, where, date),
   ]);
   if (error) throw error;
 
@@ -150,6 +159,7 @@ export async function briefFacts(
     openings: { count: scan.openings.length, withMatches: scan.openings.filter((o) => o.matches.length > 0).length },
     lowStock,
     credits,
+    events,
   };
 }
 

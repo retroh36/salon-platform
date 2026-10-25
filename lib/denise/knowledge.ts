@@ -24,6 +24,7 @@ import { FEE_KIND_LABELS, FEE_STATUS_LABELS, type FeeStatus } from "@/lib/policy
 import { loadPolicy } from "@/lib/policy-load";
 import { repeatOffenders } from "@/lib/policy-report";
 import { scanDay, type Viewer } from "./scan";
+import { eventKnowledge } from "./events";
 
 type Supabase = SupabaseClient<Database>;
 
@@ -47,6 +48,10 @@ export type Knowledge = {
   // The front of house: late cancellations and no-shows under the policy
   // (fee amounts for owners and managers).
   policy: ((period: PolicyPeriod) => Promise<unknown>) | null;
+  // Events in a month (a stylist: theirs, no money), and what's left to
+  // collect on one (the front of house).
+  events: (month: string) => Promise<unknown>;
+  eventBalance: ((name: string) => Promise<unknown>) | null;
 };
 
 export type PolicyPeriod = "this_month" | "last_month" | "last_30_days";
@@ -108,6 +113,8 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
       ...(spend ? { retail_percent: pct(spend.retailRate), lifetime_spend_dollars: dollars(spend.lifetimeSpendCents), average_visit_dollars: spend.averageVisitCents === null ? null : dollars(spend.averageVisitCents) } : {}),
     };
   };
+
+  const events = eventKnowledge(supabase, { businessId: me.businessId, timezone: tz, money: frontOfHouse, today: me.today }, (d) => sayDate(d, me.today));
 
   return {
     async clients(firstName) {
@@ -364,6 +371,9 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
           };
         }
       : null,
+
+    events: (month) => events.inMonth(month),
+    eventBalance: frontOfHouse ? (name) => events.balance(name) : null,
 
     fixes: frontOfHouse
       ? async (date) => {

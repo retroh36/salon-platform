@@ -33,7 +33,7 @@ test.describe("owner", () => {
     const denise = main.getByTestId("dashboard-denise");
     await expect(denise.getByTestId("dashboard-brief-visits")).toContainText(/visits? on the book today/);
     const brief = denise.getByTestId("dashboard-brief");
-    await expect(brief.getByRole("heading", { level: 3 })).toHaveText([/^Risks today/, /^Might not show/, /^Due back, nothing booked/, /^Low stock for today/, /^Coming in with credit/]);
+    await expect(brief.getByRole("heading", { level: 3 })).toHaveText([/^Risks today/, /^Might not show/, /^Due back, nothing booked/, /^Low stock for today/, /^Coming in with credit/, /^Events coming up/]);
     await expect(denise.getByTestId("dashboard-denise-says")).toHaveText(/Nothing to act on right now\.|need(s)? a look:/);
 
     // Five tiles, each compared with last week.

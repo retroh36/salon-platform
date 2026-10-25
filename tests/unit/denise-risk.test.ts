@@ -107,16 +107,18 @@ describe("the morning brief", () => {
     openings: { count: 2, withMatches: 1 },
     lowStock: [{ productId: "p-7n", name: "Goldwell Topchic 7N" }],
     credits: [{ clientId: "c-m", appointmentId: "a-m", client: "Mia R.", packages: ["3 Blowouts left"], giftCardCents: 4000 }],
+    events: [{ key: "event:balance_unpaid:e-r", eventId: "e-r", kind: "balance_unpaid", title: "Rossi wedding in 6 days", detail: "There's still a balance to collect." }],
   };
 
   it("leaves out what's been dismissed, in every section", () => {
-    const keys = new Set(["risk:likely:b", "noshow:a-e", "due:c-l", "stock:p-7n", "credit:c-m", "noshow:someone-else"]);
+    const keys = new Set(["risk:likely:b", "noshow:a-e", "due:c-l", "stock:p-7n", "credit:c-m", "event:balance_unpaid:e-r", "noshow:someone-else"]);
     const left = withoutDismissed(facts, keys);
     expect(left.risks).toEqual([]);
     expect(left.likelyNoShows).toEqual([]);
     expect(left.dueNotBooked).toEqual({ total: 36, top: [facts.dueNotBooked.top[1]] });
     expect(left.lowStock).toEqual([]);
     expect(left.credits).toEqual([]);
+    expect(left.events).toEqual([]);
     expect(withoutDismissed(facts, new Set())).toEqual(facts);
   });
 

@@ -279,6 +279,24 @@ async function capture(browser: Browser) {
     await main(page).getByTestId("opening-ideas").waitFor();
     if (!(await main(page).getByTestId("opening-idea").count())) throw new Error("Denise has no ideas for open time (no gap of an hour or more with a regular who fits)");
   });
+
+  // The demo's on-location wedding, a party of 6, in the event builder:
+  // the details, party and live total, then the timeline across the artists.
+  const rossi = async (page: Page) => {
+    const { data } = await admin.from("events").select("id").eq("business_id", BUSINESS).eq("title", "Rossi wedding").single();
+    if (!data) throw new Error("no Rossi wedding in the demo data");
+    await page.goto(`/events/${data.id}/edit`);
+    await waitForReact(page, "[data-task]");
+  };
+
+  await shot("12-event-builder", owner, async (page) => {
+    await rossi(page);
+  });
+
+  await shot("13-event-timeline", owner, async (page) => {
+    await rossi(page);
+    await main(page).locator("#event-timeline").evaluate((el) => el.closest("section")?.scrollIntoView({ block: "start" }));
+  });
 }
 
 // One screenshot: the steps, then a still page. A failure is reported at

@@ -13,6 +13,8 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, isLocalDate, todayIn } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { CloseoutForm } from "./closeout-form";
+import { eventReport } from "@/lib/events/report";
+import { loadEventReportRows } from "@/lib/events/report-load";
 import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Reports" };
@@ -62,7 +64,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
   const period: Period = typeof params.period === "string" && params.period in PERIODS ? (params.period as Period) : "this_month";
   const day = typeof params.day === "string" && isLocalDate(params.day) && params.day <= today ? params.day : today;
   const range = rangeOf(period, today);
-  const [liability, packages, activity, close, rebooking, staff, membershipRows, sources, promotions] = await Promise.all([
+  const [liability, packages, activity, close, rebooking, staff, membershipRows, sources, promotions, eventRows] = await Promise.all([
     loadGiftCardLiability(supabase, me.business_id),
     loadUnusedPackages(supabase, me.business_id),
     loadGiftCardActivity(supabase, me.business_id, range.from, range.to, tz),
@@ -72,7 +74,18 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
     loadMembershipRows(supabase, me.business_id, tz),
     loadBookingSources(supabase, me.location, range.from, range.to),
     loadPromotionResults(supabase, me.business_id, range.from, range.to, tz),
+    loadEventReportRows(supabase, me.business_id, tz),
   ]);
+  const events = eventReport(eventRows, range.from, range.to);
+  // By month: six months back to six ahead, whatever the period.
+  const monthStart = `${today.slice(0, 7)}-01`;
+  const shiftMonths = (n: number) => {
+    const [y, m] = monthStart.split("-").map(Number);
+    const d = new Date(Date.UTC(y, m - 1 + n, 1));
+    return d.toISOString().slice(0, 10);
+  };
+  const eventMonths = eventReport(eventRows, shiftMonths(-6), addDays(shiftMonths(7), -1)).months;
+  const monthName = (month: string) => new Date(`${month}-15T12:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
   const members = membershipReport(membershipRows, range.from, range.to);
   const staffName = new Map((staff.data ?? []).map((s) => [s.id, `${s.first_name} ${s.last_name}`]));
   const link = (q: { period?: Period; day?: string }) => {
@@ -89,7 +102,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
         title="Reports"
         description={
           <>
-            What you owe in gift cards and packages, gift card activity, memberships, where online bookings came from, rebooking, and closing out the day.
+            What you owe in gift cards and packages, gift card activity, memberships, bridal and events, where online bookings came from, rebooking, and closing out the day.
             <span className="mt-1 block text-sm" data-testid="report-period">
               Showing {formatLongDay(range.from, false)} to {formatLongDay(range.to, false)}
             </span>
@@ -214,6 +227,56 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
                   <td className="py-1.5 text-right">−{formatPrice(p.discountCents)}</td>
                   <td className="py-1.5 text-right">{p.gapsFilled}</td>
                   <td className="py-1.5 text-right">{p.newClients}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      <Card
+        title="Bridal and events"
+        titleId="events-heading"
+        description={`Events held ${formatLongDay(range.from, false)} to ${formatLongDay(range.to, false)} (booked or completed, by the event's date), inquiries that came in then, and deposits.`}
+      >
+        <dl className="grid gap-5 sm:grid-cols-3" data-testid="event-report">
+          <Stat label="Events held" value={formatPrice(events.valueCents)} note={`${events.held} ${events.held === 1 ? "event" : "events"}`} testId="event-value" />
+          <Stat label="Average event" value={events.averageCents === null ? "—" : formatPrice(events.averageCents)} testId="event-average" />
+          <Stat
+            label="Inquiries booked"
+            value={events.bookedRate === null ? "—" : `${Math.round(events.bookedRate * 100)}%`}
+            note={`${events.booked} of ${events.inquiries} that came in`}
+            testId="event-booked-rate"
+          />
+          <Stat label="Deposits collected" value={formatPrice(events.depositsCollectedCents)} testId="event-deposits" />
+          <Stat
+            label="Deposits waiting"
+            value={formatPrice(events.depositsOutstandingCents)}
+            note={`${events.depositsOutstanding} ${events.depositsOutstanding === 1 ? "proposal" : "proposals"} out`}
+            testId="event-deposits-waiting"
+          />
+          <Stat label="Still to collect" value={formatPrice(events.stillToCollectCents)} note="On booked events, as of now" testId="event-to-collect" />
+        </dl>
+        <h3 className="mt-6 mb-2 text-sm font-semibold text-ink">By month</h3>
+        {eventMonths.length === 0 ? (
+          <p className="text-sm text-ink-muted">No events booked in the six months either side of this one.</p>
+        ) : (
+          <table className="w-full text-sm tabular-nums" aria-label="Events by month">
+            <thead>
+              <tr className="text-left text-ink-muted">
+                <th className="py-1 font-medium">Month</th>
+                <th className="py-1 text-right font-medium">Events</th>
+                <th className="py-1 text-right font-medium">Value</th>
+                <th className="py-1 text-right font-medium">Collected</th>
+              </tr>
+            </thead>
+            <tbody>
+              {eventMonths.map((m) => (
+                <tr key={m.month} className="border-t border-line" data-testid="event-month">
+                  <td className="py-1.5">{monthName(m.month)}</td>
+                  <td className="py-1.5 text-right">{m.events}</td>
+                  <td className="py-1.5 text-right">{formatPrice(m.valueCents)}</td>
+                  <td className="py-1.5 text-right">{formatPrice(m.collectedCents)}</td>
                 </tr>
               ))}
             </tbody>

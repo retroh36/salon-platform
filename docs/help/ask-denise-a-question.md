@@ -1,6 +1,6 @@
 ---
 title: Ask Denise a question
-keywords: Ask Denise, AI, assistant, question, who's free, find an opening, availability, chatbot, help, look up, suggest a time
+keywords: Ask Denise, AI, assistant, question, weddings this month, what weddings do we have, left to collect on a wedding, event balance, who's free, find an opening, availability, chatbot, help, look up, suggest a time
 who: owner, manager, front_desk, stylist, assistant
 open: /calendar | Open calendar
 ---
@@ -14,7 +14,7 @@ Ask Denise about the day, availability, clients or the salon, in your own words.
 
 ## Good to know
 
-- She can find openings, look up a client's habits, who's overdue, how long stylists take, the day's schedule, stock and (for owners and managers) sales.
+- She can find openings, look up a client's habits, who's overdue, how long stylists take, the day's schedule, stock, weddings and other events in a month, what's left to collect on an event (front desk, managers and owners) and (for owners and managers) sales.
 - Her numbers come from the salon's own records; she never makes them up.
 - She takes one question at a time. Nothing changes until someone approves it.
 - Stylists see only their own figures and no money.

@@ -1023,3 +1023,217 @@ with picked as (
 update public.appointments a set status = 'canceled', cancel_reason = 'Client canceled', canceled_at = now() - interval '2 days'
 from picked p
 where a.id = p.id and p.n = 1;
+
+-- ---------------------------------------------------------------------------
+-- Bridal and events at every stage, made the way the app makes them: the
+-- desk (Sam) saves each one with save_event, sends the proposal, the client
+-- agrees (accept_event_proposal, with a test card), and the past ones are
+-- moved back to their day afterwards (a proposal can only be sent ahead).
+--   Rossi: on location this coming Sunday, a party of 6, trial done, the
+--     balance didn't go through (Denise's brief flags it).
+--   Okafor: in the salon on a Saturday three to four weeks out, trial not
+--     booked, and Nola, on the team, has since taken the day off.
+--   Patel: proposal sent, waiting on the deposit. Alvarez: Denise drafted
+--     it from one line. Nguyen: an inquiry from the booking site.
+--   Brooks: last Sunday, paid in full, waiting to be completed (Event day).
+--   Harper: three weeks ago, completed (its sale is in payroll).
+--   Chen: lost to another salon.
+-- ---------------------------------------------------------------------------
+
+create function pg_temp.at(d date, m integer) returns text language sql as $$
+  select to_char((d + make_interval(mins => m)) at time zone 'America/Chicago', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+$$;
+
+-- A task: the member's place in the party (null for touch-ups), what, whose lane, from and to (minutes).
+create function pg_temp.task(d date, member integer, kind text, role text, lane integer, staff text, s integer, e integer) returns jsonb language sql as $$
+  select jsonb_build_object('member', member::text, 'kind', kind, 'role', role, 'lane', lane, 'staff_id', staff, 'starts_at', pg_temp.at(d, s), 'ends_at', pg_temp.at(d, e))
+$$;
+
+create function pg_temp.member(name text, role text, package integer) returns jsonb language sql as $$
+  select jsonb_build_object('name', name, 'party_role', role, 'package_id', 'ee000000-0000-4000-8000-00000000000' || package)
+$$;
+
+-- Sent, then agreed by the client with a test card, booked `ago` days ago.
+create function pg_temp.book(p_event uuid, p_name text, p_ago integer) returns void language plpgsql as $$
+declare
+  v_link uuid;
+  v_event public.events;
+begin
+  v_link := public.send_event_proposal(p_event, encode(sha256(gen_random_uuid()::text::bytea), 'hex'), 'email', 'client@example.test', 14);
+  select * into v_event from public.events where id = p_event;
+  perform public.accept_event_proposal(v_link, jsonb_build_object(
+    'typed_name', p_name, 'total_cents', v_event.total_cents,
+    'deposit', jsonb_build_object('amount_cents', v_event.deposit_cents, 'provider', 'test', 'reference', 'test_seed_' || left(p_event::text, 8)),
+    'card', jsonb_build_object('provider', 'test', 'ref', 'tok_test_4242', 'label', 'Visa …4242')));
+  update public.events set booked_at = now() - make_interval(days => p_ago), status_changed_at = now() - make_interval(days => p_ago),
+    created_at = now() - make_interval(days => p_ago + 9)
+  where id = p_event;
+  update public.event_payments set paid_at = now() - make_interval(days => p_ago), created_at = now() - make_interval(days => p_ago),
+    due_on = (now() - make_interval(days => p_ago))::date
+  where event_id = p_event and kind = 'deposit';
+  update public.event_history set created_at = now() - make_interval(days => p_ago) where event_id = p_event and kind in ('proposal_sent', 'booked');
+  update public.event_history set created_at = now() - make_interval(days => p_ago + 9) where event_id = p_event and kind = 'created';
+  update public.event_agreements set agreed_at = now() - make_interval(days => p_ago) where event_id = p_event;
+  -- The schedule again, from the day it was booked (no trace of the first).
+  perform private.schedule_event_payments(p_event);
+  delete from public.event_payments where event_id = p_event and status = 'canceled';
+end;
+$$;
+
+do $$
+declare
+  v_today date := (now() at time zone 'America/Chicago')::date;
+  -- This coming Sunday (a week today on a Sunday), last Sunday, and three weeks before that.
+  v_rossi date := v_today + (7 - extract(isodow from v_today)::int % 7);
+  v_brooks date := v_today - extract(isodow from v_today)::int;
+  v_harper date := v_today - extract(isodow from v_today)::int - 21;
+  -- A Saturday three to four weeks out.
+  v_okafor date := v_today + 22 + (13 - extract(isodow from v_today + 22)::int) % 7;
+  v_patel date := v_today + 75;
+  v_ahead date := v_today + 30;
+  bridget text := 'd0000000-0000-4000-8000-000000000004';
+  hannah text := 'd0000000-0000-4000-8000-000000000006';
+  nola text := 'd0000000-0000-4000-8000-000000000007';
+  shae text := 'd0000000-0000-4000-8000-000000000009';
+  lois text := 'd0000000-0000-4000-8000-000000000010';
+  v_id uuid;
+begin
+  -- As Sam at the front desk.
+  perform set_config('request.jwt.claims', json_build_object('sub', 'a0000000-0000-4000-8000-000000000003', 'role', 'authenticated')::text, true);
+
+  -- Rossi: on location, a party of 6, four artists.
+  v_id := public.save_event(null, jsonb_build_object(
+    'title', 'Rossi wedding', 'event_date', v_rossi, 'ready_by', pg_temp.at(v_rossi, 840),
+    'new_client', jsonb_build_object('first_name', 'Mia', 'last_name', 'Rossi', 'phone', '(312) 555-0181', 'email', 'mia.rossi@example.test'),
+    'venue_name', 'The Langford Hotel', 'venue_address', '400 N Lake Shore Dr, Chicago, IL', 'on_location', true, 'travel_miles', 12, 'travel_minutes', 30,
+    'notes', 'Getting ready in the bridal suite on the 12th floor. Photographer arrives at 1pm.',
+    'members', jsonb_build_array(pg_temp.member('Mia Rossi', 'bride', 1), pg_temp.member('Rae Rossi', 'maid_of_honor', 3), pg_temp.member('Lu Chen', 'bridesmaid', 3),
+      pg_temp.member('Ana Diaz', 'bridesmaid', 3), pg_temp.member('Joy Park', 'bridesmaid', 2), pg_temp.member('Carla Rossi', 'mother', 4)),
+    'tasks', jsonb_build_array(
+      pg_temp.task(v_rossi, 5, 'hair', 'hair', 1, bridget, 545, 590), pg_temp.task(v_rossi, 6, 'hair', 'hair', 1, bridget, 595, 640), pg_temp.task(v_rossi, 1, 'hair', 'hair', 1, bridget, 645, 735),
+      pg_temp.task(v_rossi, 2, 'hair', 'hair', 2, shae, 595, 640), pg_temp.task(v_rossi, 3, 'hair', 'hair', 2, shae, 645, 690), pg_temp.task(v_rossi, 4, 'hair', 'hair', 2, shae, 695, 740),
+      pg_temp.task(v_rossi, 2, 'makeup', 'makeup', 1, hannah, 645, 690), pg_temp.task(v_rossi, 6, 'makeup', 'makeup', 1, hannah, 695, 740), pg_temp.task(v_rossi, 1, 'makeup', 'makeup', 1, hannah, 745, 820),
+      pg_temp.task(v_rossi, 3, 'makeup', 'makeup', 2, lois, 695, 740), pg_temp.task(v_rossi, 4, 'makeup', 'makeup', 2, lois, 745, 790),
+      pg_temp.task(v_rossi, null, 'touch_up', 'hair', 1, bridget, 825, 840), pg_temp.task(v_rossi, null, 'touch_up', 'hair', 2, shae, 825, 840),
+      pg_temp.task(v_rossi, null, 'touch_up', 'makeup', 1, hannah, 825, 840), pg_temp.task(v_rossi, null, 'touch_up', 'makeup', 2, lois, 825, 840))));
+  perform pg_temp.book(v_id, 'Mia Rossi', 70);
+  perform public.set_event_status(v_id, 'trial_done', null);
+  perform public.save_event_look(v_id, 'Soft romantic waves, half up, pinned with the pearl comb from the trial. Warm neutral eyes, a rosy lip; lashes for Mia only.');
+  -- The second payment went through a month ago; the balance was declined.
+  update public.event_payments set status = 'paid', paid_at = now() - interval '28 days', due_on = v_rossi - 30, provider = 'test', provider_reference = 'test_seed_second', card_label = 'Visa …4242', attempts = 1
+  where event_id = v_id and kind = 'second' and status = 'scheduled';
+  update public.event_payments set status = 'failed', failure_reason = 'The card was declined.', attempts = 1, due_on = least(due_on, v_today)
+  where event_id = v_id and kind = 'final' and status = 'scheduled';
+
+  -- Okafor: in the salon, a party of 3; Nola has since taken the day off.
+  v_id := public.save_event(null, jsonb_build_object(
+    'title', 'Okafor wedding', 'event_date', v_okafor, 'ready_by', pg_temp.at(v_okafor, 900),
+    'new_client', jsonb_build_object('first_name', 'Grace', 'last_name', 'Okafor', 'phone', '(312) 555-0144', 'email', 'grace.okafor@example.test'),
+    'members', jsonb_build_array(pg_temp.member('Grace Okafor', 'bride', 1), pg_temp.member('Ella Okafor', 'maid_of_honor', 3), pg_temp.member('Ivy Okafor', 'flower_girl', 5)),
+    'tasks', jsonb_build_array(
+      pg_temp.task(v_okafor, 2, 'hair', 'hair', 1, nola, 610, 655), pg_temp.task(v_okafor, 3, 'hair', 'hair', 1, nola, 660, 680), pg_temp.task(v_okafor, 1, 'hair', 'hair', 1, nola, 700, 790),
+      pg_temp.task(v_okafor, 2, 'makeup', 'makeup', 1, lois, 660, 705), pg_temp.task(v_okafor, 1, 'makeup', 'makeup', 1, lois, 800, 875),
+      pg_temp.task(v_okafor, null, 'touch_up', 'hair', 1, nola, 885, 900), pg_temp.task(v_okafor, null, 'touch_up', 'makeup', 1, lois, 885, 900))));
+  perform pg_temp.book(v_id, 'Grace Okafor', 20);
+  update public.event_payments set status = 'paid', paid_at = now() - interval '6 days', due_on = v_okafor - 30, provider = 'test', provider_reference = 'test_seed_second', card_label = 'Visa …4242', attempts = 1
+  where event_id = v_id and kind = 'second' and status = 'scheduled';
+  insert into public.staff_time_off (business_id, staff_id, starts_on, ends_on, reason, note, status, requested_by, decided_by, decided_at)
+  values ('b0000000-0000-4000-8000-000000000001', nola::uuid, v_okafor, v_okafor, 'personal', 'Family wedding', 'approved', nola::uuid, 'd0000000-0000-4000-8000-000000000001', now() - interval '3 days');
+
+  -- Patel: the proposal's out, waiting on the deposit.
+  v_id := public.save_event(null, jsonb_build_object(
+    'title', 'Patel wedding', 'event_date', v_patel, 'ready_by', pg_temp.at(v_patel, 960),
+    'new_client', jsonb_build_object('first_name', 'Priya', 'last_name', 'Patel', 'phone', '(312) 555-0102', 'email', 'priya.patel@example.test'),
+    'members', jsonb_build_array(pg_temp.member('Priya Patel', 'bride', 1), pg_temp.member('Anika Shah', 'bridesmaid', 3), pg_temp.member('Meera Patel', 'bridesmaid', 3),
+      pg_temp.member('Riya Desai', 'bridesmaid', 3), pg_temp.member('Tara Patel', 'flower_girl', 5)),
+    'tasks', jsonb_build_array(
+      pg_temp.task(v_patel, 2, 'hair', 'hair', 1, bridget, 640, 685), pg_temp.task(v_patel, 3, 'hair', 'hair', 1, bridget, 690, 735), pg_temp.task(v_patel, 1, 'hair', 'hair', 1, bridget, 740, 830),
+      pg_temp.task(v_patel, 5, 'hair', 'hair', 2, shae, 670, 690), pg_temp.task(v_patel, 4, 'hair', 'hair', 2, shae, 695, 740),
+      pg_temp.task(v_patel, 2, 'makeup', 'makeup', 1, hannah, 690, 735), pg_temp.task(v_patel, 4, 'makeup', 'makeup', 1, hannah, 745, 790), pg_temp.task(v_patel, 1, 'makeup', 'makeup', 1, hannah, 835, 910),
+      pg_temp.task(v_patel, 3, 'makeup', 'makeup', 2, lois, 740, 785),
+      pg_temp.task(v_patel, null, 'touch_up', 'hair', 1, bridget, 945, 960), pg_temp.task(v_patel, null, 'touch_up', 'hair', 2, shae, 945, 960),
+      pg_temp.task(v_patel, null, 'touch_up', 'makeup', 1, hannah, 945, 960), pg_temp.task(v_patel, null, 'touch_up', 'makeup', 2, lois, 945, 960))));
+  perform public.send_event_proposal(v_id, encode(sha256(gen_random_uuid()::text::bytea), 'hex'), 'email', 'priya.patel@example.test', 14);
+  update public.event_history set created_at = now() - interval '2 days' where event_id = v_id;
+  update public.events set created_at = now() - interval '4 days', status_changed_at = now() - interval '2 days' where id = v_id;
+
+  -- Alvarez: Denise drafted it from one line; nobody's chosen yet.
+  v_id := public.save_event(null, jsonb_build_object(
+    'title', 'Alvarez quinceañera', 'event_date', v_today + 150, 'ready_by', pg_temp.at(v_today + 150, 840), 'source', 'denise',
+    'described', 'Quinceañera, ready by 2pm, Sofia hair and makeup plus 3 friends hair',
+    'new_client', jsonb_build_object('first_name', 'Sofia', 'last_name', 'Alvarez', 'phone', '(312) 555-0167'),
+    'members', jsonb_build_array(pg_temp.member('Sofia Alvarez', 'guest', 1), pg_temp.member('Guest 2', 'guest', 2), pg_temp.member('Guest 3', 'guest', 2), pg_temp.member('Guest 4', 'guest', 2)),
+    'tasks', jsonb_build_array(
+      pg_temp.task(v_today + 150, 4, 'hair', 'hair', 1, null, 590, 635), pg_temp.task(v_today + 150, 1, 'hair', 'hair', 1, null, 640, 730),
+      pg_temp.task(v_today + 150, 2, 'hair', 'hair', 2, null, 720, 765), pg_temp.task(v_today + 150, 3, 'hair', 'hair', 2, null, 770, 815),
+      pg_temp.task(v_today + 150, 1, 'makeup', 'makeup', 1, null, 735, 810),
+      pg_temp.task(v_today + 150, null, 'touch_up', 'hair', 1, null, 825, 840), pg_temp.task(v_today + 150, null, 'touch_up', 'hair', 2, null, 825, 840),
+      pg_temp.task(v_today + 150, null, 'touch_up', 'makeup', 1, null, 825, 840))));
+  update public.events set created_at = now() - interval '1 day' where id = v_id;
+
+  -- Brooks: last Sunday, on location, paid in full: Event day until it's completed.
+  v_id := public.save_event(null, jsonb_build_object(
+    'title', 'Brooks wedding', 'event_date', v_ahead, 'ready_by', pg_temp.at(v_brooks, 660),
+    'new_client', jsonb_build_object('first_name', 'Zoe', 'last_name', 'Brooks', 'phone', '(312) 555-0129', 'email', 'zoe.brooks@example.test'),
+    'venue_name', 'Lincoln Park Conservatory', 'on_location', true, 'travel_miles', 6, 'travel_minutes', 20,
+    'members', jsonb_build_array(pg_temp.member('Zoe Brooks', 'bride', 1), pg_temp.member('Tess Brooks', 'bridesmaid', 2), pg_temp.member('Bea Lang', 'bridesmaid', 2)),
+    'tasks', jsonb_build_array(
+      pg_temp.task(v_brooks, 1, 'hair', 'hair', 1, shae, 470, 560), pg_temp.task(v_brooks, 2, 'hair', 'hair', 2, nola, 500, 545), pg_temp.task(v_brooks, 3, 'hair', 'hair', 2, nola, 550, 595),
+      pg_temp.task(v_brooks, 1, 'makeup', 'makeup', 1, hannah, 565, 640),
+      pg_temp.task(v_brooks, null, 'touch_up', 'hair', 1, shae, 645, 660), pg_temp.task(v_brooks, null, 'touch_up', 'hair', 2, nola, 645, 660),
+      pg_temp.task(v_brooks, null, 'touch_up', 'makeup', 1, hannah, 645, 660))));
+  perform pg_temp.book(v_id, 'Zoe Brooks', 90);
+  update public.events set event_date = v_brooks, status = 'trial_done', look_notes = 'Sleek low bun with a middle part. Fresh, dewy skin.' where id = v_id;
+  update public.event_payments set status = 'paid', paid_at = (v_brooks - 7 + time '10:00') at time zone 'America/Chicago', due_on = v_brooks - 7,
+    provider = 'test', provider_reference = 'test_seed_' || kind, card_label = 'Visa …4242', attempts = 1
+  where event_id = v_id and status = 'scheduled';
+  perform private.sync_event_blocks(v_id);
+
+  -- Harper: three weeks ago, in the salon, completed: its sale goes to payroll.
+  v_id := public.save_event(null, jsonb_build_object(
+    'title', 'Harper wedding', 'event_date', v_ahead, 'ready_by', pg_temp.at(v_harper, 780),
+    'new_client', jsonb_build_object('first_name', 'Emma', 'last_name', 'Harper', 'phone', '(312) 555-0193', 'email', 'emma.harper@example.test'),
+    'members', jsonb_build_array(pg_temp.member('Emma Harper', 'bride', 1), pg_temp.member('Ann Harper', 'bridesmaid', 3), pg_temp.member('Kay Moss', 'bridesmaid', 6), pg_temp.member('Lynn Harper', 'mother', 4)),
+    'tasks', jsonb_build_array(
+      pg_temp.task(v_harper, 4, 'hair', 'hair', 1, bridget, 480, 525), pg_temp.task(v_harper, 2, 'hair', 'hair', 1, bridget, 530, 575), pg_temp.task(v_harper, 1, 'hair', 'hair', 1, bridget, 580, 670),
+      pg_temp.task(v_harper, 1, 'makeup', 'makeup', 1, hannah, 675, 750),
+      pg_temp.task(v_harper, 3, 'makeup', 'makeup', 2, lois, 540, 585), pg_temp.task(v_harper, 4, 'makeup', 'makeup', 2, lois, 590, 635), pg_temp.task(v_harper, 2, 'makeup', 'makeup', 2, lois, 640, 685),
+      pg_temp.task(v_harper, null, 'touch_up', 'hair', 1, bridget, 765, 780), pg_temp.task(v_harper, null, 'touch_up', 'makeup', 1, hannah, 765, 780),
+      pg_temp.task(v_harper, null, 'touch_up', 'makeup', 2, lois, 765, 780))));
+  perform pg_temp.book(v_id, 'Emma Harper', 120);
+  update public.events set event_date = v_harper, status = 'trial_done' where id = v_id;
+  update public.event_payments set status = 'paid', paid_at = (v_harper - 7 + time '10:00') at time zone 'America/Chicago', due_on = v_harper - 7,
+    provider = 'test', provider_reference = 'test_seed_' || kind, card_label = 'Visa …4242', attempts = 1
+  where event_id = v_id and status = 'scheduled';
+  perform private.sync_event_blocks(v_id);
+  perform public.complete_event(v_id);
+  update public.sales set created_at = (v_harper + time '14:00') at time zone 'America/Chicago' where id = (select sale_id from public.events where id = v_id);
+  update public.events set status_changed_at = (v_harper + time '14:00') at time zone 'America/Chicago' where id = v_id;
+  update public.event_history set created_at = (v_harper + time '14:00') at time zone 'America/Chicago' where event_id = v_id and kind = 'completed';
+
+  -- Chen: a prom, lost to another salon.
+  v_id := public.save_event(null, jsonb_build_object(
+    'title', 'Chen prom', 'event_date', v_today + 40, 'ready_by', pg_temp.at(v_today + 40, 1020),
+    'new_client', jsonb_build_object('first_name', 'Lily', 'last_name', 'Chen', 'phone', '(312) 555-0155'),
+    'members', jsonb_build_array(pg_temp.member('Lily Chen', 'guest', 2), pg_temp.member('Jade Wu', 'guest', 2)),
+    'tasks', jsonb_build_array(pg_temp.task(v_today + 40, 1, 'hair', 'hair', 1, shae, 910, 955), pg_temp.task(v_today + 40, 2, 'hair', 'hair', 1, shae, 960, 1005),
+      pg_temp.task(v_today + 40, null, 'touch_up', 'hair', 1, shae, 1005, 1020))));
+  perform public.set_event_status(v_id, 'lost', 'Went with another salon');
+  update public.events set created_at = now() - interval '12 days', status_changed_at = now() - interval '5 days' where id = v_id;
+end $$;
+
+-- Nguyen: an inquiry from the booking site (as save_event_inquiry makes it).
+with client as (
+  insert into public.clients (business_id, first_name, last_name, phone, email)
+  values ('b0000000-0000-4000-8000-000000000001', 'Linh', 'Nguyen', '(312) 555-0110', 'linh.nguyen@example.test')
+  returning id
+), event as (
+  insert into public.events (business_id, location_id, client_id, title, event_date, venue_name, on_location, notes, source, inquiry_party_size, inquiry_services, created_at, status_changed_at)
+  select 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', client.id, 'Linh''s wedding',
+    (now() at time zone 'America/Chicago')::date + 120, 'Morton Arboretum', true,
+    'Outdoor ceremony at 4pm. Loves a soft, natural look.', 'online', 5, 'Hair and makeup for me and 4 bridesmaids', now() - interval '6 hours', now() - interval '6 hours'
+  from client
+  returning id
+)
+insert into public.event_history (business_id, event_id, kind, detail, created_at)
+select 'b0000000-0000-4000-8000-000000000001', id, 'inquiry', 'Sent from the booking site', now() - interval '6 hours' from event;

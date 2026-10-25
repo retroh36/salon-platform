@@ -1,6 +1,6 @@
 ---
 title: Use the Dashboard and Denise's brief
-keywords: dashboard, home, morning brief, Denise's brief, daily brief, today, overview, at a glance, risks today, might not show, due back, low stock, credit, team today, right now, opportunities
+keywords: dashboard, home, morning brief, events coming up, wedding risks, balance unpaid, trial not booked, headcount cutoff, Denise's brief, daily brief, today, overview, at a glance, risks today, might not show, due back, low stock, credit, team today, right now, opportunities
 who: owner, manager, front_desk, stylist, assistant
 open: /dashboard | Open Dashboard
 ---
@@ -8,8 +8,8 @@ open: /dashboard | Open Dashboard
 The Dashboard is the day at a glance, starting with Denise's brief: what might go wrong today and who to follow up with.
 
 1. In the sidebar, tap **Dashboard**.
-2. Read **Denise's brief**: **Risks today**, **Might not show**, **Due back, nothing booked**, **Low stock for today** and **Coming in with credit**.
-3. Tap an item to open the visit, client or product. Tap **See all** for the full list, or the × to dismiss an item for today.
+2. Read **Denise's brief**: **Risks today**, **Might not show**, **Due back, nothing booked**, **Low stock for today**, **Coming in with credit** and **Events coming up**.
+3. Tap an item to open the visit, client, product or event. Tap **See all** for the full list, or the × to dismiss an item for today.
 4. Under her open items, tap **Apply**, **Dismiss**, **Book** or **Review** to act on a fix, waitlist match or reorder draft.
 5. Check **Today at a glance**, compared with the same day last week.
 6. Check **Right now** (in the chair, next hour, running late) and **Team today**. They refresh every 30 seconds.
@@ -21,3 +21,4 @@ The Dashboard is the day at a glance, starting with Denise's brief: what might g
 - Stylists see their own day, clients and regulars, with no salon money.
 - Front desk sees everything except money.
 - Denise's brief is worked out from your own bookings and sales.
+- **Events coming up** checks booked events for the next 60 days: a payment that didn't go through, a balance still due within a week, a trial not booked within a month, the headcount cutoff closing or just passed, someone on the team who has time off or clients then, and artists not chosen.

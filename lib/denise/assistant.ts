@@ -130,7 +130,31 @@ const TOOLS: Anthropic.Tool[] = [
 const noInput = { type: "object" as const, properties: {}, required: [], additionalProperties: false as const };
 
 // Read-only lookups of what Denise has learned, and her fixes.
-const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes" | "giftCards" | "packages" | "policy", Anthropic.Tool> = {
+const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes" | "giftCards" | "packages" | "policy" | "events" | "eventBalance", Anthropic.Tool> = {
+  events: {
+    name: "events_in_month",
+    description:
+      "Weddings and other events in a month: each one by its client's first name (\"Mia's wedding\"), the date, where it stands (Inquiry, Proposal sent, Booked, Trial done, Completed), party size, ready-by time, in the salon or on location, the team, and for the front desk, managers and owners its total and what's left to collect. Lost ones are only counted. A stylist sees only the events they're on.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: { month: { type: "string", description: "The month as YYYY-MM." } },
+      required: ["month"],
+      additionalProperties: false,
+    },
+  },
+  eventBalance: {
+    name: "event_balance",
+    description:
+      "What's been paid and what's left to collect on one event, found by a name in the question (the client's first or last name, or the event's name, like \"Rossi\"): the total, paid so far, left to collect, and each payment (deposit, second payment, balance, a member's own share) as paid, due or didn't go through. Front desk, managers and owners.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: { name: { type: "string", description: "The name to look for, like \"Rossi\"." } },
+      required: ["name"],
+      additionalProperties: false,
+    },
+  },
   policy: {
     name: "late_cancellations",
     description:
@@ -378,6 +402,8 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
         ...(k.giftCards ? [KNOWLEDGE_TOOLS.giftCards] : []),
         ...(k.packages ? [KNOWLEDGE_TOOLS.packages] : []),
         ...(k.policy ? [KNOWLEDGE_TOOLS.policy] : []),
+        KNOWLEDGE_TOOLS.events,
+        ...(k.eventBalance ? [KNOWLEDGE_TOOLS.eventBalance] : []),
       ]
     : [];
 
@@ -414,6 +440,11 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
         if (!k.policy) return "Late cancellations are for the front desk, managers and owners.";
         if (!POLICY_PERIODS.includes(input.period as PolicyPeriod)) return `Choose a period: ${POLICY_PERIODS.join(", ")}.`;
         return JSON.stringify(await k.policy(input.period as PolicyPeriod));
+      case "events_in_month":
+        return JSON.stringify(await k.events(String(input.month ?? "")));
+      case "event_balance":
+        if (!k.eventBalance) return "Event payments are for the front desk, managers and owners.";
+        return JSON.stringify(await k.eventBalance(String(input.name ?? "")));
       case "propose_fixes": {
         if (!k.fixes) return "Only the front desk, managers and owners can approve fixes.";
         const date = dayOf(input.date);
@@ -478,6 +509,10 @@ export function toolStatus(name: string, input: unknown, c: Pick<AssistantContex
       return "Finding unused packages…";
     case "late_cancellations":
       return "Looking at late cancellations and no-shows…";
+    case "events_in_month":
+      return "Looking at the events that month…";
+    case "event_balance":
+      return "Checking the event's payments…";
     case "how_to":
       return "Looking it up in the help guide…";
     default:

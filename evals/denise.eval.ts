@@ -1,4 +1,4 @@
-// Ask Denise, evaluated: 35 realistic questions from the front desk,
+// Ask Denise, evaluated: 37 realistic questions from the front desk,
 // the owner and a stylist (10 of them "how do I…?", answered from the help
 // guide in docs/help/), asked of the real Claude API against the demo
 // data (npm run seed:demo). Each case checks which tools she used and that
@@ -199,6 +199,13 @@ const nextWeekday = (iso: number) => {
   }
   return today;
 };
+
+const ROSSI_MONTH = (() => {
+  const d = new Date(`${today}T12:00:00Z`);
+  const isoDow = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + (7 - (isoDow % 7)));
+  return d.toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
+})();
 
 const CASES: Case[] = [
   {
@@ -441,6 +448,25 @@ const CASES: Case[] = [
       if (!names.length) return /no one|nobody|none|no late/i.test(a) ? null : "should say no one has";
       return has(a, ...names) ? null : `should name someone who did (${names.length} clients)`;
     },
+  },
+  {
+    // The demo's Rossi wedding is this coming Sunday (supabase/seed-demo.sql).
+    question: `What weddings do we have in ${ROSSI_MONTH}?`,
+    as: "front_desk",
+    tools: ["events_in_month"],
+    facts: async () => ({ first: "Mia" }),
+    check: (a) => (/Rossi/i.test(a) ? "should use first names only" : has(a, "Mia") ? null : "should list Mia's wedding"),
+  },
+  {
+    question: "What's left to collect on the Rossi wedding?",
+    as: "front_desk",
+    tools: ["event_balance"],
+    numbersFromTools: true,
+    facts: async () => {
+      const { data } = await admin.from("event_payments").select("amount_cents, events!inner(title)").eq("events.title", "Rossi wedding").in("status", ["scheduled", "failed"]);
+      return { left: (data!.reduce((n, p) => n + p.amount_cents, 0) / 100).toFixed(2) };
+    },
+    check: (a, f) => (has(a, String(f.left), String(f.left).replace(/\.00$/, "")) ? (/didn.t go through|declined|failed/i.test(a) ? null : "should say the balance didn't go through") : `should say $${f.left} is left`),
   },
   howToCase("How do I ring up a gift card?", "front_desk", "Sell a gift card", says(/gift card/i, "should mention the Gift card button")),
   howToCase("A client wants to pay with their gift card. What do I do?", "front_desk", "Pay with a gift card", says(/gift card/i, "should mention paying by gift card")),
