@@ -71,6 +71,23 @@ describe("tickets behind the pay", () => {
     expect(ticketsFor([sale()], "nobody", from, to)).toEqual([]);
   });
 
+  it("takes back exactly everything when a sale is refunded in parts, never a cent left", () => {
+    // $3: a $1 cut and $1 tip for Ana, Ben's $1 spray; refunded $1 at a time.
+    const small = sale({
+      total_cents: 300,
+      lines: [
+        { kind: "service", staff_id: A, description: "Cut", quantity: 1, net_cents: 100, commission_pct: 45 },
+        { kind: "product", staff_id: B, description: "Spray", quantity: 1, net_cents: 100, commission_pct: 10 },
+      ],
+      tips: [{ staff_id: A, amount_cents: 100 }],
+      refunds: ["2026-10-08", "2026-10-09", "2026-10-10"].map((d) => ({ amount_cents: 100, at: `${d}T16:00:00Z` })),
+    });
+    const net = (staff: string) =>
+      ticketsFor([small], staff, from, to).reduce((n, t) => ({ service: n.service + t.serviceCents, retail: n.retail + t.retailCents, tips: n.tips + t.tipCents }), { service: 0, retail: 0, tips: 0 });
+    expect(net(A)).toEqual({ service: 0, retail: 0, tips: 0 });
+    expect(net(B)).toEqual({ service: 0, retail: 0, tips: 0 });
+  });
+
   it("takes back a refund's share of every line and tip, in the period it was given", () => {
     // $30 back on $120: a quarter of everything.
     const refunded = sale({ refunds: [{ amount_cents: 3000, at: "2026-10-10T16:00:00Z" }] });

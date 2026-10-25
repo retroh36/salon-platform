@@ -124,13 +124,16 @@ function ownShare(sale: PayrollSale, staffId: string): Amounts {
   };
 }
 
-// Taking back a share (0 to 1) of each line and tip, rounded per line.
-function takeBack(a: Amounts, share: number): Amounts {
-  const lines = a.lines.map((l) => ({ ...l, cents: -Math.round(l.cents * share) }));
+// Taking back each line and tip from one share of the sale refunded so
+// far (0 to 1) to the next, rounded on the running share, so refunds in
+// parts add up to exactly what a whole refund takes back.
+function takeBack(a: Amounts, share: number, before = 0): Amounts {
+  const part = (cents: number) => -(Math.round(cents * share) - Math.round(cents * before));
+  const lines = a.lines.map((l) => ({ ...l, cents: part(l.cents) }));
   return {
     serviceCents: lines.filter((l) => l.kind === "service").reduce((n, l) => n + l.cents, 0),
     retailCents: lines.filter((l) => l.kind === "product").reduce((n, l) => n + l.cents, 0),
-    tipCents: -Math.round(a.tipCents * share),
+    tipCents: part(a.tipCents),
     lines,
   };
 }
@@ -160,9 +163,12 @@ export function ticketsFor(sales: readonly PayrollSale[], staffId: string, from:
     if (within(sale.created_at)) push("sale", sale.created_at, own);
     // Refunds before a void; a void takes back what's left.
     let taken: Amounts = { serviceCents: 0, retailCents: 0, tipCents: 0, lines: own.lines.map((l) => ({ ...l, cents: 0 })) };
+    let refunded = 0;
+    const shareOf = (cents: number) => (sale.total_cents > 0 ? Math.min(1, cents / sale.total_cents) : 0);
     for (const r of sale.refunds) {
       if (sale.voided_at && Date.parse(r.at) > Date.parse(sale.voided_at)) continue;
-      const back = takeBack(own, sale.total_cents > 0 ? Math.min(1, r.amount_cents / sale.total_cents) : 0);
+      const back = takeBack(own, shareOf(refunded + r.amount_cents), shareOf(refunded));
+      refunded += r.amount_cents;
       if (within(r.at)) push("refund", r.at, back);
       taken = plus(taken, back);
     }
