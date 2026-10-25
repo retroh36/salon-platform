@@ -101,6 +101,17 @@ describe("managers", () => {
     expect(toggle?.code).toBe("42501");
   });
 
+  it("can't change who writes their own messages (owners), or wind back the sale numbers", async () => {
+    const { error: roles } = await manager.from("businesses").update({ free_text_roles: ["manager"] }).eq("id", B);
+    expect(roles?.code).toBe("42501");
+    // A lower next number would make every checkout clash with a sale already made.
+    const { error: number } = await manager.from("businesses").update({ next_sale_number: 1 }).eq("id", B);
+    expect(number?.code).toBe("42501");
+    const { data } = await admin.from("businesses").select("free_text_roles, next_sale_number").eq("id", B).single();
+    expect(data!.next_sale_number).toBeGreaterThan(1);
+    expect(data!.free_text_roles).not.toEqual(["manager"]);
+  });
+
   it("lose what an owner switches off", async () => {
     await owner.rpc("set_staff_permission", { p_staff_id: SEED.staff.manager, p_permission: "payroll", p_allowed: false });
     const { data: rates } = await manager.from("staff_compensation").select("staff_id");
