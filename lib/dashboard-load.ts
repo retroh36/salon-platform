@@ -16,7 +16,7 @@ import type { ClientInsight } from "@/lib/insights/clients";
 import { describeClient } from "@/lib/insights/describe";
 import { loadAllClientInsights, loadSalonInsight } from "@/lib/insights/read";
 import { loadPackagesByClient, withPackages } from "@/lib/packages";
-import { formatDay, formatLongDay } from "@/lib/schedule-format";
+import { formatDay, formatDayAt, formatLongDay } from "@/lib/schedule-format";
 import type { StaffLevel } from "@/lib/schedule-forms";
 import { loadDisruptions } from "@/lib/scheduling/disruptions";
 import { loadBookingContext, loadOffers, startOfLocalDay } from "@/lib/scheduling/load";
@@ -314,7 +314,7 @@ export async function loadDashboard(supabase: Supabase, me: DashboardMe, now = n
         next: nextVisit
           ? {
               ...view(nextVisit),
-              insight: withPackages(known ? describeClient(known, null, { staff: (id) => names.get(id) ?? null, dayOf: (iso) => formatDay(iso.slice(0, 10)) }, now) : null, nextPackages),
+              insight: withPackages(known ? describeClient(known, null, { staff: (id) => names.get(id) ?? null, dayOf: (iso) => formatDayAt(iso, tz) }, now) : null, nextPackages),
             }
           : null,
         stats: {

@@ -12,7 +12,7 @@ import { currentProvider } from "@/lib/payments";
 import { DEPOSIT_REFERENCE } from "@/lib/policy";
 import { suggestRebook, weeksUntilNext, type RebookSuggestion } from "@/lib/rebook";
 import { loadCheckoutSettings, loadRetailProducts, type CheckoutProduct, type CheckoutSettings } from "@/lib/sales";
-import { formatDay } from "@/lib/schedule-format";
+import { formatDay, formatDayAt } from "@/lib/schedule-format";
 import type { StaffLevel } from "@/lib/schedule-forms";
 import { loadBookingContext, loadOffers, startOfLocalDay } from "@/lib/scheduling/load";
 import { addDays, formatMinute, todayIn, toLocal, type LocalDate } from "@/lib/scheduling/time";
@@ -134,7 +134,7 @@ export type CheckoutScreenData = {
   ticket: Ticket;
   client: { id: string; name: string; firstName: string; email: string | null; phone: string | null } | null;
   // The latest payment link sent for this checkout (text-to-pay).
-  link: { id: string; status: "open" | "paid" | "canceled"; channel: "sms" | "email"; sentTo: string; expiresAt: string; createdAt: string; amountCents: number; tipCents: number | null } | null;
+  link: { id: string; status: "open" | "paid" | "canceled"; channel: "sms" | "email"; sentTo: string; expiresAt: string; createdAt: string; sentAt: string; expiresText: string; amountCents: number; tipCents: number | null } | null;
   insight: { summary: string; tags: { label: string; tone: string }[] } | null;
   packages: ClientPackage[];
   // Live memberships: what they include this period, and member prices.
@@ -239,7 +239,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     giftCards = (cards.data ?? []).filter((c) => !c.expires_at || new Date(c.expires_at) > now).map((c) => ({ code: c.code, balanceCents: c.balance_cents, kind: c.kind }));
     const names = new Map(staff.map((s) => [s.id, s.firstName]));
     const known = insights.get(client.id);
-    insight = withPackages(known ? describeClient(known.habits, known.spend, { staff: (id) => names.get(id) ?? null, dayOf: (iso) => formatDay(iso.slice(0, 10)) }, now) : null, packages);
+    insight = withPackages(known ? describeClient(known.habits, known.spend, { staff: (id) => names.get(id) ?? null, dayOf: (iso) => formatDayAt(iso, tz) }, now) : null, packages);
 
     // Their next visit: today's services with their usual stylist.
     if (draft.appointment_id && draft.status === "open") {
@@ -291,6 +291,8 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
           sentTo: link.sent_to,
           expiresAt: link.expires_at,
           createdAt: link.created_at,
+          sentAt: sentAtText(link.created_at, tz, today),
+          expiresText: sentAtText(link.expires_at, tz, today),
           amountCents: link.amount_cents,
           tipCents: link.tip_cents,
         }
@@ -318,4 +320,12 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     rebook,
     nextClient: next ? { appointmentId: next.id, name: next.client ? fullName(next.client) : "Walk-in", time: formatMinute(toLocal(new Date(next.starts_at), tz).minute) } : null,
   };
+}
+
+// When a payment link went out (or expires), at the salon: "2:15pm", or "Sat, Oct 24, 2:15pm"
+// on another day. Worked out here, so the screen never uses the device's own
+// timezone.
+export function sentAtText(iso: string, timeZone: string, today: LocalDate): string {
+  const local = toLocal(new Date(iso), timeZone);
+  return local.date === today ? formatMinute(local.minute) : `${formatDay(local.date)}, ${formatMinute(local.minute)}`;
 }

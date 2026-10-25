@@ -80,16 +80,15 @@ export function LinkWaiting({ data, link }: { data: CheckoutScreenData; link: No
     return () => clearInterval(t);
   }, [router]);
   const [expired] = useState(() => Date.parse(link.expiresAt) <= Date.now());
-  const time = (iso: string) => new Date(iso).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" });
   return (
     <aside aria-label="Payment" className="flex min-h-0 flex-col border-t border-line bg-surface md:border-t-0 md:border-l">
       <div className="flex flex-1 flex-col gap-4 px-4 py-6 sm:px-5" data-testid="link-waiting">
         <h2 className="font-serif text-2xl font-semibold text-navy-900">{expired ? "The payment link expired" : "Waiting for payment"}</h2>
         <p>
-          A link to pay <strong className="tabular-nums">{formatPrice(link.amountCents)}</strong> went to {link.sentTo} by {link.channel === "sms" ? "text" : "email"} at {time(link.createdAt)}.
+          A link to pay <strong className="tabular-nums">{formatPrice(link.amountCents)}</strong> went to {link.sentTo} by {link.channel === "sms" ? "text" : "email"} at {link.sentAt}.
         </p>
         <p className="text-sm text-ink-muted">
-          {expired ? "Send a new one, or take payment here." : `When ${data.client?.firstName ?? "the client"} pays, the sale completes by itself. The link expires ${time(link.expiresAt)}.`}
+          {expired ? "Send a new one, or take payment here." : `When ${data.client?.firstName ?? "the client"} pays, the sale completes by itself. The link expires at ${link.expiresText}.`}
         </p>
         <Button
           variant={expired ? "primary" : "secondary"}

@@ -1,11 +1,17 @@
 import type { TimeOff } from "@/lib/scheduling/availability";
 import type { Interval } from "@/lib/scheduling/intervals";
-import { formatMinute, type LocalDate } from "@/lib/scheduling/time";
+import { formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { REASON_LABELS, type TimeOffReason } from "@/lib/schedule-forms";
 
 // [{9am-1pm}, {2pm-6pm}] -> "9am–1pm, 2pm–6pm".
 export function formatIntervals(intervals: Interval[]): string {
   return intervals.map((i) => `${formatMinute(i.start)}–${formatMinute(i.end)}`).join(", ");
+}
+
+// A moment as the salon's day: 7:30pm in Chicago is still that evening's
+// date, though it's the next day in UTC.
+export function formatDayAt(iso: string, timeZone: string): string {
+  return formatDay(toLocal(new Date(iso), timeZone).date);
 }
 
 // "2026-10-27" -> "Tue, Oct 27".
