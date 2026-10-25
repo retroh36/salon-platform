@@ -71,7 +71,9 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
   const own = me.bookStaffId ?? me.staffId;
   const ownTimesOnly = isStylist && !can(me, "see_team_numbers");
   const tz = me.location.timezone;
-  const dateOf = (iso: string | null) => (iso ? toLocal(new Date(iso), tz).date : null);
+  // Dates as Denise says them, weekday worked out here ("Sat, Oct 24", with
+  // the year when it isn't this one), so Claude never has to.
+  const dateOf = (iso: string | null) => (iso ? sayDate(toLocal(new Date(iso), tz).date, me.today) : null);
 
   // Names, loaded once per question.
   let names: Promise<{ staff: Map<string, string>; services: Map<string, string> }> | null = null;
@@ -458,4 +460,16 @@ export async function salesBetween(supabase: Supabase, me: Pick<Asker, "location
     average_visit_dollars: visits.size ? dollars(Math.round((serviceCents + retailCents) / visits.size)) : null,
     no_shows: noShows ?? 0,
   };
+}
+
+// "2026-10-24" -> "Sat, Oct 24" (", 2025" added for another year).
+export function sayDate(date: LocalDate, today: LocalDate): string {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    ...(date.slice(0, 4) !== today.slice(0, 4) ? { year: "numeric" } : {}),
+  });
 }
