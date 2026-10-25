@@ -12,6 +12,8 @@ import { giftCardEmail, isCardCode, type GiftCardLookup } from "@/lib/gift-cards
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { PaymentMethod } from "@/lib/checkout";
+import { providerFor } from "@/lib/payments";
+import { formatPrice } from "@/lib/services";
 
 export type SaleLineInput =
   // packageItemId: a use of the client's package pays for it.
@@ -98,8 +100,39 @@ export async function voidSale(saleId: string, reason: string): Promise<SimpleRe
   if (!isUuid(saleId)) return { ok: false, message: "That sale doesn't exist." };
   const { error } = await supabase.rpc("void_sale", { p_sale_id: saleId, p_reason: reason });
   if (error) return { ok: false, message: messageFor(error, "That didn't go through. Try again.") };
+  const cards = await refundOnlineCards(supabase, saleId);
   refresh();
-  return { ok: true, message: "Voided. Payments are reversed and products are back in stock." };
+  return {
+    ok: true,
+    message: `Voided. Payments are reversed and products are back in stock.${cards.refundedCents ? ` ${formatPrice(cards.refundedCents)} went back to the card online.` : ""}${cards.failedCents ? ` The card refund of ${formatPrice(cards.failedCents)} didn't go through: tap Try the card refund again.` : ""}`,
+  };
+}
+
+// The card refunds a void made due (cards taken online: a payment link, a
+// deposit, a renewal), through the payment provider each was charged with.
+async function refundOnlineCards(supabase: Awaited<ReturnType<typeof getCurrentStaff>>["supabase"], saleId: string) {
+  const { data: due, error } = await supabase.from("payments").select("id, amount_cents, processor, processor_reference").eq("sale_id", saleId).in("provider_refund", ["due", "failed"]);
+  if (error) throw error;
+  let refundedCents = 0;
+  let failedCents = 0;
+  for (const p of due) {
+    const result = p.processor && p.processor_reference ? await providerFor(p.processor).refund(p.processor_reference) : { ok: false };
+    const { error: recordError } = await supabase.rpc("record_provider_refund", { p_payment_id: p.id, p_ok: result.ok });
+    if (recordError) throw recordError;
+    if (result.ok) refundedCents -= p.amount_cents;
+    else failedCents -= p.amount_cents;
+  }
+  return { refundedCents, failedCents };
+}
+
+export async function retryCardRefunds(saleId: string): Promise<SimpleResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!can(me, "void_refund")) return { ok: false, message: "Only managers and owners can refund." };
+  if (!isUuid(saleId)) return { ok: false, message: "That sale doesn't exist." };
+  const cards = await refundOnlineCards(supabase, saleId);
+  refresh();
+  if (cards.failedCents) return { ok: false, message: `The card refund of ${formatPrice(cards.failedCents)} didn't go through. Try again in a few minutes.` };
+  return { ok: true, message: `${formatPrice(cards.refundedCents)} went back to the card online.` };
 }
 
 export async function refundSale(

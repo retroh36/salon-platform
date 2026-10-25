@@ -79,6 +79,29 @@ test("sends a payment link; the client tips and pays on their phone; the checkou
   expect(link).toEqual({ status: "paid", tip_cents: 2000 });
 });
 
+test.describe("a manager voids it", () => {
+  test.use({ storageState: AUTH.manager });
+
+  test("after saying the card is refunded online, and it is", async ({ page }) => {
+    const { data: sale } = await admin.from("sales").select("id").eq("appointment_id", appointmentId).eq("status", "completed").single();
+    await page.goto(`/sales/${sale!.id}`);
+    const form = page.getByRole("form", { name: "Void sale" });
+    await form.getByLabel(/being voided/).fill("Charged the wrong client");
+    await form.getByRole("button", { name: "Void sale" }).click();
+    // It asks first: the money goes back to the card online.
+    const ask = form.getByRole("alertdialog", { name: "Refund the card" });
+    await expect(ask).toContainText("Voiding refunds $120 to the client's card through the payment provider.");
+    await ask.getByRole("button", { name: "Keep the sale" }).click();
+    await expect(ask).toHaveCount(0);
+    expect((await admin.from("sales").select("status").eq("id", sale!.id).single()).data!.status).toBe("completed");
+    await form.getByRole("button", { name: "Void sale" }).click();
+    await form.getByRole("button", { name: "Void and refund $120" }).click();
+    await expect(page.getByRole("list", { name: "Sale history" })).toContainText("Card refunded online");
+    const { data: reversal } = await admin.from("payments").select("amount_cents, provider_refund").eq("sale_id", sale!.id).lt("amount_cents", 0);
+    expect(reversal).toEqual([{ amount_cents: -12000, provider_refund: "refunded" }]);
+  });
+});
+
 test("can cancel a link to take payment at the desk; a canceled link no longer works", async ({ page, browser }) => {
   // A retail sale for the same client.
   const { data: product } = await admin.from("stock_levels").select("product:products!inner(id, type, is_active)").eq("location_id", L).eq("product.type", "retail").eq("product.is_active", true).gt("on_hand", 5).limit(1).single();

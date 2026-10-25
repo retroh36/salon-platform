@@ -12,7 +12,7 @@ import { canTakePayments, loadSale, receiptGroups, receiptSalon, type ReceiptSal
 import { formatDay } from "@/lib/schedule-format";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
-import { EmailReceipt, PrintOnOpen, RefundForm, VoidForm } from "./manage";
+import { EmailReceipt, PrintOnOpen, RefundForm, RetryCardRefund, VoidForm } from "./manage";
 
 export const metadata: Metadata = { title: "Sale" };
 
@@ -23,7 +23,14 @@ const STATUS: Record<SaleView["status"], { label: string; tone: Tone }> = {
   voided: { label: "Voided", tone: "red" },
 };
 
-const EVENTS: Record<string, string> = { completed: "Sold", voided: "Voided", refunded: "Refunded", receipt_emailed: "Receipt emailed" };
+const EVENTS: Record<string, string> = {
+  completed: "Sold",
+  voided: "Voided",
+  refunded: "Refunded",
+  receipt_emailed: "Receipt emailed",
+  card_refunded: "Card refunded online",
+  card_refund_failed: "Card refund didn't go through",
+};
 
 export default function SalePage({ params, searchParams }: PageProps<"/sales/[id]">) {
   return (
@@ -58,6 +65,8 @@ async function Sale({ params, searchParams }: Pick<PageProps<"/sales/[id]">, "pa
 
   const paid = sale.payments.filter((p) => p.amountCents > 0).reduce((n, p) => n + p.amountCents, 0);
   const manager = can(me, "void_refund");
+  // A void's card refund through the payment provider still to make.
+  const cardRefundDue = -sale.payments.filter((p) => p.providerRefund === "due" || p.providerRefund === "failed").reduce((n, p) => n + p.amountCents, 0);
   // Gift cards it was paid with (money can go back onto them).
   const { data: used } = await supabase.from("payments").select("gift_card:gift_cards(code, kind)").eq("sale_id", sale.id).not("gift_card_id", "is", null);
   const giftCards = [...new Map((used ?? []).flatMap((p) => (p.gift_card ? [[p.gift_card.code, { code: p.gift_card.code, label: `${p.gift_card.kind === "promotional" ? "promotional card" : "gift card"} …${p.gift_card.code.slice(-4)}` }] as const] : []))).values()];
@@ -102,6 +111,11 @@ async function Sale({ params, searchParams }: Pick<PageProps<"/sales/[id]">, "pa
               <EmailReceipt saleId={sale.id} email={sale.receiptEmail ?? sale.client?.email ?? ""} />
             </Card>
           )}
+          {manager && cardRefundDue > 0 && (
+            <Card title="Card refund" titleId="card-refund-heading">
+              <RetryCardRefund saleId={sale.id} amountCents={cardRefundDue} />
+            </Card>
+          )}
           {manager && sale.status !== "voided" && sale.status !== "refunded" && (
             <Card title="Refund" titleId="refund-heading">
               <RefundForm saleId={sale.id} refundableCents={paid - sale.refundedCents} products={products} returnable={returnable} giftCards={giftCards} />
@@ -109,7 +123,7 @@ async function Sale({ params, searchParams }: Pick<PageProps<"/sales/[id]">, "pa
           )}
           {manager && sale.status === "completed" && (
             <Card title="Void" titleId="void-heading" description="Undoes the whole sale: payments reversed, products back in stock, and the visit open to check out again.">
-              <VoidForm saleId={sale.id} />
+              <VoidForm saleId={sale.id} online={sale.payments.filter((p) => p.amountCents > 0 && p.online).map((p) => ({ label: p.reference && /…\d{4}$/.test(p.reference) ? p.reference : "the client's card", amountCents: p.amountCents }))} />
             </Card>
           )}
           {!manager && <p className="text-sm text-ink-muted">Refunds and voids are for managers and owners.</p>}

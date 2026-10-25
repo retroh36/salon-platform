@@ -2181,14 +2181,14 @@ isOneToOne: false
                   ]
                 },"payments": {
                   Row: {
-                    "amount_cents": number,"business_id": string,"change_cents": number | null,"created_at": string,"created_by": string | null,"gift_card_id": string | null,"id": string,"location_id": string,"method": Database["public"]['Enums']["payment_method"],"package_item_id": string | null,"processor": string | null,"processor_reference": string | null,"reason": string | null,"reference": string | null,"sale_id": string,"tendered_cents": number | null
+                    "amount_cents": number,"business_id": string,"change_cents": number | null,"created_at": string,"created_by": string | null,"gift_card_id": string | null,"id": string,"location_id": string,"method": Database["public"]['Enums']["payment_method"],"package_item_id": string | null,"processor": string | null,"processor_reference": string | null,"provider_refund": string | null,"reason": string | null,"reference": string | null,"sale_id": string,"tendered_cents": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount_cents": number,"business_id": string,"change_cents"?: number | null,"created_at"?: string,"created_by"?: string | null,"gift_card_id"?: string | null,"id"?: string,"location_id": string,"method": Database["public"]['Enums']["payment_method"],"package_item_id"?: string | null,"processor"?: string | null,"processor_reference"?: string | null,"reason"?: string | null,"reference"?: string | null,"sale_id": string,"tendered_cents"?: number | null
+                    "amount_cents": number,"business_id": string,"change_cents"?: number | null,"created_at"?: string,"created_by"?: string | null,"gift_card_id"?: string | null,"id"?: string,"location_id": string,"method": Database["public"]['Enums']["payment_method"],"package_item_id"?: string | null,"processor"?: string | null,"processor_reference"?: string | null,"provider_refund"?: string | null,"reason"?: string | null,"reference"?: string | null,"sale_id": string,"tendered_cents"?: number | null
                   }
                   Update: {
-                    "amount_cents"?: number,"business_id"?: string,"change_cents"?: number | null,"created_at"?: string,"created_by"?: string | null,"gift_card_id"?: string | null,"id"?: string,"location_id"?: string,"method"?: Database["public"]['Enums']["payment_method"],"package_item_id"?: string | null,"processor"?: string | null,"processor_reference"?: string | null,"reason"?: string | null,"reference"?: string | null,"sale_id"?: string,"tendered_cents"?: number | null
+                    "amount_cents"?: number,"business_id"?: string,"change_cents"?: number | null,"created_at"?: string,"created_by"?: string | null,"gift_card_id"?: string | null,"id"?: string,"location_id"?: string,"method"?: Database["public"]['Enums']["payment_method"],"package_item_id"?: string | null,"processor"?: string | null,"processor_reference"?: string | null,"provider_refund"?: string | null,"reason"?: string | null,"reference"?: string | null,"sale_id"?: string,"tendered_cents"?: number | null
                   }
                   Relationships: [
                     {
@@ -3992,6 +3992,9 @@ isOneToOne: false
                            },
 "record_online_card":
 { Args: { "p_appointment_id": string,"p_card": Json,"p_consent": Json,"p_deposit": Json }; Returns: undefined
+                           },
+"record_provider_refund":
+{ Args: { "p_ok": boolean,"p_payment_id": string }; Returns: undefined
                            },
 "record_visit_notices_for_user":
 { Args: { "p_appointment_id": string,"p_notices": Json,"p_user_id": string }; Returns: number

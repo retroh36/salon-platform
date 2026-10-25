@@ -68,7 +68,10 @@ export type SaleView = {
   appointmentId: string | null;
   items: { id: string; kind: string; description: string; staffName: string | null; quantity: number; unitPriceCents: number; bookedPriceCents: number | null; priceReason: string | null; discountCents: number; lineDiscountCents: number; lineDiscountReason: string | null; taxCents: number; totalCents: number; returnedQuantity: number }[];
   tips: { staffName: string; amountCents: number }[];
-  payments: { id: string; method: PaymentMethod; amountCents: number; tenderedCents: number | null; changeCents: number | null; reference: string | null; reason: string | null; createdAt: string }[];
+  // online: taken through the payment provider (a link, a deposit, a
+  // renewal), so a void refunds it there; providerRefund: how that refund
+  // went, on the void's reversal.
+  payments: { id: string; method: PaymentMethod; amountCents: number; tenderedCents: number | null; changeCents: number | null; reference: string | null; reason: string | null; createdAt: string; online: boolean; providerRefund: "due" | "refunded" | "failed" | null }[];
   events: { kind: string; amountCents: number | null; detail: string | null; staffName: string | null; createdAt: string }[];
   subtotalCents: number;
   discountCents: number;
@@ -86,7 +89,7 @@ export async function loadSale(supabase: Supabase, saleId: string): Promise<Sale
   const { data: s, error } = await supabase
     .from("sales")
     .select(
-      "id, number, status, created_at, appointment_id, subtotal_cents, discount_cents, discount_reason, tax_cents, tip_cents, total_cents, refunded_cents, void_reason, receipt_email, client:clients(id, first_name, last_name, email), seller:staff!sales_created_by_business_id_fkey(first_name), sale_items(id, position, kind, description, quantity, unit_price_cents, booked_price_cents, price_reason, discount_cents, line_discount_cents, line_discount_reason, tax_cents, total_cents, returned_quantity, staff:staff(first_name)), sale_tips(amount_cents, staff:staff(first_name)), payments(id, method, amount_cents, tendered_cents, change_cents, reference, reason, created_at), sale_events(kind, amount_cents, detail, created_at, staff:staff(first_name))",
+      "id, number, status, created_at, appointment_id, subtotal_cents, discount_cents, discount_reason, tax_cents, tip_cents, total_cents, refunded_cents, void_reason, receipt_email, client:clients(id, first_name, last_name, email), seller:staff!sales_created_by_business_id_fkey(first_name), sale_items(id, position, kind, description, quantity, unit_price_cents, booked_price_cents, price_reason, discount_cents, line_discount_cents, line_discount_reason, tax_cents, total_cents, returned_quantity, staff:staff(first_name)), sale_tips(amount_cents, staff:staff(first_name)), payments(id, method, amount_cents, tendered_cents, change_cents, reference, reason, created_at, processor, provider_refund), sale_events(kind, amount_cents, detail, created_at, staff:staff(first_name))",
     )
     .eq("id", saleId)
     .maybeSingle();
@@ -120,7 +123,7 @@ export async function loadSale(supabase: Supabase, saleId: string): Promise<Sale
     tips: s.sale_tips.map((t) => ({ staffName: t.staff?.first_name ?? "Stylist", amountCents: t.amount_cents })),
     payments: [...s.payments]
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
-      .map((p) => ({ id: p.id, method: p.method, amountCents: p.amount_cents, tenderedCents: p.tendered_cents, changeCents: p.change_cents, reference: p.reference, reason: p.reason, createdAt: p.created_at })),
+      .map((p) => ({ id: p.id, method: p.method, amountCents: p.amount_cents, tenderedCents: p.tendered_cents, changeCents: p.change_cents, reference: p.reference, reason: p.reason, createdAt: p.created_at, online: p.processor !== null, providerRefund: p.provider_refund as "due" | "refunded" | "failed" | null })),
     events: [...s.sale_events]
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
       .map((e) => ({ kind: e.kind, amountCents: e.amount_cents, detail: e.detail, staffName: e.staff?.first_name ?? null, createdAt: e.created_at })),

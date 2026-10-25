@@ -361,6 +361,48 @@ describe("deposits", () => {
     expect((await admin.from("appointments").select("deposit_outcome").eq("id", a).single()).data!.deposit_outcome).toBe("applied");
     await admin.from("sales").delete().eq("id", saleId!);
   });
+
+  it("a void refunds it to the card through the provider, and it isn't taken again at the next checkout", async () => {
+    const c = await client("test_visa_4242");
+    const a = await visit(c, { hoursAhead: 0, depositCents: 3000 });
+    const { data: item } = await admin.from("appointment_items").select("id").eq("appointment_id", a).single();
+    const { data: biz } = await admin.from("businesses").select("tax_rate_services_bp").eq("id", B).single();
+    const total = 10000 + Math.round((10000 * (biz!.tax_rate_services_bp ?? 0)) / 10000);
+    const sale = () =>
+      frontDesk.rpc("complete_sale", {
+        p_location_id: L,
+        p_input: {
+          appointment_id: a,
+          lines: [{ kind: "service", appointment_item_id: item!.id, unit_price_cents: 10000 }],
+          payments: [
+            { method: "card", amount_cents: 3000, reference: "Deposit paid online" },
+            { method: "cash", amount_cents: total - 3000, tendered_cents: total - 3000 },
+          ],
+        } as never,
+      });
+    const { data: saleId } = await sale();
+    expect((await manager.rpc("void_sale", { p_sale_id: saleId!, p_reason: "Wrong client" })).error).toBeNull();
+    // The card part is due back through the provider; the cash isn't.
+    const { data: back } = await admin.from("payments").select("id, method, amount_cents, processor, provider_refund").eq("sale_id", saleId!).lt("amount_cents", 0).order("method");
+    expect(back!.map((p) => ({ method: p.method, amount_cents: p.amount_cents, processor: p.processor, provider_refund: p.provider_refund }))).toEqual([
+      { method: "cash", amount_cents: -(total - 3000), processor: null, provider_refund: null },
+      { method: "card", amount_cents: -3000, processor: "test", provider_refund: "due" },
+    ]);
+    expect((await admin.from("appointments").select("deposit_outcome").eq("id", a).single()).data!.deposit_outcome).toBe("refund_due");
+    expect((await sale()).error?.message).toBe("There's no deposit to apply on this visit");
+
+    const card = back!.find((p) => p.method === "card")!.id;
+    expect((await stylist.rpc("record_provider_refund", { p_payment_id: card, p_ok: true })).error?.code).toBe("42501");
+    expect((await frontDesk.rpc("record_provider_refund", { p_payment_id: card, p_ok: true })).error?.code).toBe("42501");
+    expect((await manager.rpc("record_provider_refund", { p_payment_id: card, p_ok: false })).error).toBeNull();
+    expect((await admin.from("payments").select("provider_refund").eq("id", card).single()).data!.provider_refund).toBe("failed");
+    expect((await manager.rpc("record_provider_refund", { p_payment_id: card, p_ok: true })).error).toBeNull();
+    expect((await admin.from("appointments").select("deposit_outcome").eq("id", a).single()).data!.deposit_outcome).toBe("refunded");
+    expect((await manager.rpc("record_provider_refund", { p_payment_id: card, p_ok: true })).error?.code).toBe("55000");
+    const { data: events } = await admin.from("sale_events").select("kind, amount_cents").eq("sale_id", saleId!).like("kind", "card_%").order("created_at");
+    expect(events).toEqual([{ kind: "card_refund_failed", amount_cents: 3000 }, { kind: "card_refunded", amount_cents: 3000 }]);
+    await admin.from("sales").delete().eq("id", saleId!);
+  });
 });
 
 describe("card links", () => {

@@ -8,7 +8,7 @@ import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components
 import { Alert } from "@/components/ui/page";
 import { parseDollars } from "@/lib/checkout";
 import { formatPrice } from "@/lib/services";
-import { emailReceipt, refundSale, voidSale, type SimpleResult } from "../actions";
+import { emailReceipt, refundSale, retryCardRefunds, voidSale, type SimpleResult } from "../actions";
 
 export function PrintOnOpen() {
   useEffect(() => {
@@ -62,18 +62,24 @@ function Outcome({ result }: { result: SimpleResult | null }) {
   return <Alert tone={result.ok ? "success" : "error"}>{result.message}</Alert>;
 }
 
-// Void: the whole sale undone (managers and owners, with a reason).
-export function VoidForm({ saleId }: { saleId: string }) {
+// Void: the whole sale undone (managers and owners, with a reason). Cards
+// taken online (a payment link, a deposit) are refunded through the payment
+// provider, so it asks first.
+export function VoidForm({ saleId, online }: { saleId: string; online: { label: string; amountCents: number }[] }) {
   const router = useRouter();
   const [reason, setReason] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const [result, setResult] = useState<SimpleResult | null>(null);
   const [pending, start] = useTransition();
+  const back = online.reduce((n, p) => n + p.amountCents, 0);
   return (
     <form
       aria-label="Void sale"
       className="flex flex-col gap-3"
       onSubmit={(e) => {
         e.preventDefault();
+        if (online.length && !confirming) return setConfirming(true);
+        setConfirming(false);
         start(async () => {
           const r = await voidSale(saleId, reason);
           setResult(r);
@@ -85,11 +91,54 @@ export function VoidForm({ saleId }: { saleId: string }) {
         Why it&apos;s being voided
         <input value={reason} onChange={(e) => setReason(e.target.value)} className={fieldClass} maxLength={300} required />
       </label>
-      <Button type="submit" variant="danger" disabled={pending} className="self-start">
-        Void sale
-      </Button>
+      {confirming ? (
+        <div role="alertdialog" aria-label="Refund the card" className="flex flex-col gap-3">
+          <p>
+            Voiding refunds {formatPrice(back)} to {[...new Set(online.map((p) => p.label))].join(" and ")} through the payment provider. The client gets it back on their card.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" variant="danger" disabled={pending}>
+              Void and refund {formatPrice(back)}
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setConfirming(false)}>
+              Keep the sale
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button type="submit" variant="danger" disabled={pending} className="self-start">
+          Void sale
+        </Button>
+      )}
       <Outcome result={result} />
     </form>
+  );
+}
+
+// A card refund through the payment provider that didn't go through.
+export function RetryCardRefund({ saleId, amountCents }: { saleId: string; amountCents: number }) {
+  const router = useRouter();
+  const [result, setResult] = useState<SimpleResult | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <div className="flex flex-col gap-3">
+      <Alert tone="error">The card refund of {formatPrice(amountCents)} hasn&apos;t gone through yet.</Alert>
+      <Button
+        variant="primary"
+        className="self-start"
+        disabled={pending}
+        onClick={() =>
+          start(async () => {
+            const r = await retryCardRefunds(saleId);
+            setResult(r);
+            if (r.ok) router.refresh();
+          })
+        }
+      >
+        Try the card refund again
+      </Button>
+      <Outcome result={result} />
+    </div>
   );
 }
 
