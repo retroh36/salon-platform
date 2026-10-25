@@ -3913,6 +3913,9 @@ isOneToOne: false
 "record_ai_proposals_as_system":
 { Args: { "p_feature": string,"p_location_id": string,"p_options": Json,"p_subject": string }; Returns: (string)[]
                            },
+"record_ai_proposals_for_user":
+{ Args: { "p_feature": string,"p_location_id": string,"p_options": Json,"p_subject": string,"p_user_id": string }; Returns: (string)[]
+                           },
 "record_ai_usage":
 { Args: { "p_business_id": string,"p_cache_read": number,"p_feature": string,"p_input": number,"p_model": string,"p_output": number }; Returns: undefined
                            },
@@ -3943,8 +3946,8 @@ isOneToOne: false
 "record_online_card":
 { Args: { "p_appointment_id": string,"p_card": Json,"p_consent": Json,"p_deposit": Json }; Returns: undefined
                            },
-"record_visit_notices":
-{ Args: { "p_appointment_id": string,"p_notices": Json }; Returns: number
+"record_visit_notices_for_user":
+{ Args: { "p_appointment_id": string,"p_notices": Json,"p_user_id": string }; Returns: number
                            },
 "refund_sale":
 { Args: { "p_input": Json,"p_sale_id": string }; Returns: undefined

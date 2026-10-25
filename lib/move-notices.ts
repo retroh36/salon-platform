@@ -9,6 +9,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { moveNotices } from "@/lib/notifications";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { toLocal, todayIn, type LocalDate } from "@/lib/scheduling/time";
 
 type Supabase = SupabaseClient<Database>;
@@ -44,6 +45,10 @@ export async function recordMoveNotices(supabase: Supabase, location: { timezone
     const after = await load(supabase, [...before.keys()], location.timezone);
     const { data: salon } = await supabase.from("businesses").select("name").limit(1).maybeSingle();
     const today = todayIn(location.timezone);
+    const { data: auth } = await supabase.auth.getUser();
+    const user = auth.user;
+    if (!user) return 0;
+    const server = createAdminClient();
     let recorded = 0;
     for (const [appointmentId, was] of before) {
       const now = after.get(appointmentId);
@@ -58,7 +63,10 @@ export async function recordMoveNotices(supabase: Supabase, location: { timezone
         to: now.first,
       });
       if (!notices.length) continue;
-      const { error } = await supabase.rpc("record_visit_notices", {
+      // Recorded by the server, as the person who moved it, so nobody can
+      // send notice text of their own in.
+      const { error } = await server.rpc("record_visit_notices_for_user", {
+        p_user_id: user.id,
         p_appointment_id: appointmentId,
         p_notices: notices.map((n) => ({ template: n.template, body: n.body, client_id: "clientId" in n ? n.clientId : null, staff_id: "staffId" in n ? n.staffId : null })),
       });

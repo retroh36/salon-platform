@@ -10,6 +10,7 @@ import { blockNotifications, notificationsFor } from "@/lib/notifications";
 import { recordProposals, type ProposalOption } from "@/lib/scheduling/ai-actions";
 import { loadDisruptions } from "@/lib/scheduling/disruptions";
 import { loadBookingContext } from "@/lib/scheduling/load";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { activeDisruptions, effectiveCalendar, findConflicts, type Conflict, type Day, type FixOption } from "@/lib/scheduling/resolve";
 import { todayIn, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { fullName } from "@/lib/staff";
@@ -198,7 +199,8 @@ export async function scanDay(
             };
           }),
         },
-        { asSystem: options.system },
+        // Its notices are recorded by the server, as the person scanning.
+        { asSystem: options.system, server: options.system ? undefined : createAdminClient() },
       );
       // Staff dismissed this one.
       if (w.options.length && !recorded.length) continue;

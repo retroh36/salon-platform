@@ -10,7 +10,10 @@ import { getSupabaseEnv } from "./env";
 // membership right after staff change it, once their own login has shown
 // they may); and creating a team member's login when they're invited
 // (lib/team-logins.ts, after the inviter's own login has shown they may
-// manage them). Never import this from client components, and never use it
+// manage them); and recording the notices that go with Denise's fixes and
+// staff's moves (lib/scheduling/ai-actions.ts, lib/move-notices.ts), in our
+// templates, for the person whose login said who they are. Never import
+// this from client components, and never use it
 // to load what staff pages show.
 export function createAdminClient() {
   const { url } = getSupabaseEnv();

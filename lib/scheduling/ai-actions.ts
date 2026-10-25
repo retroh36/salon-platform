@@ -198,18 +198,32 @@ function rpcError(code: string | undefined): ActionError | null {
 // problem's options before.
 // asSystem: recorded by the server itself (the morning risk check), with
 // the service role; otherwise as the front-of-house staff member.
+// Proposals with notices (messages in our templates to clients and
+// stylists) are recorded only by our server code: `server` is the
+// service-role client, used for the person `supabase` is signed in as, so
+// nobody can send notice text of their own in.
 export async function recordProposals(
   supabase: Supabase,
   locationId: string,
   input: { feature: string; subject: string | null; options: ProposalOption[] },
-  { asSystem = false }: { asSystem?: boolean } = {},
+  { asSystem = false, server }: { asSystem?: boolean; server?: Supabase } = {},
 ): Promise<string[]> {
-  const { data, error } = await supabase.rpc(asSystem ? "record_ai_proposals_as_system" : "record_ai_proposals", {
+  const args = {
     p_location_id: locationId,
     p_feature: input.feature,
     p_subject: input.subject!,
     p_options: input.options.map((o) => ({ summary: o.summary, reason: o.reason, proposal: proposalToJson(o.proposal) })),
-  });
+  };
+  const notices = input.options.some((o) => (o.proposal.notifications?.length ?? 0) + (o.proposal.undoNotifications?.length ?? 0) > 0);
+  if (asSystem || !notices) {
+    const { data, error } = await supabase.rpc(asSystem ? "record_ai_proposals_as_system" : "record_ai_proposals", args);
+    if (error) throw error;
+    return data;
+  }
+  if (!server) throw new Error("Proposals with notices are recorded by the server.");
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) throw authError ?? new Error("Not signed in.");
+  const { data, error } = await server.rpc("record_ai_proposals_for_user", { p_user_id: auth.user.id, ...args });
   if (error) throw error;
   return data;
 }
