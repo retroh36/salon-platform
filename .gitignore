@@ -52,3 +52,6 @@ yarn-error.log*
 # marketing screenshots (npm run screenshots) and their build
 /screenshots/
 /.next-screenshots/
+
+# the simulated week (npm run test:week) and its build
+/.next-week/
