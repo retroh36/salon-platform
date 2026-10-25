@@ -51,7 +51,7 @@ export function stateFromEvent(event: EventDetail, packages: readonly EventPacka
   const fromInquiry = event.members.length === 0;
   const members: PartyMember[] = fromInquiry
     ? inquiryParty(event, packages)
-    : event.members.map((m) => ({ name: m.name, partyRole: m.partyRole, packageId: m.packageId ?? "", paysOwn: m.paysOwn, email: m.email ?? "", phone: m.phone ?? "" }));
+    : event.members.map((m) => ({ id: m.id, name: m.name, partyRole: m.partyRole, packageId: m.packageId ?? "", paysOwn: m.paysOwn, email: m.email ?? "", phone: m.phone ?? "" }));
   const keyOf = new Map(event.members.map((m, i) => [m.id, memberKey(i)]));
   const tasks: TimelineTask[] = event.tasks.map((t) => ({ member: t.memberId ? (keyOf.get(t.memberId) ?? null) : null, kind: t.kind, role: t.role, lane: t.lane, start: t.start, end: t.end }));
   const lanes = { hair: 0, makeup: 0 };

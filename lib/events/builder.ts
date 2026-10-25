@@ -108,7 +108,7 @@ export function saveInput(state: BuilderState, tasks: readonly TimelineTask[], t
     billing: state.billing,
     source: state.source,
     described: state.described,
-    members: state.members.map((m) => ({ name: m.name, party_role: m.partyRole, package_id: m.packageId, pays_own: state.billing === "split" && m.paysOwn, email: m.email, phone: m.phone })),
+    members: state.members.map((m) => ({ id: m.id, name: m.name, party_role: m.partyRole, package_id: m.packageId, pays_own: state.billing === "split" && m.paysOwn, email: m.email, phone: m.phone })),
     tasks: tasks.map((t) => ({ member: t.member, kind: t.kind, role: t.role, lane: t.lane, staff_id: state.team[laneKey(t)] ?? null, starts_at: at(t.start), ends_at: at(t.end) })),
   };
 }

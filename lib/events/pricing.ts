@@ -59,9 +59,9 @@ export const SCHEDULED_LABELS: Record<ScheduledKind, string> = { deposit: "Depos
 // one) a second payment, then the balance, a set number of days before the
 // event. A payment that would fall on or before the booking day is folded
 // into the next one (the balance is due at booking when the event is that
-// close). Amounts already paid come off the balance.
+// close). The proposal shows this; once booked, remainingSchedule.
 export function paymentSchedule(
-  input: { mainCents: number; depositCents: number; eventDate: LocalDate; bookedOn: LocalDate; paidCents?: number },
+  input: { mainCents: number; depositCents: number; eventDate: LocalDate; bookedOn: LocalDate },
   s: Pick<EventSettings, "secondPaymentPct" | "secondPaymentDays" | "finalPaymentDays">,
 ): ScheduledPayment[] {
   const out: ScheduledPayment[] = [{ kind: "deposit", amountCents: input.depositCents, dueOn: input.bookedOn }];
@@ -72,6 +72,27 @@ export function paymentSchedule(
   const balance = input.mainCents - input.depositCents - second;
   if (balance > 0) out.push({ kind: "final", amountCents: balance, dueOn: daysBetween(input.bookedOn, finalDue) > 0 ? finalDue : input.bookedOn });
   return out.filter((p) => p.amountCents > 0);
+}
+
+// What's left to schedule once booked (at booking, and whenever the total
+// changes): the second payment if the salon uses one, it was due after
+// booking and isn't paid, and the balance; each due on its day, or today
+// if that's passed. Overpaid leaves nothing. The database does the same
+// (private.schedule_event_payments).
+export function remainingSchedule(
+  input: { mainCents: number; eventDate: LocalDate; bookedOn: LocalDate; today: LocalDate; paid: readonly { kind: ScheduledKind; amountCents: number }[] },
+  s: Pick<EventSettings, "secondPaymentPct" | "secondPaymentDays" | "finalPaymentDays">,
+): ScheduledPayment[] {
+  const paid = input.paid.reduce((a, p) => a + p.amountCents, 0);
+  const later = (d: LocalDate) => (d > input.today ? d : input.today);
+  const secondDue = addDays(input.eventDate, -s.secondPaymentDays);
+  const second =
+    s.secondPaymentPct > 0 && secondDue > input.bookedOn && !input.paid.some((p) => p.kind === "second") ? Math.min(pct(input.mainCents, s.secondPaymentPct), Math.max(0, input.mainCents - paid)) : 0;
+  const balance = Math.max(0, input.mainCents - paid - second);
+  const out: ScheduledPayment[] = [];
+  if (second > 0) out.push({ kind: "second", amountCents: second, dueOn: later(secondDue) });
+  if (balance > 0) out.push({ kind: "final", amountCents: balance, dueOn: later(addDays(input.eventDate, -s.finalPaymentDays)) });
+  return out;
 }
 
 // The last day the party can change without a manager.

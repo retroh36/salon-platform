@@ -8,7 +8,7 @@ const PUBLIC_PATHS = ["/login"];
 // scheduled jobs (which check their own secret), and the link in invite and
 // password reset emails (which signs them in), and the shared iPad's PIN
 // screen (which checks the device itself).
-const OPEN_PATHS = ["/book", "/dev/outbox", "/api/cron", "/api/messages/inbound", "/unsubscribe", "/pay", "/card", "/auth/confirm", "/switch"];
+const OPEN_PATHS = ["/book", "/dev/outbox", "/api/cron", "/api/messages/inbound", "/unsubscribe", "/pay", "/card", "/event", "/auth/confirm", "/switch"];
 // Set on a device marked as shared (lib/shared-device.ts).
 const DEVICE_COOKIE = "maestra_device";
 

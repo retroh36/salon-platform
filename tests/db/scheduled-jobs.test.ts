@@ -31,6 +31,7 @@ describe("scheduled jobs", () => {
     const { data } = await admin.rpc("scheduled_jobs_status");
     expect((data as { name: string; schedule: string; active: boolean }[]).map((j) => [j.name, j.schedule, j.active])).toEqual([
       ["maestra-automations", "15 * * * *", true],
+      ["maestra-events", "45 * * * *", true],
       ["maestra-insights", "0 8 * * *", true],
       ["maestra-memberships", "0 10 * * *", true],
       ["maestra-photo-backup", "0 7 * * *", true],

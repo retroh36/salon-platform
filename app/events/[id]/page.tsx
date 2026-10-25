@@ -7,14 +7,18 @@ import { BackLink } from "@/components/ui/back-link";
 import { buttonClass } from "@/components/ui/button";
 import { Badge, Card, PageHeader } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
-import { loadEvent, loadEventTeam } from "@/lib/events/load";
+import { loadEvent, loadEventSettings, loadEventTeam, loadTaxBp } from "@/lib/events/load";
+import { PAYMENT_LABELS } from "@/lib/events/messages";
+import { memberShare, paymentSchedule } from "@/lib/events/pricing";
 import { EVENT_STATUS_LABELS, PARTY_ROLE_LABELS } from "@/lib/events/types";
+import { formatLongDay } from "@/lib/schedule-format";
 import { isUuid } from "@/lib/ids";
 import { laneSpans } from "@/lib/scheduling/events";
-import { formatMinute } from "@/lib/scheduling/time";
+import { formatMinute, toLocal, todayIn } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { isFrontOfHouse } from "@/lib/staff";
 import { formatEventDay } from "../format";
+import { CardLinkSender, MemberLinkSender, ProposalSender, RetryPayment, StatusControls } from "./money";
 
 export const metadata: Metadata = { title: "Event" };
 
@@ -33,13 +37,18 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
   if (!me) return <NotLinked />;
   if (!isUuid(id)) notFound();
   const tz = me.location.timezone;
-  const [event, team, photos] = await Promise.all([
+  const desk = isFrontOfHouse(me.role);
+  const [event, team, photos, links, agreements, payments, settings, taxBp] = await Promise.all([
     loadEvent(supabase, id, tz),
     loadEventTeam(supabase, me.location.id),
     supabase.from("event_photos").select("id, kind, storage_path").eq("event_id", id).order("created_at"),
+    supabase.from("event_links").select("id, kind, member_id, status, sent_to, expires_at, created_at").eq("event_id", id).order("created_at", { ascending: false }),
+    supabase.from("event_agreements").select("typed_name, agreed_at, terms_version, terms_text").eq("event_id", id).order("agreed_at", { ascending: false }).limit(1),
+    supabase.from("event_payments").select("id, kind, member_id, member_name, amount_cents, status, due_on, paid_at, card_label, failure_reason").eq("event_id", id).neq("status", "canceled").order("due_on").order("created_at"),
+    loadEventSettings(supabase, me.business_id),
+    loadTaxBp(supabase, me.business_id),
   ]);
   if (!event) notFound();
-  const desk = isFrontOfHouse(me.role);
   const nameOf = new Map(event.members.map((m) => [m.id, m.name]));
   const staffName = (sid: string | null) => team.find((t) => t.id === sid)?.firstName ?? null;
   const spans = laneSpans(event.tasks);
@@ -75,9 +84,11 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
                 Edit event
               </Link>
             )}
+            {desk && <StatusControls eventId={id} status={event.status} />}
           </>
         }
       />
+      {event.status === "lost" && event.lostReason && <p className="-mt-2 mb-4 text-ink-muted">Lost: {event.lostReason}</p>}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-6">
           <Card title={`Party (${event.members.length || event.inquiryPartySize || 0})`} titleId="party" flush>
@@ -169,9 +180,19 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
                     {formatPrice(event.totalCents)}
                   </dd>
                 </div>
-                <Row label="Deposit to book" cents={event.depositCents} />
+                {event.status === "inquiry" || event.status === "proposal_sent" ? <Row label="Deposit to book" cents={event.depositCents} /> : null}
               </dl>
             </Card>
+            <Money
+              eventId={id}
+              event={event}
+              links={links.data ?? []}
+              agreement={agreements.data?.[0] ?? null}
+              payments={payments.data ?? []}
+              shareOf={(priceCents) => memberShare(priceCents, settings, taxBp)}
+              preview={paymentSchedule({ mainCents: event.mainCents, depositCents: event.depositCents, eventDate: event.date, bookedOn: todayIn(tz) }, settings)}
+              tz={tz}
+            />
           </aside>
         )}
       </div>
@@ -185,5 +206,140 @@ function Row({ label, cents }: { label: string; cents: number }) {
       <dt className="text-ink-muted">{label}</dt>
       <dd className="tabular-nums">{formatPrice(cents)}</dd>
     </div>
+  );
+}
+
+type LinkRow = { id: string; kind: string; member_id: string | null; status: string; sent_to: string; expires_at: string; created_at: string };
+type PaymentRow = { id: string; kind: string; member_id: string | null; member_name: string | null; amount_cents: number; status: string; due_on: string; paid_at: string | null; card_label: string | null; failure_reason: string | null };
+
+const PAYMENT_STATUS = { scheduled: "Scheduled", paid: "Paid", failed: "Didn't go through" } as Record<string, string>;
+
+// The proposal, what was agreed, the payments (scheduled, paid, failed)
+// and members paying their own.
+function Money({
+  eventId,
+  event,
+  links,
+  agreement,
+  payments,
+  shareOf,
+  preview,
+  tz,
+}: {
+  eventId: string;
+  event: NonNullable<Awaited<ReturnType<typeof loadEvent>>>;
+  links: LinkRow[];
+  agreement: { typed_name: string; agreed_at: string; terms_version: number; terms_text: string } | null;
+  payments: PaymentRow[];
+  shareOf: (priceCents: number) => number;
+  preview: ReturnType<typeof paymentSchedule>;
+  tz: string;
+}) {
+  const day = (iso: string) => formatLongDay(toLocal(new Date(iso), tz).date, false);
+  const proposal = links.find((l) => l.kind === "proposal" && l.status === "open");
+  const booked = event.status === "booked" || event.status === "trial_done" || event.status === "completed";
+  const main = payments.filter((p) => p.kind !== "member");
+  const paidMain = main.filter((p) => p.status === "paid").reduce((a, p) => a + p.amount_cents, 0);
+  const failed = main.some((p) => p.status === "failed");
+  const own = event.members.filter((m) => m.paysOwn);
+  return (
+    <>
+      {(event.status === "inquiry" || event.status === "proposal_sent") && (
+        <Card title="Proposal" titleId="proposal">
+          <div className="flex flex-col gap-3 text-sm">
+            {proposal ? (
+              <p data-testid="proposal-status">
+                Sent to {proposal.sent_to} on {day(proposal.created_at)}. The link works until {day(proposal.expires_at)}.
+              </p>
+            ) : (
+              <p className="text-ink-muted">The client gets a link to the party, prices, payment schedule and terms, and books by agreeing and paying the deposit.</p>
+            )}
+            <ul className="flex flex-col gap-0.5 text-ink-muted" aria-label="Payment schedule if booked today">
+              {preview.map((p) => (
+                <li key={p.kind} className="flex justify-between">
+                  <span>
+                    {PAYMENT_LABELS[p.kind]} · {p.kind === "deposit" ? "to book" : formatLongDay(p.dueOn, false)}
+                  </span>
+                  <span className="tabular-nums">{formatPrice(p.amountCents)}</span>
+                </li>
+              ))}
+            </ul>
+            <ProposalSender eventId={eventId} phone={event.client?.phone ?? null} email={event.client?.email ?? null} resend={Boolean(proposal)} />
+          </div>
+        </Card>
+      )}
+      {agreement && (
+        <Card title="Agreement" titleId="agreement">
+          <p className="text-sm" data-testid="agreement">
+            Agreed by <span className="font-semibold">{agreement.typed_name}</span> on {day(agreement.agreed_at)}, terms version {agreement.terms_version}.
+          </p>
+          <details className="mt-2 text-sm">
+            <summary className="cursor-pointer text-link">What they agreed to</summary>
+            <div className="mt-2 flex max-h-64 flex-col gap-2 overflow-y-auto text-ink-muted">
+              {agreement.terms_text.split(/\n{2,}/).map((p, i) => (
+                <p key={i}>{p}</p>
+              ))}
+            </div>
+          </details>
+        </Card>
+      )}
+      {booked && (
+        <Card title="Payments" titleId="payments" flush>
+          <ul className="divide-y divide-line text-sm" data-testid="payments">
+            {main.map((p) => (
+              <li key={p.id} className="flex items-start justify-between gap-3 px-5 py-3">
+                <span className="min-w-0">
+                  <span className="font-medium">{PAYMENT_LABELS[p.kind as keyof typeof PAYMENT_LABELS]}</span>
+                  <span className="block text-ink-muted">
+                    {p.status === "paid" && p.paid_at ? `Paid ${day(p.paid_at)}${p.card_label ? ` · ${p.card_label}` : ""}` : p.status === "failed" ? `${PAYMENT_STATUS.failed}${p.failure_reason ? `: ${p.failure_reason}` : ""}` : `Due ${formatLongDay(p.due_on, false)}`}
+                  </span>
+                </span>
+                <span className="flex flex-col items-end gap-1">
+                  <span className={`tabular-nums ${p.status === "failed" ? "font-semibold text-danger" : ""}`}>{formatPrice(p.amount_cents)}</span>
+                  {p.status === "failed" && <RetryPayment paymentId={p.id} />}
+                </span>
+              </li>
+            ))}
+            <li className="flex justify-between px-5 py-3 font-semibold">
+              <span>Left to pay</span>
+              <span className="tabular-nums" data-testid="left-to-pay">
+                {formatPrice(Math.max(0, event.mainCents - paidMain))}
+              </span>
+            </li>
+          </ul>
+          {failed && (
+            <div className="border-t border-line px-5 py-3">
+              <CardLinkSender eventId={eventId} phone={event.client?.phone ?? null} email={event.client?.email ?? null} />
+            </div>
+          )}
+        </Card>
+      )}
+      {booked && own.length > 0 && (
+        <Card title="Paying their own" titleId="own" flush>
+          <ul className="divide-y divide-line text-sm" data-testid="paying-own">
+            {own.map((m) => {
+              const paid = payments.find((p) => p.member_id === m.id && p.status === "paid");
+              const link = links.find((l) => l.member_id === m.id && l.status === "open");
+              return (
+                <li key={m.id} className="flex flex-col gap-2 px-5 py-3">
+                  <span className="flex justify-between gap-3">
+                    <span className="font-medium">{m.name}</span>
+                    <span className="tabular-nums">{formatPrice(shareOf(m.priceCents))}</span>
+                  </span>
+                  {paid ? (
+                    <span className="text-ink-muted">Paid {paid.paid_at ? day(paid.paid_at) : ""}</span>
+                  ) : (
+                    <>
+                      {link && <span className="text-ink-muted">Link sent to {link.sent_to}</span>}
+                      <MemberLinkSender memberId={m.id} memberName={m.name} phone={m.phone} email={m.email} resend={Boolean(link)} />
+                    </>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
+    </>
   );
 }

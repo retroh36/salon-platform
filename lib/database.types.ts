@@ -1023,6 +1023,44 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"event_agreements": {
+                  Row: {
+                    "agreed_at": string,"business_id": string,"deposit_cents": number,"event_id": string,"id": string,"ip_hash": string | null,"link_id": string | null,"schedule": NonNullable<Json>,"terms_id": string,"terms_text": string,"terms_version": number,"total_cents": number,"typed_name": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "agreed_at"?: string,"business_id": string,"deposit_cents": number,"event_id": string,"id"?: string,"ip_hash"?: string | null,"link_id"?: string | null,"schedule": NonNullable<Json>,"terms_id": string,"terms_text": string,"terms_version": number,"total_cents": number,"typed_name": string
+                  }
+                  Update: {
+                    "agreed_at"?: string,"business_id"?: string,"deposit_cents"?: number,"event_id"?: string,"id"?: string,"ip_hash"?: string | null,"link_id"?: string | null,"schedule"?: NonNullable<Json>,"terms_id"?: string,"terms_text"?: string,"terms_version"?: number,"total_cents"?: number,"typed_name"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_agreements_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_agreements_event_id_business_id_fkey"
+      columns: ["event_id","business_id"]
+isOneToOne: false
+      referencedRelation: "events"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "event_agreements_link_id_fkey"
+      columns: ["link_id"]
+isOneToOne: false
+      referencedRelation: "event_links"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_agreements_terms_id_fkey"
+      columns: ["terms_id"]
+isOneToOne: false
+      referencedRelation: "event_terms"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"event_history": {
                   Row: {
                     "business_id": string,"created_at": string,"detail": string | null,"event_id": string,"id": string,"kind": string,"staff_id": string | null
@@ -1053,6 +1091,50 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "staff"
       referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"event_links": {
+                  Row: {
+                    "business_id": string,"channel": string,"created_at": string,"created_by": string | null,"done_at": string | null,"event_id": string,"expires_at": string,"id": string,"kind": string,"member_id": string | null,"sent_to": string,"status": string,"terms_id": string | null,"token_hash": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"channel": string,"created_at"?: string,"created_by"?: string | null,"done_at"?: string | null,"event_id": string,"expires_at": string,"id"?: string,"kind": string,"member_id"?: string | null,"sent_to": string,"status"?: string,"terms_id"?: string | null,"token_hash": string
+                  }
+                  Update: {
+                    "business_id"?: string,"channel"?: string,"created_at"?: string,"created_by"?: string | null,"done_at"?: string | null,"event_id"?: string,"expires_at"?: string,"id"?: string,"kind"?: string,"member_id"?: string | null,"sent_to"?: string,"status"?: string,"terms_id"?: string | null,"token_hash"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_links_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_links_created_by_business_id_fkey"
+      columns: ["created_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "event_links_event_id_business_id_fkey"
+      columns: ["event_id","business_id"]
+isOneToOne: false
+      referencedRelation: "events"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "event_links_member_id_business_id_fkey"
+      columns: ["member_id","business_id"]
+isOneToOne: false
+      referencedRelation: "event_members"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "event_links_terms_id_fkey"
+      columns: ["terms_id"]
+isOneToOne: false
+      referencedRelation: "event_terms"
+      referencedColumns: ["id"]
     }
                   ]
                 },"event_members": {
@@ -1105,6 +1187,38 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "businesses"
       referencedColumns: ["id"]
+    }
+                  ]
+                },"event_payments": {
+                  Row: {
+                    "amount_cents": number,"attempts": number,"business_id": string,"card_label": string | null,"charge_after": string | null,"created_at": string,"due_on": string,"event_id": string,"failure_reason": string | null,"id": string,"kind": string,"member_id": string | null,"member_name": string | null,"paid_at": string | null,"provider": string | null,"provider_reference": string | null,"receipt_sent_at": string | null,"reminded_at": string | null,"status": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount_cents": number,"attempts"?: number,"business_id": string,"card_label"?: string | null,"charge_after"?: string | null,"created_at"?: string,"due_on": string,"event_id": string,"failure_reason"?: string | null,"id"?: string,"kind": string,"member_id"?: string | null,"member_name"?: string | null,"paid_at"?: string | null,"provider"?: string | null,"provider_reference"?: string | null,"receipt_sent_at"?: string | null,"reminded_at"?: string | null,"status": string
+                  }
+                  Update: {
+                    "amount_cents"?: number,"attempts"?: number,"business_id"?: string,"card_label"?: string | null,"charge_after"?: string | null,"created_at"?: string,"due_on"?: string,"event_id"?: string,"failure_reason"?: string | null,"id"?: string,"kind"?: string,"member_id"?: string | null,"member_name"?: string | null,"paid_at"?: string | null,"provider"?: string | null,"provider_reference"?: string | null,"receipt_sent_at"?: string | null,"reminded_at"?: string | null,"status"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_payments_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_payments_event_id_business_id_fkey"
+      columns: ["event_id","business_id"]
+isOneToOne: false
+      referencedRelation: "events"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "event_payments_member_id_business_id_fkey"
+      columns: ["member_id","business_id"]
+isOneToOne: false
+      referencedRelation: "event_members"
+      referencedColumns: ["id","business_id"]
     }
                   ]
                 },"event_photos": {
@@ -1231,14 +1345,14 @@ isOneToOne: false
                   ]
                 },"events": {
                   Row: {
-                    "billing": string,"business_id": string,"client_id": string | null,"created_at": string,"created_by": string | null,"deposit_cents": number,"early_fee_cents": number,"event_date": string,"id": string,"inquiry_party_size": number | null,"inquiry_services": string | null,"location_id": string,"lost_reason": string | null,"notes": string | null,"on_location": boolean,"ready_by": string | null,"service_charge_cents": number,"source": string,"status": Database["public"]['Enums']["event_status"],"status_changed_at": string,"subtotal_cents": number,"tax_cents": number,"title": string,"total_cents": number,"travel_fee_cents": number,"travel_miles": number,"travel_minutes": number,"updated_at": string,"venue_address": string | null,"venue_name": string | null
+                    "billing": string,"booked_at": string | null,"business_id": string,"card_label": string | null,"card_provider": string | null,"card_ref": string | null,"client_id": string | null,"created_at": string,"created_by": string | null,"deposit_cents": number,"early_fee_cents": number,"event_date": string,"id": string,"inquiry_party_size": number | null,"inquiry_services": string | null,"location_id": string,"lost_reason": string | null,"main_cents": number,"notes": string | null,"on_location": boolean,"ready_by": string | null,"service_charge_cents": number,"source": string,"status": Database["public"]['Enums']["event_status"],"status_changed_at": string,"subtotal_cents": number,"tax_cents": number,"title": string,"total_cents": number,"travel_fee_cents": number,"travel_miles": number,"travel_minutes": number,"updated_at": string,"venue_address": string | null,"venue_name": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "billing"?: string,"business_id": string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"early_fee_cents"?: number,"event_date": string,"id"?: string,"inquiry_party_size"?: number | null,"inquiry_services"?: string | null,"location_id": string,"lost_reason"?: string | null,"notes"?: string | null,"on_location"?: boolean,"ready_by"?: string | null,"service_charge_cents"?: number,"source"?: string,"status"?: Database["public"]['Enums']["event_status"],"status_changed_at"?: string,"subtotal_cents"?: number,"tax_cents"?: number,"title": string,"total_cents"?: number,"travel_fee_cents"?: number,"travel_miles"?: number,"travel_minutes"?: number,"updated_at"?: string,"venue_address"?: string | null,"venue_name"?: string | null
+                    "billing"?: string,"booked_at"?: string | null,"business_id": string,"card_label"?: string | null,"card_provider"?: string | null,"card_ref"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"early_fee_cents"?: number,"event_date": string,"id"?: string,"inquiry_party_size"?: number | null,"inquiry_services"?: string | null,"location_id": string,"lost_reason"?: string | null,"main_cents"?: number,"notes"?: string | null,"on_location"?: boolean,"ready_by"?: string | null,"service_charge_cents"?: number,"source"?: string,"status"?: Database["public"]['Enums']["event_status"],"status_changed_at"?: string,"subtotal_cents"?: number,"tax_cents"?: number,"title": string,"total_cents"?: number,"travel_fee_cents"?: number,"travel_miles"?: number,"travel_minutes"?: number,"updated_at"?: string,"venue_address"?: string | null,"venue_name"?: string | null
                   }
                   Update: {
-                    "billing"?: string,"business_id"?: string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"early_fee_cents"?: number,"event_date"?: string,"id"?: string,"inquiry_party_size"?: number | null,"inquiry_services"?: string | null,"location_id"?: string,"lost_reason"?: string | null,"notes"?: string | null,"on_location"?: boolean,"ready_by"?: string | null,"service_charge_cents"?: number,"source"?: string,"status"?: Database["public"]['Enums']["event_status"],"status_changed_at"?: string,"subtotal_cents"?: number,"tax_cents"?: number,"title"?: string,"total_cents"?: number,"travel_fee_cents"?: number,"travel_miles"?: number,"travel_minutes"?: number,"updated_at"?: string,"venue_address"?: string | null,"venue_name"?: string | null
+                    "billing"?: string,"booked_at"?: string | null,"business_id"?: string,"card_label"?: string | null,"card_provider"?: string | null,"card_ref"?: string | null,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"deposit_cents"?: number,"early_fee_cents"?: number,"event_date"?: string,"id"?: string,"inquiry_party_size"?: number | null,"inquiry_services"?: string | null,"location_id"?: string,"lost_reason"?: string | null,"main_cents"?: number,"notes"?: string | null,"on_location"?: boolean,"ready_by"?: string | null,"service_charge_cents"?: number,"source"?: string,"status"?: Database["public"]['Enums']["event_status"],"status_changed_at"?: string,"subtotal_cents"?: number,"tax_cents"?: number,"title"?: string,"total_cents"?: number,"travel_fee_cents"?: number,"travel_miles"?: number,"travel_minutes"?: number,"updated_at"?: string,"venue_address"?: string | null,"venue_name"?: string | null
                   }
                   Relationships: [
                     {
@@ -3581,7 +3695,10 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "add_formula":
+            "accept_event_proposal":
+{ Args: { "p_input": Json,"p_link_id": string }; Returns: undefined
+                           },
+"add_formula":
 { Args: { "p_appointment_item_id": string,"p_client_id": string,"p_formula": string,"p_lines": Json,"p_notes": string,"p_visit_date": string }; Returns: string
                            },
 "add_inquiry_photos":
@@ -3648,6 +3765,11 @@ isOneToOne: false
                            },
 "check_staff_pin":
 { Args: { "p_pin": string,"p_staff_id": string,"p_token_hash": string }; Returns: Json
+                           },
+"claim_event_payments":
+{ Args: { "p_business_id": string,"p_limit": number,"p_payment_id": string }; Returns: {
+              "amount_cents": number,"attempt": number,"business_id": string,"card_label": string,"event_id": string,"kind": string,"payment_id": string,"payment_method_ref": string,"provider": string
+            }[]
                            },
 "claim_policy_fees":
 { Args: { "p_business_id": string,"p_fee_id": string,"p_limit": number }; Returns: {
@@ -3741,6 +3863,9 @@ isOneToOne: false
 "pause_membership":
 { Args: { "p_membership_id": string,"p_periods": number }; Returns: undefined
                            },
+"pay_event_member":
+{ Args: { "p_link_id": string,"p_payment": Json }; Returns: undefined
+                           },
 "payroll_sales":
 { Args: { "p_business_id": string,"p_from": string,"p_staff_id"?: string,"p_to": string }; Returns: Json
                            },
@@ -3764,6 +3889,9 @@ isOneToOne: false
                            },
 "record_deposit_refund":
 { Args: { "p_appointment_id": string,"p_ok": boolean }; Returns: undefined
+                           },
+"record_event_charge":
+{ Args: { "p_attempt": number,"p_payment_id": string,"p_result": Json }; Returns: string
                            },
 "record_fee_charge":
 { Args: { "p_attempt": number,"p_fee_id": string,"p_result": Json }; Returns: string
@@ -3809,6 +3937,9 @@ isOneToOne: false
                            },
 "resume_membership":
 { Args: { "p_membership_id": string }; Returns: undefined
+                           },
+"retry_event_payment":
+{ Args: { "p_payment_id": string }; Returns: undefined
                            },
 "retry_membership_payment":
 { Args: { "p_membership_id": string }; Returns: undefined
@@ -3888,6 +4019,15 @@ isOneToOne: false
 "send_client_message":
 { Args: { "p_appointment_id": string,"p_body": string,"p_channel": string,"p_opt_out_hash"?: string,"p_purpose": string,"p_subject": string,"p_template": string }; Returns: string
                            },
+"send_event_card_link":
+{ Args: { "p_channel": string,"p_days": number,"p_event_id": string,"p_to": string,"p_token_hash": string }; Returns: string
+                           },
+"send_event_member_link":
+{ Args: { "p_channel": string,"p_days": number,"p_member_id": string,"p_to": string,"p_token_hash": string }; Returns: string
+                           },
+"send_event_proposal":
+{ Args: { "p_channel": string,"p_days": number,"p_event_id": string,"p_to": string,"p_token_hash": string }; Returns: string
+                           },
 "send_promotion_message":
 { Args: { "p_body": string,"p_channel": string,"p_client_id": string,"p_opt_out_hash": string,"p_promotion_id": string,"p_subject": string,"p_template": string }; Returns: string
                            },
@@ -3923,6 +4063,9 @@ isOneToOne: false
                            },
 "set_client_consent":
 { Args: { "p_changes": Json,"p_client_id": string,"p_detail"?: string,"p_source": string }; Returns: undefined
+                           },
+"set_event_status":
+{ Args: { "p_event_id": string,"p_reason": string,"p_status": Database["public"]['Enums']["event_status"] }; Returns: undefined
                            },
 "set_free_text_roles":
 { Args: { "p_business_id": string,"p_roles": (string)[] }; Returns: undefined
@@ -4014,6 +4157,9 @@ isOneToOne: false
                            },
 "undo_reorder_draft":
 { Args: { "p_action_id": string }; Returns: undefined
+                           },
+"update_event_card":
+{ Args: { "p_card": Json,"p_link_id": string }; Returns: undefined
                            },
 "update_membership_card":
 { Args: { "p_label": string,"p_membership_id": string,"p_provider": string,"p_ref": string }; Returns: undefined

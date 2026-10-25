@@ -106,6 +106,7 @@ export type EventDetail = {
   serviceChargeCents: number;
   taxCents: number;
   totalCents: number;
+  mainCents: number;
   depositCents: number;
   createdAt: string;
   statusChangedAt: string;
@@ -114,7 +115,7 @@ export type EventDetail = {
 };
 
 export const EVENT_COLUMNS =
-  "id, title, status, lost_reason, event_date, ready_by, venue_name, venue_address, on_location, travel_miles, travel_minutes, notes, source, billing, inquiry_party_size, inquiry_services, subtotal_cents, travel_fee_cents, early_fee_cents, service_charge_cents, tax_cents, total_cents, deposit_cents, created_at, status_changed_at, client:clients(id, first_name, last_name, phone, email), members:event_members(id, position, name, party_role, package_id, package_name, price_cents, hair_minutes, makeup_minutes, pays_own, email, phone), tasks:event_tasks(id, member_id, kind, role, lane, staff_id, starts_at, ends_at)";
+  "id, title, status, lost_reason, event_date, ready_by, venue_name, venue_address, on_location, travel_miles, travel_minutes, notes, source, billing, inquiry_party_size, inquiry_services, subtotal_cents, travel_fee_cents, early_fee_cents, service_charge_cents, tax_cents, total_cents, main_cents, deposit_cents, created_at, status_changed_at, client:clients(id, first_name, last_name, phone, email), members:event_members(id, position, name, party_role, package_id, package_name, price_cents, hair_minutes, makeup_minutes, pays_own, email, phone), tasks:event_tasks(id, member_id, kind, role, lane, staff_id, starts_at, ends_at)";
 
 type EventRow = {
   id: string;
@@ -139,6 +140,7 @@ type EventRow = {
   service_charge_cents: number;
   tax_cents: number;
   total_cents: number;
+  main_cents: number;
   deposit_cents: number;
   created_at: string;
   status_changed_at: string;
@@ -177,6 +179,7 @@ export function eventFrom(e: EventRow, timeZone: string): EventDetail {
     serviceChargeCents: e.service_charge_cents,
     taxCents: e.tax_cents,
     totalCents: e.total_cents,
+    mainCents: e.main_cents,
     depositCents: e.deposit_cents,
     createdAt: e.created_at,
     statusChangedAt: e.status_changed_at,
@@ -207,6 +210,7 @@ export type EventSummary = {
   onLocation: boolean;
   venueName: string | null;
   source: string;
+  lostReason: string | null;
   statusChangedAt: string;
 };
 
@@ -214,7 +218,7 @@ export type EventSummary = {
 export async function loadEventList(supabase: Client, businessId: string, timeZone: string, from: string): Promise<EventSummary[]> {
   const { data, error } = await supabase
     .from("events")
-    .select("id, title, status, event_date, ready_by, total_cents, on_location, venue_name, source, status_changed_at, inquiry_party_size, client:clients(first_name, last_name), members:event_members(count)")
+    .select("id, title, status, lost_reason, event_date, ready_by, total_cents, on_location, venue_name, source, status_changed_at, inquiry_party_size, client:clients(first_name, last_name), members:event_members(count)")
     .eq("business_id", businessId)
     .gte("event_date", from)
     .order("event_date")
@@ -232,6 +236,7 @@ export async function loadEventList(supabase: Client, businessId: string, timeZo
     onLocation: e.on_location,
     venueName: e.venue_name,
     source: e.source,
+    lostReason: e.lost_reason,
     statusChangedAt: e.status_changed_at,
   }));
 }

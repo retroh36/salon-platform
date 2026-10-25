@@ -107,6 +107,7 @@ The database runs them (Supabase's scheduler, `pg_cron`), so they work on any Ve
 | `maestra-risk-check-morning` | `/api/cron/risk` | 12:00 daily | 6 or 7am | The risk check again, with the night's online bookings, before the salon opens |
 | `maestra-automations` | `/api/cron/automations` | :15 every hour | | Rebook reminders, win-back, birthday and review messages that are due (each salon's sending hours, 9am to 8pm local, are checked in the app) |
 | `maestra-policy-fees` | `/api/cron/fees` | every 15 minutes | | Late-cancel and no-show fees whose 10 minutes are up, charged to the card on file (with receipts), refunds of waived fees and of deposits the salon owes back |
+| `maestra-events` | `/api/cron/events` | :45 every hour | | Events: reminders three days before a scheduled payment, scheduled payments and balances that are due, charged to the card on file, and their receipts (each salon's 9am to 8pm, local) |
 
 Appointment reminders (texts before a visit) don't exist yet; they come with texts and email. When they do, they'll be one more job here.
 

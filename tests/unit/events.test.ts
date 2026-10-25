@@ -5,7 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import { builderProblems, priceOf, saveInput, timelineOf, type BuilderState } from "@/lib/events/builder";
 import { dateOf, draftFrom, packageFor, parseDescription } from "@/lib/events/describe";
-import { headcountCutoff, memberShare, pastCutoff, paymentSchedule, priceEvent, travelFee } from "@/lib/events/pricing";
+import { headcountCutoff, memberShare, pastCutoff, paymentSchedule, priceEvent, remainingSchedule, travelFee } from "@/lib/events/pricing";
+import { cardLinkMessage, memberLinkMessage, proposalMessage, receiptMessage, reminderMessage } from "@/lib/events/messages";
+import { pipelineColumn } from "@/lib/events/pipeline";
 import { DEFAULT_EVENT_SETTINGS, type EventPackage } from "@/lib/events/types";
 import { checkedDescription, describeEvent, withoutContacts } from "@/lib/denise/event-draft";
 import type { ClaudeClient } from "@/lib/denise/claude";
@@ -355,5 +357,69 @@ describe("the builder", () => {
       "Add the ready-by time.",
     ]);
     expect(builderProblems(state({ members: [{ name: "x", partyRole: "bride", packageId: "trial", paysOwn: false, email: "", phone: "" }] }), PACKAGES, S, "2026-10-25")).toContain("Choose a package for everyone in the party.");
+  });
+});
+
+describe("what's left to pay once booked", () => {
+  const plan = { ...S, secondPaymentPct: 30, secondPaymentDays: 30, finalPaymentDays: 7 };
+  const base = { mainCents: 100000, eventDate: "2027-06-14", bookedOn: "2026-11-01", today: "2026-11-01" };
+
+  it("matches the proposal's schedule at booking", () => {
+    expect(remainingSchedule({ ...base, paid: [{ kind: "deposit", amountCents: 30000 }] }, plan)).toEqual(
+      paymentSchedule({ mainCents: 100000, depositCents: 30000, eventDate: "2027-06-14", bookedOn: "2026-11-01" }, plan).slice(1),
+    );
+  });
+
+  it("follows a bigger party: the second payment is its share of the new total, the balance takes the rest", () => {
+    expect(remainingSchedule({ ...base, mainCents: 120000, today: "2027-01-10", paid: [{ kind: "deposit", amountCents: 30000 }] }, plan)).toEqual([
+      { kind: "second", amountCents: 36000, dueOn: "2027-05-15" },
+      { kind: "final", amountCents: 54000, dueOn: "2027-06-07" },
+    ]);
+  });
+
+  it("after the second payment, only the balance changes; overpaid leaves nothing", () => {
+    const paid = [
+      { kind: "deposit" as const, amountCents: 30000 },
+      { kind: "second" as const, amountCents: 30000 },
+    ];
+    expect(remainingSchedule({ ...base, mainCents: 90000, today: "2027-05-20", paid }, plan)).toEqual([{ kind: "final", amountCents: 30000, dueOn: "2027-06-07" }]);
+    expect(remainingSchedule({ ...base, mainCents: 50000, today: "2027-05-20", paid }, plan)).toEqual([]);
+  });
+
+  it("makes anything whose day has passed due today", () => {
+    expect(remainingSchedule({ ...base, today: "2027-06-09", paid: [{ kind: "deposit", amountCents: 30000 }] }, plan)).toEqual([
+      { kind: "second", amountCents: 30000, dueOn: "2027-06-09" },
+      { kind: "final", amountCents: 40000, dueOn: "2027-06-09" },
+    ]);
+  });
+});
+
+describe("the Events board", () => {
+  it("puts a booked event whose day has come under Event day", () => {
+    expect(pipelineColumn("booked", "2026-11-01", "2026-10-31")).toBe("booked");
+    expect(pipelineColumn("trial_done", "2026-11-01", "2026-11-01")).toBe("event_day");
+    expect(pipelineColumn("inquiry", "2026-10-01", "2026-11-01")).toBe("inquiry");
+    expect(pipelineColumn("completed", "2026-10-01", "2026-11-01")).toBe("completed");
+  });
+});
+
+describe("messages about events", () => {
+  it("are fixed templates with the link, and name the amount and card", () => {
+    expect(proposalMessage("Maple & Ash", "Mia", "Rossi wedding", "https://x/event/abc", "email")).toEqual({
+      subject: "Your proposal from Maple & Ash",
+      body: expect.stringContaining("https://x/event/abc"),
+    });
+    expect(proposalMessage("Maple & Ash", "Mia", "Rossi wedding", "u", "sms").subject).toBeNull();
+    expect(memberLinkMessage("Maple & Ash", "Ana", "Rossi wedding", 26400, "u", "sms").body).toContain("Your share is $264");
+    expect(cardLinkMessage("Maple & Ash", "Mia", "Rossi wedding", "u", "sms").body).toContain("didn't go through");
+    expect(reminderMessage("Maple & Ash", "Mia", "Rossi wedding", "final", 54000, "Mon, Jun 7", "Visa …4242").body).toContain("balance of $540 for Rossi wedding will be charged to Visa …4242 on Mon, Jun 7");
+    expect(receiptMessage("Maple & Ash", "Mia", "Rossi wedding", "Deposit", 30000, "Visa …4242", 70000).body).toContain("$700 is left to pay");
+    expect(receiptMessage("Maple & Ash", "Mia", "Rossi wedding", "Balance", 30000, null, 0).body).toContain("That's everything paid");
+  });
+
+  it("never say anything with an exclamation mark", () => {
+    for (const m of [proposalMessage("S", "A", "T", "u", "sms"), memberLinkMessage("S", "A", "T", 1, "u", "sms"), cardLinkMessage("S", "A", "T", "u", "sms"), reminderMessage("S", "A", "T", "second", 1, "d", null), receiptMessage("S", "A", "T", "Deposit", 1, null, 0)]) {
+      expect(m.body).not.toContain("!");
+    }
   });
 });

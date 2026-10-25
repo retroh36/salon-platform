@@ -135,6 +135,8 @@ export function settingsFrom(row: {
 
 // One person in the party, as the builder holds them.
 export type PartyMember = {
+  // A member already saved keeps their row (their pay link and payments).
+  id?: string;
   name: string;
   partyRole: PartyRole;
   packageId: string;
