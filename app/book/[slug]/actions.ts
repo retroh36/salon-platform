@@ -25,6 +25,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { patchExplanation } from "@/lib/online-booking/patch";
 import { loadManaged, canChange } from "@/lib/online-booking/manage";
 import { onlineTerms, type OnlineTerms } from "@/lib/online-booking/terms";
+import { badgeFor, onlinePromotion, onlineSpecials, plannedItems, type OnlinePromo } from "@/lib/online-booking/promotions";
+import { loadPromotions } from "@/lib/promotions-load";
 import { currentProvider, providerFor } from "@/lib/payments";
 import { ACCOUNT_SESSION, accountContact, currentAccount, startAccountSession } from "@/lib/online-booking/account";
 
@@ -64,7 +66,8 @@ function bookingWindow(site: BookingSite, now = new Date()) {
   };
 }
 
-export type DayTimes = { date: LocalDate; times: { minute: number; staffIds: string[] }[] };
+// special: a last-minute special's badge ("15% off") for that time.
+export type DayTimes = { date: LocalDate; times: { minute: number; staffIds: string[]; special: string | null }[] };
 export type TimesResult = { ok: true; days: DayTimes[]; lastDay: LocalDate } | { ok: false; message: string };
 
 // Free times for the visit over two weeks from `from`.
@@ -95,11 +98,17 @@ export async function findTimes(slug: string, serviceIds: string[], staffId: str
   const end = addDays(start, DAYS_PER_PAGE - 1) < window.lastDay ? addDays(start, DAYS_PER_PAGE - 1) : window.lastDay;
 
   const location = { id: site.location.id, timezone: site.location.timezone };
-  const ctx = await loadBookingContext(admin, location, start, end);
+  const [ctx, rules] = await Promise.all([loadBookingContext(admin, location, start, end), loadPromotions(admin, site.business.id, window.today)]);
+  // Specials aren't offered on a reschedule (the visit keeps what it had).
+  const specials = replacing ? [] : onlineSpecials(rules);
+  const now = new Date();
   const days: DayTimes[] = [];
   for (let date = start; date <= end; date = addDays(date, 1)) {
     const times = visitTimes(ctx, request, date, { notBefore: window.notBefore, notAfter: window.notAfter, replacingAppointmentId: replacing });
-    days.push({ date, times: times.map((t) => ({ minute: t.minute, staffIds: [...new Set(t.items.map((i) => i.staffId))] })) });
+    days.push({
+      date,
+      times: times.map((t) => ({ minute: t.minute, staffIds: [...new Set(t.items.map((i) => i.staffId))], special: specials.length ? badgeFor(site, specials, t.items, t.start, now, window.today) : null })),
+    });
   }
   return { ok: true, days, lastDay: window.lastDay };
 }
@@ -187,6 +196,28 @@ async function findClient(admin: ReturnType<typeof createAdminClient>, site: Boo
   return data as string | null;
 }
 
+export type PromotionResult = { ok: true; promo: OnlinePromo | null } | { ok: false; message: string };
+
+// At review: the promo code they typed (or why it can't be used), else the
+// special for their time.
+export async function reviewPromotion(slug: string, session: string, serviceIds: string[], staffId: string | null, date: string, minute: number, code: string | null): Promise<PromotionResult> {
+  const site = await openSite(slug);
+  if (!site) return { ok: false, message: "Online booking isn't available right now." };
+  const admin = createAdminClient();
+  const { ipHash } = await requestInfo();
+  if (code && !(await withinLimits(admin, [{ key: `promo:${ipHash}`, limit: 20, windowSeconds: HOUR }]))) {
+    return { ok: false, message: "Too many codes tried. Please wait a while and try again." };
+  }
+  const request = visitRequest(site, serviceIds, staffId);
+  const start = isLocalDate(date) && Number.isInteger(minute) ? fromLocal(date, minute, site.location.timezone) : null;
+  if (!request || !start) return { ok: false, message: "Those services can't be booked together online." };
+  const who = await whoIsBooking(admin, site, session);
+  if (!who) return { ok: false, message: "Your code has expired. Please confirm your details again." };
+  const items = await plannedItems(admin, site, request, start);
+  if (!items) return { ok: false, message: "Sorry, that time was just taken. Please pick another." };
+  return onlinePromotion(admin, site, who.clientId, items, start, code);
+}
+
 export type TermsResult =
   | { ok: true; lines: string[]; cardNeeded: boolean; depositCents: number; cardOnFile: string | null; testMode: boolean; cards: { ref: string; label: string; outcome: string }[] }
   | { ok: false; message: string };
@@ -236,6 +267,8 @@ export type BookInput = {
   cardRef?: string;
   // Keep them signed in to their account on this device afterwards.
   remember?: boolean;
+  // A promo code they gave at review (else the special for the time applies).
+  promoCode?: string;
   // Their answers at review: texts about their appointments (a no turns
   // them off), and offers (a yes turns them on; leaving it unticked keeps
   // what they said before).
@@ -245,7 +278,7 @@ export type BookInput = {
 
 export type BookResult =
   | { ok: true; manageUrl: string }
-  | { ok: false; message: string; reason?: "taken" | "patch_test" | "session" | "details" | "new_clients" | "card"; serviceIds?: string[] };
+  | { ok: false; message: string; reason?: "taken" | "patch_test" | "session" | "details" | "new_clients" | "card" | "promotion"; serviceIds?: string[] };
 
 export async function book(slug: string, input: BookInput): Promise<BookResult> {
   const site = await openSite(slug);
@@ -287,6 +320,10 @@ export async function book(slug: string, input: BookInput): Promise<BookResult> 
   // saved (and any deposit taken) before the booking is confirmed.
   const terms = await onlineTerms(admin, site, clientId!, request, start);
   if (!terms) return { ok: false, reason: "taken", message: "Sorry, that time was just taken. Please pick another." };
+  // Their promo code, or the special for this time: checked before booking.
+  const items = await plannedItems(admin, site, request, start);
+  const promotion = items ? await onlinePromotion(admin, site, clientId!, items, start, input.promoCode ?? null) : null;
+  if (promotion && !promotion.ok) return { ok: false, reason: "promotion", message: promotion.message };
   const token = newSecret();
   const card = await cardFor(terms, input.cardRef);
   if (!card.ok) return { ok: false, reason: "card", message: card.message };
@@ -313,6 +350,10 @@ export async function book(slug: string, input: BookInput): Promise<BookResult> 
     }
     return { ok: false, reason: "taken", message: "Sorry, that time was just taken. Please pick another." };
   }
+  // The promotion stays with the visit, to come off at checkout (if the
+  // rules no longer allow it, say because the last use just went, the
+  // booking stands without it).
+  if (promotion?.ok && promotion.promo) await admin.rpc("attach_online_promotion", { p_appointment_id: result.appointmentId, p_promotion_id: promotion.promo.id });
   // What they agreed to and when, the card, and the deposit.
   const { error: consentError } = await admin.rpc("record_online_card", {
     p_appointment_id: result.appointmentId,

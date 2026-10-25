@@ -4,7 +4,7 @@
 // complete_sale, which checks it all again.
 
 import { TIP_PERCENTS, tipFor } from "./checkout";
-import { grossOf, isCovered, ownDiscountOf, saleInput, servicesFor, totalsOf, type Rates, type Ticket } from "./ticket";
+import { grossOf, isCovered, ownDiscountOf, saleInput, servicesFor, totalsOf, withPromotions, type Rates, type Ticket } from "./ticket";
 
 // How long a link works.
 export const LINK_HOURS = 24;
@@ -34,7 +34,7 @@ export type LinkSnapshot = {
 // nothing paid yet, and something to pay, can be sent.
 export function linkSnapshot(
   ticket: Ticket,
-  rates: Rates,
+  given: Rates,
   ids: { appointmentId: string | null; clientId: string | null },
   staff: { id: string; firstName: string }[],
   clientFirstName: string | null,
@@ -42,12 +42,13 @@ export function linkSnapshot(
   if (!ticket.lines.length) return { problem: "Add something to the ticket first." };
   if (ticket.payments.length) return { problem: "Remove the payments taken first: a link pays the whole ticket." };
   const bare: Ticket = { ...ticket, tips: {}, payments: [] };
+  const rates = withPromotions(bare, given);
   const totals = totalsOf(bare, rates);
   const due = totals.totalCents - totals.coveredCents;
   if (due <= 0) return { problem: "There's nothing left to pay." };
   const name = (id: string | null) => staff.find((s) => s.id === id)?.firstName ?? null;
   const full = saleInput(bare, { draftId: "", ...ids });
-  const input = { appointment_id: full.appointment_id, client_id: full.client_id, rebook_appointment_id: full.rebook_appointment_id, lines: full.lines, discount: full.discount, receipt_email: full.receipt_email };
+  const input = { appointment_id: full.appointment_id, client_id: full.client_id, rebook_appointment_id: full.rebook_appointment_id, promotion_ids: full.promotion_ids, lines: full.lines, discount: full.discount, receipt_email: full.receipt_email };
   return {
     input,
     lines: bare.lines.map((l) => ({

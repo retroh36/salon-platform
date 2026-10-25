@@ -78,11 +78,14 @@ export function TimeGrid<T extends { minute: number }>({
   selected,
   onPick,
   label,
+  badge,
 }: {
   times: T[];
   selected: number | null;
   onPick: (t: T) => void;
   label?: (t: T) => string;
+  // A special for that time ("15% off").
+  badge?: (t: T) => string | null;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -95,12 +98,14 @@ export function TimeGrid<T extends { minute: number }>({
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {part.map((t) => {
                 const on = t.minute === selected;
+                const special = badge?.(t) ?? null;
                 return (
                   <button
                     key={t.minute}
                     type="button"
                     role="radio"
                     aria-checked={on}
+                    aria-label={special ? `${formatMinute(t.minute)}, ${special}` : undefined}
                     onClick={() => onPick(t)}
                     className={`flex min-h-12 flex-col items-center justify-center rounded-xl border px-1 text-base font-semibold tabular-nums transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                       on ? "border-(--accent) bg-(--accent) text-white" : "border-line bg-surface text-ink hover:border-(--accent-line)"
@@ -108,6 +113,11 @@ export function TimeGrid<T extends { minute: number }>({
                   >
                     {formatMinute(t.minute)}
                     {label && <span className={`max-w-full truncate text-[11px] font-medium ${on ? "text-white/90" : "text-ink-muted"}`}>{label(t)}</span>}
+                    {special && (
+                      <span className={`mt-0.5 rounded-full px-1.5 text-[11px] font-semibold ${on ? "bg-white/20 text-white" : "bg-(--accent-soft) text-ink"}`} data-testid="special-badge">
+                        {special}
+                      </span>
+                    )}
                   </button>
                 );
               })}

@@ -59,8 +59,9 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
       taxServicesBp: data.settings.taxServicesBp,
       taxRetailBp: data.settings.taxRetailBp,
       member: data.member,
+      promo: data.promo,
     }),
-    [data.settings, data.member],
+    [data.settings, data.member, data.promo],
   );
 
   // Save as the ticket changes (after a short pause).
@@ -189,8 +190,8 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
       roles: data.settings.discountRoles,
       maxPercent: data.settings.discountMaxPercent,
     },
-    // Member prices aren't staff discounts.
-    totals.discountCents - totals.memberDiscountCents,
+    // Member prices and promotions aren't staff discounts.
+    totals.discountCents - totals.memberDiscountCents - totals.promoDiscountCents,
     pool,
   );
   const problems = [
@@ -293,6 +294,7 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
                 onUpdate={updateLine}
                 onRemove={removeLine}
                 onDialog={setDialog}
+                onRemovePromotion={(id) => change((t) => ({ ...t, promotions: t.promotions.filter((p) => p !== id) }))}
               />
             </div>
           </div>

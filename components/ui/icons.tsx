@@ -190,6 +190,13 @@ export const WalletIcon = (p: IconProps) => (
     <path d="M16 13.5h1.5" />
   </Icon>
 );
+// A price tag: promotions.
+export const TagIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7a1 1 0 0 1 .7.3l7.6 7.6a1 1 0 0 1 0 1.4l-7.7 7.7a1 1 0 0 1-1.4 0l-7.6-7.6a1 1 0 0 1-.3-.7Z" />
+    <path d="M8 8h.01" strokeWidth={3} />
+  </Icon>
+);
 // Six dots: something you can drag to reorder.
 export const GripIcon = (p: IconProps) => (
   <Icon {...p}>

@@ -5,6 +5,7 @@
 
 import { computeSale, lineDiscountCents, paymentStatus, type Discount, type SaleLine, type Tender } from "./checkout";
 import { memberDiscountCents, type MemberPrices } from "./memberships";
+import { applyPromotions, promotionProblem, stackingProblem, type Level, type PromoContext, type PromoLine, type PromoRule } from "./promotions";
 
 export type TicketDiscount = { kind: "amount" | "percent"; value: number; reason: string } | null;
 
@@ -64,13 +65,27 @@ export type Ticket = {
   receiptEmail: string;
   // The next visit, booked before they left.
   rebook: { appointmentId: string; label: string } | null;
+  // Promotions on the sale (ids), in the order they apply.
+  promotions: string[];
 };
 
-export const EMPTY_TICKET: Ticket = { lines: [], saleDiscount: null, tips: {}, payments: [], receiptEmail: "", rebook: null };
+export const EMPTY_TICKET: Ticket = { lines: [], saleDiscount: null, tips: {}, payments: [], receiptEmail: "", rebook: null, promotions: [] };
 
-// Tax, and the client's member prices (taken off automatically, as
-// complete_sale does).
-export type Rates = { taxServicesBp: number; taxRetailBp: number; member?: MemberPrices | null };
+// What promotions need to price the ticket: the salon's live promotions,
+// each service's category and stylist's level, and what's known about
+// the client and visit (uses so far, for the limits).
+export type PromoRates = {
+  rules: PromoRule[];
+  categoryOf: Record<string, string>;
+  levelOf: Record<string, Level | null>;
+  context: Omit<PromoContext, "uses" | "clientUses" | "subtotalCents">;
+  uses: Record<string, { uses: number; clientUses: number }>;
+};
+
+// Tax, the client's member prices and promotions (taken off as
+// complete_sale does). promoByKey is what promotions take off each line,
+// worked out for the whole ticket by withPromotions.
+export type Rates = { taxServicesBp: number; taxRetailBp: number; member?: MemberPrices | null; promo?: PromoRates | null; promoByKey?: Record<string, number> };
 
 const NO_MEMBER: Rates = { taxServicesBp: 0, taxRetailBp: 0 };
 
@@ -102,18 +117,52 @@ export function memberDiscountOf(line: TicketLine, rates: Rates = NO_MEMBER): nu
   return 0;
 }
 
-// Its own discount, in cents: the member price, then what staff give on
-// the rest.
+// The promotions on the ticket, in order (those still live).
+export function ticketPromotions(ticket: Ticket, rates: Rates): PromoRule[] {
+  return ticket.promotions.flatMap((id) => rates.promo?.rules.find((r) => r.id === id) ?? []);
+}
+
+// Each line as promotions see it: what's left after the member price.
+function promoLines(ticket: Ticket, rates: Rates): PromoLine[] {
+  return ticket.lines.map((l) => {
+    const cents = grossOf(l) - memberDiscountOf(l, rates);
+    if (l.kind === "service" && !isCovered(l))
+      return { kind: "service", serviceId: l.serviceId, category: rates.promo?.categoryOf[l.serviceId] ?? null, staffId: l.staffId, level: rates.promo?.levelOf[l.staffId] ?? null, cents };
+    if (l.kind === "product") return { kind: "product", productId: l.productId, cents };
+    return { kind: "other", cents };
+  });
+}
+
+// What each promotion takes off, per line and in all.
+export function promotionsOn(ticket: Ticket, rates: Rates) {
+  const rules = ticketPromotions(ticket, rates);
+  return { rules, ...applyPromotions(rules, promoLines(ticket, rates)) };
+}
+
+// The rates with what promotions take off each line of this ticket.
+export function withPromotions(ticket: Ticket, rates: Rates): Rates {
+  if (!rates.promo || !ticket.promotions.length) return rates.promoByKey ? { ...rates, promoByKey: undefined } : rates;
+  const { perLine } = promotionsOn(ticket, rates);
+  return { ...rates, promoByKey: Object.fromEntries(ticket.lines.map((l, i) => [l.key, perLine[i]])) };
+}
+
+// The promotions' part of a line's discount (after withPromotions).
+export const promoDiscountOf = (line: TicketLine, rates: Rates = NO_MEMBER) => (isCovered(line) ? 0 : (rates.promoByKey?.[line.key] ?? 0));
+
+// Its own discount, in cents: the member price, then promotions, then
+// what staff give on the rest.
 export function ownDiscountOf(line: TicketLine, rates: Rates = NO_MEMBER): number {
   if (isCovered(line)) return 0;
   if (line.kind !== "service" && line.kind !== "product") return 0;
   const member = memberDiscountOf(line, rates);
-  return member + lineDiscountCents(grossOf(line) - member, asDiscount(line.discount));
+  const promo = promoDiscountOf(line, rates);
+  return member + promo + lineDiscountCents(grossOf(line) - member - promo, asDiscount(line.discount));
 }
 
 // The lines as the sale prices them: services paid with a package aren't
 // taxed or discounted again; gift cards never are.
-export function saleLines(ticket: Ticket, rates: Rates): SaleLine[] {
+export function saleLines(ticket: Ticket, given: Rates): SaleLine[] {
+  const rates = withPromotions(ticket, given);
   return ticket.lines.map((l) => {
     const gross = grossOf(l);
     switch (l.kind) {
@@ -133,7 +182,8 @@ export function saleLines(ticket: Ticket, rates: Rates): SaleLine[] {
   });
 }
 
-export function totalsOf(ticket: Ticket, rates: Rates) {
+export function totalsOf(ticket: Ticket, given: Rates) {
+  const rates = withPromotions(ticket, given);
   const lines = saleLines(ticket, rates);
   const sale = computeSale(lines, asDiscount(ticket.saleDiscount), Object.values(ticket.tips));
   // What packages and memberships pay for (added as payments by the
@@ -141,16 +191,19 @@ export function totalsOf(ticket: Ticket, rates: Rates) {
   const covered = ticket.lines.reduce((n, l, i) => n + (isCovered(l) ? sale.lines[i].totalCents : 0), 0);
   // Member prices: part of the discount, never counted against staff limits.
   const member = ticket.lines.reduce((n, l) => n + memberDiscountOf(l, rates), 0);
+  // Promotions: also never counted against staff limits.
+  const promo = ticket.lines.reduce((n, l) => n + promoDiscountOf(l, rates), 0);
   const tenders: Tender[] = ticket.payments.map((p) => ({ method: p.method, amountCents: p.amountCents, tenderedCents: p.method === "cash" ? p.tenderedCents : undefined }));
   const status = paymentStatus(sale.totalCents - covered, tenders);
-  return { ...sale, coveredCents: covered, memberDiscountCents: member, ...status };
+  return { ...sale, coveredCents: covered, memberDiscountCents: member, promoDiscountCents: promo, ...status };
 }
 
 export type StylistGroup = { staffId: string | null; lines: { line: TicketLine; index: number }[]; subtotalCents: number };
 
 // Lines grouped by who did them (or gets the credit), in the order they
 // first appear; gift cards, packages and uncredited products last.
-export function stylistGroups(ticket: Ticket, rates: Rates = NO_MEMBER): StylistGroup[] {
+export function stylistGroups(ticket: Ticket, given: Rates = NO_MEMBER): StylistGroup[] {
+  const rates = withPromotions(ticket, given);
   const groups = new Map<string | null, StylistGroup>();
   ticket.lines.forEach((line, index) => {
     const staffId = line.kind === "service" || line.kind === "product" ? line.staffId : null;
@@ -165,7 +218,8 @@ export function stylistGroups(ticket: Ticket, rates: Rates = NO_MEMBER): Stylist
 
 // A stylist's services on the ticket, after their own discounts: what tip
 // presets are worked out on.
-export function servicesFor(ticket: Ticket, staffId: string, rates: Rates = NO_MEMBER): number {
+export function servicesFor(ticket: Ticket, staffId: string, given: Rates = NO_MEMBER): number {
+  const rates = withPromotions(ticket, given);
   return ticket.lines.reduce((n, l) => n + (l.kind === "service" && l.staffId === staffId ? grossOf(l) - ownDiscountOf(l, rates) : 0), 0);
 }
 
@@ -186,6 +240,7 @@ export function ticketProblems(ticket: Ticket, rates: Rates, hasClient: boolean)
     if (l.kind === "membership" && !l.cardRef) problems.push(`Choose the card ${l.name} renews on.`);
   }
   if (ticket.saleDiscount && ticket.saleDiscount.value > 0 && !ticket.saleDiscount.reason.trim()) problems.push("Say why there's a discount.");
+  problems.push(...promotionProblems(ticket, rates));
   if (ticket.payments.some((p) => p.method === "gift_card") && ticket.lines.some((l) => l.kind === "gift_card" || l.kind === "gift_card_reload")) problems.push("Gift cards can't be paid for with a gift card.");
   for (const p of ticket.payments) {
     if (p.method === "gift_card" && p.amountCents > p.balanceCents) problems.push("That's more than is on the gift card.");
@@ -197,6 +252,25 @@ export function ticketProblems(ticket: Ticket, rates: Rates, hasClient: boolean)
   return problems;
 }
 
+// What stops the promotions on the ticket (as complete_sale checks them).
+export function promotionProblems(ticket: Ticket, rates: Rates): string[] {
+  if (!ticket.promotions.length) return [];
+  if (!rates.promo) return ["Promotions can't be checked right now."];
+  const { rules, perPromotion } = promotionsOn(ticket, rates);
+  if (rules.length < ticket.promotions.length) return ["A promotion on the sale has ended. Take it off."];
+  const spend = ticket.lines.reduce((n, l) => n + ((l.kind === "service" && !isCovered(l)) || l.kind === "product" ? grossOf(l) : 0), 0);
+  const staffDiscount =
+    Boolean(ticket.saleDiscount && ticket.saleDiscount.value > 0) || ticket.lines.some((l) => (l.kind === "service" || l.kind === "product") && !isCovered(l) && l.discount && l.discount.value > 0);
+  const out = rules.flatMap((r) => {
+    const used = rates.promo!.uses[r.id] ?? { uses: 0, clientUses: 0 };
+    const problem = promotionProblem(r, { ...rates.promo!.context, ...used, subtotalCents: spend });
+    if (problem) return [problem];
+    return perPromotion[r.id] > 0 ? [] : [`${r.name} doesn't cover anything on this sale.`];
+  });
+  const stacking = stackingProblem(rules, staffDiscount);
+  return stacking ? [...out, stacking] : out;
+}
+
 const dollars = (cents: number) => (cents % 100 === 0 ? `$${(cents / 100).toLocaleString("en-US")}` : `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 
 // What complete_sale is sent.
@@ -206,6 +280,7 @@ export function saleInput(ticket: Ticket, ids: { draftId: string; appointmentId:
     appointment_id: ids.appointmentId,
     client_id: ids.clientId,
     rebook_appointment_id: ticket.rebook?.appointmentId ?? null,
+    promotion_ids: ticket.promotions,
     lines: ticket.lines.map((l) => {
       switch (l.kind) {
         case "service":
@@ -258,5 +333,6 @@ export function parseTicket(json: unknown): Ticket {
     payments: Array.isArray(t.payments) ? t.payments : [],
     receiptEmail: typeof t.receiptEmail === "string" ? t.receiptEmail : "",
     rebook: t.rebook ?? null,
+    promotions: Array.isArray(t.promotions) ? t.promotions.filter((p): p is string => typeof p === "string") : [],
   };
 }

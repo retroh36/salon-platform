@@ -2,14 +2,14 @@ import Link from "next/link";
 import { logout } from "@/app/login/actions";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
-import { BoxIcon, CalendarIcon, ChartIcon, GiftIcon, ReceiptIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, ShieldIcon, UserIcon, WalletIcon } from "@/components/ui/icons";
+import { BoxIcon, CalendarIcon, ChartIcon, GiftIcon, ReceiptIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, ShieldIcon, TagIcon, UserIcon, WalletIcon } from "@/components/ui/icons";
 import { SalonMark } from "@/components/ui/salon-mark";
 import { firstSettingsPage } from "@/app/settings/settings-nav";
 import { AutoLock } from "@/components/auto-lock";
 import { can, type Permission } from "@/lib/permissions";
 import { isFrontOfHouse, roleLabel, type StaffRole } from "@/lib/staff";
 
-export type Section = "account" | "dashboard" | "my-day" | "calendar" | "sales" | "gift-cards" | "reports" | "payroll" | "policy" | "clients" | "team" | "services" | "durations" | "inventory" | "forms" | "settings";
+export type Section = "account" | "dashboard" | "my-day" | "calendar" | "sales" | "gift-cards" | "reports" | "payroll" | "policy" | "promotions" | "clients" | "team" | "services" | "durations" | "inventory" | "forms" | "settings";
 
 type NavItem = {
   section: Section;
@@ -43,6 +43,7 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { section: "sales", href: "/sales", label: "Sales", Icon: ReceiptIcon, frontOfHouse: true },
       { section: "gift-cards", href: "/gift-cards", label: "Gift cards", Icon: GiftIcon, frontOfHouse: true },
+      { section: "promotions", href: "/promotions", label: "Promotions", Icon: TagIcon, frontOfHouse: true },
       { section: "reports", href: "/reports", label: "Reports", Icon: ChartIcon, needs: "reports" },
       { section: "payroll", href: "/payroll", label: "Payroll", Icon: WalletIcon, needs: "payroll" },
       { section: "policy", href: "/policy", label: "Policy", Icon: ShieldIcon, needs: "reports" },

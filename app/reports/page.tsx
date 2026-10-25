@@ -8,7 +8,7 @@ import { getCurrentStaff } from "@/lib/auth";
 import { TENDER_LABELS } from "@/lib/reports";
 import { membershipReport } from "@/lib/memberships";
 import { loadMembershipRows } from "@/lib/memberships-load";
-import { loadBookingSources, loadCloseout, loadGiftCardActivity, loadGiftCardLiability, loadRebooking, loadUnusedPackages } from "@/lib/reports-load";
+import { loadBookingSources, loadPromotionResults, loadCloseout, loadGiftCardActivity, loadGiftCardLiability, loadRebooking, loadUnusedPackages } from "@/lib/reports-load";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, isLocalDate, todayIn } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
@@ -62,7 +62,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
   const period: Period = typeof params.period === "string" && params.period in PERIODS ? (params.period as Period) : "this_month";
   const day = typeof params.day === "string" && isLocalDate(params.day) && params.day <= today ? params.day : today;
   const range = rangeOf(period, today);
-  const [liability, packages, activity, close, rebooking, staff, membershipRows, sources] = await Promise.all([
+  const [liability, packages, activity, close, rebooking, staff, membershipRows, sources, promotions] = await Promise.all([
     loadGiftCardLiability(supabase, me.business_id),
     loadUnusedPackages(supabase, me.business_id),
     loadGiftCardActivity(supabase, me.business_id, range.from, range.to, tz),
@@ -71,6 +71,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
     supabase.from("staff").select("id, first_name, last_name").eq("business_id", me.business_id),
     loadMembershipRows(supabase, me.business_id, tz),
     loadBookingSources(supabase, me.location, range.from, range.to),
+    loadPromotionResults(supabase, me.business_id, range.from, range.to, tz),
   ]);
   const members = membershipReport(membershipRows, range.from, range.to);
   const staffName = new Map((staff.data ?? []).map((s) => [s.id, `${s.first_name} ${s.last_name}`]));
@@ -178,6 +179,41 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
                   <td className="py-1.5">{p.name}</td>
                   <td className="py-1.5 text-right">{p.members}</td>
                   <td className="py-1.5 text-right">{formatPrice(p.mrrCents)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      <Card
+        title="Promotions"
+        titleId="promotions-heading"
+        description={`Sales ${formatLongDay(range.from, false)} to ${formatLongDay(range.to, false)} that used a promotion: what they brought in (after tax, tips and refunds), what the discounts cost, openings filled by last-minute specials, and first visits.`}
+      >
+        {promotions.length === 0 ? (
+          <p className="text-sm text-ink-muted">No promotions used in this period.</p>
+        ) : (
+          <table className="w-full text-sm tabular-nums" aria-label="Promotion results">
+            <thead>
+              <tr className="text-left text-ink-muted">
+                <th className="py-1 font-medium">Promotion</th>
+                <th className="py-1 text-right font-medium">Used</th>
+                <th className="py-1 text-right font-medium">Revenue</th>
+                <th className="py-1 text-right font-medium">Discounts</th>
+                <th className="py-1 text-right font-medium">Gaps filled</th>
+                <th className="py-1 text-right font-medium">New clients</th>
+              </tr>
+            </thead>
+            <tbody>
+              {promotions.map((p) => (
+                <tr key={p.promotionId} className="border-t border-line" data-testid="promotion-result">
+                  <td className="py-1.5">{p.name}</td>
+                  <td className="py-1.5 text-right">{p.redemptions}</td>
+                  <td className="py-1.5 text-right">{formatPrice(p.revenueCents)}</td>
+                  <td className="py-1.5 text-right">−{formatPrice(p.discountCents)}</td>
+                  <td className="py-1.5 text-right">{p.gapsFilled}</td>
+                  <td className="py-1.5 text-right">{p.newClients}</td>
                 </tr>
               ))}
             </tbody>

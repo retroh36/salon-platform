@@ -78,7 +78,7 @@ function isoDate(label: string): string {
 async function codeFor(page: Page, to: string): Promise<string> {
   const digits = to.replace(/\D/g, "");
   const outbox = await page.context().newPage();
-  await outbox.goto("/dev/outbox");
+  await outbox.goto(`/dev/outbox?to=${digits}`);
   const message = outbox.getByTestId("outbox-message").filter({ has: outbox.getByTestId("outbox-to").getByText(digits, { exact: true }) }).first();
   const body = await message.getByTestId("outbox-body").innerText();
   await outbox.close();
@@ -237,7 +237,7 @@ test("two people can't book the same time: the second is told and picks again", 
   await expect(flow(second).getByRole("heading", { name: "Pick a date and time" })).toBeVisible();
   // The time is no longer offered.
   await expect(flow(second).getByRole("radiogroup", { name: /Morning|Afternoon|Evening/ }).first()).toBeVisible();
-  await expect(flow(second).getByRole("radiogroup", { name: /Morning|Afternoon|Evening/ }).getByRole("radio", { name: new RegExp(`^${picked[0].time}$`) })).toHaveCount(0);
+  await expect(flow(second).getByRole("radiogroup", { name: /Morning|Afternoon|Evening/ }).getByRole("radio", { name: new RegExp(`^${picked[0].time}(,|$)`) })).toHaveCount(0);
 
   const { data: clients } = await admin.from("clients").select("id").eq("business_id", B).like("first_name", `Ob${RUN}Race%`);
   created.push(...clients!.map((c) => c.id));

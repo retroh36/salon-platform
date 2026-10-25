@@ -2,10 +2,11 @@
 // shares its booking link gets its own tagged link (?src=google, …); the
 // booking site records the tag on the visit (appointments.online_source),
 // so Reports can show where bookings came from. Automated messages tag
-// their links too (rebook, win_back, birthday, review).
+// their links too (rebook, win_back, birthday, review), as do specials
+// staff send (special).
 
 export const SHARED_SOURCES = ["google", "instagram", "facebook", "website"] as const;
-export const MESSAGE_SOURCES = ["rebook", "win_back", "birthday", "review"] as const;
+export const MESSAGE_SOURCES = ["rebook", "win_back", "birthday", "review", "special"] as const;
 export type BookingSource = (typeof SHARED_SOURCES)[number] | (typeof MESSAGE_SOURCES)[number] | "other" | "direct";
 
 export const SOURCE_LABELS: Record<BookingSource, string> = {
@@ -17,6 +18,7 @@ export const SOURCE_LABELS: Record<BookingSource, string> = {
   win_back: "Win-back messages",
   birthday: "Birthday messages",
   review: "Review requests",
+  special: "Last-minute specials",
   other: "Other links",
   direct: "No tag (shared link, typed in)",
 };

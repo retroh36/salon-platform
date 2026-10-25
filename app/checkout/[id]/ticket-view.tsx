@@ -14,7 +14,7 @@ import type { CheckoutScreenData } from "@/lib/checkout-screen";
 import { usesLeft } from "@/lib/packages";
 import { centsToInput, formatPrice } from "@/lib/services";
 import { priceText } from "@/lib/memberships";
-import { grossOf, isCovered, memberDiscountOf, ownDiscountOf, stylistGroups, type Rates, type Ticket, type TicketDiscount, type TicketLine } from "@/lib/ticket";
+import { grossOf, isCovered, memberDiscountOf, ownDiscountOf, promoDiscountOf, promotionsOn, stylistGroups, withPromotions, type Rates, type Ticket, type TicketDiscount, type TicketLine } from "@/lib/ticket";
 import { setSaleClient } from "../actions";
 import type { DialogState } from "./dialogs";
 
@@ -166,7 +166,7 @@ const KIND_LABEL: Record<TicketLine["kind"], string> = { service: "Service", pro
 export function TicketList({
   data,
   ticket,
-  rates,
+  rates: given,
   editing,
   arrived,
   shortOf,
@@ -174,6 +174,7 @@ export function TicketList({
   onUpdate,
   onRemove,
   onDialog,
+  onRemovePromotion,
 }: {
   data: CheckoutScreenData;
   ticket: Ticket;
@@ -185,9 +186,13 @@ export function TicketList({
   onUpdate: (key: string, patch: Partial<TicketLine>) => void;
   onRemove: (key: string) => void;
   onDialog: (d: DialogState) => void;
+  onRemovePromotion: (id: string) => void;
 }) {
   const names = new Map(data.staff.map((s) => [s.id, s]));
+  // What promotions take off each line, for the whole ticket.
+  const rates = withPromotions(ticket, given);
   const groups = stylistGroups(ticket, rates);
+  const promos = promotionsOn(ticket, rates);
   return (
     <div className="flex flex-col gap-4">
       {groups.length === 0 && (
@@ -225,6 +230,20 @@ export function TicketList({
           </section>
         );
       })}
+      {promos.rules.length > 0 && (
+        <ul aria-label="Promotions" className="flex flex-col gap-2">
+          {promos.rules.map((r) => (
+            <li key={r.id} className="flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-2 shadow-card" data-testid="applied-promotion">
+              <span className="w-16 shrink-0 text-xs font-semibold tracking-wide text-ink-muted uppercase">Promo</span>
+              <span className="min-w-0 flex-1 truncate font-medium text-ink">{r.name}</span>
+              <span className="font-semibold text-ink tabular-nums">−{formatPrice(promos.perPromotion[r.id] ?? 0)}</span>
+              <IconButton label={`Remove ${r.name}`} onClick={() => onRemovePromotion(r.id)} className="size-11">
+                <CloseIcon className="size-5" />
+              </IconButton>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="flex flex-wrap gap-2">
         <Button size="lg" onClick={() => onDialog({ kind: "add-service" })}>
           <PlusIcon className="size-5" />
@@ -244,6 +263,12 @@ export function TicketList({
           <Button size="lg" variant="ghost" onClick={() => onDialog({ kind: "sell-membership" })}>
             <PlusIcon className="size-5" />
             Membership
+          </Button>
+        )}
+        {data.promo.rules.length > 0 && (
+          <Button size="lg" variant="ghost" onClick={() => onDialog({ kind: "promotion" })}>
+            <PlusIcon className="size-5" />
+            Promotion
           </Button>
         )}
         <Button size="lg" variant="ghost" onClick={() => onDialog({ kind: "sale-discount" })}>
@@ -266,6 +291,8 @@ function detailOf(line: TicketLine, data: CheckoutScreenData, rates: Rates): str
   }
   const member = memberDiscountOf(line, rates);
   if (member > 0 && rates.member) out.push(`member price, ${line.kind === "service" ? rates.member.servicePct : rates.member.retailPct}% off`);
+  const promo = promoDiscountOf(line, rates);
+  if (promo > 0) out.push(`${formatPrice(promo)} off with a promotion`);
   if (line.kind === "product") out.push(line.staffId ? `sold by ${staff(line.staffId)}` : "no stylist credited");
   if ((line.kind === "service" || line.kind === "product") && line.discount && line.discount.value > 0)
     out.push(`${line.discount.kind === "percent" ? `${line.discount.value}%` : formatPrice(line.discount.value)} off${line.discount.reason ? `: ${line.discount.reason}` : ""}`);

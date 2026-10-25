@@ -5,6 +5,7 @@ import type { Database } from "@/lib/database.types";
 import { startOfLocalDay } from "@/lib/scheduling/load";
 import { addDays, type LocalDate } from "@/lib/scheduling/time";
 import { bookingSourcesReport } from "@/lib/online-booking/sources";
+import { promotionReport } from "@/lib/promotions";
 import { closeout, giftCardActivity, giftCardLiability, rebookingAtCheckout, unusedPackageValue, type CardRow, type PackageItemRow } from "./reports";
 
 type Supabase = SupabaseClient<Database>;
@@ -121,6 +122,33 @@ export async function loadRebooking(supabase: Supabase, location: { id: string; 
 
 // Online bookings made in a period, by where they came from (the tag on
 // the link they followed), with what the visits brought in once checked out.
+// Promotions used on sales completed in the period (not voided): each
+// redemption with its sale's revenue (less tax, tips and refunds).
+export async function loadPromotionResults(supabase: Supabase, businessId: string, from: LocalDate, to: LocalDate, timezone: string) {
+  const rows = await all<{ promotion_id: string; discount_cents: number; first_visit: boolean; last_minute: boolean; sale: { total_cents: number; tax_cents: number; tip_cents: number; refunded_cents: number } }>((f, t) =>
+    supabase
+      .from("promotion_redemptions")
+      .select("promotion_id, discount_cents, first_visit, last_minute, sale:sales!inner(total_cents, tax_cents, tip_cents, refunded_cents)")
+      .eq("business_id", businessId)
+      .is("voided_at", null)
+      .gte("created_at", startOfLocalDay(from, timezone).toISOString())
+      .lt("created_at", startOfLocalDay(addDays(to, 1), timezone).toISOString())
+      .order("id")
+      .range(f, t) as never,
+  );
+  const { data: names } = await supabase.from("promotions").select("id, name").eq("business_id", businessId);
+  const nameOf = new Map((names ?? []).map((p) => [p.id, p.name]));
+  return promotionReport(
+    rows.map((r) => ({
+      promotionId: r.promotion_id,
+      discountCents: r.discount_cents,
+      saleNetCents: Math.max(0, r.sale.total_cents - r.sale.tax_cents - r.sale.tip_cents - r.sale.refunded_cents),
+      lastMinute: r.last_minute,
+      firstVisit: r.first_visit,
+    })),
+  ).map((p) => ({ ...p, name: nameOf.get(p.promotionId) ?? "A promotion" }));
+}
+
 export async function loadBookingSources(supabase: Supabase, location: { id: string; timezone: string }, from: LocalDate, to: LocalDate) {
   const rows = await all<{ online_source: string | null; status: string; sales: { status: string; total_cents: number; tax_cents: number; tip_cents: number; refunded_cents: number }[] }>((f, t) =>
     supabase

@@ -11,7 +11,8 @@ import { benefitsText, periodName, priceText } from "@/lib/memberships";
 import { creditFor } from "@/lib/memberships-load";
 import { packageFor, usesLeft } from "@/lib/packages";
 import { formatPrice } from "@/lib/services";
-import type { Ticket, TicketDiscount, TicketLine, TicketPayment, totalsOf } from "@/lib/ticket";
+import { normalCode, promotionSummary, type PromoRule } from "@/lib/promotions";
+import { promotionProblems, type Rates, type Ticket, type TicketDiscount, type TicketLine, type TicketPayment, type totalsOf } from "@/lib/ticket";
 import { lookupGiftCard } from "@/app/sales/actions";
 import { approveOutOfStock } from "../actions";
 import { SendLink } from "./payment-link";
@@ -26,6 +27,7 @@ export type DialogState =
   | { kind: "payment-link" }
   | { kind: "membership" }
   | { kind: "sale-discount" }
+  | { kind: "promotion" }
   | { kind: "card" }
   | { kind: "cash" }
   | { kind: "gift-card" }
@@ -89,6 +91,12 @@ export function Dialogs(props: Props) {
       return (
         <Sheet title="Discount the whole sale" onClose={onClose}>
           <SaleDiscount {...props} />
+        </Sheet>
+      );
+    case "promotion":
+      return (
+        <Sheet title="Add a promotion" onClose={onClose}>
+          <AddPromotion {...props} />
         </Sheet>
       );
     case "card":
@@ -413,6 +421,68 @@ function SaleDiscount({ data, ticket, onChange, onClose }: Props) {
         </Button>
       </div>
     </form>
+  );
+}
+
+// A code the client gives, or an offer that applies here (automatic ones
+// and last-minute specials), checked against the ticket as complete_sale
+// will check it.
+function AddPromotion({ data, ticket, onChange, onClose }: Props) {
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const rates: Rates = { taxServicesBp: data.settings.taxServicesBp, taxRetailBp: data.settings.taxRetailBp, member: data.member, promo: data.promo };
+  const problemWith = (rule: PromoRule) => promotionProblems({ ...ticket, promotions: [...ticket.promotions, rule.id] }, rates)[0] ?? null;
+  const add = (rule: PromoRule) => {
+    const problem = problemWith(rule);
+    if (problem) return setError(problem);
+    onChange((t) => ({ ...t, promotions: [...t.promotions, rule.id] }));
+    onClose();
+  };
+  const offers = data.promo.rules.filter((r) => r.kind !== "code" && !ticket.promotions.includes(r.id));
+  const names = { services: Object.fromEntries(data.services.map((s) => [s.id, s.name])), staff: Object.fromEntries(data.staff.map((s) => [s.id, s.firstName])) };
+  return (
+    <div className="flex flex-col gap-5">
+      <form
+        className="flex flex-col gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const rule = data.promo.rules.find((r) => r.kind === "code" && r.code === normalCode(code));
+          if (!rule) return setError("No promotion has that code, or it has ended.");
+          if (ticket.promotions.includes(rule.id)) return setError("That promotion is already on the sale.");
+          add(rule);
+        }}
+      >
+        <label className={labelClass}>
+          Promo code
+          <input value={code} onChange={(e) => setCode(e.target.value)} className={`${fieldClass} h-12 uppercase`} autoCapitalize="characters" autoComplete="off" maxLength={24} />
+        </label>
+        <Button type="submit" variant="primary" size="lg" className="self-start" disabled={!code.trim()}>
+          Apply code
+        </Button>
+      </form>
+      {error && <Problem text={error} />}
+      {offers.length > 0 && (
+        <section aria-label="Offers" className="flex flex-col gap-2">
+          <h3 className="text-sm font-medium text-ink-muted">Offers</h3>
+          <ul className="flex flex-col gap-2">
+            {offers.map((r) => {
+              const problem = problemWith(r);
+              return (
+                <li key={r.id} className="flex items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2" data-testid="promotion-offer">
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium text-ink">{r.name}</span>
+                    <span className="block text-sm text-ink-muted">{problem ?? promotionSummary(r, names)}</span>
+                  </span>
+                  <Button onClick={() => add(r)} disabled={Boolean(problem)}>
+                    Apply
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+    </div>
   );
 }
 

@@ -39,7 +39,7 @@ test.afterAll(async () => {
 
 async function newestTo(page: Page, to: string): Promise<string> {
   const outbox = await page.context().newPage();
-  await outbox.goto("/dev/outbox");
+  await outbox.goto(`/dev/outbox?to=${encodeURIComponent(to)}`);
   const body = await outbox
     .getByTestId("outbox-message")
     .filter({ has: outbox.getByTestId("outbox-to").getByText(to, { exact: true }) })

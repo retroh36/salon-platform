@@ -784,3 +784,19 @@ where business_id = 'b0000000-0000-4000-8000-000000000001'
 
 update public.services set deposit_kind = 'fixed', deposit_amount = 5000
 where business_id = 'b0000000-0000-4000-8000-000000000001' and name in ('Bridal Trial', 'Double Process (Bleach & Tone)');
+
+-- ---------------------------------------------------------------------------
+-- Promotions (Sales → Promotions): a welcome code for new clients' first
+-- visit, a retail offer that applies itself at checkout, and a last-minute
+-- special for open time in the next 48 hours (never Master color).
+-- ---------------------------------------------------------------------------
+
+insert into public.promotions (business_id, name, kind, code, discount_kind, percent, amount_cents, applies_services, applies_retail, starts_on,
+  max_uses_per_client, new_clients_only, first_visit_only, stackable, online, hours_ahead, exclusions, min_spend_cents)
+values
+  ('b0000000-0000-4000-8000-000000000001', 'Welcome 15', 'code', 'WELCOME15', 'percent', 15, null, true, false, current_date - 120,
+   1, true, true, false, true, null, '[]', null),
+  ('b0000000-0000-4000-8000-000000000001', 'Retail $10 off $60', 'automatic', null, 'amount', null, 1000, false, true, null,
+   null, false, false, true, false, null, '[]', 6000),
+  ('b0000000-0000-4000-8000-000000000001', 'Last-minute 15%', 'last_minute', null, 'percent', 15, null, true, false, null,
+   null, false, false, false, true, 48, '[{"level": "master", "category": "Color"}]', null);

@@ -27,7 +27,7 @@ test.describe("owner", () => {
     await page.goto("/dashboard");
     expect(await groups(page)).toEqual([
       ["Daily", ["Dashboard", "Calendar", "Clients"]],
-      ["Sales", ["Sales", "Gift cards", "Reports", "Payroll", "Policy"]],
+      ["Sales", ["Sales", "Gift cards", "Promotions", "Reports", "Payroll", "Policy"]],
       ["Salon", ["Team", "Services", "Durations", "Inventory", "Forms"]],
     ]);
     await expect(sidebar(page).getByRole("link", { name: "Settings" })).toBeVisible();
@@ -76,12 +76,12 @@ test.describe("stylist", () => {
 test.describe("front desk", () => {
   test.use({ storageState: AUTH.frontDesk });
 
-  test("sees Sales and Gift cards, not Reports, Durations or Settings", async ({ page }) => {
+  test("sees Sales, Gift cards and Promotions, not Reports, Durations or Settings", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/dashboard");
     expect(await groups(page)).toEqual([
       ["Daily", ["Dashboard", "Calendar", "Clients"]],
-      ["Sales", ["Sales", "Gift cards"]],
+      ["Sales", ["Sales", "Gift cards", "Promotions"]],
       ["Salon", ["Team", "Services", "Inventory", "Forms"]],
     ]);
     await expect(sidebar(page).getByRole("link", { name: "Settings" })).toHaveCount(0);

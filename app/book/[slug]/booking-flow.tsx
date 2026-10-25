@@ -10,7 +10,7 @@ import type { BookingSource } from "@/lib/online-booking/sources";
 import { LEVEL_LABELS } from "@/lib/schedule-forms";
 import { formatMinute, type LocalDate } from "@/lib/scheduling/time";
 import { formatMinutes, formatPrice, formatPriceRange } from "@/lib/services";
-import { book, confirmCode, findTimes, requestCode, reviewTerms, type DayTimes, type TermsResult } from "./actions";
+import { book, confirmCode, findTimes, requestCode, reviewPromotion, reviewTerms, type DayTimes, type PromotionResult, type TermsResult } from "./actions";
 import { DateStrip, TimeGrid, longDate } from "./times";
 
 type Step = "services" | "stylist" | "time" | "details" | "confirm";
@@ -73,6 +73,9 @@ export function BookingFlow({
   // The policy for this visit (from the server), and the card entered.
   const [loaded, setLoaded] = useState<{ key: string; terms: TermsResult } | null>(null);
   const [cardRef, setCardRef] = useState("");
+  // The promotion for the visit: a code they applied, or the special for
+  // their time (from the server).
+  const [promo, setPromo] = useState<{ key: string; code: string | null; result: PromotionResult } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [blockedServices, setBlockedServices] = useState<string[]>([]);
   const [pending, startTransition] = useTransition();
@@ -125,6 +128,7 @@ export function BookingFlow({
       setLoaded({ key: review, terms: t });
       if (t.ok) setCardRef(t.cards[0]?.ref ?? "");
     });
+    reviewPromotion(site.business.slug, identity.session, serviceIds, staffId ?? null, slot.date, slot.minute, null).then((result) => live && setPromo({ key: review, code: null, result }));
     return () => {
       live = false;
     };
@@ -132,6 +136,14 @@ export function BookingFlow({
   }, [review]);
   const terms = loaded && loaded.key === review ? loaded.terms : null;
   const needsCard = terms?.ok === true && terms.cardNeeded && !terms.cardOnFile;
+  const visitPromo = promo && promo.key === review ? promo : null;
+  const applyCode = async (code: string | null) => {
+    if (identity.phase !== "done" || !slot || !review) return null;
+    const result = await reviewPromotion(site.business.slug, identity.session, serviceIds, staffId ?? null, slot.date, slot.minute, code);
+    // A code that can't be used leaves what was there.
+    if (result.ok) setPromo({ key: review, code, result });
+    return result.ok ? null : result.message;
+  };
 
   const toggleService = (id: string) => {
     setBlockedServices([]);
@@ -159,6 +171,7 @@ export function BookingFlow({
         remember: !signedIn && remember,
         appointmentTexts,
         offers,
+        promoCode: visitPromo?.code ?? undefined,
       });
       if (result.ok) {
         router.push(result.manageUrl);
@@ -298,6 +311,8 @@ export function BookingFlow({
             offers={offers}
             setOffers={setOffers}
             setAgreed={setAgreed}
+            promo={visitPromo}
+            onCode={applyCode}
           />
         )}
         {step === "confirm" && slot && !signedIn && (
@@ -535,6 +550,11 @@ function TimeStep({
         onMore={nextFrom && lastDay && nextFrom < lastDay ? () => load(nextDay(nextFrom)) : null}
         loading={loading}
       />
+      {days.some((d) => d.times.some((t) => t.special)) && (
+        <p className="rounded-xl bg-(--accent-soft) px-4 py-3 text-sm text-ink" data-testid="specials-note">
+          Last-minute specials: times marked with a discount have it taken off when you pay.
+        </p>
+      )}
       {day && (
         <div>
           <h2 className="mb-3 font-semibold text-ink">{longDate(day.date)}</h2>
@@ -544,6 +564,7 @@ function TimeStep({
               selected={slot && slot.date === day.date ? slot.minute : null}
               onPick={(t) => onPick({ date: day.date, minute: t.minute, staffIds: t.staffIds })}
               label={staffId === null ? (t) => t.staffIds.map(name).join(" & ") : undefined}
+              badge={(t) => t.special}
             />
           ) : (
             <p className="rounded-xl bg-sunken px-4 py-6 text-center text-ink-muted">No times this day. Try another date.</p>
@@ -760,6 +781,8 @@ function ConfirmStep({
   setAppointmentTexts,
   offers,
   setOffers,
+  promo,
+  onCode,
 }: {
   site: BookingSite;
   selected: SiteService[];
@@ -776,6 +799,8 @@ function ConfirmStep({
   offers: boolean;
   setOffers: (on: boolean) => void;
   setAgreed: (v: boolean) => void;
+  promo: { code: string | null; result: PromotionResult } | null;
+  onCode: (code: string | null) => Promise<string | null>;
 }) {
   const single = stylists.length === 1 ? stylists[0] : null;
   const card = terms?.ok && terms.cardNeeded;
@@ -815,6 +840,8 @@ function ConfirmStep({
           </p>
         )}
       </div>
+
+      <PromoCode promo={promo} onCode={onCode} />
 
       {terms === null ? (
         <p className="text-sm text-ink-muted" aria-busy="true">
@@ -891,6 +918,70 @@ function ConfirmStep({
           </label>
         </fieldset>
       )}
+    </div>
+  );
+}
+
+// The promotion on the visit (a special for the time, or their code), and
+// a place to enter a promo code. It comes off when they pay.
+function PromoCode({ promo, onCode }: { promo: { code: string | null; result: PromotionResult } | null; onCode: (code: string | null) => Promise<string | null> }) {
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const applied = promo?.result.ok ? promo.result.promo : null;
+  return (
+    <div className="flex flex-col gap-2">
+      {applied && (
+        <div className="rounded-xl border border-(--accent-line) bg-(--accent-soft) px-4 py-3" data-testid="online-promotion">
+          <p className="flex justify-between gap-3 font-semibold text-ink">
+            <span>
+              {applied.name}: {applied.text}
+            </span>
+            <span className="tabular-nums">about −{formatPrice(applied.discountCents)}</span>
+          </p>
+          <p className="mt-0.5 text-sm text-ink-muted">Taken off when you pay at your visit.</p>
+          {promo?.code && (
+            <button type="button" className="mt-1 text-sm font-medium text-ink underline" onClick={() => start(async () => void (await onCode(null)))}>
+              Remove code
+            </button>
+          )}
+        </div>
+      )}
+      {!promo?.code &&
+        (open ? (
+          <form
+            className="flex flex-col gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setError(null);
+              start(async () => {
+                const problem = await onCode(code);
+                if (problem) setError(problem);
+                else setOpen(false);
+              });
+            }}
+          >
+            <label className="flex flex-col gap-1 text-sm font-medium text-ink">
+              Promo code
+              <span className="flex gap-2">
+                <input value={code} onChange={(e) => setCode(e.target.value)} className={`${inputClass} uppercase`} autoCapitalize="characters" autoComplete="off" maxLength={24} />
+                <button type="submit" disabled={pending || !code.trim()} className="min-h-11 shrink-0 rounded-xl border border-line-strong px-4 font-semibold text-ink disabled:opacity-60">
+                  Apply
+                </button>
+              </span>
+            </label>
+            {error && (
+              <p role="alert" className="text-sm font-medium text-danger">
+                {error}
+              </p>
+            )}
+          </form>
+        ) : (
+          <button type="button" className="self-start text-sm font-medium text-ink underline" onClick={() => setOpen(true)}>
+            Have a promo code?
+          </button>
+        ))}
     </div>
   );
 }

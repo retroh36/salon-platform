@@ -18,7 +18,8 @@ import { loadBookingContext, loadOffers, startOfLocalDay } from "@/lib/schedulin
 import { addDays, formatMinute, todayIn, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { levelPricesFrom, stylistPrice } from "@/lib/services";
 import { fullName, sortStaff, type StaffRole } from "@/lib/staff";
-import { EMPTY_TICKET, parseTicket, type ServiceLine, type Ticket } from "@/lib/ticket";
+import { promoRatesFor } from "@/lib/promotions-load";
+import { EMPTY_TICKET, parseTicket, promotionProblems, type PromoRates, type ServiceLine, type Ticket } from "@/lib/ticket";
 
 type Supabase = SupabaseClient<Database>;
 type Me = { id: string; business_id: string; role: StaffRole; permissions: readonly string[]; location: { id: string; timezone: string } };
@@ -41,7 +42,7 @@ export async function startCheckout(supabase: Supabase, me: Me, options: { appoi
     if (open) return open.id;
     const { data: a } = await supabase
       .from("appointments")
-      .select("id, status, client_id, location_id, deposit_paid_cents, deposit_outcome, appointment_items(id, starts_at, service_id, staff_id, price_cents, service:services(name), staff:staff(level))")
+      .select("id, status, client_id, location_id, deposit_paid_cents, deposit_outcome, promotion_id, appointment_items(id, starts_at, service_id, staff_id, price_cents, service:services(name), staff:staff(level))")
       .eq("id", options.appointmentId)
       .maybeSingle();
     if (!a || a.location_id !== me.location.id || !["booked", "confirmed", "checked_in"].includes(a.status)) return null;
@@ -78,9 +79,10 @@ export async function startCheckout(supabase: Supabase, me: Me, options: { appoi
           membershipCreditId: included?.credit.id ?? null,
         };
       });
+    const promotions = await startingPromotions(supabase, me, { ...EMPTY_TICKET, lines }, a);
     const { data, error } = await supabase
       .from("sale_drafts")
-      .insert({ business_id: me.business_id, location_id: me.location.id, appointment_id: a.id, client_id: a.client_id, ticket: { ...EMPTY_TICKET, lines, payments: depositPayment(a) } as never, return_to: returnTo, created_by: me.id })
+      .insert({ business_id: me.business_id, location_id: me.location.id, appointment_id: a.id, client_id: a.client_id, ticket: { ...EMPTY_TICKET, lines, payments: depositPayment(a), promotions } as never, return_to: returnTo, created_by: me.id })
       .select("id")
       .single();
     // Someone else just opened it: use theirs.
@@ -103,6 +105,22 @@ export async function startCheckout(supabase: Supabase, me: Me, options: { appoi
   return data.id;
 }
 
+// Promotions a visit starts with: the code or special the client booked
+// with online, then any automatic offer that applies (each only if the
+// rules allow it with the ones before).
+async function startingPromotions(supabase: Supabase, me: Me, ticket: Ticket, a: { id: string; client_id: string | null; promotion_id: string | null }): Promise<string[]> {
+  const today = todayIn(me.location.timezone);
+  const promo = await promoRatesFor(supabase, { businessId: me.business_id, timezone: me.location.timezone, today, clientId: a.client_id, appointmentId: a.id });
+  const rates = { taxServicesBp: 0, taxRetailBp: 0, promo };
+  const chosen: string[] = [];
+  const candidates = [...(a.promotion_id ? [a.promotion_id] : []), ...promo.rules.filter((r) => r.kind === "automatic").map((r) => r.id)];
+  for (const id of candidates) {
+    if (!promo.rules.some((r) => r.id === id) || chosen.includes(id)) continue;
+    if (!promotionProblems({ ...ticket, promotions: [...chosen, id] }, rates).length) chosen.push(id);
+  }
+  return chosen;
+}
+
 // A deposit the client paid ahead, taken off the bill.
 function depositPayment(a: { deposit_paid_cents: number; deposit_outcome: string | null }): Ticket["payments"] {
   return a.deposit_paid_cents > 0 && a.deposit_outcome === null ? [{ key: "deposit", method: "card", amountCents: a.deposit_paid_cents, reference: DEPOSIT_REFERENCE }] : [];
@@ -122,6 +140,8 @@ export type CheckoutScreenData = {
   // Live memberships: what they include this period, and member prices.
   memberships: ClientMembership[];
   member: MemberPrices | null;
+  // Live promotions, and what their rules need for this client and visit.
+  promo: PromoRates;
   // Memberships for sale, and the provider renewals are charged through.
   plans: MembershipPlan[];
   provider: { id: string; label: string; testMode: boolean; testCards: { ref: string; label: string; outcome: string }[] };
@@ -150,7 +170,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
   const tz = me.location.timezone;
   const today = todayIn(tz, now);
 
-  const [staffRows, settings, products, templates, servicesRows, clientRow, overrides, plans] = await Promise.all([
+  const [staffRows, settings, products, templates, servicesRows, clientRow, overrides, plans, promo] = await Promise.all([
     supabase.from("staff").select("id, first_name, last_name, role, level, color, is_active, location_id").eq("location_id", me.location.id).eq("is_active", true),
     loadCheckoutSettings(supabase, me.business_id),
     loadRetailProducts(supabase, me.business_id, me.location.id),
@@ -159,6 +179,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     draft.client_id ? supabase.from("clients").select("id, first_name, last_name, email, phone").eq("id", draft.client_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("stock_overrides").select("product_id").eq("draft_id", draft.id),
     loadPlans(supabase, me.business_id),
+    promoRatesFor(supabase, { businessId: me.business_id, timezone: tz, today, clientId: draft.client_id, appointmentId: draft.appointment_id }),
   ]);
   if (staffRows.error) throw staffRows.error;
   if (servicesRows.error) throw servicesRows.error;
@@ -278,6 +299,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     packages,
     memberships,
     member: memberPrices(memberships),
+    promo,
     plans,
     provider: (({ id, label, testMode, testCards }) => ({ id, label, testMode, testCards: testCards.map((c) => ({ ...c })) }))(currentProvider()),
     giftCards,
