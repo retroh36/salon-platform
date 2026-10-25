@@ -246,6 +246,41 @@ test("two people can't book the same time: the second is told and picks again", 
   await Promise.all([first.context().close(), second.context().close()]);
 });
 
+test("the connection drops as they book: it says so, and tapping Book again shows the booking, made once", async ({ page, pageErrors }) => {
+  await open(page);
+  await chooseServices(page, ["Blowout"]);
+  await chooseStylist(page, /Shae M\./);
+  await chooseFirstTime(page, 2);
+  await verify(page, newPhone());
+  await flow(page).getByLabel("First name").fill(`Ob${RUN}Retry`);
+  await flow(page).getByLabel("Last name").fill("Client");
+  await flow(page).getByLabel("Email").fill(`ob-retry-${RUN}@example.com`);
+  await cont(page).click();
+
+  // The salon books it, but the answer never gets back.
+  let dropped = false;
+  await page.route(`**/book/${SLUG}**`, async (route) => {
+    if (route.request().method() !== "POST" || dropped || !(route.request().postData() ?? "").includes('"attempt"')) return route.continue();
+    dropped = true;
+    await route.fetch();
+    await route.abort("internetdisconnected");
+  });
+  await bookIt(page);
+  await expect(flow(page).getByRole("alert")).toContainText("We couldn't reach the salon. Check your connection and tap Book again: you won't be booked twice.");
+  await flow(page).getByRole("button", { name: /^Book appointment$|deposit and book$/ }).click();
+  await expect(page).toHaveURL(/\/book\/maple-and-ash\/manage\/[A-Za-z0-9_-]{43}\?booked=1$/);
+  await expect(page.getByRole("heading", { name: `You’re booked, Ob${RUN}Retry` })).toBeVisible();
+
+  const { data: client } = await admin.from("clients").select("id").eq("business_id", B).eq("first_name", `Ob${RUN}Retry`).single();
+  created.push(client!.id);
+  const { data: visits } = await admin.from("appointments").select("id").eq("client_id", client!.id);
+  expect(visits).toHaveLength(1);
+  const { data: log } = await admin.from("online_booking_log").select("action").eq("client_id", client!.id);
+  expect(log).toEqual([{ action: "booked" }]);
+  // The dropped request is the browser's one complaint.
+  pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !/ERR_INTERNET_DISCONNECTED|Failed to fetch|Failed to load resource/.test(e)));
+});
+
 test("a client reschedules, then cancels, with their private link", async ({ page }) => {
   await open(page);
   await chooseServices(page, ["Kids' Cut (12 & under)"]);

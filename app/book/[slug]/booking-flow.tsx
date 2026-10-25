@@ -13,6 +13,12 @@ import { formatMinutes, formatPrice, formatPriceRange } from "@/lib/services";
 import { book, confirmCode, findTimes, requestCode, reviewPromotion, reviewTerms, type DayTimes, type PromotionResult, type TermsResult } from "./actions";
 import { DateStrip, TimeGrid, longDate } from "./times";
 
+// A booking attempt's key (isAttemptKey on the server).
+function newAttemptKey(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
 type Step = "services" | "stylist" | "time" | "details" | "confirm";
 const STEPS: Step[] = ["services", "stylist", "time", "details", "confirm"];
 const STEP_TITLES: Record<Step, string> = {
@@ -80,6 +86,9 @@ export function BookingFlow({
   const [blockedServices, setBlockedServices] = useState<string[]>([]);
   const [pending, startTransition] = useTransition();
   const honeypot = useRef<HTMLInputElement>(null);
+  // This booking attempt's key: new each time they reach review, the same
+  // while they tap Book again, so a dropped connection never books twice.
+  const attempt = useRef("");
   const heading = useRef<HTMLHeadingElement>(null);
 
   const services = useMemo(() => new Map(site.services.map((s) => [s.id, s])), [site.services]);
@@ -102,7 +111,10 @@ export function BookingFlow({
     setDirection(STEPS.indexOf(next) > STEPS.indexOf(step) ? 1 : -1);
     setNotice(null);
     // Agreeing is for the policy as shown for this exact visit.
-    if (next === "confirm") setAgreed(false);
+    if (next === "confirm") {
+      setAgreed(false);
+      attempt.current = newAttemptKey();
+    }
     setStep(next);
   };
 
@@ -156,7 +168,7 @@ export function BookingFlow({
   const submit = () => {
     if (identity.phase !== "done" || !slot) return;
     startTransition(async () => {
-      const result = await book(site.business.slug, {
+      const sent = await book(site.business.slug, {
         session: identity.session,
         serviceIds,
         staffId: staffId ?? null,
@@ -172,7 +184,14 @@ export function BookingFlow({
         appointmentTexts,
         offers,
         promoCode: visitPromo?.code ?? undefined,
-      });
+        attempt: attempt.current,
+      }).catch(() => null);
+      // No answer: it may or may not have booked, and tapping Book again
+      // with the same attempt finds out without booking twice.
+      if (!sent) return setNotice("We couldn't reach the salon. Check your connection and tap Book again: you won't be booked twice.");
+      const result = sent;
+      // Any other answer (but "still booking it") ends the attempt.
+      if (!result.ok && result.reason !== "pending") attempt.current = newAttemptKey();
       if (result.ok) {
         router.push(result.manageUrl);
         return;

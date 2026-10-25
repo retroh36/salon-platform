@@ -21,5 +21,6 @@ What a client sees on your booking site, so you can walk them through it on the 
 - On **Review and book**, texts about their appointments are ticked (they can untick it), and offers and news are unticked unless they choose them.
 - On **Review and book**, they can tap **Have a promo code?** to add a code. A code or special shows with about what it takes off; it comes off when they pay at the visit.
 - New clients can book only if the salon allows it; otherwise they're asked to call.
+- If their connection drops as they book, they're told to tap **Book** again: they're never booked (or charged) twice.
 - Deposits are paid online when they book, with test cards for now (no real money moves yet).
 - To change or cancel, see Help a client change or cancel an online booking.

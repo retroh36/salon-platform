@@ -36,6 +36,18 @@ export function hashKey(value: string): string {
   return keyedHash(value);
 }
 
+// A booking attempt's key, made by the booking page (newSecret's shape).
+export function isAttemptKey(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{32,64}$/.test(value);
+}
+
+// The manage link's secret for a booking attempt, worked out from its key
+// with the server's secret: a retry of the same attempt gets the same link
+// back, and the link itself is never stored.
+export function manageSecretFor(attemptKey: string): string {
+  return createHmac("sha256", process.env.SUPABASE_SECRET_KEY ?? "maestra").update(`manage:${attemptKey}`).digest("base64url");
+}
+
 // Counts a request against each limit; false if any is used up.
 export async function withinLimits(
   admin: SupabaseClient<Database>,

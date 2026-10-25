@@ -14,7 +14,7 @@ import { siteUrl } from "@/lib/branding";
 import { isBookingSource } from "@/lib/online-booking/sources";
 import { normalEmail, phoneDigits, formatPhone } from "@/lib/online-booking/contact";
 import { sendCode, sessionContact, verifyCode, type Channel } from "@/lib/online-booking/codes";
-import { hashKey, newSecret, requestInfo, sha256, withinLimits } from "@/lib/online-booking/security";
+import { hashKey, isAttemptKey, manageSecretFor, newSecret, requestInfo, sha256, withinLimits } from "@/lib/online-booking/security";
 import { loadSite, stylistsFor, type BookingSite } from "@/lib/online-booking/site";
 import { bookOnline, cancelOnline } from "@/lib/scheduling/online-book";
 import { loadBookingContext } from "@/lib/scheduling/load";
@@ -274,11 +274,14 @@ export type BookInput = {
   // what they said before).
   appointmentTexts?: boolean;
   offers?: boolean;
+  // This attempt's key (the page makes one per attempt): a retry with the
+  // same key never books twice, and gets the same booking back.
+  attempt?: string;
 };
 
 export type BookResult =
   | { ok: true; manageUrl: string }
-  | { ok: false; message: string; reason?: "taken" | "patch_test" | "session" | "details" | "new_clients" | "card" | "promotion"; serviceIds?: string[] };
+  | { ok: false; message: string; reason?: "taken" | "patch_test" | "session" | "details" | "new_clients" | "card" | "promotion" | "pending"; serviceIds?: string[] };
 
 export async function book(slug: string, input: BookInput): Promise<BookResult> {
   const site = await openSite(slug);
@@ -291,6 +294,37 @@ export async function book(slug: string, input: BookInput): Promise<BookResult> 
   if (input.honeypot) return { ok: false, message: "Something went wrong. Please call the salon." };
   if (!input.agreed) return { ok: false, message: "Please read and agree to the cancellation policy." };
 
+  // One attempt, one booking (online_booking_attempts).
+  const attempt = isAttemptKey(input.attempt) ? input.attempt : null;
+  const token = attempt ? manageSecretFor(attempt) : newSecret();
+  if (attempt) {
+    const { data: claim, error } = await admin.rpc("claim_online_booking_attempt", { p_business_id: site.business.id, p_key_hash: sha256(attempt) });
+    if (error) throw error;
+    if (claim === "booked") return { ok: true, manageUrl: `/book/${site.business.slug}/manage/${token}?booked=1` };
+    if (claim === "pending") return { ok: false, reason: "pending", message: "We're still booking your visit. Wait a moment, then tap Book again." };
+  }
+  let booked: string | null = null;
+  try {
+    const { appointmentId, ...result } = await bookAttempt(site, admin, input, token, ipHash, userAgent);
+    booked = appointmentId ?? null;
+    return result as BookResult;
+  } finally {
+    // Booked, or let go so trying again works (also if it failed).
+    if (attempt) await admin.rpc("finish_online_booking_attempt", { p_business_id: site.business.id, p_key_hash: sha256(attempt), p_appointment_id: booked as never });
+  }
+}
+
+// A booking's result, with the visit it booked (kept on the server).
+type Attempted = BookResult & { appointmentId?: string };
+
+async function bookAttempt(
+  site: BookingSite,
+  admin: ReturnType<typeof createAdminClient>,
+  input: BookInput,
+  token: string,
+  ipHash: string,
+  userAgent: string | null,
+): Promise<Attempted> {
   const request = visitRequest(site, input.serviceIds, input.staffId);
   if (!request) return { ok: false, message: "Those services can't be booked together online." };
   const window = bookingWindow(site);
@@ -324,12 +358,13 @@ export async function book(slug: string, input: BookInput): Promise<BookResult> 
   const items = await plannedItems(admin, site, request, start);
   const promotion = items ? await onlinePromotion(admin, site, clientId!, items, start, input.promoCode ?? null) : null;
   if (promotion && !promotion.ok) return { ok: false, reason: "promotion", message: promotion.message };
-  const token = newSecret();
   const card = await cardFor(terms, input.cardRef);
   if (!card.ok) return { ok: false, reason: "card", message: card.message };
   let deposit: { amount_cents: number; provider: string; reference: string } | null = null;
   if (terms.depositCents > 0 && card.charge) {
-    const charged = await providerFor(card.charge.provider).charge({ amountCents: terms.depositCents, paymentMethodRef: card.charge.ref, description: "Deposit", idempotencyKey: `deposit:${sha256(token)}` });
+    // Its own key each time: a retry of the attempt after a refunded
+    // failure charges again (the attempt's claim stops two at once).
+    const charged = await providerFor(card.charge.provider).charge({ amountCents: terms.depositCents, paymentMethodRef: card.charge.ref, description: "Deposit", idempotencyKey: `deposit:${sha256(token)}:${newSecret()}` });
     if (!charged.ok) return { ok: false, reason: "card", message: `${charged.reason}. You haven't been charged; try another card.` };
     deposit = { amount_cents: terms.depositCents, provider: card.charge.provider, reference: charged.reference };
   }
@@ -376,7 +411,7 @@ async function bookCharged(
     userAgent: string | null;
     signedIn: boolean;
   },
-): Promise<BookResult> {
+): Promise<Attempted> {
   const note = input.note?.trim().slice(0, 500);
   const result = await bookOnline(admin, { id: site.location.id, timezone: site.location.timezone }, {
     clientId: clientId!,
@@ -428,7 +463,7 @@ async function bookCharged(
   await confirmationMessage(admin, site, clientId!, contact, start, manageUrl, terms);
   // "Keep me signed in": their account, made from the code they confirmed.
   if (input.remember && !signedIn) await startAccountSession(admin, site.business.id, clientId!, contact.channel, site.business.slug, ipHash);
-  return { ok: true, manageUrl: `${manageUrl}?booked=1` };
+  return { ok: true, manageUrl: `${manageUrl}?booked=1`, appointmentId: result.appointmentId };
 }
 
 // What the client ticked at review, logged as from online booking with

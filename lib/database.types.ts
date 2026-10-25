@@ -1915,6 +1915,32 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"online_booking_attempts": {
+                  Row: {
+                    "appointment_id": string | null,"booked_at": string | null,"business_id": string,"claimed_at": string,"key_hash": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "appointment_id"?: string | null,"booked_at"?: string | null,"business_id": string,"claimed_at"?: string,"key_hash": string
+                  }
+                  Update: {
+                    "appointment_id"?: string | null,"booked_at"?: string | null,"business_id"?: string,"claimed_at"?: string,"key_hash"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "online_booking_attempts_appointment_id_fkey"
+      columns: ["appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "online_booking_attempts_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"online_booking_log": {
                   Row: {
                     "action": string,"appointment_id": string | null,"business_id": string,"client_id": string | null,"created_at": string,"id": string,"ip_hash": string | null,"source": string | null,"user_agent": string | null
@@ -3797,6 +3823,9 @@ isOneToOne: false
               "amount_cents": number,"attempt": number,"business_id": string,"card_label": string,"event_id": string,"kind": string,"payment_id": string,"payment_method_ref": string,"provider": string
             }[]
                            },
+"claim_online_booking_attempt":
+{ Args: { "p_business_id": string,"p_key_hash": string }; Returns: string
+                           },
 "claim_policy_fees":
 { Args: { "p_business_id": string,"p_fee_id": string,"p_limit": number }; Returns: {
               "amount_cents": number,"appointment_id": string,"attempt": number,"business_id": string,"card_label": string,"client_id": string,"fee_id": string,"kind": string,"payment_method_ref": string,"provider": string
@@ -3862,6 +3891,9 @@ isOneToOne: false
                            },
 "find_online_client":
 { Args: { "p_business_id": string,"p_email": string,"p_first_name": string,"p_last_name": string,"p_phone": string,"p_phone_digits": string }; Returns: string
+                           },
+"finish_online_booking_attempt":
+{ Args: { "p_appointment_id": string,"p_business_id": string,"p_key_hash": string }; Returns: undefined
                            },
 "finish_stocktake":
 { Args: { "p_stocktake_id": string }; Returns: number

@@ -76,6 +76,47 @@ describe("server-only functions", () => {
   });
 });
 
+describe("booking attempts", () => {
+  it("claim each attempt once: the first books, a repeat waits, then gets the booking; a failed one can be tried again", async () => {
+    const key = hash(`attempt-${RUN}`);
+    const claim = async () => (await admin.rpc("claim_online_booking_attempt", { p_business_id: B, p_key_hash: key })).data;
+    expect(await claim()).toBe("new");
+    expect(await claim()).toBe("pending");
+    // It didn't book: let go, so trying again starts over.
+    await admin.rpc("finish_online_booking_attempt", { p_business_id: B, p_key_hash: key, p_appointment_id: null! });
+    expect(await claim()).toBe("new");
+    const { data: visit } = await admin.from("appointments").select("id").eq("business_id", B).limit(1).single();
+    await admin.rpc("finish_online_booking_attempt", { p_business_id: B, p_key_hash: key, p_appointment_id: visit!.id });
+    expect(await claim()).toBe("booked");
+    // A failure reported late never lets go of a booked one.
+    await admin.rpc("finish_online_booking_attempt", { p_business_id: B, p_key_hash: key, p_appointment_id: null! });
+    expect(await claim()).toBe("booked");
+    // Another salon's attempt with the same key is its own.
+    const other = await createOtherSalon();
+    try {
+      expect((await admin.rpc("claim_online_booking_attempt", { p_business_id: other.businessId, p_key_hash: key })).data).toBe("new");
+    } finally {
+      await other.cleanup();
+    }
+    await admin.from("online_booking_attempts").delete().eq("key_hash", key);
+  });
+
+  it("are taken over after two minutes when the server stopped mid-way", async () => {
+    const key = hash(`stalled-${RUN}`);
+    await admin.from("online_booking_attempts").insert({ business_id: B, key_hash: key, claimed_at: new Date(Date.now() - 3 * 60_000).toISOString() });
+    expect((await admin.rpc("claim_online_booking_attempt", { p_business_id: B, p_key_hash: key })).data).toBe("new");
+    await admin.from("online_booking_attempts").delete().eq("key_hash", key);
+  });
+
+  it("are the server's alone", async () => {
+    for (const client of [anon, frontDesk, owner]) {
+      expect((await client.rpc("claim_online_booking_attempt", { p_business_id: B, p_key_hash: hash("x") })).error?.code).toBe("42501");
+      expect((await client.rpc("finish_online_booking_attempt", { p_business_id: B, p_key_hash: hash("x"), p_appointment_id: null! })).error?.code).toBe("42501");
+      expect((await client.from("online_booking_attempts").select("key_hash")).error?.code).toBe("42501");
+    }
+  });
+});
+
 describe("rate limits", () => {
   it("allow so many hits per window, then refuse", async () => {
     const key = `${RUN}-limit`;
