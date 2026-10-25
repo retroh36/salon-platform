@@ -189,6 +189,63 @@ describe("while she works", () => {
     vi.doUnmock("@/lib/denise/session");
   });
 
+  // The browser closed the page or moved on mid-reply: she stops at her next
+  // step, writes nothing more and logs nothing (it used to log "Invalid
+  // state: Controller is already closed" as a bug).
+  const APPOINTMENT = "a0000000-0000-4000-8000-000000000001";
+  const canceled = (signal?: AbortSignal) =>
+    new Request("http://x/api/denise", { method: "POST", signal, body: JSON.stringify({ action: "canceled", date: "2026-10-27", appointmentId: APPOINTMENT }) });
+
+  it("stops when the request is aborted, without writing or logging", async () => {
+    const browser = new AbortController();
+    const deniseDay = vi.fn();
+    vi.doMock("@/lib/denise/session", () => ({
+      deniseSession: async () => {
+        browser.abort();
+        return { me: { business_id: "biz" }, viewer: { location: {}, salon: {} }, today: "2026-10-27" };
+      },
+      askerOf: () => null,
+    }));
+    vi.doMock("@/lib/denise/day-state", () => ({ claudeFor: () => null, deniseDay }));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { POST } = await import("@/app/api/denise/route");
+    const response = await POST(canceled(browser.signal));
+    const reader = response.body!.getReader();
+    const read = reader.read();
+    await vi.waitFor(() => expect(browser.signal.aborted).toBe(true));
+    await new Promise((done) => setTimeout(done, 10));
+    expect(deniseDay).not.toHaveBeenCalled();
+    expect(logged).not.toHaveBeenCalled();
+    await reader.cancel();
+    expect((await read).done).toBe(true);
+    vi.doUnmock("@/lib/denise/session");
+    vi.doUnmock("@/lib/denise/day-state");
+  });
+
+  it("stops when the browser cancels the stream, without writing or logging", async () => {
+    let signIn!: () => void;
+    const signedIn = new Promise<void>((done) => (signIn = done));
+    const deniseDay = vi.fn();
+    vi.doMock("@/lib/denise/session", () => ({
+      deniseSession: async () => {
+        await signedIn;
+        return { me: { business_id: "biz" }, viewer: { location: {}, salon: {} }, today: "2026-10-27" };
+      },
+      askerOf: () => null,
+    }));
+    vi.doMock("@/lib/denise/day-state", () => ({ claudeFor: () => null, deniseDay }));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { POST } = await import("@/app/api/denise/route");
+    const response = await POST(canceled());
+    await response.body!.cancel();
+    signIn();
+    await new Promise((done) => setTimeout(done, 10));
+    expect(deniseDay).not.toHaveBeenCalled();
+    expect(logged).not.toHaveBeenCalled();
+    vi.doUnmock("@/lib/denise/session");
+    vi.doUnmock("@/lib/denise/day-state");
+  });
+
   it("when the API is busy, says to try again in a minute", async () => {
     const Anthropic = (await import("@anthropic-ai/sdk")).default;
     vi.doMock("@/lib/denise/session", () => ({

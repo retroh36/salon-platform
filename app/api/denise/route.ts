@@ -6,6 +6,8 @@
 // (./lib/denise/errors.ts) and she says what staff can do: wait for
 // tomorrow at the daily limit, try again in a minute when the API is busy,
 // or that it's been logged, with a reference that matches the log line.
+// If the browser goes (the page closed or moved on), she stops at her next
+// step: nothing is written after that, and it isn't logged as an error.
 
 import { revalidatePath } from "next/cache";
 import { answer, toolStatus } from "@/lib/denise/assistant";
@@ -30,14 +32,26 @@ const REPORT_ERRORS = {
 };
 
 type Send = (event: DeniseEvent) => void;
+
+// Thrown by send once the browser has gone, to stop her work.
+class Gone extends Error {}
+
 const reply = (text: string, kind: "fixes" | "nothing" | "stuck" | "error"): DeniseEvent => ({ t: "done", reply: { text, kind } });
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as DeniseRequest | null;
   const encoder = new TextEncoder();
+  let gone = request.signal.aborted;
+  const leave = () => {
+    gone = true;
+  };
+  request.signal.addEventListener("abort", leave, { once: true });
   const stream = new ReadableStream({
     async start(controller) {
-      const send: Send = (event) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      const send: Send = (event) => {
+        if (gone) throw new Gone();
+        controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      };
       let businessId: string | undefined;
       try {
         const s = await deniseSession();
@@ -46,16 +60,23 @@ export async function POST(request: Request) {
         else if (!body || !isLocalDate(body.date)) send(reply("I didn't catch that. Try again.", "error"));
         else await run(s, body, send);
       } catch (error) {
-        // Logged with the error's details and what she was doing, never the
-        // question or client data.
-        const ref = failureRef();
-        const kind = logDeniseError(error, { where: typeof body?.action === "string" ? body.action : "unknown", businessId, ref });
-        if (kind === "limit") send(reply(FAILURE_TEXT.limit, "nothing"));
-        else if (kind === "busy") send(reply(FAILURE_TEXT.busy, "error"));
-        else send(reply(`${FAILURE_TEXT[kind]} (Ref ${ref})`, "error"));
+        if (!(error instanceof Gone)) {
+          // Logged with the error's details and what she was doing, never the
+          // question or client data.
+          const ref = failureRef();
+          const kind = logDeniseError(error, { where: typeof body?.action === "string" ? body.action : "unknown", businessId, ref });
+          if (!gone) {
+            if (kind === "limit") send(reply(FAILURE_TEXT.limit, "nothing"));
+            else if (kind === "busy") send(reply(FAILURE_TEXT.busy, "error"));
+            else send(reply(`${FAILURE_TEXT[kind]} (Ref ${ref})`, "error"));
+          }
+        }
+      } finally {
+        request.signal.removeEventListener("abort", leave);
       }
-      controller.close();
+      if (!gone) controller.close();
     },
+    cancel: leave,
   });
   return new Response(stream, { headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" } });
 }
