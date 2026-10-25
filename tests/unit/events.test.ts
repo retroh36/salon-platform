@@ -175,6 +175,20 @@ describe("pricing", () => {
     expect(priceEvent({ members: split, billing: "main", onLocation: false, travelMiles: 0, earlyLanes: 0 }, S, 0).ownCents).toBe(0);
   });
 
+  it("splits to the cent: members pay no more than their exact share, and the main client takes the leftover cent", () => {
+    const S18 = { ...S, serviceChargePct: 18 };
+    // $33.33 at 18% and 10.25% tax is $42.7457: rounding each part up made it $42.75.
+    expect(memberShare(3333, S18, 1025)).toBe(4274);
+    for (const price of [3333, 9999, 12345, 22000, 1]) {
+      const members = [0, 1, 2, 3].map((i) => ({ priceCents: price + i, paysOwn: i > 0 }));
+      const p = priceEvent({ members, billing: "split", onLocation: false, travelMiles: 0, earlyLanes: 0 }, S18, 1025);
+      const exact = (cents: number) => cents * (1 + 0.18 + 0.1025);
+      for (const m of members.slice(1)) expect(memberShare(m.priceCents, S18, 1025)).toBeLessThanOrEqual(exact(m.priceCents));
+      expect(p.mainCents).toBeGreaterThanOrEqual(Math.floor(exact(members[0].priceCents)));
+      expect(p.ownCents + p.mainCents).toBe(p.totalCents);
+    }
+  });
+
   it("charges no travel for free miles", () => {
     expect(travelFee(8, S)).toBe(7500);
     expect(travelFee(10.1, S)).toBe(7650);

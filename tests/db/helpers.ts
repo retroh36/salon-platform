@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 
@@ -10,6 +11,12 @@ if (!url || !publishableKey || !secretKey) {
 }
 
 export type Client = SupabaseClient<Database>;
+
+// Runs SQL in the local database as its owner, for what the API can't
+// reach (functions in the private schema, the clock). One value per line.
+export function sql(text: string): string {
+  return execFileSync("docker", ["exec", "-i", "supabase_db_salon-platform", "psql", "-q", "-At", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres"], { input: text, encoding: "utf8" }).trim();
+}
 
 export const PASSWORD = "password123";
 

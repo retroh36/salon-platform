@@ -17,5 +17,5 @@ After booking, an event's payments are charged to the card on file as scheduled.
 
 - The client gets a reminder three days before each payment and a receipt after it. Messages wait in the outbox until texts and email are connected.
 - A payment that doesn't go through is flagged to the owners, managers and front desk, and shows at the top of **Events**.
-- To let party members pay their own, choose **Each pays their own** under **Party** in **Edit event**, tick **Pays their own by link** for each of them and add their phone or email. Their share is their package, its service charge and tax. The deposit and schedule are only for what the main client pays.
+- To let party members pay their own, choose **Each pays their own** under **Party** in **Edit event**, tick **Pays their own by link** for each of them and add their phone or email. Their share is their package, its service charge and tax, rounded down to the cent; the main client pays the rest, so any leftover cent is theirs and the payments always add up to the total. The deposit and schedule are only for what the main client pays.
 - If the party changes, the payments still to come change to match the new total. What's already paid stays paid.

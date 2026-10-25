@@ -34,9 +34,12 @@ export function travelFee(miles: number, s: Pick<EventSettings, "travelFeeCents"
   return s.travelFeeCents + s.travelPerMileCents * Math.max(0, Math.ceil(miles) - s.travelFreeMiles);
 }
 
-// A member paying their own: their package, its service charge and tax.
+// A member paying their own: their package with its service charge and
+// tax, rounded down to the cent, so a member never pays more than their
+// exact share and the leftover cent goes to the main client (whose part is
+// the total less what members pay, so the parts always add up).
 export function memberShare(priceCents: number, s: Pick<EventSettings, "serviceChargePct">, taxBp: number): number {
-  return priceCents + pct(priceCents, s.serviceChargePct) + bp(priceCents, taxBp);
+  return priceCents + Math.floor((priceCents * (s.serviceChargePct * 100 + taxBp)) / 10000);
 }
 
 export function priceEvent(input: PriceInput, s: EventSettings, taxBp: number): EventPrice {

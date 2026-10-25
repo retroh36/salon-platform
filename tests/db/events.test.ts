@@ -4,9 +4,9 @@
 // booked, the party changes inside the headcount cutoff only with an owner
 // or manager.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { priceEvent } from "@/lib/events/pricing";
+import { memberShare, priceEvent } from "@/lib/events/pricing";
 import { settingsFrom } from "@/lib/events/types";
-import { admin, createOtherSalon, SEED, signIn, type Client } from "./helpers";
+import { admin, createOtherSalon, SEED, signIn, sql, type Client } from "./helpers";
 
 const P = {
   bride: "ee000000-0000-4000-8000-000000000001",
@@ -131,6 +131,13 @@ describe("saving an event", () => {
     const [{ data: e }, { data: s }] = await Promise.all([admin.from("events").select("total_cents, deposit_cents").eq("id", id).single(), admin.from("event_settings").select("*").eq("business_id", SEED.business).single()]);
     const expected = priceEvent({ members: [{ priceCents: 45000, paysOwn: false }, { priceCents: 22000, paysOwn: true }], billing: "split", onLocation: false, travelMiles: 0, earlyLanes: 0 }, settingsFrom(s!), 0);
     expect(e).toEqual({ total_cents: expected.totalCents, deposit_cents: expected.depositCents });
+  });
+
+  it("works out a member's own share like the app, to the cent, never more than their exact share", async () => {
+    const prices = [1, 3333, 9999, 12345, 22000, 45001];
+    const rows = sql(prices.map((p) => `select private.event_member_share(${p}, 18, 1025);`).join("\n")).split("\n").map(Number);
+    expect(rows).toEqual(prices.map((p) => memberShare(p, { serviceChargePct: 18 }, 1025)));
+    expect(rows[1]).toBe(4274);
   });
 
   it("refuses a trial as a party package, a stylist without the event role, and anyone outside the front of house", async () => {
