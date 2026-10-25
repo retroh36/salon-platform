@@ -1,12 +1,13 @@
-// Booking and changing recurring appointments. Each visit goes through
-// ./book.ts like any other (so the booking rules apply to each one), and is
-// linked to its series. Changes to "this and following" or "all" visits
-// are made visit by visit; ones that don't fit are reported, not forced.
+// Booking and changing recurring appointments. Every visit is checked
+// against the booking rules through ./book.ts like any other, and a series
+// is saved as one change: booking it, or changing "this and following" or
+// "all" visits, saves every visit or none, reporting the ones that don't
+// fit.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { ACTION_STATUS, isEditable, type AppointmentAction, type AppointmentStatus } from "../appointments.ts";
-import { changeStatus, moveItem, saveBooking, type BookingItemInput, type SaveResult, type StatusResult } from "./book.ts";
+import { changeStatus, moveItem, saveBookings, type BookingInput, type BookingItemInput, type SaveResult, type StatusResult } from "./book.ts";
 import type { BookingProblem } from "./booking.ts";
 import { visitsInScope, type Scope, type SeriesEnd, type VisitLine } from "./series.ts";
 import { addDays, fromLocal, toLocal, type LocalDate } from "./time.ts";
@@ -20,58 +21,80 @@ export function itemsFor(lines: readonly VisitLine[], date: LocalDate, timeZone:
     const start = fromLocal(date, l.startMinute, timeZone);
     if (!start) return null;
     const resource = l.resource === "any" ? ({ kind: "any" } as const) : l.resource === "none" ? ({ kind: "none" } as const) : ({ kind: "exact", id: l.resource } as const);
-    items.push({ id: ids[n], serviceId: l.serviceId, staffId: l.staffId, start, resource });
+    items.push({ id: ids[n], serviceId: l.serviceId, staffId: l.staffId, start, resource, ...(l.minutes ? { minutes: l.minutes } : {}) });
   }
   return items;
 }
 
+// "held_back": it fit, but wasn't saved because another visit didn't.
 export type VisitResult = { date: LocalDate; ok: true; appointmentId: string } | { date: LocalDate; ok: false; error: string; problems?: BookingProblem[][] };
 
 function failure(date: LocalDate, result: Exclude<SaveResult, { ok: true }>): VisitResult {
   return result.error === "invalid" ? { date, ok: false, error: "invalid", problems: result.problems } : { date, ok: false, error: result.error };
 }
 
-// Books each visit of a new series (its own lines per date: staff may have
-// picked an alternative for some), linked to the series in order.
+// Saves the visits as one change, all or nothing, and says how each went.
+// A visit whose time doesn't exist that day (null) stops them all.
+export async function saveVisits(
+  supabase: Supabase,
+  location: Location,
+  visits: readonly { date: LocalDate; input: BookingInput | null }[],
+  create?: Parameters<typeof saveBookings>[3],
+): Promise<{ results: VisitResult[]; seriesId: string | null }> {
+  if (visits.some((v) => !v.input)) {
+    return { seriesId: null, results: visits.map((v) => (v.input ? { date: v.date, ok: false, error: "held_back" } : { date: v.date, ok: false, error: "invalid", problems: [[{ code: "invalid_start" }]] })) };
+  }
+  const saved = await saveBookings(supabase, location, visits.map((v) => v.input!), create);
+  if (saved.ok) return { seriesId: saved.seriesId, results: visits.map((v, n) => ({ date: v.date, ok: true, appointmentId: saved.appointmentIds[n] })) };
+  if (saved.error === "invalid") {
+    return {
+      seriesId: null,
+      results: visits.map((v, n) => (saved.problems[n].some((p) => p.length) ? { date: v.date, ok: false, error: "invalid", problems: saved.problems[n] } : { date: v.date, ok: false, error: "held_back" })),
+    };
+  }
+  return { seriesId: null, results: visits.map((v, n) => ({ date: v.date, ok: false, error: saved.visit === undefined || saved.visit === n ? saved.error : "held_back" })) };
+}
+
+// Which item on another visit a line of the edited one stands for: the one
+// with the same service (in start order, each used once), not the one in
+// the same position, so a reordered or added service never takes another
+// service's place (or its booked length).
+function matchItems(lines: readonly VisitLine[], edited: SeriesVisit, visit: SeriesVisit): (string | undefined)[] {
+  if (visit.appointmentId === edited.appointmentId) return lines.map((l) => l.itemId);
+  const used = new Set<string>();
+  return lines.map((l) => {
+    const service = l.itemId ? edited.items.find((i) => i.id === l.itemId)?.serviceId : undefined;
+    const match = service ? visit.items.find((i) => i.serviceId === service && !used.has(i.id)) : undefined;
+    if (match) used.add(match.id);
+    return match?.id;
+  });
+}
+
+// Books every visit of a new series (its own lines per date: staff may have
+// picked an alternative for some), linked to the series in order, or none.
 export async function bookSeries(
   supabase: Supabase,
   location: Location & { businessId: string },
   input: { clientId: string; notes: string | null; intervalWeeks: number; end: SeriesEnd; visits: { date: LocalDate; lines: VisitLine[] }[] },
 ): Promise<{ seriesId: string | null; results: VisitResult[] }> {
-  const { data: series, error } = await supabase
-    .from("appointment_series")
-    .insert({
-      business_id: location.businessId,
-      location_id: location.id,
-      client_id: input.clientId,
-      interval_weeks: input.intervalWeeks,
-      occurrences: input.end.kind === "count" ? input.end.count : null,
-      ends_on: input.end.kind === "until" ? input.end.until : null,
-    })
-    .select("id")
-    .single();
-  if (error?.code === "42501") return { seriesId: null, results: input.visits.map((v) => ({ date: v.date, ok: false, error: "forbidden" })) };
-  if (error) throw error;
-
-  const results: VisitResult[] = [];
-  let index = 0;
-  for (const visit of [...input.visits].sort((a, b) => a.date.localeCompare(b.date))) {
-    const items = itemsFor(visit.lines, visit.date, location.timezone);
-    if (!items) {
-      results.push({ date: visit.date, ok: false, error: "invalid", problems: visit.lines.map(() => [{ code: "invalid_start" }]) });
-      continue;
-    }
-    const saved = await saveBooking(supabase, location, { clientId: input.clientId, notes: input.notes, items });
-    if (!saved.ok) {
-      results.push(failure(visit.date, saved));
-      continue;
-    }
-    index++;
-    const { error: linkError } = await supabase.rpc("set_appointment_series", { p_appointment_id: saved.appointmentId, p_series_id: series.id, p_index: index });
-    if (linkError) throw linkError;
-    results.push({ date: visit.date, ok: true, appointmentId: saved.appointmentId });
-  }
-  return { seriesId: series.id, results };
+  const visits = [...input.visits].sort((a, b) => a.date.localeCompare(b.date));
+  const { seriesId, results } = await saveVisits(
+    supabase,
+    location,
+    visits.map((v) => {
+      const items = itemsFor(v.lines, v.date, location.timezone);
+      return { date: v.date, input: items && { clientId: input.clientId, notes: input.notes, items } };
+    }),
+    {
+      series: {
+        clientId: input.clientId,
+        intervalWeeks: input.intervalWeeks,
+        occurrences: input.end.kind === "count" ? input.end.count : null,
+        endsOn: input.end.kind === "until" ? input.end.until : null,
+      },
+    },
+  );
+  return { seriesId, results };
 }
 
 export type SeriesVisit = {
@@ -126,18 +149,17 @@ export async function changeSeries(
 ): Promise<VisitResult[]> {
   const series = await seriesOf(supabase, appointmentId);
   if (!series) return [{ date: "", ok: false, error: "not_found" }];
-  const visits = visitsInScope(await seriesVisits(supabase, series.seriesId, location.timezone), series.index, scope);
-  const results: VisitResult[] = [];
-  for (const v of visits) {
-    const date = addDays(v.date, days);
-    const items = itemsFor(input.lines, date, location.timezone, input.lines.map((_, n) => v.items[n]?.id));
-    if (!items) {
-      results.push({ date, ok: false, error: "invalid" });
-      continue;
-    }
-    const saved = await saveBooking(supabase, location, { appointmentId: v.appointmentId, clientId: input.clientId, notes: input.notes, items });
-    results.push(saved.ok ? { date, ok: true, appointmentId: v.appointmentId } : failure(date, saved));
-  }
+  const all = await seriesVisits(supabase, series.seriesId, location.timezone);
+  const edited = all.find((v) => v.appointmentId === appointmentId)!;
+  const { results } = await saveVisits(
+    supabase,
+    location,
+    visitsInScope(all, series.index, scope).map((v) => {
+      const date = addDays(v.date, days);
+      const items = itemsFor(input.lines, date, location.timezone, matchItems(input.lines, edited, v));
+      return { date, input: items && { appointmentId: v.appointmentId, clientId: input.clientId, notes: input.notes, items } };
+    }),
+  );
   return results;
 }
 
@@ -159,23 +181,33 @@ export async function moveSeriesItem(
   }
   const all = await seriesVisits(supabase, series.seriesId, location.timezone);
   const here = all.find((v) => v.appointmentId === item.appointment_id)!;
-  const position = here.items.findIndex((i) => i.id === move.itemId);
-  const shift = toLocal(move.start, location.timezone).minute - here.items[position].startMinute;
+  const moved = here.items.find((i) => i.id === move.itemId)!;
+  const shift = toLocal(move.start, location.timezone).minute - moved.startMinute;
   const staffChanged = move.staffId !== item.staff_id;
+  // The same service on each visit (the first of it, if there are two).
+  const nth = here.items.filter((i) => i.serviceId === moved.serviceId).indexOf(moved);
 
-  const results: VisitResult[] = [];
+  const visits: { date: LocalDate; input: BookingInput | null }[] = [];
   for (const v of visitsInScope(all, series.index, scope)) {
-    const target = v.items[position];
+    const target = v.items.filter((i) => i.serviceId === moved.serviceId)[nth];
     if (!target) continue;
     const start = fromLocal(v.date, target.startMinute + shift, location.timezone);
-    if (!start) {
-      results.push({ date: v.date, ok: false, error: "invalid" });
-      continue;
-    }
-    const r = await moveItem(supabase, location, { itemId: target.id, staffId: staffChanged ? move.staffId : target.staffId, start });
-    results.push(r.ok ? { date: v.date, ok: true, appointmentId: v.appointmentId } : failure(v.date, r));
+    visits.push({
+      date: v.date,
+      input: start && {
+        appointmentId: v.appointmentId,
+        clientId: v.clientId,
+        notes: v.notes,
+        // Only that service moves; the rest stay, with their chairs.
+        items: v.items.map((i) =>
+          i.id === target.id
+            ? { id: i.id, serviceId: i.serviceId, staffId: staffChanged ? move.staffId : i.staffId, start, resource: { kind: "any" as const, prefer: i.resourceId } }
+            : { id: i.id, serviceId: i.serviceId, staffId: i.staffId, start: i.start, resource: i.resourceId ? { kind: "exact" as const, id: i.resourceId } : { kind: "none" as const } },
+        ),
+      },
+    });
   }
-  return results;
+  return (await saveVisits(supabase, location, visits)).results;
 }
 
 // Cancels (or marks no-show, etc.) the visits in scope that still can be.

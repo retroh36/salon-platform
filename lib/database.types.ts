@@ -4078,6 +4078,9 @@ isOneToOne: false
 "save_appointment":
 { Args: { "p_appointment_id": string,"p_client_id": string,"p_expected_version": number,"p_items": Json,"p_location_id": string,"p_notes": string }; Returns: string
                            },
+"save_appointments":
+{ Args: { "p_expected_version": number,"p_location_id": string,"p_new_group"?: Json,"p_new_series"?: Json,"p_visits": Json }; Returns: Json
+                           },
 "save_automation":
 { Args: { "p_business_id": string,"p_input": Json,"p_kind": string }; Returns: undefined
                            },

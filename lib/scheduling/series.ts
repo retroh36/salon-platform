@@ -31,7 +31,16 @@ export function seriesDates(first: LocalDate, intervalWeeks: number, end: Series
 }
 
 // "any" for a free chair, "none", or a resource id.
-export type VisitLine = { serviceId: string; staffId: string; startMinute: number; resource: string };
+export type VisitLine = {
+  serviceId: string;
+  staffId: string;
+  startMinute: number;
+  resource: string;
+  // On an edit: the item this line was on the edited visit (other visits'
+  // match it by its service), and a length chosen for this booking.
+  itemId?: string;
+  minutes?: number;
+};
 
 export type VisitCheck = {
   ok: boolean;

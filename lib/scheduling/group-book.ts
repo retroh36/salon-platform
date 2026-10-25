@@ -1,15 +1,15 @@
 // Booking, moving and canceling group bookings. Each guest's visit is
-// booked through ./book.ts like any other; a move of the whole group is
-// checked as one change first (all or nothing), then saved visit by visit.
+// checked through ./book.ts like any other, and the group is saved as one
+// change: booking it or moving it saves every guest or no one.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { ACTION_STATUS, type AppointmentAction } from "../appointments.ts";
-import { changeStatus, saveBooking, type StatusResult } from "./book.ts";
+import { changeStatus, saveBookings, type StatusResult } from "./book.ts";
 import { checkMoves, type BookingProblem } from "./booking.ts";
 import { checkGroup } from "./groups.ts";
 import { loadBookingContext } from "./load.ts";
-import { itemsFor, type VisitResult } from "./series-book.ts";
+import { itemsFor } from "./series-book.ts";
 import type { VisitLine } from "./series.ts";
 import { daysBetween, shiftStart, toLocal, type LocalDate } from "./time.ts";
 
@@ -20,7 +20,8 @@ export type GuestInput = { clientId: string | null; lines: VisitLine[] };
 export type GroupResult =
   | { ok: true; groupId: string; appointmentIds: string[] }
   | { ok: false; error: "invalid"; problems: BookingProblem[][][] }
-  | { ok: false; error: "forbidden" | "partial"; appointmentIds?: string[]; results?: VisitResult[] };
+  // Someone took a slot between the check and the save: no one was booked.
+  | { ok: false; error: "forbidden" | "taken" };
 
 // Books every guest, or none if they don't all fit together.
 export async function bookGroup(
@@ -32,30 +33,15 @@ export async function bookGroup(
   const check = checkGroup(ctx, input.guests.map((g) => g.lines), input.date);
   if (!check.ok) return { ok: false, error: "invalid", problems: check.problems };
 
-  const { data: group, error } = await supabase
-    .from("appointment_groups")
-    .insert({ business_id: location.businessId, location_id: location.id, label: input.label.trim() })
-    .select("id")
-    .single();
-  if (error?.code === "42501") return { ok: false, error: "forbidden" };
-  if (error) throw error;
-
-  const results: VisitResult[] = [];
-  for (const g of input.guests) {
-    const items = itemsFor(g.lines, input.date, location.timezone)!;
-    const saved = await saveBooking(supabase, location, { clientId: g.clientId, notes: input.notes, items });
-    if (!saved.ok) {
-      results.push({ date: input.date, ok: false, error: saved.error, problems: saved.error === "invalid" ? saved.problems : undefined });
-      continue;
-    }
-    const { error: linkError } = await supabase.rpc("set_appointment_group", { p_appointment_id: saved.appointmentId, p_group_id: group.id });
-    if (linkError) throw linkError;
-    results.push({ date: input.date, ok: true, appointmentId: saved.appointmentId });
-  }
-  const ids = results.flatMap((r) => (r.ok ? [r.appointmentId] : []));
-  // Someone took a slot between the check and the save.
-  if (ids.length < input.guests.length) return { ok: false, error: "partial", appointmentIds: ids, results };
-  return { ok: true, groupId: group.id, appointmentIds: ids };
+  const saved = await saveBookings(
+    supabase,
+    location,
+    input.guests.map((g) => ({ clientId: g.clientId, notes: input.notes, items: itemsFor(g.lines, input.date, location.timezone)! })),
+    { group: { label: input.label.trim() } },
+  );
+  if (saved.ok) return { ok: true, groupId: saved.groupId!, appointmentIds: saved.appointmentIds };
+  if (saved.error === "invalid") return { ok: false, error: "invalid", problems: saved.problems };
+  return { ok: false, error: saved.error === "forbidden" ? "forbidden" : "taken" };
 }
 
 type Member = {
@@ -89,7 +75,8 @@ async function membersOf(supabase: Supabase, appointmentId: string): Promise<{ g
 
 const movable = (m: Member) => m.status === "booked" || m.status === "confirmed";
 
-export type GroupMoveResult = { ok: true; moved: number } | { ok: false; error: "not_found" | "invalid" | "partial"; problems?: BookingProblem[][]; moved?: number };
+// "taken": the calendar changed at the same moment; no one was moved.
+export type GroupMoveResult = { ok: true; moved: number } | { ok: false; error: "not_found" | "invalid" | "taken"; problems?: BookingProblem[][] };
 
 // Moves the whole group by the same amount as the dragged service (which
 // can also change stylist), if every visit still fits; otherwise nothing.
@@ -105,7 +92,6 @@ export async function moveGroupItem(supabase: Supabase, location: Location, move
   const to = toLocal(move.start, location.timezone);
   const days = daysBetween(from.date, to.date);
   const minutes = to.minute - from.minute;
-  const delta = move.start.getTime() - new Date(item.starts_at).getTime();
   const members = group.members.filter(movable);
   const placed: { itemId: string; appointmentId: string; staffId: string; resourceId: string | null; start: Date }[] = [];
   for (const m of members) {
@@ -123,23 +109,21 @@ export async function moveGroupItem(supabase: Supabase, location: Location, move
   const check = checkMoves(ctx, placed);
   if (!check.valid) return { ok: false, error: "invalid", problems: check.problems };
 
-  // Later visits first when moving later (and earlier first when moving
-  // earlier), so guests never step on each other.
-  const order = [...members].sort((a, b) => (delta >= 0 ? -1 : 1) * (Math.min(...a.items.map((i) => +i.start)) - Math.min(...b.items.map((i) => +i.start))));
-  let moved = 0;
-  for (const m of order) {
-    const saved = await saveBooking(supabase, location, {
+  const saved = await saveBookings(
+    supabase,
+    location,
+    members.map((m) => ({
       appointmentId: m.appointmentId,
       clientId: m.clientId,
       notes: m.notes,
       items: placed
         .filter((p) => p.appointmentId === m.appointmentId)
         .map((p) => ({ id: p.itemId, serviceId: m.items.find((i) => i.id === p.itemId)!.serviceId, staffId: p.staffId, start: p.start, resource: p.resourceId ? { kind: "exact" as const, id: p.resourceId } : { kind: "none" as const } })),
-    });
-    if (!saved.ok) return { ok: false, error: "partial", moved };
-    moved++;
-  }
-  return { ok: true, moved };
+    })),
+  );
+  if (saved.ok) return { ok: true, moved: members.length };
+  if (saved.error === "invalid") return { ok: false, error: "invalid", problems: saved.problems.flat() };
+  return { ok: false, error: saved.error === "not_found" ? "not_found" : "taken" };
 }
 
 // Cancels (or another status change) every visit in the group that still can be.

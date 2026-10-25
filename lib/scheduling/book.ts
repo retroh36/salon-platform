@@ -9,7 +9,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { allowedActions, ACTION_STATUS, isEditable, type AppointmentAction, type AppointmentStatus } from "../appointments.ts";
-import { checkItem, durationMinutes, pickResource, stretchTiming, timingFor, type BookedItem, type BookingProblem, type ServiceTiming } from "./booking.ts";
+import { checkItem, durationMinutes, pickResource, stretchTiming, timingFor, type BookedItem, type BookingContext, type BookingProblem, type ServiceTiming } from "./booking.ts";
 import { loadBookingContext } from "./load.ts";
 import { patchTestState, type PatchSettings } from "./patch-tests.ts";
 import { toLocal } from "./time.ts";
@@ -108,6 +108,85 @@ function unchanged(input: BookingItemInput, old: ExistingItem): boolean {
   return old.resourceId != null && r.prefer === old.resourceId;
 }
 
+type Existing = NonNullable<Awaited<ReturnType<typeof loadAppointment>>>;
+
+// The visit being changed, or why it can't be.
+async function existingFor(supabase: Supabase, input: BookingInput): Promise<{ existing: Existing | null } | { error: SaveError }> {
+  const existing = input.appointmentId ? await loadAppointment(supabase, input.appointmentId) : null;
+  if (input.appointmentId && !existing) return { error: "not_found" };
+  if (existing && !isEditable(existing.status)) return { error: "not_editable" };
+  if (existing && input.seen && !stillAsSeen(input.seen, existing)) return { error: "changed" };
+  const oldById = new Map((existing?.items ?? []).map((i) => [i.id, i]));
+  if (input.items.some((i) => i.id && !oldById.has(i.id))) return { error: "not_found" };
+  return { existing };
+}
+
+// The items that no longer hold time once this input is saved: removed ones
+// and the old copies of changed ones.
+function freedBy(input: BookingInput, existing: Existing | null): { changed: boolean[]; freed: Set<string> } {
+  const oldById = new Map((existing?.items ?? []).map((i) => [i.id, i]));
+  const changed = input.items.map((i) => !i.id || !unchanged(i, oldById.get(i.id)!));
+  const kept = new Set(input.items.filter((i, n) => i.id && !changed[n]).map((i) => i.id!));
+  return { changed, freed: new Set((existing?.items ?? []).filter((i) => !kept.has(i.id)).map((i) => i.id)) };
+}
+
+type Plan = { problems: BookingProblem[][]; items: Database["public"]["Functions"]["save_appointment"]["Args"]["p_items"] };
+
+// Checks the new and changed items of one visit against the calendar and
+// `accepted` (items already checked alongside it, which this adds to), and
+// says what to save.
+function planVisit(calendar: BookingContext, input: BookingInput, existing: Existing | null, changed: boolean[], accepted: BookedItem[]): Plan {
+  const oldById = new Map((existing?.items ?? []).map((i) => [i.id, i]));
+  // Lengths given for this booking, as timings.
+  const own: (ServiceTiming | undefined)[] = input.items.map((i) => {
+    if (i.timing) return i.timing;
+    const base = i.minutes ? timingFor(calendar, i.staffId, i.serviceId) : undefined;
+    return base && i.minutes ? stretchTiming(base, i.minutes) : undefined;
+  });
+
+  const problems: BookingProblem[][] = input.items.map(() => []);
+  const resources: (string | null)[] = input.items.map((i) => (i.id ? (oldById.get(i.id)!.resourceId ?? null) : null));
+
+  input.items.forEach((item, n) => {
+    if (!changed[n]) return;
+    const old = item.id ? oldById.get(item.id) : undefined;
+    const service = calendar.services.get(item.serviceId);
+    // A length given for this booking; else an item that keeps its
+    // service keeps its booked timing; else the stylist's (in checkItem).
+    const timing: ServiceTiming | undefined = own[n] ?? (old && old.serviceId === item.serviceId ? old : undefined);
+
+    let resourceId: string | null = item.resource.kind === "exact" ? item.resource.id : null;
+    if (item.resource.kind === "any" && (service || timing)) {
+      const t = timing ?? timingFor(calendar, item.staffId, item.serviceId)!;
+      const draft: BookedItem = { ...t, id: item.id, serviceId: item.serviceId, staffId: item.staffId, start: item.start };
+      resourceId = pickResource(calendar, draft, item.resource.prefer ?? null, accepted);
+      if (!resourceId) problems[n].push({ code: "no_free_resource" });
+    }
+    resources[n] = resourceId;
+
+    const check = checkItem(calendar, { id: item.id, serviceId: item.serviceId, staffId: item.staffId, resourceId, start: item.start, timing }, accepted);
+    if (check.valid) accepted.push(check.item);
+    else problems[n].push(...check.problems);
+  });
+
+  return {
+    problems,
+    items: input.items.map((item, n) => ({
+      id: item.id ?? null,
+      service_id: item.serviceId,
+      staff_id: item.staffId,
+      resource_id: resources[n],
+      starts_at: item.start.toISOString(),
+      timing: own[n] ? { active: own[n]!.activeMinutes, processing: own[n]!.processingMinutes, finishing: own[n]!.finishingMinutes } : null,
+    })),
+  };
+}
+
+async function contextFor(supabase: Supabase, location: Location, inputs: readonly BookingInput[]) {
+  const dates = inputs.flatMap((input) => input.items.map((i) => toLocal(i.start, location.timezone).date)).sort();
+  return loadBookingContext(supabase, location, dates[0], dates.at(-1)!);
+}
+
 export async function saveBooking(supabase: Supabase, location: Location, input: BookingInput): Promise<SaveResult> {
   if (input.items.length === 0) return { ok: false, error: "no_items" };
 
@@ -117,57 +196,13 @@ export async function saveBooking(supabase: Supabase, location: Location, input:
     const version = await supabase.from("locations").select("calendar_version").eq("id", location.id).single();
     if (version.error) throw version.error;
 
-    const existing = input.appointmentId ? await loadAppointment(supabase, input.appointmentId) : null;
-    if (input.appointmentId && !existing) return { ok: false, error: "not_found" };
-    if (existing && !isEditable(existing.status)) return { ok: false, error: "not_editable" };
-    if (existing && input.seen && !stillAsSeen(input.seen, existing)) return { ok: false, error: "changed" };
-    const oldById = new Map((existing?.items ?? []).map((i) => [i.id, i]));
-    if (input.items.some((i) => i.id && !oldById.has(i.id))) return { ok: false, error: "not_found" };
-
-    const dates = input.items.map((i) => toLocal(i.start, location.timezone).date).sort();
-    const ctx = await loadBookingContext(supabase, location, dates[0], dates.at(-1)!);
-
-    // Items to check: new ones and changed ones. Their old copies, and
-    // removed items, no longer hold time.
-    const changed = input.items.map((i) => !i.id || !unchanged(i, oldById.get(i.id)!));
-    const kept = new Set(input.items.filter((i, n) => i.id && !changed[n]).map((i) => i.id!));
-    const freed = new Set((existing?.items ?? []).filter((i) => !kept.has(i.id)).map((i) => i.id));
+    const found = await existingFor(supabase, input);
+    if ("error" in found) return { ok: false, error: found.error };
+    const ctx = await contextFor(supabase, location, [input]);
+    const { changed, freed } = freedBy(input, found.existing);
     const calendar = { ...ctx, booked: ctx.booked.filter((b) => !b.id || !freed.has(b.id)) };
-
-    // Lengths given for this booking, as timings.
-    const own: (ServiceTiming | undefined)[] = input.items.map((i) => {
-      if (i.timing) return i.timing;
-      const base = i.minutes ? timingFor(calendar, i.staffId, i.serviceId) : undefined;
-      return base && i.minutes ? stretchTiming(base, i.minutes) : undefined;
-    });
-
-    const problems: BookingProblem[][] = input.items.map(() => []);
-    const resources: (string | null)[] = input.items.map((i) => (i.id ? (oldById.get(i.id)!.resourceId ?? null) : null));
-    const accepted: BookedItem[] = [];
-
-    input.items.forEach((item, n) => {
-      if (!changed[n]) return;
-      const old = item.id ? oldById.get(item.id) : undefined;
-      const service = calendar.services.get(item.serviceId);
-      // A length given for this booking; else an item that keeps its
-      // service keeps its booked timing; else the stylist's (in checkItem).
-      const timing: ServiceTiming | undefined = own[n] ?? (old && old.serviceId === item.serviceId ? old : undefined);
-
-      let resourceId: string | null = item.resource.kind === "exact" ? item.resource.id : null;
-      if (item.resource.kind === "any" && (service || timing)) {
-        const t = timing ?? timingFor(calendar, item.staffId, item.serviceId)!;
-        const draft: BookedItem = { ...t, id: item.id, serviceId: item.serviceId, staffId: item.staffId, start: item.start };
-        resourceId = pickResource(calendar, draft, item.resource.prefer ?? null, accepted);
-        if (!resourceId) problems[n].push({ code: "no_free_resource" });
-      }
-      resources[n] = resourceId;
-
-      const check = checkItem(calendar, { id: item.id, serviceId: item.serviceId, staffId: item.staffId, resourceId, start: item.start, timing }, accepted);
-      if (check.valid) accepted.push(check.item);
-      else problems[n].push(...check.problems);
-    });
-
-    if (problems.some((p) => p.length > 0)) return { ok: false, error: "invalid", problems };
+    const plan = planVisit(calendar, input, found.existing, changed, []);
+    if (plan.problems.some((p) => p.length > 0)) return { ok: false, error: "invalid", problems: plan.problems };
 
     // Patch tests, when the salon makes them a hard requirement.
     const patch = await patchTestProblems(supabase, location, input.clientId, input.items.filter((_, n) => changed[n]));
@@ -178,14 +213,7 @@ export async function saveBooking(supabase: Supabase, location: Location, input:
       p_appointment_id: input.appointmentId ?? null!,
       p_client_id: input.clientId!,
       p_notes: input.notes ?? "",
-      p_items: input.items.map((item, n) => ({
-        id: item.id ?? null,
-        service_id: item.serviceId,
-        staff_id: item.staffId,
-        resource_id: resources[n],
-        starts_at: item.start.toISOString(),
-        timing: own[n] ? { active: own[n]!.activeMinutes, processing: own[n]!.processingMinutes, finishing: own[n]!.finishingMinutes } : null,
-      })),
+      p_items: plan.items,
       p_expected_version: version.data.calendar_version,
     });
     // A stale calendar, or a clash the database caught (23P01): check again.
@@ -195,6 +223,70 @@ export async function saveBooking(supabase: Supabase, location: Location, input:
     if (error?.code === "P0002" || error?.code === "23503") return { ok: false, error: "not_found" };
     if (error) throw error;
     return { ok: true, appointmentId: data };
+  }
+  return { ok: false, error: "busy" };
+}
+
+export type BatchResult =
+  | { ok: true; appointmentIds: string[]; seriesId: string | null; groupId: string | null }
+  // One list per visit, then per item, in order; empty for what's fine.
+  | { ok: false; error: "invalid"; problems: BookingProblem[][][] }
+  | { ok: false; error: SaveError; visit?: number };
+
+// Saves several visits as one change, all or nothing (a series, a group, or
+// the visits in scope of a series edit): each checked against the calendar
+// and the ones before it, with every visit's old times freed first, then
+// written in one transaction. `create` starts the series or group they
+// join.
+export async function saveBookings(
+  supabase: Supabase,
+  location: Location,
+  inputs: readonly BookingInput[],
+  create: { series?: { clientId: string; intervalWeeks: number; occurrences: number | null; endsOn: string | null }; group?: { label: string } } = {},
+): Promise<BatchResult> {
+  if (inputs.length === 0 || inputs.some((i) => i.items.length === 0)) return { ok: false, error: "no_items" };
+
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    const version = await supabase.from("locations").select("calendar_version").eq("id", location.id).single();
+    if (version.error) throw version.error;
+
+    const existing: (Existing | null)[] = [];
+    for (const [n, input] of inputs.entries()) {
+      const found = await existingFor(supabase, input);
+      if ("error" in found) return { ok: false, error: found.error, visit: n };
+      existing.push(found.existing);
+    }
+    const ctx = await contextFor(supabase, location, inputs);
+    const frees = inputs.map((input, n) => freedBy(input, existing[n]));
+    const freed = new Set(frees.flatMap((f) => [...f.freed]));
+    const calendar = { ...ctx, booked: ctx.booked.filter((b) => !b.id || !freed.has(b.id)) };
+    const accepted: BookedItem[] = [];
+    const plans = inputs.map((input, n) => planVisit(calendar, input, existing[n], frees[n].changed, accepted));
+
+    const problems = plans.map((p) => p.problems);
+    for (const [n, input] of inputs.entries()) {
+      const patch = await patchTestProblems(supabase, location, input.clientId, input.items.filter((_, i) => frees[n].changed[i]));
+      input.items.forEach((item, i) => {
+        if (frees[n].changed[i] && patch.has(item)) problems[n][i].push(patch.get(item)!);
+      });
+    }
+    if (problems.some((visit) => visit.some((p) => p.length > 0))) return { ok: false, error: "invalid", problems };
+
+    const { data, error } = await supabase.rpc("save_appointments", {
+      p_location_id: location.id,
+      p_visits: inputs.map((input, n) => ({ appointment_id: input.appointmentId ?? null, client_id: input.clientId, notes: input.notes ?? "", items: plans[n].items })),
+      p_expected_version: version.data.calendar_version,
+      p_new_series: create.series
+        ? { client_id: create.series.clientId, interval_weeks: create.series.intervalWeeks, occurrences: create.series.occurrences, ends_on: create.series.endsOn }
+        : null!,
+      p_new_group: create.group ? { label: create.group.label } : null!,
+    });
+    if (error?.code === "40001" || error?.code === "23P01") continue;
+    if (error?.code === "42501") return { ok: false, error: "forbidden" };
+    if (error?.code === "P0002" || error?.code === "23503") return { ok: false, error: "not_found" };
+    if (error) throw error;
+    const saved = data as { appointment_ids: string[]; series_id: string | null; group_id: string | null };
+    return { ok: true, appointmentIds: saved.appointment_ids, seriesId: saved.series_id, groupId: saved.group_id };
   }
   return { ok: false, error: "busy" };
 }

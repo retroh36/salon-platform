@@ -75,6 +75,26 @@ describe("booking a group", () => {
     expect((await admin.from("appointments").select("id").gte("starts_at", at(0).toISOString()).lt("starts_at", at(23).toISOString()).eq("location_id", L)).data).toEqual([]);
   });
 
+  it("saves everyone in one transaction: a clash on the last guest leaves no one, and no group", async () => {
+    // Someone books Nola between the app's check and the save: the
+    // database refuses the whole party.
+    const taken = await saveBooking(frontDesk, location, { clientId: null, notes: null, items: [{ serviceId: mensCut, staffId: NOLA, start: at(10, 30), resource: { kind: "none" } }] });
+    expect(taken.ok).toBe(true);
+    const { data: v } = await admin.from("locations").select("calendar_version").eq("id", L).single();
+    const visit = (clientId: string | null, serviceId: string, staffId: string, start: Date) => ({ appointment_id: null, client_id: clientId, notes: "", items: [{ id: null, service_id: serviceId, staff_id: staffId, resource_id: null, starts_at: start.toISOString(), timing: null }] });
+    const { error } = await frontDesk.rpc("save_appointments", {
+      p_location_id: L,
+      p_visits: [visit(clients[0], cut, BRIDGET, at(10)), visit(clients[1], cut, SHAE, at(10)), visit(null, mensCut, NOLA, at(10, 30))],
+      p_expected_version: v!.calendar_version,
+      p_new_series: null!,
+      p_new_group: { label: "Test race" },
+    });
+    expect(error?.code).toBe("23P01");
+    expect((await admin.from("appointment_groups").select("id").eq("label", "Test race")).data).toEqual([]);
+    const { data: left } = await admin.from("appointments").select("id").eq("location_id", L).gte("starts_at", at(0).toISOString()).lt("starts_at", at(23).toISOString());
+    expect(left).toEqual([{ id: taken.ok ? taken.appointmentId : "" }]);
+  });
+
   it("is front of house only", async () => {
     expect(await bookGroup(bridget, location, { label: "Test nope", date: DAY, notes: null, guests: party() })).toEqual({ ok: false, error: "forbidden" });
     const own = await bookGroup(frontDesk, location, { label: "Test own", date: DAY, notes: null, guests: party() });

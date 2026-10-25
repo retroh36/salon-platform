@@ -270,7 +270,7 @@ export async function moveVisitToDay(input: { appointmentId: string; date: Local
         const problem = moved.result.problems?.flat()[0];
         return { ok: false, message: `The whole group doesn't fit then${problem ? `: ${describeProblem(problem)}` : "."} Nothing was moved.` };
       }
-      return { ok: false, message: moved.result.error === "partial" ? `Someone changed the calendar at the same moment; ${moved.result.moved ?? 0} guests moved. Check the group.` : "That visit is no longer in a group." };
+      return { ok: false, message: moved.result.error === "taken" ? "Someone changed the calendar at the same moment. Nothing was moved; try again." : "That visit is no longer in a group." };
     case "series": {
       const summary = scopeSummary(moved.results, "move");
       return summary.ok ? { ok: true, message: summary.message ?? `Moved to ${when}.` } : { ok: false, message: summary.message };
@@ -468,7 +468,16 @@ function readRepeat(repeat: RepeatInput, first: LocalDate): string | null {
   return null;
 }
 
-const toLines = (lines: VisitLineInput[]) => lines.map(({ serviceId, staffId, startMinute, resource }) => ({ serviceId, staffId, startMinute, resource }));
+// Each line with the item it was (on an edit) and its own length, if set.
+const toLines = (lines: VisitLineInput[]) =>
+  lines.map(({ id, serviceId, staffId, startMinute, resource, minutes }) => ({
+    serviceId,
+    staffId,
+    startMinute,
+    resource,
+    ...(id && isUuid(id) ? { itemId: id } : {}),
+    ...(Number.isInteger(minutes) && minutes! > 0 ? { minutes } : {}),
+  }));
 
 // Every visit of a series, checked against the booking rules, with
 // suggestions for the ones that don't fit. Nothing is saved.
@@ -525,28 +534,29 @@ export async function saveSeries(input: VisitInput, repeat: RepeatInput, visits:
     end: repeat.end,
     visits: visits.map((v) => ({ date: v.date, lines: toLines(v.lines) })),
   });
-  const saved = results.filter((r) => r.ok);
-  const failed = results.filter((r) => !r.ok);
-  if (!saved.length) return { ok: false, message: failed[0] && "error" in failed[0] && failed[0].error === "forbidden" ? NOT_ALLOWED : "None of the visits could be booked. Check the times and try again." };
+  const failed = results.filter((r): r is Extract<VisitResult, { ok: false }> => !r.ok);
+  if (failed.some((f) => f.error === "forbidden")) return { ok: false, message: NOT_ALLOWED };
+  if (failed.length) return { ok: false, message: `Nothing was booked: ${notFitting(failed)} Check the times and try again.` };
   refresh();
-  const first = saved.find((r) => r.ok && r.date === input.date) ?? saved[0];
-  return {
-    ok: true,
-    appointmentId: (first as { appointmentId: string }).appointmentId,
-    message: `Booked ${saved.length} visit${saved.length === 1 ? "" : "s"}.${failed.length ? ` ${failed.length} couldn't be booked (${failed.map((f) => formatDay(f.date)).join(", ")}): the calendar changed.` : ""}`,
-  };
+  const first = results.find((r) => r.ok && r.date === input.date) ?? results[0];
+  return { ok: true, appointmentId: (first as { appointmentId: string }).appointmentId, message: `Booked ${results.length} visit${results.length === 1 ? "" : "s"}.` };
 }
 
+// The visits that stopped a series change, with why ("held back" ones fit).
+function notFitting(failed: Extract<VisitResult, { ok: false }>[]): string {
+  const stopped = failed.filter((f) => f.error !== "held_back");
+  if (!stopped.length) return "the calendar changed at the same moment.";
+  return `${stopped
+    .map((f) => `${formatDay(f.date)} ${f.problems ? `doesn't fit (${[...new Set(f.problems.flat().map(describeProblem))].join(" ").replace(/\.$/, "")})` : "couldn't be saved"}`)
+    .join("; ")}.`;
+}
+
+// Every visit in scope changes, or none does.
 function scopeSummary(results: VisitResult[], what: string): SaveVisitResult & { message?: string } {
-  const ok = results.filter((r) => r.ok);
   const failed = results.filter((r): r is Extract<VisitResult, { ok: false }> => !r.ok);
-  if (!ok.length) return { ok: false, message: failed[0]?.problems ? [...new Set(failed[0].problems.flat().map(describeProblem))].join(" ") : `Couldn't ${what} any visits.` };
-  const note = failed.length
-    ? ` ${failed.length} didn't fit and kept their old time: ${failed
-        .map((f) => `${formatDay(f.date)}${f.problems ? ` (${[...new Set(f.problems.flat().map(describeProblem))].join(" ")})` : ""}`)
-        .join("; ")}`
-    : "";
-  return { ok: true, appointmentId: (ok[0] as { appointmentId: string }).appointmentId, message: `Changed ${ok.length} visit${ok.length === 1 ? "" : "s"}.${note}` };
+  if (!results.length) return { ok: false, message: `Couldn't ${what} any visits.` };
+  if (failed.length) return { ok: false, message: `Nothing was changed: ${notFitting(failed)}` };
+  return { ok: true, appointmentId: (results[0] as { appointmentId: string }).appointmentId, message: `Changed ${results.length} visit${results.length === 1 ? "" : "s"}.` };
 }
 
 // Saves an edit to a series visit: this visit, this and following, or all.
@@ -658,10 +668,7 @@ export async function saveGroup(input: GroupInput): Promise<GroupSaveResult> {
   if (result.error === "invalid") {
     return { ok: false, message: "Not everyone fits as planned. Change the highlighted guests.", guestErrors: result.problems.map((g) => g.map((line) => line.map(describeProblem)).flat()).map((g) => [...new Set(g)]) };
   }
-  if (result.error === "partial") {
-    refresh();
-    return { ok: false, message: `Someone booked a slot at the same moment: ${result.appointmentIds?.length ?? 0} of ${input.guests.length} guests are booked. Book the rest separately.` };
-  }
+  if (result.error === "taken") return { ok: false, message: "Someone booked a slot at the same moment. No one was booked; check the times and try again." };
   return { ok: false, message: NOT_ALLOWED };
 }
 
@@ -679,7 +686,7 @@ export async function moveGroupVisit(input: { itemId: string; staffId: string; d
     const problem = result.problems?.flat()[0];
     return { ok: false, message: `the whole group doesn't fit there${problem ? ` (${describeProblem(problem).replace(/\.$/, "").toLowerCase()})` : ""}. Nothing was moved.` };
   }
-  if (result.error === "partial") return { ok: false, message: `someone changed the calendar at the same moment; ${result.moved} guests moved. Check the group.` };
+  if (result.error === "taken") return { ok: false, message: "someone changed the calendar at the same moment. Nothing was moved; try again." };
   return { ok: false, message: "that visit is no longer in a group." };
 }
 

@@ -2,14 +2,15 @@
 // together, keeping its stylist and the gaps between services, each one
 // checked against the booking rules through ./book.ts like any change. A
 // repeating visit moves this one, this and following, or all, each by the
-// same number of days (visit by visit; ones that don't fit are reported).
+// same number of days (all of them or none; ones that don't fit are
+// reported).
 // A group visit moves the whole party (./group-book.ts), or no one.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { saveBooking, type BookingItemInput, type SaveResult } from "./book.ts";
 import { moveGroupItem, type GroupMoveResult } from "./group-book.ts";
-import { seriesVisits, type VisitResult } from "./series-book.ts";
+import { saveVisits, seriesVisits, type VisitResult } from "./series-book.ts";
 import { visitsInScope, type Scope } from "./series.ts";
 import { addDays, daysBetween, shiftStart, toLocal, type LocalDate } from "./time.ts";
 
@@ -62,22 +63,16 @@ export async function moveVisitTo(
   }
 
   if (a.series_id && scope !== "this") {
-    const results: VisitResult[] = [];
-    for (const v of visitsInScope(await seriesVisits(supabase, a.series_id, location.timezone), a.series_index!, scope)) {
-      const date = addDays(v.date, days);
+    const visits = visitsInScope(await seriesVisits(supabase, a.series_id, location.timezone), a.series_index!, scope).map((v) => {
       const visitItems = shiftedItems(
         v.items.map((i) => ({ id: i.id, service_id: i.serviceId, staff_id: i.staffId, resource_id: i.resourceId, starts_at: i.start.toISOString() })),
         location.timezone,
         days,
         minutes,
       );
-      if (!visitItems) {
-        results.push({ date, ok: false, error: "invalid" });
-        continue;
-      }
-      const saved = await saveBooking(supabase, location, { appointmentId: v.appointmentId, clientId: v.clientId, notes: v.notes, items: visitItems });
-      results.push(saved.ok ? { date, ok: true, appointmentId: v.appointmentId } : saved.error === "invalid" ? { date, ok: false, error: "invalid", problems: saved.problems } : { date, ok: false, error: saved.error });
-    }
+      return { date: addDays(v.date, days), input: visitItems && { appointmentId: v.appointmentId, clientId: v.clientId, notes: v.notes, items: visitItems } };
+    });
+    const { results } = await saveVisits(supabase, location, visits);
     return { kind: "series", results };
   }
 

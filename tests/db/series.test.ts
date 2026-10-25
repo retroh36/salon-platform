@@ -1,5 +1,5 @@
-// Recurring appointments: booking a series visit by visit through the
-// booking rules, and changing or canceling this / following / all visits.
+// Recurring appointments: booking a series through the booking rules, all
+// or nothing, and changing or canceling this / following / all visits.
 // Run with `npm run test:db` after `npx supabase db reset`.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { saveBooking } from "@/lib/scheduling/book";
@@ -47,28 +47,31 @@ async function book() {
 }
 
 describe("booking a series", () => {
-  it("books each visit through the rules, linked in order, and reports any that don't fit", async () => {
-    // Someone else has Bridget at 10 on the third date.
-    const clash = await saveBooking(frontDesk, location, { clientId: otherClient, notes: null, items: [{ serviceId: cut, staffId: BRIDGET, start: at(DATES[2], 10), resource: { kind: "none" } }] });
-    expect(clash.ok).toBe(true);
-
+  it("books every visit through the rules, linked in order, or none, saying which don't fit", async () => {
     const { seriesId, results } = await book();
-    expect(results.map((r) => [r.date, r.ok])).toEqual([
-      [DATES[0], true],
-      [DATES[1], true],
-      [DATES[2], false],
-      [DATES[3], true],
-    ]);
-    expect(results[2]).toMatchObject({ error: "invalid", problems: [[expect.objectContaining({ code: "staff_double_booked" })]] });
-
+    expect(results.every((r) => r.ok)).toBe(true);
     const visits = await seriesVisits(admin, seriesId!, TZ);
-    expect(visits.map((v) => [v.index, v.date])).toEqual([
-      [1, DATES[0]],
-      [2, DATES[1]],
-      [3, DATES[3]],
-    ]);
+    expect(visits.map((v) => [v.index, v.date])).toEqual(DATES.map((d, n) => [n + 1, d]));
     const { data: series } = await admin.from("appointment_series").select("interval_weeks, occurrences, client_id").eq("id", seriesId!).single();
     expect(series).toEqual({ interval_weeks: 2, occurrences: 4, client_id: clientId });
+    await clear();
+
+    // Someone else has Bridget at 10 on the third date: nothing is booked,
+    // and no empty series is left.
+    const clash = await saveBooking(frontDesk, location, { clientId: otherClient, notes: null, items: [{ serviceId: cut, staffId: BRIDGET, start: at(DATES[2], 10), resource: { kind: "none" } }] });
+    expect(clash.ok).toBe(true);
+    const refused = await book();
+    expect(refused.seriesId).toBeNull();
+    expect(refused.results.map((r) => [r.date, r.ok ? "ok" : r.error])).toEqual([
+      [DATES[0], "held_back"],
+      [DATES[1], "held_back"],
+      [DATES[2], "invalid"],
+      [DATES[3], "held_back"],
+    ]);
+    expect(refused.results[2]).toMatchObject({ problems: [[expect.objectContaining({ code: "staff_double_booked" })]] });
+    expect((await admin.from("appointment_series").select("id").eq("client_id", clientId)).data).toEqual([]);
+    const { count } = await admin.from("appointments").select("id", { count: "exact", head: true }).eq("client_id", clientId).gte("starts_at", at(FIRST, 0).toISOString()).lt("starts_at", at("2031-10-01", 0).toISOString());
+    expect(count).toBe(0);
   });
 
   it("is front of house only, one client per series", async () => {
@@ -97,20 +100,64 @@ describe("changing a series", () => {
     ]);
   });
 
-  it("moves a service on all visits by the same amount, reporting ones that don't fit", async () => {
+  it("moves a service on all visits by the same amount, or none if one doesn't fit", async () => {
     const { seriesId } = await book();
     let visits = await seriesVisits(admin, seriesId!, TZ);
-    // Bridget has someone at 12:00 on the last date.
-    await saveBooking(frontDesk, location, { clientId: otherClient, notes: null, items: [{ serviceId: cut, staffId: BRIDGET, start: at(DATES[3], 12), resource: { kind: "none" } }] });
-    const results = await moveSeriesItem(frontDesk, location, { itemId: visits[0].items[0].id, staffId: BRIDGET, start: at(FIRST, 11, 30) }, "all");
-    expect(results.map((r) => r.ok)).toEqual([true, true, true, false]);
+    // Bridget has someone at 12:00 on the last date: nothing moves.
+    const other = await saveBooking(frontDesk, location, { clientId: otherClient, notes: null, items: [{ serviceId: cut, staffId: BRIDGET, start: at(DATES[3], 12), resource: { kind: "none" } }] });
+    const refused = await moveSeriesItem(frontDesk, location, { itemId: visits[0].items[0].id, staffId: BRIDGET, start: at(FIRST, 11, 30) }, "all");
+    expect(refused.map((r) => (r.ok ? "ok" : r.error))).toEqual(["held_back", "held_back", "held_back", "invalid"]);
     visits = await seriesVisits(admin, seriesId!, TZ);
-    expect(visits.map((v) => v.items[0].startMinute)).toEqual([690, 690, 690, 600]);
+    expect(visits.map((v) => v.items[0].startMinute)).toEqual([600, 600, 600, 600]);
+    // With the way clear, they all move.
+    await admin.from("appointments").delete().eq("id", other.ok ? other.appointmentId : "");
+    const results = await moveSeriesItem(frontDesk, location, { itemId: visits[0].items[0].id, staffId: BRIDGET, start: at(FIRST, 11, 30) }, "all");
+    expect(results.every((r) => r.ok)).toBe(true);
+    visits = await seriesVisits(admin, seriesId!, TZ);
+    expect(visits.map((v) => v.items[0].startMinute)).toEqual([690, 690, 690, 690]);
 
     // To another stylist for this visit only.
     await moveSeriesItem(frontDesk, location, { itemId: visits[1].items[0].id, staffId: SHAE, start: at(DATES[1], 11, 30) }, "this");
     visits = await seriesVisits(admin, seriesId!, TZ);
     expect(visits.map((v) => v.items[0].staffId)).toEqual([BRIDGET, SHAE, BRIDGET, BRIDGET]);
+  });
+
+  it("matches each service by its id on the other visits, keeping their own lengths", async () => {
+    // A cut then a blowout every visit; the last visit's cut booked longer.
+    const blowout = (await admin.from("services").select("id").eq("business_id", B).eq("name", "Blowout").single()).data!.id;
+    const two = (startMinute: number): VisitLine[] => [
+      { serviceId: cut, staffId: BRIDGET, startMinute, resource: "none" },
+      { serviceId: blowout, staffId: BRIDGET, startMinute: startMinute + 60, resource: "none" },
+    ];
+    const { seriesId } = await bookSeries(frontDesk, location, { clientId, notes: null, intervalWeeks: 2, end: { kind: "count", count: 4 }, visits: DATES.map((date) => ({ date, lines: two(9 * 60) })) });
+    let visits = await seriesVisits(admin, seriesId!, TZ);
+    const lastCut = visits[3].items.find((i) => i.serviceId === cut)!.id;
+    await admin.from("appointment_items").update({ active_minutes: 75, ends_at: new Date(at(DATES[3], 10, 15)).toISOString() }).eq("id", lastCut);
+    await admin.from("appointment_items").update({ starts_at: at(DATES[3], 10, 15).toISOString(), ends_at: at(DATES[3], 11, 0).toISOString() }).eq("appointment_id", visits[3].appointmentId).eq("service_id", blowout);
+    visits = await seriesVisits(admin, seriesId!, TZ);
+    const before = await admin.from("appointment_items").select("id, service_id, active_minutes").in("appointment_id", visits.map((v) => v.appointmentId));
+
+    // On the second visit: the blowout first now, then the cut.
+    const second = visits[1];
+    const [cutItem, blowItem] = [second.items.find((i) => i.serviceId === cut)!, second.items.find((i) => i.serviceId === blowout)!];
+    const changed = await changeSeries(frontDesk, location, second.appointmentId, "following", {
+      clientId,
+      notes: null,
+      lines: [
+        { serviceId: blowout, staffId: BRIDGET, startMinute: 9 * 60, resource: "none", itemId: blowItem.id },
+        { serviceId: cut, staffId: BRIDGET, startMinute: 10 * 60, resource: "none", itemId: cutItem.id },
+      ],
+    });
+    expect(changed.every((r) => r.ok)).toBe(true);
+
+    // Every item is still the service it was, with its own length: the
+    // last visit's longer cut kept its 75 minutes.
+    const { data: after } = await admin.from("appointment_items").select("id, service_id, active_minutes").in("appointment_id", visits.map((v) => v.appointmentId));
+    const byId = (rows: { id: string; service_id: string; active_minutes: number }[]) => Object.fromEntries(rows.map((r) => [r.id, [r.service_id, r.active_minutes]]));
+    expect(byId(after!)).toEqual(byId(before.data!));
+    visits = await seriesVisits(admin, seriesId!, TZ);
+    expect(visits.slice(1).map((v) => v.items.map((i) => i.serviceId))).toEqual([[blowout, cut], [blowout, cut], [blowout, cut]]);
+    expect(visits[0].items.map((i) => i.serviceId)).toEqual([cut, blowout]);
   });
 
   it("cancels this and following, or all", async () => {
