@@ -189,6 +189,7 @@ export async function runAutomations(admin: Admin, options: { businessId?: strin
           overdueDays: h?.overdueDays ?? 0,
           nextDue: h?.nextDue ?? null,
           lastVisit: h?.lastVisit ?? null,
+          lastVisitOn: h?.lastVisit ? toLocal(new Date(h.lastVisit), tz).date : null,
           preferredStaffId: h?.preferredStaffId ?? null,
           hasUpcoming: booked.has(c.id),
           lastMessagedAt: lastMessaged.get(c.id) ?? null,

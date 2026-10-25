@@ -120,6 +120,8 @@ export type ClientFacts = Contact & {
   overdueDays: number;
   nextDue: string | null;
   lastVisit: string | null;
+  // The salon's date of that visit (an evening visit's UTC date is the next day).
+  lastVisitOn: LocalDate | null;
   preferredStaffId: string | null;
   // Anything booked from today on (checked live, not from insights).
   hasUpcoming: boolean;
@@ -148,9 +150,12 @@ export function dueFor(kind: Exclude<AutomationKind, "review">, c: ClientFacts, 
     return birthdayOn(c.birthMonth, c.birthDay, target) ? `birthday:${target.slice(0, 4)}` : null;
   }
   if (c.hasUpcoming || !c.lastVisit) return null;
-  const last = c.lastVisit.slice(0, 10);
   if (kind === "win_back") {
-    return daysBetween(last, today) >= (settings.weeks ?? 12) * 7 ? `win_back:${last}` : null;
+    // Weeks away count from the salon's date of the visit. The key keeps
+    // the visit's UTC date, as it always has: it only names the occasion,
+    // so a client already sent one for this visit is never sent another.
+    const away = daysBetween(c.lastVisitOn ?? c.lastVisit.slice(0, 10), today);
+    return away >= (settings.weeks ?? 12) * 7 ? `win_back:${c.lastVisit.slice(0, 10)}` : null;
   }
   // Rebook: past their usual return (not so long that it's a win-back).
   if (c.due !== "overdue" || !c.nextDue) return null;

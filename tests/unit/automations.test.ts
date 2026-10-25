@@ -32,6 +32,7 @@ const client = (over: Partial<ClientFacts> = {}): ClientFacts => ({
   overdueDays: 9,
   nextDue: "2026-10-14T15:00:00.000Z",
   lastVisit: "2026-09-02T15:00:00.000Z",
+  lastVisitOn: null,
   preferredStaffId: null,
   hasUpcoming: false,
   lastMessagedAt: null,
@@ -92,6 +93,13 @@ describe("who's due", () => {
     expect(dueFor("win_back", client({ lastVisit: "2026-07-01T15:00:00Z" }), settings("win_back"), TODAY, NOW)).toBe("win_back:2026-07-01");
     expect(dueFor("win_back", client({ lastVisit: "2026-08-15T15:00:00Z" }), settings("win_back"), TODAY, NOW)).toBeNull();
     expect(dueFor("win_back", client({ lastVisit: null }), settings("win_back"), TODAY, NOW)).toBeNull();
+  });
+
+  it("counts the weeks away from the salon's date of the visit, keeping the key it always had", () => {
+    // 8pm on Fri Jul 31 in Chicago is already Aug 1 in UTC: 12 weeks to the day is Oct 23.
+    const evening = client({ lastVisit: "2026-08-01T01:00:00.000Z", lastVisitOn: "2026-07-31" });
+    expect(dueFor("win_back", evening, settings("win_back"), TODAY, NOW)).toBe("win_back:2026-08-01");
+    expect(dueFor("win_back", { ...evening, lastVisitOn: "2026-08-01" }, settings("win_back"), TODAY, NOW)).toBeNull();
   });
 
   it("wishes a happy birthday on the day, or days before, once a year (Feb 29 on Feb 28)", () => {

@@ -19,6 +19,7 @@ Turn on a message that goes out by itself, in your own words: **Rebook reminder*
 
 - Only clients who said yes to texts or marketing emails get these, between 9am and 8pm, with an opt-out added to every message.
 - Texts and email aren't connected yet, so messages wait in the outbox for now.
+- Win-back counts the weeks from the day of their last visit at the salon, so an evening visit counts from that day.
 - Each card shows results for 90 days: **Sent**, **Booked from it** (booked within 14 days), **Revenue** and **Opted out**.
 - **Send due messages now** under **Sending** sends what's due without waiting for the hourly run.
 
