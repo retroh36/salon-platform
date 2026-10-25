@@ -85,7 +85,7 @@ test.describe("a client", () => {
       await expect(page.getByTestId("opted-out")).toHaveText("Done. Maple & Ash Hair Studio won't send you texts like this again.");
       expect((await admin.from("clients").select("sms_opt_in").eq("id", c!.id).single()).data!.sms_opt_in).toBe(false);
       await page.goto("/unsubscribe/not-a-real-token-at-all-xx");
-      await expect(page.getByText("404")).toBeVisible();
+      await expect(page.getByRole("heading", { name: "We can't find that page" })).toBeVisible();
     } finally {
       await admin.from("clients").update({ sms_opt_in: true }).eq("id", c!.id);
       await admin.from("marketing_messages").delete().eq("id", m!.id);

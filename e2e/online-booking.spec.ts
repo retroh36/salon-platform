@@ -369,8 +369,8 @@ test("a new client reads the policy, agrees, saves a card and pays the deposit b
 
 test("a bad manage link or salon shows nothing", async ({ page }) => {
   await page.goto(`/book/${SLUG}/manage/${"x".repeat(43)}`);
-  await expect(page.getByText("This page could not be found.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "We can't find that page" })).toBeVisible();
   await expect(page.getByTestId("manage-booking")).toHaveCount(0);
   await page.goto("/book/no-such-salon");
-  await expect(page.getByText("This page could not be found.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "We can't find that page" })).toBeVisible();
 });
