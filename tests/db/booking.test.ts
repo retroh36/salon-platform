@@ -243,6 +243,40 @@ describe("editing", () => {
   });
 });
 
+describe("two people editing the same visit", () => {
+  it("refuses an edit made from what the visit was before someone else changed it, so nothing is silently undone", async () => {
+    const booked = await book(frontDesk, [item("Blowout", SHAE, at(14))], "Fine hair");
+    const id = booked.ok ? booked.appointmentId : "";
+    const [opened] = (await appointment(id)).appointment_items;
+    const seen = { notes: "Fine hair", items: [{ id: opened.id, serviceId: opened.service_id, staffId: SHAE, start: at(14) }] };
+
+    // Meanwhile the manager moves her to 3:00 (a drag, or Denise's fix).
+    expect((await moveItem(manager, location, { itemId: opened.id, staffId: SHAE, start: at(15) })).ok).toBe(true);
+
+    // The front desk saves the edit they opened at 2:00, changing the notes.
+    const stale = await saveBooking(frontDesk, location, {
+      appointmentId: id,
+      clientId,
+      notes: "Fine hair, likes it warm",
+      items: [{ id: opened.id, serviceId: opened.service_id, staffId: SHAE, start: at(14), resource: { kind: "any" } }],
+      seen,
+    });
+    expect(stale).toEqual({ ok: false, error: "changed" });
+    const after = await appointment(id);
+    expect([after.appointment_items[0].starts_at, after.notes]).toEqual([at(15).toISOString().replace(".000Z", "+00:00"), "Fine hair"]);
+
+    // Opened again, from what it is now, the edit saves.
+    const fresh = await saveBooking(frontDesk, location, {
+      appointmentId: id,
+      clientId,
+      notes: "Fine hair, likes it warm",
+      items: [{ id: opened.id, serviceId: opened.service_id, staffId: SHAE, start: at(15), resource: { kind: "any" } }],
+      seen: { notes: "Fine hair", items: [{ ...seen.items[0], start: at(15) }] },
+    });
+    expect(fresh.ok).toBe(true);
+  });
+});
+
 describe("moving", () => {
   it("moves an item to another time and stylist, keeping its chair when free", async () => {
     const booked = await book(frontDesk, [item("Women's Cut & Style", BRIDGET, at(10))]);

@@ -14,7 +14,7 @@ import { isUuid } from "@/lib/ids";
 import { isZoom, type CalendarZoom } from "@/lib/calendar";
 import { isUsable, loadClientPackages, type ClientPackage } from "@/lib/packages";
 import { loadBackBarProducts } from "@/lib/inventory-load";
-import { changeStatus, checkInPatchOverride, moveItem, saveBooking, saveNotes, undoCheckIn, undoNoShow, type BookingItemInput, type SaveResult } from "@/lib/scheduling/book";
+import { changeStatus, checkInPatchOverride, moveItem, saveBooking, saveNotes, undoCheckIn, undoNoShow, type BookingItemInput, type SaveResult, type VisitSeen } from "@/lib/scheduling/book";
 import { describeProblem, type BookingProblem } from "@/lib/scheduling/booking";
 import { bookingIdeas, type BookingIdeas } from "@/lib/denise/ideas";
 import { loadBookingContext, loadCalendarStamp } from "@/lib/scheduling/load";
@@ -89,6 +89,8 @@ export type VisitInput = {
   clientId: string | null;
   notes: string;
   lines: VisitLineInput[];
+  // An edit: the visit as it was when the panel opened.
+  seen?: { date: LocalDate; notes: string; items: { id: string; serviceId: string; staffId: string; startMinute: number }[] };
 };
 
 export type SaveVisitResult =
@@ -110,6 +112,8 @@ function saveErrorMessage(result: Exclude<SaveResult, { ok: true }>): string {
       return NOT_ALLOWED;
     case "busy":
       return "The calendar kept changing while saving. Try again.";
+    case "changed":
+      return "Someone else changed this visit while you had it open, so your edit wasn't saved. Close it and open it again to see their change, then make yours.";
   }
 }
 
@@ -155,6 +159,7 @@ export async function saveVisit(input: VisitInput): Promise<SaveVisitResult> {
       clientId: input.clientId,
       notes: input.notes,
       items,
+      seen: seenVisit(input.seen, me.location.timezone),
     }),
   );
   if (!result.ok) {
@@ -167,6 +172,14 @@ export async function saveVisit(input: VisitInput): Promise<SaveVisitResult> {
   }
   refresh();
   return { ok: true, appointmentId: result.appointmentId };
+}
+
+// What the editor saw, as instants (nothing to compare if it's unreadable).
+function seenVisit(seen: VisitInput["seen"], timezone: string): VisitSeen | undefined {
+  if (!seen || !isLocalDate(seen.date) || !Array.isArray(seen.items)) return undefined;
+  const items = seen.items.map((i) => ({ id: i.id, serviceId: i.serviceId, staffId: i.staffId, start: fromLocal(seen.date, i.startMinute, timezone) }));
+  if (items.some((i) => !i.start)) return undefined;
+  return { notes: seen.notes, items: items as VisitSeen["items"] };
 }
 
 // Denise's nearest times that work, for a refused booking. Never fails the

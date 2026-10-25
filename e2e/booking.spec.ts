@@ -314,6 +314,25 @@ test.describe("front desk", () => {
     expect(saved.appointment_items).toEqual([expect.objectContaining({ service_id: (await service("Curly Cut")).id })]);
   });
 
+  test("won't save an edit over a change someone else made while it was open, and says so", async ({ page }) => {
+    const id = await seedVisit(await newClient("Gia"), [{ service: "Women's Cut & Style", staff: BRIDGET, start: at(10) }]);
+    await openDay(page);
+    await column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Gia Test`) }).click();
+    await moreAction(panel(page), "Edit booking");
+    const form = panel(page).getByRole("form", { name: "Edit booking" });
+    await form.getByLabel("Notes").fill("Bring curl cream");
+
+    // Someone else moves her to 11 meanwhile.
+    const { data: item } = await admin.from("appointment_items").select("id").eq("appointment_id", id).single();
+    await admin.from("appointment_items").update({ starts_at: at(11).toISOString(), ends_at: at(12).toISOString() }).eq("id", item!.id);
+
+    await form.getByRole("button", { name: "Save changes" }).click();
+    await expect(form.getByRole("alert")).toContainText("Someone else changed this visit while you had it open");
+    const saved = await appointment(id);
+    expect(saved.notes).toBeNull();
+    expect(saved.appointment_items[0].starts_at).toBe(at(11).toISOString().replace(".000Z", "+00:00"));
+  });
+
   test("drags a visit to a new time and stylist", async ({ page }) => {
     const id = await seedVisit(await newClient("Gus"), [{ service: "Blowout", staff: BRIDGET, start: at(10) }]);
     await openDay(page);

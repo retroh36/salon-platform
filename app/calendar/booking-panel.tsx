@@ -71,6 +71,13 @@ export function BookingPanel({
       : [{ key: 0, serviceId: "", staffId: start!.staffId, startMinute: start!.startMinute, resource: "any" }],
   );
   const [notes, setNotes] = useState(appointment?.notes ?? "");
+  // The visit as it was when this opened, so a save never undoes someone
+  // else's change made since.
+  const [seen] = useState(() =>
+    appointment
+      ? { date: data.date, notes: appointment.notes ?? "", items: appointment.items.map((i) => ({ id: i.id, serviceId: i.serviceId, staffId: i.staffId, startMinute: i.start })) }
+      : undefined,
+  );
   // The visit's day: an edit can move it to another one.
   const [date, setDate] = useState(data.date);
   const [message, setMessage] = useState<string | null>(null);
@@ -149,6 +156,7 @@ export function BookingPanel({
       clientId: client?.id ?? null,
       notes,
       lines: lines.map((l) => ({ id: l.id, serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute ?? -1, resource: l.resource, minutes: l.minutes })),
+      seen,
     };
     startTransition(async () => {
       // A new series: check every visit first, then book what staff chose.

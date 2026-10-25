@@ -42,9 +42,26 @@ export type BookingInput = {
   clientId: string | null;
   notes: string | null;
   items: BookingItemInput[];
+  // An edit: the visit as the person editing it saw it when they opened
+  // it. If it's been changed since (someone else moved it, changed a
+  // service or the notes), the save is refused ("changed") rather than
+  // undoing their change.
+  seen?: VisitSeen;
 };
 
-export type SaveError = "no_items" | "not_found" | "not_editable" | "forbidden" | "busy";
+export type VisitSeen = { notes: string | null; items: { id: string; serviceId: string; staffId: string; start: Date }[] };
+
+export type SaveError = "no_items" | "not_found" | "not_editable" | "forbidden" | "busy" | "changed";
+
+// Whether the visit is still as the editor saw it.
+function stillAsSeen(seen: VisitSeen, existing: { notes: string | null; items: ExistingItem[] }): boolean {
+  if ((seen.notes ?? "") !== (existing.notes ?? "") || seen.items.length !== existing.items.length) return false;
+  const now = new Map(existing.items.map((i) => [i.id, i]));
+  return seen.items.every((i) => {
+    const e = now.get(i.id);
+    return e && e.serviceId === i.serviceId && e.staffId === i.staffId && e.start.getTime() === i.start.getTime();
+  });
+}
 
 export type SaveResult =
   | { ok: true; appointmentId: string }
@@ -103,6 +120,7 @@ export async function saveBooking(supabase: Supabase, location: Location, input:
     const existing = input.appointmentId ? await loadAppointment(supabase, input.appointmentId) : null;
     if (input.appointmentId && !existing) return { ok: false, error: "not_found" };
     if (existing && !isEditable(existing.status)) return { ok: false, error: "not_editable" };
+    if (existing && input.seen && !stillAsSeen(input.seen, existing)) return { ok: false, error: "changed" };
     const oldById = new Map((existing?.items ?? []).map((i) => [i.id, i]));
     if (input.items.some((i) => i.id && !oldById.has(i.id))) return { ok: false, error: "not_found" };
 

@@ -24,3 +24,4 @@ Change a visit's date, services, stylist, start time, chair, client or notes.
 ## If it doesn't work
 
 - The change is refused: the reason shows on the service, with Denise's nearest times that work. Tap one to use it.
+- "Someone else changed this visit while you had it open": someone moved it, changed a service or the notes after you opened Edit booking, so your edit wasn't saved (theirs stays). Close it, open it again to see their change, then make yours.
