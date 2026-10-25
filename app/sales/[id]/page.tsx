@@ -61,7 +61,11 @@ async function Sale({ params, searchParams }: Pick<PageProps<"/sales/[id]">, "pa
   // Gift cards it was paid with (money can go back onto them).
   const { data: used } = await supabase.from("payments").select("gift_card:gift_cards(code, kind)").eq("sale_id", sale.id).not("gift_card_id", "is", null);
   const giftCards = [...new Map((used ?? []).flatMap((p) => (p.gift_card ? [[p.gift_card.code, { code: p.gift_card.code, label: `${p.gift_card.kind === "promotional" ? "promotional card" : "gift card"} …${p.gift_card.code.slice(-4)}` }] as const] : []))).values()];
-  const products = sale.items.filter((i) => i.kind === "product").map((i) => ({ id: i.id, description: i.description, quantity: i.quantity, returned: i.returnedQuantity }));
+  const products = sale.items.filter((i) => i.kind === "product").map((i) => ({ id: i.id, description: i.description, quantity: i.quantity, returned: i.returnedQuantity, totalCents: i.totalCents }));
+  // Gift cards, packages and memberships it sold, and what returning each
+  // gives back now (refundable_lines; null once cancelled).
+  const { data: sold } = manager ? await supabase.rpc("refundable_lines", { p_sale_id: sale.id }) : { data: [] };
+  const returnable = (sold ?? []).map((l) => ({ id: l.sale_item_id, kind: l.kind as "gift_card" | "package" | "membership", description: l.description, valueCents: l.value_cents }));
 
   return (
     <AppShell section="sales" me={me}>
@@ -100,7 +104,7 @@ async function Sale({ params, searchParams }: Pick<PageProps<"/sales/[id]">, "pa
           )}
           {manager && sale.status !== "voided" && sale.status !== "refunded" && (
             <Card title="Refund" titleId="refund-heading">
-              <RefundForm saleId={sale.id} refundableCents={paid - sale.refundedCents} products={products} giftCards={giftCards} />
+              <RefundForm saleId={sale.id} refundableCents={paid - sale.refundedCents} products={products} returnable={returnable} giftCards={giftCards} />
             </Card>
           )}
           {manager && sale.status === "completed" && (

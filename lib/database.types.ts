@@ -2609,14 +2609,14 @@ isOneToOne: false
                   ]
                 },"sale_events": {
                   Row: {
-                    "amount_cents": number | null,"business_id": string,"created_at": string,"detail": string | null,"id": string,"kind": string,"sale_id": string,"staff_id": string | null
+                    "amount_cents": number | null,"business_id": string,"created_at": string,"detail": string | null,"id": string,"kind": string,"returned": NonNullable<Json>,"sale_id": string,"staff_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount_cents"?: number | null,"business_id": string,"created_at"?: string,"detail"?: string | null,"id"?: string,"kind": string,"sale_id": string,"staff_id"?: string | null
+                    "amount_cents"?: number | null,"business_id": string,"created_at"?: string,"detail"?: string | null,"id"?: string,"kind": string,"returned"?: NonNullable<Json>,"sale_id": string,"staff_id"?: string | null
                   }
                   Update: {
-                    "amount_cents"?: number | null,"business_id"?: string,"created_at"?: string,"detail"?: string | null,"id"?: string,"kind"?: string,"sale_id"?: string,"staff_id"?: string | null
+                    "amount_cents"?: number | null,"business_id"?: string,"created_at"?: string,"detail"?: string | null,"id"?: string,"kind"?: string,"returned"?: NonNullable<Json>,"sale_id"?: string,"staff_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -3998,6 +3998,11 @@ isOneToOne: false
                            },
 "refund_sale":
 { Args: { "p_input": Json,"p_sale_id": string }; Returns: undefined
+                           },
+"refundable_lines":
+{ Args: { "p_sale_id": string }; Returns: {
+              "description": string,"kind": string,"sale_item_id": string,"value_cents": number
+            }[]
                            },
 "register_shared_device":
 { Args: { "p_location_id": string,"p_name": string,"p_token_hash": string }; Returns: string

@@ -93,17 +93,33 @@ export function VoidForm({ saleId }: { saleId: string }) {
   );
 }
 
+// What returning each kind of line does (refund_sale).
+const RETURN_TEXT = {
+  gift_card: "cancels what's left on the card",
+  package: "cancels the sessions not used",
+  membership: "ends the membership today",
+} as const;
+
+// A product's share of its line for some units back (as refund_sale works it out).
+const productShare = (p: { totalCents: number; quantity: number; returned: number }, units: number) =>
+  Math.round((p.totalCents * (p.returned + units)) / p.quantity) - Math.round((p.totalCents * p.returned) / p.quantity);
+
 // Refund: some or all of what was paid, with products returned (and back
-// into stock unless they can't be sold again).
+// into stock unless they can't be sold again), and gift cards, packages and
+// memberships sold on the sale cancelled for what's left of them. The amount
+// fills in from what's ticked, and can be changed.
 export function RefundForm({
   saleId,
   refundableCents,
   products,
+  returnable,
   giftCards,
 }: {
   saleId: string;
   refundableCents: number;
-  products: { id: string; description: string; quantity: number; returned: number }[];
+  products: { id: string; description: string; quantity: number; returned: number; totalCents: number }[];
+  // valueCents: what returning it gives back (null: already cancelled).
+  returnable: { id: string; kind: "gift_card" | "package" | "membership"; description: string; valueCents: number | null }[];
   // Gift cards the sale was paid with: money can go back onto them.
   giftCards: { code: string; label: string }[];
 }) {
@@ -112,6 +128,16 @@ export function RefundForm({
   const [method, setMethod] = useState<string>(giftCards.length ? `gift:${giftCards[0].code}` : "card");
   const [reason, setReason] = useState("");
   const [returns, setReturns] = useState<Record<string, string>>({});
+  const [cancel, setCancel] = useState<string[]>([]);
+  // The amount follows what's ticked until it's typed over.
+  const [typed, setTyped] = useState(false);
+  const fill = (nextReturns: Record<string, string>, nextCancel: string[]) => {
+    if (typed) return;
+    const cents =
+      products.reduce((n, p) => n + productShare(p, Math.min(p.quantity - p.returned, Number(nextReturns[p.id]) || 0)), 0) +
+      returnable.reduce((n, l) => n + (nextCancel.includes(l.id) ? (l.valueCents ?? 0) : 0), 0);
+    setAmount(cents ? (Math.min(cents, refundableCents) / 100).toFixed(2) : "");
+  };
   const [restock, setRestock] = useState(true);
   const [result, setResult] = useState<SimpleResult | null>(null);
   const [pending, start] = useTransition();
@@ -121,16 +147,19 @@ export function RefundForm({
       className="flex flex-col gap-3"
       onSubmit={(e) => {
         e.preventDefault();
-        const cents = parseDollars(amount);
-        if (!cents) return setResult({ ok: false, message: "Enter how much to refund." });
+        const cents = parseDollars(amount) ?? 0;
+        if (!cents && !cancel.length) return setResult({ ok: false, message: "Enter how much to refund." });
         start(async () => {
           const onCard = method.startsWith("gift:");
           const r = await refundSale(saleId, {
             reason,
-            payments: [onCard ? { method: "gift_card", amountCents: cents, code: method.slice(5) } : { method: method as "card" | "cash", amountCents: cents }],
-            returns: Object.entries(returns)
-              .map(([id, q]) => ({ saleItemId: id, quantity: Number(q) || 0 }))
-              .filter((x) => x.quantity > 0),
+            payments: cents ? [onCard ? { method: "gift_card", amountCents: cents, code: method.slice(5) } : { method: method as "card" | "cash", amountCents: cents }] : [],
+            returns: [
+              ...Object.entries(returns)
+                .map(([id, q]) => ({ saleItemId: id, quantity: Number(q) || 0 }))
+                .filter((x) => x.quantity > 0),
+              ...cancel.map((id) => ({ saleItemId: id, quantity: 1 })),
+            ],
             restock,
           });
           setResult(r);
@@ -142,7 +171,16 @@ export function RefundForm({
       <div className="grid grid-cols-2 gap-3">
         <label className={labelClass}>
           Amount ($)
-          <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} className={fieldClass} required />
+          <input
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => {
+              setAmount(e.target.value);
+              setTyped(e.target.value !== "");
+            }}
+            className={fieldClass}
+            required={!cancel.length}
+          />
         </label>
         <label className={labelClass}>
           Given back by
@@ -162,7 +200,40 @@ export function RefundForm({
           <span>
             {p.description} returned <span className="text-ink-muted">(of {p.quantity - p.returned})</span>
           </span>
-          <input type="number" min={0} max={p.quantity - p.returned} value={returns[p.id] ?? "0"} onChange={(e) => setReturns({ ...returns, [p.id]: e.target.value })} className={`${fieldClass} w-20`} aria-label={`${p.description} returned`} />
+          <input
+            type="number"
+            min={0}
+            max={p.quantity - p.returned}
+            value={returns[p.id] ?? "0"}
+            onChange={(e) => {
+              const next = { ...returns, [p.id]: e.target.value };
+              setReturns(next);
+              fill(next, cancel);
+            }}
+            className={`${fieldClass} w-20`}
+            aria-label={`${p.description} returned`}
+          />
+        </label>
+      ))}
+      {returnable.map((l) => (
+        <label key={l.id} className="flex items-start gap-2">
+          <input
+            type="checkbox"
+            className={`${checkboxClass} mt-0.5`}
+            disabled={l.valueCents === null}
+            checked={cancel.includes(l.id)}
+            onChange={(e) => {
+              const next = e.target.checked ? [...cancel, l.id] : cancel.filter((x) => x !== l.id);
+              setCancel(next);
+              fill(returns, next);
+            }}
+          />
+          <span>
+            Refund {l.description}{" "}
+            <span className="text-ink-muted">
+              {l.valueCents === null ? "(already cancelled)" : `(${formatPrice(l.valueCents)} back: ${RETURN_TEXT[l.kind]})`}
+            </span>
+          </span>
         </label>
       ))}
       {products.length > 0 && (

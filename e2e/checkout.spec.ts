@@ -208,6 +208,30 @@ test.describe("owner", () => {
     await expect(ui(page).getByTestId("receipt")).toContainText("Voided: Rang up twice");
     expect((await admin.from("sales").select("status").eq("id", second).single()).data!.status).toBe("voided");
   });
+
+  test("refunding a gift card gives back only what's left on it, and cancels the card", async ({ page }) => {
+    const desk = await import("../tests/db/helpers").then((h) => h.signIn("frontdesk@mapleandash.test"));
+    const { data: saleId } = await desk.rpc("complete_sale", {
+      p_location_id: L,
+      p_input: { lines: [{ kind: "gift_card", amount_cents: 5000, recipient_name: `${PREFIX} Gift` }], payments: [{ method: "card", amount_cents: 5000 }] },
+    });
+    const { data: card } = await admin.from("gift_cards").select("id, code").eq("sale_id", saleId!).single();
+    // $12 of it already spent.
+    await admin.from("gift_cards").update({ balance_cents: 3800 }).eq("id", card!.id);
+    await page.goto(`/sales/${saleId}`);
+    await waitForHydration(page, "form[aria-label=Refund] input");
+    const refund = ui(page).getByRole("form", { name: "Refund" });
+    await refund.getByRole("checkbox", { name: /^Refund Gift card/ }).check();
+    await expect(refund.getByRole("checkbox", { name: /^Refund Gift card/ })).toHaveAccessibleName(/\$38 back: cancels what's left on the card/);
+    await expect(refund.getByLabel("Amount ($)")).toHaveValue("38.00");
+    await refund.getByLabel("Reason", { exact: true }).fill("Changed their mind");
+    await refund.getByRole("button", { name: "Refund" }).click();
+    await expect(refund.getByRole("status")).toHaveText("Refunded.");
+    expect((await admin.from("gift_cards").select("status, balance_cents").eq("id", card!.id).single()).data).toEqual({ status: "voided", balance_cents: 0 });
+    expect((await admin.from("sales").select("refunded_cents").eq("id", saleId!).single()).data!.refunded_cents).toBe(3800);
+    await admin.from("sales").delete().eq("id", saleId!);
+    await admin.from("gift_cards").delete().eq("id", card!.id);
+  });
 });
 
 test.describe("stylist", () => {

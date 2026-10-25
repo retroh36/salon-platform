@@ -2,8 +2,11 @@
 // effect on a staff member's pay, and the totals for a period.
 //
 // A sale counts in the period it was completed. A refund counts in the
-// period it was given, taking back the same share of every line and tip
-// (a $30 refund on a $120 sale takes back a quarter of each). A void counts
+// period it was given: a product returned takes back that product's line
+// (its retail commission) and nothing else, never service commission or
+// tips; money given back that isn't for a returned line takes back the same
+// share of every line and tip (a $30 refund on a $120 sale takes back a
+// quarter of each). A void counts
 // in the period it was voided, taking back whatever was left. So a sale
 // paid in one period and refunded in the next is paid, then clawed back,
 // and nothing is ever paid twice. Commission is worked out on the period's
@@ -70,11 +73,13 @@ export type PayrollSale = {
   client: string | null;
   // commission_pct: the rate recorded on the line when it was sold.
   // commission_version_id: the plan version it was sold under, if any.
-  lines: { kind: "service" | "product"; staff_id: string; description: string; quantity: number; net_cents: number; commission_pct: number; commission_version_id?: string | null }[];
+  lines: { id?: string; kind: "service" | "product"; staff_id: string; description: string; quantity: number; net_cents: number; commission_pct: number; commission_version_id?: string | null }[];
   tips: { staff_id: string; amount_cents: number }[];
   // The tenders that took money (card, cash, gift card), for itemized tips.
   payments?: { method: "card" | "cash" | "gift_card"; online: boolean }[];
-  refunds: { amount_cents: number; at: string }[];
+  // returned: what each refund gave back for (products, gift cards,
+  // packages, memberships), and how much of its money was for each.
+  refunds: { amount_cents: number; at: string; returned?: { sale_item_id: string; kind: string; quantity: number; amount_cents: number }[] }[];
 };
 
 export type TicketKind = "sale" | "refund" | "void";
@@ -106,8 +111,12 @@ export function paidWith(payments: PayrollSale["payments"]): string | null {
 
 type Amounts = { serviceCents: number; retailCents: number; tipCents: number; lines: Ticket["lines"] };
 
+function ownLines(sale: PayrollSale, staffId: string) {
+  return sale.lines.filter((l) => l.staff_id === staffId);
+}
+
 function ownShare(sale: PayrollSale, staffId: string): Amounts {
-  const lines = sale.lines.filter((l) => l.staff_id === staffId).map((l) => ({
+  const lines = ownLines(sale, staffId).map((l) => ({
       description: l.description,
       kind: l.kind,
       quantity: l.quantity,
@@ -165,11 +174,34 @@ export function ticketsFor(sales: readonly PayrollSale[], staffId: string, from:
     let taken: Amounts = { serviceCents: 0, retailCents: 0, tipCents: 0, lines: own.lines.map((l) => ({ ...l, cents: 0 })) };
     let refunded = 0;
     const shareOf = (cents: number) => (sale.total_cents > 0 ? Math.min(1, cents / sale.total_cents) : 0);
+    // Units of each of their lines returned so far.
+    const sold = ownLines(sale, staffId);
+    const returnedSoFar = sold.map(() => 0);
     for (const r of sale.refunds) {
       if (sale.voided_at && Date.parse(r.at) > Date.parse(sale.voided_at)) continue;
-      const back = takeBack(own, shareOf(refunded + r.amount_cents), shareOf(refunded));
-      refunded += r.amount_cents;
-      if (within(r.at)) push("refund", r.at, back);
+      const returned = r.returned ?? [];
+      // Products returned: their own lines, by units returned, rounded on
+      // the running share like the refund itself.
+      const lines = own.lines.map((l, i) => {
+        const units = returned.filter((x) => x.sale_item_id === sold[i].id && x.kind === "product").reduce((n, x) => n + x.quantity, 0);
+        if (!units) return { ...l, cents: 0 };
+        const q = sold[i].quantity;
+        const cents = -(Math.round((l.cents * (returnedSoFar[i] + units)) / q) - Math.round((l.cents * returnedSoFar[i]) / q));
+        returnedSoFar[i] += units;
+        return { ...l, cents };
+      });
+      const forLines: Amounts = {
+        serviceCents: 0,
+        retailCents: lines.reduce((n, l) => n + l.cents, 0),
+        tipCents: 0,
+        lines,
+      };
+      // The rest of the money: a share of everything, as before.
+      const other = Math.max(0, r.amount_cents - returned.reduce((n, x) => n + x.amount_cents, 0));
+      const back = plus(forLines, takeBack(own, shareOf(refunded + other), shareOf(refunded)));
+      refunded += other;
+      // A refund that takes nothing of theirs isn't one of their tickets.
+      if (within(r.at) && (back.tipCents || back.lines.some((l) => l.cents))) push("refund", r.at, back);
       taken = plus(taken, back);
     }
     if (sale.voided_at && within(sale.voided_at)) {

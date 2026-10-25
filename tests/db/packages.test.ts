@@ -176,14 +176,17 @@ describe("canceling", () => {
     );
   });
 
-  it("never pays out twice: a package whose sale was refunded cancels with nothing more back", async () => {
+  it("never pays out twice: a package refunded on its sale is cancelled, with nothing more back", async () => {
     const two = await template({ name: `${PREFIX} 2 blowouts`, price_cents: 8000, items: [{ service_id: blowout.id, quantity: 2 }] });
     const { data: saleId } = await sell(frontDesk, { client_id: clientId, lines: [{ kind: "package", template_id: two }], payments: [{ method: "card", amount_cents: 8000 }] });
     const packageId = (await admin.from("client_packages").select("id").eq("sale_id", saleId!).single()).data!.id;
-    expect((await manager.rpc("refund_sale", { p_sale_id: saleId!, p_input: { reason: "Changed mind", payments: [{ method: "card", amount_cents: 8000 }] } as never })).error).toBeNull();
-    const { data: refunded, error } = await manager.rpc("cancel_package", { p_client_package_id: packageId, p_reason: "Refunded", p_refund_method: "cash" });
-    expect(error).toBeNull();
-    expect(refunded).toBe(0);
+    // Money for a package comes back only by returning it.
+    const refundOf = (returns: unknown[]) => manager.rpc("refund_sale", { p_sale_id: saleId!, p_input: { reason: "Changed mind", payments: [{ method: "card", amount_cents: 8000 }], returns } as never });
+    expect((await refundOf([])).error?.code).toBe("22023");
+    const line = (await admin.from("sale_items").select("id").eq("sale_id", saleId!).eq("kind", "package").single()).data!.id;
+    expect((await refundOf([{ sale_item_id: line, quantity: 1 }])).error).toBeNull();
+    const { error } = await manager.rpc("cancel_package", { p_client_package_id: packageId, p_reason: "Refunded", p_refund_method: "cash" });
+    expect(error?.code).toBe("55000");
     const { data: out } = await admin.from("payments").select("amount_cents").eq("sale_id", saleId!).lt("amount_cents", 0);
     expect(out!.reduce((n, p) => n + p.amount_cents, 0)).toBe(-8000);
   });

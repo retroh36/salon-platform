@@ -111,6 +111,37 @@ describe("tickets behind the pay", () => {
     const [v] = ticketsFor([later], A, from, to);
     expect(v).toMatchObject({ kind: "void", serviceCents: -6000, retailCents: -1500, tipCents: -750 });
   });
+
+  it("a product returned takes back that product's line only, never service commission or tips", () => {
+    const withIds = (over: Partial<PayrollSale>) =>
+      sale({ lines: sale().lines.map((l, i) => ({ ...l, id: `i${i}`, ...(i === 1 ? { quantity: 2 } : {}) })), ...over });
+    // One of the two shampoos back, $10.83 with tax.
+    const returned = withIds({ refunds: [{ amount_cents: 1083, at: "2026-10-10T16:00:00Z", returned: [{ sale_item_id: "i1", kind: "product", quantity: 1, amount_cents: 1083 }] }] });
+    const [, back] = ticketsFor([returned], A, from, to);
+    expect(back).toMatchObject({ kind: "refund", serviceCents: 0, retailCents: -1000, tipCents: 0 });
+    expect(payLine({ staffId: A, name: "Ana", role: "Stylist" }, [back], null)).toMatchObject({ serviceCommissionCents: 0, retailCommissionCents: -150, tipCents: 0 });
+    // Nothing of Ben's.
+    expect(ticketsFor([returned], B, from, to).filter((t) => t.kind === "refund")).toEqual([]);
+    // Then the other one: the whole line back, never more.
+    const both = withIds({
+      refunds: [
+        { amount_cents: 1083, at: "2026-10-10T16:00:00Z", returned: [{ sale_item_id: "i1", kind: "product", quantity: 1, amount_cents: 1083 }] },
+        { amount_cents: 1083, at: "2026-10-11T16:00:00Z", returned: [{ sale_item_id: "i1", kind: "product", quantity: 1, amount_cents: 1083 }] },
+      ],
+    });
+    expect(ticketsFor([both], A, from, to).filter((t) => t.kind === "refund").reduce((n, t) => n + t.retailCents, 0)).toBe(-2000);
+  });
+
+  it("money given back beyond what was returned is a share of everything; a package or gift card refunded takes nothing from stylists", () => {
+    const withIds = (over: Partial<PayrollSale>) => sale({ lines: sale().lines.map((l, i) => ({ ...l, id: `i${i}` })), ...over });
+    // The shampoo back ($21.65) and $30 more for the cut.
+    const mixed = withIds({ refunds: [{ amount_cents: 2165 + 3000, at: "2026-10-10T16:00:00Z", returned: [{ sale_item_id: "i1", kind: "product", quantity: 1, amount_cents: 2165 }] }] });
+    const [, back] = ticketsFor([mixed], A, from, to);
+    // The shampoo, plus a quarter of the cut, the shampoo line and the tip (the $30 is a share of the whole sale, as before).
+    expect(back).toMatchObject({ serviceCents: -2000, retailCents: -2000 - 500, tipCents: -250 });
+    const giftCard = withIds({ refunds: [{ amount_cents: 5000, at: "2026-10-10T16:00:00Z", returned: [{ sale_item_id: "g1", kind: "gift_card", quantity: 1, amount_cents: 5000 }] }] });
+    expect(ticketsFor([giftCard], A, from, to).map((t) => t.kind)).toEqual(["sale"]);
+  });
 });
 
 describe("pay", () => {
