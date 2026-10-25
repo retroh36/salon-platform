@@ -334,6 +334,49 @@ export async function book(slug: string, input: BookInput): Promise<BookResult> 
     deposit = { amount_cents: terms.depositCents, provider: card.charge.provider, reference: charged.reference };
   }
 
+  // From here the deposit has been taken: whatever goes wrong before the
+  // booking and its deposit are recorded, it goes back.
+  try {
+    return await bookCharged(admin, site, input, { clientId: clientId!, contact, request, start, terms, promotion, card, deposit, token, ipHash, userAgent, signedIn: who.signedIn });
+  } catch (error) {
+    if (deposit) await providerFor(deposit.provider).refund(deposit.reference);
+    console.error(`[book] booking failed after the card step: ${error instanceof Error ? error.message : "unknown"}`);
+    return { ok: false, message: `Something went wrong and your visit wasn't booked.${deposit ? " You haven't been charged." : ""} Please try again.` };
+  }
+}
+
+async function bookCharged(
+  admin: ReturnType<typeof createAdminClient>,
+  site: BookingSite,
+  input: BookInput,
+  {
+    clientId,
+    contact,
+    request,
+    start,
+    terms,
+    promotion,
+    card,
+    deposit,
+    token,
+    ipHash,
+    userAgent,
+    signedIn,
+  }: {
+    clientId: string;
+    contact: { channel: Channel; destination: string };
+    request: VisitRequest;
+    start: Date;
+    terms: OnlineTerms;
+    promotion: Awaited<ReturnType<typeof onlinePromotion>> | null;
+    card: { save?: { provider: string; ref: string; label: string } };
+    deposit: { amount_cents: number; provider: string; reference: string } | null;
+    token: string;
+    ipHash: string;
+    userAgent: string | null;
+    signedIn: boolean;
+  },
+): Promise<BookResult> {
   const note = input.note?.trim().slice(0, 500);
   const result = await bookOnline(admin, { id: site.location.id, timezone: site.location.timezone }, {
     clientId: clientId!,
@@ -361,7 +404,12 @@ export async function book(slug: string, input: BookInput): Promise<BookResult> 
     p_consent: { policy_text: terms.lines.join("\n"), terms: { ...terms.terms, deposit_cents: terms.depositCents, visit_cents: terms.visitCents }, ip_hash: ipHash },
     p_deposit: deposit as never,
   });
-  if (consentError) throw consentError;
+  if (consentError) {
+    // Booked, but the deposit and what they agreed to aren't on it: take the
+    // booking back too, so they can simply book again.
+    await cancelOnline(admin, result.appointmentId, sha256(token));
+    throw consentError;
+  }
 
   const manageUrl = `/book/${site.business.slug}/manage/${token}`;
   await Promise.all([
@@ -379,7 +427,7 @@ export async function book(slug: string, input: BookInput): Promise<BookResult> 
   // After their answers, so a no to texts (or a STOP) sends it by email.
   await confirmationMessage(admin, site, clientId!, contact, start, manageUrl, terms);
   // "Keep me signed in": their account, made from the code they confirmed.
-  if (input.remember && !who.signedIn) await startAccountSession(admin, site.business.id, clientId!, contact.channel, site.business.slug, ipHash);
+  if (input.remember && !signedIn) await startAccountSession(admin, site.business.id, clientId!, contact.channel, site.business.slug, ipHash);
   return { ok: true, manageUrl: `${manageUrl}?booked=1` };
 }
 
