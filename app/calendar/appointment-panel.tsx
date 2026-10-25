@@ -28,6 +28,7 @@ import type { BookingIdeas } from "@/lib/denise/ideas";
 import type { Scope } from "@/lib/scheduling/series";
 import { useNow } from "./now-line";
 import type { AppointmentDetail, BoardData } from "./types";
+import { reach } from "@/lib/reach";
 
 export function AppointmentPanel({
   date,
@@ -102,12 +103,13 @@ export function AppointmentPanel({
   function run(action: AppointmentAction, reason = "", detail = "", scope: Scope | "group" = "this") {
     setMessage(null);
     startTransition(async () => {
-      const result =
+      const result = await reach(
         scope === "this"
-          ? await changeVisitStatus(appointment.id, action, reason, detail)
+          ? changeVisitStatus(appointment.id, action, reason, detail)
           : scope === "group"
-            ? await changeGroupVisitStatus(appointment.id, action, reason, detail)
-            : await changeVisitStatusScoped(appointment.id, action, scope, reason, detail);
+            ? changeGroupVisitStatus(appointment.id, action, reason, detail)
+            : changeVisitStatusScoped(appointment.id, action, scope, reason, detail),
+      );
       if (!result.ok) setMessage(result.message);
       else if (action === "check_in") onCheckedIn(appointment.id);
       else if (action === "no_show") {
@@ -132,7 +134,7 @@ export function AppointmentPanel({
   function overrideCheckIn(reason: string) {
     setMessage(null);
     startTransition(async () => {
-      const result = await checkInWithPatchOverride(appointment.id, reason);
+      const result = await reach(checkInWithPatchOverride(appointment.id, reason));
       if (!result.ok) return setMessage(result.message);
       setConfirmingCheckIn(false);
       onCheckedIn(appointment.id);
@@ -142,7 +144,7 @@ export function AppointmentPanel({
   function undoCheckIn() {
     setMessage(null);
     startTransition(async () => {
-      const result = await undoVisitCheckIn(appointment.id);
+      const result = await reach(undoVisitCheckIn(appointment.id));
       if (!result.ok) setMessage(result.message);
     });
   }
@@ -150,7 +152,7 @@ export function AppointmentPanel({
   function undoNoShow() {
     setMessage(null);
     startTransition(async () => {
-      const result = await undoVisitNoShow(appointment.id);
+      const result = await reach(undoVisitNoShow(appointment.id));
       if (!result.ok) setMessage(result.message);
     });
   }
@@ -961,7 +963,7 @@ function FormulaSection({ appointment, date, products, canRecord }: { appointmen
                 e.preventDefault();
                 setResult(null);
                 startTransition(async () => {
-                  const r = await addVisitFormula({ itemId, date, formula, notes, lines: toUsageJson(lines) });
+                  const r = await reach(addVisitFormula({ itemId, date, formula, notes, lines: toUsageJson(lines) }));
                   if (!r.ok) return setResult({ text: r.message, error: true });
                   setResult({ text: appointment.status === "completed" ? "Formula saved, and stock updated." : "Formula saved. Stock is taken at checkout.", error: false });
                   setAdding(false);

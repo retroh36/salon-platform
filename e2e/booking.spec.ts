@@ -229,6 +229,22 @@ test.describe("front desk", () => {
     expect(await appointment(id)).toMatchObject({ status: "completed", updated_by: FRONT_DESK });
   });
 
+  test("offline, checking in says it couldn't reach the server, and works once back", async ({ page, pageErrors }) => {
+    const id = await seedVisit(await newClient("Ona"), [{ service: "Women's Cut & Style", staff: BRIDGET, start: at(11) }]);
+    await openDay(page);
+    await column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Ona Test`) }).click();
+    const detail = panel(page);
+    await page.context().setOffline(true);
+    await detail.getByRole("button", { name: "Check in", exact: true }).click();
+    await detail.getByRole("button", { name: "Check in anyway" }).click();
+    await expect(detail).toContainText("We couldn't reach the server");
+    expect((await appointment(id)).status).toBe("booked");
+    await page.context().setOffline(false);
+    await checkIn(detail);
+    await expect(detail.locator("[data-status]")).toHaveText(/^Checked in/);
+    pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !/ERR_INTERNET_DISCONNECTED|Failed to fetch|Failed to load resource/.test(e)));
+  });
+
   test("cancels with a reason, taking the visit off the calendar", async ({ page }) => {
     const id = await seedVisit(await newClient("Dee"), [{ service: "Women's Cut & Style", staff: BRIDGET, start: at(10) }]);
     await openDay(page);

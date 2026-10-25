@@ -18,6 +18,9 @@ type Done = Extract<DeniseEvent, { t: "done" }>;
 
 const IDLE: DeniseRun = { working: false, status: null, text: "", slow: false };
 export const SLOW_MS = 20_000;
+// Past this, she gives up and says something went wrong (a request that
+// hangs would otherwise leave her "still working" for good).
+export const GIVE_UP_MS = 150_000;
 
 // Asks Denise (app/api/denise) and follows along as she works. Always ends
 // with a reply: if the request fails, hers is "Something went wrong on my
@@ -29,7 +32,7 @@ export function useDeniseRun() {
     setRun({ working: true, status: firstStatus, text: "", slow: false });
     const timer = setTimeout(() => setRun((r) => ({ ...r, slow: true })), SLOW_MS);
     try {
-      const response = await fetch("/api/denise", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) });
+      const response = await fetch("/api/denise", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request), signal: AbortSignal.timeout(GIVE_UP_MS) });
       if (!response.ok || !response.body) return { t: "done", reply: ERROR_REPLY };
       const reader = response.body.getReader();
       const decoder = new TextDecoder();

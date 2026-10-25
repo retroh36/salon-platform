@@ -18,6 +18,7 @@ import { packageFor, usesLeft, type ClientPackage } from "@/lib/packages";
 import type { Scope } from "@/lib/scheduling/series";
 import { clientPackagesFor, clientPolicyNote, patchTestWarnings, findClients, previewSeries, quickAddClient, saveSeries, saveVisit, saveVisitScoped, type ClientOption, type SeriesPreviewVisit, type VisitInput } from "./actions";
 import type { AppointmentDetail, BoardData } from "./types";
+import { reach } from "@/lib/reach";
 
 export type BookingStart = { staffId: string; startMinute: number };
 
@@ -163,7 +164,7 @@ export function BookingPanel({
       if (!appointment && repeat.on) {
         if (!preview) {
           if (!client) return setMessage("Choose a client, or add a new one.");
-          const r = await previewSeries(input, repeatInput());
+          const r = await reach(previewSeries(input, repeatInput()));
           if (!r.ok) return setMessage(r.message);
           setPreview(r.visits);
           setChoices(Object.fromEntries(r.visits.map((v) => [v.date, v.ok ? "planned" : v.alternatives.length ? "0" : "skip"])));
@@ -176,17 +177,17 @@ export function BookingPanel({
           const alt = v.alternatives[Number(c)];
           return [{ date: alt.date, lines: alt.lines }];
         });
-        const r = await saveSeries(input, repeatInput(), visits);
+        const r = await reach(saveSeries(input, repeatInput(), visits));
         if (r.ok) onSaved(r.appointmentId, r.message);
         else setMessage(r.message);
         return;
       }
-      const result = appointment?.series && scope !== "this" ? await saveVisitScoped(input, scope) : await saveVisit(input);
+      const result = await reach(appointment?.series && scope !== "this" ? saveVisitScoped(input, scope) : saveVisit(input));
       if (result.ok) onSaved(result.appointmentId, (result as { message?: string }).message ?? (date !== data.date ? `Moved to ${formatLongDay(date, false)}.` : undefined), date);
       else {
         setMessage(result.message);
-        setLineErrors(result.lineErrors ?? []);
-        setIdeas(result.ideas ?? null);
+        setLineErrors(("lineErrors" in result && result.lineErrors) || []);
+        setIdeas(("ideas" in result && result.ideas) || null);
       }
     });
   }
