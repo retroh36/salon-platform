@@ -190,7 +190,8 @@ describe("recording formulas", () => {
   it("refuses retail products, another client's visit, and other salons", async () => {
     const visit = await book([item("All-Over Color", BRIDGET, at(10))]);
     expect((await formula(bridget, visit.itemIds[0], [["OLX-3-100", 1]])).error?.code).toBe("22023");
-    const { data: c } = await admin.from("clients").select("id").eq("business_id", B).neq("id", clientId).limit(1).single();
+    // Another of her own clients (one she can't see is refused before that).
+    const { data: c } = await bridget.from("clients").select("id").neq("id", clientId).limit(1).single();
     const wrongClient = await bridget.rpc("add_formula", { p_client_id: c!.id, p_appointment_item_id: visit.itemIds[0], p_visit_date: TODAY, p_formula: "x", p_notes: "", p_lines: [] });
     expect(wrongClient.error?.code).toBe("22023");
     expect((await formula(otherOwner, visit.itemIds[0], [["GW-TC-7N", 30]])).error?.code).toBe("42501");

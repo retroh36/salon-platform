@@ -189,6 +189,27 @@ describe("stylists and assistants", () => {
     expect(error?.code).toBe("42501");
   });
 
+  it("an assistant writes nothing to a client, and a stylist only to clients on their book", async () => {
+    const { data: hers } = await bridget.from("clients").select("id").limit(1).single();
+    const { data: stranger } = await admin.from("clients").insert({ business_id: B, first_name: "Notonher", last_name: "Book" }).select("id").single();
+    try {
+      const formula = (c: Client, client: string) =>
+        c.rpc("add_formula", { p_client_id: client, p_appointment_item_id: null as unknown as string, p_visit_date: today, p_formula: "6N + 20 vol", p_notes: null as unknown as string, p_lines: [] });
+      const patch = (c: Client, client: string, by: string) =>
+        c.from("client_patch_tests").insert({ business_id: B, client_id: client, tested_at: new Date().toISOString(), products: "Color", result: "no_reaction", performed_by: by });
+      expect((await formula(ari, hers!.id)).error?.code).toBe("42501");
+      expect((await patch(ari, hers!.id, SEED.staff.ari)).error?.code).toBe("42501");
+      expect((await formula(bridget, stranger!.id)).error?.code).toBe("42501");
+      expect((await patch(bridget, stranger!.id, SEED.staff.bridget)).error?.code).toBe("42501");
+      // Her own client, as before.
+      expect((await formula(bridget, hers!.id)).error).toBeNull();
+    } finally {
+      await admin.from("client_formulas").delete().eq("formula", "6N + 20 vol");
+      await admin.from("client_patch_tests").delete().eq("client_id", stranger!.id);
+      await admin.from("clients").delete().eq("id", stranger!.id);
+    }
+  });
+
   it("an assistant with no stylist sees no one's book", async () => {
     const { error } = await manager.rpc("set_assistant_stylist", { p_staff_id: SEED.staff.ari, p_stylist_id: null as unknown as string });
     expect(error).toBeNull();
