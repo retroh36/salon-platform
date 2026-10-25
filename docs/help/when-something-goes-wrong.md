@@ -14,7 +14,7 @@ If a page can't load or can't finish what you asked, it says "Something went wro
 ## Good to know
 
 - Anything already saved stays saved.
-- An old or mistyped link says "We can't find that page", with **Go to the Dashboard**.
+- An old or mistyped link says "We can't find that page", with **Go to the Dashboard**. A client on an old link from the booking site gets **Go to the booking page** (their salon's), and on their other links (unsubscribe, pay, card, event) no link at all.
 - Denise's own messages have references too ("Ref D-…"), which work the same way.
 - Without a connection, visit notes say "Notes not saved", and save when you type again once it's back.
 - "We couldn't reach the server…" after booking, checking in or another change: the Wi-Fi dropped. It may have gone through just before, so look at the calendar before trying again.

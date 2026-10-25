@@ -371,6 +371,11 @@ test("a bad manage link or salon shows nothing", async ({ page }) => {
   await page.goto(`/book/${SLUG}/manage/${"x".repeat(43)}`);
   await expect(page.getByRole("heading", { name: "We can't find that page" })).toBeVisible();
   await expect(page.getByTestId("manage-booking")).toHaveCount(0);
+  // A client is pointed back to the salon's booking page, never the Dashboard.
+  await expect(page.getByRole("link", { name: "Go to the Dashboard" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Go to the booking page" }).click();
+  await expect(page).toHaveURL(new RegExp(`/book/${SLUG}$`));
   await page.goto("/book/no-such-salon");
   await expect(page.getByRole("heading", { name: "We can't find that page" })).toBeVisible();
+  await expect(page.getByRole("link")).toHaveCount(0);
 });
