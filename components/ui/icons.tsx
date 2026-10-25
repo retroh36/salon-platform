@@ -18,6 +18,13 @@ export const ShieldIcon = (p: IconProps) => (
     <path d="m9 12 2.2 2.2L15.5 10" />
   </Icon>
 );
+export const RingIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="14.5" r="6" />
+    <path d="m9.5 8.5-1.5-3h8l-1.5 3" />
+    <path d="M10 5.5 12 3l2 2.5" />
+  </Icon>
+);
 export const TargetIcon = (p: IconProps) => (
   <Icon {...p}>
     <circle cx="12" cy="12" r="8.5" />

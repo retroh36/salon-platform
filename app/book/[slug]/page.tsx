@@ -57,14 +57,23 @@ async function Booking({ params, searchParams }: { params: Promise<{ slug: strin
   }
   const { site } = found;
   const admin = createAdminClient();
-  const [info, account] = await Promise.all([loadSeo(admin, slug), currentAccount(admin, site.business.id)]);
+  const [info, account, events] = await Promise.all([
+    loadSeo(admin, slug),
+    currentAccount(admin, site.business.id),
+    admin.from("event_settings").select("inquiries_enabled").eq("business_id", site.business.id).maybeSingle(),
+  ]);
   // "Book this again" from their account: ?services=a,b&staff=x.
   const services = typeof query.services === "string" ? query.services.split(",").filter((id) => /^[0-9a-f-]{36}$/.test(id)) : [];
   const staff = typeof query.staff === "string" && /^[0-9a-f-]{36}$/.test(query.staff) ? query.staff : null;
   return (
     <BookingFrame name={site.business.name} logoUrl={site.business.logoUrl} accent={site.settings.accent}>
       {info && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdText(seoFor(info, siteUrl()).jsonLd) }} />}
-      <p className="-mt-2 mb-4 text-right text-sm">
+      <p className="-mt-2 mb-4 flex flex-wrap justify-end gap-x-4 text-sm">
+        {events.data?.inquiries_enabled && (
+          <Link href={`/book/${slug}/event`} className="font-medium text-(--accent) underline underline-offset-2">
+            Planning a wedding or event?
+          </Link>
+        )}
         <Link href={`/book/${slug}/account`} className="font-medium text-(--accent) underline underline-offset-2">
           {account ? `${account.firstName}'s account` : "My account"}
         </Link>

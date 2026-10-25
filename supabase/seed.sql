@@ -800,3 +800,30 @@ values
    null, false, false, true, false, null, '[]', 6000),
   ('b0000000-0000-4000-8000-000000000001', 'Last-minute 15%', 'last_minute', null, 'percent', 15, null, true, false, null,
    null, false, false, false, true, 48, '[{"level": "master", "category": "Color"}]', null);
+
+-- ---------------------------------------------------------------------------
+-- Bridal and events (Settings → Bridal and events): packages for the
+-- party, a second payment 30 days out, trials booked as Bridal Trial, and
+-- who does event hair (Bridget, Nola, Shae, Lois) and makeup (Hannah,
+-- Lois). The demo seed adds events at every stage.
+-- ---------------------------------------------------------------------------
+
+insert into public.event_packages (id, business_id, name, party_role, hair_minutes, makeup_minutes, price_cents, is_trial, position)
+values
+  ('ee000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'Bride hair + makeup',      'bride',       90, 75, 45000, false, 0),
+  ('ee000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'Bridesmaid hair',          'bridesmaid',  45,  0, 12000, false, 1),
+  ('ee000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 'Bridesmaid hair + makeup', 'bridesmaid',  45, 45, 22000, false, 2),
+  ('ee000000-0000-4000-8000-000000000004', 'b0000000-0000-4000-8000-000000000001', 'Mother of the bride',      'mother',      45, 45, 20000, false, 3),
+  ('ee000000-0000-4000-8000-000000000005', 'b0000000-0000-4000-8000-000000000001', 'Flower girl',              'flower_girl', 20,  0,  5000, false, 4),
+  ('ee000000-0000-4000-8000-000000000006', 'b0000000-0000-4000-8000-000000000001', 'Bridesmaid makeup',        'bridesmaid',   0, 45, 11000, false, 5),
+  ('ee000000-0000-4000-8000-000000000007', 'b0000000-0000-4000-8000-000000000001', 'Trial',                    'bride',       60, 60, 17500, true,  6);
+
+update public.event_settings
+set second_payment_pct = 30,
+    second_payment_days = 30,
+    trial_service_id = (select id from public.services where business_id = 'b0000000-0000-4000-8000-000000000001' and name = 'Bridal Trial')
+where business_id = 'b0000000-0000-4000-8000-000000000001';
+
+update public.staff set event_roles = array['hair'] where id in ('d0000000-0000-4000-8000-000000000004', 'd0000000-0000-4000-8000-000000000007', 'd0000000-0000-4000-8000-000000000009');
+update public.staff set event_roles = array['makeup'] where id = 'd0000000-0000-4000-8000-000000000006';
+update public.staff set event_roles = array['hair', 'makeup'] where id = 'd0000000-0000-4000-8000-000000000010';

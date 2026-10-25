@@ -2,7 +2,7 @@ import Link from "next/link";
 import { pillClass } from "@/components/ui/page";
 import { can, type Permission } from "@/lib/permissions";
 
-type Page = "salon" | "booking" | "policies" | "checkout" | "gift-cards" | "packages" | "memberships" | "automations" | "messages" | "devices" | "payroll" | "commission" | "data" | "billing";
+type Page = "salon" | "booking" | "policies" | "checkout" | "gift-cards" | "packages" | "events" | "memberships" | "automations" | "messages" | "devices" | "payroll" | "commission" | "data" | "billing";
 
 // Each settings page and the permission it needs (lib/permissions.ts).
 const LINKS: [Page, string, string, Permission][] = [
@@ -12,6 +12,7 @@ const LINKS: [Page, string, string, Permission][] = [
   ["checkout", "/settings/checkout", "Tax and receipts", "settings"],
   ["gift-cards", "/settings/gift-cards", "Gift cards", "settings"],
   ["packages", "/settings/packages", "Packages", "settings"],
+  ["events", "/settings/events", "Bridal and events", "settings"],
   ["memberships", "/settings/memberships", "Memberships", "settings"],
   ["automations", "/settings/automations", "Automations", "settings"],
   ["messages", "/settings/messages", "Messages", "settings"],

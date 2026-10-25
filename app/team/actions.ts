@@ -110,6 +110,18 @@ export async function setAssistantStylist(staffId: string, stylistId: string | n
   return { ok: true, message: stylistId ? "Saved. They'll see that stylist's day." : "Saved. They're not assisting anyone." };
 }
 
+// Which event work someone does (hair, makeup): who the event builder
+// suggests for its artist lanes.
+export async function setEventRoles(staffId: string, roles: string[]): Promise<LoginResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !isUuid(staffId)) return { ok: false, message: NOT_ALLOWED };
+  const { error } = await supabase.rpc("set_staff_event_roles", { p_staff_id: staffId, p_roles: roles.filter((r) => r === "hair" || r === "makeup") });
+  if (error?.code === "42501") return { ok: false, message: NOT_ALLOWED };
+  if (error) throw error;
+  refresh();
+  return { ok: true, message: roles.length ? "Saved. They'll be suggested for that event work." : "Saved. They won't be suggested for events." };
+}
+
 // Clears someone's PIN for the shared iPad (they set a new one themselves).
 export async function clearMemberPin(staffId: string): Promise<LoginResult> {
   const { supabase, staff: me } = await getCurrentStaff();

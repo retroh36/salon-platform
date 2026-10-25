@@ -60,6 +60,8 @@ describe("finding the page", () => {
     ["waive the late cancel fee", "Waive a cancellation or no-show fee"],
     ["send a card link", "Ask a client for a card on file"],
     ["set our cancellation policy", "Set up your cancellation policy"],
+    ["how do I set up a wedding", "Plan a wedding or event"],
+    ["change the bridal deposit", "Set up bridal packages and settings"],
   ])("%s → %s", (question, title) => {
     expect(searchHelp(pages, question)[0]?.title).toBe(title);
   });

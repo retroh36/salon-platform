@@ -2,14 +2,14 @@ import Link from "next/link";
 import { logout } from "@/app/login/actions";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
-import { BoxIcon, CalendarIcon, ChartIcon, GiftIcon, ReceiptIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, ShieldIcon, TagIcon, UserIcon, WalletIcon } from "@/components/ui/icons";
+import { BoxIcon, CalendarIcon, RingIcon, ChartIcon, GiftIcon, ReceiptIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, ShieldIcon, TagIcon, UserIcon, WalletIcon } from "@/components/ui/icons";
 import { SalonMark } from "@/components/ui/salon-mark";
 import { firstSettingsPage } from "@/app/settings/settings-nav";
 import { AutoLock } from "@/components/auto-lock";
 import { can, type Permission } from "@/lib/permissions";
 import { isFrontOfHouse, roleLabel, type StaffRole } from "@/lib/staff";
 
-export type Section = "account" | "dashboard" | "my-day" | "calendar" | "sales" | "gift-cards" | "reports" | "payroll" | "policy" | "promotions" | "clients" | "team" | "services" | "durations" | "inventory" | "forms" | "settings";
+export type Section = "account" | "dashboard" | "my-day" | "calendar" | "events" | "sales" | "gift-cards" | "reports" | "payroll" | "policy" | "promotions" | "clients" | "team" | "services" | "durations" | "inventory" | "forms" | "settings";
 
 type NavItem = {
   section: Section;
@@ -36,6 +36,7 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
       { section: "my-day", href: "/my-day", label: "My day", Icon: ClockIcon, ownBook: true },
       { section: "calendar", href: "/calendar", label: "Calendar", Icon: CalendarIcon },
       { section: "clients", href: "/clients", label: "Clients", Icon: UserIcon },
+      { section: "events", href: "/events", label: "Events", Icon: RingIcon, frontOfHouse: true },
     ],
   },
   {

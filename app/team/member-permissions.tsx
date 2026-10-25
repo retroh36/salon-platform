@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { checkboxClass, labelClass, selectClass } from "@/components/ui/field";
 import { PERMISSIONS } from "@/lib/permissions";
 import type { LoginResult } from "@/lib/team-logins";
-import { clearMemberPin, setAssistantStylist, setMemberPermission } from "./actions";
+import { clearMemberPin, setAssistantStylist, setEventRoles, setMemberPermission } from "./actions";
 
 export type PermissionRow = { permission: string; allowed: boolean; role_default: boolean; toggleable: boolean };
 
@@ -95,6 +95,39 @@ export function AssistingCard({ staffId, current, stylists }: { staffId: string;
         </select>
       </label>
       <p className="text-sm text-ink-muted">They see this stylist&rsquo;s day and clients, without prices or pay.</p>
+      <Status result={result} />
+    </section>
+  );
+}
+
+// Which event work they do: hair, makeup or both (for the event builder's
+// artist lanes).
+export function EventWorkCard({ staffId, firstName, current }: { staffId: string; firstName: string; current: string[] }) {
+  const [roles, setRoles] = useState(current);
+  const [result, setResult] = useState<LoginResult | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <section aria-label="Event work" className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-5 shadow-card">
+      <h2 className="font-serif text-lg font-semibold text-ink">Event work</h2>
+      <p className="text-sm text-ink-muted">What {firstName} does at weddings and events.</p>
+      <div className="flex gap-5">
+        {(["hair", "makeup"] as const).map((role) => (
+          <label key={role} className="flex min-h-11 items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              className={checkboxClass}
+              checked={roles.includes(role)}
+              disabled={pending}
+              onChange={(e) => {
+                const next = e.target.checked ? [...roles, role] : roles.filter((r) => r !== role);
+                setRoles(next);
+                start(async () => setResult(await setEventRoles(staffId, next)));
+              }}
+            />
+            {role === "hair" ? "Hair" : "Makeup"}
+          </label>
+        ))}
+      </div>
       <Status result={result} />
     </section>
   );

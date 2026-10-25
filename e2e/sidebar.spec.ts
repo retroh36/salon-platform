@@ -26,7 +26,7 @@ test.describe("owner", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/dashboard");
     expect(await groups(page)).toEqual([
-      ["Daily", ["Dashboard", "Calendar", "Clients"]],
+      ["Daily", ["Dashboard", "Calendar", "Clients", "Events"]],
       ["Sales", ["Sales", "Gift cards", "Promotions", "Reports", "Payroll", "Policy"]],
       ["Salon", ["Team", "Services", "Durations", "Inventory", "Forms"]],
     ]);
@@ -80,7 +80,7 @@ test.describe("front desk", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/dashboard");
     expect(await groups(page)).toEqual([
-      ["Daily", ["Dashboard", "Calendar", "Clients"]],
+      ["Daily", ["Dashboard", "Calendar", "Clients", "Events"]],
       ["Sales", ["Sales", "Gift cards", "Promotions"]],
       ["Salon", ["Team", "Services", "Inventory", "Forms"]],
     ]);

@@ -12,7 +12,7 @@ import { canManageMember, canResetPassword, loginState, rolesFor } from "@/lib/t
 import { ActiveCard, LoginCard } from "../member-access";
 import { serviceGroups } from "../member-data";
 import { MemberForm } from "../member-form";
-import { AssistingCard, PermissionsCard, PinCard } from "../member-permissions";
+import { AssistingCard, EventWorkCard, PermissionsCard, PinCard } from "../member-permissions";
 
 export const metadata: Metadata = { title: "Team member" };
 
@@ -39,7 +39,7 @@ async function Member({ params, searchParams }: { params: Promise<{ id: string }
   if (!isUuid(id)) notFound();
   const { data: member, error } = await supabase
     .from("staff")
-    .select("id, first_name, last_name, email, phone, role, level, is_active, assists_staff_id, staff_services(service_id)")
+    .select("id, first_name, last_name, email, phone, role, level, is_active, assists_staff_id, event_roles, staff_services(service_id)")
     .eq("id", id)
     .eq("business_id", me.business_id)
     .maybeSingle();
@@ -102,6 +102,7 @@ async function Member({ params, searchParams }: { params: Promise<{ id: string }
           <LoginCard staffId={member.id} firstName={member.first_name} state={loginState(login)} email={login?.email ?? member.email} canReset={canResetPassword(me)} active={member.is_active} />
           {member.role === "assistant" && <AssistingCard staffId={member.id} current={member.assists_staff_id} stylists={(stylists ?? []).map((s) => ({ id: s.id, name: fullName(s) }))} />}
           {member.role !== "owner" && <PermissionsCard staffId={member.id} firstName={member.first_name} rows={permissions ?? []} canEdit={me.role === "owner" && !isMe} />}
+          {(member.role === "stylist" || member.event_roles.length > 0) && <EventWorkCard staffId={member.id} firstName={member.first_name} current={member.event_roles} />}
           <PinCard staffId={member.id} firstName={member.first_name} hasPin={(pins ?? []).includes(member.id)} />
           <ActiveCard staffId={member.id} firstName={member.first_name} active={member.is_active} upcoming={upcoming ?? 0} isMe={isMe} />
         </div>
