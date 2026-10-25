@@ -18,6 +18,7 @@ const PREFIX = `Co${Date.now().toString(36)}`;
 
 let frontDesk: Client;
 let manager: Client;
+let owner: Client;
 let stylist: Client;
 let other: Awaited<ReturnType<typeof createOtherSalon>>;
 let otherOwner: Client;
@@ -27,7 +28,7 @@ let product: { id: string; price: number };
 const sales: string[] = [];
 
 beforeAll(async () => {
-  [frontDesk, manager, stylist] = await Promise.all([signIn("frontdesk@mapleandash.test"), signIn("manager@mapleandash.test"), signIn("bridget@mapleandash.test")]);
+  [frontDesk, manager, stylist, owner] = await Promise.all([signIn("frontdesk@mapleandash.test"), signIn("manager@mapleandash.test"), signIn("bridget@mapleandash.test"), signIn("owner@mapleandash.test")]);
   other = await createOtherSalon();
   otherOwner = await signIn(other.email);
   const { data: c } = await admin.from("clients").insert({ business_id: B, first_name: `${PREFIX}Ava`, last_name: "Test" }).select("id").single();
@@ -163,6 +164,24 @@ describe("checking out a visit", () => {
     expect((await sell(frontDesk, { appointment_id: v.appointmentId, lines: both, discount: { ...twenty, reason: "" }, payments: card(discounted) })).error?.code).toBe("22023");
     const ok = await sell(manager, { appointment_id: v.appointmentId, lines: both, discount: twenty, payments: card(discounted) });
     expect(ok.error).toBeNull();
+  });
+
+  it("lets anyone the owner allows big discounts give one, and nobody they've turned it off for", async () => {
+    const twenty = { kind: "percent", value: 20, reason: "Birthday" };
+    const sale = async (client: Client, hour: number) => {
+      const v = await visit(hour);
+      const total = v.items[0].price_cents + v.items[1].price_cents;
+      const lines = v.items.map((i) => ({ kind: "service", appointment_item_id: i.id }));
+      return sell(client, { appointment_id: v.appointmentId, lines, discount: twenty, payments: [{ method: "card", amount_cents: total - Math.round(total * 0.2) }] });
+    };
+    await owner.rpc("set_staff_permission", { p_staff_id: SEED.staff.frontDesk, p_permission: "big_discounts", p_allowed: true });
+    await owner.rpc("set_staff_permission", { p_staff_id: SEED.staff.manager, p_permission: "big_discounts", p_allowed: false });
+    try {
+      expect((await sale(frontDesk, 11)).error).toBeNull();
+      expect((await sale(manager, 12)).error?.code).toBe("42501");
+    } finally {
+      await admin.from("staff_permissions").delete().eq("business_id", B).eq("permission", "big_discounts");
+    }
   });
 
   it("sells retail without a visit", async () => {
