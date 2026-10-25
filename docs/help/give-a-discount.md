@@ -17,11 +17,13 @@ Take money off one line or the whole sale, with a reason.
 ## Good to know
 
 - Every discount needs a reason.
+- A percent off is a whole number, like 10 or 15.
 - Who can discount is set by the owner in Settings, under **Tax and receipts**. Owners always can; managers and the front desk only if turned on.
-- The front desk can take off up to a set percent of the sale, and sees the limit as they type a percent; managers and owners have no limit and see no warning.
+- The front desk can take off up to a set percent of the sale, and sees the limit as they type a percent; managers and owners have no limit and see no warning. An owner can give someone else no limit, or take it away from a manager, on their page under Team ("Give discounts over the limit").
 - Member prices and promotions come off by themselves and don't count against the limit. For a promo code, see "Apply a promo code at checkout".
 - Gift cards, and services paid with a package or membership, can't be discounted.
 
 ## If it doesn't work
 
+- "Take a whole percent off (like 10 or 15).": change the percent to a whole number.
 - "You can give up to …% off. Ask a manager for more." or "You can't give discounts. Ask a manager.": ask a manager or owner to finish the checkout.

@@ -77,6 +77,13 @@ describe("the ticket", () => {
     expect(totalsOf(paid, RATES).changeCents).toBe(1800);
   });
 
+  it("takes whole percents off only, as the sale is recorded", () => {
+    const half = ticket([product("spray", null, 2000)], { saleDiscount: { kind: "percent", value: 12.5, reason: "Loyalty" } });
+    expect(ticketProblems(half, RATES, true)).toContain("Take a whole percent off (like 10 or 15).");
+    const line = ticket([{ ...product("spray", null, 2000), discount: { kind: "percent", value: 7.5, reason: "Damaged box" } } as TicketLine]);
+    expect(ticketProblems(line, RATES, true)).toContain("Take a whole percent off spray (like 10 or 15).");
+  });
+
   it("sends complete_sale the lines, the stylist credit, discounts, tips and the rebooking", () => {
     const input = saleInput({ ...t, tips: { bridget: 1800, gil: 0 }, rebook: { appointmentId: "next", label: "Fri" } }, { draftId: "d", appointmentId: "a", clientId: "c" });
     expect(input).toMatchObject({ draft_id: "d", appointment_id: "a", client_id: "c", rebook_appointment_id: "next", tips: [{ staff_id: "bridget", amount_cents: 1800 }] });

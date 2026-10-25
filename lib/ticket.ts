@@ -232,6 +232,7 @@ export function ticketProblems(ticket: Ticket, rates: Rates, hasClient: boolean)
       if (l.kind === "service" && !l.priceReason.trim()) problems.push(`Say why ${l.name}'s price changed.`);
     }
     if ((l.kind === "service" || l.kind === "product") && l.discount && l.discount.value > 0 && !l.discount.reason.trim()) problems.push(`Say why ${l.name} is discounted.`);
+    if ((l.kind === "service" || l.kind === "product") && l.discount?.kind === "percent" && !Number.isInteger(l.discount.value)) problems.push(`Take a whole percent off ${l.name} (like 10 or 15).`);
     if ((l.kind === "gift_card" || l.kind === "gift_card_reload") && (l.amountCents < 500 || l.amountCents > 100_000)) problems.push("A gift card is $5 to $1,000.");
     if (l.kind === "gift_card" && l.physical && !/^[A-Z0-9]{8,32}$/.test(l.code.replace(/[^A-Za-z0-9]/g, "").toUpperCase())) problems.push("Enter or scan the gift card's code.");
     if (l.kind === "gift_card" && !l.physical && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l.recipientEmail.trim())) problems.push("Enter the email to send the digital gift card to.");
@@ -240,6 +241,8 @@ export function ticketProblems(ticket: Ticket, rates: Rates, hasClient: boolean)
     if (l.kind === "membership" && !l.cardRef) problems.push(`Choose the card ${l.name} renews on.`);
   }
   if (ticket.saleDiscount && ticket.saleDiscount.value > 0 && !ticket.saleDiscount.reason.trim()) problems.push("Say why there's a discount.");
+  // Percents are whole numbers in the sale (complete_sale takes them as integers).
+  if (ticket.saleDiscount?.kind === "percent" && !Number.isInteger(ticket.saleDiscount.value)) problems.push("Take a whole percent off (like 10 or 15).");
   problems.push(...promotionProblems(ticket, rates));
   if (ticket.payments.some((p) => p.method === "gift_card") && ticket.lines.some((l) => l.kind === "gift_card" || l.kind === "gift_card_reload")) problems.push("Gift cards can't be paid for with a gift card.");
   for (const p of ticket.payments) {
