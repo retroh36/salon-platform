@@ -466,14 +466,15 @@ update public.appointment_items i set
   started_at = case when x.started <= now() then x.started end,
   processing_started_at = case when x.processing_minutes > 0 and x.proc_start <= now() then x.proc_start end,
   processing_ended_at = case when x.processing_minutes > 0 and x.proc_end <= now() then x.proc_end end,
-  finished_at = case when x.finished <= now() and (x.status = 'completed' or x.finished <= now()) then x.finished end
+  -- A completed visit is done by now, even one that ran long.
+  finished_at = case when x.status = 'completed' then least(x.finished, now() - interval '5 minutes') when x.finished <= now() then x.finished end
 from times x
 where i.id = x.id;
 
 -- Checked in when they arrived, out a few minutes after the last service.
 update public.appointments a set
   checked_in_at = least(x.first_start - interval '1 minute', now()),
-  checked_out_at = case when a.status = 'completed' then x.last_finish + make_interval(mins => 3 + pg_temp.rnd(a.id || ':out') % 8) end
+  checked_out_at = case when a.status = 'completed' then least(x.last_finish + make_interval(mins => 3 + pg_temp.rnd(a.id || ':out') % 8), now()) end
 from (
   select appointment_id, min(started_at) as first_start, max(finished_at) as last_finish
   from public.appointment_items group by appointment_id
