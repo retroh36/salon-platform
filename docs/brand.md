@@ -90,20 +90,23 @@ keep a quarter of its height clear.
 | `navy-800` | `#233A57` | Hover on primary buttons |
 | `navy-700` | `#2D4A6E` | Secondary navy: hover text, group outlines |
 | `navy-200` | `#CFD8E5` | Borders on navy tints |
-| `navy-100` | `#E8EDF4` | Tints: the active nav item, avatars, selected rows |
-| `link` | `#1D64C4` | **Links** (underlined text actions). Same hue as the navy, brighter |
-| `link-hover` | `#174F9C` | Links on hover |
-| `focus` | `#1D64C4` | Keyboard focus rings |
+| `navy-100` | `#E8EDF4` | Tints: avatars, selected rows |
+| `active` | `#1963D6` | **Maestra's bright blue**, on the navy's hue: the selected Day/Week (and every segmented choice), with white text |
+| `active-soft` / `active-ink` | `#EAF2FE` / `#124C9F` | The active tint and its text: the current sidebar item, Today when it's today |
+| `link` | `#1963D6` | **Links** (underlined text actions), in the same bright blue |
+| `link-hover` | `#1556B8` | Links on hover |
+| `focus` | `#1963D6` | Keyboard focus rings |
 | (wordmark) | `#141414` | The wordmark's near-black; only in the logo |
 
 ### Surfaces and text
 
 | Token | Hex | Role |
 | --- | --- | --- |
-| `canvas` | `#FAFAF9` | The page: a neutral near-white |
-| `surface` | `#FFFFFF` | Cards, panels, fields |
-| `sunken` | `#F4F4F3` | Recessed areas, the sidebar, table headers, hover |
-| `line` / `line-strong` | `#E6E7EA` / `#D3D5DA` | Dividers and borders (fields and outlined buttons use `line-strong`) |
+| `canvas` | `#FAF8F5` | The page: a warm off-white |
+| `surface` | `#FFFFFF` | Cards, panels, fields: white on the warm page |
+| `sunken` | `#F4F2EE` | Recessed areas, the sidebar, table headers, hover |
+| `line` / `line-strong` | `#E7E4DF` / `#D4D0CA` | Dividers and borders (fields and outlined buttons use `line-strong`) |
+| `off-hours` | `#F3F0EA` | The calendar outside someone's hours: a very light flat tint (no stripes) |
 | `ink` | `#191C22` | Body text, names, titles (names are dark text, not link blue) |
 | `ink-muted` | `#5C6170` | Secondary text |
 | `ink-subtle` | `#696E7B` | Hints, placeholders, counts |
@@ -123,38 +126,47 @@ short label in the ink, on the soft fill. Never a colored sentence.
 | `neutral` | `#4D5361` | `#F1F2F4` | `#9AA0AB` | Waived, booked, completed |
 
 Appointment statuses (`status-*` tokens) are drawn from this set. On a
-calendar block, "+5m" and "Not arrived" use `block-attention` (`#8C3A08`),
+calendar block, "+5m" and "Not arrived" use `block-attention` (`#7A3106`),
 the warning a step darker so it reads on every fill.
 
 ### Denise: periwinkle, only for her
 
 | Token | Hex |
 | --- | --- |
-| `denise-50` / `-100` / `-200` | `#F4F5FF` / `#E8EAFD` / `#CFD4FA` |
+| `denise-50` / `-100` / `-200` | `#EDEFFF` / `#DFE3FE` / `#B8C0F7` (her fill, cards and borders: the Ask Denise bar, her brief, her cards) |
 | `denise-500` | `#6C78E0` (her accent, the glow on blocks she's talking about) |
 | `denise-600` | `#4E59C9` (her badge) |
 | `denise-700` / `-900` | `#3F49B0` / `#272D75` (her text) |
 
 Periwinkle means "Denise is speaking": her messages, suggestions, badge and
-highlights. Don't use it for anything else, and don't use navy or the link
-blue for her. It's deliberately a different hue from both (the token tests
-check this).
+highlights. Don't use it for anything else, and don't use navy or the
+bright blue for her. It's deliberately a different hue from both (the token
+tests check this). Her waving illustration sits above empty states
+(`EmptyState`; left out where several share a page).
 
 ### Service colors (the calendar)
 
-Slightly muted, so the client's name reads cleanly on them.
+Clear, saturated tints (the "A · Richer" style): a 4px edge in the full
+color, and dark text tinted to match (the name in the family's ink, the
+service and time in its muted ink), all AA on the fill and on its lighter
+processing part. Processing time keeps light stripes; nothing else on the
+calendar is striped but an event's travel.
 
-| Family | Fill | Accent edge |
-| --- | --- | --- |
-| Color | `#F7E1D4` peach | `#D9733F` |
-| Cuts | `#E7E1F5` lavender | `#8669CF` |
-| Gloss & blowouts | `#DDE9DF` sage | `#5A9568` |
-| Treatments | `#D7EBE8` soft teal | `#3D968F` |
-| Other | `#EBE5DF` sand | `#9C8771` |
+| Family | Fill | Edge | Ink / muted ink |
+| --- | --- | --- | --- |
+| Color | `#FFD8C2` peach | `#F2603D` | `#5A250A` / `#763F22` |
+| Cuts | `#E1DBFD` lavender | `#6B57E3` | `#2B1D78` / `#47399A` |
+| Gloss & blowouts | `#CDEBC5` sage | `#2A9A43` | `#1B461C` / `#345F33` |
+| Treatments | `#C6EBF2` teal | `#0B93B2` | `#0D4350` / `#245C69` |
+| Nails | `#FBD3E2` rose | `#D6336F` | `#67142F` / `#82304B` |
+| Skin | `#D3E4FC` sky | `#2F72D6` | `#153A72` / `#2F528B` |
+| Other | `#EBE1D9` sand | `#877462` | `#4A3516` / `#654D2C` |
 
-Where the client is in their visit fills the block instead: `visit-here`
-`#FCF1AE` (checked in), `visit-done` `#B3D9B8` (checked out), `visit-off`
-`#E3E5E9` (no-show, name struck through).
+Where the client is in their visit fills the block instead, in plain ink:
+`visit-here` `#FCF1AE` (checked in, lighter than every service color),
+`visit-done` `#9CCFA6` (checked out, clearly darker than every one),
+`visit-off` `#E3E5E9` (no-show, name struck through). The token tests keep
+them apart from the service colors with every kind of color vision.
 
 ### Stylist levels
 
@@ -227,11 +239,12 @@ the one main action, one layer of containers.
 - **Tables** (`components/ui/table.tsx`) for lists of records: a quiet
   header row, aligned columns, money right-aligned in tabular figures, a
   thin rule between rows, quiet actions at the end.
-- **Links:** the link blue only for links that read as links ("See all",
-  "Open event"). Names of people and records are dark text, underlined on
-  hover (`nameLinkClass`).
-- **Empty, loading, toasts:** `EmptyState` (one quiet centered line, an
-  optional title and action), `Skeleton` placeholders that shimmer slowly,
+- **The bright blue** is for where you are and what's live: the current
+  sidebar item, the selected Day/Week, Today when it's today, focus rings,
+  and links that read as links ("See all", "Open event"). Names of people
+  and records are dark text, underlined on hover (`nameLinkClass`).
+- **Empty, loading, toasts:** `EmptyState` (Denise waving, then one quiet
+  centered line, an optional title and action), `Skeleton` placeholders that shimmer slowly,
   and navy toasts at the foot of the screen with at most one action
   (`components/ui/feedback.tsx`).
 

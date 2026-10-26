@@ -35,7 +35,7 @@ async function Policies() {
   const stylists = sortStaff(staff).map((s) => ({ id: s.id, name: fullName(s) }));
   return (
     <AppShell section="settings" me={me}>
-      <PageHeader title="Settings" description="Your cancellation and no-show policy: clients see it in plain language and agree before their card is saved. Fees are charged to the card on file automatically." />
+      <PageHeader title="Policies" description="Your cancellation and no-show policy: clients see it in plain language and agree before their card is saved. Fees are charged to the card on file automatically." />
       <SettingsNav current="policies" me={me} />
       <div className="flex flex-col gap-6">
         <Card>

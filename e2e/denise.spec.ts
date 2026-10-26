@@ -152,9 +152,12 @@ test.describe("front desk", () => {
     // Denise's panel slides in with her fix, pointing.
     await expect(deniseTab(page)).toHaveAttribute("aria-selected", "true");
     const panel = denisePanel(page);
-    // The fix and the reorders waiting.
-    const reorders = await panel.getByTestId("denise-reorder").count();
-    await expect(page.getByTestId("denise-badge")).toHaveText(new RegExp(String(1 + reorders)));
+    // The fix, and whatever else is waiting in her panel (reorders, other
+    // tests' openings and not-arrived clients), once it has all shown.
+    await expect(async () => {
+      const others = (await panel.getByTestId("denise-reorder").count()) + (await panel.getByTestId("denise-opening").count()) + (await panel.getByTestId("late-name").count());
+      expect(await page.getByTestId("denise-badge").textContent()).toBe(`, ${1 + others} to look at`);
+    }).toPass();
     await expect(panel.locator("[data-pose]")).toHaveAttribute("data-pose", "point");
     await expect(panel.getByTestId("denise-message")).toHaveText(
       `Bridget's running 20 minutes late. I found a fix that only moves one client: ${PREFIX}Grace Lewis 11:00 → 11:20. Want me to apply it?`,

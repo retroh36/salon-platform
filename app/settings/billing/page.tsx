@@ -30,7 +30,7 @@ async function Billing() {
   if (error) throw error;
   return (
     <AppShell section="settings" me={me}>
-      <PageHeader title="Settings" description="Your Maestra plan. Only owners see billing." />
+      <PageHeader title="Billing" description="Your Maestra plan. Only owners see billing." />
       <SettingsNav current="billing" me={me} />
       <Card title="Plan" titleId="plan-heading">
         <p className="text-sm font-semibold text-ink" data-testid="plan">

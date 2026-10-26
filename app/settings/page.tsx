@@ -10,7 +10,7 @@ import { DeniseUsage, SalonSettings } from "./salon-settings";
 import { SettingsNav } from "./settings-nav";
 import { can } from "@/lib/permissions";
 
-export const metadata: Metadata = { title: "Settings" };
+export const metadata: Metadata = { title: "Your salon" };
 
 export default function SettingsPage() {
   return (
@@ -38,7 +38,7 @@ async function Settings() {
 
   return (
     <AppShell section="settings" me={me}>
-      <PageHeader title="Settings" description="Your salon's name and logo, shown to your team and on messages to your clients." />
+      <PageHeader title="Your salon" description="Your salon's name and logo, shown to your team and on messages to your clients." />
       <SettingsNav current="salon" me={me} />
       <Card title="Your salon" titleId="salon-heading">
         <SalonSettings name={business?.name ?? ""} logoUrl={salonLogoUrl(business?.logo_path)} />

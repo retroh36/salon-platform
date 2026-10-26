@@ -354,6 +354,79 @@ begin
 end;
 $$;
 
+-- The moment Denise fixes (npm run screenshots, shot 02), planted rather
+-- than left to chance: when the data loads during opening hours, a
+-- colorist (Gil first) has a color client in the chair now, finishing in
+-- 20 to 35 minutes, a client booked straight after and 20 minutes free
+-- after that, so "running 20 minutes late" always has a fix to propose.
+-- Anything already there is cleared. The color client is kept off
+-- memberships and packages, so their checkout shows the whole ticket.
+create temp table planted (client_id uuid, appointment_id uuid, status public.appointment_status);
+
+do $$
+declare
+  v_today date := (now() at time zone 'America/Chicago')::date;
+  v_minute int := (extract(epoch from (now() at time zone 'America/Chicago')::time) / 60)::int;
+  v_chairs uuid[] := array(select r.id from public.resources r where r.location_id = 'c0000000-0000-4000-8000-000000000001' and r.kind = 'chair' order by r.id);
+  c record;
+  v_from int;
+  v_mid int;
+  v_to int;
+  v_client uuid;
+  v_next uuid;
+  v_appointment uuid;
+begin
+  -- Each colorist's color services (the everyday ones first, longest first), then their shortest
+  -- other service of half an hour or more (a blowout if they do one).
+  for c in
+    select ss.staff_id, color.id as color_id, color.duration_minutes as color_minutes, nxt.id as next_id, nxt.duration_minutes as next_minutes
+    from public.staff_services ss
+    join public.services color on color.id = ss.service_id and color.category = 'Color' and color.duration_minutes >= 45 and color.archived_at is null
+    cross join lateral (
+      select sv.id, sv.duration_minutes from public.staff_services o join public.services sv on sv.id = o.service_id
+      where o.staff_id = ss.staff_id and sv.category <> 'Color' and sv.duration_minutes >= 30 and sv.archived_at is null
+      order by sv.name not like 'Blowout%', sv.duration_minutes, sv.name limit 1
+    ) nxt
+    order by ss.staff_id <> 'd0000000-0000-4000-8000-000000000005', ss.staff_id, color.name not in ('All-Over Color', 'Root Touch-Up', 'Gray Blending'), color.duration_minutes desc
+  loop
+    -- Done 20 minutes from now, started on the quarter hour before that.
+    v_from := (v_minute + 20 - c.color_minutes) / 15 * 15;
+    v_mid := v_from + c.color_minutes;
+    v_to := v_mid + c.next_minutes + 20;
+    exit when v_from < v_minute and pg_temp.staff_free(c.staff_id, v_today, v_from, v_to);
+    c := null;
+  end loop;
+  if c is null then
+    raise notice 'No colorist free around now: the Denise fix moment is left out.';
+    return;
+  end if;
+
+  delete from public.appointments a
+  where a.id in (
+    select i.appointment_id from public.appointment_items i
+    where i.staff_id = c.staff_id
+      and i.starts_at < pg_temp.at_local(v_today, v_to) and i.ends_at > pg_temp.at_local(v_today, v_from)
+  );
+
+  -- Two regulars with nothing else today, the first one theirs if possible.
+  select r.id into v_client from rhythm r
+  where not exists (select 1 from public.appointments a where a.client_id = r.id and (a.starts_at at time zone 'America/Chicago')::date = v_today)
+  order by r.preferred_staff_id is distinct from c.staff_id, r.id limit 1;
+  select r.id into v_next from rhythm r
+  where r.id <> v_client and not exists (select 1 from public.appointments a where a.client_id = r.id and (a.starts_at at time zone 'America/Chicago')::date = v_today)
+  order by r.id desc limit 1;
+
+  v_appointment := pg_temp.new_appointment(v_client, pg_temp.at_local(v_today, v_from), pg_temp.at_local(v_today, v_mid), 'planted:color');
+  perform pg_temp.add_item(v_appointment, c.staff_id, c.color_id, pg_temp.pick_resource(v_chairs, pg_temp.at_local(v_today, v_from), pg_temp.at_local(v_today, v_mid)), pg_temp.at_local(v_today, v_from));
+  insert into planted values (v_client, v_appointment, 'checked_in');
+
+  v_appointment := pg_temp.new_appointment(v_next, pg_temp.at_local(v_today, v_mid), pg_temp.at_local(v_today, v_mid + c.next_minutes), 'planted:next');
+  perform pg_temp.add_item(v_appointment, c.staff_id, c.next_id,
+    pg_temp.pick_resource(v_chairs, pg_temp.at_local(v_today, v_mid), pg_temp.at_local(v_today, v_mid + c.next_minutes)), pg_temp.at_local(v_today, v_mid));
+  insert into planted values (v_next, v_appointment, 'confirmed');
+end;
+$$;
+
 -- Statuses: past visits completed (a few no-shows), today's in progress or
 -- done, upcoming ones booked or confirmed. Some, past and future, canceled.
 -- (Set updated_at by hand to when each change happened, rather than the
@@ -399,6 +472,12 @@ where a.id = x.id;
 
 -- Canceled bookings made the day before can be after they were booked.
 update public.appointments set updated_at = greatest(updated_at, created_at) where business_id = 'b0000000-0000-4000-8000-000000000001';
+
+-- The planted moment keeps its statuses (none canceled by chance).
+update public.appointments a set status = p.status, canceled_at = null, cancel_reason = null,
+  updated_by = case when p.status = 'checked_in' then 'd0000000-0000-4000-8000-000000000003'::uuid else a.created_by end,
+  updated_at = case when p.status = 'checked_in' then least(a.starts_at, now()) else a.created_at end
+from planted p where a.id = p.appointment_id;
 
 -- ---------------------------------------------------------------------------
 -- Actual times for visits that have happened (and today's so far), so
@@ -719,9 +798,11 @@ create temp table seed_package_clients as
  where a.business_id = 'b0000000-0000-4000-8000-000000000001' and a.client_id is not null
    and (a.starts_at at time zone 'America/Chicago')::date = (now() at time zone 'America/Chicago')::date
    and a.status in ('booked', 'confirmed', 'checked_in')
+   and a.client_id not in (select client_id from planted)
  order by a.client_id limit 4)
 union
-(select id from public.clients where business_id = 'b0000000-0000-4000-8000-000000000001' order by id offset 100 limit 8);
+(select id from (select id from public.clients where business_id = 'b0000000-0000-4000-8000-000000000001' order by id offset 100 limit 8) x
+ where id not in (select client_id from planted));
 
 select private.sell_package(
   case when pg_temp.rnd('pkg' || client_id) % 3 = 0 then 'e3000000-0000-4000-8000-000000000002'::uuid else 'e3000000-0000-4000-8000-000000000001'::uuid end,
@@ -756,9 +837,11 @@ from (
      and (a.starts_at at time zone 'America/Chicago')::date = (now() at time zone 'America/Chicago')::date
      and a.status not in ('canceled', 'no_show')
      and a.client_id not in (select client_id from seed_package_clients)
+     and a.client_id not in (select client_id from planted)
    order by a.client_id offset 8 limit 3)
   union
-  (select id from public.clients where business_id = 'b0000000-0000-4000-8000-000000000001' order by id offset 300 limit 31)
+  (select id from (select id from public.clients where business_id = 'b0000000-0000-4000-8000-000000000001' order by id offset 300 limit 31) x
+   where id not in (select client_id from planted))
 ) c;
 
 insert into public.client_memberships (business_id, location_id, client_id, plan_id, name, price_cents, interval_unit, interval_count, service_discount_pct, retail_discount_pct,

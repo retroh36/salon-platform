@@ -7,9 +7,9 @@ import { SearchIcon } from "@/components/ui/icons";
 
 const DEBOUNCE_MS = 150;
 
-// Search-as-you-type. Updates ?q= so results render on the server, and works
-// as a plain GET form without JavaScript.
-export function ClientSearch({ initialQuery }: { initialQuery: string }) {
+// Search-as-you-type. Updates ?q= so results render on the server (keeping
+// the list's sort), and works as a plain GET form without JavaScript.
+export function ClientSearch({ initialQuery, sort = null }: { initialQuery: string; sort?: { sort: string; dir: string } | null }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -19,7 +19,11 @@ export function ClientSearch({ initialQuery }: { initialQuery: string }) {
   const run = (value: string) => {
     clearTimeout(timer.current);
     const q = value.trim();
-    startTransition(() => router.replace(q ? `/clients?q=${encodeURIComponent(q)}` : "/clients", { scroll: false }));
+    const qs = Object.entries({ q, ...sort })
+      .filter(([, v]) => v)
+      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+      .join("&");
+    startTransition(() => router.replace(qs ? `/clients?${qs}` : "/clients", { scroll: false }));
   };
 
   const search = (value: string) => {
@@ -37,6 +41,7 @@ export function ClientSearch({ initialQuery }: { initialQuery: string }) {
         run(new FormData(e.currentTarget).get("q")?.toString() ?? "");
       }}
     >
+      {sort && Object.entries(sort).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
       <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-subtle" />
       <input
         type="search"

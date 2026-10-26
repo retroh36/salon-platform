@@ -141,7 +141,7 @@ async function Policy({ searchParams }: Pick<PageProps<"/policy">, "searchParams
       <Section title="Late cancellations and no-shows" titleId="fees" count={monthFees.data!.length} description="Fees are charged to the card on file 10 minutes after. Waive one with a reason, before or after.">
         {monthFees.data!.length === 0 ? (
           <TableCard>
-            <EmptyState>None in {monthLabel(month)}.</EmptyState>
+            <EmptyState art={false}>None in {monthLabel(month)}.</EmptyState>
           </TableCard>
         ) : (
           <TableCard>
@@ -187,7 +187,7 @@ async function Policy({ searchParams }: Pick<PageProps<"/policy">, "searchParams
       <Section title="Repeat offenders" titleId="offenders" description={repeatRule} count={offenders.length}>
         <TableCard>
           {offenders.length === 0 ? (
-            <EmptyState>No repeat offenders.</EmptyState>
+            <EmptyState art={false}>No repeat offenders.</EmptyState>
           ) : (
             <table className={tableClass} aria-labelledby="offenders">
               <thead className={theadClass}>

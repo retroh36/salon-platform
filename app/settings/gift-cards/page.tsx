@@ -27,7 +27,7 @@ async function GiftCardSettings() {
   if (error) throw error;
   return (
     <AppShell section="settings" me={me}>
-      <PageHeader title="Settings" description="Gift cards sold at the front desk, and promotional cards." />
+      <PageHeader title="Gift cards" description="Gift cards sold at the front desk, and promotional cards." />
       <SettingsNav current="gift-cards" me={me} />
       <Alert tone="info" className="mb-6">
         Gift card rules (how long cards must last, whether fees are allowed, and what happens to unused balances) vary by state. Check your local law before setting an

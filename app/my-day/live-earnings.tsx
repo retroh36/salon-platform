@@ -103,7 +103,7 @@ export function LiveEarningsCard({ live }: { live: LiveEarnings }) {
         </TableCard>
       ) : (
         <div className="rounded-lg border border-line bg-surface">
-          <EmptyState className="py-6">Nothing checked out yet today.</EmptyState>
+          <EmptyState art={false} className="py-6">Nothing checked out yet today.</EmptyState>
         </div>
       )}
       {live.estimatedCents > 0 && <p className="mt-2 text-xs text-ink-muted">About {money(live.estimatedCents)} more once the clients in your chair check out.</p>}

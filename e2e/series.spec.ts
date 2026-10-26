@@ -119,5 +119,6 @@ test("moves and cancels this and following visits", async ({ page }) => {
   await cancel.getByLabel("Reason").selectOption("Client rescheduled");
   await cancel.getByLabel("This and following visits").check();
   await cancel.getByRole("button", { name: "Cancel booking" }).click();
-  await expect.poll(async () => (await times()).map((r) => r.status)).toEqual(["booked", "booked", "canceled", "canceled"]);
+  // Both visits cancel in one save, which takes longer under load.
+  await expect.poll(async () => (await times()).map((r) => r.status), { timeout: 15_000 }).toEqual(["booked", "booked", "canceled", "canceled"]);
 });

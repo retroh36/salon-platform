@@ -43,7 +43,7 @@ async function Devices() {
 
   return (
     <AppShell section="settings" me={me}>
-      <PageHeader title="Settings" description="Shared devices: the front desk iPad, where staff switch to themselves with a PIN instead of signing in and out." />
+      <PageHeader title="Shared devices" description="The front desk iPad, where staff switch to themselves with a PIN instead of signing in and out." />
       <SettingsNav current="devices" me={me} />
       <Card title="This device" titleId="this-device-heading" description="On a shared device, signing out shows the PIN screen. Each person sets their own PIN on Your account.">
         <ShareThisDevice shared={Boolean(thisOne)} />

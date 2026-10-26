@@ -44,7 +44,7 @@ async function Automations() {
 
   return (
     <AppShell section="settings" me={me}>
-      <PageHeader title="Settings" description="Automations: messages that go out by themselves, in your words, so nobody at the desk has to remember to send them." />
+      <PageHeader title="Automations" description="Messages that go out by themselves, in your words, so nobody at the desk has to remember to send them." />
       <SettingsNav current="automations" me={me} />
       <Alert tone="info" className="mb-6">
         Only clients who said yes to texts or marketing emails get these (it&apos;s on their profile), and every message has a way to opt out. They go out between 9am and 8pm.

@@ -162,6 +162,8 @@ test("Forgot password? and an owner's reset send a link to choose a new password
 
 test.describe("roles", () => {
   test("a manager adds people but can't open an owner or make one", async ({ browser }) => {
+    // Five whole pages, one after another.
+    test.slow();
     const page = await browser.newPage({ storageState: AUTH.manager });
     await page.goto("/team");
     await expect(ui(page).getByRole("link", { name: "Add team member" })).toBeVisible();

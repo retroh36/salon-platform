@@ -14,7 +14,7 @@ export function AskBar({ example }: { example: string }) {
   return (
     <form
       aria-label="Ask Denise"
-      className="flex w-full items-center gap-2 rounded-lg border border-denise-200 bg-surface p-1.5 pl-2.5 transition-[border-color,box-shadow] duration-(--motion-fast) focus-within:border-denise-500 focus-within:ring-2 focus-within:ring-denise-200 md:w-96"
+      className="flex w-full items-center gap-2 rounded-lg border border-denise-200 bg-denise-50 p-1.5 pl-2.5 transition-[border-color,box-shadow] duration-(--motion-fast) focus-within:border-denise-500 focus-within:ring-2 focus-within:ring-denise-200 md:w-96"
       onSubmit={(e) => {
         e.preventDefault();
         if (!question.trim()) return;
@@ -30,7 +30,7 @@ export function AskBar({ example }: { example: string }) {
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
         placeholder={`Ask Denise… “${example}”`}
-        className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-ink-subtle focus:outline-none"
+        className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-ink-muted focus:outline-none"
       />
       <IconButton type="submit" label="Ask" variant="primary" size="sm">
         <SendIcon className="size-4" />

@@ -35,6 +35,38 @@ export function parseClientSearch(query: string): ClientSearch {
   return { kind: "name", terms };
 }
 
+// The Clients list's columns that sort, each starting in the way that's
+// most useful (most recent visit first, biggest spender first), and where
+// clients without one go: always last.
+export const CLIENT_SORTS = {
+  name: { column: "search_name", ascending: true },
+  last_visit: { column: "last_visit_at", ascending: false },
+  next_visit: { column: "next_visit_at", ascending: true },
+  stylist: { column: "usual_staff_name", ascending: true },
+  spend: { column: "spend_cents", ascending: false },
+} as const;
+
+export type ClientSort = keyof typeof CLIENT_SORTS;
+export type ClientOrder = { sort: ClientSort; ascending: boolean };
+
+// ?sort=spend&dir=asc -> spend, lowest first. Anything unknown is by name;
+// spend only for those who can see it.
+export function parseClientOrder(sort: unknown, dir: unknown, canSeeSpend: boolean): ClientOrder {
+  const key = typeof sort === "string" && sort in CLIENT_SORTS && (sort !== "spend" || canSeeSpend) ? (sort as ClientSort) : "name";
+  const ascending = dir === "asc" ? true : dir === "desc" ? false : CLIENT_SORTS[key].ascending;
+  return { sort: key, ascending };
+}
+
+// The link a column's header goes to: the other way round if it's the
+// sort already, else that column in its own first direction.
+export function clientSortHref(current: ClientOrder, sort: ClientSort, query: string): string {
+  const ascending = current.sort === sort ? !current.ascending : CLIENT_SORTS[sort].ascending;
+  const params: string[] = query ? [`q=${encodeURIComponent(query)}`] : [];
+  if (sort !== "name" || !ascending) params.push(`sort=${sort}`, `dir=${ascending ? "asc" : "desc"}`);
+  const qs = params.join("&");
+  return qs ? `/clients?${qs}` : "/clients";
+}
+
 // Makes user input match literally in a LIKE pattern: escapes % _ and \, and
 // drops *, which the database API treats as a wildcard.
 export function escapeLike(value: string): string {

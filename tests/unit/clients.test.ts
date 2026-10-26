@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   canEditClients,
+  clientSortHref,
   escapeLike,
   formatDate,
   normalizePhone,
   parseClientForm,
+  parseClientOrder,
   parseClientSearch,
   parseFormulaForm,
 } from "@/lib/clients";
@@ -179,5 +181,39 @@ describe("parseFormulaForm", () => {
       ok: false,
       errors: { formula: "Enter the formula.", visit_date: "The visit date can't be in the future." },
     });
+  });
+});
+
+describe("parseClientOrder", () => {
+  it("is by name, A to Z, unless asked", () => {
+    expect(parseClientOrder(undefined, undefined, true)).toEqual({ sort: "name", ascending: true });
+    expect(parseClientOrder("nonsense", "sideways", true)).toEqual({ sort: "name", ascending: true });
+  });
+
+  it("starts each column its most useful way round", () => {
+    expect(parseClientOrder("last_visit", undefined, true)).toEqual({ sort: "last_visit", ascending: false });
+    expect(parseClientOrder("next_visit", undefined, true)).toEqual({ sort: "next_visit", ascending: true });
+    expect(parseClientOrder("spend", undefined, true)).toEqual({ sort: "spend", ascending: false });
+    expect(parseClientOrder("spend", "asc", true)).toEqual({ sort: "spend", ascending: true });
+  });
+
+  it("never sorts by spend for those who can't see it", () => {
+    expect(parseClientOrder("spend", "desc", false)).toEqual({ sort: "name", ascending: false });
+  });
+});
+
+describe("clientSortHref", () => {
+  const byName = { sort: "name", ascending: true } as const;
+
+  it("turns the current sort round, and starts another column its own way", () => {
+    expect(clientSortHref(byName, "name", "")).toBe("/clients?sort=name&dir=desc");
+    expect(clientSortHref({ sort: "name", ascending: false }, "name", "")).toBe("/clients");
+    expect(clientSortHref(byName, "spend", "")).toBe("/clients?sort=spend&dir=desc");
+    expect(clientSortHref({ sort: "spend", ascending: false }, "spend", "")).toBe("/clients?sort=spend&dir=asc");
+  });
+
+  it("keeps the search", () => {
+    expect(clientSortHref(byName, "last_visit", "ava")).toBe("/clients?q=ava&sort=last_visit&dir=desc");
+    expect(clientSortHref({ sort: "last_visit", ascending: false }, "name", "ava")).toBe("/clients?q=ava");
   });
 });

@@ -34,7 +34,7 @@ async function EventSettingsView() {
   if (error) throw error;
   return (
     <AppShell section="settings" me={me}>
-      <PageHeader title="Settings" description="Bridal and events: the packages parties choose from, and how events are priced, paid and planned." />
+      <PageHeader title="Bridal and events" description="The packages parties choose from, and how events are priced, paid and planned." />
       <SettingsNav current="events" me={me} />
       <Card title="Event packages" titleId="event-packages" description="Each person in a party gets one. The minutes say how long the hair and the makeup take, and so who can do it.">
         <ul className="-mt-3 mb-6 divide-y divide-line" aria-label="Event packages">

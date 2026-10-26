@@ -56,8 +56,11 @@ test.describe("an owner's toggles", () => {
 
     await reports.uncheck();
     await expect(card.getByText("(changed for Sam)")).toHaveCount(0);
-    await deskPage.goto("/reports");
-    await expect(deskPage).toHaveURL("/dashboard");
+    // The tick goes at once; the save lands a moment later.
+    await expect(async () => {
+      await deskPage.goto("/reports");
+      await expect(deskPage).toHaveURL("/dashboard", { timeout: 1000 });
+    }).toPass();
     await desk.close();
   });
 });

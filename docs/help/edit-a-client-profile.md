@@ -7,7 +7,7 @@ open: /clients | Open Clients
 
 Update a client's contact details, allergies, preferences and notes.
 
-1. Go to **Clients** and search by name or phone (or use the search bar at the top of any page).
+1. Go to **Clients** and search by name or phone (or use the search bar at the top of the Calendar).
 2. Tap the client to open their profile.
 3. Scroll down to **Details**.
 4. Change what you need under **Contact** and **Care**.

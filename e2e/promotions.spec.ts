@@ -148,6 +148,8 @@ test.describe("booking site", () => {
     const number = `(4${String(Math.floor(Math.random() * 90) + 10)}) 555-01${String(Math.floor(Math.random() * 100)).padStart(2, "0")}`;
     await flow(page).getByLabel("Mobile number").fill(number);
     await flow(page).getByRole("button", { name: "Send code" }).click();
+    // The code box shows once the code is sent, so the outbox has it.
+    await expect(flow(page).getByLabel("Code", { exact: true })).toBeVisible();
     const outbox = await page.context().newPage();
     await outbox.goto(`/dev/outbox?to=${number.replace(/\D/g, "")}`);
     const code = /code is (\d{6})/.exec(await outbox.getByTestId("outbox-body").first().innerText())![1];

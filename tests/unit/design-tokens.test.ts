@@ -74,6 +74,8 @@ const STATUSES = ["booked", "confirmed", "checked-in", "completed", "late", "no-
 const PAIRS: [string, string][] = [
   ...["ink", "ink-muted", "ink-subtle", "navy-900", "navy-700", "link", "link-hover", "danger"].flatMap((t) => SURFACES.map((s): [string, string] => [t, s])),
   ...["ink", "ink-muted"].flatMap((t) => FILLS.map((f): [string, string] => [t, f])),
+  // A booked block's own tinted text on its service color.
+  ...FILLS.flatMap((f): [string, string][] => [[f.replace("-fill", "-ink"), f], [f.replace("-fill", "-ink-muted"), f]]),
   // Calendar blocks: the name in ink, the rest in block-ink-muted, on a
   // service color or a visit status.
   ...["ink", "block-ink-muted", "block-attention"].flatMap((t) => [...FILLS, ...VISITS].map((f): [string, string] => [t, f])),
@@ -81,6 +83,12 @@ const PAIRS: [string, string][] = [
   // Status tags, alerts and notices: the ink on its soft fill, and on the page.
   ...["success", "warning", "info", "neutral"].flatMap((s): [string, string][] => [[s, `${s}-soft`], ...SURFACES.map((b): [string, string] => [s, b])]),
   ["white", "navy-900"],
+  // The bright blue's active states.
+  ["white", "active"],
+  ["white", "active-hover"],
+  ["active-ink", "active-soft"],
+  ["active", "active-soft"],
+  ["link", "active-soft"],
   ["white", "navy-800"],
   ["navy-700", "navy-100"],
   ["navy-900", "navy-100"],
@@ -116,6 +124,8 @@ describe("design tokens", () => {
     // Processing is the family fill at about half strength over white; a
     // checked-out block at 40%.
     for (const fill of FILLS) {
+      expect(contrast(color(fill.replace("-fill", "-ink-muted")), overWhite(color(fill), 0.45))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(color(fill.replace("-fill", "-ink")), overWhite(color(fill), 0.45))).toBeGreaterThanOrEqual(4.5);
       expect(contrast(color("ink-muted"), overWhite(color(fill), 0.45))).toBeGreaterThanOrEqual(4.5);
       expect(contrast(color("ink-muted"), overWhite(color(fill), 0.4))).toBeGreaterThanOrEqual(4.5);
       expect(contrast(color("ink"), overWhite(color(fill), 0.4))).toBeGreaterThanOrEqual(4.5);

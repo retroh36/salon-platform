@@ -16,6 +16,7 @@ Everyone has their own login, so the app shows what your role can use and record
 
 - Your name and role show at the bottom of the sidebar, so you can check who's signed in.
 - Sign out on a shared iPad before handing it over, so nothing is done under your name.
+- Signing out ends your session on this device only: you stay signed in on your phone or anywhere else.
 - Forgot your password? Tap **Forgot password?** on the sign-in screen (see Reset your own password).
 - New on the team? Your owner or manager sends you an invite by email: open it and choose a password.
 

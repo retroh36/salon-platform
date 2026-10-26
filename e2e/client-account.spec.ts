@@ -16,7 +16,9 @@ test.describe.configure({ mode: "serial" });
 let client: { id: string; first_name: string; email: string };
 
 test.beforeAll(async () => {
-  // A regular with an email and a visit coming up.
+  // A regular with an email and a visit coming up, whose last visit can be
+  // booked again straight online (no consultation-first services), so
+  // "Book again" skips the services. In a set order, so it's always the same.
   const { data } = await admin
     .from("appointments")
     .select("client:clients!inner(id, first_name, email)")
@@ -24,9 +26,27 @@ test.beforeAll(async () => {
     .eq("status", "booked")
     .gt("starts_at", new Date(Date.now() + 2 * 86_400_000).toISOString())
     .not("client.email", "is", null)
-    .limit(1)
-    .single();
-  client = data!.client as typeof client;
+    .order("starts_at")
+    .order("id")
+    .limit(100);
+  const { data: online } = await admin.from("services").select("id").eq("business_id", B).eq("online_booking", "bookable");
+  const bookable = new Set(online!.map((s) => s.id));
+  for (const row of data!) {
+    const candidate = row.client as unknown as typeof client;
+    const { data: last } = await admin
+      .from("appointments")
+      .select("appointment_items(service_id)")
+      .eq("client_id", candidate.id)
+      .eq("status", "completed")
+      .order("starts_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (last?.appointment_items.length && last.appointment_items.every((i) => bookable.has(i.service_id))) {
+      client = candidate;
+      break;
+    }
+  }
+  expect(client, "a client whose last visit can be booked again online").toBeTruthy();
 });
 
 test.beforeEach(async () => {

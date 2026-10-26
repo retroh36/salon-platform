@@ -40,7 +40,7 @@ async function BookingSettings() {
 
   return (
     <AppShell section="settings" me={me}>
-      <PageHeader title="Settings" description="Your salon's own booking site, where clients book themselves in." />
+      <PageHeader title="Online booking" description="Your salon's own booking site, where clients book themselves in." />
       <SettingsNav current="booking" me={me} />
       <div>
         <Card title="Your booking site" titleId="site-heading" description="Share the link, or put a Book button on your website.">

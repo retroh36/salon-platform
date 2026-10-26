@@ -157,8 +157,64 @@ test.describe("front desk", () => {
   });
 });
 
+test.describe("front desk sorting", () => {
+  test.use({ storageState: AUTH.frontDesk, viewport: { width: 1440, height: 900 } });
+
+  // A column's figures, top to bottom.
+  const column = async (page: Page, n: number) => (await results(page).locator(`td:nth-child(${n})`).allInnerTexts()).map((t) => t.trim());
+  const money = (t: string) => (t === "—" ? -1 : Number(t.replace(/[$,]/g, "")));
+
+  test("shows each client's last and next visit, usual stylist and spend, and sorts by any of them", async ({ page }) => {
+    await openClients(page);
+    const table = ui(page).getByRole("table", { name: "Clients" });
+    await expect(table.getByRole("columnheader")).toHaveText(["Name", "Phone", "Last visit", "Next visit", "Usual stylist", "Spend"].map((h) => new RegExp(`^\\W?${h}`)));
+    await expect(table.getByRole("columnheader", { name: /^Name/ })).toHaveAttribute("aria-sort", "ascending");
+
+    // Biggest spenders first, then the other way round.
+    await table.getByRole("link", { name: "Spend" }).click();
+    await expect(page).toHaveURL(/sort=spend&dir=desc/);
+    await expect(table.getByRole("columnheader", { name: /^Spend/ })).toHaveAttribute("aria-sort", "descending");
+    const spend = (await column(page, 6)).map(money);
+    expect(spend.length).toBeGreaterThan(10);
+    expect(spend).toEqual([...spend].sort((a, b) => b - a));
+    expect(spend[0]).toBeGreaterThan(0);
+    await table.getByRole("link", { name: "Spend" }).click();
+    await expect(page).toHaveURL(/sort=spend&dir=asc/);
+
+    // Most recent visit first, matching the database.
+    await table.getByRole("link", { name: "Last visit" }).click();
+    await expect(page).toHaveURL(/sort=last_visit&dir=desc/);
+    const first = results(page).first();
+    const id = (await first.getByRole("link").first().getAttribute("href"))!.split("/").pop()!;
+    const { data: latest } = await admin
+      .from("appointments")
+      .select("client_id, starts_at")
+      .eq("business_id", SEED.business)
+      .eq("status", "completed")
+      .order("starts_at", { ascending: false })
+      .limit(1)
+      .single();
+    const { data: mine } = await admin.from("appointments").select("starts_at").eq("client_id", id).eq("status", "completed").order("starts_at", { ascending: false }).limit(1).single();
+    expect(mine!.starts_at).toBe(latest!.starts_at);
+
+    // Searching keeps the sort.
+    await ui(page).getByRole("searchbox", { name: "Search clients" }).fill("a");
+    await expect(page).toHaveURL(/q=a&sort=last_visit&dir=desc/);
+  });
+});
+
 test.describe("stylists", () => {
   test.use({ storageState: AUTH.stylist });
+
+  test("see their clients' visits and usual stylist, but no spend", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openClients(page);
+    const table = ui(page).getByRole("table", { name: "Clients" });
+    await expect(table.getByRole("columnheader", { name: /^Usual stylist/ })).toBeVisible();
+    await expect(table.getByRole("columnheader", { name: /^Spend/ })).toHaveCount(0);
+    await page.goto("/clients?sort=spend&dir=desc");
+    await expect(table.getByRole("columnheader", { name: /^Name/ })).toHaveAttribute("aria-sort", "descending");
+  });
 
   test("see client details read-only and can add a formula entry", async ({ page }) => {
     const { data } = await admin

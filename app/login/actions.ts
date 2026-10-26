@@ -37,7 +37,9 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
 
 export async function logout() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  // This device only: signing out at the front desk never signs someone
+  // out on their phone (Supabase's default ends every session they have).
+  await supabase.auth.signOut({ scope: "local" });
   redirect("/login");
 }
 

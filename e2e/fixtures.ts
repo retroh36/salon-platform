@@ -2,6 +2,7 @@ import { test as base, expect, type Locator, type Page } from "@playwright/test"
 import { daysBetween, todayIn } from "@/lib/scheduling/time";
 import { busyDay, SEED } from "../tests/db/helpers";
 import { shiftBusiness } from "../e2e-week/time-machine";
+import { freshAuth } from "./fresh-auth";
 
 export const PASSWORD = "password123";
 
@@ -27,9 +28,20 @@ export function allowOfflineLogs(pageErrors: string[]) {
 // Fails the test if the page logs a console error or throws. In dev this
 // includes Next.js errors shown in the dev overlay, such as prerendering
 // problems.
-export const test = base.extend<{ pageErrors: string[] }>({
+export const test = base.extend<{ freshAuth: void; pageErrors: string[] }>({
+  // Every saved sign-in close to expiring is replaced before the test's
+  // browser opens, including those a test opens pages with itself
+  // (e2e/fresh-auth.ts).
+  freshAuth: [
+    async ({}, use) => {
+      for (const file of Object.values(AUTH)) await freshAuth(file);
+      await use();
+    },
+    { auto: true },
+  ],
   pageErrors: [
-    async ({ page }, use) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- only so the sign-in is fresh before the page opens
+    async ({ freshAuth, page }, use) => {
       const errors: string[] = [];
       page.on("console", (msg) => {
         if (msg.type() === "error") errors.push(msg.text());

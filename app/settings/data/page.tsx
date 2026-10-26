@@ -47,7 +47,7 @@ async function Data() {
 
   return (
     <AppShell section="settings" me={me}>
-      <PageHeader title="Settings" description="Download everything your salon keeps here." />
+      <PageHeader title="Your data" description="Download everything your salon keeps here." />
       <SettingsNav current="data" me={me} />
       <Card title="Your data is yours" titleId="data-heading">
         <div className="flex max-w-2xl flex-col gap-4">

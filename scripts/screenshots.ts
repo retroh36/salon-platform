@@ -88,9 +88,8 @@ console.log(`Demo moment: ${today} at ${hhmm(toLocal(moment, tz).minute)} (${tz}
 // 2. The busy month and the large salon as of that moment: the seed's
 // now() reads the demo clock (a now() ahead of pg_catalog's on the search
 // path, for this session only), then what Denise has learned.
-// Each load gives a different day (the seed's choices hash random row ids),
-// so if today has no color in the chair with a client after it, or no
-// visit to check out, it loads again (up to ten times).
+// The seed plants the moment Denise fixes (a color in the chair with a
+// client booked after it), whatever else the day holds.
 // Database functions with their own search path read the real clock, so the
 // one that decides whether an event's date has passed reads the demo clock
 // while the seed loads (the moment can be the day before: Rossi's wedding
@@ -102,13 +101,12 @@ const prelude = `create schema demo_clock;
 create function demo_clock.now() returns timestamptz language sql stable as $$ select '${moment.toISOString()}'::timestamptz $$;
 ${eventToday(`'${moment.toISOString()}'::timestamptz`)}set search_path = demo_clock, public, extensions, pg_catalog;\n`;
 const postlude = `\nreset search_path;\n${eventToday("now()")}drop schema demo_clock cascade;\n`;
-for (let attempt = 1; !reuse; attempt++) {
-  if (attempt > 1) run("npx", ["supabase", "db", "reset"]);
-  console.log(`Loading the demo data${attempt > 1 ? ` (try ${attempt})` : ""}…`);
+if (!reuse) {
+  console.log("Loading the demo data…");
   for (const file of ["supabase/seed-demo.sql", "supabase/seed-large.sql"]) {
     run("docker", ["exec", "-i", "supabase_db_salon-platform", "psql", "-q", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres"], {}, `${prelude}${readFileSync(file, "utf8")}${postlude}`);
   }
-  if (((await colorRunningOver()) && (await visitToCheckOut())) || attempt === 10) break;
+  if (!(await colorRunningOver()) || !(await visitToCheckOut())) throw new Error("The demo data has no color in the chair with a client after it, or no visit to check out.");
 }
 if (!reuse) run("node", ["--disable-warning=MODULE_TYPELESS_PACKAGE_JSON", "--import", "./scripts/demo-clock.ts", "scripts/insights.ts"], clock);
 
@@ -148,6 +146,7 @@ async function capture(browser: Browser) {
   const owner = await signedIn(browser, "owner@mapleandash.test");
   const stylist = await signedIn(browser, "bridget@mapleandash.test");
   const visitor = await context(browser);
+  const front = await signedIn(browser, "frontdesk@mapleandash.test");
   const staff = new Map(((await admin.from("staff").select("id, first_name, last_name").eq("business_id", BUSINESS)).data ?? []).map((s) => [s.id, `${s.first_name} ${s.last_name}`]));
 
   await shot("01-calendar", owner, async (page) => {
@@ -155,8 +154,20 @@ async function capture(browser: Browser) {
     await waitForReact(page, "section[data-staff-id]");
   });
 
+  // Mid-drag: a booked visit picked up and held half an hour later.
+  await shot("30-calendar-drag", front, async (page) => {
+    await page.goto("/calendar");
+    await waitForReact(page, "section[data-staff-id]");
+    const block = main(page).locator("[data-block][data-visit=upcoming]").first();
+    const box = (await block.boundingBox())!;
+    const ppm = Number(await main(page).locator("[data-px-per-minute]").first().getAttribute("data-px-per-minute"));
+    await page.mouse.move(box.x + 24, box.y + 12);
+    await page.mouse.down();
+    for (let i = 1; i <= 6; i++) await page.mouse.move(box.x + 24, box.y + 12 + (i * 30 * ppm) / 6);
+    return { keepMouse: true };
+  });
+
   // The whole app, page by page (for before-and-after comparisons).
-  const front = await signedIn(browser, "frontdesk@mapleandash.test");
   const page_ = (name: string, ctx: BrowserContext, path: string, ready = "main h1") =>
     shot(name, ctx, async (page) => {
       await page.goto(path);

@@ -3880,6 +3880,11 @@ isOneToOne: false
 "clear_staff_pin":
 { Args: { "p_staff_id": string }; Returns: undefined
                            },
+"client_overview":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "allergies": string,"business_id": string,"email": string,"first_name": string,"id": string,"last_name": string,"last_visit_at": string,"next_visit_at": string,"phone": string,"phone_digits": string,"search_name": string,"spend_cents": number,"usual_staff_id": string,"usual_staff_name": string
+            }[]
+                           },
 "client_policy_standing":
 { Args: { "p_client_id": string }; Returns: Json
                            },

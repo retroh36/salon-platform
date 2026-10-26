@@ -193,7 +193,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
       >
         <PatchTestForm clientId={client.id} today={today} me={me.id} staff={team.map((s) => ({ id: s.id, name: fullName(s) }))} />
         {patchTests.length === 0 ? (
-          <EmptyState className="border-t border-line">No patch tests recorded.</EmptyState>
+          <EmptyState art={false} className="border-t border-line">No patch tests recorded.</EmptyState>
         ) : (
           <ol className={recordsClass} aria-label="Patch test history">
             {patchTests.map((t) => (
@@ -221,7 +221,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
         }
       >
         {forms.length === 0 ? (
-          <EmptyState className="border-t border-line">No signed forms.</EmptyState>
+          <EmptyState art={false} className="border-t border-line">No signed forms.</EmptyState>
         ) : (
           <ul className={recordsClass} aria-label="Signed forms">
             {forms.map((f) => (
@@ -239,7 +239,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
       <Section titleId="formulas-heading" title="Color formulas" count={formulas.length}>
         <FormulaForm clientId={client.id} today={today} visits={visits} products={products} />
         {formulas.length === 0 ? (
-          <EmptyState className="border-t border-line">No formulas yet.</EmptyState>
+          <EmptyState art={false} className="border-t border-line">No formulas yet.</EmptyState>
         ) : (
           <ol className={recordsClass} aria-label="Formula history">
             {formulas.map((f) => (

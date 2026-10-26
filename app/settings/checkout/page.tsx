@@ -33,7 +33,7 @@ async function CheckoutSettings() {
   if (error) throw error;
   return (
     <AppShell section="settings" me={me}>
-      <PageHeader title="Settings" description="Tax, discounts, receipts and the cash drawer." />
+      <PageHeader title="Tax and receipts" description="Tax, discounts, receipts and the cash drawer." />
       <SettingsNav current="checkout" me={me} />
       <Card>
         <CheckoutSettingsForm

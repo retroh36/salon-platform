@@ -1,3 +1,6 @@
+import Image from "next/image";
+import wave from "@/public/brand/denise/wave.png";
+
 // Building blocks for pages: header, cards, sections, tags, alerts and
 // empty states (docs/brand.md, "Layout"). One layer of containers: only
 // the items themselves are cards; groups of them are a Section (a label and
@@ -163,9 +166,23 @@ export function Alert({ tone = "error", className = "", children }: { tone?: key
 
 // Nothing to show: one quiet line (and an optional title and action),
 // centered, the same everywhere.
-export function EmptyState({ title, action, className = "", children }: { title?: string; action?: React.ReactNode; className?: string; children?: React.ReactNode }) {
+// Denise waves above it (art={false} leaves her out, in tight spaces).
+export function EmptyState({
+  title,
+  action,
+  art = true,
+  className = "",
+  children,
+}: {
+  title?: string;
+  action?: React.ReactNode;
+  art?: boolean;
+  className?: string;
+  children?: React.ReactNode;
+}) {
   return (
     <div className={`flex flex-col items-center gap-1 px-4 py-10 text-center ${className}`} data-testid="empty-state">
+      {art && <Image src={wave} alt="" aria-hidden sizes="64px" className="mb-2 h-auto w-14" />}
       {title && <p className="text-sm font-medium text-ink">{title}</p>}
       {children && <p className="text-sm text-ink-muted">{children}</p>}
       {action && <div className="mt-3">{action}</div>}

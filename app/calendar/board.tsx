@@ -38,7 +38,7 @@ import { GroupPanel } from "./group-panel";
 import { NowLine, useNow } from "./now-line";
 import { OffChip, ViewEditor, type Department } from "./views";
 import { saveCalendarView, setCalendarOrder } from "./view-actions";
-import type { BlockData, BoardData, ColumnData, TimeBlockData } from "./types";
+import type { AppointmentDetail, BlockData, BoardData, ColumnData, TimeBlockData } from "./types";
 import { firstLetter } from "@/lib/initial";
 
 // How tall time is drawn (px per minute), from the zoom; blocks read it.
@@ -93,6 +93,8 @@ type Drag = Move & {
   pointerId: number;
   x: number;
   y: number;
+  // Where it was grabbed, px below the block's top: it stays under the pointer there.
+  grab: number;
   fromStaffId: string;
   fromStart: number;
   length: number;
@@ -253,6 +255,11 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // A stylist's column a link asked for, tinted for a moment.
   const [focusedStaff, setFocusedStaff] = useState<string | null>(data.focus.staffId);
   const dragRef = useRef<Drag | null>(null);
+  // While dragging: the element blocks are placed in (its top is the
+  // day's first minute, wherever the day is scrolled) and the pointer's
+  // last place, so a scroll under a still pointer moves the block too.
+  const dragOrigin = useRef<HTMLElement | null>(null);
+  const lastPointer = useRef({ x: 0, y: 0 });
 
   // Loads the day again when the calendar changes elsewhere (another desk,
   // or a client booking online): checks every 20 seconds while the tab is
@@ -267,6 +274,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     };
     const timer = window.setInterval(check, LIVE_CHECK_MS);
     document.addEventListener("visibilitychange", check);
+    // And once whenever new data arrives: a reload that started before a
+    // save can land after the save's own, putting the old day back, and
+    // this loads the saved one again at once rather than 20 seconds on.
+    check();
     return () => {
       stopped = true;
       window.clearInterval(timer);
@@ -465,6 +476,19 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     return { ...b, staffId: m.staffId, start: b.start + shift, end: b.end + shift, segments: b.segments.map((s) => ({ ...s, start: s.start + shift, end: s.end + shift })) };
   };
   const blocks = data.blocks.map(placed);
+  // Booking details with the same moves, so it never shows the old time
+  // while a move is saving.
+  const detailOf = (appointmentId: string): AppointmentDetail => {
+    const a = data.appointments[appointmentId];
+    if (!a.items.some((i) => moves[i.id])) return a;
+    const items = a.items.map((i) => {
+      const m = moves[i.id];
+      if (!m) return i;
+      const shift = m.start - i.start;
+      return { ...i, staffId: m.staffId, staffName: data.columns.find((c) => c.staffId === m.staffId)?.name ?? i.staffName, start: i.start + shift, end: i.end + shift };
+    });
+    return { ...a, items };
+  };
   // Who's off that day is hidden (unless asked for), except anyone with a
   // booking, a stylist a link asked for, or one Denise's fix would move a
   // client to.
@@ -554,6 +578,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
 
   function onPointerDown(e: React.PointerEvent, b: BlockData) {
     if (e.button !== 0 || !canMove(b)) return;
+    const el = e.currentTarget as HTMLElement;
+    const origin = el.offsetParent as HTMLElement | null;
+    dragOrigin.current = origin;
+    lastPointer.current = { x: e.clientX, y: e.clientY };
     const drag: Drag = {
       itemId: b.itemId,
       staffId: b.staffId,
@@ -561,6 +589,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
       pointerId: e.pointerId,
       x: e.clientX,
       y: e.clientY,
+      // From where it's placed, not where it's drawn (it lifts on hover).
+      grab: e.clientY - ((origin?.getBoundingClientRect().top ?? 0) + el.offsetTop),
       fromStaffId: b.staffId,
       fromStart: b.start,
       length: b.end - b.start,
@@ -589,9 +619,19 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     const dy = e.clientY - d.y;
     if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
     edgeScroll(e.clientX);
-    const shift = Math.round(dy / PX_PER_MINUTE / MOVE_STEP) * MOVE_STEP;
-    const start = Math.min(Math.max(d.fromStart + shift, range.start), range.end - d.length);
-    const next = { ...d, moved: true, start, staffId: columnAt(e.clientX) ?? d.staffId };
+    lastPointer.current = { x: e.clientX, y: e.clientY };
+    dragTo(d);
+  }
+
+  // Puts the dragged block where the pointer holds it: its top the grab
+  // below the pointer, on the nearest 15-minute line of the column under it.
+  function dragTo(d: Drag) {
+    const origin = dragOrigin.current;
+    if (!origin) return;
+    const { x, y: pointerY } = lastPointer.current;
+    const minute = range.start + (pointerY - d.grab - origin.getBoundingClientRect().top) / PX_PER_MINUTE;
+    const start = Math.min(Math.max(Math.round(minute / SLOT_STEP) * SLOT_STEP, range.start), range.end - d.length);
+    const next = { ...d, moved: true, start, staffId: columnAt(x) ?? d.staffId };
     dragRef.current = next;
     setDrag(next);
   }
@@ -772,7 +812,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               href="/calendar"
               transitionTypes={[data.today > data.date ? "nav-forward" : "nav-back"]}
               aria-current={data.date === data.today ? "date" : undefined}
-              className={buttonClass("secondary", "md")}
+              // On today: in the active blue, so it's clear where you are.
+              className={buttonClass("secondary", "md", data.date === data.today ? "border-active/40! bg-active-soft! text-active-ink!" : "")}
             >
               Today
             </Link>
@@ -839,6 +880,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
         <ViewTransition key={data.date} enter={DAY_SLIDE} exit={DAY_SLIDE} default="none">
           <div
             ref={gridRef}
+            // The day scrolling under a dragged block moves it with the grid.
+            onScroll={() => dragRef.current?.moved && dragTo(dragRef.current)}
             // Sideways swipes scroll the stylists, never the browser back a page.
             className="overflow-auto overscroll-x-contain rounded-lg border border-line bg-surface lg:min-h-0 lg:flex-1"
             data-testid="calendar-grid"
@@ -957,12 +1000,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                             data-off-hours
                             aria-hidden
                             title="Not bookable"
-                            className="absolute inset-x-0 bg-sunken/80"
-                            style={{
-                              top: y(o.start),
-                              height: (o.end - o.start) * PX_PER_MINUTE,
-                              backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, rgb(23 39 59 / 0.04) 6px 12px)",
-                            }}
+                            className="absolute inset-x-0 bg-off-hours/75"
+                            style={{ top: y(o.start), height: (o.end - o.start) * PX_PER_MINUTE }}
                           />
                         ))}
 
@@ -1005,7 +1044,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                             );
                           })}
 
-                        {drag?.moved && drag.staffId === c.staffId && <DragGhost block={blocks.find((b) => b.itemId === drag.itemId)!} start={drag.start} y={y} />}
+                        {drag?.moved && drag.staffId === c.staffId && <DragGhost block={blocks.find((b) => b.itemId === drag.itemId)!} start={drag.start} stylist={c.firstName} y={y} />}
 
 
                         <ul aria-label={`${c.name}'s appointments`}>
@@ -1200,7 +1239,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                 date={data.date}
                 today={data.today}
                 timeZone={data.timeZone}
-                appointment={data.appointments[selection.appointmentId]}
+                appointment={detailOf(selection.appointmentId)}
                 me={me}
                 onEdit={() => select({ kind: "edit", appointmentId: selection.appointmentId })}
                 onClose={closeDetails}
@@ -1271,7 +1310,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             ) : selection.kind === "edit" && data.appointments[selection.appointmentId] ? (
               <BookingPanel
                 data={data}
-                appointment={data.appointments[selection.appointmentId]}
+                appointment={detailOf(selection.appointmentId)}
                 onClose={() => select({ kind: "detail", appointmentId: selection.appointmentId })}
                 onSaved={(id, message, date) => {
                   if (date && date !== data.date) openOn(date, id);
@@ -1447,7 +1486,7 @@ function AskDeniseBar({ onAsk, example }: { onAsk: (question: string) => void; e
   return (
     <form
       aria-label="Ask Denise"
-      className="flex items-center gap-3 rounded-lg border border-denise-200 bg-surface p-2 pl-2.5 transition-[border-color,box-shadow] duration-(--motion-fast) focus-within:border-denise-500 focus-within:ring-2 focus-within:ring-denise-200"
+      className="flex items-center gap-3 rounded-lg border border-denise-200 bg-denise-50 p-2 pl-2.5 transition-[border-color,box-shadow] duration-(--motion-fast) focus-within:border-denise-500 focus-within:ring-2 focus-within:ring-denise-200"
       onSubmit={(e) => {
         e.preventDefault();
         if (!question.trim()) return;
@@ -1462,7 +1501,7 @@ function AskDeniseBar({ onAsk, example }: { onAsk: (question: string) => void; e
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder={example}
-          className="w-full bg-transparent text-sm text-ink placeholder:text-ink-subtle focus:outline-none"
+          className="w-full bg-transparent text-sm text-ink placeholder:text-ink-muted focus:outline-none"
         />
       </label>
       <IconButton type="submit" label="Ask" variant="primary">
@@ -1724,7 +1763,7 @@ function CalendarKey({ families }: { families: ServiceFamily[] }) {
                 Processing (stylist free)
               </li>
               <li className="flex items-center gap-2">
-                <span aria-hidden className={`${swatch} bg-sunken ring-1 ring-line-strong`} />
+                <span aria-hidden className={`${swatch} bg-off-hours ring-1 ring-line-strong`} />
                 Not bookable
               </li>
             </ul>
@@ -1778,7 +1817,7 @@ function segmentStyle(kind: string, visit: Visit): React.CSSProperties {
   if (kind !== "processing") return { backgroundColor: "var(--visit-fill)" };
   return {
     backgroundColor: `color-mix(in srgb, var(--visit-fill) ${visit === "upcoming" ? 45 : 65}%, white)`,
-    backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--fam-accent) 14%, transparent) 6px 12px)",
+    backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--fam-accent) 12%, transparent) 6px 12px)",
   };
 }
 
@@ -1879,7 +1918,6 @@ function TimeBlockBox({
         top: y(block.start),
         height,
         backgroundColor: "var(--color-sunken)",
-        backgroundImage: "repeating-linear-gradient(45deg, transparent 0 5px, rgb(23 39 59 / 0.05) 5px 10px)",
       }}
     >
       {height >= 18 && (
@@ -1907,8 +1945,9 @@ function TimeBlockBox({
   );
 }
 
-// A lifted copy of the block that follows the pointer while dragging.
-function DragGhost({ block, start, y }: { block: BlockData; start: number; y: (minute: number) => number }) {
+// Where the dragged block will land: a copy on the grid lines (no scaling,
+// so its edges sit exactly on them), with the new time and stylist.
+function DragGhost({ block, start, stylist, y }: { block: BlockData; start: number; stylist: string; y: (minute: number) => number }) {
   const PX_PER_MINUTE = usePpm();
   const length = block.end - block.start;
   return (
@@ -1916,12 +1955,12 @@ function DragGhost({ block, start, y }: { block: BlockData; start: number; y: (m
       data-drag-ghost
       data-family={block.family}
       aria-hidden
-      className="pointer-events-none absolute inset-x-1 z-40 scale-[1.02] overflow-hidden rounded-md border-l-4 border-(--fam-accent) bg-(--fam-fill) px-2 py-1 text-sm shadow-lift"
+      className="pointer-events-none absolute inset-x-1 z-40 overflow-hidden rounded-md border-l-4 border-(--fam-accent) bg-(--fam-fill) px-2 py-1 text-sm text-(--fam-ink) shadow-lift ring-2 ring-link"
       style={{ top: y(start), height: length * PX_PER_MINUTE }}
     >
       <div className="truncate font-semibold">{block.clientName}</div>
-      <div className="truncate text-[13px] text-ink-muted">
-        {formatMinute(start)}–{formatMinute(start + length)}
+      <div className="truncate text-[13px] font-medium">
+        {formatMinute(start)}–{formatMinute(start + length)} · {stylist}
       </div>
     </div>
   );
@@ -2082,7 +2121,7 @@ function AppointmentBlock({
         onBlur={(e) => onHint(null, e.currentTarget.getBoundingClientRect())}
         aria-describedby={`hint-${block.itemId}`}
         {...pointer}
-        className={`@container absolute block touch-pan-x touch-pan-y overflow-hidden [-webkit-touch-callout:none] rounded-md border-l-4 border-(--fam-accent) bg-surface text-left text-ink select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
+        className={`@container absolute block touch-pan-x touch-pan-y overflow-hidden [-webkit-touch-callout:none] rounded-md border-l-4 border-(--fam-accent) bg-surface text-left text-(--visit-ink) select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
  selected || highlight || grouped ? "" : "ring-1 ring-surface"
  } ${draggable ? "cursor-grab" : "cursor-pointer"} ${dragging ? "opacity-40 shadow-none outline-2 outline-ink-subtle outline-dashed" : ""} ${settling ? "animate-settle" : ""}`}
         style={{
@@ -2131,12 +2170,12 @@ function AppointmentBlock({
         )}
         {show.service && (
           <span aria-hidden className={`relative block ${narrow ? "px-1.5" : "px-2"}`}>
-            <FitText variants={services} lines={show.serviceLines} className="text-[13px] leading-[17px] text-block-ink-muted" />
+            <FitText variants={services} lines={show.serviceLines} className="text-[13px] leading-[17px] text-(--visit-ink-muted)" />
           </span>
         )}
         {show.time && (
           <span aria-hidden className={`relative block ${narrow ? "px-1.5" : "px-2"}`}>
-            <FitText variants={ranges} className="text-[13px] leading-[17px] text-block-ink-muted" />
+            <FitText variants={ranges} className="text-[13px] leading-[17px] text-(--visit-ink-muted)" />
           </span>
         )}
       </div>

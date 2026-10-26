@@ -67,7 +67,7 @@ function RightNow({ live, mineOnly }: { live: LiveData; mineOnly: boolean }) {
         <span className="text-13 text-ink-muted tabular-nums">{formatMinute(live.nowMinute)}</span>
       </div>
       {quiet ? (
-        <EmptyState className="py-8">{mineOnly ? "No one in your chair, and nothing in the next hour." : "No one in the chair, and nothing in the next hour."}</EmptyState>
+        <EmptyState art={false} className="py-8">{mineOnly ? "No one in your chair, and nothing in the next hour." : "No one in the chair, and nothing in the next hour."}</EmptyState>
       ) : (
         <div className="grid gap-px bg-line md:grid-cols-3">
           <Column title="In the chair" empty="No one yet." visits={live.inChair} line={(v) => `${v.service} · with ${v.staffName}`} testId="in-chair" />
@@ -129,7 +129,7 @@ function TeamToday({ team }: { team: StylistCard[] }) {
     >
       {team.length === 0 ? (
         <div className="rounded-lg border border-line bg-surface">
-          <EmptyState className="py-6">No one is working today.</EmptyState>
+          <EmptyState art={false} className="py-6">No one is working today.</EmptyState>
         </div>
       ) : (
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3" aria-label="Stylists working today">

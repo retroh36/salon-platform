@@ -26,7 +26,7 @@ async function PayrollSettings() {
   const settings = await loadPaySettings(supabase, me.business_id);
   return (
     <AppShell section="settings" me={me}>
-      <PageHeader title="Settings" description="How often you run payroll. Commission plans (tiers, back-bar fees, hourly) are on Settings → Commission; own rates and hourly pay are set per person on Team → Schedule." />
+      <PageHeader title="Payroll" description="How often you run payroll. Commission plans (tiers, back-bar fees, hourly) are on Settings → Commission; own rates and hourly pay are set per person on Team → Schedule." />
       <SettingsNav current="payroll" me={me} />
       <Card>
         <PayrollSettingsForm initial={settings} />

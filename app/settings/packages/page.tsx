@@ -33,7 +33,7 @@ async function PackagesSettings() {
   if (error) throw error;
   return (
     <AppShell section="settings" me={me}>
-      <PageHeader title="Settings" description="Packages: services clients buy up front at one price and use over several visits." />
+      <PageHeader title="Packages" description="Services clients buy up front at one price and use over several visits." />
       <SettingsNav current="packages" me={me} />
       <Card title="New package" titleId="new-package-heading">
         <PackageForm template={null} services={services} />

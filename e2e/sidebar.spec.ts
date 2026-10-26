@@ -22,6 +22,20 @@ const overlap = async (a: Locator, b: Locator) => {
 test.describe("owner", () => {
   test.use({ storageState: AUTH.owner });
 
+  test("the client search bar is on the Calendar and Clients only", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const bar = page.locator("header").getByRole("search").getByRole("searchbox", { name: "Search clients" });
+    for (const path of ["/calendar", "/clients"]) {
+      await page.goto(path);
+      await expect(bar, path).toBeVisible();
+    }
+    for (const path of ["/dashboard", "/sales", "/team", "/inventory", "/reports", "/settings"]) {
+      await page.goto(path);
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+      await expect(page.locator("header").getByRole("search"), path).toHaveCount(0);
+    }
+  });
+
   test("sees every group, with Settings at the bottom", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/dashboard");

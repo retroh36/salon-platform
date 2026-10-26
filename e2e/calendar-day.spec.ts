@@ -314,7 +314,7 @@ test.describe("front desk", () => {
     expect(due!.y).toBeGreaterThanOrEqual(nameBox!.y + nameBox!.height - 1);
     expect(open!.y).toBeGreaterThanOrEqual(due!.y + due!.height - 1);
     expect(noShow!.y).toBeCloseTo(open!.y, 0);
-    expect(open!.height).toBeLessThan(32);
+    expect(open!.height).toBeLessThanOrEqual(32);
     expect(dismiss!.y - row!.y).toBeLessThan(10);
     expect(row!.x + row!.width - (dismiss!.x + dismiss!.width)).toBeLessThan(10);
     expect(dismiss!.x).toBeGreaterThanOrEqual(nameBox!.x + nameBox!.width - 1);

@@ -29,7 +29,7 @@ async function MessagesSettings() {
   if (error) throw error;
   return (
     <AppShell section="settings" me={me}>
-      <PageHeader title="Settings" description="Messages: what your team can send clients from booking details. Clients only get messages they've agreed to, and a text STOP is always honored." />
+      <PageHeader title="Messages" description="What your team can send clients from booking details. Clients only get messages they've agreed to, and a text STOP is always honored." />
       <SettingsNav current="messages" me={me} />
       <Card
         title="Writing their own messages"

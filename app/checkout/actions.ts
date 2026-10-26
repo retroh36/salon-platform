@@ -108,7 +108,8 @@ export async function approveOutOfStock(draftId: string, productId: string, emai
   const { error: signInError } = await manager.auth.signInWithPassword({ email: email.trim(), password });
   if (signInError) return { ok: false, message: "That email and password don't match." };
   const { error } = await manager.rpc("approve_stock_override", { p_draft_id: draftId, p_product_id: productId });
-  await manager.auth.signOut();
+  // Ends only this moment's sign-in, never the manager's other devices.
+  await manager.auth.signOut({ scope: "local" });
   return error ? { ok: false, message: error.code === "42501" ? "Only a manager or owner can OK that." : "That didn't work." } : { ok: true };
 }
 

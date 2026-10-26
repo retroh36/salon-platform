@@ -83,7 +83,7 @@ function NavLink({ item, current }: { item: NavItem; current: boolean }) {
       href={href}
       aria-current={current ? "page" : undefined}
       className={`flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-[background-color,color,transform] duration-(--motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-focus ${
-        current ? "bg-navy-100 text-navy-900" : "text-ink-muted hover:bg-surface hover:text-ink"
+        current ? "bg-active-soft text-active-ink" : "text-ink-muted hover:bg-surface hover:text-ink"
       }`}
     >
       <Icon className="size-5 shrink-0" />
@@ -105,7 +105,7 @@ function PoweredBy() {
 }
 
 // The redesigned app layout (docs/design/): sidebar with the salon and
-// navigation, a search bar on top. Pages move to it one at a time; the rest
+// navigation, a client search bar on top of the Calendar and Clients. Pages move to it one at a time; the rest
 // still use AppShell.
 export function AppFrame({
   section,
@@ -128,6 +128,7 @@ export function AppFrame({
 }) {
   const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => shown(n, user)) })).filter((g) => g.items.length > 0);
   const settings = settingsFor(user);
+  const search = section === "calendar" || section === "clients";
   return (
     // One screen tall on large screens: the calendar and panels scroll inside.
     <div className="flex min-h-screen flex-1 bg-canvas text-ink lg:h-[calc(100vh-var(--demo-bar))] lg:min-h-0 lg:flex-none lg:overflow-hidden">
@@ -188,12 +189,15 @@ export function AppFrame({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 border-b border-line bg-canvas px-4 py-2.5 sm:px-6">
+        {/* The client search is on the Calendar and Clients only; elsewhere the
+            bar is just the compact header on small screens. */}
+        <header className={`flex items-center gap-3 border-b border-line bg-canvas px-4 py-2.5 sm:px-6 ${search ? "" : "justify-between lg:hidden"}`}>
           {/* Compact header for screens without the sidebar. */}
           <div className="flex items-center gap-2 lg:hidden">
             <SalonMark name={businessName} logoUrl={logoUrl} />
             <span className="font-semibold text-ink">{businessName}</span>
           </div>
+          {search && (
           <form action="/clients" role="search" className="relative ml-auto w-full max-w-xl min-w-0 lg:ml-0">
             <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-muted" />
             <input
@@ -204,6 +208,7 @@ export function AppFrame({
               className="h-9 w-full rounded-md border border-line bg-surface pr-3 pl-9 text-sm placeholder:text-ink-subtle focus:border-focus focus:ring-2 focus:ring-focus/25 focus:outline-none"
             />
           </form>
+          )}
           {sharedDevice ? (
             <form action="/switch/lock" method="post" className="lg:hidden">
               <button type="submit" className={buttonClass("secondary", "sm")}>
@@ -224,7 +229,7 @@ export function AppFrame({
               key={href}
               href={href}
               aria-current={s === section ? "page" : undefined}
-              className={`rounded-md px-3 py-1.5 text-sm whitespace-nowrap ${s === section ? "bg-navy-100 font-medium text-navy-900" : "text-ink-muted"}`}
+              className={`rounded-md px-3 py-1.5 text-sm whitespace-nowrap ${s === section ? "bg-active-soft font-medium text-active-ink" : "text-ink-muted"}`}
             >
               {label}
             </Link>

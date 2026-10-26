@@ -92,3 +92,24 @@ test("holding a visit still picks it up: dragging moves it, and the day doesn't 
   expect(Math.abs((await scrollTop(page)) - before)).toBeLessThan(5);
   expect((await admin.from("appointments").select("id").eq("id", visitId)).data).toHaveLength(1);
 });
+
+test("a held visit lands on the 15-minute line under the finger, however the day is scrolled", async ({ page }) => {
+  await openDay(page);
+  const block = ui(page).locator("[data-block]").filter({ hasText: `${PREFIX}Ava` });
+  const cdp = await page.context().newCDPSession(page);
+  const ppm = Number(await grid(page).getAttribute("data-px-per-minute"));
+  // Each from 10:00 (put back between): the drop goes to the nearest line.
+  for (const { scroll, minutes, to } of [
+    { scroll: 0, minutes: 38, to: 10 * 60 + 45 },
+    { scroll: 60, minutes: 22, to: 10 * 60 + 15 },
+    { scroll: 120, minutes: -23, to: 9 * 60 + 30 },
+  ]) {
+    await admin.from("appointment_items").update({ starts_at: at(10).toISOString(), ends_at: at(10, 45).toISOString() }).eq("id", itemId);
+    await admin.from("appointments").update({ starts_at: at(10).toISOString(), ends_at: at(10, 45).toISOString() }).eq("id", visitId);
+    await openDay(page);
+    await grid(page).evaluate((el, top) => (el.scrollTop = top), scroll);
+    const box = (await block.boundingBox())!;
+    await touch(cdp, page, box.x + box.width / 2, box.y + 12, minutes * ppm, 600);
+    await expect.poll(async () => (await startsAt()).slice(11, 16), { message: `${scroll}px` }).toBe(at(Math.floor(to / 60), to % 60).toISOString().slice(11, 16));
+  }
+});

@@ -52,7 +52,7 @@ async function Commission() {
   return (
     <AppShell section="settings" me={me}>
       <PageHeader
-        title="Settings"
+        title="Commission"
         description="How each person is paid: commission (flat or in tiers) or hourly. Changes apply to sales from then on; past pay never changes."
       />
       <SettingsNav current="commission" me={me} />

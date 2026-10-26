@@ -7,12 +7,14 @@
    --------------------------------------------------------------------------- */
 
 @theme {
-  /* Surfaces: neutral, near white */
-  --color-canvas: #fafaf9;
+  /* Surfaces: a warm off-white page, white cards */
+  --color-canvas: #faf8f5;
   --color-surface: #ffffff;
-  --color-sunken: #f4f4f3;
-  --color-line: #e6e7ea;
-  --color-line-strong: #d3d5da;
+  --color-sunken: #f4f2ee;
+  --color-line: #e7e4df;
+  --color-line-strong: #d4d0ca;
+  /* The calendar outside someone's hours: a very light flat tint */
+  --color-off-hours: #f3f0ea;
 
   /* Text: dark grays, a touch of the navy */
   --color-ink: #191c22;
@@ -27,37 +29,59 @@
   --color-navy-200: #cfd8e5;
   --color-navy-100: #e8edf4;
 
-  /* Links and focus rings: a brighter blue on the navy's hue */
-  --color-link: #1d64c4;
-  --color-link-hover: #174f9c;
-  --color-focus: #1d64c4;
+  /* Maestra's bright blue, on the navy's hue: active states (the current
+     sidebar item, the selected Day/Week, Today when it's today), links and
+     focus rings. active-soft is its tint, with active-ink on it. */
+  --color-active: #1963d6;
+  --color-active-hover: #1556b8;
+  --color-active-soft: #eaf2fe;
+  --color-active-ink: #124c9f;
+  --color-link: #1963d6;
+  --color-link-hover: #1556b8;
+  --color-focus: #1963d6;
 
   /* Denise (the AI assistant): periwinkle, only for her messages,
      suggestions and badge */
-  --color-denise-50: #f4f5ff;
-  --color-denise-100: #e8eafd;
-  --color-denise-200: #cfd4fa;
+  --color-denise-50: #edefff;
+  --color-denise-100: #dfe3fe;
+  --color-denise-200: #b8c0f7;
   --color-denise-500: #6c78e0;
   --color-denise-600: #4e59c9;
   --color-denise-700: #3f49b0;
   --color-denise-900: #272d75;
 
-  /* Service families: a soft, slightly muted fill behind text and a
-     stronger accent edge */
-  --color-peach-fill: #f7e1d4;
-  --color-peach-accent: #d9733f;
-  --color-lavender-fill: #e7e1f5;
-  --color-lavender-accent: #8669cf;
-  --color-sage-fill: #dde9df;
-  --color-sage-accent: #5a9568;
-  --color-teal-fill: #d7ebe8;
-  --color-teal-accent: #3d968f;
-  --color-sand-fill: #ebe5df;
-  --color-sand-accent: #9c8771;
-  --color-rose-fill: #f4dfe6;
-  --color-rose-accent: #c3527d;
-  --color-sky-fill: #dde7f4;
-  --color-sky-accent: #4a7dbd;
+  /* Service families ("A · Richer"): a clear, saturated tint behind the
+     text, a 4px edge in the full color, and dark text tinted to match
+     (the name in -ink, the rest in -ink-muted). Apart from the checked-in
+     yellow and checked-out green (checked in the token tests). */
+  --color-peach-fill: #ffd8c2;
+  --color-peach-accent: #f2603d;
+  --color-peach-ink: #5a250a;
+  --color-peach-ink-muted: #763f22;
+  --color-lavender-fill: #e1dbfd;
+  --color-lavender-accent: #6b57e3;
+  --color-lavender-ink: #2b1d78;
+  --color-lavender-ink-muted: #47399a;
+  --color-sage-fill: #cdebc5;
+  --color-sage-accent: #2a9a43;
+  --color-sage-ink: #1b461c;
+  --color-sage-ink-muted: #345f33;
+  --color-teal-fill: #c6ebf2;
+  --color-teal-accent: #0b93b2;
+  --color-teal-ink: #0d4350;
+  --color-teal-ink-muted: #245c69;
+  --color-sand-fill: #ebe1d9;
+  --color-sand-accent: #877462;
+  --color-sand-ink: #4a3516;
+  --color-sand-ink-muted: #654d2c;
+  --color-rose-fill: #fbd3e2;
+  --color-rose-accent: #d6336f;
+  --color-rose-ink: #67142f;
+  --color-rose-ink-muted: #82304b;
+  --color-sky-fill: #d3e4fc;
+  --color-sky-accent: #2f72d6;
+  --color-sky-ink: #153a72;
+  --color-sky-ink-muted: #2f528b;
 
   /* Stylist levels: a ring and badge on the avatar and a bar along the top
      of their calendar column (graphics, so 3:1 against the page). Gold,
@@ -103,12 +127,12 @@
      token tests). Secondary text on any block uses block-ink-muted, which
      passes AA on all of them. */
   --color-visit-here: #fcf1ae;
-  --color-visit-done: #b3d9b8;
+  --color-visit-done: #9ccfa6;
   --color-visit-off: #e3e5e9;
   --color-block-ink-muted: #454d5a;
   /* "+5m" and "Not arrived" on a block: the warning, a step darker so it
      reads on every fill. */
-  --color-block-attention: #8c3a08;
+  --color-block-attention: #7a3106;
 
   --color-danger: #b42318;
   --color-danger-soft: #fdeeec;
@@ -275,36 +299,56 @@
 [data-family="color"] {
   --fam-fill: var(--color-peach-fill);
   --fam-accent: var(--color-peach-accent);
+  --fam-ink: var(--color-peach-ink);
+  --fam-ink-muted: var(--color-peach-ink-muted);
 }
 [data-family="cut"] {
   --fam-fill: var(--color-lavender-fill);
   --fam-accent: var(--color-lavender-accent);
+  --fam-ink: var(--color-lavender-ink);
+  --fam-ink-muted: var(--color-lavender-ink-muted);
 }
 [data-family="finish"] {
   --fam-fill: var(--color-sage-fill);
   --fam-accent: var(--color-sage-accent);
+  --fam-ink: var(--color-sage-ink);
+  --fam-ink-muted: var(--color-sage-ink-muted);
 }
 [data-family="treatment"] {
   --fam-fill: var(--color-teal-fill);
   --fam-accent: var(--color-teal-accent);
+  --fam-ink: var(--color-teal-ink);
+  --fam-ink-muted: var(--color-teal-ink-muted);
 }
 [data-family="nails"] {
   --fam-fill: var(--color-rose-fill);
   --fam-accent: var(--color-rose-accent);
+  --fam-ink: var(--color-rose-ink);
+  --fam-ink-muted: var(--color-rose-ink-muted);
 }
 [data-family="skin"] {
   --fam-fill: var(--color-sky-fill);
   --fam-accent: var(--color-sky-accent);
+  --fam-ink: var(--color-sky-ink);
+  --fam-ink-muted: var(--color-sky-ink-muted);
 }
 [data-family="other"] {
   --fam-fill: var(--color-sand-fill);
   --fam-accent: var(--color-sand-accent);
+  --fam-ink: var(--color-sand-ink);
+  --fam-ink-muted: var(--color-sand-ink-muted);
 }
 
 /* Where the client is in their visit, as a calendar block's fill: set
    data-visit on the element (under its data-family). */
+[data-visit] {
+  --visit-ink: var(--color-ink);
+  --visit-ink-muted: var(--color-block-ink-muted);
+}
 [data-visit="upcoming"] {
   --visit-fill: var(--fam-fill);
+  --visit-ink: var(--fam-ink);
+  --visit-ink-muted: var(--fam-ink-muted);
 }
 [data-visit="here"] {
   --visit-fill: var(--color-visit-here);

@@ -32,7 +32,7 @@ test.describe("owner", () => {
     await expect(sidebar.getByTestId("powered-by")).toHaveText("Powered byMaestra");
 
     await sidebar.getByRole("link", { name: "Settings" }).click();
-    await expect(page).toHaveTitle("Settings · Maestra");
+    await expect(page).toHaveTitle("Your salon · Maestra");
     await waitForHydration(page, "form[aria-label='Salon logo']");
     const name = page.getByRole("form", { name: "Salon name" });
     await name.getByLabel("Salon name").fill("Willow & Co");

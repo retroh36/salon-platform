@@ -37,7 +37,7 @@ async function MembershipsSettings() {
   const provider = currentProvider();
   return (
     <AppShell section="settings" me={me}>
-      <PageHeader title="Settings" description="Memberships: clients pay every week or month for included services and member prices. Sold at checkout; benefits apply there automatically." />
+      <PageHeader title="Memberships" description="Clients pay every week or month for included services and member prices. Sold at checkout; benefits apply there automatically." />
       <SettingsNav current="memberships" me={me} />
       {provider.testMode && (
         <Alert tone="info" className="mb-6">

@@ -240,7 +240,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
       >
         {promotions.length === 0 ? (
           <TableCard className="mb-0">
-            <EmptyState>No promotions used in this period.</EmptyState>
+            <EmptyState art={false}>No promotions used in this period.</EmptyState>
           </TableCard>
         ) : (
           <TableCard className="mb-0">
@@ -302,7 +302,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
         <h3 className="mt-6 mb-2 text-13 font-medium text-ink-muted">By month</h3>
         {eventMonths.length === 0 ? (
           <TableCard className="mb-0">
-            <EmptyState>No events booked in the six months either side of this one.</EmptyState>
+            <EmptyState art={false}>No events booked in the six months either side of this one.</EmptyState>
           </TableCard>
         ) : (
           <TableCard className="mb-0">
@@ -337,7 +337,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
       >
         <TableCard className="mb-0">
           {sources.total === 0 ? (
-            <EmptyState>No online bookings in this period.</EmptyState>
+            <EmptyState art={false}>No online bookings in this period.</EmptyState>
           ) : (
             <table className={tableClass} aria-label="Online bookings by source">
               <thead className={theadClass}>
@@ -370,7 +370,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
       >
         {rebooking.visits === 0 ? (
           <TableCard className="mb-0">
-            <EmptyState>No visits checked out in this period.</EmptyState>
+            <EmptyState art={false}>No visits checked out in this period.</EmptyState>
           </TableCard>
         ) : (
           <>
