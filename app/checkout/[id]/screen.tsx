@@ -10,6 +10,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import { DeniseBubble, DeniseHeaderButton, type BubbleMe } from "@/components/denise-chat/bubble";
 import { Button } from "@/components/ui/button";
 import { ChevronLeftIcon, UndoIcon } from "@/components/ui/icons";
 import type { CheckoutScreenData } from "@/lib/checkout-screen";
@@ -40,8 +41,11 @@ export const newKey = () =>
 // The full-screen checkout: the ticket on the left (the client, every
 // line grouped by stylist, adding products), payment on the right (totals,
 // tips, payments, rebooking, Complete sale). Saved as it's built, so Back
-// or Escape loses nothing.
-export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
+// or Escape loses nothing. Denise's button is in the top bar (nothing
+// floats over the payment column), and her chat opens beside the ticket and
+// payment, which stack when that leaves too little room, so Complete sale
+// is never under her.
+export function CheckoutScreen({ data, denise }: { data: CheckoutScreenData; denise: BubbleMe }) {
   const router = useRouter();
   const [ticket, setTicket] = useState<Ticket>(data.ticket);
   const [editing, setEditing] = useState<string | null>(null);
@@ -254,16 +258,21 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
         <span className="ml-auto hidden text-13 text-ink-subtle sm:block">
           Saved as you go
         </span>
+        <span className="ml-auto sm:ml-0">
+          <DeniseHeaderButton />
+        </span>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)]">
+      <div className="flex min-h-0 flex-1">
+      <div className="@container flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto @3xl:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] @3xl:overflow-hidden">
         <main
-          className={`flex min-h-0 flex-col overflow-y-auto md:overflow-hidden ${linkOut ? "opacity-60" : ""}`}
+          className={`flex min-h-0 flex-col @3xl:overflow-hidden ${linkOut ? "opacity-60" : ""}`}
           aria-label="Ticket"
           inert={Boolean(linkOut)}
         >
           <div className="shrink-0 space-y-4 border-b border-line bg-surface px-4 py-4 sm:px-6">
-            <ClientHeader data={data} />
+            <ClientHeader data={data} walkIn={ticket.walkIn === true} onWalkIn={(walkIn) => change((t) => ({ ...t, walkIn }))} />
             <ProductPicker
               data={data}
               onAdd={(product, staffId) => {
@@ -329,6 +338,9 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
             onComplete={complete}
           />
         )}
+      </div>
+      </div>
+      <DeniseBubble me={denise} launcher="header" />
       </div>
 
       {removed && (

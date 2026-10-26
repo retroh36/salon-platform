@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, openAllDay, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration, moreAction } from "./fixtures";
+import { AUTH, expect, test, ui, waitForHydration, moreAction, toolbarMore } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -125,7 +125,7 @@ test("queues walk-ins with an estimated wait and books them in one click", async
   try {
     await page.goto(`/calendar`);
     await waitForHydration(page, "section[data-staff-id]");
-    await ui(page).getByRole("button", { name: "Walk-ins" }).click();
+    await toolbarMore(page, "Walk-ins");
     const add = page.getByRole("form", { name: "Add walk-in" });
     await add.getByLabel("Name").fill(`${PREFIX}Walker Test`);
     await add.getByLabel("Phone (optional)").fill("999 555 0123");

@@ -1,4 +1,4 @@
-// Phone booking: the best times for a visit a client asks for on a call
+// Booking by asking Denise: the best times for a visit a client asks for
 // ("balayage and a cut with Bridget next week, afternoons"). One or more
 // services back to back, each checked with the booking rules (./booking.ts:
 // hours, time off, blocked time, processing gaps, a free chair) at the

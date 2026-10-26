@@ -1,7 +1,7 @@
 // Everything Ask Denise needs for one question (./assistant.ts), for the
 // staff member asking: the menu, the stylists, the calendar, proposals,
-// and what they may look up (./knowledge.ts). Used by the calendar's "Ask
-// Denise" and the evaluation script (scripts/denise-eval).
+// and what they may look up (./knowledge.ts). Used by "Ask Denise" (her
+// chat, on every staff page) and the evaluation script (evals/).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { canBook } from "@/lib/appointments";
@@ -16,6 +16,7 @@ import type { AssistantContext } from "./assistant";
 import { loadDurations } from "@/lib/insights/read";
 import { loadHelpPages } from "@/lib/help/load";
 import { knowledgeFor } from "./knowledge";
+import type { PageContext } from "./page";
 
 type Supabase = SupabaseClient<Database>;
 
@@ -33,7 +34,7 @@ export type Asking = {
 
 const ROLE_NAMES = { owner: "owner", manager: "manager", front_desk: "front desk", stylist: "stylist", assistant: "assistant" } as const;
 
-export async function assistantContext(supabase: Supabase, me: Asking, date: LocalDate, now = new Date()): Promise<AssistantContext> {
+export async function assistantContext(supabase: Supabase, me: Asking, date: LocalDate, now = new Date(), page: PageContext | null = null): Promise<AssistantContext> {
   const [services, staff] = await Promise.all([
     supabase.from("services").select("id, name, category, duration_minutes").is("archived_at", null).order("name"),
     supabase.from("staff").select("id, first_name, role, level").eq("location_id", me.location.id).eq("is_active", true),
@@ -76,5 +77,6 @@ export async function assistantContext(supabase: Supabase, me: Asking, date: Loc
     knowledge: knowledgeFor(supabase, me),
     help: loadHelpPages(),
     role: me.role,
+    page,
   };
 }

@@ -57,7 +57,7 @@ async function Dashboard() {
             {longToday(tz)} · {me.location.name}
           </p>
         </div>
-        <AskBar example={!isFrontOfHouse(me.role) ? "Am I getting faster at cuts?" : "Who's free for a color at 3?"} />
+        <AskBar example={!isFrontOfHouse(me.role) ? "Am I getting faster at cuts?" : "Who's free for a color at 3?"} today={todayIn(tz)} />
       </header>
       <Suspense fallback={<DashboardSkeleton />}>
         <Body me={me} />

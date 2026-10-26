@@ -21,6 +21,7 @@ import type { Database } from "@/lib/database.types";
 import { assistantTools, systemPrompt, type AssistantContext } from "@/lib/denise/assistant";
 import { claudeClient, converse, modelFor } from "@/lib/denise/claude";
 import { assistantContext } from "@/lib/denise/context";
+import { pageContext } from "@/lib/denise/page";
 import { howTo } from "@/lib/help/guide";
 import type { ClientInsight } from "@/lib/insights/clients";
 import type { DurationInsight } from "@/lib/insights/durations";
@@ -88,6 +89,8 @@ type Case = {
   // A how-to question: the help page that answers it (null: none does),
   // and whether the person asking can do it. Checked in the dry run too.
   help?: { page: string | null; canDo?: boolean };
+  // Asked from a page (its path, from the facts): "their" means its client.
+  page?: (facts: Facts) => string;
 };
 
 // How-to answers: numbered steps when they can do it; who can, and no
@@ -492,7 +495,29 @@ const CASES: Case[] = [
   howToCase("A client wants to pay with their gift card. What do I do?", "front_desk", "Pay with a gift card", says(/gift card/i, "should mention paying by gift card")),
   howToCase("How do I check a client in?", "front_desk", "Check in a client", says(/check in/i, "should mention Check in")),
   howToCase("How do I book someone every 6 weeks?", "front_desk", "Book a repeating appointment", says(/repeat/i, "should mention repeating")),
-  howToCase("How do I find a time for someone on the phone?", "front_desk", "Take a phone booking", says(/phone booking/i, "should mention Phone booking")),
+  howToCase("How do I find a time for someone on the phone?", "front_desk", "Book by asking Denise", says(/denise|chat|type/i, "should say to type it in Denise's chat")),
+  howToCase("How do I sell shampoo to someone without an appointment?", "front_desk", "Sell a product on its own", says(/new sale/i, "should mention New sale")),
+  {
+    // Asked on the client's profile: "their" is that client.
+    question: "When's their next visit?",
+    as: "front_desk",
+    tools: ["this_client"],
+    page: (f) => `/clients/${f.id}`,
+    facts: async () => {
+      const { data } = await admin
+        .from("appointments")
+        .select("starts_at, client:clients!inner(id, first_name)")
+        .eq("location_id", L)
+        .in("status", ["booked", "confirmed"])
+        .gt("starts_at", new Date().toISOString())
+        .not("client_id", "is", null)
+        .order("starts_at")
+        .limit(1)
+        .single();
+      return { id: data!.client.id, first: data!.client.first_name };
+    },
+    check: (a, f) => (has(a, f.first) || /\b(mon|tue|wed|thu|fri|sat|sun)/i.test(a) ? null : "should give that client's next visit"),
+  },
   howToCase("How do I move all of a sick stylist's clients at once?", "front_desk", "Plan a sick-day rescue", says(/plan the rescue|apply all/i, "should mention Plan the rescue or Apply all")),
   howToCase("A client wants to redeem their points for a free gloss. How do I do that?", "front_desk", "Use a reward at checkout", says(/reward/i, "should mention Rewards")),
   howToCase("How do I send a client a link to pay on their phone?", "front_desk", "Send a payment link", says(/link/i, "should mention the payment link")),
@@ -576,7 +601,8 @@ describe("Ask Denise", () => {
     it(`#${i + 1} ${c.question}`, async () => {
       const facts = await c.facts();
       const question = c.question.replace(/\{(\w+)\}/g, (_, k: string) => String(facts[k] ?? ""));
-      const ctx = contexts.get(c.as)!;
+      const base = contexts.get(c.as)!;
+      const ctx = c.page ? { ...base, page: await pageContext(clients.get(c.as)!, { path: c.page(facts) }) } : base;
       const runner = assistantTools(ctx);
       const available = runner.tools.map((t) => t.name);
 

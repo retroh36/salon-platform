@@ -7,7 +7,7 @@ open: /calendar/waitlist | Open waitlist
 
 Put a client on the waitlist for when time opens up.
 
-1. Go to **Calendar** and tap **Waitlist** at the top.
+1. Go to **Calendar**, tap **More** at the top, then **Waitlist**.
 2. Under **Add to the waitlist**, find the client (or tap **New client**).
 3. Choose the **Service**. Tap **Another service** for more (up to 5).
 4. Tick the **Stylists** they'd see (none ticked means any stylist).

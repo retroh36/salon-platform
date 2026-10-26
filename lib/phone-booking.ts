@@ -1,14 +1,17 @@
-// Phone booking (the calendar's "Phone booking" panel): what the client
-// asked for, as fields staff can change: who, which services, with whom,
-// which days and what time of day. Denise reads a typed line into these
-// (lib/denise/phone-request.ts); without her, staff fill them in. Our code
-// works out the dates ("next week" → Monday to Sunday) and finds the client's
-// name in the line, so the name never goes to Claude. Pure.
+// Booking by asking Denise (her chat, ./denise/booking-chat.ts): what the
+// client asked for, as fields staff can change: who, which services, with
+// whom, which days and what time of day. Denise reads a typed line into
+// these (lib/denise/booking-request.ts), and follow-ups change them
+// (`applyChange`); without her, staff fill in a form that our code starts
+// from what it can tell (`guessRequest`). Our code works out the dates
+// ("next week" → Monday to Sunday) and finds the client's name in the line,
+// so the name never goes to Claude. Pure.
 
 import type { BookingContext } from "@/lib/scheduling/booking";
 import { PART_WINDOWS, rankVisits, searchVisits, type Candidate, type Habits, type PartOfDay, type Ranked, type VisitSearch } from "@/lib/scheduling/phone";
 import { addDays, datesBetween, startOfWeek, weekdayOf, type LocalDate } from "@/lib/scheduling/time";
 import type { StaffLevel } from "@/lib/schedule-forms";
+import type { BookingParse } from "@/lib/denise/booking-request";
 
 export type PhoneRequest = {
   // The client's name or phone as typed (for the client search), and
@@ -138,6 +141,64 @@ export function maskedLine(line: string, client: string | null): string {
   return masked.slice(0, 500);
 }
 
+// A follow-up ("what about Friday?", "with Bridget instead?", "mornings
+// only"): the request on screen with only what it changes.
+export function applyChange(current: PhoneRequest, change: BookingParse, today: LocalDate): PhoneRequest {
+  const dates = change.when ? datesFor(change.when, today) : null;
+  const timeSaid = change.anyTime || change.part !== null || change.after !== null || change.before !== null;
+  const stylistSaid = change.anyStylist || change.staffId !== null || change.level !== null;
+  return {
+    ...current,
+    serviceIds: change.serviceIds.length ? change.serviceIds.slice(0, MAX_PHONE_SERVICES) : current.serviceIds,
+    staffId: stylistSaid ? change.staffId : current.staffId,
+    level: stylistSaid ? (change.staffId ? null : change.level) : current.level,
+    from: dates ? (dates.from < today ? today : dates.from) : current.from,
+    to: dates ? dates.to : current.to,
+    part: timeSaid ? change.part : current.part,
+    after: timeSaid ? change.after : current.after,
+    before: timeSaid ? change.before : current.before,
+    earliest: change.earliest || current.earliest,
+  };
+}
+
+const DAY_WORDS: Record<string, number> = { monday: 1, mon: 1, tuesday: 2, tue: 2, tues: 2, wednesday: 3, wed: 3, thursday: 4, thu: 4, thur: 4, thurs: 4, friday: 5, fri: 5, saturday: 6, sat: 6, sunday: 7, sun: 7 };
+
+// Without Denise: what our code can tell from the line by itself, to start
+// the form with (a stylist or service named in full, a weekday, a part of
+// the day, "earliest", "tomorrow", "next week").
+export function guessRequest(line: string, menu: { services: readonly { id: string; name: string }[]; stylists: readonly { id: string; firstName: string }[] }, clientText: string | null, today: LocalDate): PhoneRequest {
+  const lower = ` ${line.toLowerCase().replace(/[^\p{L}\p{N}'’&/ ]+/gu, " ")} `;
+  const has = (words: string) => lower.includes(` ${words.toLowerCase()} `);
+  const words = lower.trim().split(/\s+/);
+  const day = words.map((w) => DAY_WORDS[w.replace(/s$/, "")] ?? DAY_WORDS[w]).find(Boolean);
+  const when: When = has("tomorrow")
+    ? { kind: "tomorrow" }
+    : has("today")
+      ? { kind: "today" }
+      : has("next week")
+        ? { kind: "next_week" }
+        : day
+          ? { kind: "weekday", weekday: day, next: has("next") }
+          : { kind: "soon" };
+  const part = (["morning", "afternoon", "evening"] as const).find((p) => has(p) || has(`${p}s`)) ?? null;
+  const serviceIds = menu.services.filter((s) => has(s.name)).map((s) => s.id);
+  return requestFrom(
+    {
+      sameAsLast: has("same as last time"),
+      serviceIds,
+      staffId: menu.stylists.find((s) => has(s.firstName))?.id ?? null,
+      level: null,
+      when,
+      part,
+      after: null,
+      before: null,
+      earliest: has("earliest") || has("soonest") || has("asap"),
+    },
+    clientText,
+    today,
+  );
+}
+
 // Denise's reading of the line (or nothing, without her) as the fields.
 export function requestFrom(
   parse: { sameAsLast: boolean; serviceIds: string[]; staffId: string | null; level: StaffLevel | null; when: When | null; part: PartOfDay | null; after: number | null; before: number | null; earliest: boolean } | null,
@@ -178,14 +239,17 @@ export const LATER_DAYS = 14;
 export function phoneTimes(
   ctx: BookingContext,
   r: PhoneRequest,
-  deps: { stylists: readonly PhoneStylist[]; timingOf: VisitSearch["timingOf"]; habits: Habits; now: Date },
+  deps: { stylists: readonly PhoneStylist[]; timingOf: VisitSearch["timingOf"]; habits: Habits; now: Date; laterThan?: { date: LocalDate; minute: number } | null },
 ): PhoneTimes {
   const names = new Map(deps.stylists.map((s) => [s.id, s.firstName]));
   const levelOf = new Map(deps.stylists.map((s) => [s.id, s.level]));
   const who = r.staffId ? [r.staffId] : r.level ? deps.stylists.filter((s) => s.level === r.level).map((s) => s.id) : deps.stylists.map((s) => s.id);
   const window = windowOf(r);
+  // "Anything later?": only times after the latest one shown.
+  const shownUpTo = deps.laterThan ?? null;
+  const after = (c: Candidate) => !shownUpTo || c.date > shownUpTo.date || (c.date === shownUpTo.date && c.minute > shownUpTo.minute);
   const search = (staffIds: readonly string[], dates: LocalDate[]) =>
-    searchVisits(ctx, { serviceIds: r.serviceIds, staffIds, dates, from: window.from, to: window.to, notBefore: deps.now, timingOf: deps.timingOf });
+    searchVisits(ctx, { serviceIds: r.serviceIds, staffIds, dates, from: window.from, to: window.to, notBefore: deps.now, timingOf: deps.timingOf }).filter(after);
   const rank = (found: Candidate[], count = 3, earliest = r.earliest) => rankVisits(ctx, found, deps.habits, names, { earliest, count });
 
   const options = rank(search(who, datesBetween(r.from, r.to)));

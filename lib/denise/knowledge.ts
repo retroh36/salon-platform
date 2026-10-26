@@ -36,6 +36,9 @@ export type Asker = { role: StaffRole; permissions: readonly string[]; staffId: 
 
 export type Knowledge = {
   clients: (firstName: string) => Promise<unknown>;
+  // One client by id (the one on the page staff are looking at), with
+  // their next visits as booked now.
+  client: (clientId: string) => Promise<unknown>;
   overdue: (limit: number) => Promise<unknown>;
   durations: (filter: { staffId: string | null; serviceId: string | null }) => Promise<unknown>;
   salon: () => Promise<unknown>;
@@ -134,6 +137,40 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
         }),
       );
       return { matches, note: matches.length > 1 ? "Several clients have this first name; ask which one if it matters." : undefined };
+    },
+
+    async client(clientId) {
+      const { data, error } = await supabase.from("clients").select("id, first_name").eq("id", clientId).maybeSingle();
+      if (error) throw error;
+      if (!data) return { error: "I can't see that client." };
+      const [known, upcoming] = await Promise.all([
+        loadClientInsights(supabase, me.businessId, [clientId]),
+        supabase
+          .from("appointments")
+          .select("starts_at, status, appointment_items(starts_at, services(name), staff(first_name))")
+          .eq("client_id", clientId)
+          .in("status", ["booked", "confirmed", "checked_in"])
+          .gte("starts_at", startOfLocalDay(me.today, tz).toISOString())
+          .order("starts_at")
+          .limit(3),
+      ]);
+      if (upcoming.error) throw upcoming.error;
+      const k = known.get(clientId);
+      const facts = k ? await clientFacts(data.first_name, k.habits, frontOfHouse ? k.spend : null) : { first_name: data.first_name, visits: 0, due_status: "new" };
+      return {
+        ...facts,
+        upcoming_visits: upcoming.data.map((a) => {
+          const at = toLocal(new Date(a.starts_at), tz);
+          const items = [...a.appointment_items].sort((x, y) => x.starts_at.localeCompare(y.starts_at));
+          return {
+            date: sayDate(at.date, me.today),
+            time: formatMinute(at.minute),
+            services: items.map((i) => i.services?.name ?? "a service"),
+            stylists: [...new Set(items.map((i) => i.staff?.first_name ?? "a stylist"))],
+            checked_in: a.status === "checked_in",
+          };
+        }),
+      };
     },
 
     async overdue(limit) {

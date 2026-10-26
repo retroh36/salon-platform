@@ -184,21 +184,33 @@ async function capture(browser: Browser) {
     await waitForReact(page, "section[data-staff-id]");
     await page.getByRole("tabpanel", { name: /Denise/ }).waitFor();
   });
-  // Phone booking for Maria Lopez, same as last time, afternoons, through the
-  // fields (so no Claude call even with the key set).
-  await shot("31-phone-booking", front, async (page) => {
+  // A booking in Denise's bubble on the Clients page: Maria Lopez's
+  // balayage with Bridget, afternoons, through "Book with the form" (so no
+  // Claude call even with the key set), the best times with her alerts.
+  await shot("31-denise-booking", front, async (page) => {
+    await page.goto("/clients");
+    await waitForReact(page, "[data-testid=denise-bubble-launcher]");
+    await page.getByTestId("denise-bubble-launcher").click();
+    const bubble = page.getByRole("complementary", { name: "Denise" });
+    await bubble.getByRole("button", { name: "Book with the form" }).click();
+    const form = bubble.getByTestId("booking-form");
+    await form.getByLabel("Find a client").fill("Maria Lopez");
+    await form.getByRole("list", { name: "Matching clients" }).getByRole("button").first().click();
+    await form.getByLabel("Service").selectOption({ label: "Balayage" });
+    await form.getByLabel("Stylist").selectOption({ label: "Bridget" });
+    await form.getByRole("radio", { name: "Afternoon" }).click();
+    await form.getByRole("button", { name: "Find times" }).click();
+    await bubble.getByTestId("booking-card").waitFor();
+    await bubble.getByTestId("booking-card").evaluate((el) => el.scrollIntoView({ block: "end" }));
+  });
+  // The calendar header: New booking and New sale in view, the rest under More.
+  await shot("34-calendar-header", front, async (page) => {
     await page.goto("/calendar");
     await waitForReact(page, "section[data-staff-id]");
-    await page.getByRole("button", { name: "Phone booking" }).click();
-    const panel = page.getByTestId("phone-panel");
-    const fields = panel.getByRole("button", { name: "Fill in the fields instead" });
-    if (await fields.isVisible()) await fields.click();
-    await panel.getByLabel("Find a client").fill("Maria Lopez");
-    await panel.getByRole("list", { name: "Matching clients" }).getByRole("button").first().click();
-    await panel.getByRole("button", { name: "Same as last time" }).click();
-    await panel.getByRole("radio", { name: "Afternoon" }).click();
-    await panel.getByRole("button", { name: "Show times" }).click();
-    await page.getByTestId("phone-times").waitFor();
+    await main(page).getByRole("button", { name: "More", exact: true }).click();
+    const menu = page.getByRole("menu", { name: "More" });
+    await menu.waitFor();
+    return { clip: await union([main(page).getByRole("heading", { level: 1 }), menu, main(page).getByRole("button", { name: "New booking" })], 24) };
   });
   await page_("16-dashboard-front-desk", front, "/dashboard", "[data-testid=dashboard-brief]");
   await page_("17-events", owner, "/events");

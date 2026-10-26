@@ -121,6 +121,13 @@ export async function moreAction(panel: Locator, name: string) {
   await panel.getByRole("menu", { name: "More actions" }).getByRole("menuitem", { name, exact: true }).click();
 }
 
+// The calendar toolbar's "More" menu: Waitlist, Walk-ins, Block time.
+export async function toolbarMore(page: Page, name: string) {
+  const more = ui(page).getByRole("button", { name: "More", exact: true });
+  if ((await more.getAttribute("aria-expanded")) !== "true") await more.click();
+  await page.getByRole("menu", { name: "More" }).getByRole("menuitem", { name, exact: true }).click();
+}
+
 // Check out: the main button once the client's checked in.
 export async function checkOut(panel: Locator) {
   const primary = panel.getByTestId("primary-action");

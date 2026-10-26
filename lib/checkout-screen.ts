@@ -159,8 +159,11 @@ export type CheckoutScreenData = {
   products: (CheckoutProduct & { brand: string })[];
   bestSellers: string[];
   recommended: { staffId: string; productIds: string[] } | null;
-  // Who products are credited to unless changed: the visit's stylist.
+  // Who products are credited to unless changed: the visit's stylist, else
+  // whoever is signed in. `creditStaff`: who a product sale can be credited
+  // to (the stylists, and whoever is signed in).
   defaultStaffId: string | null;
+  creditStaff: ScreenStaff[];
   templates: PackageTemplate[];
   settings: CheckoutSettings;
   role: StaffRole;
@@ -331,7 +334,10 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     products: products.map((p) => ({ ...p, brand: brandOf.get(p.id) ?? "" })),
     bestSellers: rank(sold ?? []).slice(0, 6),
     recommended: visitStaff ? { staffId: visitStaff, productIds: rank((sold ?? []).filter((r) => r.staff_id === visitStaff)).slice(0, 4) } : null,
-    defaultStaffId: visitStaff,
+    defaultStaffId: visitStaff ?? me.id,
+    creditStaff: staff.some((s) => s.id === me.id)
+      ? staff
+      : [...staff, ...staffRows.data.filter((s) => s.id === me.id).map((s) => ({ id: s.id, firstName: s.first_name, name: fullName(s), level: s.level, color: s.color }))],
     templates,
     settings,
     role: me.role,

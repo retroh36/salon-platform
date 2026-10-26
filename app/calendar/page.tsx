@@ -5,7 +5,6 @@ import { cookies } from "next/headers";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { canBook, type AppointmentStatus } from "@/lib/appointments";
-import { isConnected } from "@/lib/denise/claude";
 import { getCurrentStaff } from "@/lib/auth";
 import { bookedSummary, compactHours, FAMILIES, gridRange, isZoom, offHours, serviceFamily } from "@/lib/calendar";
 import { fitCookie, offReason, viewCookie, viewKey, type CalendarView, type ViewKey } from "@/lib/calendar-views";
@@ -539,13 +538,13 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       resources: resourcesResult.data,
       products,
     },
-    me: { staffId: me.id, role: me.role, canBook: canBook(me.role), canArrange: can(me, "settings"), freeText, zoom: isZoom(me.calendar_zoom) ? me.calendar_zoom : "comfortable", fitAll: jar.get(fitCookie(me.id))?.value === "1", denise: isConnected() },
+    me: { staffId: me.id, role: me.role, canBook: canBook(me.role), canArrange: can(me, "settings"), freeText, zoom: isZoom(me.calendar_zoom) ? me.calendar_zoom : "comfortable", fitAll: jar.get(fitCookie(me.id))?.value === "1" },
     views,
     initialView,
   };
 
   return (
-    <AppShell section="calendar" me={me} bleed>
+    <AppShell section="calendar" me={me} bleed denise={false}>
       {columns.length === 0 ? (
         <EmptyState className="py-16">No one at this location takes appointments yet.</EmptyState>
       ) : (

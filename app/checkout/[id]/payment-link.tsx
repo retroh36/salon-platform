@@ -78,7 +78,7 @@ export function LinkWaiting({ data, link }: { data: CheckoutScreenData; link: No
   }, [router]);
   const [expired] = useState(() => Date.parse(link.expiresAt) <= Date.now());
   return (
-    <aside aria-label="Payment" className="flex min-h-0 flex-col border-t border-line bg-surface md:border-t-0 md:border-l">
+    <aside aria-label="Payment" className="flex min-h-0 flex-col border-t border-line bg-surface @3xl:border-t-0 @3xl:border-l">
       <div className="flex flex-1 flex-col gap-4 px-4 py-6 sm:px-5" data-testid="link-waiting">
         <h2 className="text-xl font-semibold tracking-[-0.01em] text-ink">{expired ? "The payment link expired" : "Waiting for payment"}</h2>
         <p className="text-sm text-ink">

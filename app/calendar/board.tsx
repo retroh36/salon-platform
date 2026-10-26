@@ -18,7 +18,7 @@ import { Listbox } from "@/components/ui/listbox";
 import { Segmented } from "@/components/ui/segmented";
 import { Tabs } from "@/components/ui/tabs";
 import { isEditable, STATUS_LABELS } from "@/lib/appointments";
-import type { ChatMessage, DeniseRequest, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
+import type { DeniseRequest, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
 import { FAMILIES, FAMILY_LABELS, laneBox, layoutColumn, NOT_ARRIVED_MINUTES, quarterMarks, summaryVariants, timeRangeVariants, ZOOM_LABELS, ZOOM_PX_PER_MINUTE, ZOOMS, type CalendarZoom, type ServiceFamily } from "@/lib/calendar";
 import { LEVEL_LABELS, STAFF_LEVELS } from "@/lib/schedule-forms";
 import { BLOCK_LABELS } from "@/lib/scheduling/blocks";
@@ -30,10 +30,12 @@ import { moveBlock } from "./block-actions";
 import { BlockPanel, repeatLabel } from "./block-panel";
 import { AppointmentPanel } from "./appointment-panel";
 import { approveDeniseFix, bookFromWaitlist, dismissDeniseItem, rejectDeniseFix, scanDenise, undoDeniseFix } from "./denise-actions";
-import { useDeniseRun } from "./use-denise";
+import { appendDenise, askDenise, focusDenise, hydrateDenise, startDenise, takeAdjust, useDenise } from "@/components/denise-chat/store";
+import { useDeniseShortcut } from "@/components/denise-chat/bubble";
+import { DeniseChat } from "@/components/denise-chat/chat";
 import { DenisePanel, type Outcome, type Preview } from "./denise-panel";
 import { BookingPanel, type BookingDraft, type BookingStart } from "./booking-panel";
-import { PhonePanel } from "./phone-panel";
+import { NewSaleLink } from "@/components/new-sale-link";
 import { WalkInPanel } from "./walk-in-panel";
 import { GroupPanel } from "./group-panel";
 import { NowLine, useNow } from "./now-line";
@@ -75,7 +77,6 @@ type Selection =
   | { kind: "block"; blockId: string }
   | { kind: "new-block"; start: { staffId: string; startMinute: number } }
   | { kind: "book"; start: BookingStart; client?: ClientOption; draft?: BookingDraft }
-  | { kind: "phone" }
   | { kind: "edit"; appointmentId: string }
   | { kind: "detail"; appointmentId: string }
   | { kind: "walk-ins" }
@@ -161,10 +162,12 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // and what she's doing.
   const [denise, setDenise] = useState<{ state: DeniseState; for: BoardData } | null>(null);
   const [deciding, setDeciding] = useState(false);
-  // A question or a report she's working on, streamed (./use-denise.ts).
-  const { run: deniseRun, start: startDenise } = useDeniseRun();
+  // A question or a report she's working on, streamed, and the
+  // conversation, shared with her bubble on other pages
+  // (components/denise-chat/store.ts).
+  const { run: deniseRun, focus: deniseFocus, adjust } = useDenise();
+  useEffect(() => hydrateDenise(me.staffId), [me.staffId]);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
-  const [chat, setChat] = useState<ChatMessage[]>([]);
   const [preview, setPreview] = useState<Preview | null>(null);
   // Conflicts with nothing to approve, dismissed for now.
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
@@ -371,23 +374,15 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [panelOpen, leave]);
 
-  // P opens Phone booking (not while typing in a field).
-  useEffect(() => {
-    if (!me.canBook) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() !== "p" || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
-      const target = e.target as HTMLElement | null;
-      if (target?.closest?.("input, textarea, select, [contenteditable=true], [role=dialog]")) return;
-      e.preventDefault();
-      leave(() => {
-        setSelection({ kind: "phone" });
-        setTab("details");
-        setPanelOpen(true);
-      });
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [me.canBook, leave]);
+  // ⌘K / Ctrl+K (or her bubble's shortcut from another page) opens her tab
+  // with the cursor in her message box.
+  useDeniseShortcut(focusDenise);
+  const [focusSeen, setFocusSeen] = useState(deniseFocus);
+  if (focusSeen !== deniseFocus) {
+    setFocusSeen(deniseFocus);
+    setTab("denise");
+    setPanelOpen(true);
+  }
 
   // Looking at Denise's panel clears what was new.
   if (panelOpen && tab === "denise" && unseen.size) setUnseen(new Set());
@@ -412,21 +407,37 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const reject = (o: FixView) => decide(() => rejectDeniseFix(o.actionId!, data.date), null);
   const undo = (actionId: string) => decide(() => undoDeniseFix(actionId, data.date), null);
 
+  // The visit open in booking details, so Denise knows whose it is.
+  const openVisit = panelOpen && selection.kind === "detail" ? selection.appointmentId : null;
   async function ask(question: string) {
     if (deniseRun.working) return;
-    const history: ChatMessage[] = [...chat, { role: "user", text: question }];
-    setChat(history);
     setTab("denise");
     setPanelOpen(true);
-    const done = await startDenise({ action: "ask", date: data.date, history }, "Reading your question…");
-    setChat([...history, { role: "denise", text: done.reply.text, suggestions: done.suggestions, links: done.links }]);
+    await askDenise(question, { date: data.date, page: { path: "/calendar", appointmentId: openVisit } });
   }
+
+  // "Open in booking form" on one of her booking cards (here or on another
+  // page): the booking form, filled in, on that day.
+  useEffect(() => {
+    if (!adjust || !me.canBook) return;
+    if (adjust.date !== data.date) {
+      router.push(adjust.date === data.today ? "/calendar" : `/calendar?date=${adjust.date}`);
+      return;
+    }
+    const a = takeAdjust();
+    if (!a?.lines.length) return;
+    queueMicrotask(() =>
+      leave(() => show({ kind: "book", start: { staffId: a.lines[0].staffId, startMinute: a.lines[0].startMinute }, draft: { date: a.date, lines: a.lines }, client: a.client ?? undefined })),
+    );
+    // show and leave are this render's; the form opens once per request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adjust, data.date]);
 
   // Something that triggers Denise (a report, a cancellation): she shows
   // she's thinking at once, then always replies. Her panel opens, unless
   // someone is in the middle of a booking, when her badge calls instead.
   async function trigger(request: DeniseRequest, firstStatus: string) {
-    const midTask = selection.kind === "book" || selection.kind === "edit" || selection.kind === "new-block" || selection.kind === "group" || selection.kind === "phone";
+    const midTask = selection.kind === "book" || selection.kind === "edit" || selection.kind === "new-block" || selection.kind === "group";
     if (!midTask) {
       setTab("denise");
       setPanelOpen(true);
@@ -438,7 +449,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
       for (const k of [...seen.current]) if (k.startsWith("conflict:")) seen.current.delete(k);
       showDenise(done.state, data);
     }
-    setChat((all) => [...all, { role: "denise", text: done.reply.text }]);
+    appendDenise({ role: "denise", text: done.reply.text });
     if (midTask) setUnseen((all) => new Set([...all, `reply:${all.size}:${done.reply.text}`]));
     router.refresh();
   }
@@ -790,39 +801,28 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               </p>
             </ViewTransition>
           </div>
+          {/* New booking and New sale stay in view; the rest are under More. */}
           <div className="flex min-w-0 flex-wrap gap-2">
-          <Link href="/calendar/waitlist" className={buttonClass("ghost", "lg")}>
-            Waitlist
-          </Link>
-          {me.canBook && (
-            <button type="button" className={buttonClass("secondary", "lg")} onClick={() => select({ kind: "walk-ins" })}>
-              Walk-ins
-            </button>
-          )}
-          {me.canBook && (
-            <button type="button" className={buttonClass("secondary", "lg")} aria-keyshortcuts="P" title="Phone booking (P)" onClick={() => select({ kind: "phone" })}>
-              Phone booking
-            </button>
-          )}
-          {blockStaff.length > 0 && (
-            <button
-              type="button"
-              className={buttonClass("secondary", "lg")}
-              onClick={() => select({ kind: "new-block", start: { staffId: blockStaff.includes(me.staffId) ? me.staffId : blockStaff[0], startMinute: 12 * 60 } })}
-            >
-              Block time
-            </button>
-          )}
-          {me.canBook && (
-            <button
-              type="button"
-              className={buttonClass("primary", "lg")}
-              onClick={() => select({ kind: "book", start: { staffId: (columns.find((c) => c.working) ?? columns[0] ?? data.columns[0]).staffId, startMinute: range.start } })}
-            >
-              <PlusIcon className="size-5" />
-              New booking
-            </button>
-          )}
+            <MoreMenu
+              items={[
+                { label: "Waitlist", href: "/calendar/waitlist" },
+                ...(me.canBook ? [{ label: "Walk-ins", onSelect: () => select({ kind: "walk-ins" }) }] : []),
+                ...(blockStaff.length > 0
+                  ? [{ label: "Block time", onSelect: () => select({ kind: "new-block", start: { staffId: blockStaff.includes(me.staffId) ? me.staffId : blockStaff[0], startMinute: 12 * 60 } }) }]
+                  : []),
+              ]}
+            />
+            {me.canBook && <NewSaleLink size="lg" />}
+            {me.canBook && (
+              <button
+                type="button"
+                className={buttonClass("primary", "lg")}
+                onClick={() => select({ kind: "book", start: { staffId: (columns.find((c) => c.working) ?? columns[0] ?? data.columns[0]).staffId, startMinute: range.start } })}
+              >
+                <PlusIcon className="size-5" />
+                New booking
+              </button>
+            )}
           </div>
         </div>
 
@@ -1231,14 +1231,12 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                 working={deciding || deniseRun.working || (scanning && !deniseState)}
                 run={deniseRun}
                 outcome={outcome}
-                chat={chat}
                 preview={preview}
                 onApprove={approve}
                 onReject={reject}
                 onUndo={undo}
                 onDismiss={(subject) => setDismissed((all) => new Set(all).add(subject))}
                 onPreview={setPreview}
-                onAsk={ask}
                 onOpen={(appointmentId) => select({ kind: "detail", appointmentId })}
                 onDismissNotice={(id) => {
                   setDismissed((all) => new Set(all).add(id));
@@ -1258,10 +1256,19 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                       });
                   });
                 }}
-                onBook={(actionId, clientId) => decide(() => approveDeniseFix(actionId, data.date, clientId), actionId)}
-                onRejectSuggestion={(actionId) => decide(() => rejectDeniseFix(actionId, data.date), null)}
                 onBookWaitlist={(o, m) => decide(() => bookFromWaitlist(m.entryId, o.staffId, data.date, m.startMinute), null)}
-              />
+              >
+                <DeniseChat
+                  canBook={me.canBook}
+                  today={data.today}
+                  date={data.date}
+                  appointmentId={openVisit}
+                  onBooked={(appointmentId, date) => {
+                    router.refresh();
+                    if (date !== data.date) openOn(date, appointmentId);
+                  }}
+                />
+              </DenisePanel>
             ) : selection.kind === "detail" && data.appointments[selection.appointmentId] ? (
               <AppointmentPanel
                 date={data.date}
@@ -1295,23 +1302,6 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                   if (data.date === data.today) show({ kind: "detail", appointmentId: id });
                   else closeDetails();
                 }}
-              />
-            ) : selection.kind === "phone" ? (
-              <PhonePanel
-                data={data}
-                onClose={cancel}
-                onBooked={(id, date, message) => {
-                  setDoneMessage(message);
-                  if (date !== data.date) openOn(date, id);
-                  else show({ kind: "detail", appointmentId: id });
-                }}
-                onWaitlisted={(message) => {
-                  setDoneMessage(message);
-                  closeDetails();
-                }}
-                onAdjust={(draft, client) =>
-                  show({ kind: "book", start: { staffId: draft.lines[0].staffId, startMinute: draft.lines[0].startMinute }, draft, client: client ?? undefined })
-                }
               />
             ) : selection.kind === "book" ? (
               <BookingPanel
@@ -2238,5 +2228,78 @@ function AppointmentBlock({
         )}
       </div>
     </li>
+  );
+}
+
+type MoreItem = { label: string; href?: string; onSelect?: () => void };
+
+// "More" in the toolbar: Waitlist, Walk-ins and Block time, so New booking
+// and New sale stay in view. Arrow keys move through it; Escape or a click
+// outside closes it.
+function MoreMenu({ items }: { items: MoreItem[] }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    menu.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
+    const onDown = (e: PointerEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
+  if (!items.length) return null;
+  const itemClass =
+    "flex w-full items-center rounded-md px-3 py-2 text-left text-sm whitespace-nowrap text-ink transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:bg-sunken focus-visible:outline-none";
+  return (
+    <div
+      ref={root}
+      className="relative"
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && open) {
+          e.preventDefault();
+          setOpen(false);
+          button.current?.focus();
+          return;
+        }
+        if (!open || (e.key !== "ArrowDown" && e.key !== "ArrowUp")) return;
+        e.preventDefault();
+        const all = [...(menu.current?.querySelectorAll<HTMLElement>("[role=menuitem]") ?? [])];
+        const i = all.indexOf(document.activeElement as HTMLElement);
+        all[(i + (e.key === "ArrowDown" ? 1 : -1) + all.length) % all.length]?.focus();
+      }}
+    >
+      <button ref={button} type="button" className={buttonClass("secondary", "lg")} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+        More
+        <ChevronDownIcon className={`size-4 transition-transform duration-(--motion-fast) ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div ref={menu} role="menu" aria-label="More" className="absolute top-full right-0 z-40 mt-2 flex min-w-44 origin-top-right animate-pop-in flex-col rounded-lg border border-line bg-surface p-1.5 shadow-lift">
+          {items.map((item) =>
+            item.href ? (
+              <Link key={item.label} href={item.href} role="menuitem" tabIndex={-1} className={itemClass} onClick={() => setOpen(false)}>
+                {item.label}
+              </Link>
+            ) : (
+              <button
+                key={item.label}
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                className={itemClass}
+                onClick={() => {
+                  setOpen(false);
+                  item.onSelect?.();
+                }}
+              >
+                {item.label}
+              </button>
+            ),
+          )}
+        </div>
+      )}
+    </div>
   );
 }

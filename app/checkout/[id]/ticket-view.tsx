@@ -37,12 +37,12 @@ import type { DialogState } from "./dialogs";
 
 // The client at the top of the ticket: who, their credit, and what Denise
 // knows (folded away until wanted).
-export function ClientHeader({ data }: { data: CheckoutScreenData }) {
+export function ClientHeader({ data, walkIn, onWalkIn }: { data: CheckoutScreenData; walkIn: boolean; onWalkIn: (walkIn: boolean) => void }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const usesLeftTotal = data.packages.reduce((n, p) => n + p.items.reduce((m, i) => m + (i.total - i.used), 0), 0);
   const giftCents = data.giftCards.reduce((n, g) => n + g.balanceCents, 0);
-  if (!data.client) return <ChooseClient draftId={data.draft.id} />;
+  if (!data.client) return <ChooseClient draftId={data.draft.id} walkIn={walkIn} onWalkIn={onWalkIn} />;
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-3">
@@ -168,9 +168,10 @@ function RewardsPanel({ data, ticket, rates, onChange }: { data: CheckoutScreenD
   );
 }
 
-// A sale without a visit: find the client (for packages, their gift cards
-// and receipt), or leave it as a walk-in.
-function ChooseClient({ draftId }: { draftId: string }) {
+// A sale without a visit: find the client (for packages, memberships,
+// rewards, their gift cards and receipt), or choose "Walk-in guest" (no
+// client needed, for retail and gift cards).
+function ChooseClient({ draftId, walkIn, onWalkIn }: { draftId: string; walkIn: boolean; onWalkIn: (walkIn: boolean) => void }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<ClientOption[]>([]);
@@ -190,10 +191,17 @@ function ChooseClient({ draftId }: { draftId: string }) {
     <div className="flex flex-wrap items-center gap-3">
       <Avatar name="Walk in" size="lg" />
       <div className="min-w-0">
-        <p className="text-xl font-semibold tracking-[-0.01em] text-ink">Walk-in sale</p>
-        <p className="text-sm text-ink-muted">No client yet: add one for a package or their gift cards.</p>
+        <p className="text-xl font-semibold tracking-[-0.01em] text-ink" data-testid="checkout-client">
+          {walkIn ? "Walk-in guest" : "Who is this for?"}
+        </p>
+        <p className="text-sm text-ink-muted">{walkIn ? "No client needed. Find one instead for a package, membership or rewards." : "Find the client, or sell to a walk-in guest."}</p>
       </div>
-      <div className="relative ml-auto w-72 max-w-full">
+      {!walkIn && (
+        <Button size="lg" className="ml-auto" onClick={() => onWalkIn(true)}>
+          Walk-in guest
+        </Button>
+      )}
+      <div className={`relative w-72 max-w-full ${walkIn ? "ml-auto" : ""}`}>
         <input aria-label="Find a client" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find a client" className={`${fieldClass} h-12`} autoComplete="off" />
         {shown.length > 0 && (
           <ul aria-label="Matching clients" className="absolute inset-x-0 top-full z-40 mt-1 overflow-hidden rounded-lg border border-line bg-surface shadow-lift">
@@ -205,6 +213,7 @@ function ChooseClient({ draftId }: { draftId: string }) {
                   onClick={() =>
                     start(async () => {
                       await setSaleClient(draftId, c.id);
+                      onWalkIn(false);
                       router.refresh();
                     })
                   }
@@ -568,7 +577,7 @@ function LineEditor({
               className={`${selectClass} h-12`}
             >
               {line.kind === "product" && <option value="">No one</option>}
-              {data.staff.map((s) => (
+              {(line.kind === "product" ? data.creditStaff : data.staff).map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>

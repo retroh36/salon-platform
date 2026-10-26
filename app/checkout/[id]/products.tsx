@@ -36,7 +36,8 @@ function stockText(p: Product) {
 
 // Adding products: a big search (name, brand, SKU, or a scanned barcode),
 // best sellers, and what the visit's stylist usually recommends; who gets
-// the credit for the sale, defaulting to the client's stylist.
+// the credit for the sale, defaulting to the client's stylist (or, for a
+// sale without a visit, whoever is signed in).
 export function ProductPicker({ data, onAdd }: { data: CheckoutScreenData; onAdd: (product: Product, staffId: string | null) => void }) {
   const [query, setQuery] = useState("");
   const [credit, setCredit] = useState<string>(data.defaultStaffId ?? "");
@@ -110,7 +111,7 @@ export function ProductPicker({ data, onAdd }: { data: CheckoutScreenData; onAdd
           Credit to
           <select aria-label="Credit product sales to" value={credit} onChange={(e) => setCredit(e.target.value)} className={`${selectClass} h-12 w-40`}>
             <option value="">No one</option>
-            {data.staff.map((s) => (
+            {data.creditStaff.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.firstName}
               </option>

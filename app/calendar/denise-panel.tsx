@@ -1,22 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { DeniseFace, DenisePose, type Pose } from "@/components/denise";
+import type { DeniseRun } from "@/components/denise-chat/store";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
-import { DeniseText } from "@/components/denise-text";
 import { Eyebrow } from "@/components/ui/field";
-import { CheckCircleIcon, ChevronDownIcon, ClockIcon, CloseIcon, SendIcon, UndoIcon } from "@/components/ui/icons";
+import { CheckCircleIcon, ChevronDownIcon, ClockIcon, CloseIcon, UndoIcon } from "@/components/ui/icons";
 import { noFixAdvice } from "@/lib/denise/respond";
-import type { BookingSuggestion, ChatMessage, ConflictView, DeniseNotice, DeniseState, FixView, OpeningMatch, WaitlistOpening } from "@/lib/denise/types";
-import { formatLongDay } from "@/lib/schedule-format";
+import type { ConflictView, DeniseNotice, DeniseState, FixView, OpeningMatch, WaitlistOpening } from "@/lib/denise/types";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
-import type { ClientOption } from "./actions";
-import { ClientPicker } from "./booking-panel";
 import { useNow } from "./now-line";
 import type { BoardData } from "./types";
-import type { DeniseRun } from "./use-denise";
 
 // What Denise said after the last approve, reject or undo.
 export type Outcome = { message: string; error: boolean; undoActionId: string | null };
@@ -33,27 +29,25 @@ function meta(o: FixView): string {
 }
 
 // The Denise tab: her pose and what she has to say, her fixes for the day's
-// conflicts, notices, and the Ask Denise conversation.
+// conflicts, notices, and the conversation with her (shared with her
+// bubble on other pages).
 export function DenisePanel({
   data,
   state,
   working,
   outcome,
-  chat,
   preview,
   onApprove,
   onReject,
   onUndo,
   onDismiss,
   onPreview,
-  onAsk,
   onOpen,
   onDismissNotice,
   onNoShow,
-  onBook,
-  onRejectSuggestion,
   onBookWaitlist,
   run,
+  children,
 }: {
   data: BoardData;
   state: DeniseState | null;
@@ -63,7 +57,6 @@ export function DenisePanel({
   // so far.
   run: DeniseRun;
   outcome: Outcome | null;
-  chat: ChatMessage[];
   preview: Preview | null;
   onApprove: (option: FixView) => void;
   onReject: (option: FixView) => void;
@@ -71,17 +64,15 @@ export function DenisePanel({
   // For a conflict with nothing to approve.
   onDismiss: (subject: string) => void;
   onPreview: (preview: Preview | null) => void;
-  onAsk: (question: string) => void;
   onOpen: (appointmentId: string) => void;
   // A "hasn't checked in" line dismissed (it stays gone today).
   onDismissNotice: (id: string) => void;
   // Marks a client who hasn't arrived as a no-show.
   onNoShow: (notice: DeniseNotice) => void;
-  // Approve a booking Denise suggested, for this client.
-  onBook: (actionId: string, clientId: string) => void;
-  onRejectSuggestion: (actionId: string) => void;
   // Book a waitlist client into time that opened up.
   onBookWaitlist: (opening: WaitlistOpening, match: OpeningMatch) => void;
+  // The conversation with her (components/denise-chat/), at the foot.
+  children: React.ReactNode;
 }) {
   const conflicts = state?.conflicts ?? [];
   const notices = state?.notices ?? [];
@@ -90,12 +81,6 @@ export function DenisePanel({
   const isToday = data.date === data.today;
   // A not-arrived client whose "Mark no-show" was tapped: asked first.
   const [confirmingNoShow, setConfirmingNoShow] = useState<string | null>(null);
-
-  // Her latest words in view.
-  const end = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    end.current?.scrollIntoView({ block: "nearest" });
-  }, [chat.length, run.working, run.text]);
 
   let says: string;
   if (run.working) says = "Let me look into that…";
@@ -262,45 +247,7 @@ export function DenisePanel({
 
       {!conflicts.length && !notices.length && !openings.length && state && <UpNext data={data} onOpen={onOpen} />}
 
-      {(chat.length > 0 || run.working) && (
-        <section aria-label="Conversation with Denise" className="flex flex-col gap-3">
-          {chat.map((m, i) =>
-            m.role === "user" ? (
-              <p key={i} className="max-w-[85%] animate-fade-in self-end rounded-lg rounded-br-sm bg-navy-900 px-3 py-2 text-white">
-                {m.text}
-              </p>
-            ) : (
-              <div key={i} className="flex max-w-[92%] animate-fade-in gap-2">
-                <DeniseFace size={24} className="mt-1" />
-                <div className="flex min-w-0 flex-col gap-2">
-                  <DeniseText text={m.text} className="rounded-lg rounded-tl-sm bg-denise-50 px-3 py-2 text-ink" />
-                  {m.links?.map((l) => (
-                    // A plain link: some screens start in a route handler (/checkout/new).
-                    <a key={l.path} href={l.path} className={`${buttonClass("secondary", "sm")} self-start`} data-testid="denise-help-link">
-                      {l.label}
-                    </a>
-                  ))}
-                  {m.suggestions?.map((sg, j) => (
-                    <SuggestionCard
-                      key={sg.actionId ?? j}
-                      suggestion={sg}
-                      today={data.today}
-                      canBook={data.me.canBook}
-                      working={working}
-                      onBook={onBook}
-                      onReject={onRejectSuggestion}
-                    />
-                  ))}
-                </div>
-              </div>
-            ),
-          )}
-          {run.working && <Thinking run={run} />}
-        </section>
-      )}
-      <div ref={end} />
-
-      <AskForm onAsk={onAsk} disabled={run.working} />
+      {children}
     </div>
   );
 }
@@ -441,132 +388,5 @@ function UpNext({ data, onOpen }: { data: BoardData; onOpen: (appointmentId: str
   );
 }
 
-function AskForm({ onAsk, disabled }: { onAsk: (question: string) => void; disabled: boolean }) {
-  const [question, setQuestion] = useState("");
-  return (
-    <form
-      aria-label="Ask Denise a follow-up"
-      className="sticky bottom-0 mt-auto flex items-center gap-2 rounded-lg border border-line bg-surface p-1.5 pl-2 focus-within:border-denise-500 focus-within:ring-2 focus-within:ring-denise-200"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!question.trim() || disabled) return;
-        onAsk(question.trim());
-        setQuestion("");
-      }}
-    >
-      <DeniseFace size={24} />
-      <label className="sr-only" htmlFor="denise-follow-up">
-        Ask Denise
-      </label>
-      <input
-        id="denise-follow-up"
-        value={question}
-        onChange={(e) => setQuestion(e.target.value)}
-        placeholder="Ask Denise…"
-        className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-ink-subtle focus:outline-none"
-      />
-      <IconButton type="submit" label="Send" variant="primary" size="sm" disabled={disabled}>
-        <SendIcon className="size-4" />
-      </IconButton>
-    </form>
-  );
-}
 
-// A booking Denise suggested from a question: staff choose the client and
-// book it, or dismiss it.
-function SuggestionCard({
-  suggestion,
-  today,
-  canBook,
-  working,
-  onBook,
-  onReject,
-}: {
-  suggestion: BookingSuggestion;
-  today: string;
-  canBook: boolean;
-  working: boolean;
-  onBook: (actionId: string, clientId: string) => void;
-  onReject: (actionId: string) => void;
-}) {
-  const [client, setClient] = useState<ClientOption | null>(null);
-  const [done, setDone] = useState<"booked" | "dismissed" | null>(null);
-  const day = suggestion.date === today ? "Today" : formatLongDay(suggestion.date, false);
-  return (
-    <section aria-label="Suggested booking" data-testid="denise-suggestion" className="flex animate-fade-in flex-col gap-3 rounded-lg border border-denise-200 bg-surface p-3">
-      <div>
-        <p className="font-semibold text-ink">
-          {suggestion.serviceName} with {suggestion.staffName}
-        </p>
-        <p className="text-ink-muted">
-          {day}, {formatMinute(suggestion.startMinute)}–{formatMinute(suggestion.endMinute)}
-        </p>
-        {suggestion.clientHint && !client && !done && <p className="mt-1 text-xs text-denise-700">For {suggestion.clientHint}? Find them below.</p>}
-      </div>
-      {done ? (
-        <p className="text-sm font-medium text-denise-700">{done === "booked" ? "Booked." : "Dismissed."}</p>
-      ) : canBook && suggestion.actionId ? (
-        <>
-          <ClientPicker client={client} onChange={setClient} />
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={!client || working}
-              onClick={() => {
-                onBook(suggestion.actionId!, client!.id);
-                setDone("booked");
-              }}
-            >
-              Book it
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={working}
-              onClick={() => {
-                onReject(suggestion.actionId!);
-                setDone("dismissed");
-              }}
-            >
-              Dismiss
-            </Button>
-          </div>
-        </>
-      ) : (
-        <p className="text-xs text-ink-muted">The front desk can book this.</p>
-      )}
-    </section>
-  );
-}
 
-// While she works: "Denise is thinking…" (after 20 seconds, "Still working
-// on it…"), what she's doing now, and her answer as it streams in.
-function Thinking({ run }: { run: DeniseRun }) {
-  return (
-    <div className="flex max-w-[92%] animate-fade-in gap-2" data-testid="denise-thinking" aria-live="polite">
-      <DeniseFace size={24} className="mt-1" />
-      <div className="flex min-w-0 flex-col gap-1.5">
-        {run.text ? (
-          <DeniseText text={run.text} className="rounded-lg rounded-tl-sm bg-denise-50 px-3 py-2 text-ink" />
-        ) : (
-          <p className="flex items-center gap-1.5 rounded-lg rounded-tl-sm bg-denise-50 px-3 py-2 font-medium text-denise-900">
-            {run.slow ? "Still working on it" : "Denise is thinking"}
-            <span aria-hidden className="inline-flex gap-0.5">
-              {[0, 1, 2].map((i) => (
-                <span key={i} className="size-1 animate-breathe rounded-full bg-denise-500" style={{ animationDelay: `${i * 200}ms` }} />
-              ))}
-            </span>
-            <span className="sr-only">…</span>
-          </p>
-        )}
-        {run.status && (
-          <p className="text-xs text-ink-muted" data-testid="denise-status">
-            {run.slow && run.text ? "Still working on it… " : ""}
-            {run.status}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}

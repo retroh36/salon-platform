@@ -1,20 +1,40 @@
 import { AppFrame, type Section } from "@/components/ui/app-frame";
+import { canBook } from "@/lib/appointments";
 import { salonLogoUrl } from "@/lib/branding";
+import { todayIn } from "@/lib/scheduling/time";
 import { deviceTokenHash } from "@/lib/shared-device";
 import type { StaffRole } from "@/lib/staff";
 
 type Me = {
+  id: string;
   first_name: string;
   role: StaffRole;
   permissions: readonly string[];
-  location: { name: string; business: { name: string; logo_path?: string | null; auto_lock_minutes?: number } | null };
+  location: { name: string; timezone: string; business: { name: string; logo_path?: string | null; auto_lock_minutes?: number } | null };
 };
 
 // The app's page layout: the AppFrame sidebar and search bar around the
-// page, with the content fading in on arrival. `bleed` gives the page the
-// full width and height (the calendar); otherwise content sits in a
-// centered column (`wide`: a little wider, for the Dashboard).
-export async function AppShell({ section, me, bleed = false, wide = false, children }: { section: Section; me: Me; bleed?: boolean; wide?: boolean; children: React.ReactNode }) {
+// page, with the content fading in on arrival, and Denise's bubble in the
+// corner. `bleed` gives the page the full width and height (the calendar);
+// otherwise content sits in a centered column (`wide`: a little wider, for
+// the Dashboard), with room at the foot so her bubble never sits on the
+// last thing on the page. `denise={false}`: the page has her already (the
+// calendar's side panel).
+export async function AppShell({
+  section,
+  me,
+  bleed = false,
+  wide = false,
+  denise = true,
+  children,
+}: {
+  section: Section;
+  me: Me;
+  bleed?: boolean;
+  wide?: boolean;
+  denise?: boolean;
+  children: React.ReactNode;
+}) {
   // On the shared iPad: Switch user, and lock when idle.
   const shared = (await deviceTokenHash()) ? { autoLockMinutes: me.location.business?.auto_lock_minutes ?? 5 } : null;
   return (
@@ -25,8 +45,9 @@ export async function AppShell({ section, me, bleed = false, wide = false, child
       logoUrl={salonLogoUrl(me.location.business?.logo_path)}
       locationName={me.location.name}
       user={{ name: me.first_name, role: me.role, permissions: me.permissions }}
+      denise={denise ? { staffId: me.id, firstName: me.first_name, canBook: canBook(me.role), today: todayIn(me.location.timezone) } : null}
     >
-      {bleed ? children : <div className={`mx-auto w-full animate-fade-in px-4 py-8 sm:px-8 ${wide ? "max-w-6xl" : "max-w-5xl"}`}>{children}</div>}
+      {bleed ? children : <div className={`mx-auto w-full animate-fade-in px-4 pt-8 pb-24 sm:px-8 ${wide ? "max-w-6xl" : "max-w-5xl"}`}>{children}</div>}
     </AppFrame>
   );
 }

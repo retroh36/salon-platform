@@ -13,7 +13,7 @@ The Dashboard is the day at a glance, starting with Denise's brief: what might g
 4. Under her open items, tap **Apply**, **Dismiss**, **Book** or **Review** to act on a fix, waitlist match or reorder draft.
 5. Check **Today at a glance**, compared with the same day last week.
 6. Check **Right now** (in the chair, next hour, running late) and **Team today**. They refresh every 30 seconds.
-7. To ask Denise something, type in **Ask Denise** at the top and tap **Ask**. Her answer opens on the calendar.
+7. To ask Denise something, type in **Ask Denise** at the top and tap **Ask**. Her chat opens beside the Dashboard.
 
 ## Good to know
 

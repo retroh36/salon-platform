@@ -20,6 +20,7 @@ import { converse, modelFor, VOICE, type ClaudeClient, type ConverseHooks, type 
 import { POLICY_PERIODS, SALES_PERIODS, type Knowledge, type PolicyPeriod, type SalesPeriod } from "./knowledge";
 import type { StaffRole } from "@/lib/staff";
 import type { BookingSuggestion, HelpLink } from "./types";
+import type { PageContext } from "./page";
 
 export type AssistantContext = {
   salon: string;
@@ -46,6 +47,16 @@ export type AssistantContext = {
   // The help guide (docs/help/) and the asker's role, for how_to.
   help?: HelpPage[];
   role?: StaffRole;
+  // The page staff asked from (./page.ts), and its client if it has one.
+  page?: PageContext | null;
+};
+
+const THIS_CLIENT_TOOL: Anthropic.Tool = {
+  name: "this_client",
+  description:
+    "The client on the page staff are looking at: their next booked visits (date, time, services, stylists), how often they come, when they're next due, their usual stylist, day, time and services, how often they're late, cancel or don't show, and churn risk (spend for owners, managers and front desk).",
+  strict: true,
+  input_schema: { type: "object", properties: {}, required: [], additionalProperties: false },
 };
 
 const HOW_TO_TOOL: Anthropic.Tool = {
@@ -266,7 +277,15 @@ ${
 
 `
       : ""
-  }Today is ${c.today}; it's now ${formatMinute(local.minute)}. The calendar is showing ${c.date}; questions without a day are about that day.`;
+  }${pageLine(c)}Today is ${c.today}; it's now ${formatMinute(local.minute)}. The calendar is showing ${c.date}; questions without a day are about that day.`;
+}
+
+// Where they're asking from: on a client's page, "this client", "they",
+// "she" or "he" mean that client.
+function pageLine(c: AssistantContext): string {
+  if (!c.page) return "";
+  if (!c.page.client) return `They're asking from ${c.page.label}.\n\n`;
+  return `They're asking from ${c.page.label}, about ${c.page.client.firstName}: "this client", "they", "them", "she", "her", "he" or "him" without another name mean ${c.page.client.firstName}. Look them up with this_client.\n\n`;
 }
 
 // A tool runner for one question; suggestions it makes are collected.
@@ -422,6 +441,8 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
     switch (name) {
       case "client_insights":
         return JSON.stringify(await k.clients(String(input.first_name ?? "")));
+      case "this_client":
+        return c.page?.client ? JSON.stringify(await k.client(c.page.client.id)) : "There's no client on this page.";
       case "overdue_clients":
         return JSON.stringify(await k.overdue(typeof input.limit === "number" ? input.limit : 5));
       case "stylist_durations":
@@ -468,7 +489,8 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
     }
   }
 
-  return { tools: [...TOOLS, ...(c.help ? [HOW_TO_TOOL] : []), ...extra], run: runAny, suggestions, links };
+  const pageClient = k && c.page?.client ? [THIS_CLIENT_TOOL] : [];
+  return { tools: [...TOOLS, ...(c.help ? [HOW_TO_TOOL] : []), ...pageClient, ...extra], run: runAny, suggestions, links };
 }
 
 // Answers a staff question, with any bookings Denise suggests.
@@ -486,7 +508,7 @@ export async function answer(
 
 // What Denise is doing while she uses a tool, for her "thinking" status
 // ("Checking Bridget's openings…"). Our wording, from the tool's input.
-export function toolStatus(name: string, input: unknown, c: Pick<AssistantContext, "staff">): string {
+export function toolStatus(name: string, input: unknown, c: Pick<AssistantContext, "staff" | "page">): string {
   const i = (input ?? {}) as Record<string, unknown>;
   const stylist = typeof i.staff_id === "string" ? c.staff.find((s) => s.id === i.staff_id)?.firstName : undefined;
   switch (name) {
@@ -500,6 +522,8 @@ export function toolStatus(name: string, input: unknown, c: Pick<AssistantContex
       return "Looking at the team…";
     case "client_insights":
       return typeof i.first_name === "string" ? `Looking up ${i.first_name}'s visits…` : "Looking up the client…";
+    case "this_client":
+      return c.page?.client ? `Looking up ${c.page.client.firstName}'s visits…` : "Looking up the client…";
     case "overdue_clients":
       return "Finding regulars who are due back…";
     case "stylist_durations":

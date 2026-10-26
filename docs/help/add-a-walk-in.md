@@ -7,7 +7,7 @@ open: /calendar | Open calendar
 
 Add a client who walked in to the queue, see who's free next, and book them.
 
-1. Go to **Calendar** and tap **Walk-ins** at the top.
+1. Go to **Calendar**, tap **More** at the top, then **Walk-ins**.
 2. Under **Add a walk-in**, enter their **Name**, **Phone (optional)** and choose the **Service**.
 3. Tap **Add to queue**.
 4. Each person in the queue shows **Next free:** the stylist who does that service, the time and the wait.

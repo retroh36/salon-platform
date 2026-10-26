@@ -23,7 +23,7 @@ import { reach } from "@/lib/reach";
 import { useUnsavedChanges } from "@/components/unsaved";
 
 export type BookingStart = { staffId: string; startMinute: number };
-// A new booking already filled in (a time picked in Phone booking, to change
+// A new booking already filled in (a time from Denise's booking card, to change
 // before booking): its day and each service's stylist, start and length.
 export type BookingDraft = { date: string; lines: { serviceId: string; staffId: string; startMinute: number; minutes?: number }[] };
 
@@ -587,8 +587,8 @@ const SEARCH_DELAY_MS = 200;
 
 // Find an existing client by name or phone, or add a new one with just a
 // name and phone.
-// `query` and `found`: a search already made (Phone booking's reading of
-// the call).
+// `query` and `found`: a search already made (the name in a booking
+// request typed to Denise).
 export function ClientPicker({
   client,
   onChange,

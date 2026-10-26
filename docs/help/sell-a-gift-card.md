@@ -7,7 +7,7 @@ open: /checkout/new?from=/sales | Open new sale
 
 Sell a physical or digital gift card at checkout, on its own or with a visit.
 
-1. Go to **Sales** and tap **New sale** (or tap **Check out** in booking details to add it to a visit).
+1. Tap **New sale** (in the sidebar, on the calendar or on **Sales**) (or tap **Check out** in booking details to add it to a visit).
 2. Under the lines, tap **Gift card**.
 3. Choose **Physical card** or **Digital (email)**.
 4. Tap a preset amount, or type it in **Amount ($)**.

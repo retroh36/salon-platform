@@ -6,6 +6,9 @@ import { BoxIcon, CalendarIcon, RingIcon, ChartIcon, GiftIcon, ReceiptIcon, Cloc
 import { SalonMark } from "@/components/ui/salon-mark";
 import { firstSettingsPage } from "@/app/settings/settings-nav";
 import { AutoLock } from "@/components/auto-lock";
+import { DeniseBubble, type BubbleMe } from "@/components/denise-chat/bubble";
+import { NewSaleLink } from "@/components/new-sale-link";
+import { canTakePayments } from "@/lib/sales";
 import { can, type Permission } from "@/lib/permissions";
 import { isFrontOfHouse, roleLabel, type StaffRole } from "@/lib/staff";
 
@@ -114,6 +117,7 @@ export function AppFrame({
   locationName,
   user,
   sharedDevice = null,
+  denise = null,
   children,
 }: {
   section: Section;
@@ -124,6 +128,8 @@ export function AppFrame({
   // On the shared front-desk iPad: switch to someone else, and lock after
   // the salon's idle time.
   sharedDevice?: { autoLockMinutes: number } | null;
+  // Denise's bubble, for who's signed in (none: the page has her already).
+  denise?: BubbleMe | null;
   children: React.ReactNode;
 }) {
   const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => shown(n, user)) })).filter((g) => g.items.length > 0);
@@ -140,6 +146,12 @@ export function AppFrame({
             <div className="mt-0.5 text-sm leading-tight text-ink-muted">{locationName}</div>
           </div>
         </div>
+        {/* A sale without a visit, one tap from anywhere (the front of house). */}
+        {canTakePayments(user.role) && (
+          <div className="px-3 pb-4">
+            <NewSaleLink className="w-full" />
+          </div>
+        )}
         {/* Scrolls on short screens, so it never runs into the footer. */}
         <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 pb-3">
           {groups.map((g) => (
@@ -209,6 +221,11 @@ export function AppFrame({
             />
           </form>
           )}
+          {!search && canTakePayments(user.role) && (
+            <span className="ml-auto lg:hidden">
+              <NewSaleLink />
+            </span>
+          )}
           {sharedDevice ? (
             <form action="/switch/lock" method="post" className="lg:hidden">
               <button type="submit" className={buttonClass("secondary", "sm")}>
@@ -237,6 +254,7 @@ export function AppFrame({
         </nav>
         <main className="flex min-h-0 flex-1 flex-col text-sm lg:overflow-y-auto">{children}</main>
       </div>
+      {denise && <DeniseBubble me={denise} />}
       {sharedDevice && <AutoLock minutes={sharedDevice.autoLockMinutes} />}
     </div>
   );

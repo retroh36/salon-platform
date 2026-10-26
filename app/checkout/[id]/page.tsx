@@ -6,6 +6,7 @@ import { getCurrentStaff } from "@/lib/auth";
 import { loadCheckoutScreen } from "@/lib/checkout-screen";
 import { isUuid } from "@/lib/ids";
 import { canTakePayments } from "@/lib/sales";
+import { todayIn } from "@/lib/scheduling/time";
 import { CheckoutScreen } from "./screen";
 
 export const metadata: Metadata = { title: "Check out" };
@@ -27,5 +28,5 @@ async function Checkout({ params }: Pick<PageProps<"/checkout/[id]">, "params">)
   if (!isUuid(id)) notFound();
   const data = await loadCheckoutScreen(supabase, me, id);
   if (!data) notFound();
-  return <CheckoutScreen data={data} />;
+  return <CheckoutScreen data={data} denise={{ staffId: me.id, firstName: me.first_name, canBook: true, today: todayIn(me.location.timezone) }} />;
 }

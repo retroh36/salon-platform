@@ -1,15 +1,14 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { DeniseFace } from "@/components/denise";
+import { askDenise, setDeniseOpen } from "@/components/denise-chat/store";
 import { IconButton } from "@/components/ui/button";
 import { SendIcon } from "@/components/ui/icons";
 
-// "Ask Denise": the question opens on the calendar, where her answers and
-// any booking she suggests can be approved.
-export function AskBar({ example }: { example: string }) {
-  const router = useRouter();
+// "Ask Denise": the question goes to her chat, which opens beside the
+// Dashboard (the same conversation as on every other page).
+export function AskBar({ example, today }: { example: string; today: string }) {
   const [question, setQuestion] = useState("");
   return (
     <form
@@ -18,7 +17,9 @@ export function AskBar({ example }: { example: string }) {
       onSubmit={(e) => {
         e.preventDefault();
         if (!question.trim()) return;
-        router.push(`/calendar?ask=${encodeURIComponent(question.trim())}`);
+        setDeniseOpen(true);
+        void askDenise(question.trim(), { date: today, page: { path: "/dashboard" } });
+        setQuestion("");
       }}
     >
       <DeniseFace size={26} />

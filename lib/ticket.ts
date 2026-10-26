@@ -72,6 +72,8 @@ export type Ticket = {
   // and their tier's free add-on, after those.
   rewards: string[];
   tierPerk?: boolean;
+  // A sale without a visit that staff marked "Walk-in guest": no client.
+  walkIn?: boolean;
 };
 
 export const EMPTY_TICKET: Ticket = { lines: [], saleDiscount: null, tips: {}, payments: [], receiptEmail: "", rebook: null, promotions: [], rewards: [] };
@@ -397,5 +399,6 @@ export function parseTicket(json: unknown): Ticket {
     promotions: Array.isArray(t.promotions) ? t.promotions.filter((p): p is string => typeof p === "string") : [],
     rewards: Array.isArray(t.rewards) ? t.rewards.filter((p): p is string => typeof p === "string") : [],
     tierPerk: t.tierPerk === true,
+    walkIn: t.walkIn === true,
   };
 }

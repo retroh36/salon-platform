@@ -108,13 +108,13 @@ test.describe("front desk", () => {
       await open(page);
     }
 
-    // A question opens on the calendar with Denise's answer (no API key in
-    // tests, so she says she isn't connected).
+    // A question opens Denise's chat beside the Dashboard with her answer
+    // (no API key in tests, so she says she isn't connected).
     await waitForHydration(page, "#dashboard-ask");
     await main.locator("#dashboard-ask").fill("Who's free for a color at 3?");
     await main.getByRole("button", { name: "Ask" }).click();
-    await expect(page).toHaveURL(/\/calendar$/);
-    const panel = page.getByRole("tabpanel", { name: /Denise/ });
+    await expect(page).toHaveURL(/\/dashboard/);
+    const panel = page.getByRole("complementary", { name: "Denise" });
     await expect(panel).toContainText("Who's free for a color at 3?");
     await expect(panel).toContainText("I'm not connected yet");
   });

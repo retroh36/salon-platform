@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration, pxPerMinute, slotAt } from "./fixtures";
+import { AUTH, expect, test, ui, waitForHydration, pxPerMinute, slotAt, toolbarMore } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -45,7 +45,7 @@ test.describe("front desk", () => {
 
   test("blocks a repeating lunch, then moves and stretches one day of it", async ({ page }) => {
     await openDay(page);
-    await ui(page).getByRole("button", { name: "Block time" }).click();
+    await toolbarMore(page, "Block time");
     const form = page.getByRole("form", { name: "Block time" });
     await form.getByLabel("Stylist").selectOption({ label: "Bridget Callahan" });
     await form.getByLabel("What for").selectOption("lunch");

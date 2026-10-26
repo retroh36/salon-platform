@@ -52,7 +52,7 @@ export function PaymentPanel({
   const membershipUsable = ticket.lines.some((l) => l.kind === "service" && !l.packageItemId && !l.membershipCreditId && l.quantity === 1 && creditFor(data.memberships, l.serviceId));
   const blocking = message ?? problems[0] ?? null;
   return (
-    <aside aria-label="Payment" className="flex min-h-0 flex-col border-t border-line bg-surface md:border-t-0 md:border-l">
+    <aside aria-label="Payment" className="flex min-h-0 flex-col border-t border-line bg-surface @3xl:border-t-0 @3xl:border-l">
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
         <dl className="flex flex-col gap-1 tabular-nums" data-testid="checkout-totals">
           <Row label="Subtotal" value={formatPrice(totals.subtotalCents)} />

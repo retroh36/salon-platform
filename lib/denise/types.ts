@@ -3,6 +3,8 @@
 
 import type { ConflictKind } from "@/lib/scheduling/resolve";
 import type { BriefFacts } from "./brief";
+import type { BookingCard, BookingState } from "./booking-chat";
+import type { PageRef } from "./page";
 
 export type FixMove = {
   itemId: string;
@@ -95,12 +97,24 @@ export type BookingSuggestion = {
 // help page starts on ("Open new sale").
 export type HelpLink = { path: string; label: string };
 
-export type ChatMessage = { role: "user" | "denise"; text: string; suggestions?: BookingSuggestion[]; links?: HelpLink[] };
+// A booking card in the chat (./booking-chat.ts): the best times, a
+// question about the client, or the form.
+// `outcome`: what came of the card (booked, on the waitlist), kept with it.
+export type ChatMessage = {
+  role: "user" | "denise";
+  text: string;
+  suggestions?: BookingSuggestion[];
+  links?: HelpLink[];
+  booking?: BookingCard;
+  outcome?: { text: string; appointmentId?: string; date?: string };
+};
 
 // Denise's streaming endpoint (app/api/denise/route.ts): what's asked of
 // her, and what she sends back as she works, one JSON object per line.
 export type DeniseRequest =
-  | { action: "ask"; date: string; history: ChatMessage[] }
+  // `page`: where they're asking from; `booking`: the request a follow-up
+  // would change (the last booking card in the chat).
+  | { action: "ask"; date: string; history: ChatMessage[]; page?: PageRef; booking?: BookingState | null }
   | { action: "report_late"; date: string; itemId: string; minutes: number }
   | { action: "report_out"; date: string; staffId: string }
   | { action: "canceled"; date: string; appointmentId: string };
@@ -113,4 +127,4 @@ export type DeniseEvent =
   | { t: "text"; text: string }
   | { t: "discard" }
   // Finished: what she says, and her view of the day after a report.
-  | { t: "done"; reply: { text: string; kind: "fixes" | "nothing" | "stuck" | "error" }; state?: DeniseState; suggestions?: BookingSuggestion[]; links?: HelpLink[] };
+  | { t: "done"; reply: { text: string; kind: "fixes" | "nothing" | "stuck" | "error" }; state?: DeniseState; suggestions?: BookingSuggestion[]; links?: HelpLink[]; booking?: BookingCard };

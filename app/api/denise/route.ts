@@ -12,6 +12,11 @@
 import { revalidatePath } from "next/cache";
 import { canBook } from "@/lib/appointments";
 import { answer, toolStatus } from "@/lib/denise/assistant";
+import { bookingTurn, type BookingState } from "@/lib/denise/booking-chat";
+import { bookingDeps, bookingMenu, cleanRequest } from "@/lib/denise/booking-load";
+import { readBookingRequest } from "@/lib/denise/booking-request";
+import { pageContext } from "@/lib/denise/page";
+import { clientPolicyNote } from "@/app/calendar/actions";
 import { readCallOut } from "@/lib/denise/call-out";
 import { assistantContext } from "@/lib/denise/context";
 import { claudeFor, deniseDay } from "@/lib/denise/day-state";
@@ -118,6 +123,40 @@ async function callOutIn(s: DeniseSession, text: string, date: string) {
   };
 }
 
+// The booking request on screen, as the browser sent it back.
+function cleanState(raw: unknown): BookingState | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const request = cleanRequest(r.request);
+  if (!request) return null;
+  const shown = Array.isArray(r.shown)
+    ? r.shown
+        .flatMap((x: { date?: unknown; minute?: unknown } | null) => (x && typeof x.date === "string" && isLocalDate(x.date) && typeof x.minute === "number" && Number.isInteger(x.minute) ? [{ date: x.date, minute: x.minute }] : []))
+        .slice(0, 20)
+    : [];
+  return { request, clientId: typeof r.clientId === "string" && isUuid(r.clientId) ? r.clientId : null, shown };
+}
+
+// A line in the chat read as a booking request (front of house), or null.
+async function bookingIn(s: DeniseSession, line: string, current: BookingState | null, pageClientId: string | null, status: (text: string) => void) {
+  const booker = { supabase: s.supabase, me: { id: s.me.id, business_id: s.me.business_id, location: s.viewer.location } };
+  const menu = await bookingMenu(booker);
+  const reader = claudeFor(s.me.business_id, "phone_booking");
+  const read = async (masked: string, request: Parameters<typeof readBookingRequest>[3]) => {
+    if (!reader) return null;
+    status("Reading the request…");
+    return readBookingRequest(reader, masked, menu, request, (error) => logDeniseError(error, { where: "reading a booking request", businessId: s.me.business_id, ref: failureRef() }));
+  };
+  const deps = bookingDeps(booker, menu, read, clientPolicyNote);
+  return bookingTurn(line, current, pageClientId, {
+    ...deps,
+    times: (request, clientId, later) => {
+      status("Finding the best times…");
+      return deps.times(request, clientId, later);
+    },
+  });
+}
+
 async function run(s: DeniseSession, body: DeniseRequest, send: Send) {
   const status = (text: string) => send({ t: "status", text });
   const where = { supabase: s.supabase, location: s.viewer.location, today: s.today };
@@ -161,6 +200,13 @@ async function run(s: DeniseSession, body: DeniseRequest, send: Send) {
       const last = [...(Array.isArray(body.history) ? body.history : [])].reverse().find((m) => m.role === "user");
       const out = last ? await callOutIn(s, String(last.text), isLocalDate(body.date) && body.date > s.today ? body.date : s.today) : null;
       if (out) return send(out);
+      const page = await pageContext(s.supabase, body.page);
+      // A booking request, or a follow-up to one: booking cards, worked out
+      // by our code (Denise only reads the line).
+      if (last && canBook(s.me.role)) {
+        const booked = await bookingIn(s, String(last.text), cleanState(body.booking), page?.client?.id ?? null, status);
+        if (booked) return send({ t: "done", reply: { text: booked.text, kind: "fixes" }, booking: booked.card });
+      }
       const client = claudeFor(s.me.business_id, "ask_denise");
       if (!client) return send(reply(NOT_CONNECTED, "nothing"));
       status("Reading your question…");
@@ -168,6 +214,8 @@ async function run(s: DeniseSession, body: DeniseRequest, send: Send) {
         s.supabase,
         { role: s.me.role, permissions: s.me.permissions, staffId: s.me.id, bookStaffId: s.me.assists_staff_id, businessId: s.me.business_id, location: s.viewer.location, salon: s.viewer.salon, today: s.today },
         body.date,
+        new Date(),
+        page,
       );
       // Text only, starting with the staff member's question.
       const turns = (Array.isArray(body.history) ? body.history : [])
