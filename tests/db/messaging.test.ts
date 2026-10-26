@@ -6,7 +6,7 @@
 // sent them, with free text only for the roles the owner allows.
 import { createHash } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { admin, SEED, signIn, type Client } from "./helpers";
+import { admin, makeRoom, SEED, signIn, type Client } from "./helpers";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -20,11 +20,14 @@ let bridget: Client;
 let gil: Client;
 let clientId: string;
 let visitId: string;
+const putBack: (() => Promise<void>)[] = [];
 
 async function visit(staffId: string): Promise<string> {
   const { data: service } = await admin.from("services").select("id").eq("business_id", B).eq("name", "Women's Cut & Style").single();
   const at = new Date(Date.now() + 2 * 86_400_000);
   const end = new Date(at.getTime() + 3_600_000);
+  // The stylist may have demo clients then, on a working day.
+  putBack.push(await makeRoom(staffId, at, end));
   const { data: a } = await admin
     .from("appointments")
     .insert({ business_id: B, location_id: L, client_id: clientId, starts_at: at.toISOString(), ends_at: end.toISOString(), status: "booked" })
@@ -76,6 +79,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await admin.from("sms_suppressions").delete().eq("phone_digits", DIGITS);
   await admin.from("appointments").delete().eq("client_id", clientId);
+  for (const undo of putBack) await undo();
   await admin.from("clients").delete().eq("id", clientId);
   await admin.from("businesses").update({ free_text_roles: ["manager", "front_desk", "stylist"] }).eq("id", B);
 });

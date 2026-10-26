@@ -2,7 +2,7 @@
 // order of taps, undo, and check-in/out stamps. Also that the demo data
 // has realistic actual times to learn from.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { admin, SEED, signIn, type Client } from "./helpers";
+import { admin, makeRoom, SEED, signIn, type Client } from "./helpers";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -12,6 +12,7 @@ let frontDesk: Client;
 let appointmentId: string;
 let colorItem: string;
 let cutItem: string;
+let putBack = async () => {};
 
 beforeAll(async () => {
   [bridget, gil, frontDesk] = await Promise.all([signIn("bridget@mapleandash.test"), signIn("gil@mapleandash.test"), signIn("frontdesk@mapleandash.test")]);
@@ -19,6 +20,8 @@ beforeAll(async () => {
   const color = services!.find((s) => s.name === "Root Touch-Up")!.id;
   const cut = services!.find((s) => s.name === "Women's Cut & Style")!.id;
   const start = new Date(Date.now() + 60 * 60_000);
+  // Bridget may have demo clients then, on a working day.
+  putBack = await makeRoom(SEED.staff.bridget, start, new Date(start.getTime() + 145 * 60_000));
   const { data: a } = await admin
     .from("appointments")
     .insert({ business_id: B, location_id: L, starts_at: start.toISOString(), ends_at: new Date(start.getTime() + 145 * 60_000).toISOString(), status: "confirmed", notes: "actual-times test" })
@@ -39,6 +42,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await admin.from("appointments").delete().eq("id", appointmentId);
+  await putBack();
 });
 
 const tap = (client: Client, item: string, event: string) => client.rpc("record_item_time", { p_item_id: item, p_event: event });

@@ -4,11 +4,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { loadDashboard, loadDueBack, type DashboardData, type DashboardMe } from "@/lib/dashboard-load";
 import { startOfLocalDay } from "@/lib/scheduling/load";
-import { addDays, todayIn } from "@/lib/scheduling/time";
-import { admin, createOtherSalon, SEED, signIn, type Client } from "./helpers";
+import { addDays } from "@/lib/scheduling/time";
+import { admin, busyDay, createOtherSalon, SEED, signIn, type Client } from "./helpers";
 
 const TZ = "America/Chicago";
-const today = todayIn(TZ);
+// A fixed clock: 11am on the next day the salon has visits, so the
+// numbers are there whatever day this runs.
+let today: string;
 const location = { id: SEED.location, name: "Maple & Ash Downtown", timezone: TZ, business: { name: "Maple & Ash Hair Studio" } };
 const me = (id: string, role: DashboardMe["role"], first: string): DashboardMe => ({ id, first_name: first, role, permissions: role === "owner" || role === "manager" ? ["reports", "payroll", "settings", "team"] : [], business_id: SEED.business, location });
 
@@ -20,9 +22,11 @@ let shae: Client;
 beforeAll(async () => {
   const [o, f, s] = await Promise.all([signIn("owner@mapleandash.test"), signIn("frontdesk@mapleandash.test"), signIn("shae@mapleandash.test")]);
   shae = s;
-  owner = await loadDashboard(o, me(SEED.staff.owner, "owner", "Olivia"));
-  frontDesk = await loadDashboard(f, me(SEED.staff.frontDesk, "front_desk", "Sam"));
-  stylist = await loadDashboard(s, me(SEED.staff.shae, "stylist", "Shae"));
+  const day = await busyDay(TZ);
+  today = day.date;
+  owner = await loadDashboard(o, me(SEED.staff.owner, "owner", "Olivia"), day.at11);
+  frontDesk = await loadDashboard(f, me(SEED.staff.frontDesk, "front_desk", "Sam"), day.at11);
+  stylist = await loadDashboard(s, me(SEED.staff.shae, "stylist", "Shae"), day.at11);
 }, 60_000);
 
 async function appointmentsToday(staffId?: string) {

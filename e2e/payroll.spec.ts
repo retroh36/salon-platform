@@ -50,7 +50,8 @@ test.describe("owner", () => {
     await expect(bridget.getByTestId("tip-average")).toHaveText(/^\d+(\.\d)?%$/);
     await bridget.getByRole("link", { name: /Bridget/ }).click();
     const details = ui(page).getByTestId("tip-details");
-    await expect(details.getByTestId("tips-average")).toHaveText(/^\d+(\.\d)?%$/);
+    // The details load from the server after the click; slow under a full run.
+    await expect(details.getByTestId("tips-average")).toHaveText(/^\d+(\.\d)?%$/, { timeout: 15_000 });
     await expect(details.getByTestId("top-tipper").first()).toBeVisible();
     await expect(details.getByRole("list", { name: "By week" })).toBeVisible();
     const tip = details.getByRole("table", { name: "Every tip" }).getByTestId("tip-item").first();

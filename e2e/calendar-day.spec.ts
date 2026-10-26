@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { addDays, fromLocal, toLocal, todayIn } from "@/lib/scheduling/time";
-import { admin, SEED } from "../tests/db/helpers";
+import { admin, openAllDay, SEED } from "../tests/db/helpers";
 import { AUTH, checkIn, expect, moreAction, openChecklist, pxPerMinute, test, ui, waitForHydration } from "./fixtures";
 
 // The calendar's day: undoing a check-in, the patch test notice in booking
@@ -246,18 +246,24 @@ test.describe("front desk", () => {
   });
 
   test("opens today with the current time about a third of the way down", async ({ page }) => {
-    await openDay(page, today);
-    const now = page.getByRole("img", { name: /^Now,/ });
-    test.skip((await now.count()) === 0, "Outside the hours the calendar shows");
-    const grid = ui(page).getByTestId("calendar-grid");
-    const [g, line, header] = await Promise.all([grid.boundingBox(), now.boundingBox(), ui(page).locator("[data-grid-header]").boundingBox()]);
-    const third = header!.y + header!.height + (g!.y + g!.height - header!.y - header!.height) / 3;
-    // Unless it's so early or late the grid can't scroll that far.
-    const scroll = await grid.evaluate((el) => ({ top: el.scrollTop, max: el.scrollHeight - el.clientHeight }));
-    if (scroll.top > 0 && scroll.top < scroll.max - 1) expect(Math.abs(line!.y - third)).toBeLessThan(40);
-    // The stylist header and the time column stay put as it scrolls.
-    await grid.evaluate((el) => (el.scrollTop += 200));
-    expect((await ui(page).locator("[data-grid-header]").boundingBox())!.y).toBeCloseTo(header!.y, 0);
+    // Open all day today, whatever day and time this runs.
+    const reopen = await openAllDay([SEED.staff.bridget, SEED.staff.shae]);
+    try {
+      await openDay(page, today);
+      const now = page.getByRole("img", { name: /^Now,/ });
+      await expect(now).toBeVisible();
+      const grid = ui(page).getByTestId("calendar-grid");
+      const [g, line, header] = await Promise.all([grid.boundingBox(), now.boundingBox(), ui(page).locator("[data-grid-header]").boundingBox()]);
+      const third = header!.y + header!.height + (g!.y + g!.height - header!.y - header!.height) / 3;
+      // Unless it's so early or late the grid can't scroll that far.
+      const scroll = await grid.evaluate((el) => ({ top: el.scrollTop, max: el.scrollHeight - el.clientHeight }));
+      if (scroll.top > 0 && scroll.top < scroll.max - 1) expect(Math.abs(line!.y - third)).toBeLessThan(40);
+      // The stylist header and the time column stay put as it scrolls.
+      await grid.evaluate((el) => (el.scrollTop += 200));
+      expect((await ui(page).locator("[data-grid-header]").boundingBox())!.y).toBeCloseTo(header!.y, 0);
+    } finally {
+      await reopen();
+    }
   });
 
   test("groups clients who haven't arrived into one card, to mark a no-show or dismiss for good", async ({ page }) => {

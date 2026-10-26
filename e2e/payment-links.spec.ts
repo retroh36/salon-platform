@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { admin, SEED } from "../tests/db/helpers";
+import { admin, makeRoom, SEED } from "../tests/db/helpers";
 import { openCheckout } from "./checkout-helpers";
 import { AUTH, expect, test } from "./fixtures";
 
@@ -12,6 +12,7 @@ const L = SEED.location;
 const PREFIX = `Tp${Date.now().toString(36)}`;
 let clientId: string;
 let appointmentId: string;
+let putBack = async () => {};
 
 test.beforeAll(async () => {
   const { data: c } = await admin.from("clients").insert({ business_id: B, first_name: `${PREFIX}Pia`, last_name: "Test", phone: "(312) 555-0177" }).select("id").single();
@@ -19,6 +20,8 @@ test.beforeAll(async () => {
   const { data: s } = await admin.from("services").select("id").eq("business_id", B).eq("name", "Women's Cut & Style").single();
   const start = new Date(Date.now() - 2 * 3_600_000);
   const end = new Date(start.getTime() + 3_600_000);
+  // Bridget may have demo clients then, on a working day.
+  putBack = await makeRoom(SEED.staff.bridget, start, end);
   const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: clientId, starts_at: start.toISOString(), ends_at: end.toISOString(), status: "checked_in" }).select("id").single();
   appointmentId = a!.id;
   await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: appointmentId, service_id: s!.id, staff_id: SEED.staff.bridget, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: 60, price_cents: 10000 });
@@ -27,6 +30,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await admin.from("sales").delete().eq("client_id", clientId);
   await admin.from("appointments").delete().eq("client_id", clientId);
+  await putBack();
   await admin.from("clients").delete().eq("id", clientId);
 });
 

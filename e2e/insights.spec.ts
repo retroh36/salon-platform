@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import type { DurationInsight } from "@/lib/insights/durations";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
-import { admin, SEED } from "../tests/db/helpers";
+import { admin, busyDay, SEED } from "../tests/db/helpers";
 import { AUTH, expect, test, ui, waitForHydration, slotAt } from "./fixtures";
 
 const B = SEED.business;
@@ -65,7 +65,8 @@ test.describe("the front desk", () => {
   });
 
   test("no brief in her calendar panel, and what Denise knows about each client", async ({ page }) => {
-    await page.goto("/calendar");
+    // A day with visits, whatever day this runs.
+    await page.goto(`/calendar?date=${(await busyDay()).date}`);
     await waitForHydration(page, "[data-testid=denise-launcher]");
     await page.getByTestId("denise-launcher").click();
     // The brief is on the Dashboard; her panel is for what to act on now.

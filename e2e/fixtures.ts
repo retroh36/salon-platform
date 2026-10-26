@@ -1,4 +1,7 @@
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
+import { daysBetween, todayIn } from "@/lib/scheduling/time";
+import { busyDay, SEED } from "../tests/db/helpers";
+import { shiftBusiness } from "../e2e-week/time-machine";
 
 export const PASSWORD = "password123";
 
@@ -124,4 +127,19 @@ export async function openChecklist(panel: Locator) {
   const toggle = region.getByRole("button", { name: /^Before this visit/ });
   if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
   return region;
+}
+
+// For tests about a busy today, whatever day they run: when today has no
+// visits on the demo calendar (the salon is closed Sundays and Mondays),
+// Maple & Ash's whole world moves back so the next day that has them is
+// today, with its weekly hours turned to match (the week test's time
+// machine), and the same day last week too. Returns the move back, for
+// afterAll. Nothing moves when today already has visits.
+export async function busyToday(): Promise<() => void> {
+  const TZ = "America/Chicago";
+  const days = daysBetween(todayIn(TZ), (await busyDay(TZ)).date);
+  if (days > 0) shiftBusiness(SEED.business, TZ, -days);
+  return () => {
+    if (days > 0) shiftBusiness(SEED.business, TZ, days);
+  };
 }

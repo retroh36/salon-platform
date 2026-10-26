@@ -5,7 +5,7 @@
 // imported clashes stay for Denise until one is moved.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fromLocal } from "@/lib/scheduling/time";
-import { admin, SEED } from "./helpers";
+import { admin, makeRoom, SEED } from "./helpers";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -96,5 +96,20 @@ describe("the database's own booking rules", () => {
     // is Denise's to fix): nobody new can be booked over it.
     expect((await admin.from("appointment_items").update({ starts_at: at(17, 15).toISOString(), ends_at: at(18, 15).toISOString() }).eq("id", second.itemId!)).error).toBeNull();
     expect((await book(BRIDGET, at(18))).error?.code).toBe("23P01");
+  });
+
+  it("makes room for a test's own visit beside the demo's, then puts it back (makeRoom, for tests)", async () => {
+    const first = await book(SHAE, at(20));
+    expect(first.error).toBeNull();
+    const span = [at(20, 30), at(21, 30)] as const;
+    expect((await book(SHAE, span[0])).error?.code).toBe("23P01");
+    const putBack = await makeRoom(SHAE, ...span);
+    const fixture = await book(SHAE, span[0]);
+    expect(fixture.error).toBeNull();
+    await admin.from("appointments").delete().eq("id", fixture.appointmentId);
+    await putBack();
+    // The first visit is as it was: held, and checked again.
+    expect((await admin.from("appointment_items").select("imported").eq("id", first.itemId!).single()).data).toEqual({ imported: false });
+    expect((await book(SHAE, span[0])).error?.code).toBe("23P01");
   });
 });

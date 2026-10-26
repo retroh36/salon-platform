@@ -2,7 +2,14 @@ import type { Page } from "@playwright/test";
 import { startOfLocalDay } from "@/lib/scheduling/load";
 import { addDays, todayIn } from "@/lib/scheduling/time";
 import { admin, countFor, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, busyToday, expect, test, ui, waitForHydration } from "./fixtures";
+
+// Today is a busy demo day, whatever day this runs.
+let putBack: () => void;
+test.beforeAll(async () => {
+  putBack = await busyToday();
+});
+test.afterAll(() => putBack());
 
 // The Dashboard for each role, on the demo data. Screenshots of each go to
 // e2e/screenshots/ (not committed).

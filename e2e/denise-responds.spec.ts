@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
-import { admin, restoreLearnedDurations, SEED, setAsideLearnedDurations } from "../tests/db/helpers";
+import { admin, openAllDay, restoreLearnedDurations, SEED, setAsideLearnedDurations } from "../tests/db/helpers";
 import { AUTH, expect, test, ui, waitForHydration, moreAction } from "./fixtures";
 
 // Denise always responds: whatever triggers her, she shows she's thinking,
@@ -126,6 +126,8 @@ test.describe("at 10pm", () => {
     const setAside = [...new Map((later ?? []).map((i) => [i.appointment.id, i.appointment])).values()];
     for (const a of setAside) await admin.from("appointments").update({ status: "canceled", canceled_at: new Date().toISOString(), cancel_reason: "Test" }).eq("id", a.id);
     await admin.from("locations").update({ timezone: zone }).eq("id", L);
+    // Gil works today there, whatever day it is (the salon may be closed).
+    const reopen = await openAllDay([GIL], { timeZone: zone });
     try {
       await page.goto("/calendar");
       await waitForHydration(page, "section[data-staff-id]");
@@ -135,6 +137,7 @@ test.describe("at 10pm", () => {
       await expect(panel).toContainText(/Gil's day is already over|Gil has no clients left today/);
       await expect(panel).toContainText("nothing to move");
     } finally {
+      await reopen();
       await admin.from("locations").update({ timezone: TZ }).eq("id", L);
       for (const d of (await outReports()).data ?? []) {
         await admin.from("schedule_disruptions").delete().eq("id", d.id);

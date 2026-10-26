@@ -6,7 +6,7 @@ import { briefFacts } from "@/lib/denise/brief";
 import { knowledgeFor, type Asker } from "@/lib/denise/knowledge";
 import { loadCloseout, loadGiftCardLiability, loadUnusedPackages } from "@/lib/reports-load";
 import { todayIn } from "@/lib/scheduling/time";
-import { admin, DEFAULT_PERMISSIONS, SEED, signIn, type Client } from "./helpers";
+import { admin, DEFAULT_PERMISSIONS, makeRoom, SEED, signIn, type Client } from "./helpers";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -92,6 +92,7 @@ describe("closing out the day", () => {
 describe("the morning brief", () => {
   it("names today's clients with package uses or gift card money", async () => {
     // A client of our own with a package, booked today.
+    let putBack = async () => {};
     const { data: c } = await admin.from("clients").insert({ business_id: B, first_name: "Briefy", last_name: "Credit" }).select("id").single();
     try {
       const { data: template } = await admin.from("package_templates").select("id, price_cents").eq("business_id", B).eq("name", "5 Blowouts").single();
@@ -100,6 +101,8 @@ describe("the morning brief", () => {
       const { data: service } = await admin.from("services").select("id").eq("business_id", B).eq("name", "Blowout").single();
       const start = new Date(Date.now() + 60_000);
       const end = new Date(start.getTime() + 45 * 60_000);
+      // Shae may have demo clients then, on a working day.
+      putBack = await makeRoom(SEED.staff.shae, start, end);
       const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: c!.id, starts_at: start.toISOString(), ends_at: end.toISOString() }).select("id").single();
       await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: service!.id, staff_id: SEED.staff.shae, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: 45, price_cents: 4500 });
 
@@ -109,6 +112,7 @@ describe("the morning brief", () => {
       const { data: sales } = await admin.from("client_packages").select("sale_id").eq("client_id", c!.id);
       await admin.from("sales").delete().in("id", (sales ?? []).flatMap((x) => (x.sale_id ? [x.sale_id] : [])));
       await admin.from("appointments").delete().eq("client_id", c!.id);
+      await putBack();
       await admin.from("clients").delete().eq("id", c!.id);
     }
   });

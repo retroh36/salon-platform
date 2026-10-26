@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import { fromLocal, todayIn, toLocal, weekdayOf } from "@/lib/scheduling/time";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
@@ -130,6 +131,78 @@ export async function throwawayStylist(firstName: string, level: "artisan" | "se
       const { error: e } = await admin.from("staff").delete().eq("id", data.id);
       if (e) throw e;
     },
+  };
+}
+
+// Today at the salon as a known open day, for tests about "today" that
+// would otherwise depend on when they run (the salon is closed Sundays and
+// Mondays, and in the evening): the salon open all day on today's weekday
+// and these stylists working all day today, on top of whatever the demo
+// has today. Returns the undo, which puts the hours back as they were.
+export async function openAllDay(staffIds: string[], { location = SEED.location, business = SEED.business, timeZone = "America/Chicago" } = {}) {
+  const today = todayIn(timeZone);
+  const weekday = weekdayOf(today);
+  const check = <T>(r: { data: T | null; error: unknown }): T => {
+    if (r.error) throw r.error;
+    return r.data as T;
+  };
+  const hours = check(await admin.from("location_hours").select("business_id, location_id, weekday, start_minute, end_minute").eq("location_id", location).eq("weekday", weekday));
+  const changes = check(await admin.from("staff_schedule_overrides").select("business_id, staff_id, on_date, start_minute, end_minute").in("staff_id", staffIds).eq("on_date", today));
+  check(await admin.from("location_hours").delete().eq("location_id", location).eq("weekday", weekday));
+  check(await admin.from("location_hours").insert({ business_id: business, location_id: location, weekday, start_minute: 0, end_minute: 1440 }));
+  check(await admin.from("staff_schedule_overrides").delete().in("staff_id", staffIds).eq("on_date", today));
+  check(await admin.from("staff_schedule_overrides").insert(staffIds.map((staff_id) => ({ business_id: business, staff_id, on_date: today, start_minute: 0, end_minute: 1440 }))));
+  return async () => {
+    check(await admin.from("location_hours").delete().eq("location_id", location).eq("weekday", weekday));
+    if (hours.length) check(await admin.from("location_hours").insert(hours));
+    check(await admin.from("staff_schedule_overrides").delete().in("staff_id", staffIds).eq("on_date", today));
+    if (changes.length) check(await admin.from("staff_schedule_overrides").insert(changes));
+  };
+}
+
+// The first day from today with visits on the demo calendar (the salon is
+// closed Sundays and Mondays), and 11am there: a fixed clock for tests
+// about "today" that would otherwise depend on the day they run.
+export async function busyDay(timeZone = "America/Chicago") {
+  const { data, error } = await admin
+    .from("appointments")
+    .select("starts_at")
+    .eq("location_id", SEED.location)
+    .neq("status", "canceled")
+    .gte("starts_at", fromLocal(todayIn(timeZone), 0, timeZone)!.toISOString())
+    .order("starts_at")
+    .limit(1)
+    .single();
+  if (error) throw error;
+  const date = toLocal(new Date(data.starts_at), timeZone).date;
+  return { date, at11: fromLocal(date, 11 * 60, timeZone)! };
+}
+
+// Room on a seeded stylist's calendar for a test's own visit at a set
+// time: whatever the demo has for them overlapping from-to (on a working
+// day there's usually something) is marked as imported for the test, the
+// one exemption from the database's no double-booking rule, so the fixture
+// goes in beside it and nothing about those visits changes. Returns the
+// undo: call it after the fixture's visits are deleted.
+export async function makeRoom(staffId: string, from: Date, to: Date) {
+  const { data, error } = await admin
+    .from("appointment_items")
+    .select("id")
+    .eq("staff_id", staffId)
+    .eq("holds_time", true)
+    .eq("imported", false)
+    .lt("starts_at", to.toISOString())
+    .gt("ends_at", from.toISOString());
+  if (error) throw error;
+  const ids = data.map((i) => i.id);
+  if (ids.length) {
+    const { error: e } = await admin.from("appointment_items").update({ imported: true }).in("id", ids);
+    if (e) throw e;
+  }
+  return async () => {
+    if (!ids.length) return;
+    const { error: e } = await admin.from("appointment_items").update({ imported: false }).in("id", ids);
+    if (e) throw e;
   };
 }
 

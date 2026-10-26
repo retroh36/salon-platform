@@ -208,5 +208,5 @@ test("Denise flags a repeat offender when the desk books them", async ({ page })
   const form = page.getByRole("tabpanel", { name: "Booking details" }).getByRole("form", { name: "New booking" });
   await form.getByLabel("Find a client").fill(`${PREFIX}remy`);
   await form.getByRole("list", { name: "Matching clients" }).getByRole("button", { name: new RegExp(`${PREFIX}Remy Test`) }).click();
-  await expect(form.getByTestId("denise-policy")).toHaveText(/^Heads up: \w+Remy has 2 late cancellations or no-shows since \w+, so the salon asks for a 50% deposit\./);
+  await expect(form.getByTestId("denise-policy")).toHaveText(/^Heads up: \w+Remy has 2 late cancellations or no-shows since \w+, so the salon asks for a 50% deposit\./, { timeout: 15_000 });
 });

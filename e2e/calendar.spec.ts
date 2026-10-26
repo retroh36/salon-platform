@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
-import { admin, SEED } from "../tests/db/helpers";
+import { admin, openAllDay, SEED } from "../tests/db/helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
@@ -273,12 +273,18 @@ test.describe("front desk", () => {
   });
 
   test("shows a line at the current time, today only", async ({ page }) => {
-    await page.clock.setFixedTime(at(today, 11));
-    await openDay(page, today);
-    await expect(ui(page).getByRole("img", { name: "Now, 11am" })).toBeVisible();
+    // Open all day today, whatever day this runs.
+    const reopen = await openAllDay([SEED.staff.bridget]);
+    try {
+      await page.clock.setFixedTime(at(today, 11));
+      await openDay(page, today);
+      await expect(ui(page).getByRole("img", { name: "Now, 11am" })).toBeVisible();
 
-    await openDay(page, addDays(today, 1));
-    await expect(ui(page).getByRole("img", { name: /^Now/ })).toHaveCount(0);
+      await openDay(page, addDays(today, 1));
+      await expect(ui(page).getByRole("img", { name: /^Now/ })).toHaveCount(0);
+    } finally {
+      await reopen();
+    }
   });
 
   test("ignores a bad date", async ({ page }) => {

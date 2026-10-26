@@ -2,7 +2,7 @@
 // per salon), saving a photo to a visit, consent before marketing, and who
 // can remove what.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { admin, anon, createOtherSalon, SEED, signIn, type Client } from "./helpers";
+import { admin, anon, createOtherSalon, makeRoom, SEED, signIn, type Client } from "./helpers";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -23,6 +23,7 @@ async function upload(c: Client, p: string) {
   return c.storage.from(BUCKET).upload(p, JPEG, { contentType: "image/jpeg" });
 }
 
+let putBack = async () => {};
 beforeAll(async () => {
   [frontDesk, bridget, manager] = await Promise.all(["frontdesk", "bridget", "manager"].map((u) => signIn(`${u}@mapleandash.test`)));
   other = await createOtherSalon();
@@ -31,6 +32,8 @@ beforeAll(async () => {
   clientId = c!.id;
   const start = new Date(Date.now() - 2 * 3600_000);
   const end = new Date(start.getTime() + 3600_000);
+  // Bridget may have demo clients then, on a working day.
+  putBack = await makeRoom(SEED.staff.bridget, start, end);
   const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: clientId, starts_at: start.toISOString(), ends_at: end.toISOString(), status: "checked_in" }).select("id").single();
   appointmentId = a!.id;
   const { data: s } = await admin.from("services").select("id").eq("business_id", B).eq("name", "Blowout").single();
@@ -41,6 +44,7 @@ afterAll(async () => {
   const { data: files } = await admin.storage.from(BUCKET).list(`${B}/${clientId}`);
   if (files?.length) await admin.storage.from(BUCKET).remove(files.map((f) => `${B}/${clientId}/${f.name}`));
   await admin.from("appointments").delete().eq("id", appointmentId);
+  await putBack();
   await admin.from("clients").delete().eq("id", clientId);
   await other.cleanup();
 });

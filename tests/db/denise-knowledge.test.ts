@@ -7,7 +7,7 @@ import { computeInsights } from "@/lib/insights/compute";
 import { knowledgeFor, salesRange, type Asker } from "@/lib/denise/knowledge";
 import { startOfLocalDay } from "@/lib/scheduling/load";
 import { addDays, todayIn } from "@/lib/scheduling/time";
-import { admin, DEFAULT_PERMISSIONS, anon, SEED, signIn, type Client } from "./helpers";
+import { admin, busyDay, DEFAULT_PERMISSIONS, anon, SEED, signIn, type Client } from "./helpers";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -73,19 +73,21 @@ describe("as the front desk", () => {
     const salon = (await k().salon()) as { running_over_by_day: { day: string }[]; busiest_hours: unknown[] };
     expect(salon.running_over_by_day.length).toBeGreaterThan(3);
     expect(salon.busiest_hours).toHaveLength(3);
-    const day = JSON.stringify(await k().schedule(today));
+    const day = JSON.stringify(await k().schedule((await busyDay(TZ)).date));
     expect(day).not.toMatch(PRIVATE);
   });
 
   it("has no sales, but can look for fixes, with clients' first names only", async () => {
     expect(k().sales).toBeNull();
-    const fixes = JSON.stringify(await k().fixes!(today));
+    // A day with visits on it, whatever day this runs.
+    const { date } = await busyDay(TZ);
+    const fixes = JSON.stringify(await k().fixes!(date));
     const { data: visits } = await admin
       .from("appointments")
       .select("client:clients(last_name)")
       .eq("location_id", L)
-      .gte("starts_at", startOfLocalDay(today, TZ).toISOString())
-      .lt("starts_at", startOfLocalDay(addDays(today, 1), TZ).toISOString());
+      .gte("starts_at", startOfLocalDay(date, TZ).toISOString())
+      .lt("starts_at", startOfLocalDay(addDays(date, 1), TZ).toISOString());
     const lastNames = new Set(visits!.flatMap((v) => (v.client?.last_name ? [v.client.last_name] : [])));
     expect(lastNames.size).toBeGreaterThan(0);
     for (const name of lastNames) expect(fixes).not.toContain(name);

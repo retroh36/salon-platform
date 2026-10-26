@@ -44,17 +44,20 @@ test.afterAll(async () => {
 
 test.use({ viewport: { width: 1920, height: 1500 } });
 
-// A $100 cut with Bridget, checked in.
+// A $100 cut with Bridget, checked in: each an hour after the last, so no
+// one is booked twice.
+let visits = 0;
 async function visit(first: string) {
+  const start = at(10 + visits++);
   const { data: c } = await admin.from("clients").insert({ business_id: B, first_name: `${PREFIX}${first}`, last_name: "Test", email: `${first.toLowerCase()}@example.com` }).select("id").single();
   const { data: s } = await admin.from("services").select("id, active_minutes").eq("business_id", B).eq("name", "Women's Cut & Style").single();
-  const end = new Date(at(10).getTime() + 60 * 60_000).toISOString();
+  const end = new Date(start.getTime() + 60 * 60_000).toISOString();
   const { data: a } = await admin
     .from("appointments")
-    .insert({ business_id: B, location_id: L, client_id: c!.id, starts_at: at(10).toISOString(), ends_at: end, status: "checked_in", created_by: FRONT_DESK })
+    .insert({ business_id: B, location_id: L, client_id: c!.id, starts_at: start.toISOString(), ends_at: end, status: "checked_in", created_by: FRONT_DESK })
     .select("id")
     .single();
-  await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: s!.id, staff_id: BRIDGET, starts_at: at(10).toISOString(), ends_at: end, active_minutes: 60, price_cents: 10000 });
+  await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: s!.id, staff_id: BRIDGET, starts_at: start.toISOString(), ends_at: end, active_minutes: 60, price_cents: 10000 });
   return { clientId: c!.id, appointmentId: a!.id };
 }
 

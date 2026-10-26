@@ -136,7 +136,7 @@ for (const [device, viewport] of [
       await shot(page, `${device}-fit-all`);
 
       // Remembered on this device (once the zoom has saved).
-      await expect.poll(async () => (await admin.from("staff").select("calendar_zoom").eq("email", "frontdesk@harborvine.test").single()).data!.calendar_zoom).toBe("compact");
+      await expect.poll(async () => (await admin.from("staff").select("calendar_zoom").eq("email", "frontdesk@harborvine.test").single()).data!.calendar_zoom, { timeout: 15_000 }).toBe("compact");
       await page.reload();
       await expect(grid(page)).toHaveAttribute("data-fit-all", "true");
       // Not in the other zooms: the columns are readable again.

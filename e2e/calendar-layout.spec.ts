@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
-import { admin, SEED } from "../tests/db/helpers";
+import { admin, openAllDay, SEED } from "../tests/db/helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
@@ -154,23 +154,28 @@ test("each stylist's header shows their day at a glance", async ({ page }) => {
 
 test("the stylist menu opens below the header, inside the screen", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  // Today, so stylists have the menu.
-  await page.goto("/calendar");
-  await waitForHydration(page, "section[data-staff-id]");
-  const header = ui(page).locator("[data-column-header]").filter({ has: page.getByRole("button", { name: /^More for / }) }).last();
-  const button = header.getByRole("button", { name: /^More for / });
-  await button.click();
-  const dialog = page.getByRole("dialog", { name: /'s day$/ });
-  await expect(dialog).toBeVisible();
-  const [d, h] = [(await dialog.boundingBox())!, (await header.boundingBox())!];
-  // Below the name and hours, never over them, and on screen.
-  expect(d.y).toBeGreaterThanOrEqual(h.y + h.height);
-  expect(d.x).toBeGreaterThanOrEqual(0);
-  expect(d.x + d.width).toBeLessThanOrEqual(1280);
-  // The buttons each fit on one line.
-  for (const b of await dialog.getByRole("button").all()) expect((await b.boundingBox())!.height).toBeLessThanOrEqual(34);
-  await page.keyboard.press("Escape");
-  await expect(dialog).toBeHidden();
+  // Today, so stylists have the menu: open all day, whatever day this runs.
+  const reopen = await openAllDay([SEED.staff.bridget, SEED.staff.shae]);
+  try {
+    await page.goto("/calendar");
+    await waitForHydration(page, "section[data-staff-id]");
+    const header = ui(page).locator("[data-column-header]").filter({ has: page.getByRole("button", { name: /^More for / }) }).last();
+    const button = header.getByRole("button", { name: /^More for / });
+    await button.click();
+    const dialog = page.getByRole("dialog", { name: /'s day$/ });
+    await expect(dialog).toBeVisible();
+    const [d, h] = [(await dialog.boundingBox())!, (await header.boundingBox())!];
+    // Below the name and hours, never over them, and on screen.
+    expect(d.y).toBeGreaterThanOrEqual(h.y + h.height);
+    expect(d.x).toBeGreaterThanOrEqual(0);
+    expect(d.x + d.width).toBeLessThanOrEqual(1280);
+    // The buttons each fit on one line.
+    for (const b of await dialog.getByRole("button").all()) expect((await b.boundingBox())!.height).toBeLessThanOrEqual(34);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+  } finally {
+    await reopen();
+  }
 });
 
 test("the current-time pill takes the hour label's place when they'd meet", async ({ page }) => {

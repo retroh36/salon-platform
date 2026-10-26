@@ -2,7 +2,7 @@
 // alert preference and celebrations, and goal_progress's rebooking, new
 // clients and what's booked ahead, checked against the rows directly.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { admin, SEED, signIn, type Client } from "./helpers";
+import { admin, makeRoom, SEED, signIn, type Client } from "./helpers";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -35,7 +35,9 @@ afterAll(async () => {
     await admin.from("appointments").delete().in("client_id", clients);
     await admin.from("clients").delete().in("id", clients);
   }
+  await putBack();
 });
+let putBack = async () => {};
 
 const save = (c: Client, staffId: string, metric: string, period: string, target: number) =>
   c.rpc("save_staff_goal", { p_staff_id: staffId, p_metric: metric as never, p_period: period as never, p_target: target });
@@ -131,6 +133,8 @@ describe("goal progress", () => {
     const { data: n } = await admin.from("clients").insert({ business_id: B, first_name: "Newbie", last_name: "Test" }).select("id").single();
     clients.push(n!.id);
     const start = new Date(Date.now() + 2 * 86_400_000);
+    // Bridget may have demo clients then, on a working day.
+    putBack = await makeRoom(BRIDGET, start, new Date(start.getTime() + 3_600_000));
     const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: n!.id, starts_at: start.toISOString(), ends_at: new Date(start.getTime() + 3_600_000).toISOString(), status: "booked" }).select("id").single();
     await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: a!.id, service_id: s!.id, staff_id: BRIDGET, starts_at: start.toISOString(), ends_at: new Date(start.getTime() + 3_600_000).toISOString(), active_minutes: 60, price_cents: 12345 });
     const range = { p_from: new Date().toISOString(), p_to: new Date(Date.now() + 5 * 86_400_000).toISOString() };

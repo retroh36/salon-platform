@@ -250,7 +250,8 @@ test("the connection drops as they book: it says so, and tapping Book again show
   await open(page);
   await chooseServices(page, ["Blowout"]);
   await chooseStylist(page, /Shae M\./);
-  await chooseFirstTime(page, 2);
+  // The first time she has (the soonest day may have only one or two left).
+  await chooseFirstTime(page);
   await verify(page, newPhone());
   await flow(page).getByLabel("First name").fill(`Ob${RUN}Retry`);
   await flow(page).getByLabel("Last name").fill("Client");

@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
-import { admin, SEED } from "../tests/db/helpers";
+import { admin, openAllDay, SEED } from "../tests/db/helpers";
 import { AUTH, expect, test, ui, waitForHydration, moreAction } from "./fixtures";
 
 const B = SEED.business;
@@ -118,32 +118,39 @@ test("when a visit is canceled, Denise suggests who on the waitlist fits, and st
 });
 
 test("queues walk-ins with an estimated wait and books them in one click", async ({ page }) => {
-  await page.goto(`/calendar`);
-  await waitForHydration(page, "section[data-staff-id]");
-  await ui(page).getByRole("button", { name: "Walk-ins" }).click();
-  const add = page.getByRole("form", { name: "Add walk-in" });
-  await add.getByLabel("Name").fill(`${PREFIX}Walker Test`);
-  await add.getByLabel("Phone (optional)").fill("999 555 0123");
-  await add.getByLabel("Service").selectOption({ label: "Men's Cut" });
-  await add.getByRole("button", { name: "Add to queue" }).click();
+  // Open all day today, whatever day this runs, with Shae (who does men's
+  // cuts) working.
+  const reopen = await openAllDay([SEED.staff.shae]);
+  try {
+    await page.goto(`/calendar`);
+    await waitForHydration(page, "section[data-staff-id]");
+    await ui(page).getByRole("button", { name: "Walk-ins" }).click();
+    const add = page.getByRole("form", { name: "Add walk-in" });
+    await add.getByLabel("Name").fill(`${PREFIX}Walker Test`);
+    await add.getByLabel("Phone (optional)").fill("999 555 0123");
+    await add.getByLabel("Service").selectOption({ label: "Men's Cut" });
+    await add.getByRole("button", { name: "Add to queue" }).click();
 
-  const queue = page.getByRole("region", { name: "Walk-in queue" });
-  const row = queue.getByRole("listitem").filter({ hasText: `${PREFIX}Walker Test` });
-  await expect(row).toContainText("Men's Cut");
-  // Whether anyone's free depends on the time the test runs.
-  const bookButton = row.getByRole("button", { name: /^Book with / });
-  await expect(row.getByTestId("walk-in-estimate").or(row.getByText("No one who does this service is free today."))).toBeVisible();
-  if (await bookButton.isVisible()) {
-    const label = (await bookButton.textContent())!;
-    const [, stylist, time] = label.match(/^Book with (\w+) at (.+)$/)!;
-    await expect(row.getByTestId("walk-in-estimate")).toContainText(`Next free: ${stylist} at ${time} · wait`);
-    await bookButton.click();
-    await expect(page.getByRole("status").filter({ hasText: `Booked ${PREFIX}Walker Test with ${stylist} at ${time}.` })).toBeVisible();
-    const { data: w } = await admin.from("walk_ins").select("status, appointment_id").eq("name", `${PREFIX}Walker Test`).single();
-    expect(w!.status).toBe("booked");
-    await admin.from("appointments").delete().eq("id", w!.appointment_id!);
-  } else {
-    await row.getByRole("button", { name: "Left" }).click();
-    await expect(row).toHaveCount(0);
+    const queue = page.getByRole("region", { name: "Walk-in queue" });
+    const row = queue.getByRole("listitem").filter({ hasText: `${PREFIX}Walker Test` });
+    await expect(row).toContainText("Men's Cut");
+    // Shae works all day today, so someone is free, unless it is nearly midnight.
+    const bookButton = row.getByRole("button", { name: /^Book with / });
+    await expect(row.getByTestId("walk-in-estimate").or(row.getByText("No one who does this service is free today."))).toBeVisible();
+    if (await bookButton.isVisible()) {
+      const label = (await bookButton.textContent())!;
+      const [, stylist, time] = label.match(/^Book with (\w+) at (.+)$/)!;
+      await expect(row.getByTestId("walk-in-estimate")).toContainText(`Next free: ${stylist} at ${time} · wait`);
+      await bookButton.click();
+      await expect(page.getByRole("status").filter({ hasText: `Booked ${PREFIX}Walker Test with ${stylist} at ${time}.` })).toBeVisible();
+      const { data: w } = await admin.from("walk_ins").select("status, appointment_id").eq("name", `${PREFIX}Walker Test`).single();
+      expect(w!.status).toBe("booked");
+      await admin.from("appointments").delete().eq("id", w!.appointment_id!);
+    } else {
+      await row.getByRole("button", { name: "Left" }).click();
+      await expect(row).toHaveCount(0);
+    }
+  } finally {
+    await reopen();
   }
 });
