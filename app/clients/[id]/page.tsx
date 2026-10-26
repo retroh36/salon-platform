@@ -40,6 +40,7 @@ import { PatchTestForm } from "../patch-test-form";
 import { ClientNotes } from "./client-notes";
 import { MembershipList, type MembershipHistory } from "./memberships/membership-card";
 import { MessagesCard } from "./messages-card";
+import { RewardsCard } from "./rewards/rewards-card";
 import { PackagesList } from "./packages/packages-card";
 import { PolicyCard } from "./policy-card";
 import { ProfileTabs } from "./profile-tabs";
@@ -435,6 +436,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
               </Section>
             )}
 
+            {canTakePayments(me.role) && <RewardsCard supabase={supabase} me={me} clientId={client.id} firstName={client.first_name} tz={tz} />}
             {canTakePayments(me.role) && <PolicyCard supabase={supabase} businessId={me.business_id} role={me.role} client={client} tz={tz} />}
             {canTakePayments(me.role) && <MessagesCard supabase={supabase} clientId={client.id} firstName={client.first_name} tz={tz} />}
           </aside>

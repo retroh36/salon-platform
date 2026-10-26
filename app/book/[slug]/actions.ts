@@ -265,6 +265,8 @@ export type BookInput = {
   honeypot: string;
   // Where they came from (?src= on the link they followed).
   source?: string;
+  // A friend's referral code (from ?ref=): recorded for a client with no visit yet.
+  referral?: string;
   // The card entered on the provider's form, when one is needed.
   cardRef?: string;
   // Keep them signed in to their account on this device afterwards.
@@ -460,6 +462,8 @@ async function bookCharged(
       source: isBookingSource(input.source) ? input.source : "direct",
     }),
     recordConsent(admin, clientId!, input),
+    // Both earn their referral points once this client's first visit is checked out.
+    input.referral ? admin.rpc("set_referred_by", { p_client_id: clientId!, p_code: input.referral.slice(0, 12) }) : null,
   ]);
   // After their answers, so a no to texts (or a STOP) sends it by email.
   await confirmationMessage(admin, site, clientId!, contact, start, manageUrl, terms);

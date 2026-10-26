@@ -58,8 +58,8 @@ export const anon: Client = createClient<Database>(url, publishableKey, options)
 // What each role can do by default (private.role_default; owners can't be
 // limited). tests/db/permissions.test.ts checks the database agrees.
 export const DEFAULT_PERMISSIONS: Record<"owner" | "manager" | "front_desk" | "stylist" | "assistant", string[]> = {
-  owner: ["big_discounts", "billing", "delete_business", "export_data", "payroll", "reports", "see_team_numbers", "settings", "team", "void_refund", "waive_fees"],
-  manager: ["big_discounts", "export_data", "payroll", "reports", "see_team_numbers", "settings", "team", "void_refund", "waive_fees"],
+  owner: ["adjust_points", "big_discounts", "billing", "delete_business", "export_data", "payroll", "reports", "see_team_numbers", "settings", "team", "void_refund", "waive_fees"],
+  manager: ["adjust_points", "big_discounts", "export_data", "payroll", "reports", "see_team_numbers", "settings", "team", "void_refund", "waive_fees"],
   front_desk: [],
   stylist: [],
   assistant: [],

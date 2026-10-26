@@ -1368,3 +1368,76 @@ with ranked as (
     )
 )
 update public.clients c set only_sees_preferred = true from ranked r where r.id = c.id and r.n <= 2;
+
+-- Rewards (Settings → Rewards): a point a dollar on services and retail,
+-- bonuses, three tiers by spend (VIP gets half as many points again, a
+-- free hydrating mask and first place on the waitlist), a catalog, and
+-- points earned on every past sale (backfill_reward_points, oldest
+-- first). Then two planted moments: Linda, coming in on the next day with
+-- visits, 40 points from a free gloss (Denise says so at checkout), and a
+-- referral that paid both clients when the friend's first visit was
+-- checked out, and another friend who hasn't come in yet.
+do $$
+declare
+  v_business uuid := 'b0000000-0000-4000-8000-000000000001';
+  v_gloss uuid := (select id from public.services where business_id = v_business and name = 'Gloss / Toner');
+  v_mask uuid := (select id from public.services where business_id = v_business and name = 'Hydrating Mask Add-On');
+  v_vip uuid;
+  v_linda uuid;
+  v_friend uuid;
+  v_referrer uuid;
+  v_waiting uuid;
+  v_tz text := (select timezone from public.locations where business_id = v_business limit 1);
+  v_day date;
+begin
+  insert into public.reward_programs (business_id, enabled, service_points_per_dollar, retail_points_per_dollar, birthday_points, referral_points, rebook_points, first_visit_points, expiry_months, min_redeem_points, tier_basis)
+  values (v_business, true, 1, 1, 100, 200, 25, 50, 12, 200, 'spend');
+  insert into public.reward_tiers (business_id, name, threshold, bonus_pct) values (v_business, 'Silver', 30000, 0), (v_business, 'Gold', 60000, 25);
+  insert into public.reward_tiers (business_id, name, threshold, bonus_pct, free_addon_service_id, priority_booking)
+  values (v_business, 'VIP', 100000, 50, v_mask, true) returning id into v_vip;
+  insert into public.rewards (business_id, name, points, kind, amount_cents, applies_services, applies_retail) values (v_business, '$10 off', 200, 'amount', 1000, true, true), (v_business, '$25 off', 500, 'amount', 2500, true, true);
+  insert into public.rewards (business_id, name, points, kind, service_ids, max_per_year, applies_services, applies_retail) values (v_business, 'Free gloss', 400, 'free_service', array[v_gloss], 2, true, false);
+  insert into public.rewards (business_id, name, points, kind, percent, applies_services, applies_retail, max_per_year) values (v_business, '20% off retail', 300, 'percent', 20, false, true, 4);
+
+  -- A completed referral: a client whose first visit was in the last month
+  -- came from a regular's link.
+  select c.id into v_friend from public.clients c
+  where c.business_id = v_business and c.referred_by is null
+    and (select count(*) from public.appointments a where a.client_id = c.id and a.status = 'completed') = 1
+    and exists (select 1 from public.appointments a where a.client_id = c.id and a.status = 'completed' and a.checked_out_at > now() - interval '30 days')
+  order by c.id limit 1;
+  select c.id into v_referrer from public.clients c
+  where c.business_id = v_business and c.id <> v_friend
+    and (select count(*) from public.appointments a where a.client_id = c.id and a.status = 'completed') >= 4
+  order by c.id limit 1;
+  update public.clients set referred_by = v_referrer where id = v_friend;
+  -- And one who hasn't been in yet.
+  select c.id into v_waiting from public.clients c
+  where c.business_id = v_business and c.referred_by is null and c.id <> v_referrer
+    and not exists (select 1 from public.appointments a where a.client_id = c.id and a.status = 'completed')
+  order by c.id limit 1;
+  update public.clients set referred_by = v_referrer where id = v_waiting;
+
+  perform public.backfill_reward_points(v_business);
+
+  -- Linda: on the next day with visits, with no package or membership,
+  -- 40 points short of a free gloss.
+  select min((a.starts_at at time zone v_tz)::date) into v_day from public.appointments a
+  where a.business_id = v_business and a.status in ('booked', 'confirmed') and (a.starts_at at time zone v_tz)::date >= (now() at time zone v_tz)::date;
+  select a.client_id into v_linda from public.appointments a
+  join public.clients c on c.id = a.client_id
+  where a.business_id = v_business and a.status in ('booked', 'confirmed') and (a.starts_at at time zone v_tz)::date = v_day
+    and not (c.id = any (array_remove(array[v_friend, v_referrer, v_waiting], null)))
+    and not exists (select 1 from public.client_memberships m where m.client_id = c.id)
+    and not exists (select 1 from public.client_packages p where p.client_id = c.id)
+    and c.allergies is null
+    and exists (select 1 from public.appointments p where p.client_id = c.id and p.status = 'completed')
+    and private.points_balance(c.id) < 360
+  order by a.starts_at, c.id limit 1;
+  if v_linda is not null then
+    update public.clients set first_name = 'Linda', last_name = 'Park' where id = v_linda;
+    insert into public.reward_points (business_id, client_id, delta, kind, reason, staff_id, created_at)
+    select v_business, v_linda, 360 - private.points_balance(v_linda), 'adjust', 'Points from the old punch card', 'd0000000-0000-4000-8000-000000000002', now() - interval '20 days'
+    where private.points_balance(v_linda) <> 360;
+  end if;
+end $$;

@@ -1,8 +1,10 @@
 import { computeInsights } from "@/lib/insights/compute";
+import { runRewardJobs } from "@/lib/rewards-load";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // The nightly insights job (scheduled in the database, docs/operations.md):
-// recalculates what Denise has learned for every salon. Called with
+// recalculates what Denise has learned for every salon, then gives
+// rewards birthday bonuses and expires old points. Called with
 // CRON_SECRET as a bearer token; anything else is refused. Counts only.
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -19,5 +21,6 @@ export async function GET(request: Request) {
     durations += counts.durations;
     clients += counts.clients;
   }
-  return Response.json({ salons: businesses.length, durations, clients });
+  const rewards = await runRewardJobs(admin);
+  return Response.json({ salons: businesses.length, durations, clients, rewards });
 }

@@ -18,6 +18,9 @@ import { CloseoutForm } from "./closeout-form";
 import { eventReport } from "@/lib/events/report";
 import { loadEventReportRows } from "@/lib/events/report-load";
 import { can } from "@/lib/permissions";
+import { points } from "@/lib/rewards";
+import { loadRewardsOverview } from "@/lib/rewards-load";
+import { startOfLocalDay } from "@/lib/scheduling/load";
 
 export const metadata: Metadata = { title: "Reports" };
 
@@ -76,7 +79,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
   const period: Period = typeof params.period === "string" && params.period in PERIODS ? (params.period as Period) : "this_month";
   const day = typeof params.day === "string" && isLocalDate(params.day) && params.day <= today ? params.day : today;
   const range = rangeOf(period, today);
-  const [liability, packages, activity, close, rebooking, staff, membershipRows, sources, promotions, eventRows] = await Promise.all([
+  const [liability, packages, activity, close, rebooking, staff, membershipRows, sources, promotions, eventRows, rewards] = await Promise.all([
     loadGiftCardLiability(supabase, me.business_id),
     loadUnusedPackages(supabase, me.business_id),
     loadGiftCardActivity(supabase, me.business_id, range.from, range.to, tz),
@@ -87,6 +90,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
     loadBookingSources(supabase, me.location, range.from, range.to),
     loadPromotionResults(supabase, me.business_id, range.from, range.to, tz),
     loadEventReportRows(supabase, me.business_id, tz),
+    loadRewardsOverview(supabase, me.business_id, startOfLocalDay(range.from, tz), startOfLocalDay(addDays(range.to, 1), tz)),
   ]);
   const events = eventReport(eventRows, range.from, range.to);
   // By month: six months back to six ahead, whatever the period.
@@ -120,7 +124,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
         title="Reports"
         description={
           <>
-            What you owe in gift cards and packages, gift card activity, memberships, bridal and events, where online bookings came from, rebooking, and closing out the day.
+            What you owe in gift cards and packages, gift card activity, memberships, rewards, bridal and events, where online bookings came from, rebooking, and closing out the day.
             <span className="mt-1 block text-13 text-ink-subtle" data-testid="report-period">
               Showing {formatLongDay(range.from, false)} to {formatLongDay(range.to, false)}
             </span>
@@ -271,6 +275,84 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
           </TableCard>
         )}
       </Section>
+
+      {rewards && (
+        <Section
+          title="Rewards"
+          titleId="rewards-heading"
+          description={`Points earned, redeemed and expired ${between}; what's outstanding and members by tier as of now. Outstanding points are valued at the best amount-off reward: an estimate, not a cash debt.`}
+        >
+          <Stats cols={4} testId="rewards-report">
+            <Stat label="Earned" value={points(rewards.overview.earned)} note={rewards.overview.bonus ? `${points(rewards.overview.bonus)} of it bonuses` : undefined} testId="points-earned" />
+            <Stat
+              label="Redeemed"
+              value={points(rewards.overview.redeemed)}
+              note={`${rewards.overview.redemptions} ${rewards.overview.redemptions === 1 ? "reward" : "rewards"} · ${formatPrice(rewards.overview.discountCents)} off`}
+              testId="points-redeemed"
+            />
+            <Stat
+              label="Outstanding"
+              value={points(rewards.overview.outstanding)}
+              note={rewards.overview.outstandingCents ? `About ${formatPrice(rewards.overview.outstandingCents)} in rewards` : undefined}
+              testId="points-outstanding"
+            />
+            <Stat
+              label="Redemption rate"
+              value={rewards.overview.redemptionRate === null ? "—" : `${rewards.overview.redemptionRate}%`}
+              note={rewards.overview.expired ? `${points(rewards.overview.expired)} expired` : "Of the points earned"}
+              testId="redemption-rate"
+            />
+          </Stats>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            {rewards.overview.byTier.length > 0 && (
+              <TableCard className="mb-0">
+                <table className={tableClass} aria-label="Members by tier">
+                  <thead className={theadClass}>
+                    <tr>
+                      <th className={th}>Tier</th>
+                      <th className={thNum}>Clients</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rewards.overview.byTier.map((t) => (
+                      <tr key={t.tierId ?? "none"} className={trClass}>
+                        <td className={`${td} font-medium text-ink`}>{t.name}</td>
+                        <td className={tdNum}>{t.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableCard>
+            )}
+            <TableCard className="mb-0">
+              <table className={tableClass} aria-label="Referrals">
+                <thead className={theadClass}>
+                  <tr>
+                    <th className={th}>Referrals</th>
+                    <th className={thNum}>This period</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className={trClass}>
+                    <td className={td}>New clients referred</td>
+                    <td className={tdNum}>{rewards.overview.referrals.referred}</td>
+                  </tr>
+                  <tr className={trClass}>
+                    <td className={td}>Came in for their first visit</td>
+                    <td className={tdNum} data-testid="referrals-completed">
+                      {rewards.overview.referrals.completed}
+                    </td>
+                  </tr>
+                  <tr className={trClass}>
+                    <td className={td}>Points given for referrals</td>
+                    <td className={tdNum}>{rewards.overview.referrals.points.toLocaleString("en-US")}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </TableCard>
+          </div>
+        </Section>
+      )}
 
       <Section
         title="Bridal and events"

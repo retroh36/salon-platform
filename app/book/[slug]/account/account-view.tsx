@@ -4,7 +4,7 @@ import { DemoCode } from "@/components/demo-bar";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import type { AccountData, AccountVisit } from "@/lib/online-booking/account-data";
+import type { AccountData, AccountRewards, AccountVisit } from "@/lib/online-booking/account-data";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { Alert } from "@/components/ui/page";
@@ -279,6 +279,8 @@ export function AccountView({
         </section>
       )}
 
+      {data.rewards && <RewardsSection slug={slug} rewards={data.rewards} timezone={timezone} />}
+
       <section aria-labelledby="card-heading" className={sectionClass}>
         <h2 id="card-heading" className={headingClass}>
           Card on file
@@ -352,5 +354,74 @@ export function AccountView({
       )}
       {salon.phone && <p className="text-center text-sm text-ink-muted">Questions? Call {salon.phone}.</p>}
     </div>
+  );
+}
+
+// Their points: balance and tier, the rewards they can take at the salon,
+// the latest changes, and a link to share (both earn once the friend's
+// first visit is done).
+function RewardsSection({ slug, rewards, timezone }: { slug: string; rewards: AccountRewards; timezone: string }) {
+  const [copied, setCopied] = useState(false);
+  const pts = (n: number) => `${n.toLocaleString("en-US")} ${Math.abs(n) === 1 ? "point" : "points"}`;
+  return (
+    <section aria-labelledby="rewards-heading" className={sectionClass} data-testid="account-rewards">
+      <h2 id="rewards-heading" className={headingClass}>
+        Rewards
+      </h2>
+      <p className="text-ink">
+        <span className="text-xl font-semibold tabular-nums">{pts(rewards.balance)}</span>
+        {rewards.tier && <span className="text-ink-muted"> · {rewards.tier}</span>}
+      </p>
+      {rewards.next && <p className="-mt-2 text-sm text-ink-muted">{rewards.next}.</p>}
+      {rewards.rewards.length > 0 && (
+        <ul className="flex flex-col divide-y divide-line text-sm">
+          {rewards.rewards.map((r) => (
+            <li key={r.name} className="flex justify-between gap-3 py-2">
+              <span className="text-ink">{r.name}</span>
+              <span className={r.ready ? "font-medium text-ink" : "text-ink-muted tabular-nums"}>{r.ready ? "Ready to use" : pts(r.points)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-xs text-ink-subtle">Ask at the desk to use a reward when you check out.</p>
+      {rewards.referralCode && rewards.referralPoints > 0 && (
+        <div className="flex flex-col gap-1">
+          <p className="text-sm text-ink">
+            Share your link: you and your friend each get {pts(rewards.referralPoints)} after their first visit.
+          </p>
+          <button
+            type="button"
+            className={linkButton}
+            onClick={() => {
+              const link = `${window.location.origin}/book/${slug}?ref=${rewards.referralCode}`;
+              navigator.clipboard?.writeText(link).then(
+                () => setCopied(true),
+                () => setCopied(false),
+              );
+            }}
+          >
+            {copied ? "Link copied" : "Copy my referral link"}
+          </button>
+        </div>
+      )}
+      {rewards.history.length > 0 && (
+        <details>
+          <summary className="cursor-pointer text-sm font-medium text-ink">Points history</summary>
+          <ul className="mt-2 flex flex-col gap-1 text-sm">
+            {rewards.history.map((h, i) => (
+              <li key={i} className="flex justify-between gap-3">
+                <span className="text-ink">
+                  {h.label} <span className="text-ink-subtle">· {longDate(toLocal(new Date(h.at), timezone).date)}</span>
+                </span>
+                <span className="tabular-nums">
+                  {h.delta > 0 ? "+" : "−"}
+                  {Math.abs(h.delta).toLocaleString("en-US")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
   );
 }

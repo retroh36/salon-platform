@@ -17,5 +17,6 @@ Each role starts with what it needs; an owner can switch extra things on or off 
 - Owners can do everything. Managers can do everything but billing (the plan and Denise's limit) and deleting the business, and can't manage owners.
 - The front desk gets the calendar, check-in and checkout, clients and gift cards, and today's sales only. Stylists get their own day, clients, tips, pay and goals. Assistants see the day of the stylist they assist.
 - Only what makes sense for the role is listed: a stylist can be allowed to see other stylists' numbers, but never payroll.
+- **Adjust rewards points** is for managers by default; an owner can give it to the front desk.
 - It applies the next time they open a page.
 - Anyone can see what they're allowed on **Your account** (tap your name at the bottom of the sidebar).

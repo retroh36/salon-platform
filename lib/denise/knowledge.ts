@@ -8,6 +8,7 @@
 //   - sales figures for owners and managers.
 // Every number is calculated here; Claude only reads them.
 
+import { loadRewardsOverview } from "@/lib/rewards-load";
 import { can } from "@/lib/permissions";
 import { isFrontOfHouse } from "@/lib/staff";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -45,6 +46,9 @@ export type Knowledge = {
   // Owners only: what's owed on gift cards and unused packages.
   giftCards: (() => Promise<unknown>) | null;
   packages: ((limit: number) => Promise<unknown>) | null;
+  // The rewards program: points outstanding, tiers and the top tier's
+  // clients (first names). Owners and managers with reports.
+  rewards: ((limit: number) => Promise<unknown>) | null;
   // The front of house: late cancellations and no-shows under the policy
   // (fee amounts for owners and managers).
   policy: ((period: PolicyPeriod) => Promise<unknown>) | null;
@@ -328,6 +332,30 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
             };
           }
         : null,
+
+    rewards: canSeeSales(me)
+      ? async (limit) => {
+          const now = new Date();
+          const since = new Date(now.getTime() - 90 * 86_400_000);
+          const loaded = await loadRewardsOverview(supabase, me.businessId, since, now);
+          if (!loaded) return { program: "off", note: "The salon has no rewards program on (Settings, then Rewards)." };
+          const o = loaded.overview;
+          const tierName = (id: string | null) => loaded.settings.tiers.find((t) => t.id === id)?.name ?? null;
+          return {
+            points_outstanding: o.outstanding,
+            outstanding_estimated_value_dollars: o.outstandingCents ? dollars(o.outstandingCents) : null,
+            value_note: o.outstandingCents ? "Estimated at the best amount-off reward; not a cash debt." : "No amount-off reward to value points by.",
+            clients_in_the_program: o.members,
+            clients_by_tier: o.byTier.map((t) => ({ tier: t.name, clients: t.count })),
+            last_90_days: { points_earned: o.earned, points_redeemed: o.redeemed, rewards_taken: o.redemptions, redemption_rate_percent: o.redemptionRate, points_expired: o.expired, referrals_completed: o.referrals.completed },
+            vips: {
+              means: loaded.settings.tiers.length ? `clients in the top tier (${o.byTier[0]?.name})` : "the biggest spenders over the last 12 months (no tiers set up)",
+              total: o.vips.length,
+              clients: o.vips.slice(0, Math.min(Math.max(limit, 1), 20)).map((m) => ({ first_name: m.firstName, tier: tierName(m.tierId), points: m.balance, spent_last_12_months_dollars: dollars(m.spendCents), visits_last_12_months: m.visits })),
+            },
+          };
+        }
+      : null,
 
     policy: frontOfHouse
       ? async (period) => {

@@ -227,6 +227,7 @@ function knowledge(overrides: Partial<Knowledge> = {}): Knowledge & Record<strin
     fixes: vi.fn(async (date: string) => ({ date, problems: [] })),
     giftCards: vi.fn(async () => ({ purchased_balance_dollars: 1250, cards_with_a_balance: 14 })),
     packages: vi.fn(async () => ({ unused_value_dollars: 640, clients: [{ first_name: "Ava", uses_left: ["3 Blowout"] }] })),
+    rewards: vi.fn(async () => ({ points_outstanding: 41_250, vips: { total: 3, clients: [{ first_name: "Linda", tier: "VIP" }] } })),
     policy: vi.fn(async (period: string) => ({ period, late_cancellations: 2, incidents: [{ first_name: "Liam", what: "Late cancellation" }] })),
     ...overrides,
   } as never;
@@ -244,14 +245,15 @@ describe("Ask Denise's knowledge", () => {
     const names = (k?: Knowledge) => assistantTools(context({ knowledge: k })).tools.map((t) => t.name);
     expect(names(knowledge())).toEqual(expect.arrayContaining(["client_insights", "overdue_clients", "stylist_durations", "salon_patterns", "day_schedule", "inventory_levels", "sales_summary", "propose_fixes", "find_openings", "propose_booking"]));
     // An owner: gift card and package totals too.
-    expect(names(knowledge())).toEqual(expect.arrayContaining(["gift_card_balances", "unused_packages"]));
-    // A manager or the front desk: not those.
-    const desk = names(knowledge({ giftCards: null, packages: null }));
+    expect(names(knowledge())).toEqual(expect.arrayContaining(["gift_card_balances", "unused_packages", "rewards_summary"]));
+    // The front desk: not those.
+    const desk = names(knowledge({ giftCards: null, packages: null, rewards: null }));
+    expect(desk).not.toContain("rewards_summary");
     expect(desk).not.toContain("gift_card_balances");
     expect(desk).not.toContain("unused_packages");
     expect(desk).toContain("late_cancellations");
     // A stylist: no sales, no fixes to approve and no one's cancellations.
-    const stylist = names(knowledge({ sales: null, fixes: null, giftCards: null, packages: null, policy: null }));
+    const stylist = names(knowledge({ sales: null, fixes: null, giftCards: null, packages: null, rewards: null, policy: null }));
     expect(stylist).not.toContain("sales_summary");
     expect(stylist).not.toContain("propose_fixes");
     expect(stylist).not.toContain("late_cancellations");

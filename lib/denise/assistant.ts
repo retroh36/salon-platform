@@ -130,7 +130,7 @@ const TOOLS: Anthropic.Tool[] = [
 const noInput = { type: "object" as const, properties: {}, required: [], additionalProperties: false as const };
 
 // Read-only lookups of what Denise has learned, and her fixes.
-const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes" | "giftCards" | "packages" | "policy" | "events" | "eventBalance", Anthropic.Tool> = {
+const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes" | "giftCards" | "packages" | "rewards" | "policy" | "events" | "eventBalance", Anthropic.Tool> = {
   events: {
     name: "events_in_month",
     description:
@@ -178,6 +178,13 @@ const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "s
     description: "Unused package uses: what they're worth in total, how many uses are left, and the clients who have them (first names, most value first). Owners only.",
     strict: true,
     input_schema: { type: "object", properties: { limit: { ...nullable("integer"), description: "How many clients to list (1-20, default 5)." } }, required: ["limit"], additionalProperties: false },
+  },
+  rewards: {
+    name: "rewards_summary",
+    description:
+      "The salon's rewards program: points outstanding (and their estimated value), clients by tier, the last 90 days' points earned and redeemed with the redemption rate, and the VIPs (the top tier's clients, first names, most spent first). For \"How many points are outstanding?\" and \"Who are our VIPs?\". Owners and managers.",
+    strict: true,
+    input_schema: { type: "object", properties: { limit: { ...nullable("integer"), description: "How many VIPs to list (1-20, default 5)." } }, required: ["limit"], additionalProperties: false },
   },
   clients: {
     name: "client_insights",
@@ -401,6 +408,7 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
         ...(k.fixes ? [KNOWLEDGE_TOOLS.fixes] : []),
         ...(k.giftCards ? [KNOWLEDGE_TOOLS.giftCards] : []),
         ...(k.packages ? [KNOWLEDGE_TOOLS.packages] : []),
+        ...(k.rewards ? [KNOWLEDGE_TOOLS.rewards] : []),
         ...(k.policy ? [KNOWLEDGE_TOOLS.policy] : []),
         KNOWLEDGE_TOOLS.events,
         ...(k.eventBalance ? [KNOWLEDGE_TOOLS.eventBalance] : []),
@@ -436,6 +444,9 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
       case "unused_packages":
         if (!k.packages) return "Package totals are for owners.";
         return JSON.stringify(await k.packages(typeof input.limit === "number" ? input.limit : 5));
+      case "rewards_summary":
+        if (!k.rewards) return "Rewards totals are for owners and managers.";
+        return JSON.stringify(await k.rewards(typeof input.limit === "number" ? input.limit : 5));
       case "late_cancellations":
         if (!k.policy) return "Late cancellations are for the front desk, managers and owners.";
         if (!POLICY_PERIODS.includes(input.period as PolicyPeriod)) return `Choose a period: ${POLICY_PERIODS.join(", ")}.`;
@@ -509,6 +520,8 @@ export function toolStatus(name: string, input: unknown, c: Pick<AssistantContex
       return "Finding unused packages…";
     case "late_cancellations":
       return "Looking at late cancellations and no-shows…";
+    case "rewards_summary":
+      return "Adding up rewards points…";
     case "events_in_month":
       return "Looking at the events that month…";
     case "event_balance":

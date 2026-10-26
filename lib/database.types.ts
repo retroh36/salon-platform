@@ -857,14 +857,14 @@ isOneToOne: false
                   ]
                 },"clients": {
                   Row: {
-                    "allergies": string | null,"appointment_email_ok": boolean,"appointment_sms_ok": boolean,"birth_day": number | null,"birth_month": number | null,"business_id": string,"consent_signed_on": string | null,"created_at": string,"email": string | null,"email_opt_in": boolean,"first_name": string,"id": string,"last_name": string,"notes": string | null,"notes_updated_at": string | null,"notes_updated_by": string | null,"only_sees_preferred": boolean,"phone": string | null,"phone_digits": string | null,"photo_consent_by": string | null,"photo_consent_on": string | null,"preferences": string | null,"preferred_staff_id": string | null,"search_name": string | null,"sms_opt_in": boolean,"sms_stopped_at": string | null,"updated_at": string
+                    "allergies": string | null,"appointment_email_ok": boolean,"appointment_sms_ok": boolean,"birth_day": number | null,"birth_month": number | null,"business_id": string,"consent_signed_on": string | null,"created_at": string,"email": string | null,"email_opt_in": boolean,"first_name": string,"id": string,"last_name": string,"notes": string | null,"notes_updated_at": string | null,"notes_updated_by": string | null,"only_sees_preferred": boolean,"phone": string | null,"phone_digits": string | null,"photo_consent_by": string | null,"photo_consent_on": string | null,"preferences": string | null,"preferred_staff_id": string | null,"referral_code": string | null,"referred_by": string | null,"search_name": string | null,"sms_opt_in": boolean,"sms_stopped_at": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id": string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"first_name": string,"id"?: string,"last_name"?: string,"notes"?: string | null,"notes_updated_at"?: string | null,"notes_updated_by"?: string | null,"only_sees_preferred"?: boolean,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
+                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id": string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"first_name": string,"id"?: string,"last_name"?: string,"notes"?: string | null,"notes_updated_at"?: string | null,"notes_updated_by"?: string | null,"only_sees_preferred"?: boolean,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"referral_code"?: string | null,"referred_by"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id"?: string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"first_name"?: string,"id"?: string,"last_name"?: string,"notes"?: string | null,"notes_updated_at"?: string | null,"notes_updated_by"?: string | null,"only_sees_preferred"?: boolean,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
+                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id"?: string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"first_name"?: string,"id"?: string,"last_name"?: string,"notes"?: string | null,"notes_updated_at"?: string | null,"notes_updated_by"?: string | null,"only_sees_preferred"?: boolean,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"referral_code"?: string | null,"referred_by"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -891,6 +891,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "staff"
       referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "clients_referred_by_fkey"
+      columns: ["referred_by"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id"]
     }
                   ]
                 },"commission_plan_versions": {
@@ -2603,6 +2609,128 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"reward_points": {
+                  Row: {
+                    "bonus": string | null,"business_id": string,"client_id": string,"created_at": string,"cycle": string | null,"delta": number,"discount_cents": number | null,"id": string,"kind": string,"reason": string | null,"reward_id": string | null,"sale_id": string | null,"staff_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "bonus"?: string | null,"business_id": string,"client_id": string,"created_at"?: string,"cycle"?: string | null,"delta": number,"discount_cents"?: number | null,"id"?: string,"kind": string,"reason"?: string | null,"reward_id"?: string | null,"sale_id"?: string | null,"staff_id"?: string | null
+                  }
+                  Update: {
+                    "bonus"?: string | null,"business_id"?: string,"client_id"?: string,"created_at"?: string,"cycle"?: string | null,"delta"?: number,"discount_cents"?: number | null,"id"?: string,"kind"?: string,"reason"?: string | null,"reward_id"?: string | null,"sale_id"?: string | null,"staff_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "reward_points_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "reward_points_client_id_fkey"
+      columns: ["client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "reward_points_reward_id_fkey"
+      columns: ["reward_id"]
+isOneToOne: false
+      referencedRelation: "rewards"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "reward_points_sale_id_fkey"
+      columns: ["sale_id"]
+isOneToOne: false
+      referencedRelation: "sales"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "reward_points_staff_id_fkey"
+      columns: ["staff_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"reward_programs": {
+                  Row: {
+                    "birthday_points": number,"business_id": string,"earn_on_memberships": boolean,"earn_on_packages": boolean,"enabled": boolean,"expiry_months": number | null,"first_visit_points": number,"min_redeem_points": number,"rebook_points": number,"referral_points": number,"retail_points_per_dollar": number,"service_points_per_dollar": number,"stack_with_promotions": boolean,"tier_basis": string,"updated_at": string,"updated_by": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "birthday_points"?: number,"business_id": string,"earn_on_memberships"?: boolean,"earn_on_packages"?: boolean,"enabled"?: boolean,"expiry_months"?: number | null,"first_visit_points"?: number,"min_redeem_points"?: number,"rebook_points"?: number,"referral_points"?: number,"retail_points_per_dollar"?: number,"service_points_per_dollar"?: number,"stack_with_promotions"?: boolean,"tier_basis"?: string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "birthday_points"?: number,"business_id"?: string,"earn_on_memberships"?: boolean,"earn_on_packages"?: boolean,"enabled"?: boolean,"expiry_months"?: number | null,"first_visit_points"?: number,"min_redeem_points"?: number,"rebook_points"?: number,"referral_points"?: number,"retail_points_per_dollar"?: number,"service_points_per_dollar"?: number,"stack_with_promotions"?: boolean,"tier_basis"?: string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "reward_programs_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: true
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "reward_programs_updated_by_fkey"
+      columns: ["updated_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"reward_tiers": {
+                  Row: {
+                    "bonus_pct": number,"business_id": string,"created_at": string,"free_addon_service_id": string | null,"id": string,"name": string,"priority_booking": boolean,"threshold": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "bonus_pct"?: number,"business_id": string,"created_at"?: string,"free_addon_service_id"?: string | null,"id"?: string,"name": string,"priority_booking"?: boolean,"threshold": number
+                  }
+                  Update: {
+                    "bonus_pct"?: number,"business_id"?: string,"created_at"?: string,"free_addon_service_id"?: string | null,"id"?: string,"name"?: string,"priority_booking"?: boolean,"threshold"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "reward_tiers_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "reward_tiers_free_addon_service_id_fkey"
+      columns: ["free_addon_service_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"rewards": {
+                  Row: {
+                    "amount_cents": number | null,"applies_retail": boolean,"applies_services": boolean,"business_id": string,"created_at": string,"id": string,"is_active": boolean,"kind": string,"max_per_year": number | null,"min_tier_id": string | null,"name": string,"percent": number | null,"points": number,"service_ids": (string)[] | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount_cents"?: number | null,"applies_retail"?: boolean,"applies_services"?: boolean,"business_id": string,"created_at"?: string,"id"?: string,"is_active"?: boolean,"kind": string,"max_per_year"?: number | null,"min_tier_id"?: string | null,"name": string,"percent"?: number | null,"points": number,"service_ids"?: (string)[] | null
+                  }
+                  Update: {
+                    "amount_cents"?: number | null,"applies_retail"?: boolean,"applies_services"?: boolean,"business_id"?: string,"created_at"?: string,"id"?: string,"is_active"?: boolean,"kind"?: string,"max_per_year"?: number | null,"min_tier_id"?: string | null,"name"?: string,"percent"?: number | null,"points"?: number,"service_ids"?: (string)[] | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "rewards_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "rewards_min_tier_id_fkey"
+      columns: ["min_tier_id"]
+isOneToOne: false
+      referencedRelation: "reward_tiers"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"sale_drafts": {
                   Row: {
                     "appointment_id": string | null,"business_id": string,"client_id": string | null,"created_at": string,"created_by": string | null,"id": string,"location_id": string,"return_to": string | null,"sale_id": string | null,"status": string,"ticket": NonNullable<Json>,"updated_at": string
@@ -3788,6 +3916,9 @@ isOneToOne: false
             "accept_event_proposal":
 { Args: { "p_input": Json,"p_link_id": string }; Returns: undefined
                            },
+"account_rewards":
+{ Args: { "p_client_id": string }; Returns: Json
+                           },
 "add_event_photo":
 { Args: { "p_event_id": string,"p_path": string }; Returns: string
                            },
@@ -3805,6 +3936,9 @@ isOneToOne: false
                            },
 "adjust_gift_card":
 { Args: { "p_card_id": string,"p_change_cents": number,"p_reason": string }; Returns: number
+                           },
+"adjust_reward_points":
+{ Args: { "p_client_id": string,"p_delta": number,"p_reason": string }; Returns: number
                            },
 "adjust_stock":
 { Args: { "p_change": number,"p_location_id": string,"p_note": string,"p_product_id": string,"p_reason": Database["public"]['Enums']["stock_reason"] }; Returns: number
@@ -3840,6 +3974,9 @@ isOneToOne: false
                            },
 "attach_online_promotion":
 { Args: { "p_appointment_id": string,"p_promotion_id": string }; Returns: undefined
+                           },
+"backfill_reward_points":
+{ Args: { "p_business_id": string }; Returns: number
                            },
 "best_sellers":
 { Args: { "p_location_id": string,"p_since": string }; Returns: {
@@ -3892,6 +4029,9 @@ isOneToOne: false
             }[]
                            },
 "client_policy_standing":
+{ Args: { "p_client_id": string }; Returns: Json
+                           },
+"client_rewards":
 { Args: { "p_client_id": string }; Returns: Json
                            },
 "commission_rules":
@@ -4100,6 +4240,17 @@ isOneToOne: false
 "revoke_shared_device":
 { Args: { "p_device_id": string }; Returns: undefined
                            },
+"reward_members":
+{ Args: { "p_business_id": string }; Returns: {
+              "balance": number,"client_id": string,"first_name": string,"spend_cents": number,"tier_id": string,"visits": number
+            }[]
+                           },
+"rewards_report":
+{ Args: { "p_business_id": string,"p_from": string,"p_to": string }; Returns: Json
+                           },
+"run_reward_jobs":
+{ Args: { "p_business_id": string,"p_today": string }; Returns: Json
+                           },
 "run_scheduled_job_now":
 { Args: { "p_path": string }; Returns: number
                            },
@@ -4153,6 +4304,15 @@ isOneToOne: false
                            },
 "save_purchase_order":
 { Args: { "p_lines": Json,"p_location_id": string,"p_notes": string,"p_order_id": string,"p_supplier_id": string }; Returns: string
+                           },
+"save_reward":
+{ Args: { "p_business_id": string,"p_reward": Json }; Returns: string
+                           },
+"save_reward_program":
+{ Args: { "p_business_id": string,"p_program": Json }; Returns: undefined
+                           },
+"save_reward_tiers":
+{ Args: { "p_business_id": string,"p_tiers": Json }; Returns: undefined
                            },
 "save_service":
 { Args: { "p_active_minutes": number,"p_business_id": string,"p_category": string,"p_description": string,"p_finishing_minutes": number,"p_name": string,"p_price_cents": number,"p_processing_minutes": number,"p_service_id": string,"p_staff": Json }; Returns: string
@@ -4247,6 +4407,9 @@ isOneToOne: false
 "set_photo_marketing":
 { Args: { "p_ok": boolean,"p_photo_id": string }; Returns: undefined
                            },
+"set_referred_by":
+{ Args: { "p_client_id": string,"p_code": string }; Returns: boolean
+                           },
 "set_service_level_prices":
 { Args: { "p_prices": Json,"p_service_id": string }; Returns: undefined
                            },
@@ -4328,6 +4491,9 @@ isOneToOne: false
                            },
 "void_sale":
 { Args: { "p_reason": string,"p_sale_id": string }; Returns: undefined
+                           },
+"waitlist_priority_clients":
+{ Args: { "p_location_id": string }; Returns: (string)[]
                            },
 "waive_policy_fee":
 { Args: { "p_fee_id": string,"p_reason": string }; Returns: Json

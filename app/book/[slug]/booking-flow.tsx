@@ -50,12 +50,14 @@ export function BookingFlow({
   site,
   today,
   source,
+  referral = null,
   signedIn = null,
   start = null,
 }: {
   site: BookingSite;
   today: LocalDate;
   source: BookingSource;
+  referral?: string | null;
   signedIn?: { firstName: string } | null;
   start?: { serviceIds: string[]; staffId: string | null } | null;
 }) {
@@ -177,6 +179,7 @@ export function BookingFlow({
         agreed,
         honeypot: honeypot.current?.value ?? "",
         source,
+        referral: referral ?? undefined,
         cardRef: needsCard ? cardRef : undefined,
         remember: !signedIn && remember,
         appointmentTexts,

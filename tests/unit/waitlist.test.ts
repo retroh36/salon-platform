@@ -69,6 +69,11 @@ describe("matching the waitlist to an opening", () => {
       ["gloss", m("14:00")],
     ]);
   });
+
+  it("puts clients in a priority tier ahead of those who've waited longer", () => {
+    const entries = [entry("first"), entry("vip", { priority: true }), entry("wants-marcus", { staffIds: ["marcus"] })];
+    expect(matchOpening(busy, opening, entries).map((x) => x.entryId)).toEqual(["wants-marcus", "vip", "first"]);
+  });
 });
 
 describe("walk-ins", () => {

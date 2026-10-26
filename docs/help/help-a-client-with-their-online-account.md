@@ -21,6 +21,7 @@ Clients can have their own account on the salon's booking site, to see and chang
 - A client's profile says "Has an online account" once they've made one.
 - Under **Messages** they choose texts and emails **About your visits** and **Offers and news** separately; every change shows in **Consent history** on their profile.
 - Codes go to the outbox for now, until texts and email are connected.
+- **Rewards** shows their points, tier and rewards, and **Copy my referral link** gives them a link to share: both earn points once the friend's first visit is done.
 
 ## If it doesn't work
 

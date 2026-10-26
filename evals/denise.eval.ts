@@ -428,6 +428,26 @@ const CASES: Case[] = [
     check: (a) => (/package/i.test(a) ? null : "should talk about packages"),
   },
   {
+    question: "How many points are outstanding?",
+    as: "owner",
+    tools: ["rewards_summary"],
+    facts: async () => {
+      const { data } = await admin.from("reward_points").select("client_id, delta").eq("business_id", B);
+      const by = new Map<string, number>();
+      for (const r of data!) by.set(r.client_id, (by.get(r.client_id) ?? 0) + r.delta);
+      return { points: [...by.values()].reduce((n, v) => n + Math.max(v, 0), 0).toLocaleString("en-US") };
+    },
+    check: (a, f) => (has(a, f.points) ? null : `should say ${f.points} points`),
+    numbersFromTools: true,
+  },
+  {
+    question: "Who are our VIPs?",
+    as: "owner",
+    tools: ["rewards_summary"],
+    facts: async () => ({}),
+    check: (a) => (/VIP|tier/i.test(a) ? null : "should talk about the VIP tier"),
+  },
+  {
     question: "Who's cancelled late this month?",
     as: "front_desk",
     tools: ["late_cancellations"],
@@ -474,6 +494,7 @@ const CASES: Case[] = [
   howToCase("How do I book someone every 6 weeks?", "front_desk", "Book a repeating appointment", says(/repeat/i, "should mention repeating")),
   howToCase("How do I find a time for someone on the phone?", "front_desk", "Take a phone booking", says(/phone booking/i, "should mention Phone booking")),
   howToCase("How do I move all of a sick stylist's clients at once?", "front_desk", "Plan a sick-day rescue", says(/plan the rescue|apply all/i, "should mention Plan the rescue or Apply all")),
+  howToCase("A client wants to redeem their points for a free gloss. How do I do that?", "front_desk", "Use a reward at checkout", says(/reward/i, "should mention Rewards")),
   howToCase("How do I send a client a link to pay on their phone?", "front_desk", "Send a payment link", says(/link/i, "should mention the payment link")),
   howToCase("How do I block off my lunch?", "stylist", "Block time", says(/block|lunch/i, "should mention blocking time")),
   howToCase("How do I run payroll?", "owner", "Run payroll for a pay period", says(/payroll/i, "should mention Payroll")),

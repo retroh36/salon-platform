@@ -23,3 +23,4 @@ Reports show what the salon owes in services, gift card activity, memberships, p
 - Owners and managers see Reports (an owner can also allow someone else).
 - For each person's sales, commission and tips, see "Run payroll for a pay period". For a day's sales, see **Sales**.
 - Memberships run on a test payment provider for now, so no real money moves.
+- **Rewards** (when the program is on): points earned, redeemed and expired, the redemption rate, points outstanding with about what they'd come to in rewards (an estimate, not money owed), clients by tier and referrals.

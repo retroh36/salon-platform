@@ -21,3 +21,4 @@ A client's profile shows what matters first: allergies, who they are, their note
 - Tap a visit's date to open it on the calendar.
 - Stylists and assistants see the same page for their own clients, without money or editing.
 - **Message** is about their next visit, so it works once they have one booked.
+- **Rewards** (front desk, managers and owners, when the program is on) shows their points, tier, rewards they can take and every change to their points.

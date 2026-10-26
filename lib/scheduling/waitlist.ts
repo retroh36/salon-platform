@@ -33,6 +33,8 @@ export type WaitlistEntry = {
   // Empty: any time.
   windows: WindowName[];
   createdAt: Date;
+  // In a rewards tier with priority booking: offered openings first.
+  priority?: boolean;
 };
 
 export type FreedSlot = { staffId: string; date: LocalDate; start: number; end: number };
@@ -109,7 +111,10 @@ export function matchOpening(ctx: BookingContext, opening: FreedSlot, entries: r
     }
   }
   const created = new Map(entries.map((e) => [e.id, e.createdAt.getTime()]));
-  return matches.sort((a, b) => Number(b.preferred) - Number(a.preferred) || created.get(a.entryId)! - created.get(b.entryId)!);
+  const priority = new Set(entries.filter((e) => e.priority).map((e) => e.id));
+  return matches.sort(
+    (a, b) => Number(b.preferred) - Number(a.preferred) || Number(priority.has(b.entryId)) - Number(priority.has(a.entryId)) || created.get(a.entryId)! - created.get(b.entryId)!,
+  );
 }
 
 export type WalkIn = { id: string; serviceId: string };

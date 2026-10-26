@@ -18,7 +18,7 @@ export type WaitlistRow = WaitlistEntry & { clientName: string; phone: string | 
 
 // Everyone still waiting whose dates reach `from` or later.
 export async function loadWaitlist(supabase: Supabase, locationId: string, from: LocalDate): Promise<WaitlistRow[]> {
-  const [{ data, error }, { data: services, error: serviceError }, { data: staff, error: staffError }] = await Promise.all([
+  const [{ data, error }, { data: services, error: serviceError }, { data: staff, error: staffError }, { data: priority }] = await Promise.all([
     supabase
       .from("waitlist_entries")
       .select("id, client_id, service_ids, staff_ids, from_date, to_date, windows, notes, created_at, client:clients(first_name, last_name, phone)")
@@ -28,7 +28,10 @@ export async function loadWaitlist(supabase: Supabase, locationId: string, from:
       .order("created_at"),
     supabase.from("services").select("id, name"),
     supabase.from("staff").select("id, first_name"),
+    // Clients in a rewards tier with priority booking (none when the program's off).
+    supabase.rpc("waitlist_priority_clients", { p_location_id: locationId }),
   ]);
+  const first = new Set(priority ?? []);
   if (error) throw error;
   if (serviceError) throw serviceError;
   if (staffError) throw staffError;
@@ -43,6 +46,7 @@ export async function loadWaitlist(supabase: Supabase, locationId: string, from:
     toDate: e.to_date,
     windows: e.windows as WindowName[],
     createdAt: new Date(e.created_at),
+    priority: first.has(e.client_id),
     clientName: fullName(e.client),
     phone: e.client.phone,
     notes: e.notes,

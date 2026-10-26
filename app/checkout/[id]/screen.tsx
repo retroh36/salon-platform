@@ -61,8 +61,9 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
       taxRetailBp: data.settings.taxRetailBp,
       member: data.member,
       promo: data.promo,
+      rewards: data.rewards,
     }),
-    [data.settings, data.member, data.promo],
+    [data.settings, data.member, data.promo, data.rewards],
   );
 
   // Save as the ticket changes (after a short pause).
@@ -305,6 +306,7 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
                 onRemove={removeLine}
                 onDialog={setDialog}
                 onRemovePromotion={(id) => change((t) => ({ ...t, promotions: t.promotions.filter((p) => p !== id) }))}
+                onChange={change}
               />
             </div>
           </div>

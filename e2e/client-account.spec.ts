@@ -89,6 +89,10 @@ test("signs in with a code, sees their visits, changes one with the policy first
   await expect(account.getByRole("heading", { name: `Hi, ${client.first_name}` })).toBeVisible();
   await expect(account.getByTestId("upcoming-visit").first()).toBeVisible();
   await expect(account.getByRole("link", { name: /^Book (again|a visit)/ })).toBeVisible();
+  // Their rewards: points from their visits, and a link to share.
+  const points = (await admin.from("reward_points").select("delta").eq("client_id", client.id)).data!.reduce((n, r) => n + r.delta, 0);
+  await expect(account.getByTestId("account-rewards")).toContainText(`${points.toLocaleString("en-US")} points`);
+  await expect(account.getByTestId("account-rewards").getByRole("button", { name: "Copy my referral link" })).toBeVisible();
 
   // The booking site knows them now.
   await page.goto(`/book/${SLUG}`);

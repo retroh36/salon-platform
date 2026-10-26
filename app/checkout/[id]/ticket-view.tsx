@@ -15,7 +15,23 @@ import type { CheckoutScreenData } from "@/lib/checkout-screen";
 import { usesLeft } from "@/lib/packages";
 import { centsToInput, formatPrice } from "@/lib/services";
 import { priceText } from "@/lib/memberships";
-import { grossOf, isCovered, memberDiscountOf, ownDiscountOf, promoDiscountOf, promotionsOn, stylistGroups, withPromotions, type Rates, type Ticket, type TicketDiscount, type TicketLine } from "@/lib/ticket";
+import { points, rewardProblem } from "@/lib/rewards";
+import {
+  clientTier,
+  grossOf,
+  isCovered,
+  memberDiscountOf,
+  ownDiscountOf,
+  promoDiscountOf,
+  promotionsOn,
+  rewardProblems,
+  stylistGroups,
+  withPromotions,
+  type Rates,
+  type Ticket,
+  type TicketDiscount,
+  type TicketLine,
+} from "@/lib/ticket";
 import { setSaleClient } from "../actions";
 import type { DialogState } from "./dialogs";
 
@@ -55,6 +71,14 @@ export function ClientHeader({ data }: { data: CheckoutScreenData }) {
                 </Badge>
               </span>
             ))}
+            {data.rewards && (
+              <span data-testid="badge-points" className="max-w-full">
+                <Badge tone="info">
+                  <span className="tabular-nums">{points(data.rewards.client.balance)}</span>
+                  {tierName(data) ? ` · ${tierName(data)}` : ""}
+                </Badge>
+              </span>
+            )}
             {giftCents > 0 && (
               <span data-testid="badge-gift-card" className="max-w-full">
                 <Badge tone="info">
@@ -82,12 +106,65 @@ export function ClientHeader({ data }: { data: CheckoutScreenData }) {
           </button>
         )}
       </div>
+      {data.rewardsLine && (
+        <p className="flex items-center gap-2 text-sm text-denise-900" data-testid="rewards-line">
+          <DeniseFace size={20} />
+          {data.rewardsLine}
+        </p>
+      )}
       {open && data.insight && (
         <div className="animate-fade-in">
           <ClientInsightCard insight={data.insight as never} />
         </div>
       )}
     </div>
+  );
+}
+
+const tierName = (data: CheckoutScreenData) => data.rewards?.tiers.find((t) => t.id === data.rewards!.client.tierId)?.name ?? null;
+
+// The client's rewards: one tap takes one off (as complete_sale will), with
+// why one can't be taken yet.
+function RewardsPanel({ data, ticket, rates, onChange }: { data: CheckoutScreenData; ticket: Ticket; rates: Rates; onChange: (f: (t: Ticket) => Ticket) => void }) {
+  const r = data.rewards;
+  if (!r || (!r.catalog.length && !clientTier(rates)?.freeAddonServiceId)) return null;
+  const used = ticket.rewards ?? [];
+  const spent = r.catalog.filter((x) => used.includes(x.id)).reduce((n, x) => n + x.points, 0);
+  const left = { ...r.client, balance: r.client.balance - spent };
+  const tier = clientTier(rates);
+  const addon = tier?.freeAddonServiceId ? data.services.find((s) => s.id === tier.freeAddonServiceId) : null;
+  const perkProblem = ticket.tierPerk ? null : (rewardProblems({ ...ticket, tierPerk: true }, rates, true)[0] ?? null);
+  return (
+    <section aria-label="Rewards" className="flex flex-col gap-2" data-testid="rewards">
+      <p className="text-13 font-medium text-ink-muted">
+        Rewards · <span className="tabular-nums">{points(left.balance)}</span> left
+      </p>
+      <ul className="flex flex-wrap gap-2">
+        {tier && addon && !ticket.tierPerk && (
+          <li className="flex flex-col gap-1">
+            <Button variant="secondary" disabled={Boolean(perkProblem)} onClick={() => onChange((t) => ({ ...t, tierPerk: true }))}>
+              {tier.name}: free {addon.name}
+            </Button>
+            {perkProblem && <span className="max-w-56 text-xs text-ink-muted">{perkProblem}</span>}
+          </li>
+        )}
+        {r.catalog
+          .filter((x) => !used.includes(x.id))
+          .map((x) => {
+            const problem =
+              rewardProblem(x, left, used.length ? { ...r.program, minRedeemPoints: 0 } : r.program, r.tiers) ??
+              (rewardProblems({ ...ticket, rewards: [...used, x.id] }, rates, true)[0] ?? null);
+            return (
+              <li key={x.id} className="flex flex-col gap-1">
+                <Button variant="secondary" disabled={Boolean(problem)} onClick={() => onChange((t) => ({ ...t, rewards: [...(t.rewards ?? []), x.id] }))}>
+                  {x.name} <span className="font-normal text-ink-muted tabular-nums">· {points(x.points)}</span>
+                </Button>
+                {problem && <span className="max-w-56 text-xs text-ink-muted">{problem.replace(`${x.name}: `, "")}</span>}
+              </li>
+            );
+          })}
+      </ul>
+    </section>
   );
 }
 
@@ -176,6 +253,7 @@ export function TicketList({
   onRemove,
   onDialog,
   onRemovePromotion,
+  onChange,
 }: {
   data: CheckoutScreenData;
   ticket: Ticket;
@@ -188,6 +266,7 @@ export function TicketList({
   onRemove: (key: string) => void;
   onDialog: (d: DialogState) => void;
   onRemovePromotion: (id: string) => void;
+  onChange: (f: (t: Ticket) => Ticket) => void;
 }) {
   const names = new Map(data.staff.map((s) => [s.id, s]));
   // What promotions take off each line, for the whole ticket.
@@ -234,17 +313,26 @@ export function TicketList({
       {promos.rules.length > 0 && (
         <ul aria-label="Promotions" className="flex flex-col gap-2">
           {promos.rules.map((r) => (
-            <li key={r.id} className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2" data-testid="applied-promotion">
-              <span className="w-16 shrink-0 text-xs font-medium text-ink-muted">Promo</span>
+            <li key={r.id} className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2" data-testid={ticket.promotions.includes(r.id) ? "applied-promotion" : "applied-reward"}>
+              <span className="w-16 shrink-0 text-xs font-medium text-ink-muted">{ticket.promotions.includes(r.id) ? "Promo" : "Reward"}</span>
               <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{r.name}</span>
               <span className="font-semibold text-ink tabular-nums">−{formatPrice(promos.perPromotion[r.id] ?? 0)}</span>
-              <IconButton label={`Remove ${r.name}`} onClick={() => onRemovePromotion(r.id)} className="size-11">
+              <IconButton
+                label={`Remove ${r.name}`}
+                onClick={() =>
+                  ticket.promotions.includes(r.id)
+                    ? onRemovePromotion(r.id)
+                    : onChange((t) => (t.rewards?.includes(r.id) ? { ...t, rewards: t.rewards.filter((x) => x !== r.id) } : { ...t, tierPerk: false }))
+                }
+                className="size-11"
+              >
                 <CloseIcon className="size-5" />
               </IconButton>
             </li>
           ))}
         </ul>
       )}
+      <RewardsPanel data={data} ticket={ticket} rates={given} onChange={onChange} />
       <div className="flex flex-wrap gap-2">
         <Button size="lg" onClick={() => onDialog({ kind: "add-service" })}>
           <PlusIcon className="size-5" />
@@ -293,7 +381,7 @@ function detailOf(line: TicketLine, data: CheckoutScreenData, rates: Rates): str
   const member = memberDiscountOf(line, rates);
   if (member > 0 && rates.member) out.push(`member price, ${line.kind === "service" ? rates.member.servicePct : rates.member.retailPct}% off`);
   const promo = promoDiscountOf(line, rates);
-  if (promo > 0) out.push(`${formatPrice(promo)} off with a promotion`);
+  if (promo > 0) out.push(`${formatPrice(promo)} off with a promotion or reward`);
   if (line.kind === "product") out.push(line.staffId ? `sold by ${staff(line.staffId)}` : "no stylist credited");
   if ((line.kind === "service" || line.kind === "product") && line.discount && line.discount.value > 0)
     out.push(`${line.discount.kind === "percent" ? `${line.discount.value}%` : formatPrice(line.discount.value)} off${line.discount.reason ? `: ${line.discount.reason}` : ""}`);

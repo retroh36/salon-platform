@@ -44,6 +44,8 @@ async function Booking({ params, searchParams }: { params: Promise<{ slug: strin
   const [{ slug }, query] = await Promise.all([params, searchParams]);
   // Where they came from (?src=google, …), recorded with the booking.
   const source = bookingSource(query);
+  // A friend's referral code (?ref=…), kept for a new client's first booking.
+  const referral = typeof query.ref === "string" && /^[A-Za-z0-9]{6,12}$/.test(query.ref) ? query.ref.toUpperCase() : null;
   const found = await loadSite(createAdminClient(), slug);
   if (found.status === "missing") notFound();
   if (found.status === "closed") {
@@ -83,6 +85,7 @@ async function Booking({ params, searchParams }: { params: Promise<{ slug: strin
         site={site}
         today={todayIn(site.location.timezone)}
         source={source}
+        referral={referral}
         signedIn={account ? { firstName: account.firstName } : null}
         start={services.length ? { serviceIds: services, staffId: staff } : null}
       />

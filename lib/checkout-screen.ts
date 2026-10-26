@@ -19,7 +19,9 @@ import { addDays, formatMinute, todayIn, toLocal, type LocalDate } from "@/lib/s
 import { levelPricesFrom, stylistPrice } from "@/lib/services";
 import { fullName, sortStaff, type StaffRole } from "@/lib/staff";
 import { promoRatesFor } from "@/lib/promotions-load";
-import { EMPTY_TICKET, parseTicket, promotionProblems, type PromoRates, type ServiceLine, type Ticket } from "@/lib/ticket";
+import { pointsLine, rewardProblem } from "@/lib/rewards";
+import { rewardRatesFor } from "@/lib/rewards-load";
+import { EMPTY_TICKET, parseTicket, promotionProblems, type PromoRates, type RewardRates, type ServiceLine, type Ticket } from "@/lib/ticket";
 
 type Supabase = SupabaseClient<Database>;
 type Me = { id: string; business_id: string; role: StaffRole; permissions: readonly string[]; location: { id: string; timezone: string } };
@@ -144,6 +146,10 @@ export type CheckoutScreenData = {
   member: MemberPrices | null;
   // Live promotions, and what their rules need for this client and visit.
   promo: PromoRates;
+  // The rewards program and the client's points (null: off, or no client),
+  // and Denise's line about them ("Linda is 40 points from a free gloss.").
+  rewards: RewardRates | null;
+  rewardsLine: string | null;
   // Memberships for sale, and the provider renewals are charged through.
   plans: MembershipPlan[];
   provider: { id: string; label: string; testMode: boolean; testCards: { ref: string; label: string; outcome: string }[] };
@@ -172,7 +178,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
   const tz = me.location.timezone;
   const today = todayIn(tz, now);
 
-  const [staffRows, settings, products, templates, servicesRows, clientRow, overrides, plans, promo] = await Promise.all([
+  const [staffRows, settings, products, templates, servicesRows, clientRow, overrides, plans, promo, rewards] = await Promise.all([
     supabase.from("staff").select("id, first_name, last_name, role, level, color, is_active, location_id").eq("location_id", me.location.id).eq("is_active", true),
     loadCheckoutSettings(supabase, me.business_id),
     loadRetailProducts(supabase, me.business_id, me.location.id),
@@ -182,6 +188,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     supabase.from("stock_overrides").select("product_id").eq("draft_id", draft.id),
     loadPlans(supabase, me.business_id),
     promoRatesFor(supabase, { businessId: me.business_id, timezone: tz, today, clientId: draft.client_id, appointmentId: draft.appointment_id }),
+    rewardRatesFor(supabase, me.business_id, draft.client_id),
   ]);
   if (staffRows.error) throw staffRows.error;
   if (servicesRows.error) throw servicesRows.error;
@@ -306,6 +313,16 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     memberships,
     member: memberPrices(memberships),
     promo,
+    rewards,
+    rewardsLine:
+      rewards && client
+        ? pointsLine(
+            client.firstName,
+            rewards.client.balance,
+            rewards.catalog,
+            rewards.catalog.filter((r) => !rewardProblem(r, rewards.client, rewards.program, rewards.tiers)),
+          )
+        : null,
     plans,
     provider: (({ id, label, testMode, testCards }) => ({ id, label, testMode, testCards: testCards.map((c) => ({ ...c })) }))(currentProvider()),
     giftCards,

@@ -17,7 +17,8 @@ import type { LocalDate } from "./scheduling/time.ts";
 export type PromoKind = "code" | "automatic" | "last_minute";
 export type Level = "artisan" | "senior" | "master";
 export type Exclusion = { level: Level | null; category: string | null };
-export type PromoDiscount = { kind: "percent"; pct: number } | { kind: "amount"; cents: number };
+// "line": the first line it covers, in full (a reward's free service).
+export type PromoDiscount = { kind: "percent"; pct: number } | { kind: "amount"; cents: number } | { kind: "line" };
 
 export type PromoRule = {
   id: string;
@@ -149,14 +150,16 @@ export function promotionApplies(rule: PromoRule, line: PromoLine): boolean {
 // covers in order until it's used up.
 export function applyPromotions(rules: readonly PromoRule[], lines: readonly PromoLine[]): { perLine: number[]; perPromotion: Record<string, number> } {
   const pool = new Map(rules.map((r) => [r.id, r.discount.kind === "amount" ? r.discount.cents : Infinity]));
+  const done = new Set<string>();
   const perPromotion: Record<string, number> = Object.fromEntries(rules.map((r) => [r.id, 0]));
   const perLine = lines.map((line) => {
     let left = Math.max(0, line.cents);
     let taken = 0;
     for (const rule of rules) {
-      if (left <= 0 || !promotionApplies(rule, line)) continue;
+      if (left <= 0 || done.has(rule.id) || !promotionApplies(rule, line)) continue;
       const amount = rule.discount.kind === "percent" ? Math.round((left * rule.discount.pct) / 100) : Math.min(left, pool.get(rule.id)!);
       if (rule.discount.kind === "amount") pool.set(rule.id, pool.get(rule.id)! - amount);
+      if (rule.discount.kind === "line") done.add(rule.id);
       perPromotion[rule.id] += amount;
       left -= amount;
       taken += amount;
@@ -226,7 +229,7 @@ export function specialFor(
   return live.sort((a, b) => applyPromotions([b], lines).perLine.reduce((x, y) => x + y, 0) - applyPromotions([a], lines).perLine.reduce((x, y) => x + y, 0))[0] ?? null;
 }
 
-export const discountText = (d: PromoDiscount) => (d.kind === "percent" ? `${d.pct}% off` : `${dollars(d.cents)} off`);
+export const discountText = (d: PromoDiscount) => (d.kind === "percent" ? `${d.pct}% off` : d.kind === "line" ? "Free" : `${dollars(d.cents)} off`);
 
 // "15% off services · open time in the next 48 hours · never Master color".
 export function promotionSummary(rule: PromoRule, names: { services?: Record<string, string>; staff?: Record<string, string>; products?: Record<string, string> } = {}): string {

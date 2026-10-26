@@ -67,6 +67,10 @@ describe("finding the page", () => {
     ["Nola called in sick, how do I move all her clients?", "Plan a sick-day rescue"],
     ["stylist has to leave early", "Plan a sick-day rescue"],
     ["how do I book an appointment", "Book an appointment"],
+    ["how do I set up a loyalty program", "Set up the rewards program"],
+    ["client wants to spend their points", "Use a reward at checkout"],
+    ["redeem a free gloss with points", "Use a reward at checkout"],
+    ["add points to a client", "Adjust a client's points"],
   ])("%s → %s", (question, title) => {
     expect(searchHelp(pages, question)[0]?.title).toBe(title);
   });

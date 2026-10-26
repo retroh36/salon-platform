@@ -369,6 +369,22 @@ async function capture(browser: Browser) {
     await main(page).locator("#event-timeline").evaluate((el) => el.closest("section")?.scrollIntoView({ block: "start" }));
   });
 
+  // Rewards at checkout: Linda (planted in the demo seed, 40 points from a
+  // free gloss) buying retail, with Denise's line and a reward taken.
+  await shot("33-rewards-checkout", front, async (page) => {
+    const { data: linda } = await admin.from("clients").select("id").eq("business_id", BUSINESS).eq("first_name", "Linda").eq("last_name", "Park").maybeSingle();
+    if (!linda) throw new Error("no Linda Park in the demo seed");
+    const { data: product } = await admin.from("products").select("name").eq("business_id", BUSINESS).eq("type", "retail").eq("is_active", true).gte("price_cents", 3000).order("name").limit(1).single();
+    await page.goto(`/checkout/new?client=${linda.id}&from=/calendar`);
+    await page.waitForURL(/\/checkout\/[0-9a-f-]{36}$/);
+    await waitForReact(page, "#product-search");
+    const ticket = page.getByRole("main", { name: "Ticket" });
+    await ticket.getByLabel("Add a product: name, brand, SKU or scan").fill(product!.name);
+    await ticket.getByRole("list", { name: "Matching products" }).getByRole("button").first().click();
+    await ticket.getByTestId("rewards").getByRole("button", { name: /^\$10 off/ }).click();
+    await ticket.getByTestId("applied-reward").waitFor();
+  });
+
   // Sick-day rescue: the stylist with the most clients on the next day with
   // visits marked out all day, and the plan for every client. Last, since
   // it adds time off.

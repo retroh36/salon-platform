@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { can, type Permission } from "@/lib/permissions";
 
-type Page = "salon" | "booking" | "policies" | "checkout" | "gift-cards" | "packages" | "events" | "memberships" | "automations" | "messages" | "devices" | "payroll" | "commission" | "data" | "billing";
+type Page = "salon" | "booking" | "policies" | "checkout" | "gift-cards" | "packages" | "events" | "memberships" | "rewards" | "automations" | "messages" | "devices" | "payroll" | "commission" | "data" | "billing";
 
 // Each settings page and the permission it needs (lib/permissions.ts).
 const LINKS: [Page, string, string, Permission][] = [
@@ -13,6 +13,7 @@ const LINKS: [Page, string, string, Permission][] = [
   ["packages", "/settings/packages", "Packages", "settings"],
   ["events", "/settings/events", "Bridal and events", "settings"],
   ["memberships", "/settings/memberships", "Memberships", "settings"],
+  ["rewards", "/settings/rewards", "Rewards", "settings"],
   ["automations", "/settings/automations", "Automations", "settings"],
   ["messages", "/settings/messages", "Messages", "settings"],
   ["devices", "/settings/devices", "Shared devices", "settings"],
