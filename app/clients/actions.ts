@@ -30,7 +30,7 @@ export type ClientFormFields = Record<
   | "birth_month"
   | "birth_day",
   string
-> & { sms_opt_in: boolean; email_opt_in: boolean; consent_signed: boolean };
+> & { sms_opt_in: boolean; email_opt_in: boolean; consent_signed: boolean; only_sees_preferred: boolean };
 
 export type SaveClientState = { errors: ClientFormErrors; message?: string; fields: ClientFormFields } | undefined;
 
@@ -170,5 +170,6 @@ function readClientFields(formData: FormData): ClientFormFields {
     sms_opt_in: formData.get("sms_opt_in") !== null,
     email_opt_in: formData.get("email_opt_in") !== null,
     consent_signed: formData.get("consent_signed") !== null,
+    only_sees_preferred: formData.get("only_sees_preferred") !== null,
   };
 }

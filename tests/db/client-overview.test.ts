@@ -16,7 +16,14 @@ beforeAll(async () => {
 
 describe("client_overview", () => {
   it("gives the front of house every client, with visits, usual stylist and spend that match the records", async () => {
-    const { data, error } = await frontDesk.rpc("client_overview").eq("business_id", SEED.business).order("spend_cents", { ascending: false, nullsFirst: false }).limit(1).single();
+    // The top spender with a usual stylist (a client who sees everyone has none).
+    const { data, error } = await frontDesk
+      .rpc("client_overview")
+      .eq("business_id", SEED.business)
+      .not("usual_staff_id", "is", null)
+      .order("spend_cents", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .single();
     expect(error).toBeNull();
     expect(data!.spend_cents).toBeGreaterThan(0);
     expect(data!.usual_staff_name).toBeTruthy();

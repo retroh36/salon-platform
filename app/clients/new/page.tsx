@@ -28,6 +28,7 @@ const EMPTY: ClientFormFields = {
   sms_opt_in: false,
   email_opt_in: false,
   consent_signed: false,
+  only_sees_preferred: false,
 };
 
 export default function NewClientPage() {

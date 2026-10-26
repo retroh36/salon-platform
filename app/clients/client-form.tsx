@@ -102,6 +102,10 @@ export function ClientForm({
               ))}
             </select>
           </Field>
+          <label className="flex items-center gap-2 self-end pb-2 text-sm text-ink">
+            <input type="checkbox" name="only_sees_preferred" defaultChecked={fields.only_sees_preferred} className={checkboxClass} />
+            Only books with their preferred stylist
+          </label>
           <Field label="Preferences">
             <input name="preferences" defaultValue={fields.preferences} className={inputClass} />
           </Field>

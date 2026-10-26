@@ -1320,3 +1320,51 @@ with client as (
 )
 insert into public.event_history (business_id, event_id, kind, detail, created_at)
 select 'b0000000-0000-4000-8000-000000000001', id, 'inquiry', 'Sent from the booking site', now() - interval '6 hours' from event;
+
+-- Phone booking (the calendar's Phone booking panel, docs/help/take-a-phone-booking.md):
+-- "Maria Lopez, balayage + cut with Bridget next week, afternoons" finds a
+-- real regular. The client with the most balayage visits with Bridget
+-- (among those with a card on file that no test looks up by id) is
+-- renamed Maria Lopez, with a latex allergy, so the panel shows both alerts.
+do $$
+declare
+  v_client uuid;
+begin
+  select c.id into v_client
+  from public.clients c
+  join public.appointments a on a.client_id = c.id and a.status = 'completed'
+  join public.appointment_items i on i.appointment_id = a.id
+  join public.services s on s.id = i.service_id
+  where c.business_id = 'b0000000-0000-4000-8000-000000000001'
+    and i.staff_id = 'd0000000-0000-4000-8000-000000000004'
+    and c.id not in (
+      'e0000000-0000-4000-8000-000000000000', 'e0000000-0000-4000-8000-0000000000fb', 'e0000000-0000-4000-8000-0000000000a8',
+      'e0000000-0000-4000-8000-00000000009a', 'e0000000-0000-4000-8000-00000000014a', 'e0000000-0000-4000-8000-000000000088',
+      'e0000000-0000-4000-8000-00000000007c', 'e0000000-0000-4000-8000-00000000000d', 'e0000000-0000-4000-8000-000000000008',
+      'e0000000-0000-4000-8000-00000000018b', 'e0000000-0000-4000-8000-000000000135', 'e0000000-0000-4000-8000-000000000099',
+      'e0000000-0000-4000-8000-000000000093', 'e0000000-0000-4000-8000-00000000008d', 'e0000000-0000-4000-8000-00000000009e')
+    and not exists (select 1 from public.client_memberships m where m.client_id = c.id)
+    and exists (select 1 from public.client_cards cc where cc.client_id = c.id and cc.removed_at is null)
+  group by c.id
+  order by count(distinct a.id) filter (where s.category = 'Balayage') desc, count(distinct a.id) desc, c.id
+  limit 1;
+  if v_client is null then return; end if;
+  update public.clients set first_name = 'Maria', last_name = 'Lopez', email = 'maria.lopez@example.com', allergies = 'Latex allergy: use nitrile gloves.'
+  where id = v_client;
+end $$;
+
+-- Sick-day rescue (/calendar/rescue): a few regulars of each stylist only
+-- book with them (their preferred stylist), so a rescue offers them their
+-- stylist's next openings instead of someone else. Two per stylist, among
+-- those with a visit booked with them in the next nine days.
+with ranked as (
+  select c.id, row_number() over (partition by c.preferred_staff_id order by c.id) as n
+  from public.clients c
+  where c.business_id = 'b0000000-0000-4000-8000-000000000001'
+    and c.preferred_staff_id is not null
+    and exists (
+      select 1 from public.appointments a join public.appointment_items i on i.appointment_id = a.id
+      where a.client_id = c.id and i.staff_id = c.preferred_staff_id and a.status in ('booked', 'confirmed') and a.starts_at > now()
+    )
+)
+update public.clients c set only_sees_preferred = true from ranked r where r.id = c.id and r.n <= 2;

@@ -25,6 +25,7 @@ import { metricInfo } from "@/lib/goals/pacing";
 import { averageTipPct, pctText } from "@/lib/tips";
 import { loadLiveEarnings } from "@/lib/earnings-load";
 import { LiveEarningsCard } from "./live-earnings";
+import { Notices } from "./notices";
 import { firstLetter } from "@/lib/initial";
 
 export const metadata: Metadata = { title: "My day" };
@@ -37,6 +38,12 @@ const summaryClass =
 // for Start service, Processing, Back in chair and Finish service. The only
 // place times are tapped: the front desk just checks clients in and out.
 // Tapped times are what Denise learns from first.
+// When a notice came: "9:40am", or "Mon, Oct 26" before today.
+function noticeTime(at: Date, tz: string, today: string) {
+  const local = toLocal(at, tz);
+  return local.date === today ? formatMinute(local.minute) : new Date(`${local.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+}
+
 export default function MyDayPage({ searchParams }: PageProps<"/my-day">) {
   return (
     <Suspense fallback={<LoadingShell />}>
@@ -67,6 +74,16 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
     .order("starts_at");
   if (error) throw error;
 
+  // Notices for them in the app: unread, newest first.
+  const { data: notices } = await supabase
+    .from("notifications")
+    .select("id, body, created_at")
+    .eq("staff_id", me.id)
+    .eq("channel", "app")
+    .is("read_at", null)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
   const visits = data.map((i) => ({ ...i, minutes: i.active_minutes + i.processing_minutes + i.finishing_minutes }));
   const counted = visits.filter((i) => i.appointment.status !== "no_show").map((i) => ({ appointmentId: i.appointment_id, minutes: i.minutes }));
 
@@ -74,6 +91,7 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
     <AppShell section="my-day" me={me}>
       <PageHeader title="My day" description={`${stylist ? `${stylist.first_name}'s day, ` : ""}${formatLongDay(today, false)} · ${bookedSummary(counted)}`} />
       <div className="max-w-2xl">
+      <Notices notices={(notices ?? []).map((n) => ({ id: n.id, body: n.body, when: noticeTime(new Date(n.created_at), tz, today) }))} />
       {me.role === "assistant" ? (
         <p className="mb-4 text-sm text-ink-muted" data-testid="assisting">
           {stylist ? `You're assisting ${stylist.first_name}: here's their day, as it's booked.` : "You're not assigned to a stylist yet. Ask a manager to choose one on your Team page."}

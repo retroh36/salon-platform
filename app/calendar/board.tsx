@@ -32,7 +32,8 @@ import { AppointmentPanel } from "./appointment-panel";
 import { approveDeniseFix, bookFromWaitlist, dismissDeniseItem, rejectDeniseFix, scanDenise, undoDeniseFix } from "./denise-actions";
 import { useDeniseRun } from "./use-denise";
 import { DenisePanel, type Outcome, type Preview } from "./denise-panel";
-import { BookingPanel, type BookingStart } from "./booking-panel";
+import { BookingPanel, type BookingDraft, type BookingStart } from "./booking-panel";
+import { PhonePanel } from "./phone-panel";
 import { WalkInPanel } from "./walk-in-panel";
 import { GroupPanel } from "./group-panel";
 import { NowLine, useNow } from "./now-line";
@@ -73,7 +74,8 @@ type Selection =
   | { kind: "none" }
   | { kind: "block"; blockId: string }
   | { kind: "new-block"; start: { staffId: string; startMinute: number } }
-  | { kind: "book"; start: BookingStart; client?: ClientOption }
+  | { kind: "book"; start: BookingStart; client?: ClientOption; draft?: BookingDraft }
+  | { kind: "phone" }
   | { kind: "edit"; appointmentId: string }
   | { kind: "detail"; appointmentId: string }
   | { kind: "walk-ins" }
@@ -369,6 +371,24 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [panelOpen, leave]);
 
+  // P opens Phone booking (not while typing in a field).
+  useEffect(() => {
+    if (!me.canBook) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "p" || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.("input, textarea, select, [contenteditable=true], [role=dialog]")) return;
+      e.preventDefault();
+      leave(() => {
+        setSelection({ kind: "phone" });
+        setTab("details");
+        setPanelOpen(true);
+      });
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [me.canBook, leave]);
+
   // Looking at Denise's panel clears what was new.
   if (panelOpen && tab === "denise" && unseen.size) setUnseen(new Set());
 
@@ -406,7 +426,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // she's thinking at once, then always replies. Her panel opens, unless
   // someone is in the middle of a booking, when her badge calls instead.
   async function trigger(request: DeniseRequest, firstStatus: string) {
-    const midTask = selection.kind === "book" || selection.kind === "edit" || selection.kind === "new-block" || selection.kind === "group";
+    const midTask = selection.kind === "book" || selection.kind === "edit" || selection.kind === "new-block" || selection.kind === "group" || selection.kind === "phone";
     if (!midTask) {
       setTab("denise");
       setPanelOpen(true);
@@ -779,6 +799,11 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               Walk-ins
             </button>
           )}
+          {me.canBook && (
+            <button type="button" className={buttonClass("secondary", "lg")} aria-keyshortcuts="P" title="Phone booking (P)" onClick={() => select({ kind: "phone" })}>
+              Phone booking
+            </button>
+          )}
           {blockStaff.length > 0 && (
             <button
               type="button"
@@ -952,7 +977,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         )}
                         {!squeezed && c.working && data.date >= data.today && (me.canBook || me.staffId === c.staffId) && (
                           <div className="absolute right-1 bottom-1">
-                            <OutMenu column={c} date={data.date} today={data.today} onMarkOut={markOut} />
+                            <OutMenu column={c} date={data.date} today={data.today} onMarkOut={markOut} canRescue={me.canBook} />
                           </div>
                         )}
                       </div>
@@ -1271,14 +1296,34 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                   else closeDetails();
                 }}
               />
+            ) : selection.kind === "phone" ? (
+              <PhonePanel
+                data={data}
+                onClose={cancel}
+                onBooked={(id, date, message) => {
+                  setDoneMessage(message);
+                  if (date !== data.date) openOn(date, id);
+                  else show({ kind: "detail", appointmentId: id });
+                }}
+                onWaitlisted={(message) => {
+                  setDoneMessage(message);
+                  closeDetails();
+                }}
+                onAdjust={(draft, client) =>
+                  show({ kind: "book", start: { staffId: draft.lines[0].staffId, startMinute: draft.lines[0].startMinute }, draft, client: client ?? undefined })
+                }
+              />
             ) : selection.kind === "book" ? (
               <BookingPanel
+                key={selection.draft ? JSON.stringify(selection.draft) : "new"}
                 data={data}
                 start={selection.start}
                 client={selection.client}
+                draft={selection.draft}
                 onClose={cancel}
-                onSaved={(id, message) => {
-                  show({ kind: "detail", appointmentId: id });
+                onSaved={(id, message, date) => {
+                  if (date && date !== data.date) openOn(date, id);
+                  else show({ kind: "detail", appointmentId: id });
                   if (message) setDoneMessage(message);
                 }}
                 onBlockInstead={blockStaff.includes(selection.start.staffId) ? () => show({ kind: "new-block", start: selection.start }) : undefined}
@@ -1618,7 +1663,7 @@ function BlockHint({ id, details, rect }: { id: string; details: string[]; rect:
 const MENU_WIDTH = 340;
 const MENU_MARGIN = 8;
 
-function OutMenu({ column, date, today, onMarkOut }: { column: ColumnData; date: string; today: string; onMarkOut: (staffId: string) => void }) {
+function OutMenu({ column, date, today, onMarkOut, canRescue }: { column: ColumnData; date: string; today: string; onMarkOut: (staffId: string) => void; canRescue: boolean }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const popover = useRef<HTMLDivElement>(null);
@@ -1674,10 +1719,17 @@ function OutMenu({ column, date, today, onMarkOut }: { column: ColumnData; date:
             style={{ top: place.top, left: place.left, width: `min(${MENU_WIDTH}px, calc(100vw - ${2 * MENU_MARGIN}px))` }}
           >
             <p className="text-ink">
-              Mark {column.firstName} out {restOfDay ? "for the rest of the day" : "for the day"}? Denise will find new places for {column.firstName}&apos;s clients.
+              {canRescue
+                ? `${column.firstName} is out? Plan the rescue to see where every client goes and apply it all at once, or mark them out and Denise suggests fixes one at a time.`
+                : `Mark ${column.firstName} out ${restOfDay ? "for the rest of the day" : "for the day"}? Denise will find new places for ${column.firstName}'s clients.`}
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button variant="primary" size="sm" onClick={markOut} className="whitespace-nowrap">
+              {canRescue && (
+                <a href={`/calendar/rescue?staff=${column.staffId}&date=${date}`} className={buttonClass("primary", "sm", "whitespace-nowrap")}>
+                  Plan the rescue
+                </a>
+              )}
+              <Button variant={canRescue ? "secondary" : "primary"} size="sm" onClick={markOut} className="whitespace-nowrap">
                 {restOfDay ? "Out for the rest of the day" : "Out for the day"}
               </Button>
               <Button size="sm" onClick={() => setOpen(false)} className="whitespace-nowrap">

@@ -62,6 +62,11 @@ describe("finding the page", () => {
     ["set our cancellation policy", "Set up your cancellation policy"],
     ["how do I set up a wedding", "Plan a wedding or event"],
     ["change the bridal deposit", "Set up bridal packages and settings"],
+    ["How do I find a time for someone on the phone?", "Take a phone booking"],
+    ["client on the phone wants the earliest cut", "Take a phone booking"],
+    ["Nola called in sick, how do I move all her clients?", "Plan a sick-day rescue"],
+    ["stylist has to leave early", "Plan a sick-day rescue"],
+    ["how do I book an appointment", "Book an appointment"],
   ])("%s → %s", (question, title) => {
     expect(searchHelp(pages, question)[0]?.title).toBe(title);
   });

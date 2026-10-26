@@ -5,7 +5,7 @@ import { consentEventText, consentOf, noTextsFlag, type Channel, type Purpose, t
 import { CONSENT_COLUMNS } from "@/lib/messaging/send";
 import { formatDay } from "@/lib/schedule-format";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
-import { STAFF_TEMPLATES, type StaffTemplate } from "@/lib/messaging/templates";
+import { templateLabel } from "@/lib/messaging/templates";
 import { VisitMessageSwitches } from "./visit-message-switches";
 
 // Messages (front of house): whether texts and emails about visits reach
@@ -71,7 +71,7 @@ export async function MessagesCard({ supabase, clientId, firstName, tz }: { supa
               {sent!.map((m) => (
                 <li key={m.id}>
                   <p className="text-ink-subtle">
-                    {m.template === "custom" ? (m.purpose === "marketing" ? "Offer" : "Written") : STAFF_TEMPLATES[m.template as StaffTemplate]?.label} by{" "}
+                    {m.template === "custom" ? (m.purpose === "marketing" ? "Offer" : "Written") : templateLabel(m.template)} by{" "}
                     {m.channel === "sms" ? "text" : "email"} · {when(m.created_at)} · {m.sender?.first_name ?? "Former staff"}
                   </p>
                   <p className="mt-0.5 line-clamp-3 text-ink whitespace-pre-line">{m.body}</p>

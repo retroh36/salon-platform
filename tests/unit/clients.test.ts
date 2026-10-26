@@ -115,6 +115,7 @@ describe("parseClientForm", () => {
         email: "mia.patel@example.com",
         phone: "(312) 555-0142",
         preferred_staff_id: "d0000000-0000-4000-8000-000000000004",
+        only_sees_preferred: false,
         preferences: "Quiet appointment",
         notes: null,
         allergies: "PPD sensitivity",
@@ -132,6 +133,12 @@ describe("parseClientForm", () => {
     for (const bad of [{ birth_month: "4", birth_day: "31" }, { birth_month: "4" }, { birth_day: "3" }, { birth_month: "13", birth_day: "1" }] as Record<string, string>[]) {
       expect(parseClientForm(form({ first_name: "A", ...bad }), TODAY)).toEqual({ ok: false, errors: { birthday: "Choose a month and a day that exists." } });
     }
+  });
+
+  it("only books with their preferred stylist when one is chosen", () => {
+    const stylist = "d0000000-0000-4000-8000-000000000004";
+    expect(parseClientForm(form({ first_name: "A", preferred_staff_id: stylist, only_sees_preferred: "on" }), TODAY)).toMatchObject({ ok: true, value: { only_sees_preferred: true } });
+    expect(parseClientForm(form({ first_name: "A", only_sees_preferred: "on" }), TODAY)).toMatchObject({ ok: true, value: { only_sees_preferred: false } });
   });
 
   it("only needs a first name", () => {

@@ -49,6 +49,32 @@ export function renderStaffMessage(template: StaffTemplate, f: TemplateFacts, ch
   return { subject, body: channel === "sms" ? withStopLine(text) : text };
 }
 
+// The messages to a stylist's clients when they're out (the sick-day
+// rescue), filled in from the visit as it is after the change. `absent`
+// is the stylist who's out; they never say why.
+export const RESCUE_TEMPLATES = {
+  stylist_out_covered: { label: "Stylist out: new stylist" },
+  stylist_out_moved: { label: "Stylist out: new time" },
+} as const;
+
+export type RescueTemplate = keyof typeof RESCUE_TEMPLATES;
+
+export const isRescueTemplate = (v: string): v is RescueTemplate => v in RESCUE_TEMPLATES;
+
+export function renderRescueMessage(template: RescueTemplate, f: TemplateFacts & { absent: string }, channel: Channel): { subject: string; body: string } {
+  const call = f.phone ? ` at ${f.phone}` : "";
+  const text = {
+    stylist_out_covered: `Hi ${f.firstName}, ${f.salon} here. ${f.absent} is out, so ${f.stylist ?? "another stylist"} will look after you ${f.when} instead. Call us${call} if you'd rather change it.`,
+    stylist_out_moved: `Hi ${f.firstName}, ${f.salon} here. ${f.absent} is out, so we've moved your visit to ${f.when}${f.stylist ? ` with ${f.stylist}` : ""}. Call us${call} if that doesn't work.`,
+  }[template];
+  const subject = { stylist_out_covered: `A change to your visit at ${f.salon}`, stylist_out_moved: `Your visit at ${f.salon} has moved` }[template];
+  return { subject, body: channel === "sms" ? withStopLine(text) : text };
+}
+
+// What a message was, for the client's message list.
+export const templateLabel = (template: string): string | null =>
+  isStaffTemplate(template) ? STAFF_TEMPLATES[template].label : isRescueTemplate(template) ? RESCUE_TEMPLATES[template].label : null;
+
 // Checks the fill-ins a template needs.
 export function templateProblem(template: StaffTemplate, f: { minutes?: number; time?: string }): string | null {
   if (template === "running_late" && !(Number.isInteger(f.minutes) && f.minutes! >= 5 && f.minutes! <= 120)) return "Say how many minutes behind (5 to 120).";

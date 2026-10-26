@@ -23,6 +23,9 @@ import { reach } from "@/lib/reach";
 import { useUnsavedChanges } from "@/components/unsaved";
 
 export type BookingStart = { staffId: string; startMinute: number };
+// A new booking already filled in (a time picked in Phone booking, to change
+// before booking): its day and each service's stylist, start and length.
+export type BookingDraft = { date: string; lines: { serviceId: string; staffId: string; startMinute: number; minutes?: number }[] };
 
 type Line = {
   key: number;
@@ -42,6 +45,7 @@ export function BookingPanel({
   data,
   start,
   client: initialClient,
+  draft,
   appointment,
   onClose,
   onSaved,
@@ -52,6 +56,7 @@ export function BookingPanel({
   start?: BookingStart;
   // A new booking for this client (from "Book" on their profile).
   client?: ClientOption;
+  draft?: BookingDraft;
   appointment?: AppointmentDetail;
   onClose: () => void;
   // date: the day it's on now (an edit can move it to another day).
@@ -74,7 +79,9 @@ export function BookingPanel({
       ? [...appointment.items]
           .sort((a, b) => a.start - b.start)
           .map((i, n) => ({ key: -1 - n, id: i.id, serviceId: i.serviceId, staffId: i.staffId, startMinute: i.start, resource: i.resourceId ?? "none" }))
-      : [{ key: 0, serviceId: "", staffId: start!.staffId, startMinute: start!.startMinute, resource: "any" }],
+      : draft
+        ? draft.lines.map((l, n) => ({ key: -1 - n, serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute, resource: "any", minutes: l.minutes }))
+        : [{ key: 0, serviceId: "", staffId: start!.staffId, startMinute: start!.startMinute, resource: "any" }],
   );
   const [notes, setNotes] = useState(appointment?.notes ?? "");
   // The visit as it was when this opened, so a save never undoes someone
@@ -85,7 +92,7 @@ export function BookingPanel({
       : undefined,
   );
   // The visit's day: an edit can move it to another one.
-  const [date, setDate] = useState(data.date);
+  const [date, setDate] = useState(draft?.date ?? data.date);
   const [message, setMessage] = useState<string | null>(null);
   const [lineErrors, setLineErrors] = useState<string[][]>([]);
   const [ideas, setIdeas] = useState<BookingIdeas | null>(null);
@@ -275,7 +282,7 @@ export function BookingPanel({
 
         {appointment?.group ? (
           <p className="text-ink-muted">To move the whole group to another day, use Move to another day in ⋯.</p>
-        ) : appointment && (
+        ) : (appointment || draft) && (
           <label className={labelClass}>
             Date
             <input
@@ -290,7 +297,7 @@ export function BookingPanel({
               required
               className={fieldClass}
             />
-            {date !== data.date && (
+            {appointment && date !== data.date && (
               <span className="text-xs font-normal text-ink-muted" data-testid="moving-note">
                 Moves the visit from {formatLongDay(data.date, false)} to {formatLongDay(date, false)}, with the times below.
               </span>
@@ -580,9 +587,21 @@ const SEARCH_DELAY_MS = 200;
 
 // Find an existing client by name or phone, or add a new one with just a
 // name and phone.
-export function ClientPicker({ client, onChange }: { client: ClientOption | null; onChange: (c: ClientOption | null) => void }) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<ClientOption[] | null>(null);
+// `query` and `found`: a search already made (Phone booking's reading of
+// the call).
+export function ClientPicker({
+  client,
+  onChange,
+  query: initialQuery = "",
+  found = null,
+}: {
+  client: ClientOption | null;
+  onChange: (c: ClientOption | null) => void;
+  query?: string;
+  found?: (ClientOption & { lastVisit?: string | null })[] | null;
+}) {
+  const [query, setQuery] = useState(initialQuery);
+  const [results, setResults] = useState<(ClientOption & { lastVisit?: string | null })[] | null>(found);
   const [adding, setAdding] = useState(false);
   const [fields, setFields] = useState({ firstName: "", lastName: "", phone: "" });
   const [errors, setErrors] = useState<{ first_name?: string; phone?: string; form?: string }>({});
@@ -695,7 +714,10 @@ export function ClientPicker({ client, onChange }: { client: ClientOption | null
           {results.map((c) => (
             <li key={c.id}>
               <button type="button" className="flex w-full justify-between gap-3 px-3 py-2.5 text-left transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:bg-sunken focus-visible:outline-none active:bg-navy-100" onClick={() => onChange(c)}>
-                <span className="min-w-0 truncate font-medium text-ink">{c.name}</span>
+                <span className="min-w-0">
+                  <span className="block truncate font-medium text-ink">{c.name}</span>
+                  {c.lastVisit && <span className="block text-13 text-ink-muted">Last in {c.lastVisit}</span>}
+                </span>
                 <span className="shrink-0 text-ink-muted tabular-nums">{c.phone}</span>
               </button>
             </li>

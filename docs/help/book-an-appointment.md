@@ -21,6 +21,7 @@ Book a visit for a client from the calendar, with one or more services.
 - For several people, tap **Book a group instead**. To keep a slot free, tap **Block this time instead**.
 - Closing a booking you've started (or tapping elsewhere) asks first: **Keep editing** or **Discard changes**.
 - A stylist is never booked with two clients at once, and a chair never holds two: Maestra itself refuses it, even when two people book the same time on two screens. A stylist can still take a client while another's color processes.
+- On the phone? **Phone booking** (or **P**) finds the three best times from what the client asks for (see Take a phone booking).
 
 ## If it doesn't work
 

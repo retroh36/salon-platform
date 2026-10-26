@@ -4,7 +4,8 @@ import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { BackLink } from "@/components/ui/back-link";
-import { Alert, PageHeader } from "@/components/ui/page";
+import { buttonClass } from "@/components/ui/button";
+import { Alert, Card, PageHeader } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
 import { fullName } from "@/lib/staff";
@@ -101,6 +102,14 @@ async function Member({ params, searchParams }: { params: Promise<{ id: string }
         />
         <div className="flex flex-col gap-6">
           <LoginCard staffId={member.id} firstName={member.first_name} state={loginState(login)} email={login?.email ?? member.email} canReset={canResetPassword(me)} active={member.is_active} />
+          {member.role === "stylist" && member.is_active && (
+            <Card title="Out sick?" className="mb-0">
+              <p className="text-sm text-ink-muted">Mark {member.first_name} out, all day or from a time, and see where each of their clients can go.</p>
+              <Link href={`/calendar/rescue?staff=${member.id}`} className={`${buttonClass("secondary", "sm")} mt-3`}>
+                Plan the rescue
+              </Link>
+            </Card>
+          )}
           {member.role === "assistant" && <AssistingCard staffId={member.id} current={member.assists_staff_id} stylists={(stylists ?? []).map((s) => ({ id: s.id, name: fullName(s) }))} />}
           {member.role !== "owner" && <PermissionsCard staffId={member.id} firstName={member.first_name} rows={permissions ?? []} canEdit={me.role === "owner" && !isMe} />}
           {(member.role === "stylist" || member.event_roles.length > 0) && <EventWorkCard staffId={member.id} firstName={member.first_name} current={member.event_roles} />}

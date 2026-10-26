@@ -169,7 +169,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
   const member = memberships.find((m) => m.status === "active");
   const tags = clientTags({ firstVisit, visits, spendCents: spend?.lifetimeSpendCents ?? null, vipCents: spend ? vipCents : null, member: member ? `${member.name} member` : null, noTexts: noTextsFlag(consent) }, now);
   const usual = known?.habits.preferredStaffId ? names.get(known.habits.preferredStaffId) : null;
-  const stylistLine = client.preferred ? `Prefers ${fullName(client.preferred)}` : usual ? `Usually sees ${usual}` : null;
+  const stylistLine = client.preferred ? `${client.only_sees_preferred ? "Only sees" : "Prefers"} ${fullName(client.preferred)}` : usual ? `Usually sees ${usual}` : null;
   const dayOf = (iso: string) => formatDay(toLocal(new Date(iso), tz).date, true);
   const isToday = (iso: string) => toLocal(new Date(iso), tz).date === today;
 

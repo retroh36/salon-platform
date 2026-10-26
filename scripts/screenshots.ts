@@ -184,6 +184,22 @@ async function capture(browser: Browser) {
     await waitForReact(page, "section[data-staff-id]");
     await page.getByRole("tabpanel", { name: /Denise/ }).waitFor();
   });
+  // Phone booking for Maria Lopez, same as last time, afternoons, through the
+  // fields (so no Claude call even with the key set).
+  await shot("31-phone-booking", front, async (page) => {
+    await page.goto("/calendar");
+    await waitForReact(page, "section[data-staff-id]");
+    await page.getByRole("button", { name: "Phone booking" }).click();
+    const panel = page.getByTestId("phone-panel");
+    const fields = panel.getByRole("button", { name: "Fill in the fields instead" });
+    if (await fields.isVisible()) await fields.click();
+    await panel.getByLabel("Find a client").fill("Maria Lopez");
+    await panel.getByRole("list", { name: "Matching clients" }).getByRole("button").first().click();
+    await panel.getByRole("button", { name: "Same as last time" }).click();
+    await panel.getByRole("radio", { name: "Afternoon" }).click();
+    await panel.getByRole("button", { name: "Show times" }).click();
+    await page.getByTestId("phone-times").waitFor();
+  });
   await page_("16-dashboard-front-desk", front, "/dashboard", "[data-testid=dashboard-brief]");
   await page_("17-events", owner, "/events");
   await page_("18-clients", front, "/clients");
@@ -352,6 +368,39 @@ async function capture(browser: Browser) {
     await rossi(page);
     await main(page).locator("#event-timeline").evaluate((el) => el.closest("section")?.scrollIntoView({ block: "start" }));
   });
+
+  // Sick-day rescue: the stylist with the most clients on the next day with
+  // visits marked out all day, and the plan for every client. Last, since
+  // it adds time off.
+  await shot("32-sick-day-rescue", front, async (page) => {
+    const out = await busiestTomorrow();
+    if (!out) throw new Error("no stylist with visits on a day after today");
+    await page.goto(`/calendar/rescue?staff=${out.staffId}&date=${out.date}`);
+    const form = page.getByRole("form", { name: /^Mark .* out$/ });
+    await waitForReact(page, "form[aria-label^='Mark'] button[type=submit]");
+    await form.getByRole("button", { name: /^Mark .* out$/ }).click();
+    await page.getByTestId("rescue-row").first().waitFor();
+  });
+}
+
+// The next day after today with visits, and the stylist with the most of
+// them that day.
+async function busiestTomorrow() {
+  for (let ahead = 1; ahead < 8; ahead++) {
+    const date = addDays(today, ahead);
+    const { data } = await admin
+      .from("appointment_items")
+      .select("staff_id, appointments!inner(status)")
+      .eq("location_id", location!.id)
+      .in("appointments.status", ["booked", "confirmed"])
+      .gte("starts_at", fromLocal(date, 0, tz)!.toISOString())
+      .lt("starts_at", fromLocal(addDays(date, 1), 0, tz)!.toISOString());
+    const count = new Map<string, number>();
+    for (const i of data ?? []) count.set(i.staff_id, (count.get(i.staff_id) ?? 0) + 1);
+    const [best] = [...count].sort((a, b) => b[1] - a[1]);
+    if (best) return { staffId: best[0], date };
+  }
+  return null;
 }
 
 // One screenshot: the steps, then a still page. A failure is reported at

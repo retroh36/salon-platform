@@ -110,6 +110,9 @@ export type ClientInput = {
   email: string | null;
   phone: string | null;
   preferred_staff_id: string | null;
+  // Books only with their preferred stylist (a sick-day rescue offers them
+  // their stylist's next openings, never someone else).
+  only_sees_preferred: boolean;
   preferences: string | null;
   notes: string | null;
   allergies: string | null;
@@ -133,7 +136,7 @@ function isRealDate(value: string): boolean {
 }
 
 // Form fields: first_name, last_name, email, phone, preferred_staff_id,
-// preferences, notes, allergies, sms_opt_in, email_opt_in, consent_signed
+// only_sees_preferred (checkbox), preferences, notes, allergies, sms_opt_in, email_opt_in, consent_signed
 // (checkbox), consent_signed_on (date), birth_month and birth_day (both or
 // neither). `today` is the location's date.
 export function parseClientForm(
@@ -182,6 +185,7 @@ export function parseClientForm(
       email: optional(email),
       phone,
       preferred_staff_id: optional(text(form, "preferred_staff_id")),
+      only_sees_preferred: form.get("only_sees_preferred") !== null && Boolean(text(form, "preferred_staff_id")),
       preferences: optional(text(form, "preferences")),
       notes: optional(text(form, "notes")),
       allergies: optional(text(form, "allergies")),

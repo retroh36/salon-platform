@@ -50,6 +50,7 @@ function toFields(client: {
   email: string | null;
   phone: string | null;
   preferred_staff_id: string | null;
+  only_sees_preferred: boolean;
   preferences: string | null;
   notes: string | null;
   allergies: string | null;
@@ -72,6 +73,7 @@ function toFields(client: {
     sms_opt_in: client.sms_opt_in,
     email_opt_in: client.email_opt_in,
     consent_signed: client.consent_signed_on !== null,
+    only_sees_preferred: client.only_sees_preferred,
     birth_month: client.birth_month ? String(client.birth_month) : "",
     birth_day: client.birth_day ? String(client.birth_day) : "",
   };

@@ -10,7 +10,9 @@
 // step: nothing is written after that, and it isn't logged as an error.
 
 import { revalidatePath } from "next/cache";
+import { canBook } from "@/lib/appointments";
 import { answer, toolStatus } from "@/lib/denise/assistant";
+import { readCallOut } from "@/lib/denise/call-out";
 import { assistantContext } from "@/lib/denise/context";
 import { claudeFor, deniseDay } from "@/lib/denise/day-state";
 import { DEMO_DENISE_PER_10_MIN, DEMO_LIMIT_TEXT, DEMO_SLOW_DOWN, isDemo } from "@/lib/demo";
@@ -21,7 +23,7 @@ import type { DeniseEvent, DeniseRequest } from "@/lib/denise/types";
 import { isUuid } from "@/lib/ids";
 import { LATE_MINUTES, reportCallOut, reportRunningLate } from "@/lib/scheduling/disruptions";
 import { startOfLocalDay } from "@/lib/scheduling/load";
-import { isLocalDate } from "@/lib/scheduling/time";
+import { formatMinute, isLocalDate, minuteToTime } from "@/lib/scheduling/time";
 import { requestInfo, withinLimits } from "@/lib/online-booking/security";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -97,6 +99,25 @@ async function staffName(s: DeniseSession, staffId: string) {
   return data?.first_name ?? "this stylist";
 }
 
+// A question saying a stylist is out: a link to plan the rescue (front of
+// house), or how to mark yourself out.
+async function callOutIn(s: DeniseSession, text: string, date: string) {
+  const { data: team } = await s.supabase.from("staff").select("id, first_name, staff_services(service_id)").eq("location_id", s.viewer.location.id).eq("is_active", true);
+  const read = readCallOut(text, (team ?? []).filter((t) => t.staff_services.length > 0).map((t) => ({ id: t.id, firstName: t.first_name })));
+  if (!read) return null;
+  if (!canBook(s.me.role)) {
+    const text = read.staffId === s.me.id ? "Mark yourself out from the ⋯ on your column on the calendar, and I'll find new places for your clients." : `The front desk can plan where ${read.firstName}'s clients go.`;
+    return { t: "done" as const, reply: { text, kind: "nothing" as const } };
+  }
+  const from = read.from === null ? "" : `&from=${minuteToTime(read.from)}`;
+  const when = read.from === null ? "" : ` from ${formatMinute(read.from)}`;
+  return {
+    t: "done" as const,
+    reply: { text: `Sorry to hear ${read.firstName} is out${when}. I'll plan where each of ${read.firstName}'s clients goes, and you check it before anything moves.`, kind: "fixes" as const },
+    links: [{ path: `/calendar/rescue?staff=${read.staffId}&date=${date}${from}`, label: "Open sick-day rescue" }],
+  };
+}
+
 async function run(s: DeniseSession, body: DeniseRequest, send: Send) {
   const status = (text: string) => send({ t: "status", text });
   const where = { supabase: s.supabase, location: s.viewer.location, today: s.today };
@@ -135,6 +156,11 @@ async function run(s: DeniseSession, body: DeniseRequest, send: Send) {
       return send({ t: "done", reply: said ?? { text: "That's canceled. Nothing else changes.", kind: "nothing" }, state });
     }
     case "ask": {
+      // "Nola called out", "Gil has to leave at 1": the sick-day rescue,
+      // read by our code (no Claude needed).
+      const last = [...(Array.isArray(body.history) ? body.history : [])].reverse().find((m) => m.role === "user");
+      const out = last ? await callOutIn(s, String(last.text), isLocalDate(body.date) && body.date > s.today ? body.date : s.today) : null;
+      if (out) return send(out);
       const client = claudeFor(s.me.business_id, "ask_denise");
       if (!client) return send(reply(NOT_CONNECTED, "nothing"));
       status("Reading your question…");

@@ -7,6 +7,7 @@ import type { ClientInsight } from "./clients";
 import type { ClientSpend } from "./describe";
 import type { DurationInsight } from "./durations";
 import type { SalonInsight } from "./salon";
+import { stretchTiming, timingFor, type BookingContext } from "@/lib/scheduling/booking";
 
 type Supabase = SupabaseClient<Database>;
 
@@ -62,4 +63,20 @@ export async function loadAllClientInsights(supabase: Supabase, businessId: stri
     if (data.length < 1000) break;
   }
   return out;
+}
+
+// Each stylist's length for a service: their trusted usual time (in
+// 5-minute steps, stretched over the service's parts), else their own or
+// the menu's. usualFor says whether Denise knows it.
+export function usualTimings(ctx: BookingContext, learned: ReadonlyMap<string, DurationInsight>) {
+  const usualFor = (staffId: string, serviceId: string) => {
+    const d = learned.get(`${staffId}:${serviceId}`);
+    return d?.trusted ? d : null;
+  };
+  const timingOf = (staffId: string, serviceId: string) => {
+    const base = timingFor(ctx, staffId, serviceId);
+    const usual = usualFor(staffId, serviceId);
+    return base && usual ? stretchTiming(base, Math.ceil(usual.medianMinutes / 5) * 5) : base;
+  };
+  return { usualFor, timingOf };
 }

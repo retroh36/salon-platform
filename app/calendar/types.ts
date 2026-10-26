@@ -203,7 +203,8 @@ export type BoardData = {
   // this device.
   // canArrange: the salon's column order and shared views (the settings permission).
   // freeText: may write their own messages to clients (Settings → Messages).
-  me: { staffId: string; role: StaffRole; canBook: boolean; canArrange: boolean; freeText: boolean; zoom: CalendarZoom; fitAll: boolean };
+  // denise: Claude is connected, so Phone booking can read a typed line.
+  me: { staffId: string; role: StaffRole; canBook: boolean; canArrange: boolean; freeText: boolean; zoom: CalendarZoom; fitAll: boolean; denise: boolean };
   // Saved views (shared, and this person's own), and the one to open on:
   // the last used on this device.
   views: CalendarView[];

@@ -10,7 +10,7 @@ Create a client record with their contact details and care notes.
 1. Go to **Clients** and tap **Add client**.
 2. Under **Contact**, enter **First name**, **Last name**, **Phone** and **Email**, and their **Birthday (optional)**.
 3. Tick **Texts OK (reminders and offers)** and **Marketing emails OK** only if the client says yes.
-4. Under **Care**, add **Allergies and sensitivities**, **Preferred stylist**, **Preferences** and **Notes**.
+4. Under **Care**, add **Allergies and sensitivities**, **Preferred stylist** (tick **Only books with their preferred stylist** if they won't see anyone else), **Preferences** and **Notes**.
 5. If they signed a consent form, tick **Consent form signed** and set **Signed on**.
 6. Tap **Add client**.
 

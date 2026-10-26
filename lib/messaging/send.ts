@@ -17,7 +17,7 @@ import { withOptOut } from "@/lib/automations";
 import { siteUrl } from "@/lib/branding";
 import { formatMinute, toLocal, todayIn } from "@/lib/scheduling/time";
 import { channelFor, consentOf, type Channel, type Purpose } from "./consent";
-import { isStaffTemplate, renderStaffMessage, templateProblem, withStopLine, type StaffTemplate } from "./templates";
+import { isRescueTemplate, isStaffTemplate, renderRescueMessage, renderStaffMessage, templateProblem, withStopLine, type RescueTemplate, type StaffTemplate } from "./templates";
 
 type Client = SupabaseClient<Database>;
 
@@ -26,8 +26,10 @@ export const CONSENT_COLUMNS = "phone, email, appointment_sms_ok, appointment_em
 export type MessageInput = {
   appointmentId: string;
   purpose: Purpose;
-  // A quick pick, or "custom" for what they wrote.
-  template: StaffTemplate | "custom";
+  // A quick pick, a rescue message, or "custom" for what they wrote.
+  template: StaffTemplate | RescueTemplate | "custom";
+  // For a rescue message: the stylist who's out.
+  absentStaffId?: string;
   channel: Channel;
   subject?: string;
   body?: string;
@@ -70,10 +72,24 @@ export async function previewTemplate(supabase: Client, input: Pick<MessageInput
   return renderStaffMessage(input.template, { ...facts, minutes: input.minutes, time: input.time }, input.channel);
 }
 
+// A rescue message for the visit as it is now, naming the stylist who's out.
+export async function previewRescue(supabase: Client, input: { appointmentId: string; template: RescueTemplate; channel: Channel; absentStaffId: string }) {
+  const [facts, absent] = await Promise.all([
+    visitFacts(supabase, input.appointmentId),
+    supabase.from("staff").select("first_name").eq("id", input.absentStaffId).maybeSingle(),
+  ]);
+  if (!facts || !absent.data) return null;
+  return renderRescueMessage(input.template, { ...facts, absent: absent.data.first_name }, input.channel);
+}
+
 export async function sendStaffMessage(supabase: Client, input: MessageInput): Promise<SendResult> {
   let subject = input.subject?.trim() ?? "";
   let body = input.body?.trim() ?? "";
-  if (input.template !== "custom") {
+  if (isRescueTemplate(input.template)) {
+    const rendered = input.absentStaffId ? await previewRescue(supabase, { ...input, template: input.template, absentStaffId: input.absentStaffId }) : null;
+    if (!rendered) return { ok: false, message: "We couldn't find this visit." };
+    ({ subject, body } = rendered);
+  } else if (input.template !== "custom") {
     if (!isStaffTemplate(input.template)) return { ok: false, message: "Choose a message." };
     const problem = templateProblem(input.template, input);
     if (problem) return { ok: false, message: problem };

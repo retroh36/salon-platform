@@ -20,8 +20,9 @@ type Location = { id: string; timezone: string };
 
 export type Placement = { staffId: string; resourceId: string | null; start: Date };
 
-// Move a booked item from one place to another.
-export type ItemChange = { itemId: string; appointmentId: string; from: Placement; to: Placement };
+// Move a booked item from one place to another; timing is the new
+// stylist's own length for it (otherwise it keeps its booked length).
+export type ItemChange = { itemId: string; appointmentId: string; from: Placement; to: Placement; timing?: ServiceTiming };
 
 export type ProposedBooking = {
   clientId: string | null;
@@ -30,8 +31,9 @@ export type ProposedBooking = {
   items: { serviceId: string; staffId: string; resourceId: string | null; start: Date; timing?: ServiceTiming }[];
 };
 
-// A message to a client or stylist, recorded when the change is applied.
-export type NotificationDraft = { appointmentId: string | null; template: string; body: string } & (
+// A message to a client or stylist, recorded when the change is applied;
+// channel "app" is a notice in the app, for staff.
+export type NotificationDraft = { appointmentId: string | null; template: string; body: string; channel?: "app" } & (
   | { clientId: string; staffId?: never }
   | { staffId: string; clientId?: never }
 );
@@ -77,8 +79,10 @@ function placementFrom(json: { staff_id: string; resource_id: string | null; sta
   return { staffId: json.staff_id, resourceId: json.resource_id, start: new Date(json.starts_at) };
 }
 
+const timingJson = (t: ServiceTiming) => ({ active: t.activeMinutes, processing: t.processingMinutes, finishing: t.finishingMinutes });
+
 function notificationJson(n: NotificationDraft) {
-  return { appointment_id: n.appointmentId, client_id: n.clientId ?? null, staff_id: n.staffId ?? null, template: n.template, body: n.body };
+  return { appointment_id: n.appointmentId, client_id: n.clientId ?? null, staff_id: n.staffId ?? null, template: n.template, body: n.body, ...(n.channel ? { channel: n.channel } : {}) };
 }
 
 export function proposalToJson(p: Proposal): Json {
@@ -87,7 +91,13 @@ export function proposalToJson(p: Proposal): Json {
     undo_notifications: (p.undoNotifications ?? []).map(notificationJson),
     resolves: p.resolves ?? [],
     block_moves: (p.blockMoves ?? []).map((m) => ({ block_id: m.blockId, on_date: m.date, from: m.from, to: m.to })),
-    changes: p.changes.map((c) => ({ item_id: c.itemId, appointment_id: c.appointmentId, from: placementJson(c.from), to: placementJson(c.to) })),
+    changes: p.changes.map((c) => ({
+      item_id: c.itemId,
+      appointment_id: c.appointmentId,
+      from: placementJson(c.from),
+      to: placementJson(c.to),
+      ...(c.timing ? { timing: timingJson(c.timing) } : {}),
+    })),
     book: p.book
       ? {
           client_id: p.book.clientId,
@@ -96,7 +106,7 @@ export function proposalToJson(p: Proposal): Json {
             staff_id: i.staffId,
             resource_id: i.resourceId,
             starts_at: i.start.toISOString(),
-            timing: i.timing ? { active: i.timing.activeMinutes, processing: i.timing.processingMinutes, finishing: i.timing.finishingMinutes } : null,
+            timing: i.timing ? timingJson(i.timing) : null,
           })),
         }
       : null,
@@ -104,8 +114,10 @@ export function proposalToJson(p: Proposal): Json {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- JSON from our own functions */
+const timingFrom = (t: any): ServiceTiming | undefined => (t ? { activeMinutes: t.active, processingMinutes: t.processing, finishingMinutes: t.finishing } : undefined);
+
 function notificationFrom(n: any): NotificationDraft {
-  const base = { appointmentId: n.appointment_id, template: n.template, body: n.body };
+  const base = { appointmentId: n.appointment_id, template: n.template, body: n.body, ...(n.channel === "app" ? { channel: "app" as const } : {}) };
   return n.client_id ? { ...base, clientId: n.client_id } : { ...base, staffId: n.staff_id };
 }
 
@@ -116,7 +128,13 @@ export function proposalFromJson(json: Json): Proposal {
     undoNotifications: (j.undo_notifications ?? []).map(notificationFrom),
     resolves: j.resolves ?? [],
     blockMoves: (j.block_moves ?? []).map((m: any) => ({ blockId: m.block_id, date: m.on_date, from: m.from, to: m.to })),
-    changes: (j.changes ?? []).map((c: any) => ({ itemId: c.item_id, appointmentId: c.appointment_id, from: placementFrom(c.from), to: placementFrom(c.to) })),
+    changes: (j.changes ?? []).map((c: any) => ({
+      itemId: c.item_id,
+      appointmentId: c.appointment_id,
+      from: placementFrom(c.from),
+      to: placementFrom(c.to),
+      ...(c.timing ? { timing: timingFrom(c.timing) } : {}),
+    })),
     book: j.book
       ? {
           clientId: j.book.client_id ?? null,
@@ -125,23 +143,39 @@ export function proposalFromJson(json: Json): Proposal {
             staffId: i.staff_id,
             resourceId: i.resource_id ?? null,
             start: new Date(i.starts_at),
-            timing: i.timing ? { activeMinutes: i.timing.active, processingMinutes: i.timing.processing, finishingMinutes: i.timing.finishing } : undefined,
+            timing: timingFrom(i.timing),
           })),
         }
       : null,
   };
 }
 
-type PreviousItem = { itemId: string; staffId: string; resourceId: string | null; start: Date };
+type PreviousItem = { itemId: string; staffId: string; resourceId: string | null; start: Date; timing?: ServiceTiming; now: Date | null };
 
 function previousFromJson(json: Json): { items: PreviousItem[]; createdAppointmentId: string | null } {
   const j = json as any;
   return {
-    items: (j.items ?? []).map((i: any) => ({ itemId: i.item_id, staffId: i.staff_id, resourceId: i.resource_id ?? null, start: new Date(i.starts_at) })),
+    items: (j.items ?? []).map((i: any) => ({
+      itemId: i.item_id,
+      staffId: i.staff_id,
+      resourceId: i.resource_id ?? null,
+      start: new Date(i.starts_at),
+      timing: timingFrom(i.timing),
+      // Where it is now (a move to another day needs that day loaded too).
+      now: i.applied?.starts_at ? new Date(i.applied.starts_at) : null,
+    })),
     createdAppointmentId: j.created_appointment_id ?? null,
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+// The calendar with these items at the lengths given (a move to a stylist
+// who takes longer, or undo putting the old length back).
+function withTimings(ctx: BookingContext, items: readonly { itemId: string; timing?: ServiceTiming }[]): BookingContext {
+  const lengths = new Map(items.flatMap((i) => (i.timing ? [[i.itemId, i.timing] as const] : [])));
+  if (!lengths.size) return ctx;
+  return { ...ctx, booked: ctx.booked.map((b) => (b.id && lengths.has(b.id) ? { ...b, ...lengths.get(b.id) } : b)) };
+}
 
 // Whether a proposal can be made on this calendar: its moves, or its new
 // booking, pass the booking rules. Problems from every part, deduplicated.
@@ -165,7 +199,7 @@ export function checkProposal(base: BookingContext, proposal: Proposal): Booking
     if (clash.length) problems.push({ code: "staff_double_booked", conflictWith: clash[0].id });
   }
   if (proposal.changes.length) {
-    problems.push(...checkMoves(ctx, proposal.changes.map((c) => ({ itemId: c.itemId, ...c.to }))).problems.flat());
+    problems.push(...checkMoves(withTimings(ctx, proposal.changes), proposal.changes.map((c) => ({ itemId: c.itemId, ...c.to }))).problems.flat());
   }
   if (proposal.book) {
     const check = checkAppointment(ctx, proposal.book.items);
@@ -284,7 +318,7 @@ export async function undoAction(supabase: Supabase, location: Location, actionI
     const version = await supabase.from("locations").select("calendar_version").eq("id", location.id).single();
     if (version.error) throw version.error;
 
-    const { data: action, error } = await supabase.from("ai_actions").select("status, previous_state").eq("id", actionId).maybeSingle();
+    const { data: action, error } = await supabase.from("ai_actions").select("status, previous_state, proposal").eq("id", actionId).maybeSingle();
     if (error) throw error;
     if (!action) return { ok: false, error: "not_found" };
     if (action.status !== "approved" || !action.previous_state) return { ok: false, error: "decided" };
@@ -292,10 +326,14 @@ export async function undoAction(supabase: Supabase, location: Location, actionI
     const previous = previousFromJson(action.previous_state);
     if (previous.items.length) {
       const restores: MoveRequest[] = previous.items.map((p) => ({ itemId: p.itemId, staffId: p.staffId, resourceId: p.resourceId, start: p.start }));
-      const ctx = await loadBookingContext(supabase, location, ...datesOf(location, restores.map((r) => r.start)));
-      const check = checkMoves(ctx, restores);
-      if (!check.valid) {
-        const problems = check.problems.flat();
+      const ctx = await loadBookingContext(supabase, location, ...datesOf(location, [...restores.map((r) => r.start), ...previous.items.flatMap((p) => (p.now ? [p.now] : []))]));
+      const check = checkMoves(withTimings(ctx, previous.items), restores);
+      // Putting clients back with a stylist this action moved them from
+      // because they called out: that time off is why they moved, and
+      // undoing means they're back where they were.
+      const outStaff = await calledOut(supabase, action.proposal);
+      const problems = check.problems.flatMap((list, i) => list.filter((p) => !(p.code === "staff_unavailable" && p.reason === "time_off" && outStaff.has(restores[i].staffId))));
+      if (!check.valid && problems.length) {
         if (problems.some((p) => p.code === "not_booked")) return { ok: false, error: "stale" };
         return { ok: false, error: "invalid", problems };
       }
@@ -310,6 +348,14 @@ export async function undoAction(supabase: Supabase, location: Location, actionI
     return { ok: true };
   }
   return { ok: false, error: "busy" };
+}
+
+// The stylists whose call-outs an action resolved.
+async function calledOut(supabase: Supabase, proposal: Json): Promise<Set<string>> {
+  const ids = ((proposal as { resolves?: unknown } | null)?.resolves ?? []) as string[];
+  if (!Array.isArray(ids) || !ids.length) return new Set();
+  const { data } = await supabase.from("schedule_disruptions").select("staff_id").in("id", ids).eq("kind", "call_out");
+  return new Set((data ?? []).flatMap((d) => (d.staff_id ? [d.staff_id] : [])));
 }
 
 // Dismisses a proposal and the other options for the same problem.
