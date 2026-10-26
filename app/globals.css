@@ -337,13 +337,15 @@ input[type="checkbox"] {
    Touchscreens (the front desk's iPad): every button is at least 44px each
    way, so a finger never misses. Calendar blocks keep their height (it's the
    visit's length, and the whole block is the tap). Zero specificity, so a
-   component's own sizes still apply above it.
+   component's own sizes (utilities) still apply above it.
    --------------------------------------------------------------------------- */
 
-@media (pointer: coarse) {
-  :where(button, [role="button"], summary, input[type="button"], input[type="submit"]):where(:not([data-block], [data-time-block], [data-resize-handle])) {
-    min-height: 44px;
-    min-width: 44px;
+@layer base {
+  @media (pointer: coarse) {
+    :where(button, [role="button"], summary, input[type="button"], input[type="submit"], .touch-target):where(:not([data-block], [data-time-block], [data-resize-handle])) {
+      min-height: 44px;
+      min-width: 44px;
+    }
   }
 }
 
