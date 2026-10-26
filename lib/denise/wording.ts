@@ -6,6 +6,7 @@
 // Claude in full.
 
 import { BASIS_TEXT } from "@/lib/insights/durations";
+import { formatDuration } from "@/lib/duration";
 import type { BookedItem } from "@/lib/scheduling/booking";
 import type { Conflict, FixOption } from "@/lib/scheduling/resolve";
 import { toLocal } from "@/lib/scheduling/time";
@@ -66,18 +67,18 @@ export function headline(c: Conflict, l: Lookup, firstNames = false): string {
   const staff = c.staffId ? staffName(l, c.staffId) : null;
   switch (c.kind) {
     case "overrun":
-      return `${possessive(staff!)} running ${c.minutes} minutes late.`;
+      return `${possessive(staff!)} running ${formatDuration(c.minutes ?? 0)} late.`;
     case "likely_overrun": {
       // No client name: this also goes into the morning brief.
       const item = l.items.get(c.causeItemIds[0])!;
       const service = l.services.get(item.serviceId) ?? "this service";
       // Said when it's an estimate: "(based on check-in to checkout times)".
       const basis = c.estimated ? ` (${BASIS_TEXT.check_in_out})` : "";
-      return `${staff} usually takes about ${c.minutes} minutes longer than booked for ${service}${basis}, so the ${clock(minuteOf(l, item.start))} is likely to run into the next client.`;
+      return `${staff} usually takes about ${formatDuration(c.minutes ?? 0)} longer than booked for ${service}${basis}, so the ${clock(minuteOf(l, item.start))} is likely to run into the next client.`;
     }
     case "client_late": {
       const visit = l.items.get(c.causeItemIds[0])!.appointmentId!;
-      return `${firstNames ? firstName(l, visit) : clientName(l, visit)} is running ${c.minutes} minutes late.`;
+      return `${firstNames ? firstName(l, visit) : clientName(l, visit)} is running ${formatDuration(c.minutes ?? 0)} late.`;
     }
     case "call_out":
       return `${staff} is out for the rest of the day.`;
@@ -170,11 +171,11 @@ export function templateReason(c: Conflict, option: FixOption, l: Lookup): strin
     const who = v.client?.firstName ?? "The walk-in";
     const shift = v.to.minute - v.from.minute;
     if (v.from.staffId === v.to.staffId) {
-      return shift === 0 ? `${who} keeps the same time with ${v.to.staffFirstName} in another chair.` : `${who} starts ${shift} minutes later and stays with ${v.to.staffFirstName}.`;
+      return shift === 0 ? `${who} keeps the same time with ${v.to.staffFirstName} in another chair.` : `${who} starts ${formatDuration(shift)} later and stays with ${v.to.staffFirstName}.`;
     }
     return shift === 0
       ? `${v.to.staffFirstName} is free at ${clock(v.to.minute)} and can take ${who} at the same time.`
-      : `${v.to.staffFirstName} can take ${who} ${shift} minutes later, at ${clock(v.to.minute)}.`;
+      : `${v.to.staffFirstName} can take ${who} ${formatDuration(shift)} later, at ${clock(v.to.minute)}.`;
   });
   for (const b of option.blockMoves) {
     clauses.push(`${staffName(l, b.staffId)} takes ${b.kind} at ${clock(minuteOf(l, b.to.start))} instead of ${clock(minuteOf(l, b.from.start))}.`);

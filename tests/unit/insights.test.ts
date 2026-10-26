@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { clientInsight, timeOfDay, type ClientVisit } from "@/lib/insights/clients";
-import { describeClient, minutesText, usualTime } from "@/lib/insights/describe";
+import { describeClient, usualTime } from "@/lib/insights/describe";
+import { formatDuration } from "@/lib/duration";
 import { BASIS_TEXT, consistencyOf, ESTIMATE_WEIGHT, kendallTau, mannKendallZ, MIN_ESTIMATED_VISITS, MIN_VISITS, stylistDurations, trendOf, type DurationSample } from "@/lib/insights/durations";
 import { salonInsight, type SalonItem } from "@/lib/insights/salon";
 import { ceilTo, median, mode, quantile, withoutOutliers } from "@/lib/insights/stats";
@@ -336,8 +337,8 @@ describe("describing a client", () => {
   });
 
   it("words learned times", () => {
-    expect(minutesText(161)).toBe("2h 41m");
-    expect(minutesText(45)).toBe("45m");
-    expect(usualTime("Bridget", { medianMinutes: 181, visits: 9 })).toBe("Bridget usually takes 3h 1m for this (9 visits)");
+    expect(formatDuration(161)).toBe("2 hr 41 min");
+    expect(formatDuration(45)).toBe("45 min");
+    expect(usualTime("Bridget", { medianMinutes: 181, visits: 9 })).toBe("Bridget usually takes 3 hr 1 min for this (9 visits)");
   });
 });

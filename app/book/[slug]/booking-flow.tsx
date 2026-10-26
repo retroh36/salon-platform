@@ -11,7 +11,8 @@ import { describeDeposit } from "@/lib/online-booking/settings";
 import type { BookingSource } from "@/lib/online-booking/sources";
 import { LEVEL_LABELS } from "@/lib/schedule-forms";
 import { formatMinute, type LocalDate } from "@/lib/scheduling/time";
-import { formatMinutes, formatPrice, formatPriceRange } from "@/lib/services";
+import { formatPrice, formatPriceRange } from "@/lib/services";
+import { formatDuration } from "@/lib/duration";
 import { book, confirmCode, findTimes, requestCode, reviewPromotion, reviewTerms, type DayTimes, type PromotionResult, type TermsResult } from "./actions";
 import { accentLink, choiceClass, inputClass, primaryButton, secondaryButton, sectionTitle, smallButton } from "./styles";
 import { DateStrip, TimeGrid, longDate } from "./times";
@@ -348,7 +349,7 @@ export function BookingFlow({
         {serviceIds.length > 0 && step !== "confirm" && (
           <p className="mb-2 flex justify-between gap-3 text-sm text-ink-muted" data-testid="summary">
             <span>
-              {serviceIds.length} {serviceIds.length === 1 ? "service" : "services"} · {formatMinutes(totalMinutes)}
+              {serviceIds.length} {serviceIds.length === 1 ? "service" : "services"} · {formatDuration(totalMinutes)}
               {slot && ` · ${longDate(slot.date, true)}, ${formatMinute(slot.minute)}`}
             </span>
             <span className="font-medium text-ink tabular-nums">{formatPriceRange(prices)}</span>
@@ -431,7 +432,7 @@ function ServicesStep({
                       <span className="min-w-0 flex-1">
                         <span className="block font-medium text-ink">{s.name}</span>
                         <span className="block text-sm text-ink-muted">
-                          {formatMinutes(s.minutes)}
+                          {formatDuration(s.minutes)}
                           {deposit && ` · ${deposit}`}
                         </span>
                         {s.requiresPatchTest && (
@@ -834,7 +835,7 @@ function ConfirmStep({
               <span>
                 <span className="block font-medium text-ink">{s.name}</span>
                 <span className="text-sm text-ink-muted">
-                  {formatMinutes(s.minutes)}
+                  {formatDuration(s.minutes)}
                   {single && ` · with ${single.firstName}`}
                 </span>
               </span>

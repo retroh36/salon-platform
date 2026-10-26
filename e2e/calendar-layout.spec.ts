@@ -142,13 +142,13 @@ test("each stylist's header shows their day at a glance", async ({ page }) => {
   await book("Glance2", "Bang Trim", 10, 0, 15);
   await openDay(page);
   const summary = ui(page).locator("[data-column-header]").filter({ hasText: "Bridget" }).getByTestId("booked-summary");
-  await expect(summary).toHaveAttribute("title", "2 visits · 1h 15m booked");
+  await expect(summary).toHaveAttribute("title", "2 visits · 1 hr 15 min booked");
   // Shortened to fit if need be, never cut off with an ellipsis.
-  await expect(summary).toHaveText(/^2 (visits )?· 1h 15m( booked)?$/);
+  await expect(summary).toHaveText(/^2 (visits )?· 1 hr 15 min( booked)?$/);
   await expect(ui(page).locator("[data-column-header]").filter({ hasText: "Nola Brennan" }).getByTestId("booked-summary")).toHaveText("No bookings");
   // Narrower columns get the shorter form, whole.
   await page.setViewportSize({ width: 1024, height: 800 });
-  await expect(summary).toHaveText(/^2 (visits )?· 1h 15m( booked)?$/);
+  await expect(summary).toHaveText(/^2 (visits )?· 1 hr 15 min( booked)?$/);
   expect(await summary.locator("span").evaluate((el) => el.scrollWidth <= el.clientWidth + 0.5)).toBe(true);
 });
 

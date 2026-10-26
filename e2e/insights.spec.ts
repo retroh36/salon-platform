@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { formatDuration } from "@/lib/duration";
 import type { DurationInsight } from "@/lib/insights/durations";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
@@ -19,7 +20,7 @@ async function learned(staffId: string, service: string) {
   return { serviceId: s!.id, d: data!.data as unknown as DurationInsight };
 }
 
-const hm = (m: number) => (Math.floor(m / 60) ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}` : `${m}m`);
+const hm = formatDuration;
 
 test.afterAll(async () => {
   await admin.from("appointments").delete().eq("location_id", L).gte("starts_at", at(0).toISOString()).lt("starts_at", at(23).toISOString());

@@ -129,15 +129,15 @@ test.describe("front desk", () => {
     const first = form.getByRole("group", { name: "Service 1" });
     await first.getByLabel("Service").selectOption({ label: "All-Over Color" });
     // Bridget's color price, not the $130 menu price.
-    await expect(first.getByTestId("line-summary")).toHaveText("10am–11:45am · 1h 45m · $150");
+    await expect(first.getByTestId("line-summary")).toHaveText("10am–11:45am · 1 hr 45 min · $150");
 
     await form.getByRole("button", { name: "Add another service" }).click();
     const second = form.getByRole("group", { name: "Service 2" });
     await expect(second.getByLabel("Starts")).toHaveValue("11:45"); // straight after
     await second.getByLabel("Stylist").selectOption({ label: "Shae Morgan" });
     await second.getByLabel("Service").selectOption({ label: "Blowout" });
-    await expect(second.getByTestId("line-summary")).toHaveText("11:45am–12:30pm · 45m · $45");
-    await expect(form.getByTestId("visit-total")).toHaveText("10am–12:30pm · 2h 30m$195");
+    await expect(second.getByTestId("line-summary")).toHaveText("11:45am–12:30pm · 45 min · $45");
+    await expect(form.getByTestId("visit-total")).toHaveText("10am–12:30pm · 2 hr 30 min$195");
 
     await form.getByRole("button", { name: "Create booking" }).click();
     // The panel moves on to the new booking.

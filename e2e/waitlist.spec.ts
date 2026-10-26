@@ -105,7 +105,7 @@ test("when a visit is canceled, Denise suggests who on the waitlist fits, and st
   // Denise opens her panel with the opening and who fits, best first.
   const opening = page.getByTestId("denise-opening");
   // Her reply streams in after the cancel saves, slower when the machine is busy.
-  await expect(opening).toContainText("A 90-minute opening with Nola at 12:30pm fits 2 people on your waitlist.", { timeout: 15_000 });
+  await expect(opening).toContainText("A 1 hr 30 min opening with Nola at 12:30pm fits 2 people on your waitlist.", { timeout: 15_000 });
   const matches = opening.getByRole("listitem");
   await expect(matches).toHaveText([new RegExp(`1\\. ${PREFIX}Sam Test.*asked for Nola`), new RegExp(`2\\. ${PREFIX}Eli Test`)]);
   await matches.first().getByRole("button", { name: "Book" }).click();

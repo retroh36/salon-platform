@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   centsToInput,
-  formatMinutes,
   formatPrice,
   formatPriceRange,
   formatServiceTime,
@@ -64,17 +63,11 @@ describe("formatting", () => {
     expect(parsePrice(centsToInput(12345))).toBe(12345);
   });
 
-  it("formats minutes", () => {
-    expect(formatMinutes(45)).toBe("45m");
-    expect(formatMinutes(60)).toBe("1h");
-    expect(formatMinutes(85)).toBe("1h 25m");
-  });
-
   it("shows total time and the processing gap", () => {
     expect(formatServiceTime({ active_minutes: 30, processing_minutes: 35, finishing_minutes: 20 })).toBe(
-      "1h 25m · 35m processing",
+      "1 hr 25 min · 35 min processing",
     );
-    expect(formatServiceTime({ active_minutes: 45, processing_minutes: 0, finishing_minutes: 0 })).toBe("45m");
+    expect(formatServiceTime({ active_minutes: 45, processing_minutes: 0, finishing_minutes: 0 })).toBe("45 min");
   });
 });
 

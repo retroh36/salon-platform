@@ -163,7 +163,7 @@ test.describe("at 9pm", () => {
       await waitForHydration(page, "section[data-staff-id]");
       await reportLate(page, "Camila", 45);
       const panel = denisePanel(page);
-      await expect(panel).toContainText(`${PREFIX}Camila's 3:15pm visit should have started by now, even 45 minutes late`);
+      await expect(panel).toContainText(`${PREFIX}Camila's 3:15pm visit should have started by now, even 45 min late`);
       await expect(panel).toContainText("you could mark it a no-show, or rebook them");
     } finally {
       await admin.from("locations").update({ timezone: TZ }).eq("id", L);

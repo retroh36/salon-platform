@@ -1,4 +1,5 @@
 import { isFrontOfHouse } from "@/lib/staff";
+import { formatDuration } from "@/lib/duration";
 import Link from "next/link";
 import { ClientInsightCard } from "@/components/client-insight";
 import { DeniseFace, DenisePose } from "@/components/denise";
@@ -153,7 +154,7 @@ export function OpportunitySections({ o, today, mine }: { o: Opportunities; toda
                   <span className="block text-sm font-medium text-ink underline-offset-2 group-hover:underline">
                     {g.staffName}, {g.date === today ? "today" : "tomorrow"} {formatMinute(g.start)}–{formatMinute(g.end)}
                   </span>
-                  <span className="block text-13 text-ink-muted">{g.matches.length ? `Waitlist: ${g.matches.join(", ")}` : `${Math.round((g.end - g.start) / 15) * 15} min free`}</span>
+                  <span className="block text-13 text-ink-muted">{g.matches.length ? `Waitlist: ${g.matches.join(", ")}` : `${formatDuration(Math.round((g.end - g.start) / 15) * 15)} free`}</span>
                 </Link>
               </li>
             ))}

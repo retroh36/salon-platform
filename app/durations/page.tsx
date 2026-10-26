@@ -6,7 +6,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { EmptyState, PageHeader, Section } from "@/components/ui/page";
 import { numClass, TableCard, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { canManage, getCurrentStaff } from "@/lib/auth";
-import { minutesText } from "@/lib/insights/describe";
+import { formatDuration } from "@/lib/duration";
 import { MIN_VISITS } from "@/lib/insights/durations";
 import { loadDurations } from "@/lib/insights/read";
 import { fullName } from "@/lib/staff";
@@ -103,11 +103,11 @@ async function Durations() {
                           {name}
                         </th>
                         <td className={`${tdClass} ${numClass}`}>
-                          {minutesText(current)}
-                          {ownLength.has(key) && <span className="block text-xs text-ink-subtle">(menu {minutesText(d.menuMinutes)})</span>}
+                          {formatDuration(current)}
+                          {ownLength.has(key) && <span className="block text-xs text-ink-subtle">(menu {formatDuration(d.menuMinutes)})</span>}
                         </td>
                         <td className={`${tdClass} ${numClass}`}>
-                          {d.trusted ? minutesText(d.medianMinutes) : <span className="text-ink-subtle">Learning</span>}
+                          {d.trusted ? formatDuration(d.medianMinutes) : <span className="text-ink-subtle">Learning</span>}
                           {d.trusted && d.trend !== "steady" && <span className="block text-xs text-ink-subtle">({d.trend === "faster" ? "getting faster" : "getting slower"})</span>}
                         </td>
                         <td className={`${tdClass} text-ink-muted`}>
@@ -120,7 +120,7 @@ async function Durations() {
                           )}
                         </td>
                         <td className={`${tdClass} text-right`}>
-                          <DurationButton staffId={d.staffId} serviceId={d.serviceId} suggested={d.suggestedMinutes && d.suggestedMinutes !== current ? minutesText(d.suggestedMinutes) : null} undoActionId={actionId} />
+                          <DurationButton staffId={d.staffId} serviceId={d.serviceId} suggested={d.suggestedMinutes && d.suggestedMinutes !== current ? formatDuration(d.suggestedMinutes) : null} undoActionId={actionId} />
                         </td>
                       </tr>
                     );

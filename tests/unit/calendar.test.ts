@@ -146,15 +146,15 @@ describe("lane boxes", () => {
 describe("bookedSummary", () => {
   it("counts visits once and adds up their time", () => {
     expect(bookedSummary([])).toBe("No bookings");
-    expect(bookedSummary([{ appointmentId: "a", minutes: 45 }])).toBe("1 visit · 45m booked");
+    expect(bookedSummary([{ appointmentId: "a", minutes: 45 }])).toBe("1 visit · 45 min booked");
     expect(
       bookedSummary([
         { appointmentId: "a", minutes: 105 },
         { appointmentId: "a", minutes: 45 },
         { appointmentId: "b", minutes: 60 },
       ]),
-    ).toBe("2 visits · 3h 30m booked");
-    expect(bookedSummary([{ appointmentId: "a", minutes: 120 }])).toBe("1 visit · 2h booked");
+    ).toBe("2 visits · 3 hr 30 min booked");
+    expect(bookedSummary([{ appointmentId: "a", minutes: 120 }])).toBe("1 visit · 2 hr booked");
   });
 
   it("labels every quarter hour, marking the hours", () => {
@@ -180,8 +180,8 @@ describe("bookedSummary", () => {
   });
 
   it("shortens to fit a narrow header", () => {
-    expect(summaryVariants("7 visits · 6h 10m booked")).toEqual(["7 visits · 6h 10m booked", "7 visits · 6h 10m", "7 · 6h 10m"]);
-    expect(summaryVariants("1 visit · 45m booked")).toEqual(["1 visit · 45m booked", "1 visit · 45m", "1 · 45m"]);
+    expect(summaryVariants("7 visits · 6 hr 10 min booked")).toEqual(["7 visits · 6 hr 10 min booked", "7 visits · 6 hr 10 min", "7 · 6 hr 10 min"]);
+    expect(summaryVariants("1 visit · 45 min booked")).toEqual(["1 visit · 45 min booked", "1 visit · 45 min", "1 · 45 min"]);
     expect(summaryVariants("No bookings")).toEqual(["No bookings"]);
   });
 });

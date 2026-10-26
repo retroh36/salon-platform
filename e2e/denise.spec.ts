@@ -160,7 +160,7 @@ test.describe("front desk", () => {
     }).toPass();
     await expect(panel.locator("[data-pose]")).toHaveAttribute("data-pose", "point");
     await expect(panel.getByTestId("denise-message")).toHaveText(
-      `Bridget's running 20 minutes late. I found a fix that only moves one client: ${PREFIX}Grace Lewis 11:00 → 11:20. Want me to apply it?`,
+      `Bridget's running 20 min late. I found a fix that only moves one client: ${PREFIX}Grace Lewis 11:00 → 11:20. Want me to apply it?`,
     );
     await expect(panel).toContainText("Why it works:");
 
@@ -198,7 +198,7 @@ test.describe("front desk", () => {
     await expect(panel.getByRole("status")).toContainText(`Undone — ${PREFIX}Grace is back at 11:00.`);
     expect(await startOf(grace)).toEqual({ start: at(11).getTime(), staffId: BRIDGET });
     // The problem is back, so Denise offers the fix again.
-    await expect(panel.getByTestId("denise-message")).toContainText("Bridget's running 20 minutes late.");
+    await expect(panel.getByTestId("denise-message")).toContainText("Bridget's running 20 min late.");
   });
 
   test("dismisses a fix", async ({ page }) => {
@@ -210,7 +210,7 @@ test.describe("front desk", () => {
     await page.getByRole("button", { name: "Tell Denise" }).click();
 
     const panel = denisePanel(page);
-    await expect(panel.getByTestId("denise-message")).toContainText("Bridget's running 30 minutes late.");
+    await expect(panel.getByTestId("denise-message")).toContainText("Bridget's running 30 min late.");
     await panel.getByRole("button", { name: "Dismiss" }).click();
     await expect(panel.getByRole("status")).toContainText("Okay, I'll leave that one.");
     await expect(panel.getByTestId("denise-message")).toHaveCount(0);
@@ -283,7 +283,7 @@ test.describe("stylist", () => {
     await page.getByRole("button", { name: "Tell Denise" }).click();
 
     const panel = denisePanel(page);
-    await expect(panel.getByTestId("denise-message")).toContainText("Bridget's running 15 minutes late.");
+    await expect(panel.getByTestId("denise-message")).toContainText("Bridget's running 15 min late.");
     await expect(panel.getByRole("button", { name: "Apply fix" })).toHaveCount(0);
     await expect(panel).toContainText("The front desk can apply this.");
   });

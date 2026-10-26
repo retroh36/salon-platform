@@ -5,6 +5,7 @@
 // together (the server checks the booking rules again on apply).
 
 import { formatPrice } from "./services";
+import { formatDuration } from "./duration.ts";
 import { durationMinutes, itemEnd, staffBusySpans, type ServiceTiming } from "./scheduling/booking.ts";
 import type { RescueLine, RescueOption } from "./scheduling/rescue.ts";
 import { daysBetween, formatMinute, toLocal, type LocalDate } from "./scheduling/time.ts";
@@ -75,14 +76,14 @@ function describe(o: RescueOption, line: RescueLine, f: RescueFacts, absentId: s
   }
   if (o.sameLevel) details.push("Same level");
   else details.push(LEVEL_NAMES[f.levels.get(o.staffId) ?? ""] ?? "Another level");
-  if (o.shift) details.push(`${o.shift} minutes later`);
+  if (o.shift) details.push(`${formatDuration(o.shift)} later`);
   // What the client pays, and how long it takes, with the new stylist.
   const out = line.visit.items.filter((i) => i.staffId === absentId);
   const before = out.reduce((sum, i) => sum + (f.priceOf(absentId, i.serviceId) ?? 0), 0);
   const after = out.reduce((sum, i) => sum + (f.priceOf(o.staffId, i.serviceId) ?? 0), 0);
   if (after !== before) details.push(`${formatPrice(Math.abs(after - before))} ${after > before ? "more" : "less"}`);
   const longer = o.moves.reduce((sum, m) => sum + durationMinutes(m.timing), 0) - line.visit.items.reduce((sum, i) => sum + durationMinutes(i), 0);
-  if (longer >= 10) details.push(`takes ${longer} minutes longer`);
+  if (longer >= 10) details.push(`takes ${formatDuration(longer)} longer`);
   const label = `${name} at ${time}`;
   return { label, detail: details.join(" · ").replace(/^./, (c) => c.toUpperCase()) };
 }

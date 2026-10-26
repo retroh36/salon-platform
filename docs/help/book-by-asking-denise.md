@@ -19,6 +19,6 @@ Type what a client asks for in Denise's chat, on any page, and book one of the b
 
 - Times come from the same booking rules as every booking, at the length each stylist usually takes for the service where Denise knows it.
 - If nothing fits, she shows times on another day, with another stylist at the same level, and **Add to waitlist**.
-- On a client's profile, "book her a gloss on Friday" means that client.
-- If Denise can't read requests right now, she shows a form (client, service, stylist, day and time of day) that finds times the same way. **Book with the form** under her message box opens it any time.
+- On a client's profile, "book a gloss on Friday" means that client.
+- If Denise can't read a request, she says why and shows a form (client, service, stylist, day and time of day) that finds times the same way: "I'm offline right now" (she can't reach the AI), "I've reached today's limit" (the salon's daily allowance on Settings is used up; back tomorrow) or "I didn't catch that" (try saying it another way, or use the form). **Book with the form** under her message box opens it any time.
 - She never sees the client's name, phone or email, and never contacts them. Stylists and assistants can't book this way.

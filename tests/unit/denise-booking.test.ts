@@ -4,8 +4,9 @@
 // new client, follow-ups, and the form without her).
 import { describe, expect, it, vi } from "vitest";
 import { CHAT_MODEL, type ClaudeClient } from "@/lib/denise/claude";
-import { bookingTurn, mightBeBooking, pickClient, stateOf, type BookingDeps, type BookingSlot, type ClientMatch, type TimesFound } from "@/lib/denise/booking-chat";
-import { checkedParse, readBookingRequest, type BookingMenu, type BookingParse } from "@/lib/denise/booking-request";
+import { bookingTurn, mightBeBooking, MISSED, pickClient, stateOf, type BookingDeps, type BookingSlot, type ClientMatch, type TimesFound } from "@/lib/denise/booking-chat";
+import { checkedParse, isMiss, readBookingRequest, schema, type BookingMenu, type BookingParse, type ReadMiss } from "@/lib/denise/booking-request";
+import { DailyLimitReached } from "@/lib/denise/usage";
 import { applyChange, clientWords, datesFor, guessRequest, maskedLine, phoneTimes, requestFrom, vocabularyOf, windowOf, type PhoneRequest } from "@/lib/phone-booking";
 import { checkAppointment, fromLocal, parseTime, staffBusySpans, timingFor, type BookedItem, type BookingContext, type ServiceTiming } from "@/lib/scheduling";
 import { rankVisits, searchVisits, type VisitSearch } from "@/lib/scheduling/phone";
@@ -262,6 +263,31 @@ function fake(...responses: unknown[]) {
   return { client: { messages: { create } } as unknown as ClaudeClient, requests };
 }
 
+// Her reading, or the test fails saying why she couldn't.
+function read(r: BookingParse | ReadMiss): BookingParse {
+  if (isMiss(r)) throw new Error(`missed: ${r.missed}`);
+  return r;
+}
+
+describe("the answer's shape, as the API accepts it", () => {
+  // The API refused an enum holding null next to strings ("Enum value 't1'
+  // does not match declared type"): null is its own branch.
+  it("never mixes null into an enum or a list of types", () => {
+    const walk = (node: unknown, path: string): string[] => {
+      if (!node || typeof node !== "object") return [];
+      const n = node as Record<string, unknown>;
+      const here: string[] = [];
+      if (Array.isArray(n.enum) && n.enum.includes(null)) here.push(`${path}: null in enum`);
+      if (Array.isArray(n.type)) here.push(`${path}: a list of types`);
+      return [...here, ...Object.entries(n).flatMap(([k, v]) => walk(v, `${path}.${k}`))];
+    };
+    expect(walk(schema(MENU), "schema")).toEqual([]);
+    expect(schema(MENU).properties.stylist_code).toEqual({ anyOf: [{ type: "string", enum: ["t1", "t2"] }, { type: "null" }] });
+    // No stylists yet: only null.
+    expect(schema({ ...MENU, stylists: [] }).properties.stylist_code).toEqual({ type: "null" });
+  });
+});
+
 describe("Denise reading the line", () => {
   it("reads services, stylist and when from the salon's own lists", async () => {
     const { client, requests } = fake(answer({ ...blank, service_codes: ["s1", "s2"], stylist_code: "t1", when: "next_week", part_of_day: "afternoon" }));
@@ -276,20 +302,20 @@ describe("Denise reading the line", () => {
     expect(sent).not.toContain("svc-balayage");
     expect(requests[0].model).toBe(CHAT_MODEL);
 
-    const r = requestFrom(parse, "Maria Lopez", TUE);
+    const r = requestFrom(read(parse), "Maria Lopez", TUE);
     expect(r).toMatchObject({ clientText: "Maria Lopez", from: "2026-11-02", to: "2026-11-08", part: "afternoon", staffId: "st-bridget", level: null });
   });
 
   it("reads 'earliest men's cut with anyone'", async () => {
     const { client } = fake(answer({ ...blank, service_codes: ["s3"], when: "soon", earliest: true }));
     const parse = await readBookingRequest(client, "earliest men's cut with anyone", MENU);
-    const r = requestFrom(parse, null, TUE);
+    const r = requestFrom(read(parse), null, TUE);
     expect(r).toMatchObject({ serviceIds: ["svc-mens"], staffId: null, level: null, earliest: true, from: TUE, to: "2026-11-09" });
   });
 
   it("reads 'same as last time for Zoey' as same as last time, leaving the services to the visit", async () => {
     const { client } = fake(answer({ ...blank, same_as_last_time: true }));
-    const r = requestFrom(await readBookingRequest(client, maskedLine("same as last time for Zoey", "Zoey"), MENU), "Zoey", TUE);
+    const r = requestFrom(read(await readBookingRequest(client, maskedLine("same as last time for Zoey", "Zoey"), MENU)), "Zoey", TUE);
     expect(r).toMatchObject({ sameAsLast: true, serviceIds: [], clientText: "Zoey" });
   });
 
@@ -298,16 +324,20 @@ describe("Denise reading the line", () => {
     expect(parse).toMatchObject({ level: "senior", when: { kind: "weekday", weekday: 4, next: false }, after: 15 * 60 });
   });
 
-  it("gives up on an answer that isn't the shape, and without her", async () => {
+  it("says why when she can't read it: offline, today's limit, or didn't catch it", async () => {
     expect(checkedParse({ ...blank, service_codes: ["s99"] }, MENU)).toBeNull();
     expect(checkedParse({ ...blank, stylist_code: "t9" }, MENU)).toBeNull();
     expect(checkedParse("nope", MENU)).toBeNull();
-    expect(await readBookingRequest(null, "a cut", MENU)).toBeNull();
+    expect(await readBookingRequest(null, "a cut", MENU)).toEqual({ missed: "offline" });
     const { client } = fake(answer(blank, "max_tokens"));
-    expect(await readBookingRequest(client, "a cut", MENU)).toBeNull();
+    expect(await readBookingRequest(client, "a cut", MENU)).toEqual({ missed: "unclear" });
+    expect(await readBookingRequest(fake(answer({ ...blank, service_codes: ["s99"] })).client, "a cut", MENU)).toEqual({ missed: "unclear" });
     const failing = fake(new Error("overloaded"));
     const onError = vi.fn();
-    expect(await readBookingRequest(failing.client, "a cut", MENU, null, onError)).toBeNull();
+    expect(await readBookingRequest(failing.client, "a cut", MENU, null, onError)).toEqual({ missed: "offline" });
+    expect(onError).toHaveBeenCalledOnce();
+    const limited = fake(new DailyLimitReached());
+    expect(await readBookingRequest(limited.client, "a cut", MENU, null, onError)).toEqual({ missed: "limit" });
     expect(onError).toHaveBeenCalledOnce();
     // Without her reading, the fields start empty for the next two weeks.
     expect(requestFrom(null, "Zoey", TUE)).toMatchObject({ serviceIds: [], from: TUE, to: "2026-11-09", clientText: "Zoey" });
@@ -412,12 +442,12 @@ const slot = (date: string, minute: number, staffId = "st-bridget"): BookingSlot
 });
 
 // Fake database: who's on file and the times found, with what was asked.
-function chatDeps(read: BookingParse | null, found: Partial<TimesFound> = {}, clients: ClientMatch[] = [JOHN_A, JOHN_B, ZOEY]) {
+function chatDeps(reading: BookingParse | ReadMiss, found: Partial<TimesFound> = {}, clients: ClientMatch[] = [JOHN_A, JOHN_B, ZOEY]) {
   const asked: { request: PhoneRequest; clientId: string | null; laterThan: unknown }[] = [];
   const deps: BookingDeps = {
     today: TUE,
     menu: MENU,
-    read: async () => read,
+    read: async () => reading,
     findClients: async (text) => clients.filter((c) => text.toLowerCase().split(/\s+/).every((w) => c.name.toLowerCase().includes(w) || (c.phone ?? "").includes(w))),
     clientById: async (id) => clients.find((c) => c.id === id) ?? null,
     lastVisit: async (id) => (id === ZOEY.id ? { serviceIds: ["svc-womens"], staffId: "st-nola", text: "Women's Cut & Style with Nola on Oct 1" } : null),
@@ -506,15 +536,19 @@ describe("booking in Denise's chat", () => {
     expect(reply?.text).toBe("Here are later times for Zoey.");
   });
 
-  it("without Denise, shows the form started from the line", async () => {
-    const { deps, asked } = chatDeps(null);
+  it("without Denise, shows the form started from the line, saying why", async () => {
+    const { deps, asked } = chatDeps({ missed: "offline" });
     const reply = await bookingTurn("Zoey Park wants a balayage with Bridget on Thursday", null, null, deps);
-    expect(reply?.text).toBe("I can't read requests right now, so fill in what the client wants and I'll find the best times.");
+    expect(reply?.text).toBe("I'm offline right now, so fill in what the client wants and I'll find the best times.");
     expect(reply?.card).toMatchObject({ kind: "form", client: { id: ZOEY.id }, request: { serviceIds: ["svc-balayage"], staffId: "st-bridget", from: "2026-10-29" } });
     // The form's lists, without prices.
     expect(reply?.card.kind === "form" && reply.card.menu.services.map((s) => s.id)).toEqual(MENU.services.map((s) => s.id));
     expect(asked).toEqual([]);
     // A question still goes to Ask Denise.
     expect(await bookingTurn("Who's free at 3?", null, null, deps)).toBeNull();
+    // The other reasons, in plain words.
+    expect((await bookingTurn("Zoey Park wants a balayage", null, null, chatDeps({ missed: "limit" }).deps))?.text).toBe(MISSED.limit);
+    expect(MISSED.limit).toMatch(/^I've reached today's limit/);
+    expect((await bookingTurn("Zoey Park wants a balayage", null, null, chatDeps({ missed: "unclear" }).deps))?.text).toMatch(/^I didn't catch that/);
   });
 });

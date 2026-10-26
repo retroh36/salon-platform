@@ -5,6 +5,7 @@
 // worked out (no Claude). Pure.
 
 import { formatMinute } from "@/lib/scheduling/time";
+import { formatDuration } from "@/lib/duration";
 
 export type ReplyKind = "fixes" | "nothing" | "stuck" | "error";
 export type Reply = { text: string; kind: ReplyKind };
@@ -62,20 +63,20 @@ export function lateReply(f: {
   found: Found;
 }): Reply {
   if (f.alreadyPast && f.checkedIn) {
-    return { text: `${f.client}'s visit should have finished by now, even running ${f.minutes} minutes over, so nothing else is affected. Check them out when they're done.`, kind: "nothing" };
+    return { text: `${f.client}'s visit should have finished by now, even running ${formatDuration(f.minutes)} over, so nothing else is affected. Check them out when they're done.`, kind: "nothing" };
   }
   if (f.alreadyPast) {
     return {
-      text: `${f.client}'s ${formatMinute(f.start)} visit should have started by now, even ${f.minutes} minutes late, so there's no time left for me to move. If ${f.client} isn't coming, you could mark it a no-show, or rebook them for another day.`,
+      text: `${f.client}'s ${formatMinute(f.start)} visit should have started by now, even ${formatDuration(f.minutes)} late, so there's no time left for me to move. If ${f.client} isn't coming, you could mark it a no-show, or rebook them for another day.`,
       kind: "stuck",
     };
   }
   if (f.found && f.found.options > 0) {
-    return { text: `${f.checkedIn ? `${f.client}'s visit running ${f.minutes} minutes over` : `${f.client} being ${f.minutes} minutes late`} pushes into ${f.stylist}'s next client. Here's how I'd keep the day on track.`, kind: "fixes" };
+    return { text: `${f.checkedIn ? `${f.client}'s visit running ${formatDuration(f.minutes)} over` : `${f.client} being ${formatDuration(f.minutes)} late`} pushes into ${f.stylist}'s next client. Here's how I'd keep the day on track.`, kind: "fixes" };
   }
   if (f.found) {
     return {
-      text: `I couldn't find a way to fit everyone around that. You could let ${f.stylist}'s next client know they'll wait about ${f.minutes} minutes, or offer them another time.`,
+      text: `I couldn't find a way to fit everyone around that. You could let ${f.stylist}'s next client know they'll wait about ${formatDuration(f.minutes)}, or offer them another time.`,
       kind: "stuck",
     };
   }

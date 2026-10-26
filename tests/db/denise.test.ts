@@ -151,12 +151,12 @@ describe("Denise's fixes", () => {
     const state = await scanDay(frontDesk, desk, DAY, { now: NOW });
     expect(state.conflicts).toHaveLength(1);
     const [conflict] = state.conflicts;
-    expect(conflict.headline).toBe("Bridget's running 20 minutes late.");
+    expect(conflict.headline).toBe("Bridget's running 20 min late.");
     expect(conflict.itemIds).toEqual([current.id, next.id]);
     const [top] = conflict.options;
     expect(top.summary).toBe(`${name(1)} 11:00 → 11:20`);
     expect(top.intro).toBe(`I found a fix that only moves one client: ${name(1)} 11:00 → 11:20. Want me to apply it?`);
-    expect(top.reason).toBe(`${clients[1].first_name} starts 20 minutes later and stays with Bridget. Nothing else on the calendar changes.`);
+    expect(top.reason).toBe(`${clients[1].first_name} starts 20 min later and stays with Bridget. Nothing else on the calendar changes.`);
     expect(top.actionId).toBeTruthy();
 
     // Logged as a proposal, with what it would send.
@@ -223,7 +223,7 @@ describe("Denise's fixes", () => {
     const late = await reportRunningLate(frontDesk, visit.id, 15);
     const state = await scanDay(frontDesk, desk, DAY, { now: NOW });
     const [conflict] = state.conflicts;
-    expect(conflict.headline).toBe(`${name(1)} is running 15 minutes late.`);
+    expect(conflict.headline).toBe(`${name(1)} is running 15 min late.`);
     expect(conflict.options[0].summary).toBe(`${name(1)} 11:00 → 11:15`);
 
     expect((await approveFix(frontDesk, desk, conflict.options[0].actionId!, { now: NOW })).ok).toBe(true);

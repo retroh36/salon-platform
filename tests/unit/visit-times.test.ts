@@ -56,6 +56,6 @@ describe("a visit's one main action and status", () => {
     expect(text("checked_in", [{ start: 600, times: { ...none, startedAt: at("10:00"), processingStartedAt: at("10:30") } }])).toBe("Processing since 10:30am");
     expect(text("checked_in", [{ start: 600, times: { ...none, startedAt: at("10:00"), finishedAt: at("12:05") } }])).toBe("Finished at 12:05pm");
     expect(text("completed", [], null, at("12:20"))).toBe("Checked out at 12:20pm");
-    expect(timerStatus({ ...none, startedAt: at("10:00"), finishedAt: at("11:47") }, 100, TZ)).toBe("Finished at 11:47am · 1h 47m, 7m over");
+    expect(timerStatus({ ...none, startedAt: at("10:00"), finishedAt: at("11:47") }, 100, TZ)).toBe("Finished at 11:47am · 1 hr 47 min, 7 min over");
   });
 });

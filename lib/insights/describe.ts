@@ -1,6 +1,7 @@
 // Plain-English wording for what Denise has learned, from the stored facts
 // (no AI): the client insight card, "usually takes" lines. Pure.
 
+import { formatDuration } from "../duration.ts";
 import type { ClientInsight } from "./clients.ts";
 import { BASIS_TEXT, type DurationInsight } from "./durations.ts";
 
@@ -10,12 +11,6 @@ const DAY = 86_400_000;
 
 export type ClientSpend = { lifetimeSpendCents: number; averageVisitCents: number | null; retailRate: number | null };
 
-// "2h 40m", "45m".
-export function minutesText(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = Math.round(minutes % 60);
-  return h ? (m ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
-}
 
 function every(days: number): string {
   return days < 14 ? `every ~${days} days` : `every ~${Math.round(days / 7)} weeks`;
@@ -76,7 +71,7 @@ export function describeClient(
 // "Bridget usually takes 3h 1m for this (9 visits)", and when it's an
 // estimate "(12 visits, based on check-in to checkout times)".
 export function usualTime(name: string, d: Pick<DurationInsight, "medianMinutes" | "visits"> & { basis?: DurationInsight["basis"] }): string {
-  return `${name} usually takes ${minutesText(d.medianMinutes)} for this (${visitsText(d)})`;
+  return `${name} usually takes ${formatDuration(d.medianMinutes)} for this (${visitsText(d)})`;
 }
 
 // "9 visits", or "12 visits, based on check-in to checkout times".

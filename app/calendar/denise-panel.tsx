@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { DeniseFace, DenisePose, type Pose } from "@/components/denise";
+import { formatDuration } from "@/lib/duration";
 import type { DeniseRun } from "@/components/denise-chat/store";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/field";
@@ -23,7 +24,7 @@ export type Preview = { subject: string; index: number };
 // "Moves 2 clients · 35 min later in total"
 function meta(o: FixView): string {
   const parts = [o.clientsMoved === 0 ? "Moves no one" : o.clientsMoved === 1 ? "Moves 1 client" : `Moves ${o.clientsMoved} clients`];
-  if (o.shiftMinutes > 0) parts.push(`${o.shiftMinutes} min later${o.clientsMoved > 1 ? " in total" : ""}`);
+  if (o.shiftMinutes > 0) parts.push(`${formatDuration(o.shiftMinutes)} later${o.clientsMoved > 1 ? " in total" : ""}`);
   if (o.unresolved.length) parts.push(`${o.unresolved.length} to rebook`);
   return parts.join(" · ");
 }

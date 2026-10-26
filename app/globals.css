@@ -437,6 +437,29 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
+   Scrollbars: none to see until you're over something that scrolls, then a
+   thin one (the calendar, Denise's panel, booking details, tables, side
+   panels). Scrolling itself is untouched: wheel, trackpad, touch, keyboard
+   (scrollers stay focusable) and screen readers all work as before.
+   --------------------------------------------------------------------------- */
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  *:hover,
+  *:focus-visible {
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+  @media (forced-colors: active) {
+    * {
+      scrollbar-color: auto;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Reduce motion: everything changes instantly.
    --------------------------------------------------------------------------- */
 

@@ -25,7 +25,7 @@ import { pageContext } from "@/lib/denise/page";
 import { howTo } from "@/lib/help/guide";
 import type { ClientInsight } from "@/lib/insights/clients";
 import type { DurationInsight } from "@/lib/insights/durations";
-import { minutesText } from "@/lib/insights/describe";
+import { formatDuration } from "@/lib/duration";
 import type { SalonInsight } from "@/lib/insights/salon";
 import { salesRange } from "@/lib/denise/knowledge";
 import { findOpenings } from "@/lib/scheduling/openings";
@@ -193,7 +193,7 @@ async function bridgetGapDay(): Promise<Facts> {
 }
 
 const has = (answer: string, ...any: (string | number | null)[]) => any.some((x) => x !== null && answer.toLowerCase().includes(String(x).toLowerCase()));
-const mins = (m: number) => [String(m), minutesText(m)];
+const mins = (m: number) => [String(m), formatDuration(m)];
 const nextWeekday = (iso: number) => {
   for (let d = 1; d <= 7; d++) {
     const date = addDays(today, d);

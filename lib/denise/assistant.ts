@@ -11,6 +11,7 @@
 // notes), and what each tool returns depends on who's asking (./knowledge.ts).
 
 import { howTo, type HelpPage } from "@/lib/help/guide";
+import { formatDuration } from "@/lib/duration";
 import { BASIS_TEXT, type DurationBasis } from "@/lib/insights/durations";
 import type Anthropic from "@anthropic-ai/sdk";
 import { checkAppointment, describeProblem, durationMinutes, pickResource, stretchTiming, timingFor, type BookingContext, type ServiceTiming } from "@/lib/scheduling/booking";
@@ -339,7 +340,7 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
         const basis = (staffId: string) => {
           const l = lengths.get(staffId);
           return l
-            ? `${staff.get(staffId)?.firstName ?? "their"}'s usual time (typically ${l.median} minutes over ${l.visits} visits, ${BASIS_TEXT[l.basis]})`
+            ? `${staff.get(staffId)?.firstName ?? "their"}'s usual time (typically ${formatDuration(l.median)} over ${l.visits} visits, ${BASIS_TEXT[l.basis]})`
             : "the booked length for this stylist (not enough timed visits to know their usual time)";
         };
         if (!openings.length) {
@@ -390,7 +391,7 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
         const hint = typeof input.client_first_name === "string" ? input.client_first_name.slice(0, 50) : null;
         const actionId = await c.propose({
           summary,
-          reason: usual ? `Suggested from Ask Denise, booked for ${durationMinutes(usual.timing)} minutes: ${stylist.firstName}'s usual time.` : "Suggested from Ask Denise.",
+          reason: usual ? `Suggested from Ask Denise, booked for ${formatDuration(durationMinutes(usual.timing))}: ${stylist.firstName}'s usual time.` : "Suggested from Ask Denise.",
           serviceId: service.id,
           staffId: stylist.id,
           resourceId,

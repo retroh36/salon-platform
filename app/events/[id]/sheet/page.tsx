@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { formatDuration } from "@/lib/duration";
 import { LoadingShell, NotLinked } from "@/components/app-shell";
 import { Badge } from "@/components/ui/page";
 import { BackLink } from "@/components/ui/back-link";
@@ -46,7 +47,7 @@ async function Sheet({ params, searchParams }: Pick<PageProps<"/events/[id]/shee
           {formatEventDay(event.date)}
           {sheet.readyBy && <> · ready by <strong>{sheet.readyBy}</strong></>}
         </p>
-        <p className="text-ink-muted">{sheet.where}{event.onLocation && event.travelMinutes ? ` · ${event.travelMinutes} minutes' travel each way` : ""}</p>
+        <p className="text-ink-muted">{sheet.where}{event.onLocation && event.travelMinutes ? ` · ${formatDuration(event.travelMinutes)} travel each way` : ""}</p>
         {event.client && (
           <p className="text-ink-muted">
             Contact: {event.client.firstName} {event.client.lastName}

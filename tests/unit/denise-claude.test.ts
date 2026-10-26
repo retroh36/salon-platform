@@ -168,7 +168,7 @@ describe("Ask Denise", () => {
     const found = JSON.parse(await runner.run("find_openings", { service_id: "cut", date: DAY, staff_id: null, after: "11:30", before: "12:00", limit: 10 }));
     const priya = found.filter((o: { stylist: string }) => o.stylist === "Priya");
     expect(priya.map((o: { start: string }) => o.start)).toEqual(["11:30am"]);
-    expect(priya[0]).toMatchObject({ length_minutes: 80, length_basis: "Priya's usual time (typically 78 minutes over 12 visits, based on check-in to checkout times)" });
+    expect(priya[0]).toMatchObject({ length_minutes: 80, length_basis: "Priya's usual time (typically 1 hr 18 min over 12 visits, based on check-in to checkout times)" });
     // Ethan has no usual time yet: the booked length.
     expect(found.find((o: { stylist: string }) => o.stylist === "Ethan")).toMatchObject({ length_minutes: 60, length_basis: expect.stringContaining("booked length") });
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { formatDuration } from "@/lib/duration";
 import { fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { Alert, Badge } from "@/components/ui/page";
 import { formatMinute } from "@/lib/scheduling/time";
@@ -11,10 +12,8 @@ import { useUnsavedChanges } from "@/components/unsaved";
 
 function waitLabel(minutes: number): string {
   if (minutes <= 5) return "now";
-  if (minutes < 60) return `about ${Math.round(minutes / 5) * 5} min`;
-  const h = Math.floor(minutes / 60);
-  const m = Math.round((minutes % 60) / 15) * 15;
-  return `about ${h}h${m ? ` ${m}m` : ""}`;
+  if (minutes < 60) return `about ${formatDuration(Math.round(minutes / 5) * 5)}`;
+  return `about ${formatDuration(Math.round(minutes / 15) * 15)}`;
 }
 
 // Today's walk-ins: a quick queue with the estimated wait and the next free

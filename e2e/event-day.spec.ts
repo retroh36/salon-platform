@@ -164,7 +164,7 @@ test.describe.serial("an event's day", () => {
     await page.goto(`/calendar?date=${DAY}`);
     const holds = ui(page).locator("[data-time-block=event]");
     await expect(holds).toHaveCount(4);
-    await expect(holds.first()).toHaveAttribute("aria-label", new RegExp(`^Event: ${PREFIX} Rossi wedding, .*including 30 minutes' travel each way`));
+    await expect(holds.first()).toHaveAttribute("aria-label", new RegExp(`^Event: ${PREFIX} Rossi wedding, .*including 30 min travel each way`));
     await expect(holds.first().locator("[data-travel]")).toHaveCount(2);
     await holds.first().click();
     await expect(page).toHaveURL(new RegExp(`/events/${eventId}$`));

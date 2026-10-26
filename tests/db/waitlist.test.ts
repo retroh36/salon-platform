@@ -106,7 +106,7 @@ describe("waitlist", () => {
     const ctx = await loadBookingContext(frontDesk, location, DAY, DAY);
     const openings = waitlistOpenings(ctx, DAY, freed, entries, new Map([[NOLA, "Nola"]]), 0);
     const nola = openings.find((o) => o.staffId === NOLA)!;
-    expect(nola.headline).toBe("A 90-minute opening with Nola at 12:30pm fits 2 people on your waitlist.");
+    expect(nola.headline).toBe("A 1 hr 30 min opening with Nola at 12:30pm fits 2 people on your waitlist.");
     expect(nola.matches.map((m) => m.clientName)).toEqual(["Nola Waitlist", "Any Waitlist"]);
 
     // Book the first; they're off the waitlist and the time is taken.

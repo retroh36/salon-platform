@@ -16,7 +16,7 @@ Book a visit for a client from the calendar, with one or more services.
 
 ## Good to know
 
-- If the stylist usually takes longer, Denise offers a button (like **Book 1h 45m**) to book their usual length.
+- If the stylist usually takes longer, Denise offers a button (like **Book 1 hr 45 min**) to book their usual length.
 - A patch test warning shows if the service needs one. If the salon requires it, you can't book until one is recorded (see Record a patch test).
 - For several people, tap **Book a group instead**. To keep a slot free, tap **Block this time instead**.
 - Closing a booking you've started (or tapping elsewhere) asks first: **Keep editing** or **Discard changes**.

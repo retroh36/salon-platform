@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { recomputeForVisit } from "@/lib/insights/compute";
+import { formatDuration } from "@/lib/duration";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ACTION_LABELS, canBook, cancelReason, MAX_NOTES, type AppointmentAction } from "@/lib/appointments";
 import { getCurrentStaff } from "@/lib/auth";
@@ -504,7 +505,7 @@ export async function previewSeries(input: VisitInput, repeat: RepeatInput): Pro
       const start = formatMinute(Math.min(...a.lines.map((l) => l.startMinute)));
       const label =
         a.kind === "time"
-          ? `Same day at ${start} (${a.shift > 0 ? `${a.shift} min later` : `${-a.shift} min earlier`})`
+          ? `Same day at ${start} (${a.shift > 0 ? `${formatDuration(a.shift)} later` : `${formatDuration(-a.shift)} earlier`})`
           : a.kind === "stylist"
             ? `With ${[...new Set(a.lines.filter((l, i) => l.staffId !== lines[i].staffId).map((l) => staffName.get(l.staffId)))].join(" and ")} at ${formatMinute(firstStart)}`
             : `${formatDay(a.date)} at ${formatMinute(firstStart)}`;

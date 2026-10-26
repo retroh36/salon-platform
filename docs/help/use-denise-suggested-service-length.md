@@ -9,8 +9,8 @@ See how long each stylist really takes for each service, and book them for their
 
 1. In the sidebar, under **Salon**, tap **Durations**.
 2. Find the stylist. Each row shows the service, **Booked as**, **Really takes** and how many visits it's **From**.
-3. Where Denise has a suggestion, tap **Use** with the new length (for example **Use 1h 15m**).
-4. Check the message, for example "Gil's Balayage now books for 1h 15m."
+3. Where Denise has a suggestion, tap **Use** with the new length (for example **Use 1 hr 15 min**).
+4. Check the message, for example "Gil's Balayage now books for 1 hr 15 min."
 5. To go back, tap **Undo** on that row.
 
 ## Good to know

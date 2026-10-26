@@ -14,7 +14,7 @@
 
 import { applyChange, clientWords, guessRequest, maskedLine, requestFrom, vocabularyOf, type PhoneRequest } from "@/lib/phone-booking";
 import type { LocalDate } from "@/lib/scheduling/time";
-import type { BookingMenu, BookingParse } from "./booking-request";
+import { isMiss, type BookingMenu, type BookingParse, type ReadMiss } from "./booking-request";
 
 export type ClientMatch = { id: string; name: string; phone: string | null; allergies: string | null; lastVisit: string | null };
 
@@ -68,9 +68,9 @@ export type BookingState = { request: PhoneRequest; clientId: string | null; sho
 export type BookingDeps = {
   today: LocalDate;
   menu: BookingMenu;
-  // Denise reading the masked line, or null when she can't (no key, the
-  // daily limit, a failure, an answer that doesn't check out).
-  read: (masked: string, current: PhoneRequest | null) => Promise<BookingParse | null>;
+  // Denise reading the masked line, or why she can't (offline, the daily
+  // limit, an answer that doesn't check out).
+  read: (masked: string, current: PhoneRequest | null) => Promise<BookingParse | ReadMiss>;
   findClients: (text: string) => Promise<ClientMatch[]>;
   clientById: (id: string) => Promise<ClientMatch | null>;
   lastVisit: (clientId: string) => Promise<LastVisit | null>;
@@ -117,14 +117,15 @@ export async function bookingTurn(line: string, current: BookingState | null, pa
   const named = clientWords(text, vocabulary);
   const parse = await deps.read(maskedLine(text, named), current?.request ?? null);
 
-  // Without her: a form, started from what our code can tell, unless it was
-  // only ever a follow-up (that needs her) or plainly not about booking.
-  if (!parse) {
+  // Without her: a form, started from what our code can tell, saying why,
+  // unless it was only ever a follow-up (that needs her) or plainly not
+  // about booking.
+  if (isMiss(parse)) {
     if (QUESTION.test(text) || !(BOOKING_WORDS.test(text) || mentionsService(text, deps.menu))) return null;
     const request = guessRequest(text, deps.menu, named, deps.today);
     const client = await clientFor(named, pageClientId, deps);
     if (client.kind !== "found") return client.reply(request);
-    return { text: "I can't read requests right now, so fill in what the client wants and I'll find the best times.", card: { kind: "form", request, client: client.match, menu: menuOf(deps) } };
+    return { text: MISSED[parse.missed], card: { kind: "form", request, client: client.match, menu: menuOf(deps) } };
   }
   if (parse.intent === "other") return null;
 
@@ -140,6 +141,13 @@ export async function bookingTurn(line: string, current: BookingState | null, pa
   if (client.kind !== "found") return client.reply(request);
   return withClient(request, client.match, deps);
 }
+
+// Why there's a form instead of times, in plain words.
+export const MISSED: Record<ReadMiss["missed"], string> = {
+  offline: "I'm offline right now, so fill in what the client wants and I'll find the best times.",
+  limit: "I've reached today's limit, so fill in what the client wants and I'll find the best times.",
+  unclear: "I didn't catch that, so fill in what the client wants and I'll find the best times.",
+};
 
 // The client for the line: by name or phone, else the one on the page.
 async function clientFor(

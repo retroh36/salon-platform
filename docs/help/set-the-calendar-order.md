@@ -13,7 +13,7 @@ Choose the order stylists appear on the calendar, left to right, for everyone at
 
 ## Good to know
 
-- You can also do it on the calendar: drag the small dots at the top of a stylist's column header left or right. It saves straight away.
+- You can also do it on the calendar: drag the small dots at the top of a stylist's column header left or right. It saves when you let go; press **Escape** before letting go to put it back.
 - Dragging while a department is picked reorders those stylists among themselves; everyone else stays where they were.
 - In a saved view, dragging a header changes that view's order instead (your own views, or shared ones if you're an owner). See Choose who shows on the calendar with a saved view.
 - New team members go at the end until you place them.

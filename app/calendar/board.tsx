@@ -3,6 +3,7 @@
 import { toastActionClass, toastClass } from "@/components/ui/feedback";
 import Link from "next/link";
 import { useLeaveGuard } from "@/components/unsaved";
+import { formatDuration } from "@/lib/duration";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { createContext, startTransition, useCallback, useContext, useEffect, useLayoutEffect, useOptimistic, useRef, useState, ViewTransition } from "react";
@@ -556,7 +557,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
 
   // Dragging a header by its grip: the columns make room as it goes, and
   // the new order saves on letting go (followed on the window, since the
-  // header moves in the page).
+  // header moves in the page). However it ends (dropped, Escape, the
+  // browser taking the pointer, the window losing focus) the drag is
+  // cleared, so every header is back as it was.
   function onHeaderGrip(e: React.PointerEvent, staffId: string) {
     if (e.button !== 0 || columnDrag) return;
     e.preventDefault();
@@ -564,6 +567,16 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     const before = shownColumns.map((c) => c.staffId);
     let to = before.indexOf(staffId);
     setColumnDrag({ staffId, to });
+    const finish = (save: boolean) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("blur", onBlur);
+      setColumnDrag(null);
+      const after = moveItem(before, before.indexOf(staffId), to);
+      if (save && after.some((id, i) => id !== before[i])) saveOrder(before, after);
+    };
     const onMove = (ev: PointerEvent) => {
       if (ev.pointerId !== pointerId) return;
       edgeScroll(ev.clientX);
@@ -574,17 +587,20 @@ export function CalendarBoard({ data }: { data: BoardData }) {
       setColumnDrag({ staffId, to });
     };
     const onEnd = (ev: PointerEvent) => {
-      if (ev.pointerId !== pointerId) return;
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onEnd);
-      window.removeEventListener("pointercancel", onEnd);
-      setColumnDrag(null);
-      const after = moveItem(before, before.indexOf(staffId), to);
-      if (ev.type === "pointerup" && after.some((id, i) => id !== before[i])) saveOrder(before, after);
+      if (ev.pointerId === pointerId) finish(ev.type === "pointerup");
     };
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== "Escape") return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      finish(false);
+    };
+    const onBlur = () => finish(false);
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onEnd);
     window.addEventListener("pointercancel", onEnd);
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("blur", onBlur);
   }
 
   // Saves a new order for the columns shown: the view's own, or the
@@ -930,7 +946,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             ) : (
               // Columns share the width; below their minimum the grid scrolls.
               <div className="min-w-fit">
-                <div data-grid-header className="sticky top-0 z-30 grid border-b border-line-strong bg-surface" style={gridColumns}>
+                {/* Above everything on the grid (a dragged visit or blocked
+                    time, Denise's previews: z-40 at most), so a stylist's name
+                    and avatar are never covered; below menus and popovers. */}
+                <div data-grid-header className="sticky top-0 z-[45] grid border-b border-line-strong bg-surface" style={gridColumns}>
                   <div className="sticky left-0 z-10 bg-surface" />
                   {columns.map((c) => (
                       <div
@@ -939,8 +958,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                           if (el) headerRefs.current.set(c.staffId, el);
                           else headerRefs.current.delete(c.staffId);
                         }}
-                        className={`relative flex min-w-0 animate-fade-in flex-col gap-1 border-l border-line py-2.5 ${squeezed ? "px-1.5" : "px-2.5"} ${columnDrag?.staffId === c.staffId ? "z-10 bg-navy-100 shadow-lift" : ""}`}
+                        className={`relative flex min-w-0 flex-col gap-1 border-l border-line py-2.5 ${squeezed ? "px-1.5" : "px-2.5"} ${columnDrag?.staffId === c.staffId ? "z-10 bg-navy-100 shadow-lift" : ""}`}
                         data-column-header
+                        data-dragging={columnDrag?.staffId === c.staffId || undefined}
                         data-level={c.level ?? undefined}
                       >
                         {c.level && <span aria-hidden data-testid="level-bar" className={`absolute inset-x-0 top-0 h-1 ${LEVEL_BG[c.level]}`} />}
@@ -1878,7 +1898,7 @@ function EventHoldBox({ block, y, columnName }: { block: TimeBlockData; y: (minu
   const time = `${formatMinute(block.start)}–${formatMinute(block.end)}`;
   const title = block.event?.title ?? block.note ?? "Event";
   const travel = block.event?.travelMinutes ?? 0;
-  const label = [`Event: ${title}`, time, travel ? `including ${travel} minutes' travel each way` : null, columnName].filter(Boolean).join(", ");
+  const label = [`Event: ${title}`, time, travel ? `including ${formatDuration(travel)} travel each way` : null, columnName].filter(Boolean).join(", ");
   const hatch = "repeating-linear-gradient(45deg, transparent 0 4px, rgb(23 39 59 / 0.12) 4px 8px)";
   const body = (
     <>
@@ -2078,7 +2098,7 @@ function AppointmentBlock({
   const late = lateBy !== null;
   // Past the grace period: "Not arrived", not a growing count.
   const notArrived = late && lateBy >= NOT_ARRIVED_MINUTES;
-  const lateText = notArrived ? "not arrived" : lateBy ? `${lateBy} min late` : "due now";
+  const lateText = notArrived ? "not arrived" : lateBy ? `${formatDuration(lateBy)} late` : "due now";
 
   // Only lines that fit whole: name, service, then time.
   let room = height - 6;
@@ -2207,7 +2227,7 @@ function AppointmentBlock({
               // clock (it's all in the tooltip).
               <span
                 data-attention={notArrived ? "not-arrived" : "late"}
-                title={notArrived ? `Not arrived: due ${formatMinute(block.start)}` : lateBy ? `Running ${lateBy} min late` : "Due now, not here yet"}
+                title={notArrived ? `Not arrived: due ${formatMinute(block.start)}` : lateBy ? `Running ${formatDuration(lateBy)} late` : "Due now, not here yet"}
                 className="hidden shrink-0 items-center gap-0.5 text-xs leading-4 font-semibold whitespace-nowrap text-block-attention @min-[6.5rem]:flex"
               >
                 <ClockIcon className="size-3.5" />

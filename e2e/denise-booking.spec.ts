@@ -73,7 +73,7 @@ async function findTimes(bubble: Locator, opts: { service?: string; stylist?: st
 
 test("without Denise reading it, a form from the line finds the best times; Book and Confirm in one step", async ({ page }) => {
   const bubble = await ask(page, `${PAT} Test wants a Women's Cut & Style with Bridget`);
-  await expect(bubble.getByRole("region", { name: "Conversation with Denise" })).toContainText("I can't read requests right now");
+  await expect(bubble.getByRole("region", { name: "Conversation with Denise" })).toContainText("I'm offline right now");
   // What our code could tell from the line is filled in.
   const form = bubble.getByTestId("booking-form");
   await expect(form.getByLabel("Service")).toHaveValue(await serviceId("Women's Cut & Style"));

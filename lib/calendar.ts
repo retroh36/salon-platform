@@ -2,6 +2,7 @@
 // service categories, and how overlapping blocks sit in a column. Display
 // only; whether a booking is allowed is decided in lib/scheduling/booking.ts.
 
+import { formatDuration } from "@/lib/duration";
 import { subtractIntervals, type Interval } from "@/lib/scheduling/intervals";
 import { formatMinute, MINUTES_PER_DAY } from "@/lib/scheduling/time";
 
@@ -105,21 +106,18 @@ export function laneBox(lane: number, lanes: number): { left: number; width: num
 }
 
 // A stylist's day at a glance, for their column header: "3 visits ·
-// 4h 15m booked", or "No bookings". Counts each visit once however many
+// 4 hr 15 min booked", or "No bookings". Counts each visit once however many
 // services they do on it, and the time they're booked for (processing
 // included, since the client is theirs).
 export function bookedSummary(items: readonly { appointmentId: string; minutes: number }[]): string {
   if (items.length === 0) return "No bookings";
   const visits = new Set(items.map((i) => i.appointmentId)).size;
   const minutes = items.reduce((sum, i) => sum + i.minutes, 0);
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  const time = h === 0 ? `${m}m` : m === 0 ? `${h}h` : `${h}h ${m}m`;
-  return `${visits} ${visits === 1 ? "visit" : "visits"} · ${time} booked`;
+  return `${visits} ${visits === 1 ? "visit" : "visits"} · ${formatDuration(minutes)} booked`;
 }
 
 // Shorter forms of a booked summary for a narrow header, longest first:
-// "7 visits · 6h 10m booked", "7 visits · 6h 10m", "7 · 6h 10m".
+// "7 visits · 6 hr 10 min booked", "7 visits · 6 hr 10 min", "7 · 6 hr 10 min".
 // A client who hasn't checked in this many minutes after their start shows
 // as "Not arrived" (not a growing count), and Denise suggests calling them
 // or marking a no-show.

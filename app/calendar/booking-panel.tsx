@@ -12,7 +12,8 @@ import { MAX_NOTES, priceFor, visitSummary } from "@/lib/appointments";
 import { parseClientSearch } from "@/lib/clients";
 import { formatLongDay } from "@/lib/schedule-format";
 import { formatMinute, minuteToTime, parseTime } from "@/lib/scheduling/time";
-import { formatMinutes, formatPrice, sortCategories } from "@/lib/services";
+import { formatPrice, sortCategories } from "@/lib/services";
+import { formatDuration } from "@/lib/duration";
 import { DeniseFace } from "@/components/denise";
 import type { BookingIdea, BookingIdeas } from "@/lib/denise/ideas";
 import { packageFor, usesLeft, type ClientPackage } from "@/lib/packages";
@@ -385,7 +386,7 @@ export function BookingPanel({
               <div className="flex min-h-8 items-center justify-between gap-2 text-13 text-ink-muted">
                 <span data-testid="line-summary" className="tabular-nums">
                   {info && l.startMinute != null
-                    ? `${formatMinute(l.startMinute)}–${formatMinute(l.startMinute + info.minutes)} · ${formatMinutes(info.minutes)} · ${formatPrice(info.priceCents)}`
+                    ? `${formatMinute(l.startMinute)}–${formatMinute(l.startMinute + info.minutes)} · ${formatDuration(info.minutes)} · ${formatPrice(info.priceCents)}`
                     : "Choose a service"}
                 </span>
                 {lines.length > 1 && (
@@ -448,7 +449,7 @@ export function BookingPanel({
           {summary ? (
             <>
               <span>
-                {formatMinute(summary.start)}–{formatMinute(summary.end)} · {formatMinutes(summary.minutes)}
+                {formatMinute(summary.start)}–{formatMinute(summary.end)} · {formatDuration(summary.minutes)}
               </span>
               <span>{formatPrice(summary.priceCents)}</span>
             </>
@@ -770,9 +771,9 @@ function UsualLength({
     <div role="note" className="flex items-start gap-2 rounded-lg bg-denise-50 px-3 py-2.5 text-sm text-denise-900" data-testid="usual-length">
       <DeniseFace size={22} />
       <p className="flex-1">
-        This is shorter than {stylist} usually takes: {formatMinutes(learned.medianMinutes)} for this ({visitsText(learned)}).{" "}
+        This is shorter than {stylist} usually takes: {formatDuration(learned.medianMinutes)} for this ({visitsText(learned)}).{" "}
         <button type="button" className="font-medium text-denise-700 underline underline-offset-2 hover:text-denise-900" onClick={() => onUse(suggested)}>
-          Book {formatMinutes(suggested)}
+          Book {formatDuration(suggested)}
         </button>
       </p>
     </div>

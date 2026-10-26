@@ -73,7 +73,7 @@ describe("the risk check", () => {
       services: new Map([["cut", "Women's Cut"]]),
       resources: new Map(),
     };
-    expect(headline(conflict, lookup)).toBe("Bridget usually takes about 20 minutes longer than booked for Women's Cut (based on check-in to checkout times), so the 11:00 is likely to run into the next client.");
+    expect(headline(conflict, lookup)).toBe("Bridget usually takes about 20 min longer than booked for Women's Cut (based on check-in to checkout times), so the 11:00 is likely to run into the next client.");
   });
 
   it("skips visits that have started, are over, or were already reported", () => {
@@ -101,7 +101,7 @@ describe("the morning brief", () => {
   const facts: BriefFacts = {
     date: DAY,
     visits: 23,
-    risks: [{ subject: "likely:b", headline: "Bridget usually takes about 30 minutes longer…", appointmentId: "a-b" }],
+    risks: [{ subject: "likely:b", headline: "Bridget usually takes about 30 min longer…", appointmentId: "a-b" }],
     likelyNoShows: [{ appointmentId: "a-e", client: "Emma S.", time: "2pm", noShowPercent: 33, visits: 6 }],
     dueNotBooked: { total: 37, top: [{ clientId: "c-l", client: "Liam B.", overdueDays: 21, usualWeeks: 5 }, { clientId: "c-a", client: "Ava K.", overdueDays: 0, usualWeeks: 6 }] },
     openings: { count: 2, withMatches: 1 },

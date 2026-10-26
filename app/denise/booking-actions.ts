@@ -37,7 +37,7 @@ export async function bookingTimes(rawRequest: unknown, clientId: string | null)
   if (!request) return { ok: false, message: "Fill in what the client wants." };
   if (clientId !== null && !isUuid(clientId)) return { ok: false, message: "Choose the client again." };
   const menu = await bookingMenu(s);
-  const deps = bookingDeps(s, menu, async () => null, clientPolicyNote);
+  const deps = bookingDeps(s, menu, async () => ({ missed: "offline" as const }), clientPolicyNote);
   const client = clientId ? await clientById(s, clientId) : null;
   if (clientId && !client) return { ok: false, message: "That client no longer exists." };
   return { ok: true, reply: await withClient(request, client, deps) };

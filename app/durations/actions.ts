@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import type { Json } from "@/lib/database.types";
-import { minutesText, visitsText } from "@/lib/insights/describe";
+import { visitsText } from "@/lib/insights/describe";
+import { formatDuration } from "@/lib/duration";
 import type { DurationInsight } from "@/lib/insights/durations";
 import { isUuid } from "@/lib/ids";
 import { stretchTiming } from "@/lib/scheduling/booking";
@@ -39,8 +40,8 @@ export async function applySuggestedDuration(staffId: string, serviceId: string)
     p_subject: `${DURATION_FEATURE}:${staffId}:${serviceId}`,
     p_options: [
       {
-        summary: `Book ${service.name} with ${stylist.first_name} for ${minutesText(d.suggestedMinutes)}`,
-        reason: `${stylist.first_name} takes ${minutesText(d.medianMinutes)} for ${service.name} (median of ${visitsText(d)}); the menu says ${minutesText(d.menuMinutes)}.`,
+        summary: `Book ${service.name} with ${stylist.first_name} for ${formatDuration(d.suggestedMinutes)}`,
+        reason: `${stylist.first_name} takes ${formatDuration(d.medianMinutes)} for ${service.name} (median of ${visitsText(d)}); the menu says ${formatDuration(d.menuMinutes)}.`,
         proposal: { staff_service: { staff_id: staffId, service_id: serviceId, to: { active: to.activeMinutes, processing: to.processingMinutes, finishing: to.finishingMinutes } } } as Json,
       },
     ],
@@ -54,7 +55,7 @@ export async function applySuggestedDuration(staffId: string, serviceId: string)
   if (applyError) throw applyError;
   revalidatePath("/durations");
   revalidatePath("/calendar", "layout");
-  return { ok: true, message: `${stylist.first_name}'s ${service.name} now books for ${minutesText(d.suggestedMinutes)}.` };
+  return { ok: true, message: `${stylist.first_name}'s ${service.name} now books for ${formatDuration(d.suggestedMinutes)}.` };
 }
 
 export async function undoDuration(actionId: string): Promise<DurationResult> {

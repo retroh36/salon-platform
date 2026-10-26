@@ -18,6 +18,7 @@ import { readBookingRequest } from "@/lib/denise/booking-request";
 import { pageContext } from "@/lib/denise/page";
 import { clientPolicyNote } from "@/app/calendar/actions";
 import { readCallOut } from "@/lib/denise/call-out";
+import { isConnected } from "@/lib/denise/claude";
 import { assistantContext } from "@/lib/denise/context";
 import { claudeFor, deniseDay } from "@/lib/denise/day-state";
 import { DEMO_DENISE_PER_10_MIN, DEMO_LIMIT_TEXT, DEMO_SLOW_DOWN, isDemo } from "@/lib/demo";
@@ -138,12 +139,24 @@ function cleanState(raw: unknown): BookingState | null {
 }
 
 // A line in the chat read as a booking request (front of house), or null.
+// Once per server: why Denise is offline when the key isn't set, so it's
+// plain in the log (restart `npm run dev` after adding it to .env.local).
+let warnedNoKey = false;
+function warnNoKey() {
+  if (warnedNoKey || isConnected()) return;
+  warnedNoKey = true;
+  console.warn("[denise] ANTHROPIC_API_KEY isn't set in this server's environment, so Denise is offline. Add it to .env.local and restart the server.");
+}
+
 async function bookingIn(s: DeniseSession, line: string, current: BookingState | null, pageClientId: string | null, status: (text: string) => void) {
   const booker = { supabase: s.supabase, me: { id: s.me.id, business_id: s.me.business_id, location: s.viewer.location } };
   const menu = await bookingMenu(booker);
   const reader = claudeFor(s.me.business_id, "phone_booking");
   const read = async (masked: string, request: Parameters<typeof readBookingRequest>[3]) => {
-    if (!reader) return null;
+    if (!reader) {
+      warnNoKey();
+      return { missed: "offline" as const };
+    }
     status("Reading the request…");
     return readBookingRequest(reader, masked, menu, request, (error) => logDeniseError(error, { where: "reading a booking request", businessId: s.me.business_id, ref: failureRef() }));
   };

@@ -70,7 +70,7 @@ test("books a series, with Denise's suggestion for a date that doesn't fit", asy
   await expect(bad).toContainText("Denise suggests:");
   // Her first suggestion is picked: an hour later the same day.
   await expect(bad.getByRole("radio").first()).toBeChecked();
-  await expect(bad.getByRole("radio").first()).toHaveAccessibleName(/Same day at 11am \(60 min later\)/);
+  await expect(bad.getByRole("radio").first()).toHaveAccessibleName(/Same day at 11am \(1 hr later\)/);
   await form.getByRole("button", { name: "Book 4 visits" }).click();
   await expect(ui(page).getByRole("status").filter({ hasText: "Booked 4 visits." })).toBeVisible();
 

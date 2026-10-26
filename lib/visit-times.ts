@@ -3,7 +3,7 @@
 // its status in words. Pure; recorded by record_item_time.
 
 import type { AppointmentStatus } from "@/lib/appointments";
-import { formatMinutes } from "@/lib/services";
+import { formatDuration } from "@/lib/duration";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 
 export type ItemTimes = {
@@ -85,7 +85,7 @@ export function timerStatus(t: ItemTimes, bookedMinutes: number, timeZone: strin
     case "done": {
       const actual = actualMinutes(t);
       const diff = actual === null ? 0 : actual - bookedMinutes;
-      const took = actual === null ? "" : ` · ${formatMinutes(actual)}${Math.abs(diff) >= 3 ? `, ${formatMinutes(Math.abs(diff))} ${diff > 0 ? "over" : "under"}` : ""}`;
+      const took = actual === null ? "" : ` · ${formatDuration(actual)}${Math.abs(diff) >= 3 ? `, ${formatDuration(Math.abs(diff))} ${diff > 0 ? "over" : "under"}` : ""}`;
       return `Finished at ${clockAt(t.finishedAt!, timeZone)}${took}`;
     }
   }

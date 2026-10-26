@@ -38,7 +38,7 @@ async function open(page: Page, query = "") {
 }
 
 async function chooseServices(page: Page, names: string[]) {
-  // The name is followed by the duration ("45m", "1h").
+  // The name is followed by the duration ("45 min", "1 hr").
   for (const name of names) await flow(page).getByRole("button", { name: new RegExp(`^${name.replace(/[()&/]/g, ".")}\\s*\\d`) }).click();
   await cont(page).click();
 }

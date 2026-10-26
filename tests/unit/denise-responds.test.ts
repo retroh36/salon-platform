@@ -42,14 +42,14 @@ describe("her reply to running late", () => {
     expect(lateReply({ ...base, nextStart: 14 * 60 }).text).toBe("Nothing else is affected: Bridget's next client isn't until 2pm.");
   });
   it("introduces her fixes, or what to do without one", () => {
-    expect(lateReply({ ...base, found: { options: 2 } }).text).toBe("Mia's visit running 15 minutes over pushes into Bridget's next client. Here's how I'd keep the day on track.");
-    expect(lateReply({ ...base, checkedIn: false, client: "Ava", minutes: 30, found: { options: 1 } }).text).toMatch(/^Ava being 30 minutes late pushes into/);
+    expect(lateReply({ ...base, found: { options: 2 } }).text).toBe("Mia's visit running 15 min over pushes into Bridget's next client. Here's how I'd keep the day on track.");
+    expect(lateReply({ ...base, checkedIn: false, client: "Ava", minutes: 30, found: { options: 1 } }).text).toMatch(/^Ava being 30 min late pushes into/);
     expect(lateReply({ ...base, found: { options: 0 } })).toMatchObject({ kind: "stuck", text: expect.stringContaining("You could let Bridget's next client know") });
     for (const kind of ["client_late", "call_out", "overrun", "double_booking"]) expect(noFixAdvice(kind)).toMatch(/You could/);
   });
   it("says when the visit's time has already passed (reported hours later)", () => {
     expect(lateReply({ ...base, checkedIn: false, client: "Camila", minutes: 45, start: 15 * 60 + 15, alreadyPast: true, found: { options: 0 } })).toEqual({
-      text: "Camila's 3:15pm visit should have started by now, even 45 minutes late, so there's no time left for me to move. If Camila isn't coming, you could mark it a no-show, or rebook them for another day.",
+      text: "Camila's 3:15pm visit should have started by now, even 45 min late, so there's no time left for me to move. If Camila isn't coming, you could mark it a no-show, or rebook them for another day.",
       kind: "stuck",
     });
     expect(lateReply({ ...base, alreadyPast: true }).text).toMatch(/^Mia's visit should have finished by now/);

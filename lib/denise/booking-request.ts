@@ -7,9 +7,10 @@
 // "Tuesday"), in a fixed shape that's checked here. Our code works out the
 // dates, finds the client and the times (lib/phone-booking.ts,
 // lib/scheduling/phone.ts, ./booking-chat.ts). The client's name, phone
-// numbers and emails are taken out of the line before it's sent. Without
-// her (no key, the daily limit, the API failing, or an answer that doesn't
-// check out) the chat shows a form for the same fields instead.
+// numbers and emails are taken out of the line before it's sent. When she
+// can't read it, the reader says why (`ReadMiss`: offline, today's limit,
+// or an answer that doesn't check out) and the chat shows a form for the
+// same fields instead, saying so.
 
 import type Anthropic from "@anthropic-ai/sdk";
 import type { PhoneRequest, When } from "@/lib/phone-booking";
@@ -17,6 +18,7 @@ import type { PartOfDay } from "@/lib/scheduling/phone";
 import { STAFF_LEVELS, type StaffLevel } from "@/lib/schedule-forms";
 import { formatMinute, weekdayOf } from "@/lib/scheduling/time";
 import { CHAT_MODEL, type ClaudeClient } from "./claude";
+import { failureKind } from "./errors";
 
 export type BookingMenu = {
   services: readonly { id: string; name: string; category: string }[];
@@ -84,7 +86,12 @@ ${stylists}
 when: soon (no day said, or "asap", "earliest"), today, tomorrow, this_week, next_week, weekend, weekday (a day of the week: weekday is 1 for Monday to 7 for Sunday, and next is true only when it says "next Tuesday"), or date (a date written as a month and day: month 1-12, day 1-31). part_of_day: morning, afternoon or evening if said. after_hour and before_hour: 0-23 when it says "after 3" (15) or "before noon" (12); a bare number from 1 to 7 means pm. earliest is true when it asks for the earliest or soonest time.`;
 }
 
-function schema(menu: BookingMenu) {
+// A value from a list, or null. The API wants null as its own branch: an
+// enum can't hold null alongside the strings.
+const oneOrNull = (values: readonly string[]) => (values.length ? { anyOf: [{ type: "string", enum: [...values] }, { type: "null" }] } : { type: "null" });
+const intOrNull = { anyOf: [{ type: "integer" }, { type: "null" }] };
+
+export function schema(menu: BookingMenu) {
   const serviceCodes = menu.services.map((_, n) => `s${n + 1}`);
   const stylistCodes = menu.stylists.map((_, n) => `t${n + 1}`);
   return {
@@ -93,17 +100,17 @@ function schema(menu: BookingMenu) {
       intent: { type: "string", enum: ["booking", "change", "other"] },
       same_as_last_time: { type: "boolean" },
       service_codes: { type: "array", items: { type: "string", enum: serviceCodes } },
-      stylist_code: { type: ["string", "null"], enum: [...stylistCodes, null] },
-      level: { type: ["string", "null"], enum: [...STAFF_LEVELS, null] },
+      stylist_code: oneOrNull(stylistCodes),
+      level: oneOrNull(STAFF_LEVELS),
       any_stylist: { type: "boolean" },
-      when: { type: ["string", "null"], enum: [...WHEN_KINDS, null] },
-      weekday: { type: ["integer", "null"] },
+      when: oneOrNull(WHEN_KINDS),
+      weekday: intOrNull,
       next: { type: "boolean" },
-      month: { type: ["integer", "null"] },
-      day: { type: ["integer", "null"] },
-      part_of_day: { type: ["string", "null"], enum: [...PARTS, null] },
-      after_hour: { type: ["integer", "null"] },
-      before_hour: { type: ["integer", "null"] },
+      month: intOrNull,
+      day: intOrNull,
+      part_of_day: oneOrNull(PARTS),
+      after_hour: intOrNull,
+      before_hour: intOrNull,
       any_time: { type: "boolean" },
       earliest: { type: "boolean" },
       later: { type: "boolean" },
@@ -185,18 +192,24 @@ export function checkedParse(raw: unknown, menu: BookingMenu): BookingParse | nu
   };
 }
 
-// The masked line read by Claude, or null when she can't (staff fill in
-// the form instead). `current` is the request on screen, for follow-ups.
+// Why she couldn't read a line: no connection to Claude (no key, the API
+// failing), the salon's daily limit, or an answer that doesn't check out.
+export type ReadMiss = { missed: "offline" | "limit" | "unclear" };
+export const isMiss = (r: BookingParse | ReadMiss): r is ReadMiss => "missed" in r;
+
+// The masked line read by Claude, or why she couldn't (staff fill in the
+// form instead). `current` is the request on screen, for follow-ups.
 export async function readBookingRequest(
   client: ClaudeClient | null,
   masked: string,
   menu: BookingMenu,
   current: PhoneRequest | null = null,
   onError: (error: unknown) => void = () => {},
-): Promise<BookingParse | null> {
-  if (!client) return null;
+): Promise<BookingParse | ReadMiss> {
+  if (!client) return { missed: "offline" };
+  let response: Anthropic.Message;
   try {
-    const response = await client.messages.create(
+    response = await client.messages.create(
       {
         model: CHAT_MODEL,
         max_tokens: 600,
@@ -206,16 +219,24 @@ export async function readBookingRequest(
       },
       { timeout: 15_000, maxRetries: 1 },
     );
-    if (response.stop_reason !== "end_turn") return null;
-    const body = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("");
-    const parse = checkedParse(JSON.parse(body), menu);
-    // A change needs something on screen to change.
-    return parse && parse.intent === "change" && !current ? { ...parse, intent: "booking" } : parse;
   } catch (error) {
+    if (failureKind(error) === "limit") return { missed: "limit" };
     onError(error);
-    return null;
+    return { missed: "offline" };
   }
+  if (response.stop_reason !== "end_turn") return { missed: "unclear" };
+  const body = response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+  let raw: unknown;
+  try {
+    raw = JSON.parse(body);
+  } catch {
+    return { missed: "unclear" };
+  }
+  const parse = checkedParse(raw, menu);
+  if (!parse) return { missed: "unclear" };
+  // A change needs something on screen to change.
+  return parse.intent === "change" && !current ? { ...parse, intent: "booking" } : parse;
 }

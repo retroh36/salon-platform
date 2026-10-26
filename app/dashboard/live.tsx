@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
+import { formatDuration } from "@/lib/duration";
 import { Badge, EmptyState, Section, textLinkClass, type Tone } from "@/components/ui/page";
 import type { LiveData, LiveVisit, StylistCard } from "@/lib/dashboard-load";
 import type { StylistStatus } from "@/lib/dashboard";
@@ -77,7 +78,7 @@ function RightNow({ live, mineOnly }: { live: LiveData; mineOnly: boolean }) {
             empty="Everyone's on time."
             visits={live.late}
             line={(v) => `due ${formatMinute(v.start)} with ${v.staffName}`}
-            tag={(v) => `${(v as LiveVisit & { lateMinutes: number }).lateMinutes} min late`}
+            tag={(v) => `${formatDuration((v as LiveVisit & { lateMinutes: number }).lateMinutes)} late`}
             testId="running-late"
           />
         </div>

@@ -20,7 +20,7 @@ import { addDays, daysBetween, formatMinute, isLocalDate, toLocal, todayIn, type
 import { levelPricesFrom, stylistPrice } from "@/lib/services";
 import { fullName } from "@/lib/staff";
 import type { BookingDeps, BookingSlot, ClientAlerts, ClientMatch, LastVisit, TimesFound } from "./booking-chat";
-import type { BookingMenu, BookingParse } from "./booking-request";
+import type { BookingMenu } from "./booking-request";
 
 type Supabase = SupabaseClient<Database>;
 export type Booker = { supabase: Supabase; me: { id: string; business_id: string; location: { id: string; timezone: string } } };
@@ -220,7 +220,7 @@ export async function findTimes(s: Booker, menu: PricedMenu, request: PhoneReque
 }
 
 // Everything the chat's booking turn needs, for this staff member.
-export function bookingDeps(s: Booker, menu: PricedMenu, read: (masked: string, current: PhoneRequest | null) => Promise<BookingParse | null>, policyNote: (clientId: string) => Promise<string | null>): BookingDeps {
+export function bookingDeps(s: Booker, menu: PricedMenu, read: BookingDeps["read"], policyNote: (clientId: string) => Promise<string | null>): BookingDeps {
   return {
     today: todayIn(s.me.location.timezone),
     menu,

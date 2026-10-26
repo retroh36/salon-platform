@@ -125,7 +125,7 @@ describe("the risk check", () => {
     expect(first.ok && next.ok).toBe(true);
     const state = await scanDay(frontDesk, { location, salon: "Maple & Ash", canBook: true }, RISK_DAY, { now: at(7, 0, RISK_DAY) });
     const risk = state.conflicts.find((c) => c.kind === "likely_overrun");
-    expect(risk?.headline).toMatch(/^Bridget usually takes about \d+ minutes longer than booked for Balayage/);
+    expect(risk?.headline).toMatch(/^Bridget usually takes about (\d+ hr )?\d+ min longer than booked for Balayage/);
     expect(risk!.options.length).toBeGreaterThan(0);
     expect(risk!.options[0].actionId).toBeTruthy();
   });

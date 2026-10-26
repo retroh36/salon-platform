@@ -1,4 +1,5 @@
 import type { Tables } from "@/lib/database.types";
+import { formatDuration } from "@/lib/duration";
 import { STAFF_LEVELS, type StaffLevel } from "@/lib/schedule-forms";
 
 type ServiceTimes = Pick<Tables<"services">, "active_minutes" | "processing_minutes" | "finishing_minutes">;
@@ -59,22 +60,14 @@ export function formatPriceRange(prices: readonly number[]): string {
   return min === max ? formatPrice(min) : `${formatPrice(min)}–${formatPrice(max)}`;
 }
 
-// 75 -> "1h 15m", 45 -> "45m", 120 -> "2h".
-export function formatMinutes(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m}m`;
-  return m === 0 ? `${h}h` : `${h}h ${m}m`;
-}
-
 export function totalMinutes(times: ServiceTimes): number {
   return times.active_minutes + times.processing_minutes + times.finishing_minutes;
 }
 
-// "1h 25m" or "1h 25m · 35m processing".
+// "1 hr 25 min" or "1 hr 25 min · 35 min processing".
 export function formatServiceTime(times: ServiceTimes): string {
-  const total = formatMinutes(totalMinutes(times));
-  return times.processing_minutes > 0 ? `${total} · ${formatMinutes(times.processing_minutes)} processing` : total;
+  const total = formatDuration(totalMinutes(times));
+  return times.processing_minutes > 0 ? `${total} · ${formatDuration(times.processing_minutes)} processing` : total;
 }
 
 export function sortCategories(categories: Iterable<string>): string[] {

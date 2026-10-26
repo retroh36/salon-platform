@@ -59,7 +59,7 @@ test.describe("owners", () => {
       "Blowouts & Styling (6)",
       "Treatments (6)",
     ]);
-    await expect(serviceRow(page, "Root Touch-Up")).toContainText("1h 25m · 35m processing");
+    await expect(serviceRow(page, "Root Touch-Up")).toContainText("1 hr 25 min · 35 min processing");
     // Masters (Bridget, Gil, Sandra) charge more for a root touch-up than Lois, a Senior.
     await expect(serviceRow(page, "Root Touch-Up")).toContainText("$95–$110");
     await expect(ui(page).getByText("Archived (1)")).toBeVisible();
@@ -95,7 +95,7 @@ test.describe("owners", () => {
     await ui(page).getByRole("button", { name: "Add service" }).click();
 
     await expect(page).toHaveURL("/services");
-    await expect(serviceRow(page, name)).toContainText("45m · 20m processing");
+    await expect(serviceRow(page, name)).toContainText("45 min · 20 min processing");
     await expect(serviceRow(page, name)).toContainText("$70");
     await expect(serviceRow(page, name)).toContainText("Bridget");
   });

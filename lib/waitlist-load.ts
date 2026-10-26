@@ -4,6 +4,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import { formatDuration } from "@/lib/duration";
 import { proposalFromJson } from "@/lib/scheduling/ai-actions";
 import type { BookingContext } from "@/lib/scheduling/booking";
 import { FREE_STATUSES, startOfLocalDay } from "@/lib/scheduling/load";
@@ -120,7 +121,7 @@ export function waitlistOpenings(
       staffName: name,
       startMinute: opening.start,
       endMinute: opening.end,
-      headline: `A ${opening.end - opening.start}-minute opening with ${name} at ${formatMinute(opening.start)} fits ${people} on your waitlist.`,
+      headline: `A ${formatDuration(opening.end - opening.start)} opening with ${name} at ${formatMinute(opening.start)} fits ${people} on your waitlist.`,
       matches: matches.map((m) => ({
         entryId: m.entryId,
         clientName: row.get(m.entryId)!.clientName,

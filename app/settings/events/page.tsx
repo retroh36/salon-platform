@@ -7,7 +7,8 @@ import { getCurrentStaff } from "@/lib/auth";
 import { loadEventSettings, loadPackages, loadTerms } from "@/lib/events/load";
 import { packageRoles, PARTY_ROLE_LABELS } from "@/lib/events/types";
 import { can } from "@/lib/permissions";
-import { formatMinutes, formatPrice } from "@/lib/services";
+import { formatPrice } from "@/lib/services";
+import { formatDuration } from "@/lib/duration";
 import { SettingsNav } from "../settings-nav";
 import { EventPackageForm, EventSettingsForm } from "./forms";
 
@@ -45,7 +46,7 @@ async function EventSettingsView() {
                   <span>
                     <span className="font-medium text-ink">{p.name}</span>{" "}
                     <span className="text-sm text-ink-muted">
-                      · {packageRoles(p)} · {formatMinutes(p.hairMinutes + p.makeupMinutes)}
+                      · {packageRoles(p)} · {formatDuration(p.hairMinutes + p.makeupMinutes)}
                       {p.partyRole && ` · ${PARTY_ROLE_LABELS[p.partyRole]}`}
                     </span>
                   </span>
