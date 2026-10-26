@@ -10,15 +10,16 @@ Known gaps to pick up later. Move an item into a task when it's scheduled.
 
 ## Calendar and booking
 
-- [ ] **Rules checked in the app only.** The booking rules and status changes run in `lib/scheduling/` before the database functions save. A staff member who can book could skip them by calling those functions directly with their own login. If that matters (e.g. before opening an API), have the functions accept only calls from the server.
+- [ ] **Rules checked in the app only.** The database itself refuses a double-booking (a stylist's busy time or a chair held twice), but the other booking rules (hours, time off, blocked time) and status changes run in `lib/scheduling/` before the database functions save. A staff member who can book could skip them by calling those functions directly with their own login. If that matters (e.g. before opening an API), have the functions accept only calls from the server.
 - [ ] **Move a whole visit.** Dragging moves one service; a visit with two stylists needs each moved separately (or edited in the panel).
 - [ ] **Undo a move.** A drag saves straight away; offer "Undo" in the notice.
 - [ ] **Confirm appointments.** "Confirmed" exists as a status but there's no action for it yet; it comes with reminders (phase 3).
-- [ ] **Touch dragging.** Drag uses pointer events and should work on tablets, but it's only been tested with a mouse.
 - [ ] **Category colors chosen by the salon.** The calendar colors categories in alphabetical order from a fixed palette, so adding a category can shift colors. Let managers pick a color per category.
 - [ ] **Breaks during processing.** A stylist must be on shift for a whole item, processing included, so a color can't process over their lunch. Some salons allow it; make it a setting.
 - [ ] **Client double-booking.** The booking rules check stylists and resources, not clients; the same client could be booked in two places at once.
 - [ ] **Pending time off on the calendar.** Only approved time off is shown; pending requests could be shown faintly so the front desk knows.
+
+- [ ] **The hour the clocks skip or repeat.** Left as it is for now, since salons are closed then. In spring, a wall-clock time between 2:00 and 3:00am doesn't exist: the app (`fromLocal`, `shiftStart` in `lib/scheduling/time.ts`) refuses it, while Postgres moves it an hour forward, and the event builder would send no start for a task in that hour. In autumn, 1:00 to 2:00am happens twice and `fromLocal` always picks the first, so a visit at the second 1:30am (an import, say) moves an hour earlier if it's edited or moved. If it ever matters, pick one rule (the next minute that exists) and use it in both places.
 
 ## Denise (AI assistant)
 
