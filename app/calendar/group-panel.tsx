@@ -10,6 +10,7 @@ import { formatMinute, minuteToTime, parseTime } from "@/lib/scheduling/time";
 import { saveGroup, type ClientOption } from "./actions";
 import { ClientPicker, type BookingStart } from "./booking-panel";
 import type { BoardData } from "./types";
+import { useUnsavedChanges } from "@/components/unsaved";
 
 type Guest = { key: number; client: ClientOption | null; serviceId: string; staffId: string; startMinute: number | null };
 type Timing = "together" | "staggered" | "custom";
@@ -33,6 +34,10 @@ export function GroupPanel({ data, start, onClose, onSaved }: { data: BoardData;
   const [message, setMessage] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[][]>([]);
   const [pending, startTransition] = useTransition();
+  // Changed since it opened: leaving asks first.
+  const snapshot = JSON.stringify([label, notes, timing, first, every, guests.map((g) => [g.client?.id ?? null, g.serviceId, g.staffId, g.startMinute])]);
+  const [opened] = useState(snapshot);
+  useUnsavedChanges(snapshot !== opened);
 
   // Each guest's start, from the timing.
   const starts = timing === "custom" ? guests.map((g) => g.startMinute) : first == null ? guests.map(() => null) : staggered(first, guests.length, timing === "staggered" ? Number(every) || 0 : 0);

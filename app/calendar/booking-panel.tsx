@@ -19,6 +19,7 @@ import type { Scope } from "@/lib/scheduling/series";
 import { clientPackagesFor, clientPolicyNote, patchTestWarnings, findClients, previewSeries, quickAddClient, saveSeries, saveVisit, saveVisitScoped, type ClientOption, type SeriesPreviewVisit, type VisitInput } from "./actions";
 import type { AppointmentDetail, BoardData } from "./types";
 import { reach } from "@/lib/reach";
+import { useUnsavedChanges } from "@/components/unsaved";
 
 export type BookingStart = { staffId: string; startMinute: number };
 
@@ -91,6 +92,10 @@ export function BookingPanel({
   const [preview, setPreview] = useState<SeriesPreviewVisit[] | null>(null);
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [scope, setScope] = useState<Scope>("this");
+  // Changed since it opened: leaving asks first.
+  const snapshot = JSON.stringify([client?.id ?? null, lines.map((l) => [l.serviceId, l.staffId, l.startMinute, l.resource, l.minutes ?? null]), notes, date, repeat]);
+  const [opened] = useState(snapshot);
+  useUnsavedChanges(snapshot !== opened);
 
   // Time and price for a line: an item that keeps its service keeps its
   // booked length, and its price unless the stylist changes.

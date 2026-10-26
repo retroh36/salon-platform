@@ -7,6 +7,7 @@ import { Alert } from "@/components/ui/page";
 import { formatMinute } from "@/lib/scheduling/time";
 import type { BoardData } from "./types";
 import { addWalkIn, bookWalkInNow, walkIns, walkInLeft, type WalkInView } from "./waitlist-actions";
+import { useUnsavedChanges } from "@/components/unsaved";
 
 function waitLabel(minutes: number): string {
   if (minutes <= 5) return "now";
@@ -28,6 +29,8 @@ export function WalkInPanel({ data, onClose, onBooked }: { data: BoardData; onCl
   const staffName = (id: string) => data.columns.find((c) => c.staffId === id)?.firstName ?? "a stylist";
   const serviceName = (id: string) => data.menu.services.find((s) => s.id === id)?.name ?? "A service";
   const services = data.menu.services.filter((s) => !s.archived);
+  // Something filled in: leaving asks first.
+  useUnsavedChanges(Boolean(name.trim() || phone.trim() || serviceId));
 
   useEffect(() => {
     let live = true;

@@ -9,6 +9,7 @@ import { BLOCK_KINDS, BLOCK_LABELS, type BlockFormErrors } from "@/lib/schedulin
 import { formatMinute, minuteToTime, weekdayOf, type LocalDate } from "@/lib/scheduling/time";
 import { deleteBlock, moveBlock, saveBlock } from "./block-actions";
 import type { ColumnData, TimeBlockData } from "./types";
+import { useUnsavedChanges } from "@/components/unsaved";
 
 const DAYS = [
   [1, "Mon"],
@@ -66,6 +67,10 @@ export function BlockPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const name = (id: string) => columns.find((c) => c.staffId === id)?.name ?? "";
+  // Changed since it opened: leaving asks first.
+  const snapshot = JSON.stringify([scope, staffId, kind, note, from, to, repeat, weekdays, until]);
+  const [opened] = useState(snapshot);
+  useUnsavedChanges(snapshot !== opened);
 
   const run = (action: () => Promise<{ ok: boolean; message: string; errors?: BlockFormErrors }>) =>
     startTransition(async () => {

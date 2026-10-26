@@ -19,6 +19,7 @@ Block time in a stylist's day for lunch, a break, training, a meeting or persona
 - Stylists can block only their own time: tap an empty time in your column, or use **Block time**.
 - Denise may move a lunch or break by up to 30 minutes as part of a fix you approve. She never moves training, meetings or personal time. Undo puts it back.
 - To move or remove a block, see Change or remove blocked time.
+- Closing the form after changing it asks first: **Keep editing** or **Discard changes**.
 
 ## If it doesn't work
 

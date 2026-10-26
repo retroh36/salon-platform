@@ -19,6 +19,7 @@ Book a visit for a client from the calendar, with one or more services.
 - If the stylist usually takes longer, Denise offers a button (like **Book 1h 45m**) to book their usual length.
 - A patch test warning shows if the service needs one. If the salon requires it, you can't book until one is recorded (see Record a patch test).
 - For several people, tap **Book a group instead**. To keep a slot free, tap **Block this time instead**.
+- Closing a booking you've started (or tapping elsewhere) asks first: **Keep editing** or **Discard changes**.
 - A stylist is never booked with two clients at once, and a chair never holds two: Maestra itself refuses it, even when two people book the same time on two screens. A stylist can still take a client while another's color processes.
 
 ## If it doesn't work

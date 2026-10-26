@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useLeaveGuard } from "@/components/unsaved";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { createContext, startTransition, useCallback, useContext, useEffect, useLayoutEffect, useOptimistic, useRef, useState, ViewTransition } from "react";
@@ -285,11 +286,16 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // The pill is about 20px tall, centered on the line; a label is too.
   const nowHides = (mark: number) => nowMinute !== null && nowMinute >= range.start && nowMinute < range.end && Math.abs(mark - nowMinute) * PX_PER_MINUTE < NOW_PILL_CLEARANCE;
 
-  const select = (next: Selection) => {
+  // Anything that would throw away a half-filled form in the panel asks
+  // first; `show` is for what a form does itself (after saving, say).
+  const guard = useLeaveGuard();
+  const { leave } = guard;
+  const show = (next: Selection) => {
     setSelection(next);
     setTab("details");
     setPanelOpen(true);
   };
+  const select = (next: Selection) => leave(() => show(next));
 
   // Shows Denise's latest view. A conflict or reorder she hasn't shown
   // before opens her panel at it; anything else new makes her badge bounce.
@@ -339,11 +345,14 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       if ((e.target as HTMLElement | null)?.closest?.("[role=dialog], [role=listbox]")) return;
-      setPanelOpen(false);
+      leave(
+        () => setPanelOpen(false),
+        () => setSelection({ kind: "none" }),
+      );
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [panelOpen]);
+  }, [panelOpen, leave]);
 
   // Looking at Denise's panel clears what was new.
   if (panelOpen && tab === "denise" && unseen.size) setUnseen(new Set());
@@ -617,7 +626,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // blocking their own time).
   function onSlotClick(e: React.MouseEvent<HTMLElement>, column: ColumnData) {
     if ((e.target as HTMLElement).closest("[data-block], [data-time-block]")) return;
-    if (panelOpen) return setPanelOpen(false);
+    if (panelOpen) return leave(() => setPanelOpen(false), closeDetails);
     const top = e.currentTarget.getBoundingClientRect().top;
     const minute = range.start + Math.floor((e.clientY - top) / PX_PER_MINUTE / SLOT_STEP) * SLOT_STEP;
     const start = { staffId: column.staffId, startMinute: Math.min(minute, range.end - SLOT_STEP) };
@@ -687,8 +696,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     gridTemplateColumns: `4rem repeat(${columns.length}, minmax(${squeezed ? "0px" : COLUMN_MIN}, 1fr))`,
   };
   const dayLink = (d: string) => (d === data.today ? "/calendar" : `/calendar?date=${d}`);
-  const goTo = (d: string) => router.push(dayLink(d), { transitionTypes: [d > data.date ? "nav-forward" : "nav-back"] });
   const closeDetails = () => setSelection({ kind: "none" });
+  const goTo = (d: string) => leave(() => router.push(dayLink(d), { transitionTypes: [d > data.date ? "nav-forward" : "nav-back"] }), closeDetails);
+  // A form's own Cancel.
+  const cancel = () => leave(closeDetails);
   // A visit moved to another day: go there, with it open.
   const openOn = (d: string, appointmentId: string) => {
     setArriving(appointmentId);
@@ -1124,165 +1135,169 @@ export function CalendarBoard({ data }: { data: BoardData }) {
 
       {/* Denise and booking details: a panel that slides over the calendar
           when something opens it. */}
-      <aside
-        aria-label="Assistant and booking details"
-        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col gap-4 border-l border-line bg-surface p-4 shadow-panel transition-[transform,visibility] duration-(--motion-slow) ease-out sm:w-96 ${
-          // Closed, it's hidden once it has slid away, so keyboard focus skips it.
-          panelOpen ? "visible translate-x-0" : "invisible translate-x-full"
-        }`}
-      >
-        <Tabs
-          label="Assistant"
-          value={tab}
-          onChange={setTab}
-          panelKey={`${tab}-${selection.kind}-${"appointmentId" in selection ? selection.appointmentId : ""}`}
-          tabs={[
-            { value: "denise", label: "Denise", icon: <DeniseFace size={20} />, badge: <DeniseBadge count={attention} /> },
-            { value: "details", label: "Booking details", icon: <CalendarIcon className="size-4" /> },
-          ]}
-          trailing={
-            // The panel's one close button (a visit being viewed is let go too).
-            <IconButton
-              label="Close panel"
-              onClick={() => {
-                setPanelOpen(false);
-                if (selection.kind === "detail") closeDetails();
-              }}
-            >
-              <CloseIcon />
-            </IconButton>
-          }
+      <guard.Provider value={guard.set}>
+        <aside
+          aria-label="Assistant and booking details"
+          className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col gap-4 border-l border-line bg-surface p-4 shadow-panel transition-[transform,visibility] duration-(--motion-slow) ease-out sm:w-96 ${
+            // Closed, it's hidden once it has slid away, so keyboard focus skips it.
+            panelOpen ? "visible translate-x-0" : "invisible translate-x-full"
+          }`}
         >
-          {tab === "denise" ? (
-            <DenisePanel
-              data={data}
-              state={deniseState && { ...deniseState, conflicts, notices }}
-              working={deciding || deniseRun.working || (scanning && !deniseState)}
-              run={deniseRun}
-              outcome={outcome}
-              chat={chat}
-              preview={preview}
-              onApprove={approve}
-              onReject={reject}
-              onUndo={undo}
-              onDismiss={(subject) => setDismissed((all) => new Set(all).add(subject))}
-              onPreview={setPreview}
-              onAsk={ask}
-              onOpen={(appointmentId) => select({ kind: "detail", appointmentId })}
-              onDismissNotice={(id) => {
-                setDismissed((all) => new Set(all).add(id));
-                startTransition(() => dismissDeniseItem(id, data.date).then(() => {}));
-              }}
-              onNoShow={(n) => {
-                setDismissed((all) => new Set(all).add(n.id));
-                startTransition(async () => {
-                  const result = await changeVisitStatus(n.appointmentId, "no_show");
-                  if (result.ok) offerUndo("no_show", n.appointmentId, n.clientName.split(" ")[0]);
-                  else setOutcome({ message: result.message ?? "That didn't work. Try again from the booking.", error: true, undoActionId: null });
-                  if (!result.ok)
-                    setDismissed((all) => {
-                      const next = new Set(all);
-                      next.delete(n.id);
-                      return next;
-                    });
-                });
-              }}
-              onBook={(actionId, clientId) => decide(() => approveDeniseFix(actionId, data.date, clientId), actionId)}
-              onRejectSuggestion={(actionId) => decide(() => rejectDeniseFix(actionId, data.date), null)}
-              onBookWaitlist={(o, m) => decide(() => bookFromWaitlist(m.entryId, o.staffId, data.date, m.startMinute), null)}
-            />
-          ) : selection.kind === "detail" && data.appointments[selection.appointmentId] ? (
-            <AppointmentPanel
-              date={data.date}
-              today={data.today}
-              timeZone={data.timeZone}
-              appointment={data.appointments[selection.appointmentId]}
-              me={me}
-              onEdit={() => select({ kind: "edit", appointmentId: selection.appointmentId })}
-              onClose={closeDetails}
-              onReportLate={reportLate}
-              onCanceled={onCanceled}
-              // A full load: /checkout/new is a route handler that opens the checkout.
-              // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-              onCheckout={() => window.location.assign(`/checkout/new?appointment=${selection.appointmentId}&from=${encodeURIComponent(window.location.pathname + window.location.search)}`)}
-              onOpenVisit={(appointmentId) => select({ kind: "detail", appointmentId })}
-              onCheckedIn={(appointmentId) => offerUndo("check_in", appointmentId)}
-              onNoShow={(appointmentId) => offerUndo("no_show", appointmentId)}
-              onMoved={(date, appointmentId, message) => {
-                if (date !== data.date) openOn(date, appointmentId);
-                setDoneMessage(message);
-              }}
-              team={data.columns.map((c) => ({ id: c.staffId, name: c.name }))}
-              products={data.menu.products}
-            />
-          ) : selection.kind === "walk-ins" ? (
-            <WalkInPanel
-              data={data}
-              onClose={closeDetails}
-              onBooked={(id, message) => {
-                setDoneMessage(message);
-                if (data.date === data.today) select({ kind: "detail", appointmentId: id });
-                else closeDetails();
-              }}
-            />
-          ) : selection.kind === "book" ? (
-            <BookingPanel
-              data={data}
-              start={selection.start}
-              onClose={closeDetails}
-              onSaved={(id, message) => {
-                select({ kind: "detail", appointmentId: id });
-                if (message) setDoneMessage(message);
-              }}
-              onBlockInstead={blockStaff.includes(selection.start.staffId) ? () => select({ kind: "new-block", start: selection.start }) : undefined}
-              onGroupInstead={() => select({ kind: "group", start: selection.start })}
-            />
-          ) : selection.kind === "group" ? (
-            <GroupPanel
-              data={data}
-              start={selection.start}
-              onClose={closeDetails}
-              onSaved={(id, message) => {
-                select({ kind: "detail", appointmentId: id });
-                setDoneMessage(message);
-              }}
-            />
-          ) : selection.kind === "new-block" || (selection.kind === "block" && data.timeBlocks.some((b) => b.blockId === selection.blockId)) ? (
-            <BlockPanel
-              key={selection.kind === "block" ? selection.blockId : "new"}
-              date={data.date}
-              columns={data.columns}
-              staffChoices={blockStaff}
-              block={selection.kind === "block" ? data.timeBlocks.find((b) => b.blockId === selection.blockId) : undefined}
-              start={selection.kind === "new-block" ? selection.start : undefined}
-              onClose={closeDetails}
-              onDone={(message) => {
-                closeDetails();
-                setPanelOpen(false);
-                setNotice(null);
-                setBlockMoves({});
-                setDoneMessage(message);
-              }}
-            />
-          ) : selection.kind === "edit" && data.appointments[selection.appointmentId] ? (
-            <BookingPanel
-              data={data}
-              appointment={data.appointments[selection.appointmentId]}
-              onClose={() => select({ kind: "detail", appointmentId: selection.appointmentId })}
-              onSaved={(id, message, date) => {
-                if (date && date !== data.date) openOn(date, id);
-                else select({ kind: "detail", appointmentId: selection.appointmentId });
-                if (message) setDoneMessage(message);
-              }}
-            />
-          ) : (
-            <div className="flex flex-col gap-3 py-6 text-sm text-ink-muted">
-              <p>Choose an appointment to see its details{me.canBook ? ", or click an empty time to book it." : "."}</p>
-              {me.canBook && <p>Drag an appointment to move it.</p>}
-            </div>
-          )}
-        </Tabs>
-      </aside>
+          <Tabs
+            label="Assistant"
+            value={tab}
+            onChange={setTab}
+            panelKey={`${tab}-${selection.kind}-${"appointmentId" in selection ? selection.appointmentId : ""}`}
+            tabs={[
+              { value: "denise", label: "Denise", icon: <DeniseFace size={20} />, badge: <DeniseBadge count={attention} /> },
+              { value: "details", label: "Booking details", icon: <CalendarIcon className="size-4" /> },
+            ]}
+            trailing={
+              // The panel's one close button (a visit being viewed is let go too).
+              <IconButton
+                label="Close panel"
+                onClick={() =>
+                  leave(() => {
+                    setPanelOpen(false);
+                    if (selection.kind === "detail") closeDetails();
+                  }, closeDetails)
+                }
+              >
+                <CloseIcon />
+              </IconButton>
+            }
+          >
+            {tab === "denise" ? (
+              <DenisePanel
+                data={data}
+                state={deniseState && { ...deniseState, conflicts, notices }}
+                working={deciding || deniseRun.working || (scanning && !deniseState)}
+                run={deniseRun}
+                outcome={outcome}
+                chat={chat}
+                preview={preview}
+                onApprove={approve}
+                onReject={reject}
+                onUndo={undo}
+                onDismiss={(subject) => setDismissed((all) => new Set(all).add(subject))}
+                onPreview={setPreview}
+                onAsk={ask}
+                onOpen={(appointmentId) => select({ kind: "detail", appointmentId })}
+                onDismissNotice={(id) => {
+                  setDismissed((all) => new Set(all).add(id));
+                  startTransition(() => dismissDeniseItem(id, data.date).then(() => {}));
+                }}
+                onNoShow={(n) => {
+                  setDismissed((all) => new Set(all).add(n.id));
+                  startTransition(async () => {
+                    const result = await changeVisitStatus(n.appointmentId, "no_show");
+                    if (result.ok) offerUndo("no_show", n.appointmentId, n.clientName.split(" ")[0]);
+                    else setOutcome({ message: result.message ?? "That didn't work. Try again from the booking.", error: true, undoActionId: null });
+                    if (!result.ok)
+                      setDismissed((all) => {
+                        const next = new Set(all);
+                        next.delete(n.id);
+                        return next;
+                      });
+                  });
+                }}
+                onBook={(actionId, clientId) => decide(() => approveDeniseFix(actionId, data.date, clientId), actionId)}
+                onRejectSuggestion={(actionId) => decide(() => rejectDeniseFix(actionId, data.date), null)}
+                onBookWaitlist={(o, m) => decide(() => bookFromWaitlist(m.entryId, o.staffId, data.date, m.startMinute), null)}
+              />
+            ) : selection.kind === "detail" && data.appointments[selection.appointmentId] ? (
+              <AppointmentPanel
+                date={data.date}
+                today={data.today}
+                timeZone={data.timeZone}
+                appointment={data.appointments[selection.appointmentId]}
+                me={me}
+                onEdit={() => select({ kind: "edit", appointmentId: selection.appointmentId })}
+                onClose={closeDetails}
+                onReportLate={reportLate}
+                onCanceled={onCanceled}
+                // A full load: /checkout/new is a route handler that opens the checkout.
+                // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+                onCheckout={() => window.location.assign(`/checkout/new?appointment=${selection.appointmentId}&from=${encodeURIComponent(window.location.pathname + window.location.search)}`)}
+                onOpenVisit={(appointmentId) => select({ kind: "detail", appointmentId })}
+                onCheckedIn={(appointmentId) => offerUndo("check_in", appointmentId)}
+                onNoShow={(appointmentId) => offerUndo("no_show", appointmentId)}
+                onMoved={(date, appointmentId, message) => {
+                  if (date !== data.date) openOn(date, appointmentId);
+                  setDoneMessage(message);
+                }}
+                team={data.columns.map((c) => ({ id: c.staffId, name: c.name }))}
+                products={data.menu.products}
+              />
+            ) : selection.kind === "walk-ins" ? (
+              <WalkInPanel
+                data={data}
+                onClose={cancel}
+                onBooked={(id, message) => {
+                  setDoneMessage(message);
+                  if (data.date === data.today) show({ kind: "detail", appointmentId: id });
+                  else closeDetails();
+                }}
+              />
+            ) : selection.kind === "book" ? (
+              <BookingPanel
+                data={data}
+                start={selection.start}
+                onClose={cancel}
+                onSaved={(id, message) => {
+                  show({ kind: "detail", appointmentId: id });
+                  if (message) setDoneMessage(message);
+                }}
+                onBlockInstead={blockStaff.includes(selection.start.staffId) ? () => show({ kind: "new-block", start: selection.start }) : undefined}
+                onGroupInstead={() => show({ kind: "group", start: selection.start })}
+              />
+            ) : selection.kind === "group" ? (
+              <GroupPanel
+                data={data}
+                start={selection.start}
+                onClose={cancel}
+                onSaved={(id, message) => {
+                  show({ kind: "detail", appointmentId: id });
+                  setDoneMessage(message);
+                }}
+              />
+            ) : selection.kind === "new-block" || (selection.kind === "block" && data.timeBlocks.some((b) => b.blockId === selection.blockId)) ? (
+              <BlockPanel
+                key={selection.kind === "block" ? selection.blockId : "new"}
+                date={data.date}
+                columns={data.columns}
+                staffChoices={blockStaff}
+                block={selection.kind === "block" ? data.timeBlocks.find((b) => b.blockId === selection.blockId) : undefined}
+                start={selection.kind === "new-block" ? selection.start : undefined}
+                onClose={cancel}
+                onDone={(message) => {
+                  closeDetails();
+                  setPanelOpen(false);
+                  setNotice(null);
+                  setBlockMoves({});
+                  setDoneMessage(message);
+                }}
+              />
+            ) : selection.kind === "edit" && data.appointments[selection.appointmentId] ? (
+              <BookingPanel
+                data={data}
+                appointment={data.appointments[selection.appointmentId]}
+                onClose={() => select({ kind: "detail", appointmentId: selection.appointmentId })}
+                onSaved={(id, message, date) => {
+                  if (date && date !== data.date) openOn(date, id);
+                  else show({ kind: "detail", appointmentId: selection.appointmentId });
+                  if (message) setDoneMessage(message);
+                }}
+              />
+            ) : (
+              <div className="flex flex-col gap-3 py-6 text-sm text-ink-muted">
+                <p>Choose an appointment to see its details{me.canBook ? ", or click an empty time to book it." : "."}</p>
+                {me.canBook && <p>Drag an appointment to move it.</p>}
+              </div>
+            )}
+          </Tabs>
+        </aside>
+      </guard.Provider>
 
       {pendingMove && (
         <ScopeDialog
@@ -1306,7 +1321,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           onCancel={() => setPendingMove(null)}
         />
       )}
-
+      {guard.dialog}
     </div>
   );
 }
