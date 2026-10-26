@@ -91,7 +91,7 @@ test("shows the client's alerts, and fills in the same as last time", async ({ p
   await expect(panel.getByText("Latex allergy")).toBeVisible();
   await expect(alerts).toContainText("Last visit:");
   await alerts.getByRole("button", { name: "Same as last time" }).click();
-  await expect(panel.getByLabel("Service")).not.toHaveValue("");
+  await expect(panel.getByRole("combobox", { name: /^Service/ })).not.toHaveValue("");
   await expect(panel.getByLabel("Stylist")).not.toHaveValue("anyone");
 });
 

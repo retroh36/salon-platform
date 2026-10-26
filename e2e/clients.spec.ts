@@ -108,7 +108,7 @@ test.describe("front desk", () => {
     await form.getByLabel("Phone", { exact: true }).fill("555");
     await form.getByLabel("Email", { exact: true }).fill("rosa@example");
     await form.getByLabel("Allergies and sensitivities").fill("Fragrance sensitivity");
-    await form.getByLabel("Preferred stylist").selectOption({ label: "Sandra Whitfield" });
+    await form.getByLabel("Preferred stylist", { exact: true }).selectOption({ label: "Sandra Whitfield" });
     await expect(form.getByLabel("Signed on")).toBeDisabled();
     await form.getByLabel("Consent form signed").check();
     await expect(form.getByLabel("Signed on")).toBeEnabled();
@@ -119,7 +119,7 @@ test.describe("front desk", () => {
     await expect(form.getByText("Enter a 10-digit phone number.")).toBeVisible();
     await expect(form.getByText("Enter a valid email address.")).toBeVisible();
     await expect(form.getByLabel("First name")).toHaveValue(`${PREFIX} Rosa`);
-    await expect(form.getByLabel("Preferred stylist")).toHaveValue(SEED.staff.sandra);
+    await expect(form.getByLabel("Preferred stylist", { exact: true })).toHaveValue(SEED.staff.sandra);
     await expect(form.getByLabel("Consent form signed")).toBeChecked();
     await expect(form.getByLabel("Signed on")).toHaveValue("2026-01-15");
 
