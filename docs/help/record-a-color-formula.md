@@ -17,6 +17,6 @@ Save the color formula used on a visit, with the products and amounts.
 ## Good to know
 
 - The products are taken from stock when the visit is checked out. A formula saved after checkout updates stock straight away.
-- The **Formula** tab also shows earlier formulas for the client. Their profile lists them all under **Color formulas**.
-- You can also add one from the client's profile: fill in the form under **Color formulas**, choose the visit under **For service**, and tap **Add formula entry**.
+- The **Formula** tab also shows earlier formulas for the client, newest first; the one to start from is marked **Latest**. Their profile's **Formulas** tab lists them all, the latest on top.
+- You can also add one from the client's profile: tap the **Formulas** tab, then **Add formula**, choose the visit under **For service**, and tap **Save formula**.
 - In booking details, a formula can be recorded on the day of the visit or after. Stylists can record them on their own visits.

@@ -35,7 +35,7 @@ export function safeReturn(path: string | null | undefined): string | null {
 // the visit's services, using the client's package or what their
 // membership includes where one covers it),
 // or a new sale (optionally with a product on it). Returns the draft's id.
-export async function startCheckout(supabase: Supabase, me: Me, options: { appointmentId?: string | null; productId?: string | null; returnTo?: string | null }): Promise<string | null> {
+export async function startCheckout(supabase: Supabase, me: Me, options: { appointmentId?: string | null; productId?: string | null; clientId?: string | null; returnTo?: string | null }): Promise<string | null> {
   const returnTo = safeReturn(options.returnTo);
   if (options.appointmentId) {
     const { data: open } = await supabase.from("sale_drafts").select("id").eq("appointment_id", options.appointmentId).eq("status", "open").maybeSingle();
@@ -96,9 +96,11 @@ export async function startCheckout(supabase: Supabase, me: Me, options: { appoi
     const { data: p } = await supabase.from("products").select("id, brand, line, name, price_cents, type").eq("id", options.productId).maybeSingle();
     if (p?.type === "retail") ticket = { ...EMPTY_TICKET, lines: [{ key: key(), kind: "product", productId: p.id, name: [p.brand, p.line, p.name].filter(Boolean).join(" "), staffId: null, unitPriceCents: p.price_cents ?? 0, quantity: 1, discount: null }] };
   }
+  // A client this person can see, or none.
+  const client = options.clientId ? (await supabase.from("clients").select("id").eq("id", options.clientId).maybeSingle()).data : null;
   const { data, error } = await supabase
     .from("sale_drafts")
-    .insert({ business_id: me.business_id, location_id: me.location.id, ticket: ticket as never, return_to: returnTo, created_by: me.id })
+    .insert({ business_id: me.business_id, location_id: me.location.id, client_id: client?.id ?? null, ticket: ticket as never, return_to: returnTo, created_by: me.id })
     .select("id")
     .single();
   if (error) throw error;

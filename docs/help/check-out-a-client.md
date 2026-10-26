@@ -18,6 +18,7 @@ Start checkout for a visit from the calendar.
 - When the sale is done the visit turns green on the calendar ("Checked out").
 - To reverse a checkout, a manager or owner voids the sale. Booking details shows a link to it.
 - For the checkout screen itself (payments, tips, rebooking), see the checkout help pages.
+- **Check out** on a client's profile opens today's visit, or a new sale for them if they have none today.
 
 ## If it doesn't work
 

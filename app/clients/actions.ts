@@ -13,6 +13,7 @@ import {
 import { describeUsage, parseUsageLines } from "@/lib/color-usage";
 import { isUuid } from "@/lib/ids";
 import { loadBackBarProducts } from "@/lib/inventory-load";
+import { editedLine, MAX_CLIENT_NOTES } from "@/lib/client-profile";
 import { todayIn } from "@/lib/scheduling/time";
 
 // Echoed back so the form keeps what was typed after an error.
@@ -49,8 +50,11 @@ export async function saveClient(_prev: SaveClientState, formData: FormData): Pr
   const preferred = parsed.value.preferred_staff_id;
   if (preferred && !isUuid(preferred)) return { errors: {}, message: "Choose a stylist from the list.", fields };
 
+  // Notes are edited on the profile itself, not in this form (saveClientNotes).
+  const details: Partial<typeof parsed.value> = { ...parsed.value };
+  delete details.notes;
   const result = clientId
-    ? await supabase.from("clients").update(parsed.value).eq("id", clientId).select("id")
+    ? await supabase.from("clients").update(details).eq("id", clientId).select("id")
     : await supabase
         .from("clients")
         .insert({ ...parsed.value, business_id: me.business_id })
@@ -69,6 +73,31 @@ export async function saveClient(_prev: SaveClientState, formData: FormData): Pr
 
   revalidatePath("/clients", "layout");
   redirect(`/clients/${result.data[0].id}`);
+}
+
+export type SaveNotesResult = { ok: true; notes: string; edited: string | null } | { ok: false; message: string };
+
+// The client's notes, from the profile (front of house). Who changed them
+// and when is recorded by the database (trigger `clients_stamp_notes`).
+export async function saveClientNotes(clientId: string, notes: string): Promise<SaveNotesResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canEditClients(me.role)) return { ok: false, message: "Only owners, managers and front desk can change client notes." };
+  if (!isUuid(clientId)) return { ok: false, message: "That client doesn't exist." };
+  const text = notes.trim();
+  if (text.length > MAX_CLIENT_NOTES) return { ok: false, message: `Notes can be up to ${MAX_CLIENT_NOTES.toLocaleString("en-US")} characters.` };
+  const { data, error } = await supabase
+    .from("clients")
+    .update({ notes: text || null })
+    .eq("id", clientId)
+    .select("notes, notes_updated_at, editor:staff!clients_notes_updated_by_business_id_fkey(first_name, last_name)");
+  if (error) {
+    if (error.code === "42501") return { ok: false, message: "You don't have permission to change this client." };
+    throw error;
+  }
+  if (!data.length) return { ok: false, message: "That client doesn't exist." };
+  const row = data[0];
+  revalidatePath(`/clients/${clientId}`);
+  return { ok: true, notes: row.notes ?? "", edited: editedLine(row.notes_updated_at, row.editor, me.location.timezone) };
 }
 
 export type FormulaFormFields = { visit_date: string; formula: string; notes: string; appointment_item_id: string; lines: string };

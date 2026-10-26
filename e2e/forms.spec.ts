@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration, openChecklist, slotAt } from "./fixtures";
+import { AUTH, clientTab, expect, test, ui, waitForHydration, openChecklist, slotAt } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -146,6 +146,7 @@ test.describe("front desk", () => {
 
     // The signed form is on the client's profile.
     await page.goto(`/clients/${client}`);
+    await clientTab(page, "Forms");
     await page.getByRole("list", { name: "Signed forms" }).getByRole("link", { name: /New client consultation/ }).click();
     await expect(page.getByText("Box dye in spring")).toBeVisible();
     await expect(page.getByRole("img", { name: `Signature of ${PREFIX}Nova Test` })).toBeVisible();
@@ -171,13 +172,14 @@ test.describe("front desk", () => {
 
     // Record one (a week before), and the booking goes through.
     await page.goto(`/clients/${clientId}`);
-    await waitForHydration(page, "form[aria-label='Record patch test']");
+    const history = await clientTab(page, "Patch tests");
+    await history.getByRole("button", { name: "Add patch test" }).click();
     const record = page.getByRole("form", { name: "Record patch test" });
     await record.getByLabel("Date").fill(addDays(todayIn(TZ), -1));
     await record.getByLabel("Products tested").fill("Redken Shades EQ 09V");
     await record.getByRole("button", { name: "Record patch test" }).click();
-    await expect(record.getByRole("status")).toHaveText("Saved.");
+    await expect(record).toHaveCount(0);
     await expect(page.getByRole("list", { name: "Patch test history" })).toContainText("Redken Shades EQ 09V");
-    await expect(page.getByRole("region", { name: "Patch tests" })).toContainText("Valid today for services that need one.");
+    await expect(history.getByTestId("patch-state")).toHaveText("Valid today for services that need one.");
   });
 });

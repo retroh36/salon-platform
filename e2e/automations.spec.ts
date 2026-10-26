@@ -126,7 +126,7 @@ test.describe("front desk", () => {
   test("records a client's birthday", async ({ page }) => {
     const { data: c } = await admin.from("clients").insert({ business_id: B, first_name: "Birthdayna", last_name: "Test" }).select("id").single();
     try {
-      await page.goto(`/clients/${c!.id}`);
+      await page.goto(`/clients/${c!.id}/edit`);
       await waitForHydration(page, "select[name=birth_month]");
       await ui(page).getByLabel("Birthday month").selectOption({ label: "February" });
       await ui(page).getByLabel("Birthday day").selectOption("30");

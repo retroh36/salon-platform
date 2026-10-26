@@ -7,6 +7,7 @@ import { buttonClass } from "@/components/ui/button";
 import { selectClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
 import type { PickerProduct } from "@/lib/inventory-load";
+import { useCloseRecord } from "./add-record";
 import { addFormula } from "./actions";
 
 // A recent service on one of the client's visits.
@@ -26,6 +27,8 @@ export function FormulaForm({ clientId, today, visits, products }: { clientId: s
   const failed = state && !state.saved ? state : null;
   const errors = failed?.errors ?? {};
   const formRef = useRef<HTMLFormElement>(null);
+  // Opened from "Add formula": closes once saved.
+  const close = useCloseRecord();
   const [itemId, setItemId] = useState(failed?.fields.appointment_item_id ?? "");
   const [date, setDate] = useState(failed?.fields.visit_date ?? today);
   const [lines, setLines] = useState<DraftLine[]>(linesFrom(failed?.fields.lines));
@@ -42,8 +45,10 @@ export function FormulaForm({ clientId, today, visits, products }: { clientId: s
     }
   }
   useEffect(() => {
-    if (state?.saved) formRef.current?.reset();
-  }, [state]);
+    if (!state?.saved) return;
+    formRef.current?.reset();
+    close?.();
+  }, [state, close]);
 
   return (
     <form ref={formRef} action={action} onSubmit={submitWithoutReset(action)} aria-label="Add formula" className="grid gap-4 pb-4 sm:grid-cols-[11rem_1fr]" noValidate>
@@ -88,8 +93,13 @@ export function FormulaForm({ clientId, today, visits, products }: { clientId: s
       </Field>
       <div className="flex items-center gap-3 sm:col-start-2">
         <button type="submit" disabled={pending} className={buttonClass("primary", "md")}>
-          {pending ? "Saving…" : "Add formula entry"}
+          {pending ? "Saving…" : "Save formula"}
         </button>
+        {close && (
+          <button type="button" onClick={close} className={buttonClass("quiet", "md")}>
+            Cancel
+          </button>
+        )}
         {state?.saved && (
           <span role="status" className="animate-fade-in text-sm text-ink-muted">
             Saved.

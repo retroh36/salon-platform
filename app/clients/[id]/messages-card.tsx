@@ -46,7 +46,7 @@ export async function MessagesCard({ supabase, clientId, firstName, tz }: { supa
             email={{ on: consent.appointmentEmailOk, possible: Boolean(consent.email) }}
           />
         </div>
-        <p className="py-3 text-sm text-ink-muted">Offers: {offers ? `yes to ${offers}` : "no"} (change it under Details).</p>
+        <p className="py-3 text-sm text-ink-muted">Offers: {offers ? `yes to ${offers}` : "no"} (change it in Edit details).</p>
         {Boolean(events?.length) && (
           <details className="py-3">
             <summary className="cursor-pointer text-sm font-medium text-ink">Consent history</summary>

@@ -24,7 +24,7 @@ import { LEVEL_LABELS, STAFF_LEVELS } from "@/lib/schedule-forms";
 import { BLOCK_LABELS } from "@/lib/scheduling/blocks";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, toLocal } from "@/lib/scheduling/time";
-import { calendarStamp, changeVisitStatus, moveGroupVisit, saveCalendarZoom, moveVisitItem, moveVisitItemScoped, undoVisitCheckIn, undoVisitNoShow } from "./actions";
+import { calendarStamp, changeVisitStatus, type ClientOption, moveGroupVisit, saveCalendarZoom, moveVisitItem, moveVisitItemScoped, undoVisitCheckIn, undoVisitNoShow } from "./actions";
 import type { Scope } from "@/lib/scheduling/series";
 import { moveBlock } from "./block-actions";
 import { BlockPanel, repeatLabel } from "./block-panel";
@@ -73,7 +73,7 @@ type Selection =
   | { kind: "none" }
   | { kind: "block"; blockId: string }
   | { kind: "new-block"; start: { staffId: string; startMinute: number } }
-  | { kind: "book"; start: BookingStart }
+  | { kind: "book"; start: BookingStart; client?: ClientOption }
   | { kind: "edit"; appointmentId: string }
   | { kind: "detail"; appointmentId: string }
   | { kind: "walk-ins" }
@@ -151,7 +151,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // A link from the Dashboard can ask for a booking, a stylist's column or
   // Denise's panel (data.focus).
   const linked = data.focus.appointmentId && data.appointments[data.focus.appointmentId] ? data.focus.appointmentId : null;
-  const [selection, setSelection] = useState<Selection>(linked ? { kind: "detail", appointmentId: linked } : { kind: "none" });
+  // "Book" on a client's profile: a new booking for them, open on arrival.
+  const [selection, setSelection] = useState<Selection>(
+    linked ? { kind: "detail", appointmentId: linked } : data.focus.book ? { kind: "book", start: data.focus.book.start, client: data.focus.book.client } : { kind: "none" },
+  );
   // Denise: her view of the day (for the board's data she last looked at),
   // and what she's doing.
   const [denise, setDenise] = useState<{ state: DeniseState; for: BoardData } | null>(null);
@@ -173,10 +176,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     setOutcome(null);
     setPreview(null);
   }
-  const [tab, setTab] = useState<Tab>(linked ? "details" : "denise");
+  const [tab, setTab] = useState<Tab>(linked || data.focus.book ? "details" : "denise");
   // The panel is closed until something opens it: a booking, a new
   // booking, Denise spotting something, or a question for her.
-  const [panelOpen, setPanelOpen] = useState(Boolean(linked || data.focus.denise || data.focus.ask));
+  const [panelOpen, setPanelOpen] = useState(Boolean(linked || data.focus.book || data.focus.denise || data.focus.ask));
   // What Denise has that hasn't been looked at in her panel yet.
   const [unseen, setUnseen] = useState<ReadonlySet<string>>(new Set());
 
@@ -431,8 +434,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   useEffect(() => {
     if (followed.current) return;
     followed.current = true;
-    const { staffId, denise: openDenise, appointmentId, ask: question } = data.focus;
-    if (!staffId && !openDenise && !appointmentId && !question) return;
+    const { staffId, denise: openDenise, appointmentId, ask: question, book } = data.focus;
+    if (!staffId && !openDenise && !appointmentId && !question && !book) return;
     if (staffId) columnRefs.current.get(staffId)?.scrollIntoView({ inline: "center", block: "nearest" });
     if (staffId) setTimeout(() => setFocusedStaff(null), 2500);
     if (question) queueMicrotask(() => ask(question));
@@ -1272,6 +1275,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               <BookingPanel
                 data={data}
                 start={selection.start}
+                client={selection.client}
                 onClose={cancel}
                 onSaved={(id, message) => {
                   show({ kind: "detail", appointmentId: id });
@@ -2073,6 +2077,7 @@ function AppointmentBlock({
       .filter(Boolean)
       .join(" · "),
     ...(others.length ? ["Whole visit:", ...block.parts.map((p) => `${p.service} · ${p.staff}, ${formatMinute(p.start)}–${formatMinute(p.end)}`)] : []),
+    ...(block.allergies ? [`Allergies: ${block.allergies}`] : []),
   ];
   const plainService = block.service.replace(/\s*\([^)]*\)/g, "");
   // This stylist's part of the visit only; the rest is in the tooltip.
@@ -2091,6 +2096,7 @@ function AppointmentBlock({
     block.member,
     STATUS_LABELS[block.status],
     late && (notArrived ? "not arrived" : "running late"),
+    block.allergies && `allergies: ${block.allergies}`,
   ]
     .filter(Boolean)
     .join(", ");

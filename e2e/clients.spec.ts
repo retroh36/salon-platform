@@ -129,7 +129,7 @@ test.describe("front desk", () => {
 
     await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/);
     await expect(ui(page).getByRole("heading", { level: 1 })).toHaveText(`${PREFIX} Rosa Delgado`);
-    await expect(ui(page).getByText("(312) 555-0177 · rosa.delgado@example.com")).toBeVisible();
+    await expect(ui(page).getByTestId("client-contact")).toHaveText(/\(312\) 555-0177\s*rosa\.delgado@example\.com/);
     await expect(ui(page).getByRole("note", { name: "Allergies" })).toContainText("Fragrance sensitivity");
 
     // Findable straight away.
@@ -138,22 +138,103 @@ test.describe("front desk", () => {
     await expect(results(page).filter({ hasText: `${PREFIX} Rosa Delgado` })).toBeVisible();
   });
 
-  test("edit a client's details", async ({ page }) => {
+  test("edit a client's details from the profile, opening the form only when asked", async ({ page }) => {
     const { data } = await admin
       .from("clients")
-      .insert({ business_id: SEED.business, first_name: `${PREFIX} Edit`, last_name: "Me", phone: "(312) 555-0178" })
+      .insert({ business_id: SEED.business, first_name: `${PREFIX} Edit`, last_name: "Me", phone: "(312) 555-0178", notes: "Keep me." })
       .select("id")
       .single();
     await page.goto(`/clients/${data!.id}`);
-    await waitForHydration(page, "input[name=first_name]");
+    // View mode: the contact details are text (tap to call), no form.
+    await expect(ui(page).getByRole("link", { name: "(312) 555-0178" })).toHaveAttribute("href", "tel:(312) 555-0178");
+    await expect(ui(page).getByLabel("First name")).toHaveCount(0);
 
+    await ui(page).getByRole("link", { name: "Edit details" }).click();
+    await expect(page).toHaveURL(`/clients/${data!.id}/edit`);
+    await waitForHydration(page, "input[name=first_name]");
+    // Notes aren't in the details form: they're on the profile.
+    await expect(ui(page).getByLabel("Notes", { exact: true })).toHaveCount(0);
     await ui(page).getByLabel("Phone", { exact: true }).fill("(312) 555-0179");
-    await ui(page).getByLabel("Notes", { exact: true }).fill("Prefers Saturday mornings.");
     await ui(page).getByRole("button", { name: "Save changes" }).click();
 
-    await expect(ui(page).getByText("(312) 555-0179")).toBeVisible();
+    await expect(page).toHaveURL(`/clients/${data!.id}`);
+    await expect(ui(page).getByRole("link", { name: "(312) 555-0179" })).toBeVisible();
+    // Saving the details leaves the notes as they were.
+    await expect(ui(page).getByTestId("notes-text")).toHaveText("Keep me.");
+  });
+
+  test("notes save at the top of the profile and say who changed them", async ({ page }) => {
+    const { data } = await admin.from("clients").insert({ business_id: SEED.business, first_name: `${PREFIX} Notes`, last_name: "Client", allergies: "Latex: nitrile gloves only." }).select("id").single();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`/clients/${data!.id}`);
+    await waitForHydration(page, "[data-testid=notes-text]");
+
+    // Allergies first, at the very top, then the header, then the notes,
+    // above the history.
+    const top = async (selector: string) => (await page.locator(selector).filter({ visible: true }).first().boundingBox())!.y;
+    const alert = ui(page).getByRole("note", { name: "Allergies" });
+    await expect(alert).toContainText("Latex: nitrile gloves only.");
+    expect(await top("[data-testid=allergy-alert]")).toBeLessThan(await top("[data-testid=client-header]"));
+    expect(await top("[data-testid=client-header]")).toBeLessThan(await top("[data-testid=client-notes]"));
+    expect(await top("[data-testid=client-notes]")).toBeLessThan(await top("[role=tablist]"));
+
+    const notes = ui(page).getByTestId("client-notes");
+    await expect(notes.getByTestId("notes-text")).toHaveText(/No notes yet/);
+    await notes.getByTestId("notes-text").click();
+    await notes.getByRole("textbox", { name: "Notes" }).fill("Prefers a quiet chair. Always offer an oat latte.");
+    await expect(notes.getByRole("status")).toHaveText("Notes saved.");
+    await expect(notes.getByTestId("notes-edited")).toHaveText(/^Edited by Sam Rivera on /);
+    await notes.getByRole("button", { name: "Done" }).click();
+    await expect(notes.getByTestId("notes-text")).toHaveText("Prefers a quiet chair. Always offer an oat latte.");
+
     await page.reload();
-    await expect(ui(page).getByLabel("Notes", { exact: true })).toHaveValue("Prefers Saturday mornings.");
+    await expect(ui(page).getByTestId("notes-text")).toHaveText("Prefers a quiet chair. Always offer an oat latte.");
+    await expect(ui(page).getByTestId("notes-edited")).toHaveText(/^Edited by Sam Rivera on /);
+  });
+
+  test("Book on the profile starts a booking for the client on the calendar", async ({ page }) => {
+    const { data } = await admin.from("clients").insert({ business_id: SEED.business, first_name: `${PREFIX} Book`, last_name: "Client", phone: "(312) 555-0186", allergies: "Fragrance" }).select("id").single();
+    await page.goto(`/clients/${data!.id}`);
+    await ui(page).getByRole("link", { name: "Book", exact: true }).click();
+    const form = page.getByRole("form", { name: "New booking" });
+    await expect(form.getByRole("region", { name: "Client" })).toContainText(`${PREFIX} Book Client`);
+    await expect(form.getByRole("region", { name: "Client" })).toContainText("Fragrance");
+    // The address is tidied, so a reload doesn't start another.
+    await expect(page).toHaveURL(/\/calendar(\?date=[\d-]+)?$/);
+  });
+
+  test("patch tests and formulas open their add forms only when asked, and the tab is remembered", async ({ page }) => {
+    const { data } = await admin.from("clients").insert({ business_id: SEED.business, first_name: `${PREFIX} Tabs`, last_name: "Client" }).select("id").single();
+    await page.goto(`/clients/${data!.id}`);
+    await waitForHydration(page, "[role=tab]");
+    const history = ui(page).getByRole("region", { name: "History" });
+
+    // No history: one quiet line each, no blank forms.
+    await expect(history.getByText("No visits yet.")).toBeVisible();
+    await history.getByRole("tab", { name: /^Patch tests/ }).click();
+    await expect(history.getByText("No patch tests yet.")).toBeVisible();
+    await expect(history.getByRole("form", { name: "Record patch test" })).toHaveCount(0);
+
+    await history.getByRole("button", { name: "Add patch test" }).click();
+    const form = history.getByRole("form", { name: "Record patch test" });
+    await expect(form).toBeVisible();
+    await form.getByLabel("Products tested").fill("Shades EQ 6N + processing solution");
+    await form.getByRole("button", { name: "Record patch test" }).click();
+    // Saved: the form closes and the test is listed.
+    await expect(form).toHaveCount(0);
+    await expect(history.getByRole("list", { name: "Patch test history" })).toContainText("Shades EQ 6N + processing solution");
+
+    await history.getByRole("tab", { name: /^Formulas/ }).click();
+    await expect(history.getByText("No formulas yet.")).toBeVisible();
+    await expect(history.getByRole("form", { name: "Add formula" })).toHaveCount(0);
+    await history.getByRole("button", { name: "Add formula" }).click();
+    await expect(history.getByRole("form", { name: "Add formula" })).toBeVisible();
+    await history.getByRole("button", { name: "Cancel" }).click();
+    await expect(history.getByRole("form", { name: "Add formula" })).toHaveCount(0);
+
+    // The next profile opens on the tab last used.
+    await page.reload();
+    await expect(ui(page).getByRole("tab", { name: /^Formulas/ })).toHaveAttribute("aria-selected", "true");
   });
 });
 
@@ -245,30 +326,38 @@ test.describe("stylists", () => {
       price_cents: svc!.price_cents,
     });
     await page.goto(`/clients/${data!.id}`);
+    await waitForHydration(page, "[role=tab]");
+
+    // The same layout, read-only: notes at the top with no editing, no
+    // Edit details or Book.
+    await expect(ui(page).getByTestId("notes-text")).toHaveText("Growing out bangs.");
+    await expect(ui(page).getByRole("button", { name: "Edit notes" })).toHaveCount(0);
+    await expect(ui(page).getByRole("link", { name: "Edit details" })).toHaveCount(0);
+    await expect(ui(page).getByRole("link", { name: "Book" })).toHaveCount(0);
+    await expect(ui(page).getByLabel("First name")).toHaveCount(0);
+    // No money for stylists.
+    await expect(ui(page).getByTestId("client-stats").locator("[data-stat=spend]")).toHaveCount(0);
+
+    await ui(page).getByRole("tab", { name: /^Formulas/ }).click();
+    await expect(ui(page).getByText("No formulas yet.")).toBeVisible();
+    await ui(page).getByRole("button", { name: "Add formula" }).click();
     await waitForHydration(page, "textarea[name=formula]");
 
-    // Details are shown, not editable.
-    await expect(ui(page).getByText("Growing out bangs.")).toBeVisible();
-    await expect(ui(page).getByRole("button", { name: "Save changes" })).toHaveCount(0);
-    await expect(ui(page).getByLabel("First name")).toHaveCount(0);
-    await expect(ui(page).getByRole("heading", { name: "Color formulas (0)" })).toBeVisible();
-
     // An empty formula is rejected.
-    await ui(page).getByRole("button", { name: "Add formula entry" }).click();
+    await ui(page).getByRole("button", { name: "Save formula" }).click();
     await expect(ui(page).getByText("Enter the formula.")).toBeVisible();
 
     await ui(page).getByLabel("Formula", { exact: true }).fill("Roots: Shades EQ 6N + 6NB (1:1), 20 vol, 35 min");
     await ui(page).getByRole("form", { name: "Add formula" }).getByLabel("Notes (optional)").fill("Lifted fast; check at 30.");
-    await ui(page).getByRole("button", { name: "Add formula entry" }).click();
+    await ui(page).getByRole("button", { name: "Save formula" }).click();
 
-    await expect(ui(page).getByRole("status")).toHaveText("Saved.");
-    await expect(ui(page).getByRole("heading", { name: "Color formulas (1)" })).toBeVisible();
-    const entry = ui(page).getByRole("list", { name: "Formula history" }).getByRole("listitem").first();
+    // Saved: the form closes and the newest formula is on top, marked.
+    await expect(ui(page).getByRole("form", { name: "Add formula" })).toHaveCount(0);
+    const entry = ui(page).getByTestId("latest-formula");
+    await expect(entry).toContainText("Latest");
     await expect(entry).toContainText("Bridget Callahan");
     await expect(entry).toContainText("Roots: Shades EQ 6N + 6NB (1:1), 20 vol, 35 min");
     await expect(entry).toContainText("Lifted fast; check at 30.");
-    // The form is cleared for the next entry.
-    await expect(ui(page).getByLabel("Formula", { exact: true })).toHaveValue("");
   });
 
   test("can't open the add-client page", async ({ page }) => {

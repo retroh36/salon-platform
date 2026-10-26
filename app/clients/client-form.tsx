@@ -105,9 +105,12 @@ export function ClientForm({
           <Field label="Preferences">
             <input name="preferences" defaultValue={fields.preferences} className={inputClass} />
           </Field>
-          <Field label="Notes" className="sm:col-span-2">
-            <textarea name="notes" defaultValue={fields.notes} rows={3} className={inputClass} />
-          </Field>
+          {/* An existing client's notes are edited on their profile. */}
+          {!clientId && (
+            <Field label="Notes" className="sm:col-span-2">
+              <textarea name="notes" defaultValue={fields.notes} rows={3} className={inputClass} />
+            </Field>
+          )}
           <div className="flex flex-wrap items-end gap-4 sm:col-span-2">
             <label className={`${checkLabel} py-2.5 font-medium`}>
               <input

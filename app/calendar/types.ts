@@ -16,6 +16,8 @@ import type { SegmentKind } from "@/lib/scheduling/booking";
 import type { Interval } from "@/lib/scheduling/intervals";
 import type { TimeBlockKind } from "@/lib/scheduling/blocks";
 import type { LocalDate } from "@/lib/scheduling/time";
+import type { ClientOption } from "./actions";
+import type { BookingStart } from "./booking-panel";
 
 export type ColumnData = {
   staffId: string;
@@ -59,6 +61,8 @@ export type BlockData = Interval & {
   online: boolean;
   // Their membership, for the tooltip ("Blowout Club member").
   member: string | null;
+  // The client's allergies and sensitivities, for the tooltip.
+  allergies: string | null;
 };
 
 export type ItemDetail = Interval & {
@@ -208,5 +212,6 @@ export type BoardData = {
   stamp: string;
   // What a link asked to show (from the Dashboard): a stylist's column,
   // Denise's panel, a booking, or a question for Denise.
-  focus: { staffId: string | null; denise: boolean; appointmentId: string | null; ask: string | null };
+  // book: "Book" on a client's profile (`?book=`), a new booking for them.
+  focus: { staffId: string | null; denise: boolean; appointmentId: string | null; ask: string | null; book: { client: ClientOption; start: BookingStart } | null };
 };

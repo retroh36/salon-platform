@@ -1,4 +1,4 @@
-import { admin, busyDay, SEED } from "../tests/db/helpers";
+import { admin, busyDay, makeRoom, SEED } from "../tests/db/helpers";
 import { runPolicyCharges } from "../lib/policy-billing";
 import { todayIn } from "../lib/scheduling/time";
 import { AUTH, expect, moreAction, test, ui, waitForHydration } from "./fixtures";
@@ -13,6 +13,8 @@ const L = SEED.location;
 const PREFIX = `Pc${Date.now().toString(36)}`;
 const TZ = "America/Chicago";
 const ids: string[] = [];
+// Demo visits set aside to make room for the test's own (put back after).
+const putBack: (() => Promise<void>)[] = [];
 
 async function newClient(name: string, phone: string) {
   const { data } = await admin.from("clients").insert({ business_id: B, first_name: `${PREFIX}${name}`, last_name: "Test", phone }).select("id").single();
@@ -26,6 +28,8 @@ async function visit(clientId: string, hours: number, status: "booked" | "confir
   const { data: s } = await admin.from("services").select("id").eq("business_id", B).eq("name", "Women's Cut & Style").single();
   const start = new Date(Math.round((Date.now() + hours * 3_600_000) / 900_000) * 900_000);
   const end = new Date(start.getTime() + 3_600_000);
+  // The database refuses a double-booking with the demo calendar.
+  putBack.push(await makeRoom(SEED.staff.bridget, start, end));
   const { data: a } = await admin
     .from("appointments")
     .insert({ business_id: B, location_id: L, client_id: clientId, starts_at: start.toISOString(), ends_at: end.toISOString(), status, created_at: new Date(Date.now() - 20 * 86_400_000).toISOString() })
@@ -56,6 +60,7 @@ test.afterAll(async () => {
   await admin.from("policy_consents").delete().in("client_id", ids);
   await admin.from("appointments").delete().in("client_id", ids);
   await admin.from("clients").delete().in("id", ids);
+  for (const back of putBack) await back();
 });
 
 test.use({ storageState: AUTH.frontDesk });

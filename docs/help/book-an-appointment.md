@@ -8,7 +8,7 @@ open: /calendar | Open calendar
 Book a visit for a client from the calendar, with one or more services.
 
 1. Go to **Calendar** and pick the day (use the arrows, **Today**, or the date picker).
-2. Tap an empty time in the stylist's column, or tap **New booking** at the top.
+2. Tap an empty time in the stylist's column, or tap **New booking** at the top. (Or tap **Book** on the client's profile: the booking opens with them already chosen, with their stylist.)
 3. Under **Find a client**, search by name or phone and tap the client. New? Tap **New client**, enter their name and **Phone**, then tap **Add client**.
 4. Under **Service 1**, choose the **Service**, then check the **Stylist**, **Starts** time and **Chair** (**Any free chair** is fine).
 5. To add more, tap **Add another service**. It starts straight after the one before.

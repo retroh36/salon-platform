@@ -14,7 +14,7 @@ Take before and after photos of a visit, saved to the client's record.
 
 ## Good to know
 
-- All of a client's photos are on their profile under **Before and after**, grouped by visit, newest first.
+- All of a client's photos are on their profile under the **Photos** tab, grouped by visit, newest first.
 - Photos are private to your salon. They're never public and never sent to Denise.
 - To remove one, tap the × on it. Only whoever added it, or a manager, can remove a photo.
 - To use a photo in marketing, the client's consent must be recorded first (see Record photo consent).

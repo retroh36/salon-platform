@@ -5,15 +5,20 @@ import { Field, inputClass, submitWithoutReset } from "@/components/form";
 import { buttonClass } from "@/components/ui/button";
 import { selectClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
+import { useCloseRecord } from "./add-record";
 import { recordPatchTest } from "./forms-actions";
 
 // `compact`: two columns, for a side panel (booking details).
 export function PatchTestForm({ clientId, today, me, staff, compact = false }: { clientId: string; today: string; me: string; staff: { id: string; name: string }[]; compact?: boolean }) {
   const [state, action, pending] = useActionState(recordPatchTest.bind(null, clientId), undefined);
   const formRef = useRef<HTMLFormElement>(null);
+  // Opened from "Add patch test": closes once saved.
+  const close = useCloseRecord();
   useEffect(() => {
-    if (state?.ok) formRef.current?.reset();
-  }, [state]);
+    if (!state?.ok) return;
+    formRef.current?.reset();
+    close?.();
+  }, [state, close]);
 
   return (
     <form ref={formRef} action={action} onSubmit={submitWithoutReset(action)} aria-label="Record patch test" className={compact ? "grid grid-cols-2 gap-3 rounded-lg border border-line bg-sunken/40 p-3 [&>*:nth-last-child(-n+3)]:col-span-2" : "grid gap-4 pb-4 sm:grid-cols-4"} noValidate>
@@ -49,6 +54,11 @@ export function PatchTestForm({ clientId, today, me, staff, compact = false }: {
         <button type="submit" disabled={pending} className={buttonClass("primary", "md")}>
           {pending ? "Saving…" : "Record patch test"}
         </button>
+        {close && (
+          <button type="button" onClick={close} className={buttonClass("quiet", "md")}>
+            Cancel
+          </button>
+        )}
         {state?.ok && (
           <span role="status" className="animate-fade-in text-sm text-ink-muted">
             Saved.

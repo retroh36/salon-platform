@@ -8,7 +8,7 @@ open: /calendar | Open the calendar
 Send a client a text or email about an upcoming visit: a quick pick, or your own words.
 
 1. On the calendar, tap the visit to open booking details.
-2. Tap **⋯**, then **Message client**.
+2. Tap **⋯**, then **Message client**. (Or tap **Message** on the client's profile, for their next visit.)
 3. Under **Message**, choose a quick pick (like **We're running behind** or **Please call us**), or **Write my own**.
 4. For your own words, choose what it's about: **Their visit**, or **An offer** (only for clients who said yes to offers).
 5. Choose **Text** or **Email**. Only the ways the client gets messages can be chosen.

@@ -7,7 +7,7 @@ open: /clients | Open Clients
 
 Record that a client agreed to their photos being used in marketing, then mark which photos can be used.
 
-1. Open the client's profile (under **Before and after**), or their visit's **Photos** tab in booking details.
+1. Open the client's profile and tap the **Photos** tab, or open their visit's **Photos** tab in booking details.
 2. Next to "No consent to use their photos in marketing", tap **They've agreed**.
 3. Set **Consent given on** to the date they agreed, then tap **Record consent**.
 4. Under each photo you can use, tick **OK for marketing**.

@@ -1032,7 +1032,8 @@ function FormulaSection({ appointment, date, products, canRecord }: { appointmen
           {appointment.pastFormulas.length === 0 ? (
             <p className="text-ink-muted">No earlier formulas.</p>
           ) : (
-            appointment.pastFormulas.map((f) => <FormulaEntry key={f.id} meta={`${f.date} · ${f.author}`} products={f.products} text={f.text} notes={f.notes} />)
+            // Newest first: the one to start from is on top, marked.
+            appointment.pastFormulas.map((f, i) => <FormulaEntry key={f.id} meta={`${i === 0 ? "Latest · " : ""}${f.date} · ${f.author}`} products={f.products} text={f.text} notes={f.notes} />)
           )}
         </div>
       )}

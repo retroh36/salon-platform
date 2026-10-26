@@ -185,6 +185,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       group: a.group,
       online: a.source === "online",
       member: null,
+      allergies: client?.allergies ?? null,
     });
     appointments[a.id] ??= {
       id: a.id,
@@ -465,6 +466,19 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   // Who may write their own messages to clients (owners always).
   const { data: business } = await supabase.from("businesses").select("free_text_roles").eq("id", me.business_id).single();
   const freeText = me.role === "owner" || Boolean(business?.free_text_roles.includes(me.role));
+  // "Book" on a client's profile: the booking starts with them.
+  const bookId = typeof params.book === "string" && isUuid(params.book) ? params.book : null;
+  const { data: bookRow } = bookId ? await supabase.from("clients").select("id, first_name, last_name, phone, allergies").eq("id", bookId).maybeSingle() : { data: null };
+  // With their stylist (or the first working), at the next quarter hour from now.
+  const bookColumn = columns.find((c) => c.staffId === params.staff && c.working) ?? columns.find((c) => c.working) ?? columns[0];
+  const nowMinute = date === today ? toLocal(new Date(), tz).minute : range.start;
+  const book =
+    bookRow && bookColumn && canBook(me.role)
+      ? {
+          client: { id: bookRow.id, name: fullName(bookRow), phone: bookRow.phone, allergies: bookRow.allergies },
+          start: { staffId: bookColumn.staffId, startMinute: Math.min(Math.max(Math.ceil(nowMinute / 15) * 15, range.start), range.end - 15) },
+        }
+      : null;
   const data: BoardData = {
     stamp,
     focus: {
@@ -472,6 +486,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       denise: params.denise === "1",
       appointmentId: typeof params.open === "string" && isUuid(params.open) ? params.open : null,
       ask: typeof params.ask === "string" && params.ask.trim() ? params.ask.trim().slice(0, 300) : null,
+      book,
     },
     date,
     today,

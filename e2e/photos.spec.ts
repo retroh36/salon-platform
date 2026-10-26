@@ -1,7 +1,7 @@
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, visitTab, waitForHydration } from "./fixtures";
+import { AUTH, clientTab, expect, test, ui, visitTab, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -74,7 +74,7 @@ test("adds before and after photos to a visit, records consent, and shows them o
 
   // On the profile: the visit's photos together, with the date and stylist.
   await page.goto(`/clients/${clientId}`);
-  const gallery = ui(page).getByRole("region", { name: /Before and after/ });
+  const gallery = await clientTab(page, "Photos");
   await expect(gallery.getByRole("list", { name: "Photos by visit" }).getByRole("heading", { level: 3 })).toContainText("with Gil");
   await expect(gallery.getByTestId("visit-photo")).toHaveCount(2);
   await expect(gallery.getByTestId("visit-photo").last().getByLabel("OK for marketing")).toBeChecked();

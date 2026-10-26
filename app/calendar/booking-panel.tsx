@@ -41,6 +41,7 @@ type Line = {
 export function BookingPanel({
   data,
   start,
+  client: initialClient,
   appointment,
   onClose,
   onSaved,
@@ -49,6 +50,8 @@ export function BookingPanel({
 }: {
   data: BoardData;
   start?: BookingStart;
+  // A new booking for this client (from "Book" on their profile).
+  client?: ClientOption;
   appointment?: AppointmentDetail;
   onClose: () => void;
   // date: the day it's on now (an edit can move it to another day).
@@ -64,7 +67,7 @@ export function BookingPanel({
   const nextKey = useRef(1);
 
   const [client, setClient] = useState<ClientOption | null>(
-    appointment?.client ? { id: appointment.client.id, name: appointment.client.name, phone: appointment.client.phone, allergies: appointment.client.allergies } : null,
+    appointment?.client ? { id: appointment.client.id, name: appointment.client.name, phone: appointment.client.phone, allergies: appointment.client.allergies } : (initialClient ?? null),
   );
   const [lines, setLines] = useState<Line[]>(() =>
     appointment

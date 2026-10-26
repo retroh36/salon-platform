@@ -133,6 +133,13 @@ export async function visitTab(panel: Locator, name: "Notes" | "Formula" | "Phot
   await panel.getByRole("tab", { name, exact: true }).click();
 }
 
+// One of the client profile's history tabs.
+export async function clientTab(page: Page, name: "Visits" | "Formulas" | "Photos" | "Patch tests" | "Forms") {
+  await waitForHydration(page, "[role=tab]");
+  await ui(page).getByRole("region", { name: "History" }).getByRole("tab", { name: new RegExp(`^${name}`) }).click();
+  return ui(page).getByRole("region", { name: "History" });
+}
+
 // "Before this visit (2)", opened to its checklist.
 export async function openChecklist(panel: Locator) {
   const region = panel.getByRole("region", { name: "Before this visit" });

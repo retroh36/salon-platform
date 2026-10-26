@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { fromLocal, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { onCheckout } from "./checkout-helpers";
-import { AUTH, checkOut, expect, test, ui, visitTab, waitForHydration } from "./fixtures";
+import { AUTH, checkOut, clientTab, expect, test, ui, visitTab, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -111,6 +111,7 @@ test.describe("formulas and stock", () => {
 
     // And the client's record shows the products.
     await desk.goto(`/clients/${visit.clientId}`);
+    await clientTab(desk, "Formulas");
     await expect(ui(desk).getByTestId("formula-products").first()).toContainText("30 g Goldwell Topchic 7N");
     await desk.close();
   });
