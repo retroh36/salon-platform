@@ -41,7 +41,9 @@
     ".next-screenshots/types/**/*.ts",
     ".next-screenshots/dev/types/**/*.ts",
     ".next-week/types/**/*.ts",
-    ".next-week/dev/types/**/*.ts"
+    ".next-week/dev/types/**/*.ts",
+    ".next-demo/types/**/*.ts",
+    ".next-demo/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

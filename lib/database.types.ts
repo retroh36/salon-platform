@@ -971,6 +971,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"demo_feedback": {
+                  Row: {
+                    "created_at": string,"id": string,"name": string | null,"note": string,"page": string,"role": string,"salon": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id"?: string,"name"?: string | null,"note": string,"page": string,"role": string,"salon"?: string | null
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"name"?: string | null,"note"?: string,"page"?: string,"role"?: string,"salon"?: string | null
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"denise_briefs": {
                   Row: {
                     "created_at": string,"day": string,"facts_hash": string,"location_id": string,"model": string,"text": string
@@ -4262,6 +4276,9 @@ isOneToOne: false
                            },
 "start_stocktake":
 { Args: { "p_location_id": string }; Returns: string
+                           },
+"tables_without_rls":
+{ Args: Record<PropertyKey, never>; Returns: string[]
                            },
 "team_logins":
 { Args: { "p_business_id": string }; Returns: {

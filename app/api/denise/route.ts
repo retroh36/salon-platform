@@ -13,6 +13,7 @@ import { revalidatePath } from "next/cache";
 import { answer, toolStatus } from "@/lib/denise/assistant";
 import { assistantContext } from "@/lib/denise/context";
 import { claudeFor, deniseDay } from "@/lib/denise/day-state";
+import { DEMO_DENISE_PER_10_MIN, DEMO_LIMIT_TEXT, DEMO_SLOW_DOWN, isDemo } from "@/lib/demo";
 import { FAILURE_TEXT, failureRef, logDeniseError } from "@/lib/denise/errors";
 import { askerOf, deniseSession, type DeniseSession } from "@/lib/denise/session";
 import { replyToCallOut, replyToCancel, replyToLate } from "@/lib/denise/triggers";
@@ -21,6 +22,8 @@ import { isUuid } from "@/lib/ids";
 import { LATE_MINUTES, reportCallOut, reportRunningLate } from "@/lib/scheduling/disruptions";
 import { startOfLocalDay } from "@/lib/scheduling/load";
 import { isLocalDate } from "@/lib/scheduling/time";
+import { requestInfo, withinLimits } from "@/lib/online-booking/security";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const NOT_CONNECTED =
   "I'm not connected yet, so I can't answer questions. Once I am, ask me things like “Who's free for a color at 3?” In the meantime I'm still watching the calendar for clashes.";
@@ -58,6 +61,7 @@ export async function POST(request: Request) {
         businessId = s?.me.business_id;
         if (!s) send(reply("Sign in again.", "error"));
         else if (!body || !isLocalDate(body.date)) send(reply("I didn't catch that. Try again.", "error"));
+        else if (isDemo() && !(await withinDemoLimit())) send(reply(DEMO_SLOW_DOWN, "nothing"));
         else await run(s, body, send);
       } catch (error) {
         if (!(error instanceof Gone)) {
@@ -66,7 +70,7 @@ export async function POST(request: Request) {
           const ref = failureRef();
           const kind = logDeniseError(error, { where: typeof body?.action === "string" ? body.action : "unknown", businessId, ref });
           if (!gone) {
-            if (kind === "limit") send(reply(FAILURE_TEXT.limit, "nothing"));
+            if (kind === "limit") send(reply(isDemo() ? DEMO_LIMIT_TEXT : FAILURE_TEXT.limit, "nothing"));
             else if (kind === "busy") send(reply(FAILURE_TEXT.busy, "error"));
             else send(reply(`${FAILURE_TEXT[kind]} (Ref ${ref})`, "error"));
           }
@@ -79,6 +83,13 @@ export async function POST(request: Request) {
     cancel: leave,
   });
   return new Response(stream, { headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" } });
+}
+
+// In the demo, testers share the same few logins, so the limit is per
+// connection.
+async function withinDemoLimit(): Promise<boolean> {
+  const { ipHash } = await requestInfo();
+  return withinLimits(createAdminClient(), [{ key: `denise:${ipHash}`, limit: DEMO_DENISE_PER_10_MIN, windowSeconds: 600 }]);
 }
 
 async function staffName(s: DeniseSession, staffId: string) {

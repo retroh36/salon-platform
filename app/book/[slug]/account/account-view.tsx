@@ -1,5 +1,6 @@
 "use client";
 
+import { DemoCode } from "@/components/demo-bar";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
@@ -27,7 +28,7 @@ export function SignInForm({ slug, salon, expired }: { slug: string; salon: stri
   const router = useRouter();
   const [channel, setChannel] = useState<"email" | "sms">("email");
   const [value, setValue] = useState("");
-  const [sent, setSent] = useState<{ id: string; to: string } | null>(null);
+  const [sent, setSent] = useState<{ id: string; to: string; demoCode?: string } | null>(null);
   const [code, setCode] = useState("");
   const [problem, setProblem] = useState<string | null>(expired ? "That sign-in link has expired or was already used. Ask for a new one." : null);
   const [pending, start] = useTransition();
@@ -49,7 +50,7 @@ export function SignInForm({ slug, salon, expired }: { slug: string; salon: stri
             setProblem(null);
             start(async () => {
               const r = await requestSignIn(slug, channel, value, honeypot.current?.value ?? "");
-              if (r.ok) setSent({ id: r.verificationId, to: r.sentTo });
+              if (r.ok) setSent({ id: r.verificationId, to: r.sentTo, demoCode: r.demoCode });
               else setProblem(r.message);
             });
           }}
@@ -101,6 +102,7 @@ export function SignInForm({ slug, salon, expired }: { slug: string; salon: stri
           <p className="text-sm">
             We sent a code and a sign-in link to <span className="font-medium">{sent.to}</span>. Enter the code, or tap the link.
           </p>
+          <DemoCode code={sent.demoCode} />
           <label className="flex flex-col gap-1.5 text-sm font-medium">
             6-digit code
             <input className={inputClass} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} inputMode="numeric" autoComplete="one-time-code" maxLength={6} required />

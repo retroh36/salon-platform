@@ -11,6 +11,7 @@ import { APPOINTMENT_TEXTS_CONSENT, MARKETING_CONSENT } from "@/lib/messaging/co
 import { appointmentChannel } from "@/lib/messaging/send";
 import { withStopLine } from "@/lib/messaging/templates";
 import { siteUrl } from "@/lib/branding";
+import { isDemo } from "@/lib/demo";
 import { isBookingSource } from "@/lib/online-booking/sources";
 import { normalEmail, phoneDigits, formatPhone } from "@/lib/online-booking/contact";
 import { sendCode, sessionContact, verifyCode, type Channel } from "@/lib/online-booking/codes";
@@ -113,7 +114,8 @@ export async function findTimes(slug: string, serviceIds: string[], staffId: str
   return { ok: true, days, lastDay: window.lastDay };
 }
 
-export type CodeResult = { ok: true; verificationId: string; sentTo: string } | { ok: false; message: string };
+// demoCode: the code, shown on screen in the demo (nothing is sent).
+export type CodeResult = { ok: true; verificationId: string; sentTo: string; demoCode?: string } | { ok: false; message: string };
 
 // Sends a code to a phone number or email. The answer is the same whether
 // or not the salon knows them, so the site can't be used to look people up.
@@ -134,8 +136,8 @@ export async function requestCode(slug: string, channel: Channel, value: string,
   // Bots fill in every field, including the hidden one: pretend it worked.
   if (honeypot) return { ok: true, verificationId: crypto.randomUUID(), sentTo: value };
 
-  const verificationId = await sendCode(admin, site.business, channel, destination);
-  return { ok: true, verificationId, sentTo: channel === "sms" ? formatPhone(destination) : destination };
+  const sent = await sendCode(admin, site.business, channel, destination);
+  return { ok: true, verificationId: sent.id, sentTo: channel === "sms" ? formatPhone(destination) : destination, demoCode: isDemo() ? sent.code : undefined };
 }
 
 export type ConfirmResult =

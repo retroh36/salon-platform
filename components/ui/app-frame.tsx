@@ -130,7 +130,7 @@ export function AppFrame({
   const settings = settingsFor(user);
   return (
     // One screen tall on large screens: the calendar and panels scroll inside.
-    <div className="flex min-h-screen flex-1 bg-canvas text-ink lg:h-screen lg:min-h-0 lg:flex-none lg:overflow-hidden">
+    <div className="flex min-h-screen flex-1 bg-canvas text-ink lg:h-[calc(100vh-var(--demo-bar))] lg:min-h-0 lg:flex-none lg:overflow-hidden">
       <aside className="hidden w-60 shrink-0 flex-col border-r border-line bg-sunken/60 lg:flex">
         <div className="flex items-center gap-3 px-5 pt-6 pb-5">
           <SalonMark name={businessName} logoUrl={logoUrl} />

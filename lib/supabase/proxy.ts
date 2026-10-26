@@ -4,12 +4,13 @@ import { getSupabaseEnv } from "./env";
 
 const PUBLIC_PATHS = ["/login"];
 // Open to everyone, signed in or not: salons' booking sites, payment, card
-// and opt-out links, the dev outbox (which shows nothing in production), and
+// and opt-out links, the dev outbox (which shows nothing in production but
+// the demo), the demo's status (booleans only, and only in the demo), and
 // scheduled jobs (which check their own secret), and the link in invite and
 // password reset emails (which signs them in), and the shared iPad's PIN
 // screen (which checks the device itself), and error reports from the
 // error page (which log only).
-const OPEN_PATHS = ["/book", "/api/client-error", "/dev/outbox", "/api/cron", "/api/messages/inbound", "/unsubscribe", "/pay", "/card", "/event", "/auth/confirm", "/switch"];
+const OPEN_PATHS = ["/book", "/api/client-error", "/dev/outbox", "/api/demo", "/api/cron", "/api/messages/inbound", "/unsubscribe", "/pay", "/card", "/event", "/auth/confirm", "/switch"];
 // Set on a device marked as shared (lib/shared-device.ts).
 const DEVICE_COOKIE = "maestra_device";
 

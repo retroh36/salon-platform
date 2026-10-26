@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentStaff } from "@/lib/auth";
+import { DEMO_OFF, isDemo, isDemoAccount } from "@/lib/demo";
 import { isToggle } from "@/lib/permissions";
 import { isUuid } from "@/lib/ids";
 import type { StaffRole } from "@/lib/staff";
@@ -29,8 +30,9 @@ export async function saveMember(staffId: string | null, _prev: MemberState, for
   if (!me || (staffId !== null && !isUuid(staffId))) return { message: NOT_ALLOWED };
   let target: { role: StaffRole } | null = null;
   if (staffId) {
-    const { data } = await supabase.from("staff").select("role").eq("id", staffId).eq("business_id", me.business_id).maybeSingle();
+    const { data } = await supabase.from("staff").select("role, email").eq("id", staffId).eq("business_id", me.business_id).maybeSingle();
     if (!data) return { message: "They're no longer on the team." };
+    if (isDemo() && isDemoAccount(data.email)) return { message: DEMO_OFF.accounts };
     target = data;
   }
   if (!canManageMember(me, target)) return { message: NOT_ALLOWED };
@@ -54,7 +56,7 @@ export async function saveMember(staffId: string | null, _prev: MemberState, for
 
   if (!staffId) {
     let note = "added";
-    if (formData.get("invite")) note = (await inviteMember(supabase, me, id)).ok ? "invited" : "invite_failed";
+    if (formData.get("invite")) note = isDemo() ? "invite_off" : (await inviteMember(supabase, me, id)).ok ? "invited" : "invite_failed";
     redirect(`/team/${id}?done=${note}`);
   }
   return { saved: true, message: "Saved." };
@@ -64,6 +66,10 @@ export async function saveMember(staffId: string | null, _prev: MemberState, for
 export async function setMemberActive(staffId: string, active: boolean): Promise<LoginResult> {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me || !isUuid(staffId)) return { ok: false, message: NOT_ALLOWED };
+  if (isDemo()) {
+    const { data } = await supabase.from("staff").select("email").eq("id", staffId).maybeSingle();
+    if (isDemoAccount(data?.email)) return { ok: false, message: DEMO_OFF.accounts };
+  }
   const { error } = await supabase.rpc("set_staff_active", { p_staff_id: staffId, p_active: active });
   if (error?.code === "42501") return { ok: false, message: NOT_ALLOWED };
   if (error?.code === "55000") return { ok: false, message: error.message === "The salon needs an owner" ? "The salon needs an owner: make someone else an owner first." : "You can't deactivate yourself." };

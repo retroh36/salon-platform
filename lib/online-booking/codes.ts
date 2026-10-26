@@ -14,6 +14,9 @@ const CODE_MINUTES = 10;
 const SESSION_MINUTES = 30;
 const MAX_ATTEMPTS = 5;
 
+// Returns the verification's id, and the code itself only for the demo to
+// show on screen (lib/demo.ts); nothing else ever sees it.
+//
 // signInLink: for signing in to their account, a one-time link as well
 // as the code (made from the verification id and a secret; only the
 // secret's hash is kept).
@@ -23,7 +26,7 @@ export async function sendCode(
   channel: Channel,
   destination: string,
   signInLink?: (verificationId: string, secret: string) => string,
-): Promise<string> {
+): Promise<{ id: string; code: string }> {
   const id = crypto.randomUUID();
   const code = newCode();
   const secret = signInLink ? newSecret() : null;
@@ -48,7 +51,7 @@ export async function sendCode(
     body,
   });
   if (outboxError) throw outboxError;
-  return id;
+  return { id, code };
 }
 
 export type VerifyResult = { ok: true; session: string } | { ok: false; error: "wrong" | "expired" | "too_many" };

@@ -8,6 +8,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { siteUrl } from "@/lib/branding";
+import { isDemo } from "@/lib/demo";
 import { accountContact, currentAccount, endAccountSession, startAccountSession, type Account } from "@/lib/online-booking/account";
 import { afterVerified, PENDING_COOKIE } from "@/lib/online-booking/account-signin";
 import { ownsVisit } from "@/lib/online-booking/account-data";
@@ -28,7 +29,8 @@ async function openSite(slug: string): Promise<BookingSite | null> {
 
 const signInLink = (slug: string) => (id: string, secret: string) => `${siteUrl()}/book/${slug}/account/link?v=${id}&t=${secret}`;
 
-export type SignInResult = { ok: true; verificationId: string; sentTo: string } | { ok: false; message: string };
+// demoCode: the code, shown on screen in the demo (nothing is sent).
+export type SignInResult = { ok: true; verificationId: string; sentTo: string; demoCode?: string } | { ok: false; message: string };
 
 // Sends a code and a sign-in link. The same answer whether or not the
 // salon knows them, so it can't be used to look people up.
@@ -46,8 +48,8 @@ export async function requestSignIn(slug: string, channel: Channel, value: strin
   if (!allowed) return { ok: false, message: "Too many sign-in tries. Please wait a while, or call the salon." };
   const sentTo = channel === "sms" ? formatPhone(destination) : destination;
   if (honeypot) return { ok: true, verificationId: crypto.randomUUID(), sentTo };
-  const verificationId = await sendCode(admin, site.business, channel, destination, signInLink(site.business.slug));
-  return { ok: true, verificationId, sentTo };
+  const sent = await sendCode(admin, site.business, channel, destination, signInLink(site.business.slug));
+  return { ok: true, verificationId: sent.id, sentTo, demoCode: isDemo() ? sent.code : undefined };
 }
 
 export type ConfirmResult = { ok: true; needsName: boolean } | { ok: false; message: string };

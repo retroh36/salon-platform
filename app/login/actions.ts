@@ -1,6 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { DEMO_OFF, isDemo } from "@/lib/demo";
+import { requestInfo, withinLimits } from "@/lib/online-booking/security";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export type LoginState = { error: string; email: string } | undefined;
@@ -11,6 +14,14 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
 
   if (!email || !password) {
     return { error: "Enter your email and password.", email };
+  }
+
+  // The public demo's logins are known, so tries are limited per connection.
+  if (isDemo()) {
+    const { ipHash } = await requestInfo();
+    if (!(await withinLimits(createAdminClient(), [{ key: `login:${ipHash}`, limit: 20, windowSeconds: 600 }]))) {
+      return { error: "Too many tries from here. Wait a few minutes, then try again.", email };
+    }
   }
 
   const supabase = await createClient();
@@ -36,6 +47,7 @@ export type ForgotState = { sent: boolean; email: string; error?: string } | und
 // or not the email has a login (so it doesn't tell anyone who does).
 export async function forgotPassword(_prev: ForgotState, formData: FormData): Promise<ForgotState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (isDemo()) return { sent: false, email, error: DEMO_OFF.passwords };
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { sent: false, email, error: "Enter the email you sign in with." };
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email);
@@ -48,6 +60,7 @@ export type PasswordState = { error: string } | undefined;
 
 // Choosing a password, after an invite or a reset link signed them in.
 export async function choosePassword(_prev: PasswordState, formData: FormData): Promise<PasswordState> {
+  if (isDemo()) return { error: DEMO_OFF.passwords };
   const password = String(formData.get("password") ?? "");
   const again = String(formData.get("password_again") ?? "");
   if (password.length < 8) return { error: "Use at least 8 characters." };

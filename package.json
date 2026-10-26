@@ -21,6 +21,8 @@
     "backup:drill": "./scripts/backup-drill.sh",
     "photos": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/photos.ts",
     "jobs": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/jobs.ts",
+    "demo:db": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/demo-db.ts",
+    "test:demo": "playwright test --config playwright.demo.config.ts",
     "screenshots": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/screenshots.ts"
   },
   "dependencies": {

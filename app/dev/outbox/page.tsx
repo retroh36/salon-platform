@@ -3,13 +3,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { isDemo } from "@/lib/demo";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = { title: "Dev outbox", robots: { index: false } };
 
-// Development only: the texts and emails Maestra would have sent (booking
+// Development and the public demo only: the texts and emails Maestra would have sent (booking
 // codes and confirmations, receipts, gift cards), newest first, until a real provider is
-// connected. Shows nothing in production.
+// connected. Shows nothing in production, unless it's the demo.
 export default function OutboxPage({ searchParams }: PageProps<"/dev/outbox">) {
   return (
     <Suspense fallback={<main className="p-6" aria-busy="true" />}>
@@ -21,7 +22,7 @@ export default function OutboxPage({ searchParams }: PageProps<"/dev/outbox">) {
 // ?to= shows only what went to one number or address.
 async function Outbox({ searchParams }: Pick<PageProps<"/dev/outbox">, "searchParams">) {
   await connection();
-  if (process.env.NODE_ENV === "production") notFound();
+  if (process.env.NODE_ENV === "production" && !isDemo()) notFound();
   const to = (await searchParams).to;
   let query = createAdminClient()
     .from("outbox_messages")
@@ -34,7 +35,7 @@ async function Outbox({ searchParams }: Pick<PageProps<"/dev/outbox">, "searchPa
 
   return (
     <main className="mx-auto w-full max-w-2xl bg-canvas px-4 py-8">
-      <h1 className="font-serif text-3xl font-semibold tracking-tight text-navy-900">Dev outbox</h1>
+      <h1 className="font-serif text-3xl font-semibold tracking-tight text-navy-900">{isDemo() ? "Demo outbox" : "Dev outbox"}</h1>
       <p className="mt-1 mb-6 text-ink-muted">
         Messages that would have been sent, newest first. Nothing is really sent yet. <a href="/dev/outbox" className="text-link underline hover:text-link-hover">Refresh</a>
       </p>

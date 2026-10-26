@@ -20,6 +20,7 @@ const DONE: Record<string, { tone: "success" | "error"; text: string }> = {
   added: { tone: "success", text: "Added to the team." },
   invited: { tone: "success", text: "Added to the team and invited: they'll get an email to choose a password." },
   invite_failed: { tone: "error", text: "Added to the team, but the invite didn't send. Try Send invite below." },
+  invite_off: { tone: "success", text: "Added to the team. Invites are off in the demo, so they won't get an email." },
 };
 
 export default function MemberPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ done?: string }> }) {

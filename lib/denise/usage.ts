@@ -6,6 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import type Anthropic from "@anthropic-ai/sdk";
+import { demoTokenLimit, isDemo } from "@/lib/demo";
 import type { ClaudeClient, ClaudeStream } from "./claude";
 
 type Admin = SupabaseClient<Database>;
@@ -21,7 +22,9 @@ export async function usageToday(admin: Admin, businessId: string): Promise<{ us
   const { data, error } = await admin.rpc("ai_usage_today", { p_business_id: businessId });
   if (error) throw error;
   const row = data[0];
-  return { used: Number(row?.used ?? 0), limit: row?.daily_limit ?? 0 };
+  const limit = row?.daily_limit ?? 0;
+  // The demo's allowance holds whatever a tester sets on Settings.
+  return { used: Number(row?.used ?? 0), limit: isDemo() ? Math.min(limit, demoTokenLimit()) : limit };
 }
 
 // The same client, with each call checked against the limit and logged.

@@ -1,0 +1,44 @@
+# The public demo's nightly reset (docs/operations.md, "The public demo"):
+# empties the demo's Supabase project (all but the testers' feedback) and
+# loads the demo data again, so its calendar always has a realistic today.
+# 07:30 UTC is the middle of the night in the US. Runs only once the
+# repository has the demo's secrets; "Run workflow" on the Actions tab runs
+# it now.
+name: Reset the demo
+
+on:
+  schedule:
+    - cron: "30 7 * * *"
+  workflow_dispatch:
+
+concurrency: demo-reset
+
+permissions:
+  contents: read
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DEMO_DATABASE_URL: ${{ secrets.DEMO_DATABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.DEMO_SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.DEMO_SUPABASE_SECRET_KEY }}
+      DEMO_AI_DAILY_TOKENS: ${{ vars.DEMO_AI_DAILY_TOKENS }}
+    steps:
+      - name: Check the demo's secrets are set
+        run: |
+          if [ -z "$DEMO_DATABASE_URL" ] || [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || [ -z "$SUPABASE_SECRET_KEY" ]; then
+            echo "::error::Add DEMO_DATABASE_URL, DEMO_SUPABASE_URL and DEMO_SUPABASE_SECRET_KEY as repository secrets."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: psql
+        run: psql --version || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+      - name: Reset
+        run: npm run demo:db -- reset --yes

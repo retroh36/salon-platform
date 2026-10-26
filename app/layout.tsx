@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { DemoBar } from "@/components/demo-bar";
 import { BRAND_NAVY, siteUrl, TAGLINE } from "@/lib/branding";
+import { isDemo } from "@/lib/demo";
 import { Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 
@@ -22,10 +24,15 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: BRAND_NAVY };
 
+// The public demo (DEMO_MODE=true) has its bar on every page.
 export default function RootLayout({ children }: LayoutProps<"/">) {
+  const demo = isDemo();
   return (
-    <html lang="en" className={`${inter.variable} ${fraunces.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col font-sans">{children}</body>
+    <html lang="en" className={`${inter.variable} ${fraunces.variable} h-full antialiased`} data-demo={demo ? "" : undefined}>
+      <body className="flex min-h-full flex-col font-sans">
+        {demo && <DemoBar />}
+        {children}
+      </body>
     </html>
   );
 }

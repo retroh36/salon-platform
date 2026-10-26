@@ -55,3 +55,6 @@ yarn-error.log*
 
 # the simulated week (npm run test:week) and its build
 /.next-week/
+
+# the demo's checks (npm run test:demo) and its build
+/.next-demo/

@@ -231,6 +231,20 @@
   --motion-slow: 250ms;
 }
 
+/* The public demo's bar (components/demo-bar.tsx): full-height screens take
+   its height off theirs. A finger's height on touchscreens. */
+:root {
+  --demo-bar: 0px;
+}
+:root[data-demo] {
+  --demo-bar: 2.25rem;
+}
+@media (pointer: coarse) {
+  :root[data-demo] {
+    --demo-bar: 2.75rem;
+  }
+}
+
 /* Service family colors for a block: set data-family on the element. */
 [data-family="color"] {
   --fam-fill: var(--color-peach-fill);

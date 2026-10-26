@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentStaff } from "@/lib/auth";
+import { DEMO_OFF, isDemo } from "@/lib/demo";
 import { LOGO_BUCKET, LOGO_TYPES, MAX_LOGO_BYTES } from "@/lib/branding";
 import { can } from "@/lib/permissions";
 
@@ -68,6 +69,7 @@ export async function removeSalonLogo(): Promise<SettingsResult> {
 export async function saveDeniseLimit(limit: number): Promise<SettingsResult> {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!can(me, "billing")) return { ok: false, message: "Only owners can change Denise's limit." };
+  if (isDemo()) return { ok: false, message: DEMO_OFF.limit };
   const s = { supabase, me };
   if (!Number.isInteger(limit) || limit < 0 || limit > 50_000_000) return { ok: false, message: "Enter a whole number of tokens, up to 50,000,000." };
   const { error } = await s.supabase.from("businesses").update({ ai_daily_token_limit: limit }).eq("id", s.me.business_id);

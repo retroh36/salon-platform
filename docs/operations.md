@@ -120,3 +120,44 @@ Appointment reminders (texts before a visit) don't exist yet; they come with tex
 Until it's configured, the jobs run but do nothing. Locally they're off; run the same jobs by hand with `npm run insights`, `npm run photos -- backup`, or the "Run renewals now" and "Send due messages now" buttons.
 
 **If a job fails:** `npm run jobs -- status` shows whether the database ran it; the request and the app's answer are in `net._http_response` for a while, and the endpoint's errors are in the app's logs (Vercel → Logs). Each job must finish within the plan's time limit for a function; the insights job is the longest, so watch it as salons are added. Every job is safe to run again: renewals and messages are recorded once, and copies skip what's already backed up.
+
+## The public demo
+
+A separate deployment for salon owners and stylists to try Maestra: its own Vercel project and its own Supabase project (`maestra-demo`), with only the seeded salons in it. `DEMO_MODE=true` turns on everything below; without it none of it exists, so a real deployment never behaves like the demo (`lib/demo.ts`).
+
+**What's different in the demo**
+
+- A slim bar on every page: "Demo: fake data, resets nightly. Don't enter real client info.", with the demo outbox and **Feedback** (`components/demo-bar.tsx`). Notes go to `demo_feedback` with the page (tokens taken out), the role and salon, and the time; only the service role reads it, so view it in the Supabase dashboard (Table Editor → `demo_feedback`). It survives the nightly reset.
+- The sign-in page is one-tap buttons (`app/login/demo-logins.tsx`, `demoSignIn` in `app/demo/actions.ts`): Maple & Ash's owner, manager, front desk and Bridget, Harbor & Vine's owner, and a client (Aurora Baker, signed in to her account on Maple & Ash's booking site). The front desk and Harbor & Vine open on the calendar's next day with visits (Maple & Ash is closed Sundays and Mondays).
+- Nothing is sent: codes show on screen (`DemoCode`), and every text and email is in the outbox at `/dev/outbox`. Invites, password resets and password changes are off, and the demo's sign-in accounts can't be changed or deactivated.
+- Payments use the test provider (no `STRIPE_SECRET_KEY`): test cards …4242 (works), …0002 (declined), …9995 (insufficient funds), listed on every card form.
+- Denise is live, on an allowance per salon per day (`DEMO_AI_DAILY_TOKENS`, default 250,000 tokens, whatever Settings says), with her own message when it's used up, and 20 questions per connection every 10 minutes.
+- Sign-in, one-tap sign-in and feedback are rate limited per connection (`hit_rate_limit`).
+- `/api/demo/status` says what's set, yes or no, never a value.
+
+**Its settings** (Vercel → the demo project → Settings → Environment Variables, for Production and Preview):
+
+| Variable | Value |
+| --- | --- |
+| `DEMO_MODE` | `true` |
+| `NEXT_PUBLIC_SUPABASE_URL` | the demo project's URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | its publishable key |
+| `SUPABASE_SECRET_KEY` | its secret key |
+| `NEXT_PUBLIC_SITE_URL` | the demo's address, e.g. `https://maestra-demo.vercel.app` |
+| `CRON_SECRET` | a new random string, used only by the demo |
+| `ANTHROPIC_API_KEY` | a key for the demo (a separate key with its own spend limit in the Anthropic console is best) |
+| `DEMO_AI_DAILY_TOKENS` | optional, Denise's allowance per salon per day |
+
+Never set `PHOREST_*`, `STRIPE_SECRET_KEY`, `TWILIO_AUTH_TOKEN` or the photo backup's settings there.
+
+**The database.** `npm run demo:db` works on the demo's project, with its settings in `.env.demo.local` (git-ignored) and `MAESTRA_ENV_FILE=.env.demo.local` in front of the command: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `DEMO_DATABASE_URL` (Connect → Session pooler; GitHub can't reach the direct one) and `CRON_SECRET`.
+
+- `migrate` applies every migration (`supabase db push`).
+- `reset --yes` is the nightly reset: removes stored files, empties every table but `demo_feedback`, deletes the logins, loads `seed.sql`, `seed-demo.sql` and `seed-large.sql`, sets Denise's allowance and recalculates insights. It refuses a database with any salon besides the two seeded ones, and one whose connection string isn't for the same project as the URL.
+- `check [app url]` shows Row Level Security is on for every table, only the seeded salons are there, and, given the app's address, what the deployed app has set.
+
+**Nightly reset.** `.github/workflows/demo-reset.yml` runs `reset` at 07:30 UTC, and on Actions → Reset the demo → Run workflow. It needs repository secrets `DEMO_DATABASE_URL`, `DEMO_SUPABASE_URL` and `DEMO_SUPABASE_SECRET_KEY` (and optionally a variable `DEMO_AI_DAILY_TOKENS`). GitHub turns scheduled workflows off after 60 days without a commit; Actions shows it, and "Enable workflow" turns it back on.
+
+**Scheduled jobs.** `MAESTRA_ENV_FILE=.env.demo.local npm run jobs -- configure https://<the demo's address>`, as for any environment. They run on the demo's data (test cards only).
+
+**Checking it.** `npm run test:demo` runs the demo's checks (`e2e-demo/`) against a local server with `DEMO_MODE=true`, or with `DEMO_URL=https://…` against a deployment (only reading, apart from a client's sign-in code). For a protected preview, put the project's `VERCEL_AUTOMATION_BYPASS_SECRET` in `.env.local`.

@@ -235,7 +235,7 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
   const linkOut = data.link?.status === "open" ? data.link : null;
 
   return (
-    <div className="flex h-dvh flex-col bg-canvas text-ink">
+    <div className="flex h-[calc(100dvh-var(--demo-bar))] flex-col bg-canvas text-ink">
       <header className="flex shrink-0 items-center gap-3 border-b border-line bg-surface px-4 py-2.5 sm:px-6">
         <Button
           size="lg"

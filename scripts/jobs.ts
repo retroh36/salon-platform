@@ -9,8 +9,10 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+// MAESTRA_ENV_FILE points at another project's settings (the demo's,
+// .env.demo.local).
 try {
-  process.loadEnvFile(".env.local");
+  process.loadEnvFile(process.env.MAESTRA_ENV_FILE ?? ".env.local");
 } catch {
   // Fall back to the environment.
 }

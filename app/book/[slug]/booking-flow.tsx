@@ -1,5 +1,6 @@
 "use client";
 
+import { DemoCode } from "@/components/demo-bar";
 import { APPOINTMENT_TEXTS_CONSENT, MARKETING_CONSENT } from "@/lib/messaging/consent";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -32,7 +33,7 @@ const MAX_SERVICES = 4;
 
 type Identity =
   | { phase: "enter" }
-  | { phase: "code"; verificationId: string; sentTo: string }
+  | { phase: "code"; verificationId: string; sentTo: string; demoCode?: string }
   | { phase: "done"; session: string; known: true; firstName: string }
   | { phase: "done"; session: string; known: false; channel: "sms" | "email"; contact: string };
 
@@ -627,7 +628,7 @@ function DetailsStep({
       if (!result.ok) return setError(result.message);
       setError(null);
       setCode("");
-      setIdentity({ phase: "code", verificationId: result.verificationId, sentTo: result.sentTo });
+      setIdentity({ phase: "code", verificationId: result.verificationId, sentTo: result.sentTo, demoCode: result.demoCode });
     });
 
   const check = (verificationId: string) =>
@@ -711,6 +712,7 @@ function DetailsStep({
           <p className="text-ink-muted">
             If {identity.sentTo} is yours, we&rsquo;ve sent it a 6-digit code. It expires in 10 minutes.
           </p>
+          <DemoCode code={identity.demoCode} />
           <label className="flex flex-col gap-1.5 text-sm font-medium text-ink">
             Code
             <input

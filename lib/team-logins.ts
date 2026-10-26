@@ -10,6 +10,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import { DEMO_OFF, isDemo } from "@/lib/demo";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { StaffRole } from "@/lib/staff";
 import { canManageMember, canResetPassword, loginState } from "./team";
@@ -35,6 +36,7 @@ async function loginOf(supabase: Supabase, me: Me, staffId: string) {
 
 // A first login, or the invite again for someone who hasn't signed in yet.
 export async function inviteMember(supabase: Supabase, me: Me, staffId: string): Promise<LoginResult> {
+  if (isDemo()) return { ok: false, message: DEMO_OFF.invites };
   const member = await memberOf(supabase, me, staffId);
   if (!member || !canManageMember(me, member)) return { ok: false, message: NOT_ALLOWED };
   if (!member.is_active) return { ok: false, message: `${member.first_name} is deactivated. Reactivate them first.` };
@@ -64,6 +66,7 @@ export async function inviteMember(supabase: Supabase, me: Me, staffId: string):
 // A link to choose a new password, to the email they sign in with (owners).
 export async function resetMemberPassword(supabase: Supabase, me: Me, staffId: string): Promise<LoginResult> {
   if (!canResetPassword(me)) return { ok: false, message: "Only owners can reset someone's password." };
+  if (isDemo()) return { ok: false, message: DEMO_OFF.passwords };
   const member = await memberOf(supabase, me, staffId);
   if (!member) return { ok: false, message: NOT_ALLOWED };
   const login = await loginOf(supabase, me, staffId);
