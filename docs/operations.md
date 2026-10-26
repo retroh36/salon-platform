@@ -133,7 +133,7 @@ A separate deployment for salon owners and stylists to try Maestra: its own Verc
 - Payments use the test provider (no `STRIPE_SECRET_KEY`): test cards …4242 (works), …0002 (declined), …9995 (insufficient funds), listed on every card form.
 - Denise is live, on an allowance per salon per day (`DEMO_AI_DAILY_TOKENS`, default 250,000 tokens, whatever Settings says), with her own message when it's used up, and 20 questions per connection every 10 minutes.
 - Sign-in, one-tap sign-in and feedback are rate limited per connection (`hit_rate_limit`).
-- `/api/demo/status` says what's set, yes or no, never a value.
+- `/api/demo/status` says what's set, yes or no, never a value, and the commit it was built from.
 
 **Its settings** (Vercel → the demo project → Settings → Environment Variables, for Production and Preview):
 
@@ -159,5 +159,7 @@ Never set `PHOREST_*`, `STRIPE_SECRET_KEY`, `TWILIO_AUTH_TOKEN` or the photo bac
 **Nightly reset.** `.github/workflows/demo-reset.yml` runs `reset` at 07:30 UTC, and on Actions → Reset the demo → Run workflow. It needs repository secrets `DEMO_DATABASE_URL`, `DEMO_SUPABASE_URL` and `DEMO_SUPABASE_SECRET_KEY` (and optionally a variable `DEMO_AI_DAILY_TOKENS`). GitHub turns scheduled workflows off after 60 days without a commit; Actions shows it, and "Enable workflow" turns it back on.
 
 **Scheduled jobs.** `MAESTRA_ENV_FILE=.env.demo.local npm run jobs -- configure https://<the demo's address>`, as for any environment. They run on the demo's data (test cards only).
+
+**Releasing to it.** `npm run release:demo` from a clean, pushed main: the local checks and the week, the demo database's migrations and safety check, the demo data again if a seed changed, then the `demo` branch pushed (Vercel builds the demo from it: Settings → Environments → Production → Branch Tracking is `demo`), a wait until `/api/demo/status` shows the new commit, and the demo's checks against the live site. It stops at the first failure, and says what changed by then. If the live checks fail after the push, roll back in Vercel (Deployments → the previous one → Instant Rollback).
 
 **Checking it.** `npm run test:demo` runs the demo's checks (`e2e-demo/`) against a local server with `DEMO_MODE=true`, or with `DEMO_URL=https://…` against a deployment (only reading, apart from a client's sign-in code). For a protected preview, put the project's `VERCEL_AUTOMATION_BYPASS_SECRET` in `.env.local`.

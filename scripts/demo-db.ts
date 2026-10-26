@@ -170,8 +170,9 @@ if (command === "migrate") {
       headers: process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? { "x-vercel-protection-bypass": process.env.VERCEL_AUTOMATION_BYPASS_SECRET } : {},
     });
     if (!response.ok) fail(`The app's status page answered ${response.status}: is DEMO_MODE=true set there?`);
-    const status = (await response.json()) as Record<string, boolean>;
+    const { commit, ...status } = (await response.json()) as Record<string, boolean> & { commit?: string | null };
     for (const [name, set] of Object.entries(status)) console.log(`  ${name}: ${set ? "yes" : "no"}`);
+    if (commit) console.log(`  commit: ${commit.slice(0, 7)}`);
     const right = status.demoMode && status.supabase && status.denise && status.cronSecret && !status.phorest && !status.stripe;
     console.log(right ? "The app is set up as the demo." : "The app's settings aren't right for the demo (see above).");
     ok &&= right;
