@@ -13,7 +13,6 @@ const TZ = "America/Chicago";
 const { bridget: BRIDGET, gil: GIL, frontDesk: FRONT_DESK } = SEED.staff;
 // A Wednesday clear of the seeded month and the other tests' days.
 const DAY = addDays(startOfWeek(todayIn(TZ)), 79);
-const at = (minute: number) => fromLocal(DAY, minute, TZ)!;
 const PREFIX = `Cs${Date.now().toString(36)}`;
 
 test.use({ storageState: AUTH.frontDesk, viewport: { width: 1180, height: 820 }, hasTouch: true });
@@ -47,7 +46,11 @@ test.afterAll(async () => {
 });
 
 // A cut with Bridget ($100) then a gloss with Gil ($65), checked in.
+// Each visit two hours after the last, so no one is booked twice.
+let visits = 0;
 async function visit(first: string) {
+  const t = 2 * 60 * visits++;
+  const at = (minute: number) => fromLocal(DAY, minute + t, TZ)!;
   const { data: c } = await admin.from("clients").insert({ business_id: B, first_name: `${PREFIX}${first}`, last_name: "Test" }).select("id").single();
   const { data: services } = await admin.from("services").select("id, name").eq("business_id", B).in("name", ["Women's Cut & Style", "Gloss / Toner"]);
   const id = (name: string) => services!.find((s) => s.name === name)!.id;
@@ -229,8 +232,9 @@ test("the connection drops as the sale completes: it says so, and tapping again 
   await expect(co.payment.getByRole("alert")).toContainText("We couldn't reach the server");
   await co.payment.getByRole("button", { name: /^Complete sale/ }).click();
   await expect(page.getByTestId("checkout-success")).toBeVisible();
-  const { data: sales } = await admin.from("sale_items").select("sale_id").eq("product_id", spray!.id);
-  expect(new Set(sales!.map((s) => s.sale_id)).size).toBe(1);
+  // One sale for this checkout (the busy one above sold a spray too).
+  const { data: sales } = await admin.from("sales").select("id").eq("draft_id", draftId);
+  expect(sales).toHaveLength(1);
   // The dropped request is the browser's one complaint.
   allowOfflineLogs(pageErrors);
 });

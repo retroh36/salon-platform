@@ -28,6 +28,8 @@ export function buttonClass(variant: ButtonVariant = "secondary", size: ButtonSi
     "transition-[background-color,box-shadow,transform,filter] duration-(--motion-fast) ease-out active:scale-[0.97]",
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
     "disabled:pointer-events-none disabled:opacity-55",
+    // A finger's worth on a touchscreen, links styled as buttons too.
+    "pointer-coarse:min-h-11 pointer-coarse:min-w-11",
     VARIANTS[variant],
     square ? SQUARE[size] : SIZES[size],
     extra,

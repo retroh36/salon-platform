@@ -52,6 +52,12 @@ const MOVE_STEP = 5;
 const SLOT_STEP = 15;
 // Pointer travel before a press counts as a drag rather than a click.
 const DRAG_THRESHOLD = 5;
+// On a touchscreen a swipe scrolls the calendar, even from a block; holding
+// a block still this long picks it up to drag (a finger moved sooner is a
+// swipe). Mouse and pen drag at once.
+const LONG_PRESS_MS = 350;
+// While a touch drag is on, the page doesn't scroll under the finger.
+const stopScroll = (e: TouchEvent) => e.preventDefault();
 // Dragging near the grid's left or right edge scrolls it sideways (many
 // columns): how close, in px, and how far each move scrolls at most.
 const EDGE_ZONE = 72;
@@ -211,6 +217,35 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // Blocked time being dragged or resized, and where moved blocks now are
   // until the calendar reloads.
   const [blockDrag, setBlockDrag] = useState<BlockDrag | null>(null);
+  // A touch on a block, waiting to see if it's held (a drag) or moves (a
+  // swipe that scrolls).
+  const press = useRef<{ pointerId: number; x: number; y: number; timer: number; armed: boolean } | null>(null);
+  function startPress(e: React.PointerEvent, onArm: () => void) {
+    endPress();
+    const p = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, armed: false, timer: 0 };
+    p.timer = window.setTimeout(() => {
+      p.armed = true;
+      document.addEventListener("touchmove", stopScroll, { passive: false });
+      onArm();
+    }, LONG_PRESS_MS);
+    press.current = p;
+  }
+  // "wait" until it's held, "swipe" once it moved first (the drag is off).
+  function pressState(e: React.PointerEvent): "none" | "wait" | "swipe" | "armed" {
+    const p = press.current;
+    if (!p || e.pointerId !== p.pointerId) return "none";
+    if (p.armed) return "armed";
+    if (Math.hypot(e.clientX - p.x, e.clientY - p.y) < DRAG_THRESHOLD) return "wait";
+    endPress();
+    return "swipe";
+  }
+  function endPress() {
+    if (!press.current) return;
+    window.clearTimeout(press.current.timer);
+    if (press.current.armed) document.removeEventListener("touchmove", stopScroll);
+    press.current = null;
+  }
+  useEffect(() => endPress, []);
   const [blockMoves, setBlockMoves] = useState<Record<string, { start: number; end: number }>>({});
   const [settling, setSettling] = useState<string | null>(null);
   // A stylist's column a link asked for, tinted for a moment.
@@ -509,8 +544,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
 
   function onPointerDown(e: React.PointerEvent, b: BlockData) {
     if (e.button !== 0 || !canMove(b)) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = {
+    const drag: Drag = {
       itemId: b.itemId,
       staffId: b.staffId,
       start: b.start,
@@ -522,9 +556,23 @@ export function CalendarBoard({ data }: { data: BoardData }) {
       length: b.end - b.start,
       moved: false,
     };
+    if (e.pointerType === "touch") {
+      // Held still: picked up where it is.
+      const target = e.currentTarget;
+      return startPress(e, () => {
+        if (target.isConnected) target.setPointerCapture(drag.pointerId);
+        dragRef.current = { ...drag, moved: true };
+        setHint(null);
+        setDrag(dragRef.current);
+      });
+    }
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = drag;
   }
 
   function onPointerMove(e: React.PointerEvent) {
+    const touch = pressState(e);
+    if (touch === "wait" || touch === "swipe") return;
     const d = dragRef.current;
     if (!d || e.pointerId !== d.pointerId) return;
     const dx = e.clientX - d.x;
@@ -539,6 +587,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   }
 
   function onPointerUp(e: React.PointerEvent, b: BlockData) {
+    endPress();
     const d = dragRef.current;
     dragRef.current = null;
     setDrag(null);
@@ -586,11 +635,21 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   function onBlockPointerDown(e: React.PointerEvent, b: TimeBlockData, mode: "move" | "resize") {
     if (e.button !== 0 || !canEditBlock(b)) return;
     e.stopPropagation();
+    const drag: BlockDrag = { key: `${b.blockId}:${data.timeBlocks.find((x) => x.blockId === b.blockId)!.start}`, block: b, mode, pointerId: e.pointerId, y: e.clientY, start: b.start, end: b.end, moved: false };
+    if (e.pointerType === "touch") {
+      const target = e.currentTarget;
+      return startPress(e, () => {
+        if (target.isConnected) target.setPointerCapture(drag.pointerId);
+        setBlockDrag({ ...drag, moved: true });
+      });
+    }
     e.currentTarget.setPointerCapture(e.pointerId);
-    setBlockDrag({ key: `${b.blockId}:${data.timeBlocks.find((x) => x.blockId === b.blockId)!.start}`, block: b, mode, pointerId: e.pointerId, y: e.clientY, start: b.start, end: b.end, moved: false });
+    setBlockDrag(drag);
   }
 
   function onBlockPointerMove(e: React.PointerEvent) {
+    const touch = pressState(e);
+    if (touch === "wait" || touch === "swipe") return;
     const d = blockDrag;
     if (!d || e.pointerId !== d.pointerId) return;
     const dy = e.clientY - d.y;
@@ -606,6 +665,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   }
 
   function onBlockPointerUp(e: React.PointerEvent) {
+    // A touch that was never held opens it with its click (onOpen).
+    endPress();
     const d = blockDrag;
     setBlockDrag(null);
     if (!d || e.pointerId !== d.pointerId) return;
@@ -934,7 +995,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                                 onPointerDown={onBlockPointerDown}
                                 onPointerMove={onBlockPointerMove}
                                 onPointerUp={onBlockPointerUp}
-                                onPointerCancel={() => setBlockDrag(null)}
+                                onPointerCancel={() => {
+                                  endPress();
+                                  setBlockDrag(null);
+                                }}
                                 onOpen={() => select({ kind: "block", blockId: b.blockId })}
                               />
                             );
@@ -970,6 +1034,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                               onPointerMove={onPointerMove}
                               onPointerUp={(e) => onPointerUp(e, b)}
                               onPointerCancel={() => {
+                                endPress();
                                 dragRef.current = null;
                                 setDrag(null);
                               }}
@@ -1754,7 +1819,7 @@ function TimeBlockBox({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      className={`absolute inset-x-1 touch-none overflow-hidden rounded-md border border-dashed border-line-strong px-2 py-1 text-xs text-ink-muted select-none transition-[box-shadow] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-focus ${
+      className={`absolute inset-x-1 touch-pan-x touch-pan-y overflow-hidden [-webkit-touch-callout:none] rounded-md border border-dashed border-line-strong px-2 py-1 text-xs text-ink-muted select-none transition-[box-shadow] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-focus ${
         editable ? "cursor-grab" : "cursor-pointer"
       } ${selected ? "ring-2 ring-link/70 ring-inset" : ""} ${dragging ? "z-40 shadow-lift" : ""}`}
       style={{
@@ -1964,7 +2029,7 @@ function AppointmentBlock({
         onBlur={(e) => onHint(null, e.currentTarget.getBoundingClientRect())}
         aria-describedby={`hint-${block.itemId}`}
         {...pointer}
-        className={`@container absolute block touch-none overflow-hidden rounded-md border-l-4 border-(--fam-accent) bg-surface text-left text-ink shadow-card select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
+        className={`@container absolute block touch-pan-x touch-pan-y overflow-hidden [-webkit-touch-callout:none] rounded-md border-l-4 border-(--fam-accent) bg-surface text-left text-ink shadow-card select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
           selected || highlight || grouped ? "" : "ring-1 ring-surface"
         } ${draggable ? "cursor-grab" : "cursor-pointer"} ${dragging ? "opacity-40 shadow-none outline-2 outline-ink-subtle outline-dashed" : ""} ${settling ? "animate-settle" : ""}`}
         style={{
