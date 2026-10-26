@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { Sheet } from "@/components/ui/sheet";
 import { discountLimitWarning, parseDollars, quickCash } from "@/lib/checkout";
@@ -161,7 +161,7 @@ function AddService({ data, onAddLine, onClose }: Props) {
         Find a service
         <input value={query} onChange={(e) => setQuery(e.target.value)} className={`${fieldClass} h-12`} placeholder="e.g. Gloss" />
       </label>
-      <ul aria-label="Services" className="flex max-h-80 flex-col divide-y divide-line overflow-y-auto rounded-xl border border-line">
+      <ul aria-label="Services" className="flex max-h-80 flex-col divide-y divide-line overflow-y-auto rounded-lg border border-line">
         {offered.length === 0 && <li className="px-4 py-3 text-ink-muted">This stylist doesn’t offer a service like that.</li>}
         {offered.map((s) => (
           <li key={s.id}>
@@ -230,7 +230,7 @@ function SellGiftCard({ data, onAddLine, onClose }: Props) {
             ["Reload a card", reload, () => setReload(true)],
           ] as const
         ).map(([label, on, pick]) => (
-          <button key={label} type="button" aria-pressed={on} onClick={pick} className={`h-12 rounded-lg border text-sm font-semibold ${on ? "border-navy-900 bg-navy-900 text-white" : "border-line-strong bg-surface"}`}>
+          <button key={label} type="button" aria-pressed={on} onClick={pick} className={buttonClass(on ? "primary" : "secondary", "lg", "h-12 min-w-0 px-2")}>
             {label}
           </button>
         ))}
@@ -274,7 +274,7 @@ function SellGiftCard({ data, onAddLine, onClose }: Props) {
 function SellPackage({ data, onAddLine, onClose }: Props) {
   const active = data.templates.filter((t) => t.isActive);
   return (
-    <ul className="flex flex-col divide-y divide-line rounded-xl border border-line">
+    <ul className="flex flex-col divide-y divide-line rounded-lg border border-line">
       {active.map((t) => (
         <li key={t.id}>
           <button
@@ -321,7 +321,7 @@ function SellMembership({ data, ticket, onAddLine, onClose }: Props) {
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-1 text-sm font-medium">Membership</legend>
         {data.plans.map((p) => (
-          <label key={p.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 ${planId === p.id ? "border-navy-900 bg-navy-100/40" : "border-line"} ${taken.has(p.id) ? "opacity-50" : ""}`}>
+          <label key={p.id} className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 ${planId === p.id ? "border-navy-900 bg-navy-100/40" : "border-line"} ${taken.has(p.id) ? "opacity-50" : ""}`}>
             <input type="radio" name="plan" value={p.id} checked={planId === p.id} disabled={taken.has(p.id)} onChange={() => setPlanId(p.id)} className="mt-1" />
             <span className="min-w-0 flex-1">
               <span className="flex justify-between gap-3 font-medium">
@@ -537,7 +537,7 @@ function CashPay({ totals, onAddPayment, onClose }: Props) {
     <div className="flex flex-col gap-4">
       <div className="flex items-baseline justify-between">
         <span className="text-ink-muted">Owed {formatPrice(owed)}</span>
-        <span className="font-serif text-4xl font-semibold tabular-nums" data-testid="cash-tendered" aria-label="Cash handed over">
+        <span className="text-2xl font-semibold tabular-nums" data-testid="cash-tendered" aria-label="Cash handed over">
           {formatPrice(tendered)}
         </span>
       </div>
@@ -555,13 +555,13 @@ function CashPay({ totals, onAddPayment, onClose }: Props) {
             type="button"
             aria-label={k === "back" ? "Delete" : k}
             onClick={() => press(k)}
-            className="h-14 rounded-xl border border-line-strong bg-surface text-xl font-semibold tabular-nums active:scale-[0.97] active:bg-sunken"
+            className={buttonClass("secondary", "lg", "h-14 text-xl tabular-nums")}
           >
             {k === "back" ? "⌫" : k}
           </button>
         ))}
       </div>
-      <p className="text-lg font-semibold" data-testid="change-due">
+      <p className="text-base font-semibold" data-testid="change-due">
         {tendered > owed ? `Change due: ${formatPrice(tendered - owed)}` : tendered < owed && tendered > 0 ? `${formatPrice(owed - tendered)} still to pay after this` : " "}
       </p>
       <Button
@@ -624,7 +624,7 @@ function GiftCardPay({ data, totals, onAddPayment, onClose }: Props) {
       )}
       {card && (
         <>
-          <p className="text-lg" data-testid="gift-card-balance">
+          <p className="text-base" data-testid="gift-card-balance">
             Balance <strong>{formatPrice(card.balanceCents)}</strong>
           </p>
           <AmountField value={amount} onChange={setAmount} />

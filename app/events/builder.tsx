@@ -5,10 +5,10 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ClientPicker } from "@/app/calendar/booking-panel";
 import type { ClientOption } from "@/app/calendar/actions";
 import { DeniseFace } from "@/components/denise";
-import { Button } from "@/components/ui/button";
+import { Button, IconButton } from "@/components/ui/button";
 import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { CloseIcon } from "@/components/ui/icons";
-import { Alert, Card } from "@/components/ui/page";
+import { Alert, Badge, Card } from "@/components/ui/page";
 import { Segmented } from "@/components/ui/segmented";
 import { builderProblems, lanesFor, memberKey, priceOf, timelineOf, type BuilderState } from "@/lib/events/builder";
 import { headcountCutoff, paymentSchedule, SCHEDULED_LABELS } from "@/lib/events/pricing";
@@ -141,9 +141,9 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
   const client: ClientOption | null = state.clientId ? { id: state.clientId, name: state.clientName, phone: null, allergies: null } : null;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-      <div className="flex min-w-0 flex-col gap-6">
-        <section aria-label="Denise drafts it" className="flex flex-col gap-3 rounded-xl border border-denise-200 bg-denise-50 p-4">
+    <div className="grid gap-x-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="flex min-w-0 flex-col">
+        <section aria-label="Denise drafts it" className="mb-6 flex flex-col gap-3 rounded-lg border border-denise-200 bg-denise-50 p-4">
           <form
             className="flex flex-col gap-2 sm:flex-row sm:items-end"
             onSubmit={(e) => {
@@ -201,7 +201,7 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
               />
             </label>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <span className="text-sm font-medium text-ink">Where</span>
+              <span className="text-13 font-medium text-ink">Where</span>
               <Segmented
                 label="Where"
                 value={state.onLocation ? "location" : "salon"}
@@ -235,6 +235,11 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
           </div>
         </Card>
 
+        {partyLocked && (
+          <Alert tone="info" className="mb-4">
+            The headcount cutoff has passed. An owner or manager can change the party now.
+          </Alert>
+        )}
         <Card
           title={`Party (${state.members.length})`}
           titleId="event-party"
@@ -250,14 +255,9 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
             />
           }
         >
-          {partyLocked && (
-            <Alert tone="info" className="mb-4">
-              The headcount cutoff has passed. An owner or manager can change the party now.
-            </Alert>
-          )}
-          <ol className="flex flex-col gap-2" aria-label="Party">
+          <ol className="-my-3 flex flex-col divide-y divide-line" aria-label="Party">
             {state.members.map((m, i) => (
-              <li key={i} className="flex flex-col gap-2 rounded-lg border border-line p-2.5" data-testid="party-member">
+              <li key={i} className="flex flex-col gap-2 py-3" data-testid="party-member">
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_minmax(0,1.3fr)_auto]">
                   <input
                     aria-label={`Name of person ${i + 1}`}
@@ -294,15 +294,15 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
                       </option>
                     ))}
                   </select>
-                  <button
-                    type="button"
-                    aria-label={`Remove ${m.name || `person ${i + 1}`}`}
+                  <IconButton
+                    label={`Remove ${m.name || `person ${i + 1}`}`}
+                    variant="quiet"
                     disabled={partyLocked}
                     onClick={() => updateParty(state.members.filter((_, j) => j !== i))}
-                    className="flex size-11 items-center justify-center rounded-md text-ink-muted transition-colors duration-(--motion-fast) hover:bg-sunken hover:text-ink disabled:opacity-40"
+                    className="text-ink-muted hover:text-ink"
                   >
                     <CloseIcon className="size-4" />
-                  </button>
+                  </IconButton>
                 </div>
                 {state.billing === "split" && (
                   <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -322,7 +322,7 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
             ))}
           </ol>
           {!partyLocked && (
-            <div className="mt-3 flex flex-wrap gap-2" aria-label="Add to the party">
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4" aria-label="Add to the party">
               {(brideAt < 0 ? (["bride", ...QUICK_ADD] as PartyRole[]) : QUICK_ADD).map((role) => (
                 <Button
                   key={role}
@@ -338,12 +338,12 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
               ))}
             </div>
           )}
-          {!active.length && <p className="mt-3 text-ink-muted">There are no event packages yet. An owner sets them up on Settings → Bridal and events.</p>}
+          {!active.length && <p className="mt-3 text-sm text-ink-muted">There are no event packages yet. An owner sets them up on Settings → Bridal and events.</p>}
         </Card>
 
         <Card title="Timeline" titleId="event-timeline">
           {state.readyBy == null || !state.members.length ? (
-            <p className="text-ink-muted">Add the party and the ready-by time, and I&rsquo;ll plan the day backward from it.</p>
+            <p className="text-sm text-ink-muted">Add the party and the ready-by time, and I&rsquo;ll plan the day backward from it.</p>
           ) : (
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap gap-4">
@@ -359,7 +359,7 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
                   const options = team.filter((t) => t.eventRoles.includes(span.role));
                   return (
                     <li key={key} className="flex flex-col gap-1" data-testid="lane">
-                      <label className="grid grid-cols-[9rem_minmax(0,16rem)] items-center gap-3 text-sm font-medium">
+                      <label className="grid grid-cols-[10.5rem_minmax(0,16rem)] items-center gap-3 text-13 font-medium text-ink">
                         <span>
                           {span.role === "hair" ? "Hair" : "Makeup"} {span.lane} · call {formatMinute(span.call)}
                         </span>
@@ -370,7 +370,7 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
                             manual.current.add(key);
                             update({ team: { ...state.team, [key]: e.target.value || null } });
                           }}
-                          className={`${selectClass} h-10`}
+                          className={selectClass}
                         >
                           <option value="">Not chosen</option>
                           {options.map((t) => (
@@ -382,8 +382,11 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
                         </select>
                       </label>
                       {state.team[key] && check[key]?.[state.team[key]!] && (
-                        <p className="text-sm text-danger">
-                          {team.find((t) => t.id === state.team[key])?.firstName} {check[key][state.team[key]!]} then.
+                        <p className="flex flex-wrap items-center gap-2">
+                          <Badge tone="danger">Not free</Badge>
+                          <span className="text-13 text-ink-muted">
+                            {team.find((t) => t.id === state.team[key])?.firstName} {check[key][state.team[key]!]} then.
+                          </span>
                         </p>
                       )}
                     </li>
@@ -391,8 +394,11 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
                 })}
               </ul>
               {spans.some((s) => !state.team[laneKey(s)]) && Object.keys(check).length > 0 && (
-                <p className="text-sm text-danger" data-testid="short-staffed">
-                  {spans.filter((s) => !state.team[laneKey(s)]).length === 1 ? "One lane has" : `${spans.filter((s) => !state.team[laneKey(s)]).length} lanes have`} nobody free.
+                <p className="flex flex-wrap items-center gap-2" data-testid="short-staffed">
+                  <Badge tone="warning">Short-staffed</Badge>
+                  <span className="text-13 text-ink-muted">
+                    {spans.filter((s) => !state.team[laneKey(s)]).length === 1 ? "One lane has" : `${spans.filter((s) => !state.team[laneKey(s)]).length} lanes have`} nobody free.
+                  </span>
                 </p>
               )}
               <TimelineEditor
@@ -407,11 +413,13 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
                 onReset={() => update({ tasks: null })}
               />
               {timelineIssues.length > 0 && (
-                <ul className="flex flex-col gap-1 text-sm text-danger" role="alert">
-                  {timelineIssues.map((p, i) => (
-                    <li key={i}>{describeTimelineProblem(p, nameOf)}</li>
-                  ))}
-                </ul>
+                <Alert>
+                  <ul className="flex flex-col gap-1">
+                    {timelineIssues.map((p, i) => (
+                      <li key={i}>{describeTimelineProblem(p, nameOf)}</li>
+                    ))}
+                  </ul>
+                </Alert>
               )}
             </div>
           )}
@@ -422,7 +430,7 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
         </Card>
       </div>
 
-      <aside className="flex flex-col gap-6 lg:sticky lg:top-6 lg:self-start" aria-label="Total">
+      <aside className="flex flex-col lg:sticky lg:top-6 lg:self-start" aria-label="Total">
         <Card title="Total" titleId="event-total">
           <dl className="flex flex-col gap-1.5 text-sm" data-testid="event-total">
             <Line label={`Packages (${state.members.length})`} cents={price.subtotalCents} />
@@ -437,7 +445,7 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
               </dd>
             </div>
             {price.ownCents > 0 && <Line label="Paid by the party, by link" cents={price.ownCents} />}
-            <div className="flex justify-between font-semibold">
+            <div className="flex justify-between gap-2 font-medium text-ink">
               <dt>
                 Deposit to book ({settings.depositPct}%{settings.depositRefundable ? "" : ", non-refundable"})
               </dt>
@@ -448,7 +456,7 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
           </dl>
           {schedule.length > 0 && !booked && (
             <div className="mt-4">
-              <h3 className="text-xs font-semibold tracking-wide text-ink-muted uppercase">If booked today</h3>
+              <h3 className="text-xs font-medium text-ink-muted">If booked today</h3>
               <ul className="mt-1 flex flex-col gap-1 text-sm" data-testid="schedule">
                 {schedule.map((p) => (
                   <li key={p.kind} className="flex justify-between gap-2">
@@ -493,7 +501,7 @@ function Line({ label, cents }: { label: string; cents: number }) {
 function LaneCount({ role, lanes, onChange }: { role: EventRole; lanes: Lanes; onChange: (lanes: Lanes) => void }) {
   const label = role === "hair" ? "Hair artists" : "Makeup artists";
   return (
-    <div className="flex items-center gap-2 text-sm font-medium" role="group" aria-label={label}>
+    <div className="flex items-center gap-2 text-13 font-medium text-ink" role="group" aria-label={label}>
       <span>{label}</span>
       <Button size="xs" aria-label={`Fewer ${label.toLowerCase()}`} disabled={lanes[role] <= 1} onClick={() => onChange({ ...lanes, [role]: lanes[role] - 1 })}>
         −

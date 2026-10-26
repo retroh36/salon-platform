@@ -5,6 +5,8 @@ import type { LinkSnapshot } from "@/lib/payment-links";
 import { linkTotal, tipChoices } from "@/lib/payment-links";
 import { parseDollars } from "@/lib/checkout";
 import { formatPrice } from "@/lib/services";
+import { accentLink, chipClass, inputClass, pageLead, pageTitle, primaryButton, sectionTitle } from "@/app/book/[slug]/styles";
+import { Alert } from "@/components/ui/page";
 import { payLink, type PayResult } from "./actions";
 import { CLIENT_NO_CONNECTION, reach } from "@/lib/reach";
 
@@ -25,9 +27,9 @@ export function PayForm({ token, salon, snapshot, testMode, cards }: { token: st
 
   if (result?.ok)
     return (
-      <div className="flex flex-col gap-2" data-testid="link-paid">
-        <h1 className="font-serif text-3xl font-semibold text-ink">Paid. Thank you.</h1>
-        <p className="text-lg tabular-nums">
+      <div className="flex flex-col gap-1" data-testid="link-paid">
+        <h1 className={pageTitle}>Paid. Thank you.</h1>
+        <p className="mt-1.5 text-base font-medium tabular-nums">
           {formatPrice(result.totalCents)}
           {result.tipCents > 0 ? `, including ${formatPrice(result.tipCents)} in tips` : ""}
         </p>
@@ -44,14 +46,14 @@ export function PayForm({ token, salon, snapshot, testMode, cards }: { token: st
       }}
     >
       <div>
-        <h1 className="font-serif text-3xl font-semibold text-ink">{snapshot.clientFirstName ? `Thanks for coming in, ${snapshot.clientFirstName}` : "Your visit"}</h1>
-        <p className="text-ink-muted">Here&apos;s your receipt from {salon}.</p>
+        <h1 className={pageTitle}>{snapshot.clientFirstName ? `Thanks for coming in, ${snapshot.clientFirstName}` : "Your visit"}</h1>
+        <p className={pageLead}>Here&apos;s your receipt from {salon}.</p>
       </div>
 
-      <section aria-label="Receipt" className="rounded-xl border border-line bg-surface p-4">
-        <ul className="flex flex-col divide-y divide-line">
+      <section aria-label="Receipt" className="overflow-hidden rounded-lg border border-line bg-surface">
+        <ul className="flex flex-col divide-y divide-line px-4">
           {snapshot.lines.map((l, i) => (
-            <li key={i} className="flex justify-between gap-3 py-2" data-testid="link-line">
+            <li key={i} className="flex justify-between gap-3 py-3" data-testid="link-line">
               <span className="min-w-0">
                 <span className="block font-medium">
                   {l.name}
@@ -59,11 +61,11 @@ export function PayForm({ token, salon, snapshot, testMode, cards }: { token: st
                 </span>
                 {l.detail && <span className="block text-sm text-ink-muted">{l.detail}</span>}
               </span>
-              <span className="shrink-0 tabular-nums">{formatPrice(l.totalCents)}</span>
+              <span className="shrink-0 font-medium tabular-nums">{formatPrice(l.totalCents)}</span>
             </li>
           ))}
         </ul>
-        <dl className="mt-2 flex flex-col gap-1 border-t border-line pt-2 text-sm tabular-nums">
+        <dl className="flex flex-col gap-1 border-t border-line px-4 py-3 text-sm tabular-nums">
           {snapshot.discountCents > 0 && (
             <div className="flex justify-between">
               <dt className="text-ink-muted">Discounts</dt>
@@ -85,13 +87,13 @@ export function PayForm({ token, salon, snapshot, testMode, cards }: { token: st
 
       {snapshot.stylists.length > 0 && (
         <section aria-label="Tips" className="flex flex-col gap-4">
-          <h2 className="text-sm font-semibold tracking-wide text-ink-muted uppercase">Add a tip</h2>
+          <h2 className={sectionTitle}>Add a tip</h2>
           {snapshot.stylists.map((s) => {
             const tip = tips[s.staffId] ?? { kind: "none" };
             const pick = (t: Tip) => setTips({ ...tips, [s.staffId]: t });
             return (
               <div key={s.staffId} role="group" aria-label={`Tip for ${s.firstName}`} className="flex flex-col gap-2">
-                <p className="font-medium">For {s.firstName}</p>
+                <p className="text-sm font-medium text-ink">For {s.firstName}</p>
                 <div className="grid grid-cols-4 gap-2">
                   {tipChoices(s.servicesCents).map((c) => (
                     <button
@@ -99,28 +101,28 @@ export function PayForm({ token, salon, snapshot, testMode, cards }: { token: st
                       type="button"
                       aria-pressed={tip.kind === "percent" && tip.percent === c.percent}
                       onClick={() => pick({ kind: "percent", percent: c.percent, cents: c.cents })}
-                      className={`flex h-14 flex-col items-center justify-center rounded-lg border text-sm font-semibold ${tip.kind === "percent" && tip.percent === c.percent ? "border-(--accent) bg-(--accent) text-white" : "border-line-strong bg-surface"}`}
+                      className={`${chipClass(tip.kind === "percent" && tip.percent === c.percent)} h-14 flex-col tabular-nums`}
                     >
-                      {c.percent}%<span className="text-xs font-normal">{formatPrice(c.cents)}</span>
+                      {c.percent}%<span className="text-xs font-normal opacity-80">{formatPrice(c.cents)}</span>
                     </button>
                   ))}
                   <button
                     type="button"
                     aria-pressed={tip.kind === "custom"}
                     onClick={() => pick({ kind: "custom", text: "" })}
-                    className={`h-14 rounded-lg border text-sm font-semibold ${tip.kind === "custom" ? "border-(--accent) bg-(--accent) text-white" : "border-line-strong bg-surface"}`}
+                    className={`${chipClass(tip.kind === "custom")} h-14`}
                   >
                     Custom
                   </button>
                 </div>
                 {tip.kind === "custom" && (
-                  <label className="flex flex-col gap-1 text-sm font-medium">
+                  <label className="flex flex-col gap-1.5 text-sm font-medium">
                     Tip for {s.firstName} ($)
-                    <input inputMode="decimal" value={tip.text} onChange={(e) => pick({ kind: "custom", text: e.target.value })} className="h-12 rounded-lg border border-line-strong bg-surface px-3 text-lg" autoFocus />
+                    <input inputMode="decimal" value={tip.text} onChange={(e) => pick({ kind: "custom", text: e.target.value })} className={inputClass} autoFocus />
                   </label>
                 )}
                 {tip.kind !== "none" && (
-                  <button type="button" onClick={() => pick({ kind: "none" })} className="self-start text-sm font-medium text-link underline-offset-2 hover:underline">
+                  <button type="button" onClick={() => pick({ kind: "none" })} className={`min-h-9 self-start text-sm ${accentLink}`}>
                     No tip
                   </button>
                 )}
@@ -132,9 +134,9 @@ export function PayForm({ token, salon, snapshot, testMode, cards }: { token: st
 
       <section aria-label="Pay" className="flex flex-col gap-3">
         {testMode && (
-          <label className="flex flex-col gap-1 text-sm font-medium">
+          <label className="flex flex-col gap-1.5 text-sm font-medium">
             Card (test mode: nothing is charged)
-            <select value={card} onChange={(e) => setCard(e.target.value)} className="h-12 rounded-lg border border-line-strong bg-surface px-3">
+            <select value={card} onChange={(e) => setCard(e.target.value)} className={inputClass}>
               {cards.map((c) => (
                 <option key={c.ref} value={c.ref}>
                   {c.label} ({c.outcome.toLowerCase()})
@@ -144,17 +146,13 @@ export function PayForm({ token, salon, snapshot, testMode, cards }: { token: st
           </label>
         )}
         <div className="flex items-baseline justify-between border-t border-line pt-3">
-          <span className="text-lg font-semibold">Total{tipTotal > 0 ? ` (with ${formatPrice(tipTotal)} tip)` : ""}</span>
-          <span className="font-serif text-3xl font-semibold tabular-nums" data-testid="link-total">
+          <span className="text-base font-semibold">Total{tipTotal > 0 ? ` (with ${formatPrice(tipTotal)} tip)` : ""}</span>
+          <span className="text-2xl font-semibold tabular-nums" data-testid="link-total">
             {formatPrice(total)}
           </span>
         </div>
-        {result && !result.ok && (
-          <p role="alert" className="font-medium text-danger">
-            {result.message}
-          </p>
-        )}
-        <button type="submit" disabled={pending} className="h-14 rounded-xl bg-(--accent) text-lg font-semibold text-white disabled:opacity-60">
+        {result && !result.ok && <Alert>{result.message}</Alert>}
+        <button type="submit" disabled={pending} className={primaryButton}>
           {pending ? "Paying…" : `Pay ${formatPrice(total)}`}
         </button>
       </section>

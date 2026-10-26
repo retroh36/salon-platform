@@ -14,8 +14,8 @@ export function VisitMessageSwitches({ clientId, sms, email }: { clientId: strin
       setError(r.ok ? null : r.message);
     });
   return (
-    <fieldset className="flex flex-col gap-2">
-      <legend className="mb-1 font-medium">About their visits</legend>
+    <fieldset className="flex flex-col gap-2 text-sm">
+      <legend className="mb-1 font-medium text-ink">About their visits</legend>
       <label className="flex items-center gap-2">
         <input type="checkbox" className={checkboxClass} checked={sms.on && sms.possible} disabled={pending || !sms.possible} onChange={(e) => toggle("appointment_sms_ok", e.target.checked)} />
         Texts (confirmations, reminders, changes)

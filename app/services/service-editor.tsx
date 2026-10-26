@@ -107,7 +107,7 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
         ← Services
       </Link>
       <div className="mt-3 mb-6 flex flex-wrap items-center gap-3">
-        <h1 className="font-serif text-4xl font-semibold tracking-tight text-navy-900">{title}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">{title}</h1>
         {archived && <Badge tone="neutral">Archived</Badge>}
         {!manage && <Badge tone="navy">View only</Badge>}
       </div>
@@ -149,9 +149,9 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
       {service && manage && (
         <form
           action={setServiceArchived.bind(null, service.id, !archived)}
-          className={`mt-10 rounded-xl border p-5 ${archived ? "border-line bg-surface" : "border-danger/25 bg-danger-soft/40"}`}
+          className="mt-10 rounded-lg border border-line bg-surface p-4"
         >
-          <h2 className="font-serif text-lg font-semibold text-ink">{archived ? "Restore" : "Archive"}</h2>
+          <h2 className="text-base font-semibold text-ink">{archived ? "Restore" : "Archive"}</h2>
           <p className="mt-1 mb-4 text-sm text-ink-muted">
             {archived
               ? "Put this service back on the menu."
@@ -159,7 +159,7 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
           </p>
           <button
             type="submit"
-            className={archived ? buttonClass("secondary", "md") : buttonClass("secondary", "md", "border-danger/40 text-danger hover:bg-danger-soft")}
+            className={archived ? buttonClass("secondary", "md") : buttonClass("danger-quiet", "md", "-ml-3.5")}
           >
             {archived ? "Restore service" : "Archive service"}
           </button>

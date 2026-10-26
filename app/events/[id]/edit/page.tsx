@@ -45,7 +45,7 @@ async function EditEvent({ params }: Pick<PageProps<"/events/[id]/edit">, "param
       <BackLink href={`/events/${id}`}>{event.title}</BackLink>
       <PageHeader title="Edit event" />
       {event.source === "online" && event.members.length === 0 && (
-        <Alert tone="info" className="mb-4">
+        <Alert tone="info" className="mb-6">
           From the booking site: {event.inquiryPartySize ? `${event.inquiryPartySize} ${event.inquiryPartySize === 1 ? "person" : "people"}` : "party size not given"}
           {event.inquiryServices ? `, ${event.inquiryServices}` : ""}. I&rsquo;ve started the party from that; change anything.
         </Alert>

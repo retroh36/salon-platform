@@ -1,4 +1,4 @@
-import { admin, SEED } from "../tests/db/helpers";
+import { admin, busyDay, SEED } from "../tests/db/helpers";
 import { runPolicyCharges } from "../lib/policy-billing";
 import { todayIn } from "../lib/scheduling/time";
 import { AUTH, expect, moreAction, test, ui, waitForHydration } from "./fixtures";
@@ -202,7 +202,8 @@ test("Denise flags a repeat offender when the desk books them", async ({ page })
       .single();
     await admin.from("policy_fees").insert({ business_id: B, location_id: L, appointment_id: a!.id, client_id: clientId, kind: "no_show", fee_cents: 5000, status: "charged", created_at: new Date(Date.now() - days * 86_400_000).toISOString() });
   }
-  await page.goto("/calendar");
+  // A day the salon is open (today is closed on Sundays and Mondays).
+  await page.goto(`/calendar?date=${(await busyDay()).date}`);
   await waitForHydration(page, "section[data-staff-id]");
   await ui(page).getByRole("button", { name: "New booking" }).click();
   const form = page.getByRole("tabpanel", { name: "Booking details" }).getByRole("form", { name: "New booking" });

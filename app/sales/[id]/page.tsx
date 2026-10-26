@@ -17,10 +17,10 @@ import { EmailReceipt, PrintOnOpen, RefundForm, RetryCardRefund, VoidForm } from
 export const metadata: Metadata = { title: "Sale" };
 
 const STATUS: Record<SaleView["status"], { label: string; tone: Tone }> = {
-  completed: { label: "Paid", tone: "green" },
-  partly_refunded: { label: "Part refunded", tone: "amber" },
-  refunded: { label: "Refunded", tone: "amber" },
-  voided: { label: "Voided", tone: "red" },
+  completed: { label: "Paid", tone: "success" },
+  partly_refunded: { label: "Part refunded", tone: "warning" },
+  refunded: { label: "Refunded", tone: "neutral" },
+  voided: { label: "Voided", tone: "danger" },
 };
 
 const EVENTS: Record<string, string> = {
@@ -88,9 +88,9 @@ async function Sale({ params, searchParams }: Pick<PageProps<"/sales/[id]">, "pa
             <Receipt sale={sale} salon={salon} when={at(sale.createdAt)} />
           </Card>
           <Card title="History" titleId="history-heading">
-            <ol className="flex flex-col gap-2 text-sm" aria-label="Sale history">
+            <ol className="flex flex-col divide-y divide-line text-sm" aria-label="Sale history">
               {sale.events.map((e, i) => (
-                <li key={i} className="flex flex-wrap justify-between gap-2">
+                <li key={i} className="flex flex-wrap justify-between gap-2 py-2 first:pt-0 last:pb-0">
                   <span>
                     <span className="font-medium text-ink">{EVENTS[e.kind] ?? e.kind}</span>
                     {e.detail && <span className="text-ink-muted"> · {e.detail}</span>}
@@ -138,7 +138,7 @@ function Receipt({ sale, salon, when }: { sale: SaleView; salon: ReceiptSalon; w
   return (
     <div className="flex flex-col gap-3 text-sm" data-testid="receipt">
       <div>
-        <p className="font-serif text-lg font-semibold text-navy-900">{salon.name}</p>
+        <p className="text-base font-semibold text-ink">{salon.name}</p>
         <p className="text-ink-muted">
           {salon.locationName}
           {salon.address ? ` · ${salon.address}` : ""}
@@ -152,7 +152,7 @@ function Receipt({ sale, salon, when }: { sale: SaleView; salon: ReceiptSalon; w
       {receiptGroups(sale).map((g) => (
         <section key={g.staffName ?? "other"} aria-label={salon.showStylists && g.staffName ? `${g.staffName}'s lines` : "Lines"}>
           {salon.showStylists && (
-            <p className="flex justify-between border-b border-line pb-0.5 text-xs font-semibold tracking-wide text-ink-muted uppercase">
+            <p className="flex justify-between border-b border-line pb-0.5 text-xs font-medium text-ink-muted">
               <span>{g.staffName ?? "Other"}</span>
               <span className="tabular-nums">{formatPrice(g.subtotalCents)}</span>
             </p>
@@ -176,7 +176,7 @@ function Receipt({ sale, salon, when }: { sale: SaleView; salon: ReceiptSalon; w
                     )}
                     {i.returnedQuantity > 0 && <span className="block text-xs text-ink-muted">{i.returnedQuantity} returned</span>}
                   </td>
-                  <td className="py-1 text-right">{formatPrice(i.unitPriceCents * i.quantity)}</td>
+                  <td className="py-1 text-right align-top whitespace-nowrap">{formatPrice(i.unitPriceCents * i.quantity)}</td>
                 </tr>
               ))}
             </tbody>
@@ -202,7 +202,17 @@ function Receipt({ sale, salon, when }: { sale: SaleView; salon: ReceiptSalon; w
         ))}
         {change > 0 && <Line label="Change given" value={formatPrice(change)} />}
       </dl>
-      {sale.status === "voided" && <p className="font-medium text-danger">Voided{sale.voidReason ? `: ${sale.voidReason}` : ""}</p>}
+      {sale.status === "voided" && (
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <Badge tone="danger">Voided</Badge>
+          {sale.voidReason && (
+            <span className="text-ink-muted">
+              <span className="sr-only">: </span>
+              {sale.voidReason}
+            </span>
+          )}
+        </p>
+      )}
       {salon.footer && <p className="text-ink-muted">{salon.footer}</p>}
     </div>
   );
@@ -210,9 +220,9 @@ function Receipt({ sale, salon, when }: { sale: SaleView; salon: ReceiptSalon; w
 
 function Line({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className={`flex justify-between gap-3 ${strong ? "text-base font-semibold text-navy-900" : ""}`}>
+    <div className={`flex justify-between gap-3 ${strong ? "pt-1 text-base font-semibold text-ink" : ""}`}>
       <dt>{label}</dt>
-      <dd>{value}</dd>
+      <dd className="text-right tabular-nums">{value}</dd>
     </div>
   );
 }

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
-import { Card, PageHeader } from "@/components/ui/page";
+import { Badge, Card, PageHeader, Section } from "@/components/ui/page";
+import { buttonClass } from "@/components/ui/button";
 import { getCurrentStaff } from "@/lib/auth";
 import { MODE_LABELS, NEW_PLAN, parseRules, planInput, planSummary, tierExample } from "@/lib/commission";
 import { can } from "@/lib/permissions";
@@ -55,33 +56,38 @@ async function Commission() {
         description="How each person is paid: commission (flat or in tiers) or hourly. Changes apply to sales from then on; past pay never changes."
       />
       <SettingsNav current="commission" me={me} />
+      {list.length > 0 && (
+      <Section title="Plans" titleId="plans-heading" count={list.length}>
       {list.map((p) => (
         <Card
+          className="mb-3"
           key={p.id}
           title={
             <>
               {p.name}
-              {p.isDefault && <span className="ml-2 align-middle text-xs font-normal text-ink-muted">Default for new people</span>}
+              {p.isDefault && <Badge className="ml-2 align-middle">Default for new people</Badge>}
             </>
           }
           titleId={`plan-${p.id}`}
           description={
             <>
               {MODE_LABELS[p.rules.mode]} · {planSummary(p.rules)}
-              {tierExample(p.rules) && <span className="block text-xs">For example, {tierExample(p.rules)}</span>}
+              {tierExample(p.rules) && <span className="mt-0.5 block text-xs text-ink-subtle">For example, {tierExample(p.rules)}</span>}
             </>
           }
           actions={<ArchivePlan planId={p.id} name={p.name} />}
           data-testid="commission-plan"
         >
           <details>
-            <summary className="cursor-pointer text-sm font-medium text-link">Edit {p.name}</summary>
-            <div className="mt-4">
+            <summary className={buttonClass("secondary", "sm", "cursor-pointer list-none")}>Edit {p.name}</summary>
+            <div className="mt-4 border-t border-line pt-4">
               <PlanEditor planId={p.id} initial={planInput(p.name, p.isDefault, p.rules)} />
             </div>
           </details>
         </Card>
       ))}
+      </Section>
+      )}
       <Card title="Add a plan" titleId="new-plan-heading" description="Tiers can be marginal (each dollar at its tier's rate) or retroactive (reaching a tier pays all the period's sales at its rate).">
         <PlanEditor planId={null} initial={NEW_PLAN} />
       </Card>

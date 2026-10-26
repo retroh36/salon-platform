@@ -35,16 +35,16 @@ async function Outbox({ searchParams }: Pick<PageProps<"/dev/outbox">, "searchPa
 
   return (
     <main className="mx-auto w-full max-w-2xl bg-canvas px-4 py-8">
-      <h1 className="font-serif text-3xl font-semibold tracking-tight text-navy-900">{isDemo() ? "Demo outbox" : "Dev outbox"}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-ink">{isDemo() ? "Demo outbox" : "Dev outbox"}</h1>
       <p className="mt-1 mb-6 text-ink-muted">
         Messages that would have been sent, newest first. Nothing is really sent yet. <a href="/dev/outbox" className="text-link underline hover:text-link-hover">Refresh</a>
       </p>
       {data.length === 0 ? (
-        <p className="rounded-xl bg-sunken px-4 py-6 text-center text-ink-muted">Nothing yet.</p>
+        <p className="rounded-lg bg-sunken px-4 py-6 text-center text-ink-muted">Nothing yet.</p>
       ) : (
         <ol className="flex flex-col gap-3">
           {data.map((m) => (
-            <li key={m.id} className="rounded-xl border border-line bg-surface px-4 py-3 shadow-card" data-testid="outbox-message">
+            <li key={m.id} className="rounded-lg border border-line bg-surface px-4 py-3" data-testid="outbox-message">
               <p className="flex flex-wrap justify-between gap-2 text-sm text-ink-muted">
                 <span>
                   <span className="font-semibold text-ink">{m.channel === "sms" ? "Text" : "Email"}</span> to <span data-testid="outbox-to">{m.to_address}</span>

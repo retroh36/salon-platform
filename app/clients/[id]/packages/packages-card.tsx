@@ -8,35 +8,35 @@ import { proRatedRefund, usesLeft, type ClientPackage } from "@/lib/packages";
 import { formatPrice } from "@/lib/services";
 import { cancelClientPackage, type PackageResult } from "./actions";
 
-const STATUS = { active: { label: "Active", tone: "green" }, canceled: { label: "Canceled", tone: "neutral" }, refunded: { label: "Refunded", tone: "amber" } } as const;
+const STATUS = { active: { label: "Active", tone: "success" }, canceled: { label: "Canceled", tone: "neutral" }, refunded: { label: "Refunded", tone: "warning" } } as const;
 
 // A client's packages: what's left of each, and (managers) cancelling one
 // with a pro-rated refund.
 export function PackagesList({ clientId, packages, canCancel, expiresLabels }: { clientId: string; packages: ClientPackage[]; canCancel: boolean; expiresLabels: Record<string, string> }) {
   return (
-    <ul className="flex flex-col gap-3" aria-label="Packages">
+    <ul className="divide-y divide-line border-y border-line" aria-label="Packages">
       {packages.map((p) => {
         const expired = p.status === "active" && p.expiresAt !== null && new Date(p.expiresAt) <= new Date();
         return (
-          <li key={p.id} className="rounded-lg border border-line p-4" data-testid="client-package">
+          <li key={p.id} className="py-3" data-testid="client-package">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-semibold text-ink">{p.name}</span>
+              <span className="font-medium text-ink">{p.name}</span>
               <span className="flex items-center gap-2">
-                <span className="text-sm text-ink-muted">{formatPrice(p.priceCents)}</span>
-                {expired ? <Badge tone="amber">Expired</Badge> : <Badge tone={STATUS[p.status].tone}>{STATUS[p.status].label}</Badge>}
+                <span className="text-sm text-ink-muted tabular-nums">{formatPrice(p.priceCents)}</span>
+                {expired ? <Badge tone="warning">Expired</Badge> : <Badge tone={STATUS[p.status].tone}>{STATUS[p.status].label}</Badge>}
               </span>
             </div>
-            <ul className="mt-2 flex flex-col gap-1 text-sm">
+            <ul className="mt-1.5 flex flex-col gap-1 text-13">
               {p.items.map((i) => (
                 <li key={i.id} className="flex justify-between gap-2">
-                  <span>{i.serviceName}</span>
+                  <span className="text-ink-muted">{i.serviceName}</span>
                   <span className="tabular-nums text-ink-muted">
                     {i.used} of {i.total} used · <span className="font-medium text-ink">{usesLeft(i)}</span>
                   </span>
                 </li>
               ))}
             </ul>
-            {p.expiresAt && <p className="mt-2 text-xs text-ink-muted">{expired ? "Expired" : "Use by"} {expiresLabels[p.id]}</p>}
+            {p.expiresAt && <p className="mt-1.5 text-xs text-ink-subtle">{expired ? "Expired" : "Use by"} {expiresLabels[p.id]}</p>}
             {canCancel && p.status === "active" && <CancelForm clientId={clientId} pkg={p} />}
           </li>
         );
@@ -54,7 +54,7 @@ function CancelForm({ clientId, pkg }: { clientId: string; pkg: ClientPackage })
   const refund = proRatedRefund(pkg);
   if (!open)
     return (
-      <Button size="sm" variant="ghost" className="mt-2" onClick={() => setOpen(true)}>
+      <Button size="xs" variant="danger-quiet" className="mt-2 -ml-2.5" onClick={() => setOpen(true)}>
         Cancel package
       </Button>
     );

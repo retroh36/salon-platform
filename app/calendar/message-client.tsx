@@ -9,6 +9,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass, selectClass } from "@/components/ui/field";
+import { Alert, Badge } from "@/components/ui/page";
 import { Segmented } from "@/components/ui/segmented";
 import { withOptOut } from "@/lib/automations";
 import type { Channel, Purpose } from "@/lib/messaging/consent";
@@ -68,7 +69,7 @@ export function MessageClientForm({
 
   if (!channels.appointment.length && !channels.marketing.length) {
     return (
-      <div className="flex animate-fade-in flex-col gap-3 rounded-lg border border-line-strong bg-sunken/60 p-3" aria-label="Message client" role="group">
+      <div className="flex animate-fade-in flex-col gap-3" aria-label="Message client" role="group">
         <p className="text-ink">{firstName} can&rsquo;t get messages by text or email. Give them a call.</p>
         <Button className="self-start" onClick={onCancel}>
           Close
@@ -80,7 +81,7 @@ export function MessageClientForm({
   return (
     <form
       aria-label="Message client"
-      className="flex animate-fade-in flex-col gap-3 rounded-lg border border-line-strong bg-sunken/60 p-3"
+      className="flex animate-fade-in flex-col gap-3"
       onSubmit={(e) => {
         e.preventDefault();
         if (!ch) return;
@@ -101,7 +102,7 @@ export function MessageClientForm({
         });
       }}
     >
-      <p className="font-semibold text-ink">Message {firstName}</p>
+      <p className="font-medium text-ink">Message {firstName}</p>
       <label className={labelClass}>
         Message
         <select value={template} onChange={(e) => setTemplate(e.target.value as StaffTemplate | "custom")} className={selectClass}>
@@ -155,22 +156,18 @@ export function MessageClientForm({
           <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} maxLength={900} className={`${fieldClass} h-auto! py-2`} />
         </label>
       ) : (
-        <p className="rounded-md bg-surface p-2 text-ink whitespace-pre-line" data-testid="message-preview">
+        <p className="rounded-md bg-sunken px-3 py-2 text-ink whitespace-pre-line" data-testid="message-preview">
           {preview?.body ?? "…"}
         </p>
       )}
       {counter && (
-        <p className={`text-xs ${counter.warn ? "font-medium text-status-late-ink" : "text-ink-muted"}`} data-testid="sms-counter" aria-live="polite">
-          {counter.text}
+        <p className="flex flex-wrap items-center gap-1.5 text-xs text-ink-muted" data-testid="sms-counter" aria-live="polite">
+          {counter.warn ? <Badge tone="warning">{counter.text}</Badge> : counter.text}
           {custom && !offer && " · “Reply STOP to stop texts.” is added"}
         </p>
       )}
       {offer && <p className="text-xs text-ink-muted">How to stop offers, with a link, is added at the end.</p>}
-      {error && (
-        <p className="text-danger" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <Alert>{error}</Alert>}
       <div className="flex gap-2">
         <Button type="submit" variant="primary" disabled={pending || !ch || !text.trim()}>
           Send

@@ -47,26 +47,26 @@ export function TemplateEditor({ initial, services, readOnly }: { initial: Templ
     <form onSubmit={submit} aria-label="Form template" className="flex flex-col gap-6">
       {message && <Alert>{message}</Alert>}
       <fieldset disabled={readOnly || pending} className="flex flex-col gap-6">
-        <section className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-5 shadow-card">
-          <label className="flex flex-col gap-1.5 text-sm font-medium text-ink">
+        <section className="flex flex-col gap-4 rounded-lg border border-line bg-surface p-4">
+          <label className="flex flex-col gap-1.5 text-13 font-medium text-ink">
             Name
             <input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} className={fieldClass} />
           </label>
-          <label className="flex flex-col gap-1.5 text-sm font-medium text-ink">
+          <label className="flex flex-col gap-1.5 text-13 font-medium text-ink">
             Introduction for the client (optional)
             <textarea value={intro} onChange={(e) => setIntro(e.target.value)} rows={2} maxLength={2000} className={fieldClass} />
           </label>
         </section>
 
         <section aria-label="Questions" className="flex flex-col gap-3">
-          <h2 className="font-serif text-xl font-semibold text-navy-900">Questions</h2>
+          <h2 className="text-xl font-semibold text-ink">Questions</h2>
           {fields.map((f, i) => (
-            <div key={f.key} role="group" aria-label={`Question ${i + 1}`} className="flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface p-4 shadow-card">
+            <div key={f.key} role="group" aria-label={`Question ${i + 1}`} className="flex flex-wrap items-end gap-3 rounded-lg border border-line bg-surface p-4">
               <label className="flex min-w-60 flex-1 flex-col gap-1.5 text-sm font-medium text-ink">
                 Question
                 <input value={f.label} onChange={(e) => update(f.key, { label: e.target.value })} maxLength={300} className={fieldClass} />
               </label>
-              <label className="flex flex-col gap-1.5 text-sm font-medium text-ink">
+              <label className="flex flex-col gap-1.5 text-13 font-medium text-ink">
                 Type
                 <select value={f.type} onChange={(e) => update(f.key, { type: e.target.value as FieldType, required: e.target.value === "signature" || f.required })} className={`${selectClass} w-40!`}>
                   {Object.entries(FIELD_LABELS).map(([v, l]) => (
@@ -102,8 +102,8 @@ export function TemplateEditor({ initial, services, readOnly }: { initial: Templ
           </div>
         </section>
 
-        <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-5 shadow-card">
-          <h2 className="font-serif text-lg font-semibold text-ink">When it&apos;s needed</h2>
+        <section className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
+          <h2 className="text-base font-semibold text-ink">When it&apos;s needed</h2>
           {(
             [
               ["none", "Optional: fill in whenever"],
@@ -120,7 +120,7 @@ export function TemplateEditor({ initial, services, readOnly }: { initial: Templ
             <div className="grid max-h-72 animate-fade-in gap-x-6 gap-y-1 overflow-y-auto rounded-lg border border-line p-3 sm:grid-cols-2" role="group" aria-label="Services that need this form">
               {categories.map((c) => (
                 <div key={c} className="contents">
-                  <p className="pt-2 text-xs font-semibold tracking-wider text-ink-muted uppercase sm:col-span-2">{c}</p>
+                  <p className="pt-2 text-xs font-medium text-ink-muted sm:col-span-2">{c}</p>
                   {services
                     .filter((s) => s.category === c)
                     .map((s) => (

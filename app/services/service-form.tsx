@@ -13,8 +13,8 @@ import { saveService, type ServiceFormFields } from "./actions";
 export type StaffOption = { id: string; name: string; role: string; level: StaffLevel | null; color: string | null; isActive: boolean };
 
 const inputClass = fieldClass;
-const cardClass = "rounded-xl border border-line bg-surface shadow-card";
-const cardTitle = "font-serif text-lg font-semibold text-ink";
+const cardClass = "rounded-lg border border-line bg-surface";
+const cardTitle = "text-base font-semibold text-ink";
 
 export function ServiceForm({
   serviceId,
@@ -70,7 +70,7 @@ export function ServiceForm({
       )}
 
       <fieldset disabled={readOnly || pending} className="flex flex-col gap-6">
-        <section className={`grid gap-4 p-5 sm:grid-cols-2 ${cardClass}`}>
+        <section className={`grid gap-4 p-4 sm:grid-cols-2 ${cardClass}`}>
           <Field label="Name" error={errors.name} className="sm:col-span-2">
             <input name="name" defaultValue={fields.name} maxLength={100} required className={inputClass} />
           </Field>
@@ -97,7 +97,7 @@ export function ServiceForm({
           </label>
         </section>
 
-        <section className={`p-5 ${cardClass}`} aria-labelledby="level-prices-heading">
+        <section className={`p-4 ${cardClass}`} aria-labelledby="level-prices-heading">
           <h2 id="level-prices-heading" className={cardTitle}>
             Prices by level
           </h2>
@@ -120,7 +120,7 @@ export function ServiceForm({
           </div>
         </section>
 
-        <section className={`p-5 ${cardClass}`}>
+        <section className={`p-4 ${cardClass}`}>
           <h2 className={cardTitle}>Time</h2>
           <p className="mb-4 text-sm text-ink-muted">
             The stylist is free during processing, so other clients can be booked into that gap. Use 5-minute steps.
@@ -139,7 +139,7 @@ export function ServiceForm({
         </section>
 
         <section className={`overflow-hidden ${cardClass}`}>
-          <div className="border-b border-line px-5 py-3.5">
+          <div className="border-b border-line px-4 py-3">
             <h2 className={cardTitle}>
               Who offers this <span className="font-sans text-sm font-medium text-ink-muted">({offered.size})</span>
             </h2>
@@ -152,7 +152,7 @@ export function ServiceForm({
               return (
                 <li
                   key={s.id}
-                  className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 transition-colors duration-(--motion-fast) ${checked ? "bg-navy-100/40" : ""}`}
+                  className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors duration-(--motion-fast) ${checked ? "bg-navy-100/40" : ""}`}
                 >
                   <label className="flex min-w-56 flex-1 cursor-pointer items-center gap-3">
                     {/* Uncontrolled like the other fields: React resets the form

@@ -37,9 +37,9 @@ export function FillForm({
 
   if (done) {
     return (
-      <div className="flex animate-fade-in flex-col items-center gap-4 rounded-2xl border border-line bg-surface p-10 text-center shadow-card">
-        <p className="font-serif text-3xl font-semibold text-navy-900">Thank you, {clientName.split(" ")[0]}!</p>
-        <p className="text-lg text-ink-muted">Please hand the iPad back to the front desk.</p>
+      <div className="flex animate-fade-in flex-col items-center gap-4 rounded-lg border border-line bg-surface p-10 text-center">
+        <p className="text-2xl font-semibold text-ink">Thank you, {clientName.split(" ")[0]}!</p>
+        <p className="text-base text-ink-muted">Please hand the iPad back to the front desk.</p>
         <Button variant="primary" size="lg" onClick={() => router.push(back)}>
           Done
         </Button>
@@ -58,11 +58,11 @@ export function FillForm({
   }
 
   return (
-    <form onSubmit={submit} aria-label={template.name} className="flex flex-col gap-5 text-lg">
+    <form onSubmit={submit} aria-label={template.name} className="flex flex-col gap-4 text-base">
       {template.intro && <p className="text-ink-muted">{template.intro}</p>}
       {template.fields.map((f) => {
         const missing = error?.missing.includes(f.label);
-        const box = `flex flex-col gap-3 rounded-xl border bg-surface p-5 shadow-card ${missing ? "border-danger" : "border-line"}`;
+        const box = `flex flex-col gap-3 rounded-lg border bg-surface p-4 ${missing ? "border-danger" : "border-line"}`;
         const title = (
           <>
             {f.label}
@@ -110,7 +110,7 @@ export function FillForm({
         return (
           <label key={f.id} className={box}>
             <span>{title}</span>
-            <textarea rows={3} className={`${fieldClass} text-lg`} value={String(answers[f.id] ?? "")} onChange={(e) => set(f.id, e.target.value)} />
+            <textarea rows={3} className={`${fieldClass} text-base`} value={String(answers[f.id] ?? "")} onChange={(e) => set(f.id, e.target.value)} />
           </label>
         );
       })}
@@ -120,7 +120,7 @@ export function FillForm({
           {error.missing.length > 0 && <span className="block">Still needed: {error.missing.join("; ")}</span>}
         </Alert>
       )}
-      <Button type="submit" variant="primary" size="lg" disabled={pending} className="py-4 text-lg">
+      <Button type="submit" variant="primary" size="lg" disabled={pending} className="py-4 text-base">
         {pending ? "Saving…" : "Sign and submit"}
       </Button>
     </form>

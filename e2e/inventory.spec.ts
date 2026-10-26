@@ -17,7 +17,7 @@ async function openInventory(page: Page, query = "") {
   await waitForHydration(page, "input[name=q]");
 }
 
-const products = (page: Page) => ui(page).getByRole("list", { name: "Products" }).getByRole("listitem");
+const products = (page: Page) => ui(page).getByRole("table", { name: "Products" }).locator("tbody").getByRole("row");
 
 // A retail product with stock, straight into the database.
 async function retailProduct(name: string, onHand: number) {

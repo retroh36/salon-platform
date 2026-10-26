@@ -37,7 +37,7 @@ export function ClientSearch({ initialQuery }: { initialQuery: string }) {
         run(new FormData(e.currentTarget).get("q")?.toString() ?? "");
       }}
     >
-      <SearchIcon className="pointer-events-none absolute top-1/2 left-3.5 size-5 -translate-y-1/2 text-ink-muted" />
+      <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-subtle" />
       <input
         type="search"
         name="q"
@@ -47,10 +47,10 @@ export function ClientSearch({ initialQuery }: { initialQuery: string }) {
         aria-label="Search clients"
         autoComplete="off"
         autoFocus
-        className={`${fieldClass} h-12 rounded-lg pr-28 pl-11 text-base shadow-card`}
+        className={`${fieldClass} h-10 pr-28 pl-9`}
       />
       {pending && (
-        <span className="absolute top-1/2 right-4 flex -translate-y-1/2 animate-fade-in items-center gap-2 text-sm text-ink-muted" aria-live="polite">
+        <span className="absolute top-1/2 right-3 flex -translate-y-1/2 animate-fade-in items-center gap-2 text-13 text-ink-muted" aria-live="polite">
           <span aria-hidden className="size-3.5 animate-spin rounded-full border-2 border-navy-200 border-t-navy-900" />
           Searching…
         </span>

@@ -148,7 +148,7 @@ export function ArchivePlan({ planId, name }: { planId: string; name: string }) 
     <div className="flex items-center gap-2">
       {result && !result.ok && <span className="text-sm text-danger">{result.message}</span>}
       <Button
-        variant="ghost"
+        variant="danger-quiet"
         size="sm"
         disabled={pending}
         aria-label={`Remove ${name}`}
@@ -168,13 +168,13 @@ export function TeamPlans({ people, plans }: { people: { id: string; name: strin
   return (
     <>
       {result && (
-        <div className="px-5 pt-4">
+        <div className="px-4 pt-4">
           <Alert tone={result.ok ? "success" : "error"}>{result.message}</Alert>
         </div>
       )}
       <ul className={listClass} aria-label="Team plans">
         {people.map((person) => (
-          <li key={person.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+          <li key={person.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
             <span className="font-medium text-ink">{person.name}</span>
             <select
               aria-label={`${person.name}'s plan`}

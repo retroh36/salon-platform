@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
-import { Card, PageHeader } from "@/components/ui/page";
+import { Card, PageHeader, textLinkClass } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { SettingsNav } from "../settings-nav";
@@ -33,15 +33,15 @@ async function Billing() {
       <PageHeader title="Settings" description="Your Maestra plan. Only owners see billing." />
       <SettingsNav current="billing" me={me} />
       <Card title="Plan" titleId="plan-heading">
-        <p className="text-lg font-semibold" data-testid="plan">
+        <p className="text-sm font-semibold text-ink" data-testid="plan">
           {PLANS[b.plan] ?? b.plan}
         </p>
-        <p className="mt-1 text-sm text-ink-muted">Paying for Maestra online isn&rsquo;t connected yet.</p>
+        <p className="mt-0.5 text-13 text-ink-muted">Paying for Maestra online isn&rsquo;t connected yet.</p>
       </Card>
       <Card title="Denise's daily limit" titleId="limit-heading">
-        <p className="text-sm">
+        <p className="text-sm text-ink tabular-nums">
           {b.ai_daily_token_limit.toLocaleString("en-US")} tokens a day.{" "}
-          <Link href="/settings" className="font-medium text-link hover:underline">
+          <Link href="/settings" className={textLinkClass}>
             Change it on Salon settings
           </Link>
         </p>

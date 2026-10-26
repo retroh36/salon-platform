@@ -34,7 +34,7 @@ export function PayrollSettingsForm({ initial }: { initial: { kind: PayPeriodKin
         <label className={labelClass}>
           First day of any pay period
           <input type="date" value={s.anchor} onChange={(e) => setS({ ...s, anchor: e.target.value })} className={fieldClass} />
-          <span className="text-xs font-normal text-ink-muted">Any first day of a period, past or future; the others follow from it.</span>
+          <span className="text-13 font-normal text-ink-muted">Any first day of a period, past or future; the others follow from it.</span>
         </label>
       )}
       <Button type="submit" variant="primary" disabled={pending} className="self-start">

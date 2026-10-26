@@ -15,18 +15,18 @@ export function DurationButton({ staffId, serviceId, suggested, undoActionId }: 
   return (
     <div className="flex flex-col items-end gap-1">
       {suggested ? (
-        <Button size="sm" variant="primary" disabled={pending} onClick={() => run(() => applySuggestedDuration(staffId, serviceId))}>
+        <Button size="xs" variant="secondary" disabled={pending} onClick={() => run(() => applySuggestedDuration(staffId, serviceId))}>
           Use {suggested}
         </Button>
       ) : undoActionId ? (
-        <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => undoDuration(undoActionId))}>
+        <Button size="xs" variant="quiet" disabled={pending} onClick={() => run(() => undoDuration(undoActionId))}>
           Undo
         </Button>
       ) : (
-        <span className="text-ink-muted">—</span>
+        <span className="text-ink-subtle">—</span>
       )}
       {message && (
-        <p role={message.ok ? "status" : "alert"} className={`text-xs ${message.ok ? "text-status-confirmed-ink" : "text-danger"}`}>
+        <p role={message.ok ? "status" : "alert"} className={`text-xs ${message.ok ? "text-ink-muted" : "text-danger"}`}>
           {message.text}
         </p>
       )}

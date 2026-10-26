@@ -14,7 +14,7 @@ export function AskBar({ example }: { example: string }) {
   return (
     <form
       aria-label="Ask Denise"
-      className="flex w-full items-center gap-2 rounded-xl border border-denise-200 bg-surface p-1.5 pl-2.5 shadow-card transition-[border-color,box-shadow] duration-(--motion-fast) focus-within:border-denise-500 focus-within:ring-2 focus-within:ring-denise-200 md:w-96"
+      className="flex w-full items-center gap-2 rounded-lg border border-denise-200 bg-surface p-1.5 pl-2.5 transition-[border-color,box-shadow] duration-(--motion-fast) focus-within:border-denise-500 focus-within:ring-2 focus-within:ring-denise-200 md:w-96"
       onSubmit={(e) => {
         e.preventDefault();
         if (!question.trim()) return;

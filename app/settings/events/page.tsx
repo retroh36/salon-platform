@@ -37,13 +37,13 @@ async function EventSettingsView() {
       <PageHeader title="Settings" description="Bridal and events: the packages parties choose from, and how events are priced, paid and planned." />
       <SettingsNav current="events" me={me} />
       <Card title="Event packages" titleId="event-packages" description="Each person in a party gets one. The minutes say how long the hair and the makeup take, and so who can do it.">
-        <ul className="mb-6 divide-y divide-line" aria-label="Event packages">
+        <ul className="-mt-3 mb-6 divide-y divide-line" aria-label="Event packages">
           {packages.map((p) => (
             <li key={p.id} className="py-3">
               <details>
                 <summary className="flex cursor-pointer flex-wrap items-baseline justify-between gap-2">
                   <span>
-                    <span className="font-semibold">{p.name}</span>{" "}
+                    <span className="font-medium text-ink">{p.name}</span>{" "}
                     <span className="text-sm text-ink-muted">
                       · {packageRoles(p)} · {formatMinutes(p.hairMinutes + p.makeupMinutes)}
                       {p.partyRole && ` · ${PARTY_ROLE_LABELS[p.partyRole]}`}
@@ -55,14 +55,14 @@ async function EventSettingsView() {
                     <span className="tabular-nums">{formatPrice(p.priceCents)}</span>
                   </span>
                 </summary>
-                <div className="mt-4">
+                <div className="mt-4 border-t border-line pt-4">
                   <EventPackageForm pkg={p} />
                 </div>
               </details>
             </li>
           ))}
         </ul>
-        <h3 className="mb-3 font-semibold">New package</h3>
+        <h3 className="mb-3 border-t border-line pt-6 text-sm font-semibold text-ink">New package</h3>
         <EventPackageForm pkg={null} />
       </Card>
       <Card title="Bridal settings" titleId="bridal-settings">

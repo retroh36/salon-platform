@@ -73,7 +73,7 @@ export function PromoForm({ defaultDays }: { defaultDays: number }) {
         <input type="email" value={f.recipientEmail} onChange={(e) => setF({ ...f, recipientEmail: e.target.value })} className={fieldClass} />
       </label>
       <p className="text-sm text-ink-muted sm:col-span-2">Promotional cards have no cash value: they can be used for services and products, but never refunded as money.</p>
-      <Button type="submit" variant="primary" disabled={pending} className="self-start">
+      <Button type="submit" disabled={pending} className="justify-self-start">
         Issue card
       </Button>
       <div className="sm:col-span-2">

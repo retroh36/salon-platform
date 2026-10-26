@@ -9,7 +9,7 @@ import { earliestEnd, periodName, priceText, STATUS_LABELS, type MembershipStatu
 import type { ClientMembership } from "@/lib/memberships-load";
 import { cancelMembership, keepMembership, pauseMembership, resumeMembership, retryMembershipPayment, updateMembershipCard, type MembershipResult } from "./actions";
 
-const TONE: Record<MembershipStatus, "green" | "amber" | "neutral" | "red"> = { active: "green", past_due: "red", paused: "amber", canceled: "neutral" };
+const TONE: Record<MembershipStatus, "success" | "warning" | "neutral" | "danger"> = { active: "success", past_due: "danger", paused: "warning", canceled: "neutral" };
 
 export type MembershipHistory = { id: string; at: string; text: string };
 
@@ -31,24 +31,24 @@ export function MembershipList({
   testCards: { ref: string; label: string; outcome: string }[];
 }) {
   return (
-    <ul className="flex flex-col gap-3" aria-label="Memberships">
+    <ul className="divide-y divide-line border-y border-line" aria-label="Memberships">
       {memberships.map((m) => (
-        <li key={m.id} className="rounded-lg border border-line p-4" data-testid="client-membership" data-status={m.status}>
+        <li key={m.id} className="py-3" data-testid="client-membership" data-status={m.status}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="font-semibold text-ink">{m.name}</span>
+            <span className="font-medium text-ink">{m.name}</span>
             <span className="flex items-center gap-2">
-              <span className="text-sm text-ink-muted">{priceText(m.priceCents, m.intervalUnit, m.intervalCount)}</span>
+              <span className="text-sm text-ink-muted tabular-nums">{priceText(m.priceCents, m.intervalUnit, m.intervalCount)}</span>
               <Badge tone={TONE[m.status]}>{STATUS_LABELS[m.status]}</Badge>
             </span>
           </div>
-          <p className="mt-1 text-sm text-ink-muted" data-testid="membership-when">
+          <p className="mt-1 text-13 text-ink-muted" data-testid="membership-when">
             {whenText(m)}
           </p>
           {m.status !== "canceled" && m.credits.length > 0 && (
-            <ul className="mt-2 flex flex-col gap-1 text-sm" aria-label={`Included this ${periodName(m.intervalUnit, m.intervalCount)}`}>
+            <ul className="mt-1.5 flex flex-col gap-1 text-13" aria-label={`Included this ${periodName(m.intervalUnit, m.intervalCount)}`}>
               {m.credits.map((c) => (
                 <li key={c.id} className="flex justify-between gap-2">
-                  <span>{c.serviceName}</span>
+                  <span className="text-ink-muted">{c.serviceName}</span>
                   <span className="text-ink-muted tabular-nums">
                     {c.used} of {c.allowance} used · <span className="font-medium text-ink">{c.allowance - c.used} left</span>
                   </span>
@@ -57,7 +57,7 @@ export function MembershipList({
             </ul>
           )}
           {(m.serviceDiscountPct > 0 || m.retailDiscountPct > 0) && m.status !== "canceled" && (
-            <p className="mt-2 text-sm">
+            <p className="mt-1.5 text-13 text-ink-muted">
               Member prices: {[m.serviceDiscountPct && `${m.serviceDiscountPct}% off services`, m.retailDiscountPct && `${m.retailDiscountPct}% off retail`].filter(Boolean).join(", ")}
               {m.status !== "active" ? " (not while it's " + STATUS_LABELS[m.status].toLowerCase() + ")" : ""}
             </p>
@@ -65,11 +65,11 @@ export function MembershipList({
           {canChange && m.status !== "canceled" && <MembershipActions m={m} today={today} canEndNow={canEndNow} testCards={testCards} />}
           {(history[m.id]?.length ?? 0) > 0 && (
             <details className="mt-3">
-              <summary className="cursor-pointer text-sm font-medium text-link">History</summary>
-              <ol className="mt-2 flex flex-col gap-1 text-sm" aria-label={`${m.name} history`}>
+              <summary className="cursor-pointer text-13 font-medium text-ink-muted hover:text-ink">History</summary>
+              <ol className="mt-2 flex flex-col gap-1 text-13" aria-label={`${m.name} history`}>
                 {history[m.id].map((h) => (
                   <li key={h.id} className="flex gap-3">
-                    <span className="w-24 shrink-0 text-ink-muted">{formatDate(h.at)}</span>
+                    <span className="w-24 shrink-0 text-ink-subtle tabular-nums">{formatDate(h.at)}</span>
                     <span>{h.text}</span>
                   </li>
                 ))}
@@ -120,33 +120,33 @@ function MembershipActions({ m, today, canEndNow, testCards }: { m: ClientMember
     <div className="mt-3 flex flex-col gap-3">
       <div className="flex flex-wrap gap-2">
         {m.status === "past_due" && (
-          <Button size="sm" variant="primary" disabled={pending} onClick={() => run(() => retryMembershipPayment(m.id))}>
+          <Button size="xs" variant="primary" disabled={pending} onClick={() => run(() => retryMembershipPayment(m.id))}>
             Try the payment again
           </Button>
         )}
         {m.status === "paused" || (m.status === "active" && m.pauseFrom) ? (
-          <Button size="sm" disabled={pending} onClick={() => run(() => resumeMembership(m.id))}>
+          <Button size="xs" disabled={pending} onClick={() => run(() => resumeMembership(m.id))}>
             {m.status === "paused" ? "Resume now" : "Call off the pause"}
           </Button>
         ) : (
           m.status === "active" &&
           m.allowPause &&
           !m.cancelsOn && (
-            <Button size="sm" disabled={pending} onClick={() => setOpen(open === "pause" ? null : "pause")}>
+            <Button size="xs" disabled={pending} onClick={() => setOpen(open === "pause" ? null : "pause")}>
               Pause
             </Button>
           )
         )}
         {m.status === "active" && m.cancelsOn ? (
-          <Button size="sm" disabled={pending} onClick={() => run(() => keepMembership(m.id))}>
+          <Button size="xs" disabled={pending} onClick={() => run(() => keepMembership(m.id))}>
             Keep membership
           </Button>
         ) : (
-          <Button size="sm" variant="ghost" disabled={pending} onClick={() => setOpen(open === "cancel" ? null : "cancel")}>
+          <Button size="xs" variant="danger-quiet" disabled={pending} onClick={() => setOpen(open === "cancel" ? null : "cancel")}>
             End membership
           </Button>
         )}
-        <Button size="sm" variant="ghost" disabled={pending} onClick={() => setOpen(open === "card" ? null : "card")}>
+        <Button size="xs" variant="quiet" disabled={pending} onClick={() => setOpen(open === "card" ? null : "card")}>
           Update card
         </Button>
       </div>
@@ -236,7 +236,7 @@ function MembershipActions({ m, today, canEndNow, testCards }: { m: ClientMember
       )}
 
       {result && (
-        <p role="status" className={`text-sm ${result.ok ? "text-ink-muted" : "text-danger"}`}>
+        <p role="status" className={`text-13 ${result.ok ? "text-ink-muted" : "text-danger"}`}>
           {result.message}
         </p>
       )}

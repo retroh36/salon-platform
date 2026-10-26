@@ -6,6 +6,7 @@ import { addVisitPhoto, deleteVisitPhoto, setPhotoConsent, setPhotoMarketing, vi
 import { Button, IconButton } from "@/components/ui/button";
 import { checkboxClass, fieldClass } from "@/components/ui/field";
 import { CloseIcon } from "@/components/ui/icons";
+import { textLinkClass } from "@/components/ui/page";
 import { Segmented } from "@/components/ui/segmented";
 import { formatDate } from "@/lib/clients";
 import { byVisit, PHOTO_KIND_LABELS, shrinkPhoto, type PhotoKind, type PhotoView } from "@/lib/photos";
@@ -83,7 +84,7 @@ export function PhotoUploader({ appointmentId, onAdded }: { appointmentId: strin
           { value: "after", label: "After" },
         ]}
       />
-      <Button size="sm" variant="primary" disabled={pending} onClick={() => camera.current?.click()}>
+      <Button size="sm" disabled={pending} onClick={() => camera.current?.click()}>
         Take photo
       </Button>
       <Button size="sm" disabled={pending} onClick={() => files.current?.click()}>
@@ -117,7 +118,7 @@ export function PhotoGrid({ photos, consent, onChange, showDate = true }: { phot
             <div className="relative overflow-hidden rounded-lg bg-sunken">
               {/* eslint-disable-next-line @next/next/no-img-element -- signed, short-lived links */}
               <img src={p.url} alt={`${PHOTO_KIND_LABELS[p.kind]} photo, ${formatDate(p.takenOn)}`} className="aspect-[3/4] w-full object-cover" loading="lazy" />
-              <span className="absolute top-1.5 left-1.5 rounded-full bg-surface/90 px-2 py-0.5 text-xs font-semibold text-ink">{PHOTO_KIND_LABELS[p.kind]}</span>
+              <span className="absolute top-1.5 left-1.5 rounded-sm bg-surface/90 px-1.5 py-0.5 text-xs font-medium text-ink">{PHOTO_KIND_LABELS[p.kind]}</span>
               {p.canDelete && (
                 <IconButton
                   label={`Remove this ${p.kind} photo`}
@@ -186,7 +187,7 @@ export function ConsentLine({ clientId, consent, today, onChange }: { clientId: 
         <p className="text-ink-muted">
           Consent to use photos in marketing: given {formatDate(consent.on)}
           {consent.by ? ` (recorded by ${consent.by})` : ""}.{" "}
-          <button type="button" disabled={pending} onClick={() => save(null)} className="font-medium text-link hover:underline">
+          <button type="button" disabled={pending} onClick={() => save(null)} className={textLinkClass}>
             Withdraw
           </button>
         </p>
@@ -199,14 +200,14 @@ export function ConsentLine({ clientId, consent, today, onChange }: { clientId: 
           <Button size="sm" variant="primary" disabled={pending} onClick={() => save(date)}>
             Record consent
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+          <Button size="sm" onClick={() => setOpen(false)}>
             Cancel
           </Button>
         </div>
       ) : (
         <p className="text-ink-muted">
           No consent to use their photos in marketing.{" "}
-          <button type="button" onClick={() => setOpen(true)} className="font-medium text-link hover:underline">
+          <button type="button" onClick={() => setOpen(true)} className={textLinkClass}>
             They&apos;ve agreed
           </button>
         </p>
@@ -230,7 +231,7 @@ export function PhotoGallery({ clientId, photos, consent, today }: { clientId: s
         <ol className="flex flex-col gap-5" aria-label="Photos by visit">
           {byVisit(photos).map((v) => (
             <li key={v.appointmentId}>
-              <h3 className="mb-2 text-sm font-semibold text-ink">
+              <h3 className="mb-2 text-sm font-medium text-ink">
                 {formatDate(v.takenOn)}
                 {v.photos[0].stylist ? <span className="font-normal text-ink-muted"> · with {v.photos[0].stylist}</span> : null}
               </h3>

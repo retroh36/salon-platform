@@ -61,9 +61,9 @@ export function ServiceTimer({
         </div>
       )}
       {canRecord && state !== "waiting" && (
-        <button type="button" disabled={pending} onClick={() => tap("undo")} className="self-start text-sm font-medium text-link underline-offset-2 hover:text-link-hover hover:underline">
+        <Button variant="quiet" size="sm" disabled={pending} onClick={() => tap("undo")} className="-ml-3 self-start">
           Undo last tap
-        </button>
+        </Button>
       )}
       {error && (
         <p role="alert" className="text-sm text-danger">

@@ -42,25 +42,25 @@ export function CountMode({ stocktakeId, products, initial }: { stocktakeId: str
             ["Found", formatPrice(summary.gainCents)],
             ["Missing", formatPrice(summary.lossCents)],
           ].map(([label, value]) => (
-            <div key={label} className="rounded-xl border border-line bg-surface p-4 shadow-card">
+            <div key={label} className="rounded-lg border border-line bg-surface p-4">
               <p className="text-sm text-ink-muted">{label}</p>
-              <p className="font-serif text-2xl font-semibold text-navy-900">{value}</p>
+              <p className="text-2xl font-semibold text-ink">{value}</p>
             </div>
           ))}
         </div>
         {summary.flagged > 0 && (
-          <p role="note" className="rounded-xl border border-status-no-show-ink/25 bg-status-no-show-bg px-4 py-3 text-sm text-status-no-show-ink">
+          <p role="note" className="rounded-lg border border-status-no-show-ink/25 bg-status-no-show-bg px-4 py-3 text-sm text-status-no-show-ink">
             <strong>{summary.flagged === 1 ? "1 product is" : `${summary.flagged} products are`} well short of what the records say.</strong> That could be
             shrinkage (theft, waste, or use that wasn&apos;t recorded). Worth a recount before you finish.
           </p>
         )}
-        <ul aria-label="Differences" className="divide-y divide-line rounded-xl border border-line bg-surface shadow-card">
-          {changed.length === 0 && <li className="px-5 py-6 text-center text-sm text-ink-muted">Everything counted matches. Nice.</li>}
+        <ul aria-label="Differences" className="divide-y divide-line rounded-lg border border-line bg-surface">
+          {changed.length === 0 && <li className="px-4 py-6 text-center text-sm text-ink-muted">Everything counted matches. Nice.</li>}
           {changed.map((r) => {
             const diff = r.counted - r.expected;
             const flagged = isPossibleShrinkage(r.expected, r.counted, r.product);
             return (
-              <li key={r.product.id} data-shrinkage={flagged || undefined} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3">
+              <li key={r.product.id} data-shrinkage={flagged || undefined} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
                 <span className="min-w-52 flex-1 font-medium text-ink">
                   {productName(r.product)}
                   {flagged && (
@@ -72,7 +72,7 @@ export function CountMode({ stocktakeId, products, initial }: { stocktakeId: str
                 <span className="text-sm text-ink-muted tabular-nums">
                   {formatAmount(r.expected, r.product.unit)} expected → {formatAmount(r.counted, r.product.unit)}
                 </span>
-                <span className={`w-28 text-right font-semibold tabular-nums ${diff < 0 ? "text-danger" : "text-status-confirmed-ink"}`}>
+                <span className={`w-28 text-right font-semibold tabular-nums ${diff < 0 ? "text-danger" : "text-success"}`}>
                   {diff > 0 ? "+" : "−"}
                   {formatAmount(Math.abs(diff), r.product.unit)}
                 </span>
@@ -118,7 +118,7 @@ export function CountMode({ stocktakeId, products, initial }: { stocktakeId: str
             type="button"
             aria-current={s === shelf ? "true" : undefined}
             onClick={() => setShelf(s)}
-            className={`flex h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-[background-color,color] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+            className={`flex h-11 shrink-0 items-center gap-2 rounded-md border px-4 text-sm font-medium transition-[background-color,color] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
               s === shelf ? "border-navy-900 bg-navy-900 text-white" : "border-line-strong bg-surface text-ink hover:bg-sunken"
             }`}
           >
@@ -186,7 +186,7 @@ function CountCard({ product, stocktakeId, saved, onSaved }: { product: CountPro
     <form
       aria-label={productName(product)}
       data-counted={saved ? true : undefined}
-      className={`flex flex-col gap-3 rounded-xl border bg-surface p-4 shadow-card transition-[border-color] duration-(--motion-fast) ${saved && !dirty ? "border-status-confirmed-ink/40" : "border-line"}`}
+      className={`flex flex-col gap-3 rounded-lg border bg-surface p-4 transition-[border-color] duration-(--motion-fast) ${saved && !dirty ? "border-line-strong" : "border-line"}`}
       onSubmit={(e) => {
         e.preventDefault();
         if (amount === null) return setError(byWeight ? "Enter full containers and what's in the open one." : "Enter how many.");
@@ -203,7 +203,7 @@ function CountCard({ product, stocktakeId, saved, onSaved }: { product: CountPro
           <p className="font-semibold text-ink">{productName(product)}</p>
           <p className="text-xs text-ink-muted">{byWeight ? `${formatAmount(product.size, product.unit)} ${containerName(product)}` : "Units"}</p>
         </div>
-        {saved && !dirty && <CheckCircleIcon className="size-6 text-status-confirmed-ink" />}
+        {saved && !dirty && <CheckCircleIcon className="size-6 text-success" />}
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
@@ -219,7 +219,7 @@ function CountCard({ product, stocktakeId, saved, onSaved }: { product: CountPro
               value={full}
               onChange={(e) => setFull(e.target.value)}
               placeholder="0"
-              className={`${fieldClass} h-11 w-16! text-center text-lg tabular-nums`}
+              className={`${fieldClass} h-11 w-16! text-center text-base tabular-nums`}
             />
             <IconButton label={`One more ${productName(product)}`} size="lg" variant="secondary" onClick={() => step(1)}>
               <span aria-hidden className="text-xl leading-none">+</span>
@@ -229,7 +229,7 @@ function CountCard({ product, stocktakeId, saved, onSaved }: { product: CountPro
         {byWeight && (
           <label className="flex flex-col gap-1">
             <span className="text-xs font-medium text-ink-muted">Open one ({product.unit})</span>
-            <input aria-label={`Open (${product.unit})`} inputMode="decimal" value={open} onChange={(e) => setOpen(e.target.value)} placeholder="0" className={`${fieldClass} h-11 w-24! text-center text-lg tabular-nums`} />
+            <input aria-label={`Open (${product.unit})`} inputMode="decimal" value={open} onChange={(e) => setOpen(e.target.value)} placeholder="0" className={`${fieldClass} h-11 w-24! text-center text-base tabular-nums`} />
           </label>
         )}
         <Button type="submit" size="lg" variant={dirty || !saved ? "primary" : "secondary"} disabled={pending || (!dirty && saved !== null)} className="ml-auto">
@@ -247,7 +247,7 @@ function CountCard({ product, stocktakeId, saved, onSaved }: { product: CountPro
           <span>
             Expected {formatAmount(saved.expected, product.unit)} · counted {formatAmount(saved.counted, product.unit)}
           </span>
-          <span className={`font-semibold ${diff < 0 ? "text-danger" : diff > 0 ? "text-status-confirmed-ink" : "text-ink"}`}>
+          <span className={`font-semibold ${diff < 0 ? "text-danger" : diff > 0 ? "text-success" : "text-ink"}`}>
             {diff === 0 ? "Matches" : `${diff > 0 ? "+" : "−"}${formatAmount(Math.abs(diff), product.unit)}`}
           </span>
           {flagged && <Badge tone="red">Possible shrinkage</Badge>}

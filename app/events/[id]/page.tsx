@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { BackLink } from "@/components/ui/back-link";
 import { buttonClass } from "@/components/ui/button";
-import { Alert, Badge, Card, PageHeader } from "@/components/ui/page";
+import { Alert, Badge, Card, PageHeader, nameLinkClass, textLinkClass, type Tone } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { eventClashes } from "@/lib/events/clashes";
 import { loadEvent, loadEventSettings, loadEventTeam, loadTaxBp } from "@/lib/events/load";
@@ -33,6 +33,15 @@ export default function EventPage({ params }: PageProps<"/events/[id]">) {
 }
 
 const KIND = { hair: "Hair", makeup: "Makeup", touch_up: "Touch-ups" } as const;
+
+const STATUS_TONE: Record<keyof typeof EVENT_STATUS_LABELS, Tone> = {
+  inquiry: "info",
+  proposal_sent: "info",
+  booked: "success",
+  trial_done: "success",
+  completed: "neutral",
+  lost: "danger",
+};
 
 async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) {
   const [{ id }, { supabase, staff: me }] = await Promise.all([params, getCurrentStaff()]);
@@ -89,7 +98,7 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
             {event.client && desk && (
               <>
                 {" · "}
-                <Link href={`/clients/${event.client.id}`} className="text-link underline underline-offset-2">
+                <Link href={`/clients/${event.client.id}`} className={nameLinkClass}>
                   {event.client.firstName} {event.client.lastName}
                 </Link>
               </>
@@ -98,7 +107,7 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
         }
         actions={
           <>
-            <Badge tone={event.status === "lost" ? "red" : event.status === "inquiry" ? "amber" : "green"}>{EVENT_STATUS_LABELS[event.status]}</Badge>
+            <Badge tone={STATUS_TONE[event.status]}>{EVENT_STATUS_LABELS[event.status]}</Badge>
             {desk && event.status !== "completed" && event.status !== "lost" && (
               <Link href={`/events/${id}/edit`} className={buttonClass("secondary", "md")}>
                 Edit event
@@ -114,18 +123,18 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
           </>
         }
       />
-      {event.status === "lost" && event.lostReason && <p className="-mt-2 mb-4 text-ink-muted">Lost: {event.lostReason}</p>}
+      {event.status === "lost" && event.lostReason && <p className="-mt-2 mb-6 flex items-center gap-2 text-sm text-ink-muted"><Badge tone="danger">Lost</Badge><span className="sr-only">:</span> {event.lostReason}</p>}
       {event.status === "completed" && event.saleId && desk && (
-        <p className="-mt-2 mb-4 text-ink-muted">
+        <p className="-mt-2 mb-6 text-sm text-ink-muted">
           Completed.{" "}
-          <Link href={`/sales/${event.saleId}`} className="text-link underline underline-offset-2">
+          <Link href={`/sales/${event.saleId}`} className={textLinkClass}>
             See the sale
           </Link>{" "}
           for the team&rsquo;s work and tips.
         </p>
       )}
       {clashes.length > 0 && (
-        <div className="mb-4">
+        <div className="mb-6">
           <Alert>
             <span data-testid="team-clash">
               {clashes.map((c) => `${staffName(c.staffId) ?? "Someone"} ${c.text} during this event`).join(". ")}. {holds ? "Choose someone else in Edit event." : "Choose someone else before it's booked."}
@@ -133,16 +142,16 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
           </Alert>
         </div>
       )}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="flex min-w-0 flex-col gap-6">
+      <div className="grid gap-x-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="flex min-w-0 flex-col">
           <Card title={`Party (${event.members.length || event.inquiryPartySize || 0})`} titleId="party" flush>
             {event.members.length ? (
               <ul className="divide-y divide-line" data-testid="party">
                 {event.members.map((m) => (
-                  <li key={m.id} className="flex items-baseline justify-between gap-3 px-5 py-3">
+                  <li key={m.id} className="flex items-baseline justify-between gap-3 px-4 py-3">
                     <span className="min-w-0">
-                      <span className="font-semibold">{m.name}</span> <span className="text-ink-muted">· {PARTY_ROLE_LABELS[m.partyRole]}</span>
-                      <span className="block text-sm text-ink-muted">
+                      <span className="font-medium text-ink">{m.name}</span> <span className="text-ink-muted">· {PARTY_ROLE_LABELS[m.partyRole]}</span>
+                      <span className="block text-13 text-ink-muted">
                         {m.packageName}
                         {m.paysOwn && " · pays their own"}
                       </span>
@@ -152,7 +161,7 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
                 ))}
               </ul>
             ) : (
-              <p className="px-5 py-4 text-ink-muted">
+              <p className="px-4 py-3 text-sm text-ink-muted">
                 Nobody in the party yet.{event.inquiryServices ? ` They asked for: ${event.inquiryServices}.` : ""}
               </p>
             )}
@@ -160,7 +169,7 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
           <Card title="Timeline" titleId="timeline" flush>
             {event.tasks.length ? (
               <>
-                <ul className="flex flex-wrap gap-x-6 gap-y-1 border-b border-line px-5 py-3 text-sm" aria-label="Call times">
+                <ul className="flex flex-wrap gap-x-6 gap-y-1 border-b border-line px-4 py-3 text-sm" aria-label="Call times">
                   {spans.map((s) => (
                     <li key={`${s.role}-${s.lane}`}>
                       <span className="font-semibold">{staffName(event.tasks.find((t) => t.role === s.role && t.lane === s.lane)?.staffId ?? null) ?? `${KIND[s.role]} ${s.lane}`}</span>{" "}
@@ -174,7 +183,7 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
                   {event.tasks
                     .filter((t) => t.kind !== "touch_up")
                     .map((t) => (
-                      <li key={t.id} className="flex items-baseline justify-between gap-3 px-5 py-2">
+                      <li key={t.id} className="flex items-baseline justify-between gap-3 px-4 py-2">
                         <span className="w-32 shrink-0 tabular-nums text-ink-muted">
                           {formatMinute(t.start)}–{formatMinute(t.end)}
                         </span>
@@ -184,11 +193,11 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
                         <span className="text-ink-muted">{staffName(t.staffId) ?? `${KIND[t.role]} ${t.lane}`}</span>
                       </li>
                     ))}
-                  {event.readyBy != null && <li className="px-5 py-2 font-semibold">Ready by {formatMinute(event.readyBy)}</li>}
+                  {event.readyBy != null && <li className="px-4 py-2 font-semibold">Ready by {formatMinute(event.readyBy)}</li>}
                 </ol>
               </>
             ) : (
-              <p className="px-5 py-4 text-ink-muted">No timeline yet. Add the party and the ready-by time in Edit event.</p>
+              <p className="px-4 py-3 text-sm text-ink-muted">No timeline yet. Add the party and the ready-by time in Edit event.</p>
             )}
           </Card>
           {(event.status !== "inquiry" || trials.data?.length) && event.status !== "lost" ? (
@@ -201,10 +210,12 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
                         <span>
                           <span className="font-medium">{trialDay(t.starts_at)}</span>
                           {staffName(t.items[0]?.staff_id ?? null) && <span className="text-ink-muted"> with {staffName(t.items[0]?.staff_id ?? null)}</span>}
-                          <span className="text-ink-muted"> · {t.status === "completed" ? "Done" : t.status === "no_show" ? "Missed" : "Booked"}</span>
+                          <Badge tone={t.status === "completed" ? "neutral" : t.status === "no_show" ? "danger" : "success"} className="ml-2">
+                            {t.status === "completed" ? "Done" : t.status === "no_show" ? "Missed" : "Booked"}
+                          </Badge>
                         </span>
                         {desk && (
-                          <Link href={`/calendar?date=${toLocal(new Date(t.starts_at), tz).date}&open=${t.id}`} className="text-link underline underline-offset-2">
+                          <Link href={`/calendar?date=${toLocal(new Date(t.starts_at), tz).date}&open=${t.id}`} className={textLinkClass}>
                             Open on the calendar
                           </Link>
                         )}
@@ -245,7 +256,7 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
             <Card title="History" titleId="history" flush>
               <ul className="divide-y divide-line text-sm" data-testid="history">
                 {history.data!.map((h) => (
-                  <li key={h.id} className="flex flex-wrap justify-between gap-x-3 px-5 py-2">
+                  <li key={h.id} className="flex flex-wrap justify-between gap-x-3 px-4 py-2">
                     <span>
                       {HISTORY_TEXT[h.kind] ?? h.kind.replace(/_/g, " ")}
                       {h.detail && <span className="text-ink-muted"> · {h.detail}</span>}
@@ -261,7 +272,7 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
           )}
         </div>
         {desk && (
-          <aside className="flex flex-col gap-6" aria-label="Money">
+          <aside className="flex flex-col" aria-label="Money">
             <Card title="Total" titleId="total">
               <dl className="flex flex-col gap-1.5 text-sm">
                 <Row label="Packages" cents={event.subtotalCents} />
@@ -306,6 +317,7 @@ function trialDefault(eventDate: string, today: string): string {
 const HISTORY_TEXT: Record<string, string> = {
   created: "Created",
   changed: "Changed",
+  status: "Status changed",
   proposal_sent: "Proposal sent",
   booked: "Booked",
   member_link_sent: "Pay link sent",
@@ -424,20 +436,37 @@ function Money({
         <Card title="Payments" titleId="payments" flush>
           <ul className="divide-y divide-line text-sm" data-testid="payments">
             {main.map((p) => (
-              <li key={p.id} className="flex items-start justify-between gap-3 px-5 py-3">
+              <li key={p.id} className="flex items-start justify-between gap-3 px-4 py-3">
                 <span className="min-w-0">
                   <span className="font-medium">{PAYMENT_LABELS[p.kind as keyof typeof PAYMENT_LABELS]}</span>
-                  <span className="block text-ink-muted">
-                    {p.status === "paid" && p.paid_at ? `Paid ${day(p.paid_at)}${p.card_label ? ` · ${p.card_label.replace(" ", "\u00a0")}` : ""}` : p.status === "failed" ? `${PAYMENT_STATUS.failed}${p.failure_reason ? `: ${p.failure_reason}` : ""}` : `Due ${formatLongDay(p.due_on, false)}`}
+                  <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <Badge tone={p.status === "paid" ? "success" : p.status === "failed" ? "danger" : "neutral"}>{p.status === "paid" ? "Paid" : p.status === "failed" ? PAYMENT_STATUS.failed : "Due"}</Badge>
+                    <span className="text-13 text-ink-muted">
+                      {p.status === "paid" && p.paid_at ? (
+                        <>
+                          {day(p.paid_at)}
+                          {p.card_label ? ` · ${p.card_label.replace(" ", "\u00a0")}` : ""}
+                        </>
+                      ) : p.status === "failed" ? (
+                        p.failure_reason && (
+                          <>
+                            <span className="sr-only">: </span>
+                            {p.failure_reason}
+                          </>
+                        )
+                      ) : (
+                        formatLongDay(p.due_on, false)
+                      )}
+                    </span>
                   </span>
                 </span>
                 <span className="flex flex-col items-end gap-1">
-                  <span className={`tabular-nums ${p.status === "failed" ? "font-semibold text-danger" : ""}`}>{formatPrice(p.amount_cents)}</span>
+                  <span className="tabular-nums">{formatPrice(p.amount_cents)}</span>
                   {p.status === "failed" && <RetryPayment paymentId={p.id} />}
                 </span>
               </li>
             ))}
-            <li className="flex justify-between px-5 py-3 font-semibold">
+            <li className="flex justify-between px-4 py-3 font-semibold">
               <span>Left to pay</span>
               <span className="tabular-nums" data-testid="left-to-pay">
                 {formatPrice(Math.max(0, event.mainCents - paidMain))}
@@ -445,7 +474,7 @@ function Money({
             </li>
           </ul>
           {failed && (
-            <div className="border-t border-line px-5 py-3">
+            <div className="border-t border-line px-4 py-3">
               <CardLinkSender eventId={eventId} phone={event.client?.phone ?? null} email={event.client?.email ?? null} />
             </div>
           )}
@@ -458,16 +487,19 @@ function Money({
               const paid = payments.find((p) => p.member_id === m.id && p.status === "paid");
               const link = links.find((l) => l.member_id === m.id && l.status === "open");
               return (
-                <li key={m.id} className="flex flex-col gap-2 px-5 py-3">
+                <li key={m.id} className="flex flex-col gap-2 px-4 py-3">
                   <span className="flex justify-between gap-3">
                     <span className="font-medium">{m.name}</span>
                     <span className="tabular-nums">{formatPrice(shareOf(m.priceCents))}</span>
                   </span>
                   {paid ? (
-                    <span className="text-ink-muted">Paid {paid.paid_at ? day(paid.paid_at) : ""}</span>
+                    <span className="flex items-center gap-2">
+                      <Badge tone="success">Paid</Badge>
+                      <span className="text-13 text-ink-muted">{paid.paid_at ? day(paid.paid_at) : ""}</span>
+                    </span>
                   ) : (
                     <>
-                      {link && <span className="text-ink-muted">Link sent to {link.sent_to}</span>}
+                      {link && <span className="text-13 text-ink-muted">Link sent to {link.sent_to}</span>}
                       <MemberLinkSender memberId={m.id} memberName={m.name} phone={m.phone} email={m.email} resend={Boolean(link)} />
                     </>
                   )}

@@ -8,14 +8,23 @@ import { buttonClass } from "@/components/ui/button";
 import { ChevronRightIcon, PlusIcon } from "@/components/ui/icons";
 import {
   Badge,
-  Card,
   EmptyState,
-  listClass,
+  nameLinkClass,
   PageHeader,
   pillClass,
-  rowLinkClass,
+  Section,
   type Tone,
 } from "@/components/ui/page";
+import {
+  actionsClass,
+  numClass,
+  TableCard,
+  tableClass,
+  tdClass,
+  theadClass,
+  thClass,
+  trClass,
+} from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
 import { METHOD_LABELS, type PaymentMethod } from "@/lib/checkout";
 import { canTakePayments } from "@/lib/sales";
@@ -34,10 +43,10 @@ import { fullName } from "@/lib/staff";
 export const metadata: Metadata = { title: "Sales" };
 
 const STATUS: Record<string, { label: string; tone: Tone }> = {
-  completed: { label: "Paid", tone: "green" },
-  partly_refunded: { label: "Part refunded", tone: "amber" },
-  refunded: { label: "Refunded", tone: "amber" },
-  voided: { label: "Voided", tone: "red" },
+  completed: { label: "Paid", tone: "success" },
+  partly_refunded: { label: "Part refunded", tone: "warning" },
+  refunded: { label: "Refunded", tone: "neutral" },
+  voided: { label: "Voided", tone: "danger" },
 };
 
 export default function SalesPage({ searchParams }: PageProps<"/sales">) {
@@ -134,79 +143,109 @@ async function Sales({
         </nav>
       )}
 
-      <Card
-        title="Taken"
-        titleId="taken-heading"
-        description={`By how it was paid, after the refunds and voids given ${date === today ? "today" : "that day"}.`}
-      >
+      <section aria-labelledby="taken-heading" className="mb-8">
+        <div className="mb-3">
+          <h2 id="taken-heading" className="text-base font-semibold text-ink">
+            Taken
+          </h2>
+          <p className="mt-0.5 text-13 text-ink-muted">
+            By how it was paid, after the refunds and voids given {date === today ? "today" : "that day"}.
+          </p>
+        </div>
         <dl
-          className="grid grid-cols-2 gap-3 sm:grid-cols-6"
+          className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-6"
           data-testid="sales-by-tender"
         >
           {(
             ["cash", "card", "gift_card", "package", "membership"] as const
           ).map((m) => (
-            <div key={m}>
-              <dt className="text-sm text-ink-muted">{METHOD_LABELS[m]}</dt>
-              <dd className="font-serif text-2xl font-semibold text-navy-900 tabular-nums">
+            <div key={m} className="bg-surface px-4 py-3">
+              <dt className="text-13 text-ink-muted">{METHOD_LABELS[m]}</dt>
+              <dd className="mt-1 text-2xl font-semibold tracking-[-0.015em] text-ink tabular-nums">
                 {formatPrice(byTender.get(m) ?? 0)}
               </dd>
             </div>
           ))}
-          <div>
-            <dt className="text-sm text-ink-muted">All</dt>
-            <dd className="font-serif text-2xl font-semibold text-navy-900 tabular-nums">
+          <div className="bg-surface px-4 py-3">
+            <dt className="text-13 font-medium text-ink">All</dt>
+            <dd className="mt-1 text-2xl font-semibold tracking-[-0.015em] text-ink tabular-nums">
               {formatPrice(net)}
             </dd>
           </div>
         </dl>
-      </Card>
+      </section>
 
-      <Card
-        flush
-        title={`${sales.length} ${sales.length === 1 ? "sale" : "sales"}`}
+      <Section
+        title="Sales"
         titleId="sales-heading"
+        count={sales.length}
       >
         {sales.length === 0 ? (
-          <EmptyState>
-            No sales {date === today ? "yet today" : "that day"}.
-          </EmptyState>
+          <TableCard>
+            <EmptyState>
+              No sales {date === today ? "yet today" : "that day"}.
+            </EmptyState>
+          </TableCard>
         ) : (
-          <ul className={listClass} aria-label="Sales">
-            {sales.map((s) => (
-              <li key={s.id}>
-                <Link href={`/sales/${s.id}`} className={rowLinkClass}>
-                  <span className="w-16 font-semibold text-ink tabular-nums">
-                    #{s.number}
-                  </span>
-                  <span className="w-20 text-sm text-ink-muted tabular-nums">
-                    {formatMinute(toLocal(new Date(s.created_at), tz).minute)}
-                  </span>
-                  <span className="min-w-40 flex-1 text-ink">
-                    {s.client ? fullName(s.client) : "Walk-in sale"}
-                  </span>
-                  <span className="text-sm text-ink-muted">
-                    {[
-                      ...new Set(
-                        s.payments
-                          .filter((p) => p.amount_cents > 0)
-                          .map((p) => METHOD_LABELS[p.method]),
-                      ),
-                    ].join(" + ")}
-                  </span>
-                  <Badge tone={STATUS[s.status].tone}>
-                    {STATUS[s.status].label}
-                  </Badge>
-                  <span className="w-24 text-right font-semibold text-ink tabular-nums">
-                    {formatPrice(s.total_cents)}
-                  </span>
-                  <ChevronRightIcon className="hidden size-4 text-ink-muted sm:block" />
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <TableCard>
+            <table className={tableClass} aria-label="Sales">
+              <thead className={theadClass}>
+                <tr>
+                  <th scope="col" className={thClass}>Sale</th>
+                  <th scope="col" className={thClass}>Time</th>
+                  <th scope="col" className={thClass}>Client</th>
+                  <th scope="col" className={thClass}>Paid by</th>
+                  <th scope="col" className={thClass}>Status</th>
+                  <th scope="col" className={`${thClass} text-right`}>Total</th>
+                  <th scope="col" className={`${thClass} w-px`}>
+                    <span className="sr-only">Open</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sales.map((s) => (
+                  <tr key={s.id} className={`${trClass} relative`}>
+                    <td className={`${tdClass} font-medium text-ink tabular-nums whitespace-nowrap`}>
+                      <Link
+                        href={`/sales/${s.id}`}
+                        className={`${nameLinkClass} after:absolute after:inset-0`}
+                      >
+                        #{s.number}
+                      </Link>
+                    </td>
+                    <td className={`${tdClass} text-ink-muted tabular-nums whitespace-nowrap`}>
+                      {formatMinute(toLocal(new Date(s.created_at), tz).minute)}
+                    </td>
+                    <td className={`${tdClass} text-ink`}>
+                      {s.client ? fullName(s.client) : "Walk-in sale"}
+                    </td>
+                    <td className={`${tdClass} text-ink-muted`}>
+                      {[
+                        ...new Set(
+                          s.payments
+                            .filter((p) => p.amount_cents > 0)
+                            .map((p) => METHOD_LABELS[p.method]),
+                        ),
+                      ].join(" + ")}
+                    </td>
+                    <td className={tdClass}>
+                      <Badge tone={STATUS[s.status].tone}>
+                        {STATUS[s.status].label}
+                      </Badge>
+                    </td>
+                    <td className={`${tdClass} ${numClass} font-medium text-ink`}>
+                      {formatPrice(s.total_cents)}
+                    </td>
+                    <td className={`${tdClass} ${actionsClass}`}>
+                      <ChevronRightIcon className="size-4 text-ink-subtle" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableCard>
         )}
-      </Card>
+      </Section>
     </AppShell>
   );
 }

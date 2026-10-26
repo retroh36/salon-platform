@@ -13,7 +13,7 @@ export function AuthScreen({ title, subtitle, children, footer }: { title: strin
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/maestra/maestra-logo-white.png" alt="Maestra" className="-ml-3 h-16 w-auto self-start" />
         <div className="relative z-10 animate-fade-in">
-          <p className="font-serif text-5xl leading-[1.05] font-semibold tracking-tight">Your salon&rsquo;s brain.</p>
+          <p className="text-2xl leading-tight font-semibold tracking-[-0.015em]">Your salon&rsquo;s brain.</p>
           <p className="mt-5 flex items-center gap-3 text-2xl font-semibold text-denise-200">
             <span className="inline-flex size-11 overflow-hidden rounded-full bg-denise-100 ring-2 ring-denise-500">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -35,9 +35,9 @@ export function AuthScreen({ title, subtitle, children, footer }: { title: strin
           <div className="mb-10 lg:hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/maestra/maestra-logo.png" alt="Maestra" className="-ml-2 h-12 w-auto" />
-            <p className="mt-3 text-ink-muted">{TAGLINE}</p>
+            <p className="mt-3 text-sm text-ink-muted">{TAGLINE}</p>
           </div>
-          <h1 className="font-serif text-3xl font-semibold tracking-tight text-navy-900">{title}</h1>
+          <h1 className="text-2xl font-semibold tracking-[-0.015em] text-ink">{title}</h1>
           <p className="mt-1 mb-8 text-ink-muted">{subtitle}</p>
           {children}
           {footer}

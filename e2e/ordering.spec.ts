@@ -89,7 +89,7 @@ test.describe("front desk", () => {
     const before = await level();
 
     await page.goto("/inventory/orders");
-    await ui(page).getByRole("list", { name: "Orders" }).getByRole("link", { name: /Lakeshore Salon Wholesale/ }).click();
+    await ui(page).getByRole("table", { name: "Orders" }).getByRole("link", { name: /Lakeshore Salon Wholesale/ }).click();
     await waitForHydration(page, "form[aria-label='Receive delivery'] input");
     const form = ui(page).getByRole("form", { name: "Receive delivery" });
     // Only 4 of the 6 T18 arrived; the other lines came in full.

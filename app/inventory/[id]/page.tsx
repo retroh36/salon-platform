@@ -30,12 +30,12 @@ import { AdjustForm, SettingsForm } from "./stock-actions";
 
 export const metadata: Metadata = { title: "Product" };
 
-const REASON_TONES: Record<StockReason, "neutral" | "navy" | "green" | "blue" | "amber"> = {
-  service_use: "navy",
-  sale: "blue",
+const REASON_TONES: Record<StockReason, "neutral" | "info" | "success"> = {
+  service_use: "neutral",
+  sale: "info",
   count: "neutral",
-  order_received: "green",
-  adjustment: "amber",
+  order_received: "success",
+  adjustment: "neutral",
 };
 
 export default function ProductPage({ params }: PageProps<"/inventory/[id]">) {
@@ -92,9 +92,9 @@ async function Product({ params }: Pick<PageProps<"/inventory/[id]">, "params">)
         title={productName(product)}
         description={
           <span className="flex flex-wrap items-center gap-2">
-            <Badge tone={product.type === "retail" ? "blue" : "navy"}>{TYPE_LABELS[product.type]}</Badge>
+            <Badge tone="neutral" dot={false}>{TYPE_LABELS[product.type]}</Badge>
             {!product.is_active && <Badge>Not in use</Badge>}
-            {low && <Badge tone="amber">Low stock</Badge>}
+            {low && <Badge tone="warning">Low stock</Badge>}
             <span>{[product.sku, product.supplier?.name, product.shelf].filter(Boolean).join(" · ")}</span>
           </span>
         }
@@ -107,39 +107,42 @@ async function Product({ params }: Pick<PageProps<"/inventory/[id]">, "params">)
         }
       />
 
-      <Card title="Stock" titleId="stock-heading">
-        <dl className="grid gap-4 sm:grid-cols-4">
-          <div>
-            <dt className="text-sm text-ink-muted">On hand</dt>
-            <dd className={`font-serif text-3xl font-semibold ${onHand < 0 ? "text-danger" : "text-navy-900"}`} data-testid="on-hand">
+      <section aria-labelledby="stock-heading" className="mb-6">
+        <h2 id="stock-heading" className="sr-only">
+          Stock
+        </h2>
+        <dl className="grid divide-y divide-line rounded-lg border border-line bg-surface sm:grid-flow-col sm:auto-cols-fr sm:divide-x sm:divide-y-0">
+          <div className="px-4 py-3">
+            <dt className="text-13 text-ink-muted">On hand</dt>
+            <dd className={`mt-1 text-2xl font-semibold tabular-nums ${onHand < 0 ? "text-danger" : "text-ink"}`} data-testid="on-hand">
               {stock.main}
             </dd>
-            {stock.containers && <dd className="text-sm text-ink-muted">{stock.containers}</dd>}
+            {stock.containers && <dd className="mt-0.5 text-xs text-ink-subtle">{stock.containers}</dd>}
           </div>
-          <div>
-            <dt className="text-sm text-ink-muted">Reorder below</dt>
-            <dd className="text-lg font-medium text-ink">{reorderPoint > 0 ? formatAmount(reorderPoint, product.unit) : "Not set"}</dd>
-            <dd className="text-sm text-ink-muted">
+          <div className="px-4 py-3">
+            <dt className="text-13 text-ink-muted">Reorder below</dt>
+            <dd className="mt-1 text-2xl font-semibold text-ink tabular-nums">{reorderPoint > 0 ? formatAmount(reorderPoint, product.unit) : "Not set"}</dd>
+            <dd className="mt-0.5 text-xs text-ink-subtle">
               Orders {level?.reorder_quantity ?? 1} {containerName(product, (level?.reorder_quantity ?? 1) !== 1)} at a time
             </dd>
           </div>
           {frontOfHouse && (
-            <div>
-              <dt className="text-sm text-ink-muted">Value at cost</dt>
-              <dd className="text-lg font-medium text-ink">{formatPrice(stockValueCents(onHand, product))}</dd>
-              <dd className="text-sm text-ink-muted">
+            <div className="px-4 py-3">
+              <dt className="text-13 text-ink-muted">Value at cost</dt>
+              <dd className="mt-1 text-2xl font-semibold text-ink tabular-nums">{formatPrice(stockValueCents(onHand, product))}</dd>
+              <dd className="mt-0.5 text-xs text-ink-subtle">
                 {formatPrice(product.cost_cents)} per {product.unit === "unit" ? "unit" : `${formatAmount(product.size, product.unit)} ${containerName(product)}`}
               </dd>
             </div>
           )}
           {product.price_cents !== null && (
-            <div>
-              <dt className="text-sm text-ink-muted">Retail price</dt>
-              <dd className="text-lg font-medium text-ink">{formatPrice(product.price_cents)}</dd>
+            <div className="px-4 py-3">
+              <dt className="text-13 text-ink-muted">Retail price</dt>
+              <dd className="mt-1 text-2xl font-semibold text-ink tabular-nums">{formatPrice(product.price_cents)}</dd>
             </div>
           )}
         </dl>
-      </Card>
+      </section>
 
       {product.type === "retail" && canSellRetail(me.role) && (
         <Card title="Sell" titleId="sell-heading" description="A sale at the front desk takes it out of stock.">
@@ -153,7 +156,7 @@ async function Product({ params }: Pick<PageProps<"/inventory/[id]">, "params">)
         <Card title="Adjust" titleId="adjust-heading" description="For breakage, samples and corrections. Counts go through a stocktake.">
           <div className="flex flex-col gap-6">
             <AdjustForm productId={product.id} unit={product.unit} />
-            <div className="border-t border-line pt-5">
+            <div className="border-t border-line pt-4">
               <SettingsForm productId={product.id} unit={product.unit} reorderPoint={reorderPoint} reorderQuantity={level?.reorder_quantity ?? 1} containerWord={containerName(product)} />
             </div>
           </div>
@@ -167,20 +170,20 @@ async function Product({ params }: Pick<PageProps<"/inventory/[id]">, "params">)
           ) : (
             <ol className={listClass} aria-label="Stock history">
               {movements.map((m) => (
-                <li key={m.id} className={`${rowClass} flex flex-wrap items-center gap-x-4 gap-y-1`}>
-                  <Badge tone={REASON_TONES[m.reason]} className="w-28 justify-center">
-                    {REASON_LABELS[m.reason]}
-                  </Badge>
-                  <span className={`w-24 font-medium tabular-nums ${m.change < 0 ? "text-ink" : "text-status-confirmed-ink"}`}>
+                <li key={m.id} className={`${rowClass} flex flex-wrap items-center gap-x-4 gap-y-1 text-sm`}>
+                  <span className="w-28">
+                    <Badge tone={REASON_TONES[m.reason]}>{REASON_LABELS[m.reason]}</Badge>
+                  </span>
+                  <span className={`w-20 text-right font-medium tabular-nums ${m.change < 0 ? "text-ink" : "text-success"}`}>
                     {m.change > 0 ? "+" : "−"}
                     {formatAmount(Math.abs(m.change), product.unit)}
                   </span>
-                  <span className="w-28 text-sm text-ink-muted tabular-nums">→ {formatAmount(m.on_hand_after, product.unit)}</span>
-                  <span className="min-w-40 flex-1 text-sm text-ink">
+                  <span className="w-24 text-ink-muted tabular-nums">→ {formatAmount(m.on_hand_after, product.unit)}</span>
+                  <span className="min-w-40 flex-1 text-ink">
                     {m.note}
                     {m.unit_cost_cents !== null && <span className="text-ink-muted"> · {formatPrice(m.unit_cost_cents)} each</span>}
                   </span>
-                  <span className="text-sm text-ink-muted">
+                  <span className="text-13 text-ink-subtle">
                     {when(m.created_at)}
                     {m.creator && ` · ${m.creator.first_name}`}
                   </span>

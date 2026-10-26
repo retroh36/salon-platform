@@ -46,7 +46,7 @@ export function FormulaForm({ clientId, today, visits, products }: { clientId: s
   }, [state]);
 
   return (
-    <form ref={formRef} action={action} onSubmit={submitWithoutReset(action)} aria-label="Add formula" className="grid gap-4 border-b border-line bg-sunken/40 p-5 sm:grid-cols-[11rem_1fr]" noValidate>
+    <form ref={formRef} action={action} onSubmit={submitWithoutReset(action)} aria-label="Add formula" className="grid gap-4 pb-4 sm:grid-cols-[11rem_1fr]" noValidate>
       {failed?.message && <Alert className="sm:col-span-2">{failed.message}</Alert>}
       <Field label="Visit date" error={errors.visit_date}>
         <input name="visit_date" type="date" max={today} value={date} onChange={(e) => setDate(e.target.value)} required className={inputClass} />
@@ -91,7 +91,7 @@ export function FormulaForm({ clientId, today, visits, products }: { clientId: s
           {pending ? "Saving…" : "Add formula entry"}
         </button>
         {state?.saved && (
-          <span role="status" className="animate-fade-in text-sm font-medium text-status-confirmed-ink">
+          <span role="status" className="animate-fade-in text-sm text-ink-muted">
             Saved.
           </span>
         )}

@@ -7,20 +7,18 @@ import { useRef, useState, useTransition } from "react";
 import type { AccountData, AccountVisit } from "@/lib/online-booking/account-data";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
-import { inputClass, primaryButton } from "../booking-flow";
+import { Alert } from "@/components/ui/page";
+import { accentLink, inputClass, pageLead, pageTitle, primaryButton, sectionTitle, smallButton } from "../styles";
 import { longDate } from "../times";
 import { addCard, confirmSignIn, createAccount, openVisit, removeCard, requestSignIn, saveMessagePreferences, signOut, type AccountResult } from "./actions";
 
-const sectionClass = "rounded-2xl border border-line bg-surface p-5 shadow-card";
-const headingClass = "font-serif text-xl font-semibold text-ink";
-const linkButton = "font-medium text-(--accent) underline underline-offset-2 disabled:opacity-50";
+// Sections are a title over a thin rule, with the items below (no boxes).
+const sectionClass = "flex flex-col gap-3";
+const headingClass = sectionTitle;
+const linkButton = `min-h-9 text-sm ${accentLink}`;
 
 function Problem({ text }: { text: string | null }) {
-  return text ? (
-    <p role="alert" className="rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger">
-      {text}
-    </p>
-  ) : null;
+  return text ? <Alert>{text}</Alert> : null;
 }
 
 // Signing in: an email or phone, then the code (or the link we send).
@@ -37,8 +35,8 @@ export function SignInForm({ slug, salon, expired }: { slug: string; salon: stri
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h1 className="font-serif text-3xl font-semibold tracking-tight">Your account</h1>
-        <p className="mt-2 text-ink-muted">See and change your visits at {salon}, your balances and your card. No password: we send you a code.</p>
+        <h1 className={pageTitle}>Your account</h1>
+        <p className={pageLead}>See and change your visits at {salon}, your balances and your card. No password: we send you a code.</p>
       </div>
       <Problem text={problem} />
       {!sent ? (
@@ -55,7 +53,7 @@ export function SignInForm({ slug, salon, expired }: { slug: string; salon: stri
             });
           }}
         >
-          <div role="radiogroup" aria-label="Send my code by" className="grid grid-cols-2 gap-2">
+          <div role="radiogroup" aria-label="Send my code by" className="grid grid-cols-2 gap-1 rounded-lg bg-sunken p-1">
             {(["email", "sms"] as const).map((c) => (
               <button
                 key={c}
@@ -63,7 +61,7 @@ export function SignInForm({ slug, salon, expired }: { slug: string; salon: stri
                 role="radio"
                 aria-checked={channel === c}
                 onClick={() => setChannel(c)}
-                className={`min-h-12 rounded-xl border font-medium ${channel === c ? "border-(--accent) bg-(--accent-soft)" : "border-line"}`}
+                className={`min-h-11 rounded-md text-sm font-medium transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-focus ${channel === c ? "bg-surface text-ink ring-1 ring-line-strong" : "text-ink-muted hover:text-ink"}`}
               >
                 {c === "email" ? "Email" : "Text"}
               </button>
@@ -99,8 +97,8 @@ export function SignInForm({ slug, salon, expired }: { slug: string; salon: stri
             });
           }}
         >
-          <p className="text-sm">
-            We sent a code and a sign-in link to <span className="font-medium">{sent.to}</span>. Enter the code, or tap the link.
+          <p className="text-ink-muted">
+            We sent a code and a sign-in link to <span className="font-medium text-ink">{sent.to}</span>. Enter the code, or tap the link.
           </p>
           <DemoCode code={sent.demoCode} />
           <label className="flex flex-col gap-1.5 text-sm font-medium">
@@ -110,14 +108,14 @@ export function SignInForm({ slug, salon, expired }: { slug: string; salon: stri
           <button type="submit" className={primaryButton} disabled={pending || code.length !== 6}>
             Sign in
           </button>
-          <button type="button" className={linkButton} onClick={() => (setSent(null), setCode(""))}>
+          <button type="button" className={`self-center ${linkButton}`} onClick={() => (setSent(null), setCode(""))}>
             Use a different email or number
           </button>
         </form>
       )}
       <p className="text-sm text-ink-muted">
         Just booking?{" "}
-        <Link href={`/book/${slug}`} className={linkButton}>
+        <Link href={`/book/${slug}`} className={accentLink}>
           Book without an account
         </Link>
       </p>
@@ -134,8 +132,8 @@ export function NewAccountForm({ slug, salon, allowed }: { slug: string; salon: 
   if (!allowed)
     return (
       <div>
-        <h1 className="font-serif text-3xl font-semibold tracking-tight">We couldn&rsquo;t find you</h1>
-        <p className="mt-2 text-ink-muted">{salon} isn&rsquo;t taking new clients online. Please call the salon.</p>
+        <h1 className={pageTitle}>We couldn&rsquo;t find you</h1>
+        <p className={pageLead}>{salon} isn&rsquo;t taking new clients online. Please call the salon.</p>
       </div>
     );
   return (
@@ -151,8 +149,10 @@ export function NewAccountForm({ slug, salon, allowed }: { slug: string; salon: 
         });
       }}
     >
-      <h1 className="font-serif text-3xl font-semibold tracking-tight">Welcome to {salon}</h1>
-      <p className="text-ink-muted">We don&rsquo;t have you on file yet. Tell us who you are to create your account.</p>
+      <div>
+        <h1 className={pageTitle}>Welcome to {salon}</h1>
+        <p className={pageLead}>We don&rsquo;t have you on file yet. Tell us who you are to create your account.</p>
+      </div>
       <Problem text={problem} />
       {(
         [
@@ -203,30 +203,30 @@ export function AccountView({
     });
 
   return (
-    <div className="flex flex-col gap-5" data-testid="client-account">
+    <div className="flex flex-col gap-8" data-testid="client-account">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="font-serif text-3xl font-semibold tracking-tight">Hi, {data.firstName}</h1>
-          <p className="mt-1 text-ink-muted">Your account at {salon.name}.</p>
+          <h1 className={pageTitle}>Hi, {data.firstName}</h1>
+          <p className={pageLead}>Your account at {salon.name}.</p>
         </div>
-        <form action={() => signOut(slug)}>
-          <button type="submit" className={linkButton}>
+        <form action={() => signOut(slug)} className="shrink-0">
+          <button type="submit" className={smallButton}>
             Sign out
           </button>
         </form>
       </div>
-      {result && (result.ok ? <p role="status" className="text-sm font-medium">{result.message}</p> : <Problem text={result.message} />)}
+      {result && (result.ok ? <Alert tone="success" className="-mt-4">{result.message}</Alert> : <Problem text={result.message} />)}
 
       <section aria-labelledby="upcoming-heading" className={sectionClass}>
         <h2 id="upcoming-heading" className={headingClass}>
           Coming up
         </h2>
         {data.upcoming.length ? (
-          <ul className="mt-3 flex flex-col divide-y divide-line">
+          <ul className="flex flex-col gap-2">
             {data.upcoming.map((v) => (
-              <li key={v.id} className="flex flex-wrap items-center justify-between gap-2 py-3" data-testid="upcoming-visit">
-                <div>
-                  <p className="font-medium">{when(v)}</p>
+              <li key={v.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-line bg-surface px-4 py-3" data-testid="upcoming-visit">
+                <div className="min-w-0">
+                  <p className="font-medium text-ink">{when(v)}</p>
                   <p className="text-sm text-ink-muted">{what(v)}</p>
                 </div>
                 {v.status !== "checked_in" && (
@@ -238,20 +238,20 @@ export function AccountView({
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-ink-muted">Nothing booked.</p>
+          <p className="text-sm text-ink-muted">Nothing booked.</p>
         )}
-        <p className="mt-3 text-xs text-ink-muted">
+        <p className="text-xs text-ink-subtle">
           You can change or cancel online until {salon.cutoffHours} {salon.cutoffHours === 1 ? "hour" : "hours"} before; you&rsquo;ll see the cancellation policy and any fee first.
         </p>
         {data.rebook ? (
           <Link
             href={`/book/${slug}?services=${data.rebook.serviceIds.join(",")}${data.rebook.staffId ? `&staff=${data.rebook.staffId}` : ""}&src=rebook`}
-            className={`${primaryButton} mt-4`}
+            className={`${primaryButton} mt-1`}
           >
             Book again: {data.rebook.label}
           </Link>
         ) : (
-          <Link href={`/book/${slug}`} className={`${primaryButton} mt-4`}>
+          <Link href={`/book/${slug}`} className={`${primaryButton} mt-1`}>
             Book a visit
           </Link>
         )}
@@ -262,17 +262,17 @@ export function AccountView({
           <h2 id="balances-heading" className={headingClass}>
             Balances
           </h2>
-          <ul className="mt-3 flex flex-col gap-2 text-sm" data-testid="balances">
+          <ul className="-mt-3 flex flex-col divide-y divide-line text-sm" data-testid="balances">
             {data.giftCards.map((g) => (
-              <li key={g.last4} className="flex justify-between gap-3">
-                <span>Gift card ending {g.last4}</span>
-                <span className="font-semibold tabular-nums">{formatPrice(g.balanceCents)}</span>
+              <li key={g.last4} className="flex justify-between gap-3 py-3">
+                <span className="text-ink">Gift card ending {g.last4}</span>
+                <span className="font-medium tabular-nums">{formatPrice(g.balanceCents)}</span>
               </li>
             ))}
             {data.packages.map((p) => (
-              <li key={p.name} className="flex justify-between gap-3">
-                <span>{p.name}</span>
-                <span className="text-right">{p.left.map((l) => `${l.service}: ${l.uses} left`).join(" · ")}</span>
+              <li key={p.name} className="flex justify-between gap-3 py-3">
+                <span className="text-ink">{p.name}</span>
+                <span className="text-right text-ink-muted">{p.left.map((l) => `${l.service}: ${l.uses} left`).join(" · ")}</span>
               </li>
             ))}
           </ul>
@@ -283,8 +283,8 @@ export function AccountView({
         <h2 id="card-heading" className={headingClass}>
           Card on file
         </h2>
-        <p className="mt-2 text-sm">{data.card ? data.card.label : "No card on file."}</p>
-        <div className="mt-3 flex flex-wrap gap-4">
+        <p className="text-sm text-ink">{data.card ? data.card.label : "No card on file."}</p>
+        <div className="-mt-1 flex flex-wrap gap-x-5">
           <button type="button" className={linkButton} disabled={pending} onClick={() => run(() => addCard(slug))}>
             {data.card ? "Replace card" : "Add a card"}
           </button>
@@ -294,7 +294,7 @@ export function AccountView({
             </button>
           )}
         </div>
-        <p className="mt-2 text-xs text-ink-muted">Cards are kept by our payment provider; we never see or store the number.{testMode ? " Test mode: test cards only." : ""}</p>
+        <p className="text-xs text-ink-subtle">Cards are kept by our payment provider; we never see or store the number.{testMode ? " Test mode: test cards only." : ""}</p>
       </section>
 
       <section aria-labelledby="messages-heading" className={sectionClass}>
@@ -302,7 +302,7 @@ export function AccountView({
           Messages
         </h2>
         {messages.stopped && (
-          <p className="mt-1 text-sm text-ink" data-testid="texts-stopped">
+          <p className="text-sm text-ink-muted" data-testid="texts-stopped">
             You replied STOP, so we don&rsquo;t text you. Text START to us to get texts about your visits again.
           </p>
         )}
@@ -312,11 +312,11 @@ export function AccountView({
             ["Offers and news", "Offers and reminders to come back. Turning these off never stops messages about your visits.", [["sms", "Texts"], ["email", "Emails"]]],
           ] as const
         ).map(([title, note, boxes]) => (
-          <fieldset key={title} className="mt-3 flex flex-col gap-2 text-sm">
-            <legend className="font-medium">{title}</legend>
-            <p className="text-ink-muted">{note}</p>
+          <fieldset key={title} className="flex flex-col gap-1 text-sm">
+            <legend className="font-medium text-ink">{title}</legend>
+            <p className="mb-1 text-ink-muted">{note}</p>
             {boxes.map(([key, label]) => (
-              <label key={key} className="flex items-center gap-3">
+              <label key={key} className="flex min-h-10 items-center gap-3">
                 <input
                   type="checkbox"
                   className="size-5 accent-(--accent)"
@@ -340,10 +340,10 @@ export function AccountView({
           <h2 id="past-heading" className={headingClass}>
             Past visits
           </h2>
-          <ul className="mt-3 flex flex-col divide-y divide-line text-sm">
+          <ul className="-mt-3 flex flex-col divide-y divide-line text-sm">
             {data.past.map((v) => (
-              <li key={v.id} className="py-2">
-                <p className="font-medium">{longDate(toLocal(new Date(v.start), timezone).date)}</p>
+              <li key={v.id} className="py-3">
+                <p className="font-medium text-ink">{longDate(toLocal(new Date(v.start), timezone).date)}</p>
                 <p className="text-ink-muted">{what(v)}</p>
               </li>
             ))}

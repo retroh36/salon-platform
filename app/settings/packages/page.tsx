@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
-import { Badge, Card, PageHeader } from "@/components/ui/page";
+import { Badge, Card, PageHeader, Section } from "@/components/ui/page";
+import { buttonClass } from "@/components/ui/button";
 import { getCurrentStaff } from "@/lib/auth";
 import { loadTemplates } from "@/lib/packages";
 import { LEVEL_LABELS } from "@/lib/schedule-forms";
@@ -37,8 +38,11 @@ async function PackagesSettings() {
       <Card title="New package" titleId="new-package-heading">
         <PackageForm template={null} services={services} />
       </Card>
+      {templates.length > 0 && (
+      <Section title="Packages" titleId="templates-heading" count={templates.length}>
       {templates.map((t) => (
         <Card
+          className="mb-3"
           key={t.id}
           title={t.name}
           titleId={`package-${t.id}`}
@@ -46,13 +50,15 @@ async function PackagesSettings() {
           actions={t.isActive ? <Badge tone="green">On sale</Badge> : <Badge tone="neutral">Not on sale</Badge>}
         >
           <details>
-            <summary className="cursor-pointer text-sm font-medium text-link">Edit</summary>
-            <div className="mt-4">
+            <summary className={buttonClass("secondary", "sm", "cursor-pointer list-none")}>Edit</summary>
+            <div className="mt-4 border-t border-line pt-4">
               <PackageForm template={t} services={services} />
             </div>
           </details>
         </Card>
       ))}
+      </Section>
+      )}
     </AppShell>
   );
 }

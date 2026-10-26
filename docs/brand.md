@@ -100,15 +100,31 @@ keep a quarter of its height clear.
 
 | Token | Hex | Role |
 | --- | --- | --- |
-| `canvas` | `#FBF8F5` | The page: a warm off-white |
+| `canvas` | `#FAFAF9` | The page: a neutral near-white |
 | `surface` | `#FFFFFF` | Cards, panels, fields |
-| `sunken` | `#F5F0EB` | Recessed areas, the sidebar |
-| `line` / `line-strong` | `#EBE4DD` / `#D9CFC5` | Dividers and borders |
-| `ink` | `#1D2532` | Body text |
-| `ink-muted` | `#565E6B` | Secondary text |
-| `ink-subtle` | `#666E7C` | Hints, placeholders |
-| `danger` / `danger-soft` | `#B42318` / `#FDECEA` | Errors, destructive actions |
+| `sunken` | `#F4F4F3` | Recessed areas, the sidebar, table headers, hover |
+| `line` / `line-strong` | `#E6E7EA` / `#D3D5DA` | Dividers and borders (fields and outlined buttons use `line-strong`) |
+| `ink` | `#191C22` | Body text, names, titles (names are dark text, not link blue) |
+| `ink-muted` | `#5C6170` | Secondary text |
+| `ink-subtle` | `#696E7B` | Hints, placeholders, counts |
 | `now` | `#C8323A` | The calendar's current-time line |
+
+### Status: one set
+
+Every tag, alert and notice uses these, and nothing else: a small dot and a
+short label in the ink, on the soft fill. Never a colored sentence.
+
+| Status | Ink | Soft fill | Dot | For |
+| --- | --- | --- | --- | --- |
+| `success` | `#15703A` | `#ECF7EF` | `#22A35A` | Charged, paid, confirmed |
+| `warning` | `#A6460A` | `#FDF3E7` | `#EE8A1C` | Needs attention: no card on file, running late |
+| `danger` | `#B42318` | `#FDEEEC` | `#E5484D` | Failed, declined, no-show; errors; destructive buttons |
+| `info` | `#1D55B8` | `#EDF3FD` | `#3B7BE0` | Checked in, kept from deposit |
+| `neutral` | `#4D5361` | `#F1F2F4` | `#9AA0AB` | Waived, booked, completed |
+
+Appointment statuses (`status-*` tokens) are drawn from this set. On a
+calendar block, "+5m" and "Not arrived" use `block-attention` (`#8C3A08`),
+the warning a step darker so it reads on every fill.
 
 ### Denise: periwinkle, only for her
 
@@ -126,13 +142,19 @@ check this).
 
 ### Service colors (the calendar)
 
+Slightly muted, so the client's name reads cleanly on them.
+
 | Family | Fill | Accent edge |
 | --- | --- | --- |
-| Color | `#FBDFCF` peach | `#E2733D` |
-| Cuts | `#E9E0F8` lavender | `#8A68D6` |
-| Gloss & blowouts | `#DCECDF` sage | `#5A9969` |
-| Treatments | `#D5EFEB` soft teal | `#3B9B93` |
-| Other | `#EDE5DD` sand | `#A08870` |
+| Color | `#F7E1D4` peach | `#D9733F` |
+| Cuts | `#E7E1F5` lavender | `#8669CF` |
+| Gloss & blowouts | `#DDE9DF` sage | `#5A9568` |
+| Treatments | `#D7EBE8` soft teal | `#3D968F` |
+| Other | `#EBE5DF` sand | `#9C8771` |
+
+Where the client is in their visit fills the block instead: `visit-here`
+`#FCF1AE` (checked in), `visit-done` `#B3D9B8` (checked out), `visit-off`
+`#E3E5E9` (no-show, name struck through).
 
 ### Stylist levels
 
@@ -163,12 +185,58 @@ or one-off hex values.
 
 ## Typography
 
-- **Inter** for everything in the interface: body, labels, buttons, numbers.
-- **Fraunces** (semibold) for page titles and headings, and the big lines on
-  the login screen and social image.
+- **Geist** (the `geist` package, through `next/font`) for everything:
+  titles, body, labels, buttons, numbers, the booking site and the login
+  screen. No serif anywhere in the product.
+- **Geist Mono** only where characters must line up as code (gift card
+  codes, a formula's amounts). Money and counts use Geist with tabular
+  figures (`tabular-nums`), so columns line up.
+- **The scale:** 12, 13, 14, 16, 20 and 24px (`text-xs`, `text-13`,
+  `text-sm`, `text-base`, `text-xl`, `text-2xl`). Page titles 24px semibold
+  with slight negative letter-spacing (`PageHeader`); section and card
+  titles 16px semibold; body 14px (the app's default); labels 13px medium;
+  meta and tags 12px. Hierarchy comes from weight and color, not size.
+- Small labels are sentence case, never spaced-out capitals.
 - The wordmark is part of the logo: never set "Maestra" in a font to stand
   in for it.
 - Sentence case everywhere ("New booking", not "New Booking").
+
+## Layout
+
+The style is calm and flat, like a good dashboard: neutral grays, navy for
+the one main action, one layer of containers.
+
+- **Spacing** is on a 4px grid. Pages: 32px from the top, 16px (phones) or
+  32px at the sides, `max-w-5xl` (`max-w-6xl` for wide pages) (`AppShell`).
+  Cards: 16px padding, a 12px header row. Rows: 12px by 16px.
+- **One layer of containers.** Never a bordered or tinted box inside another
+  box. Groups and columns are a `Section`: a 16px title over the items, or
+  a label over a thin rule. Only the items themselves are cards: a 1px
+  `line` border, 8px corners, no shadow (`Card`). Shadows are only for what
+  floats over the page: menus, popovers, sheets, toasts, a dragged block.
+- **Buttons** (`components/ui/button.tsx`): one `primary` (filled navy) per
+  page or panel; `secondary` (outlined) beside it; row actions as `quiet`
+  text buttons; less common actions in a "⋯" menu; `danger` (filled red)
+  only for the confirming step of something destructive, `danger-quiet`
+  (red text) to start it. All 36px tall (40px `lg`, 32px `xs` in dense
+  rows, 44px on a touchscreen), 8px corners, a 6px gap to an icon. No
+  pill-shaped buttons or chips.
+- **Status** is a small tag (`Badge`, `StatusChip`): a dot and a short
+  label from the status set. **Alerts** (`Alert`) are the soft fill with a
+  dot, no border.
+- **Tables** (`components/ui/table.tsx`) for lists of records: a quiet
+  header row, aligned columns, money right-aligned in tabular figures, a
+  thin rule between rows, quiet actions at the end.
+- **Links:** the link blue only for links that read as links ("See all",
+  "Open event"). Names of people and records are dark text, underlined on
+  hover (`nameLinkClass`).
+- **Empty, loading, toasts:** `EmptyState` (one quiet centered line, an
+  optional title and action), `Skeleton` placeholders that shimmer slowly,
+  and navy toasts at the foot of the screen with at most one action
+  (`components/ui/feedback.tsx`).
+
+Every component, in each of its states, is on the owners' style guide at
+`/design` (not in the sidebar).
 
 ## Voice
 

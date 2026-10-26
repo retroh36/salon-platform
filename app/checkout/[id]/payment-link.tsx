@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
+import { Alert } from "@/components/ui/page";
 import { Segmented } from "@/components/ui/segmented";
 import type { CheckoutScreenData } from "@/lib/checkout-screen";
 import { LINK_HOURS } from "@/lib/payment-links";
@@ -35,7 +36,7 @@ export function SendLink({ data, ticket, dueCents, onClose }: { data: CheckoutSc
         });
       }}
     >
-      <p>
+      <p className="text-sm text-ink">
         {data.client?.firstName ?? "The client"} gets a link to pay <strong className="tabular-nums">{formatPrice(dueCents)}</strong> on their phone, with a tip for each stylist if
         they like. When they pay, the sale completes by itself.
       </p>
@@ -56,11 +57,7 @@ export function SendLink({ data, ticket, dueCents, onClose }: { data: CheckoutSc
         <input type={channel === "sms" ? "tel" : "email"} value={address} onChange={(e) => setAddress(e.target.value)} className={`${fieldClass} h-12`} required />
       </label>
       <p className="text-sm text-ink-muted">The link works once and expires in {LINK_HOURS} hours. Until texts are connected, it waits in the outbox.</p>
-      {error && (
-        <p role="alert" className="text-sm font-medium text-danger">
-          {error}
-        </p>
-      )}
+      {error && <Alert>{error}</Alert>}
       <Button type="submit" variant="primary" size="lg" disabled={pending}>
         {pending ? "Sending…" : "Send payment link"}
       </Button>
@@ -83,8 +80,8 @@ export function LinkWaiting({ data, link }: { data: CheckoutScreenData; link: No
   return (
     <aside aria-label="Payment" className="flex min-h-0 flex-col border-t border-line bg-surface md:border-t-0 md:border-l">
       <div className="flex flex-1 flex-col gap-4 px-4 py-6 sm:px-5" data-testid="link-waiting">
-        <h2 className="font-serif text-2xl font-semibold text-navy-900">{expired ? "The payment link expired" : "Waiting for payment"}</h2>
-        <p>
+        <h2 className="text-xl font-semibold tracking-[-0.01em] text-ink">{expired ? "The payment link expired" : "Waiting for payment"}</h2>
+        <p className="text-sm text-ink">
           A link to pay <strong className="tabular-nums">{formatPrice(link.amountCents)}</strong> went to {link.sentTo} by {link.channel === "sms" ? "text" : "email"} at {link.sentAt}.
         </p>
         <p className="text-sm text-ink-muted">
@@ -104,11 +101,7 @@ export function LinkWaiting({ data, link }: { data: CheckoutScreenData; link: No
         >
           {expired ? "Take payment here" : "Cancel the link"}
         </Button>
-        {error && (
-          <p role="alert" className="text-sm text-danger">
-            {error}
-          </p>
-        )}
+        {error && <Alert>{error}</Alert>}
       </div>
     </aside>
   );

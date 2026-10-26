@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { BackLink } from "@/components/ui/back-link";
-import { Card, EmptyState, listClass, PageHeader, rowClass } from "@/components/ui/page";
+import { EmptyState, PageHeader } from "@/components/ui/page";
+import { numClass, TableCard, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
 import { canManageInventory } from "@/lib/inventory";
 import { SupplierForm } from "./supplier-form";
@@ -27,24 +28,47 @@ async function Suppliers() {
       <BackLink href="/inventory">Inventory</BackLink>
       <PageHeader title="Suppliers" description="Where products come from, and how long deliveries take." />
       {canManageInventory(me.role) && <SupplierForm />}
-      <Card flush>
-        {suppliers.length === 0 ? (
+      {suppliers.length === 0 ? (
+        <TableCard>
           <EmptyState>No suppliers yet.</EmptyState>
-        ) : (
-          <ul className={listClass} aria-label="Suppliers">
-            {suppliers.map((s) => (
-              <li key={s.id} className={`${rowClass} flex flex-wrap items-baseline gap-x-4 gap-y-1`}>
-                <span className="min-w-52 flex-1 font-semibold text-ink">{s.name}</span>
-                <span className="text-sm text-ink-muted">{[s.email, s.phone, s.account_number && `Account ${s.account_number}`].filter(Boolean).join(" · ")}</span>
-                <span className="w-40 text-sm text-ink-muted">
-                  {s.lead_time_days} {s.lead_time_days === 1 ? "day" : "days"} to deliver · {s.products.length} products
-                </span>
-                {s.notes && <p className="w-full text-sm text-ink-muted">{s.notes}</p>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+        </TableCard>
+      ) : (
+        <TableCard>
+          <table className={tableClass} aria-label="Suppliers">
+            <thead className={theadClass}>
+              <tr>
+                <th scope="col" className={thClass}>
+                  Supplier
+                </th>
+                <th scope="col" className={`${thClass} hidden md:table-cell`}>
+                  Contact
+                </th>
+                <th scope="col" className={`${thClass} text-right`}>
+                  Delivers in
+                </th>
+                <th scope="col" className={`${thClass} text-right`}>
+                  Products
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {suppliers.map((s) => (
+                <tr key={s.id} className={trClass}>
+                  <td className={tdClass}>
+                    <span className="font-medium text-ink">{s.name}</span>
+                    {s.notes && <span className="block text-13 text-ink-muted">{s.notes}</span>}
+                  </td>
+                  <td className={`${tdClass} hidden text-ink-muted md:table-cell`}>{[s.email, s.phone, s.account_number && `Account ${s.account_number}`].filter(Boolean).join(" · ")}</td>
+                  <td className={`${tdClass} ${numClass} text-ink-muted`}>
+                    {s.lead_time_days} {s.lead_time_days === 1 ? "day" : "days"}
+                  </td>
+                  <td className={`${tdClass} ${numClass} text-ink-muted`}>{s.products.length}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableCard>
+      )}
     </AppShell>
   );
 }

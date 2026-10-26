@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
+import { PlusIcon } from "@/components/ui/icons";
 import { formatLongDay } from "@/lib/schedule-format";
 import { MAX_GUESTS, staggered } from "@/lib/scheduling/groups";
 import { formatMinute, minuteToTime, parseTime } from "@/lib/scheduling/time";
@@ -89,10 +90,10 @@ export function GroupPanel({ data, start, onClose, onSaved }: { data: BoardData;
     <form onSubmit={submit} aria-label="Group booking" className="flex flex-col gap-5 py-2 text-sm">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h2 className="font-serif text-2xl font-semibold text-navy-900">Group booking</h2>
+          <h2 className="text-xl font-semibold text-ink">Group booking</h2>
           <p className="text-ink-muted">{formatLongDay(data.date)}</p>
         </div>
-        <Button size="sm" variant="ghost" onClick={onClose}>
+        <Button size="sm" onClick={onClose}>
           Cancel
         </Button>
       </div>
@@ -104,8 +105,8 @@ export function GroupPanel({ data, start, onClose, onSaved }: { data: BoardData;
         <input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} placeholder="e.g. Ava's bridal party" className={fieldClass} />
       </label>
 
-      <fieldset className="flex flex-col gap-2 rounded-lg border border-line p-3">
-        <legend className="px-1 font-medium text-ink">Timing</legend>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1.5 text-13 font-medium text-ink">Timing</legend>
         <label className="flex items-center gap-2">
           First starts at
           <input type="time" step={300} value={first != null ? minuteToTime(first) : ""} onChange={(e) => setFirst(parseTime(e.target.value))} className={`${fieldClass} w-32!`} aria-label="First start" />
@@ -146,13 +147,13 @@ export function GroupPanel({ data, start, onClose, onSaved }: { data: BoardData;
       </fieldset>
 
       {guests.map((g, i) => (
-        <fieldset key={g.key} aria-label={`Guest ${i + 1}`} className={`flex flex-col gap-3 rounded-lg border p-3 ${errors[i]?.length ? "border-danger" : "border-line"}`}>
-          <legend className="flex w-full items-center justify-between px-1 font-medium text-ink">
+        <fieldset key={g.key} aria-label={`Guest ${i + 1}`} className={`flex flex-col gap-3 rounded-lg border p-4 pt-3 ${errors[i]?.length ? "border-danger" : "border-line"}`}>
+          <legend className="flex w-full items-center justify-between px-1 text-13 font-medium text-ink">
             Guest {i + 1}
             {guests.length > 2 && (
-              <button type="button" className="text-sm font-normal text-ink-muted hover:text-danger" onClick={() => setGuests(guests.filter((x) => x.key !== g.key))}>
+              <Button variant="quiet" size="xs" className="text-ink-muted" onClick={() => setGuests(guests.filter((x) => x.key !== g.key))}>
                 Remove
-              </button>
+              </Button>
             )}
           </legend>
           <ClientPicker client={g.client} onChange={(client) => update(g.key, { client })} />
@@ -187,19 +188,20 @@ export function GroupPanel({ data, start, onClose, onSaved }: { data: BoardData;
                 <input type="time" step={300} value={g.startMinute != null ? minuteToTime(g.startMinute) : ""} onChange={(e) => update(g.key, { startMinute: parseTime(e.target.value) })} className={fieldClass} />
               </label>
             ) : (
-              <p className="flex flex-col gap-1.5 text-sm font-medium text-ink">
+              <p className="flex flex-col gap-1.5 text-13 font-medium text-ink">
                 Starts
-                <span className="py-2 font-normal text-ink-muted">{starts[i] != null ? formatMinute(starts[i]!) : "—"}</span>
+                <span className="py-2 text-sm font-normal text-ink-muted">{starts[i] != null ? formatMinute(starts[i]!) : "—"}</span>
               </p>
             )}
           </div>
-          {errors[i]?.length > 0 && <p className="text-danger">{errors[i].join(" ")}</p>}
+          {errors[i]?.length > 0 && <p className="text-13 text-danger">{errors[i].join(" ")}</p>}
         </fieldset>
       ))}
 
       {guests.length < MAX_GUESTS && (
-        <Button className="self-start" onClick={addGuest}>
-          + Add a guest
+        <Button size="sm" className="self-start" onClick={addGuest}>
+          <PlusIcon className="size-4" />
+          Add a guest
         </Button>
       )}
 

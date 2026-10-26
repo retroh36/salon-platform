@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { ChevronRightIcon } from "@/components/ui/icons";
-import { Badge, Card, EmptyState, listClass, PageHeader, pillClass, rowLinkClass } from "@/components/ui/page";
+import { Badge, Card, EmptyState, nameLinkClass, PageHeader, pillClass, Section } from "@/components/ui/page";
+import { actionsClass, numClass, TableCard, tableClass, tdClass, theadClass, thClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
 import { formatCode } from "@/lib/gift-cards";
 import { canRefund, canTakePayments } from "@/lib/sales";
@@ -53,7 +54,10 @@ async function GiftCards({ searchParams }: Pick<PageProps<"/gift-cards">, "searc
           <PromoForm defaultDays={b?.promo_card_expiry_days ?? 90} />
         </Card>
       )}
-      <nav aria-label="Kind" className="mb-3 flex gap-2">
+      <Section title={kind === "purchased" ? "Recent cards" : "Recent promotional cards"} titleId="recent-heading"
+        count={cards.length}
+        actions={
+      <nav aria-label="Kind" className="flex gap-2">
         <Link href="/gift-cards" className={pillClass(kind === "purchased")}>
           Bought
         </Link>
@@ -61,33 +65,66 @@ async function GiftCards({ searchParams }: Pick<PageProps<"/gift-cards">, "searc
           Promotional
         </Link>
       </nav>
-      <Card flush title={kind === "purchased" ? "Recent cards" : "Recent promotional cards"} titleId="recent-heading">
-        {cards.length === 0 ? (
-          <EmptyState>No cards yet.</EmptyState>
-        ) : (
-          <ul className={listClass} aria-label="Gift cards">
-            {cards.map((c) => {
-              const expired = c.expires_at !== null && new Date(c.expires_at) <= new Date();
-              return (
-                <li key={c.id}>
-                  <Link href={`/gift-cards/${c.id}`} className={rowLinkClass}>
-                    <span className="w-48 font-mono text-sm text-ink">{formatCode(c.code)}</span>
-                    <span className="min-w-32 flex-1 text-sm text-ink-muted">
-                      {c.recipient_name ?? (c.client ? `${c.client.first_name} ${c.client.last_name}` : c.physical ? "Physical card" : "Digital card")} · {day(c.created_at)}
-                    </span>
-                    {c.status === "voided" ? <Badge tone="red">Voided</Badge> : expired ? <Badge tone="amber">Expired</Badge> : null}
-                    <span className="w-36 text-right text-sm tabular-nums">
-                      <span className="font-semibold text-ink">{formatPrice(c.balance_cents)}</span>
-                      <span className="text-ink-muted"> of {formatPrice(c.initial_cents)}</span>
-                    </span>
-                    <ChevronRightIcon className="hidden size-4 text-ink-muted sm:block" />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
+        }
+      >
+        <TableCard>
+          {cards.length === 0 ? (
+            <EmptyState>No cards yet.</EmptyState>
+          ) : (
+            <table className={tableClass} aria-label="Gift cards">
+              <thead className={theadClass}>
+                <tr>
+                  <th scope="col" className={thClass}>
+                    Code
+                  </th>
+                  <th scope="col" className={thClass}>
+                    For
+                  </th>
+                  <th scope="col" className={thClass}>
+                    {kind === "purchased" ? "Sold" : "Issued"}
+                  </th>
+                  <th scope="col" className={thClass}>
+                    <span className="sr-only">Status</span>
+                  </th>
+                  <th scope="col" className={`${thClass} text-right`}>
+                    Balance
+                  </th>
+                  <th scope="col" className={`${thClass} text-right`}>
+                    {kind === "purchased" ? "Sold for" : "Issued for"}
+                  </th>
+                  <th scope="col" className={`${thClass} w-px`}>
+                    <span className="sr-only">Open</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {cards.map((c) => {
+                  const expired = c.expires_at !== null && new Date(c.expires_at) <= new Date();
+                  return (
+                    <tr key={c.id} className={`${trClass} relative`}>
+                      <td className={`${tdClass} whitespace-nowrap`}>
+                        <Link href={`/gift-cards/${c.id}`} className={`${nameLinkClass} font-mono text-13 after:absolute after:inset-0`}>
+                          {formatCode(c.code)}
+                        </Link>
+                      </td>
+                      <td className={`${tdClass} text-ink`}>
+                        {c.recipient_name ?? (c.client ? `${c.client.first_name} ${c.client.last_name}` : <span className="text-ink-muted">{c.physical ? "Physical card" : "Digital card"}</span>)}
+                      </td>
+                      <td className={`${tdClass} whitespace-nowrap text-ink-muted tabular-nums`}>{day(c.created_at)}</td>
+                      <td className={tdClass}>{c.status === "voided" ? <Badge tone="danger">Voided</Badge> : expired ? <Badge tone="warning">Expired</Badge> : null}</td>
+                      <td className={`${tdClass} ${numClass} font-medium text-ink`}>{formatPrice(c.balance_cents)}</td>
+                      <td className={`${tdClass} ${numClass} text-ink-muted`}>{formatPrice(c.initial_cents)}</td>
+                      <td className={`${tdClass} ${actionsClass}`}>
+                        <ChevronRightIcon className="size-4 text-ink-subtle" />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </TableCard>
+      </Section>
     </AppShell>
   );
 }

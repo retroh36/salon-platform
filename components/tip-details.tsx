@@ -5,6 +5,8 @@ import { formatDay } from "@/lib/schedule-format";
 import { formatPrice } from "@/lib/services";
 import { averageTipPct, pctText, tipItems, tipTotals, topTippers, type TipItem, type TipTotal } from "@/lib/tips";
 import { firstLetter } from "@/lib/initial";
+import { numClass, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
+import { nameLinkClass } from "@/components/ui/page";
 
 const KIND_LABELS = { sale: null, refund: "Refund", void: "Voided" } as const;
 
@@ -18,13 +20,13 @@ function Totals({ label, rows, day }: { label: string; rows: TipTotal[]; day: bo
   if (!rows.length) return null;
   return (
     <div>
-      <h4 className="mb-1 text-xs font-semibold tracking-wide text-ink-muted uppercase">{label}</h4>
+      <h4 className="border-b border-line pb-2 text-13 font-medium text-ink">{label}</h4>
       <ul className="flex flex-col text-sm tabular-nums" aria-label={label}>
         {rows.map((r) => (
-          <li key={r.from} className="flex justify-between gap-3 border-b border-line py-1">
+          <li key={r.from} className="flex justify-between gap-3 border-b border-line py-2 last:border-b-0">
             <span className="text-ink-muted">{day ? formatDay(r.from) : r.from === r.to ? formatDay(r.from) : `${formatDay(r.from)} – ${formatDay(r.to)}`}</span>
             <span>
-              {payMoney(r.cents)} <span className="text-xs text-ink-muted">({r.count})</span>
+              {payMoney(r.cents)} <span className="text-xs text-ink-subtle">({r.count})</span>
             </span>
           </li>
         ))}
@@ -44,36 +46,36 @@ export function TipDetails({ tickets, period, timeZone, linkSales, ownView }: { 
   const top = topTippers(items);
   const name = (c: string | null) => (c ? (ownView ? shortName(c) : c) : "Walk-in");
   return (
-    <div className="flex flex-col gap-4" data-testid="tip-details">
-      <dl className="grid grid-cols-3 gap-3 text-sm">
-        <div>
-          <dt className="text-ink-muted">Tips</dt>
-          <dd className="text-lg font-semibold tabular-nums" data-testid="tips-total">
+    <div className="flex flex-col gap-6" data-testid="tip-details">
+      <dl className="grid grid-cols-3 divide-x divide-line">
+        <div className="pr-4">
+          <dt className="text-13 text-ink-muted">Tips</dt>
+          <dd className="text-xl font-semibold text-ink tabular-nums" data-testid="tips-total">
             {formatPrice(totals.total.cents)}
           </dd>
         </div>
-        <div>
-          <dt className="text-ink-muted">Average tip</dt>
-          <dd className="text-lg font-semibold tabular-nums" data-testid="tips-average">
+        <div className="px-4">
+          <dt className="text-13 text-ink-muted">Average tip</dt>
+          <dd className="text-xl font-semibold text-ink tabular-nums" data-testid="tips-average">
             {pctText(average)}
           </dd>
-          <p className="text-xs text-ink-muted">of service sales</p>
+          <dd className="text-xs text-ink-subtle">of service sales</dd>
         </div>
-        <div>
-          <dt className="text-ink-muted">Tipped visits</dt>
-          <dd className="text-lg font-semibold tabular-nums">{totals.total.count}</dd>
+        <div className="pl-4">
+          <dt className="text-13 text-ink-muted">Tipped visits</dt>
+          <dd className="text-xl font-semibold text-ink tabular-nums">{totals.total.count}</dd>
         </div>
       </dl>
       {top.length > 0 && (
         <div>
-          <h4 className="mb-1 text-xs font-semibold tracking-wide text-ink-muted uppercase">Top tippers</h4>
+          <h4 className="border-b border-line pb-2 text-13 font-medium text-ink">Top tippers</h4>
           <ol className="flex flex-col text-sm tabular-nums" aria-label="Top tippers">
             {top.map((t) => (
-              <li key={t.client} className="flex justify-between gap-3 border-b border-line py-1" data-testid="top-tipper">
+              <li key={t.client} className="flex justify-between gap-3 border-b border-line py-2 last:border-b-0" data-testid="top-tipper">
                 <span>{name(t.client)}</span>
                 <span>
                   {formatPrice(t.cents)}
-                  <span className="text-xs text-ink-muted">
+                  <span className="text-xs text-ink-subtle">
                     {" "}
                     · {t.visits} {t.visits === 1 ? "visit" : "visits"}
                     {t.pct !== null ? ` · ${pctText(t.pct)}` : ""}
@@ -84,7 +86,7 @@ export function TipDetails({ tickets, period, timeZone, linkSales, ownView }: { 
           </ol>
         </div>
       )}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-6 sm:grid-cols-2">
         <Totals label="By week" rows={totals.weeks} day={false} />
         <Totals label="By day" rows={totals.days} day />
       </div>
@@ -95,25 +97,25 @@ export function TipDetails({ tickets, period, timeZone, linkSales, ownView }: { 
 
 function TipList({ items, timeZone, linkSales, name }: { items: TipItem[]; timeZone: string; linkSales: boolean; name: (c: string | null) => string }) {
   return (
-    <div className="-mx-4 overflow-x-auto sm:mx-0">
-      <table className="w-full text-sm tabular-nums" aria-label="Every tip">
-        <thead>
-          <tr className="text-left text-ink-muted">
-            <th className="px-4 py-2 font-medium sm:pl-0">Date</th>
-            <th className="py-2 pr-3 font-medium">Client and services</th>
-            <th className="py-2 pr-3 text-right font-medium">Tip</th>
-            <th className="py-2 pr-3 text-right font-medium">Tip %</th>
-            <th className="py-2 pr-4 font-medium sm:pr-0">Paid with</th>
+    <div className="-mx-4 -mb-4 overflow-x-auto overscroll-x-contain border-t border-line">
+      <table className={`${tableClass} tabular-nums`} aria-label="Every tip">
+        <thead className={theadClass}>
+          <tr>
+            <th className={thClass}>Date</th>
+            <th className={thClass}>Client and services</th>
+            <th className={`${thClass} text-right`}>Tip</th>
+            <th className={`${thClass} text-right`}>Tip %</th>
+            <th className={thClass}>Paid with</th>
           </tr>
         </thead>
         <tbody>
           {items.map((i) => (
-            <tr key={`${i.saleId}:${i.kind}:${i.at}`} className="border-t border-line align-top" data-testid="tip-item" data-kind={i.kind}>
-              <td className="px-4 py-2 whitespace-nowrap sm:pl-0">
+            <tr key={`${i.saleId}:${i.kind}:${i.at}`} className={trClass} data-testid="tip-item" data-kind={i.kind}>
+              <td className={`${tdClass} whitespace-nowrap`}>
                 {shortDay(i.at, timeZone)}
                 <span className="block text-xs text-ink-muted">
                   {linkSales ? (
-                    <Link href={`/sales/${i.saleId}`} className="text-link hover:underline">
+                    <Link href={`/sales/${i.saleId}`} className={nameLinkClass}>
                       #{i.number}
                     </Link>
                   ) : (
@@ -122,16 +124,16 @@ function TipList({ items, timeZone, linkSales, name }: { items: TipItem[]; timeZ
                   {KIND_LABELS[i.kind] ? ` · ${KIND_LABELS[i.kind]}` : ""}
                 </span>
               </td>
-              <td className="py-2 pr-3">
+              <td className={tdClass}>
                 <span className="block text-ink">{name(i.client)}</span>
                 <span className="block text-xs text-ink-muted">
                   {i.services.join(", ") || "Retail only"}
                   {i.serviceCents ? ` · ${payMoney(i.serviceCents)}` : ""}
                 </span>
               </td>
-              <td className="py-2 pr-3 text-right">{payMoney(i.tipCents)}</td>
-              <td className="py-2 pr-3 text-right">{pctText(i.pct)}</td>
-              <td className="py-2 pr-4 sm:pr-0">{i.paidWith ?? "—"}</td>
+              <td className={`${tdClass} ${numClass}`}>{payMoney(i.tipCents)}</td>
+              <td className={`${tdClass} ${numClass}`}>{pctText(i.pct)}</td>
+              <td className={`${tdClass} whitespace-nowrap`}>{i.paidWith ?? "—"}</td>
             </tr>
           ))}
         </tbody>

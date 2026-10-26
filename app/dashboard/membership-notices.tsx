@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card } from "@/components/ui/page";
+import { Card, nameLinkClass } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { formatDate } from "@/lib/clients";
 import { priceText, type IntervalUnit } from "@/lib/memberships";
@@ -20,14 +20,14 @@ export async function MembershipNotices({ businessId }: { businessId: string }) 
     .limit(20);
   if (!data?.length) return null;
   return (
-    <Card title="Membership payments that failed" titleId="membership-notices-heading" description="Ask for a new card (on their profile); the payment is tried again on it straight away." data-testid="membership-notices">
+    <Card title="Membership payments that failed" titleId="membership-notices-heading" description="Ask for a new card (on their profile); the payment is tried again on it straight away." data-testid="membership-notices" flush>
       <ul className="divide-y divide-line text-sm" aria-label="Failed membership payments">
         {data.map((m) => (
-          <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
-            <Link href={`/clients/${m.client.id}`} className="font-medium text-link hover:underline">
+          <li key={m.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3">
+            <Link href={`/clients/${m.client.id}`} className={nameLinkClass}>
               {fullName(m.client)}
             </Link>
-            <span className="text-ink-muted">
+            <span className="text-13 text-ink-muted">
               {m.name}, {priceText(m.price_cents, m.interval_unit as IntervalUnit, m.interval_count)} · {m.failed_attempts} {m.failed_attempts === 1 ? "try" : "tries"}
               {m.next_retry_at ? ` · next try ${formatDate(toLocal(new Date(m.next_retry_at), m.location.timezone).date)}` : ""}
             </span>

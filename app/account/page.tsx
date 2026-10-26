@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Card, PageHeader } from "@/components/ui/page";
+import { buttonClass } from "@/components/ui/button";
 import { getCurrentStaff } from "@/lib/auth";
 import { roleLabel } from "@/lib/staff";
 import { PERMISSIONS, can } from "@/lib/permissions";
@@ -33,7 +34,7 @@ async function Account() {
         <PinForm hasPin={(withPins ?? []).includes(me.id)} digits={me.role === "owner" || me.role === "manager" ? 6 : 4} />
       </Card>
       <Card title="Password" titleId="password-heading">
-        <Link href="/account/password" className="text-sm font-medium text-link hover:underline">
+        <Link href="/account/password" className={buttonClass("secondary", "md")}>
           Change your password
         </Link>
       </Card>

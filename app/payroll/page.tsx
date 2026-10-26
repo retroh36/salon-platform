@@ -6,11 +6,13 @@ import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { PayTickets, payMoney } from "@/components/pay-tickets";
 import { buttonClass } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
-import { Card, PageHeader, pillClass } from "@/components/ui/page";
+import { Card, PageHeader, Section, nameLinkClass, textLinkClass } from "@/components/ui/page";
+import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
+import { TableCard, numClass, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
 import { formatHours, nextPeriod, previousPeriod, ratesText, requestedPeriod, type PayPeriod } from "@/lib/payroll";
 import { loadPayroll, loadPaySettings } from "@/lib/payroll-load";
-import { formatLongDay } from "@/lib/schedule-format";
+import { formatDay, formatLongDay } from "@/lib/schedule-format";
 import { todayIn } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { averageTipPct, pctText, tipItems, topTippers } from "@/lib/tips";
@@ -57,159 +59,177 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
         title="Payroll"
         description={`${formatLongDay(period.from, false)} to ${formatLongDay(period.to)}${running ? " (still running)" : ""}`}
         actions={
-          <div className="flex flex-wrap gap-2">
+          <>
             <a href={`/payroll/export${query(period)}`} className={buttonClass("primary", "md")} download>
               Export CSV
             </a>
             <a href={`/payroll/export${query(period)}&detail=tips`} className={buttonClass("secondary", "md")} download>
               Export tips CSV
             </a>
-          </div>
+          </>
         }
       />
 
-      <Card
-        title="Pay period"
-        titleId="period-heading"
-        actions={
-          <nav aria-label="Pay period" className="flex flex-wrap gap-2">
-            <Link href={`/payroll${query(prev)}`} className={pillClass(false)}>
-              ← Previous
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-line pb-4">
+        <nav aria-label="Pay period" className="flex items-center gap-2">
+          <Link href={`/payroll${query(prev)}`} aria-label="Previous period" title="Previous period" className={buttonClass("secondary", "md", "", { square: true })}>
+            <ChevronLeftIcon />
+          </Link>
+          <span className="px-1 text-sm font-medium text-ink tabular-nums" data-testid="pay-period">
+            {formatDay(period.from)} – {formatDay(period.to)}
+          </span>
+          {next.from <= today ? (
+            <Link href={`/payroll${query(next)}`} aria-label="Next period" title="Next period" className={buttonClass("secondary", "md", "", { square: true })}>
+              <ChevronRightIcon />
             </Link>
-            {next.from <= today && (
-              <Link href={`/payroll${query(next)}`} className={pillClass(false)}>
-                Next →
-              </Link>
-            )}
-          </nav>
-        }
-      >
-        <form action="/payroll" className="flex flex-wrap items-end gap-3" aria-label="Custom dates">
+          ) : (
+            <span aria-hidden className={buttonClass("secondary", "md", "pointer-events-none opacity-40", { square: true })}>
+              <ChevronRightIcon />
+            </span>
+          )}
+        </nav>
+        <form action="/payroll" className="flex flex-wrap items-end gap-2" aria-label="Custom dates">
           <label className={labelClass}>
             From
-            <input type="date" name="from" defaultValue={period.from} className={`${fieldClass} w-44!`} />
+            <input type="date" name="from" defaultValue={period.from} className={`${fieldClass} w-40!`} />
           </label>
           <label className={labelClass}>
             To
-            <input type="date" name="to" defaultValue={period.to} className={`${fieldClass} w-44!`} />
+            <input type="date" name="to" defaultValue={period.to} className={`${fieldClass} w-40!`} />
           </label>
           <button type="submit" className={buttonClass("secondary", "md")}>
             Show
           </button>
-          <p className="basis-full text-xs text-ink-muted">
-            Commission is on sales after discounts, before tax, at the rate each person had when each sale was made (changing a rate on Team → Schedule only affects
-            sales from then on). Refunds and voids are taken back at the same rate, in the period they happen. Hours come from their schedule, less approved time off
-            {running ? ", up to today" : ""}, at the hourly rate in effect each day.
-            {can(me, "payroll") && (
-              <>
-                {" "}
-                <Link href="/settings/payroll" className="text-link hover:underline">
-                  Change the pay period
-                </Link>
-              </>
-            )}
-          </p>
         </form>
-      </Card>
+      </div>
 
-      <Card title="Pay due" titleId="pay-heading" flush>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm tabular-nums" aria-label="Pay by staff member">
-            <thead>
-              <tr className="text-left text-ink-muted">
-                <th className="px-5 py-2 font-medium">Staff</th>
-                <th className="py-2 pr-3 text-right font-medium">Service sales</th>
-                <th className="py-2 pr-3 text-right font-medium">Commission</th>
-                <th className="py-2 pr-3 text-right font-medium">Retail sales</th>
-                <th className="py-2 pr-3 text-right font-medium">Commission</th>
-                <th className="py-2 pr-3 text-right font-medium">Tips</th>
-                <th className="py-2 pr-3 text-right font-medium">Hours</th>
-                <th className="py-2 pr-5 text-right font-medium">Total pay</th>
+      <Section title="Pay due" titleId="pay-heading" count={lines.length}>
+        <TableCard className="mb-3">
+          <table className={`${tableClass} tabular-nums`} aria-label="Pay by staff member">
+            <thead className={theadClass}>
+              <tr>
+                <th className={thClass}>Staff</th>
+                <th className={`${thClass} text-right`}>Service sales</th>
+                <th className={`${thClass} text-right`}>Commission</th>
+                <th className={`${thClass} text-right`}>Retail sales</th>
+                <th className={`${thClass} text-right`}>Commission</th>
+                <th className={`${thClass} text-right`}>Tips</th>
+                <th className={`${thClass} text-right`}>Hours</th>
+                <th className={`${thClass} text-right`}>Total pay</th>
               </tr>
             </thead>
             <tbody>
               {lines.map((l) => (
-                <tr key={l.staffId} className={`border-t border-line ${selected?.staffId === l.staffId ? "bg-navy-100/50" : ""}`} data-testid="pay-line" data-staff-id={l.staffId}>
-                  <td className="px-5 py-2">
-                    <Link href={`/payroll${query(period, l.staffId)}`} className="font-medium text-link hover:underline" aria-current={selected?.staffId === l.staffId ? "true" : undefined}>
+                <tr key={l.staffId} className={`${trClass} ${selected?.staffId === l.staffId ? "bg-navy-100/60" : ""}`} data-testid="pay-line" data-staff-id={l.staffId}>
+                  <td className={tdClass}>
+                    <Link href={`/payroll${query(period, l.staffId)}`} className={nameLinkClass} aria-current={selected?.staffId === l.staffId ? "true" : undefined}>
                       {l.name}
                     </Link>
-                    <span className="block text-xs text-ink-muted">{l.role}</span>
+                    <span className="block text-xs text-ink-subtle">{l.role}</span>
                   </td>
-                  <td className="py-2 pr-3 text-right">{payMoney(l.serviceCents)}</td>
-                  <td className="py-2 pr-3 text-right">
+                  <td className={`${tdClass} ${numClass}`}>{payMoney(l.serviceCents)}</td>
+                  <td className={`${tdClass} ${numClass}`}>
                     {payMoney(l.serviceCommissionCents)}
-                    {l.rates.service.length > 0 && <span className="block text-xs text-ink-muted">{ratesText(l.rates.service, (v) => `${v}%`)}</span>}
-                    {l.rates.plans.length > 0 && <span className="block text-xs text-ink-muted">{l.rates.plans.join(", ")}</span>}
-                    {l.feeCents !== 0 && <span className="block text-xs text-ink-muted">after {formatPrice(l.feeCents)} back-bar</span>}
+                    {l.rates.service.length > 0 && <span className="block text-xs text-ink-subtle">{ratesText(l.rates.service, (v) => `${v}%`)}</span>}
+                    {l.rates.plans.length > 0 && <span className="block text-xs text-ink-subtle">{l.rates.plans.join(", ")}</span>}
+                    {l.feeCents !== 0 && <span className="block text-xs text-ink-subtle">after {formatPrice(l.feeCents)} back-bar</span>}
                   </td>
-                  <td className="py-2 pr-3 text-right">{payMoney(l.retailCents)}</td>
-                  <td className="py-2 pr-3 text-right">
+                  <td className={`${tdClass} ${numClass}`}>{payMoney(l.retailCents)}</td>
+                  <td className={`${tdClass} ${numClass}`}>
                     {payMoney(l.retailCommissionCents)}
-                    {l.rates.retail.length > 0 && <span className="block text-xs text-ink-muted">{ratesText(l.rates.retail, (v) => `${v}%`)}</span>}
+                    {l.rates.retail.length > 0 && <span className="block text-xs text-ink-subtle">{ratesText(l.rates.retail, (v) => `${v}%`)}</span>}
                   </td>
-                  <td className="py-2 pr-3 text-right">{payMoney(l.tipCents)}</td>
-                  <td className="py-2 pr-3 text-right">
+                  <td className={`${tdClass} ${numClass}`}>{payMoney(l.tipCents)}</td>
+                  <td className={`${tdClass} ${numClass}`}>
                     {l.minutes === null ? "—" : formatHours(l.minutes)}
-                    {l.rates.hourly.length > 0 && <span className="block text-xs text-ink-muted">at {ratesText(l.rates.hourly, (c) => `${formatPrice(c)}/h`)}</span>}
+                    {l.rates.hourly.length > 0 && <span className="block text-xs text-ink-subtle">at {ratesText(l.rates.hourly, (c) => `${formatPrice(c)}/h`)}</span>}
                   </td>
-                  <td className="py-2 pr-5 text-right font-semibold" data-testid="pay-total">
+                  <td className={`${tdClass} ${numClass} font-semibold text-ink`} data-testid="pay-total">
                     {formatPrice(l.totalCents)}
                   </td>
                 </tr>
               ))}
-              <tr className="border-t border-line-strong font-semibold">
-                <td className="px-5 py-2">Everyone</td>
-                <td className="py-2 pr-3 text-right">{payMoney(sum((l) => l.serviceCents))}</td>
-                <td className="py-2 pr-3 text-right">{payMoney(sum((l) => l.serviceCommissionCents))}</td>
-                <td className="py-2 pr-3 text-right">{payMoney(sum((l) => l.retailCents))}</td>
-                <td className="py-2 pr-3 text-right">{payMoney(sum((l) => l.retailCommissionCents))}</td>
-                <td className="py-2 pr-3 text-right">{payMoney(sum((l) => l.tipCents))}</td>
-                <td className="py-2 pr-3 text-right">{formatHours(sum((l) => l.minutes ?? 0))}</td>
-                <td className="py-2 pr-5 text-right" data-testid="pay-everyone">
+              <tr className="border-t border-line-strong bg-sunken/40 font-semibold">
+                <td className={tdClass}>Everyone</td>
+                <td className={`${tdClass} ${numClass}`}>{payMoney(sum((l) => l.serviceCents))}</td>
+                <td className={`${tdClass} ${numClass}`}>{payMoney(sum((l) => l.serviceCommissionCents))}</td>
+                <td className={`${tdClass} ${numClass}`}>{payMoney(sum((l) => l.retailCents))}</td>
+                <td className={`${tdClass} ${numClass}`}>{payMoney(sum((l) => l.retailCommissionCents))}</td>
+                <td className={`${tdClass} ${numClass}`}>{payMoney(sum((l) => l.tipCents))}</td>
+                <td className={`${tdClass} ${numClass}`}>{formatHours(sum((l) => l.minutes ?? 0))}</td>
+                <td className={`${tdClass} ${numClass}`} data-testid="pay-everyone">
                   {formatPrice(sum((l) => l.totalCents))}
                 </td>
               </tr>
             </tbody>
           </table>
-        </div>
-      </Card>
+        </TableCard>
+        <p className="max-w-3xl text-13 text-ink-muted">
+          Commission is on sales after discounts, before tax, at the rate each person had when each sale was made (changing a rate on Team → Schedule only affects sales
+          from then on). Refunds and voids are taken back at the same rate, in the period they happen. Hours come from their schedule, less approved time off
+          {running ? ", up to today" : ""}, at the hourly rate in effect each day.
+          {can(me, "payroll") && (
+            <>
+              {" "}
+              <Link href="/settings/payroll" className={textLinkClass}>
+                Change the pay period
+              </Link>
+            </>
+          )}
+        </p>
+      </Section>
 
-      <Card title="Tips" titleId="tips-heading" description="Each person's tips as a share of their service sales (untipped visits included), and who tipped them the most. Tap a name for every tip." flush>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm tabular-nums" aria-label="Tips by staff member">
-            <thead>
-              <tr className="text-left text-ink-muted">
-                <th className="px-5 py-2 font-medium">Staff</th>
-                <th className="py-2 pr-3 text-right font-medium">Tips</th>
-                <th className="py-2 pr-3 text-right font-medium">Tipped visits</th>
-                <th className="py-2 pr-3 text-right font-medium">Average tip</th>
-                <th className="py-2 pr-5 font-medium">Top tipper</th>
+      <Section title="Tips" titleId="tips-heading" description="Each person's tips as a share of their service sales (untipped visits included), and who tipped them the most. Tap a name for every tip.">
+        <TableCard>
+          <table className={`${tableClass} tabular-nums`} aria-label="Tips by staff member">
+            <thead className={theadClass}>
+              <tr>
+                <th className={thClass}>Staff</th>
+                <th className={`${thClass} text-right`}>Tips</th>
+                <th className={`${thClass} text-right`}>Tipped visits</th>
+                <th className={`${thClass} text-right`}>Average tip</th>
+                <th className={thClass}>Top tipper</th>
               </tr>
             </thead>
             <tbody>
               {tips.map(({ line, items, average, top }) => (
-                <tr key={line.staffId} className="border-t border-line" data-testid="tip-line" data-staff-id={line.staffId}>
-                  <td className="px-5 py-2">
-                    <Link href={`/payroll${query(period, line.staffId)}#tips-for`} className="font-medium text-link hover:underline">
+                <tr key={line.staffId} className={trClass} data-testid="tip-line" data-staff-id={line.staffId}>
+                  <td className={tdClass}>
+                    <Link href={`/payroll${query(period, line.staffId)}#tips-for`} className={nameLinkClass}>
                       {line.name}
                     </Link>
                   </td>
-                  <td className="py-2 pr-3 text-right">{payMoney(line.tipCents)}</td>
-                  <td className="py-2 pr-3 text-right">{items.filter((i) => i.kind === "sale").length}</td>
-                  <td className="py-2 pr-3 text-right" data-testid="tip-average">
+                  <td className={`${tdClass} ${numClass}`}>{payMoney(line.tipCents)}</td>
+                  <td className={`${tdClass} ${numClass}`}>{items.filter((i) => i.kind === "sale").length}</td>
+                  <td className={`${tdClass} ${numClass}`} data-testid="tip-average">
                     {pctText(average)}
                   </td>
-                  <td className="py-2 pr-5">{top ? `${top.client} · ${formatPrice(top.cents)}` : "—"}</td>
+                  <td className={`${tdClass} text-ink-muted`}>
+                    {top ? (
+                      <>
+                        <span className="text-ink">{top.client}</span> · <span className="tabular-nums">{formatPrice(top.cents)}</span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-      </Card>
+        </TableCard>
+      </Section>
 
       {selected && (
-        <Card title={`${selected.name}'s tips`} titleId="tips-for" actions={<Link href={`/payroll${query(period)}`} className={pillClass(false)}>Close</Link>}>
+        <Card
+          title={`${selected.name}'s tips`}
+          titleId="tips-for"
+          actions={
+            <Link href={`/payroll${query(period)}`} className={buttonClass("quiet", "sm")}>
+              Close
+            </Link>
+          }
+        >
           <TipDetails tickets={selected.tickets} period={period} timeZone={tz} linkSales ownView={false} />
         </Card>
       )}
@@ -220,7 +240,7 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
           titleId="tickets-heading"
           description={`${selected.tickets.length} ${selected.tickets.length === 1 ? "ticket" : "tickets"}, ${formatPrice(selected.serviceCents)} in services and ${formatPrice(selected.retailCents)} in retail`}
           actions={
-            <Link href={`/payroll${query(period)}`} className={pillClass(false)}>
+            <Link href={`/payroll${query(period)}`} className={buttonClass("quiet", "sm")}>
               Close
             </Link>
           }

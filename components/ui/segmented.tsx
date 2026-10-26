@@ -13,7 +13,7 @@ export function Segmented<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-md border border-line-strong bg-surface p-0.5">
+    <div role="radiogroup" aria-label={label} className="inline-flex h-9 items-center rounded-md border border-line-strong bg-surface p-0.5">
       {options.map((o) => {
         const selected = o.value === value;
         return (
@@ -25,8 +25,8 @@ export function Segmented<T extends string>({
             disabled={o.disabled}
             title={o.title}
             onClick={() => onChange(o.value)}
-            className={`h-8 min-w-16 rounded-[7px] px-3 text-sm font-medium transition-[background-color,color,transform] duration-(--motion-fast) active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus disabled:cursor-not-allowed disabled:text-ink-subtle ${
-              selected ? "bg-navy-900 text-white" : "text-ink-muted hover:text-ink"
+            className={`h-full min-w-16 rounded-[6px] px-3 text-sm font-medium transition-[background-color,color,transform] duration-(--motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus disabled:cursor-not-allowed disabled:text-ink-subtle ${
+              selected ? "bg-sunken text-ink" : "text-ink-muted hover:text-ink"
             }`}
           >
             {o.label}

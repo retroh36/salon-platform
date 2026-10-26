@@ -8,7 +8,7 @@ open: /payroll | Open Payroll
 See what each person is owed for a pay period, check the tickets behind it, and download a CSV for your payroll provider.
 
 1. In the sidebar, under **Sales**, tap **Payroll**. It opens on the last pay period that's over.
-2. To pick another period, tap **← Previous** or **Next →**, or enter dates under **From** and **To** and tap **Show**.
+2. To pick another period, tap the arrows either side of the dates (‹ and ›), or enter dates under **From** and **To** and tap **Show**.
 3. Check the **Pay due** table: service and retail sales, commission, tips, hours and **Total pay** for each person, with **Everyone** at the bottom.
 4. Under **Tips**, see each person's tips, **Average tip** and top tipper.
 5. Tap a person's name to see every tip (date, client, services, tip %, how it was paid, with totals by week and day) and the **Tickets behind** their pay. Tap **Close** when you're done.

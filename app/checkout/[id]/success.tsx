@@ -34,31 +34,31 @@ export function Success({
   const back = data.draft.returnTo.startsWith("/checkout") ? "/calendar" : data.draft.returnTo;
   return (
     <main className="flex min-h-dvh items-center justify-center bg-canvas p-4 sm:p-8">
-      <div className="flex w-full max-w-lg animate-pop-in flex-col items-center gap-6 rounded-2xl bg-surface p-6 text-center shadow-lift sm:p-10" data-testid="checkout-success">
-        <span className="flex size-16 items-center justify-center rounded-full bg-status-confirmed-bg text-status-confirmed-ink">
+      <div className="flex w-full max-w-lg animate-pop-in flex-col items-center gap-6 rounded-lg border border-line bg-surface p-6 text-center sm:p-10" data-testid="checkout-success">
+        <span className="flex size-14 items-center justify-center rounded-full bg-success-soft text-success">
           <CheckCircleIcon className="size-8" />
         </span>
         <div className="flex flex-col items-center gap-1">
-          <h1 className="font-serif text-3xl font-semibold text-navy-900">{paidByLink ? "Paid by link" : "Sale complete"}</h1>
-          <p className="font-serif text-4xl font-semibold text-navy-900 tabular-nums">{formatPrice(paidByLink ? paidByLink.amountCents + paidByLink.tipCents : totals.totalCents)}</p>
-          {paidByLink && paidByLink.tipCents > 0 && <p className="text-ink-muted">Including {formatPrice(paidByLink.tipCents)} in tips</p>}
-          {data.client && <p className="text-lg text-ink-muted">{data.client.name}</p>}
+          <h1 className="text-2xl font-semibold text-ink">{paidByLink ? "Paid by link" : "Sale complete"}</h1>
+          <p className="text-2xl font-semibold tracking-[-0.015em] text-ink tabular-nums">{formatPrice(paidByLink ? paidByLink.amountCents + paidByLink.tipCents : totals.totalCents)}</p>
+          {paidByLink && paidByLink.tipCents > 0 && <p className="text-sm text-ink-muted">Including {formatPrice(paidByLink.tipCents)} in tips</p>}
+          {data.client && <p className="text-sm text-ink-muted">{data.client.name}</p>}
         </div>
         {totals.changeCents > 0 && (
-          <p className="rounded-xl bg-sunken px-5 py-3 text-xl font-semibold tabular-nums" data-testid="success-change">
+          <p className="w-full border-y border-line py-3 text-xl font-semibold text-ink tabular-nums" data-testid="success-change">
             Change to give: {formatPrice(totals.changeCents)}
           </p>
         )}
         {ticket.rebook && (
-          <p className="flex items-center gap-2 rounded-xl bg-status-confirmed-bg px-4 py-2.5 font-medium text-status-confirmed-ink" data-testid="success-rebooked">
-            <CalendarIcon className="size-5" />
+          <p className="flex items-center gap-2 text-sm font-medium text-ink" data-testid="success-rebooked">
+            <CalendarIcon className="size-5 text-success" />
             Rebooked for {ticket.rebook.label}
           </p>
         )}
         <section aria-label="Receipt" className="flex w-full flex-col gap-3">
           {receipt === "choose" && (
             <>
-              <h2 className="text-sm font-semibold tracking-wide text-ink-muted uppercase">Receipt</h2>
+              <h2 className="text-13 font-medium text-ink-muted">Receipt</h2>
               <div className="grid grid-cols-3 gap-2">
                 <Link href={`/sales/${saleId}?print=1`} target="_blank" onClick={() => setReceipt("done")} className={buttonClass("secondary", "lg", "h-14")}>
                   Print
@@ -66,7 +66,7 @@ export function Success({
                 <Button size="lg" className="h-14" onClick={() => setReceipt("email")}>
                   Email
                 </Button>
-                <Button size="lg" variant="ghost" className="h-14" onClick={() => setReceipt("done")}>
+                <Button size="lg" variant="quiet" className="h-14" onClick={() => setReceipt("done")}>
                   No receipt
                 </Button>
               </div>
@@ -110,7 +110,7 @@ export function Success({
             </a>
           )}
         </div>
-        <Link href={`/sales/${saleId}`} className="text-sm text-ink-muted underline-offset-2 hover:underline">
+        <Link href={`/sales/${saleId}`} className="text-sm font-medium text-link underline-offset-2 hover:text-link-hover hover:underline">
           View the sale
         </Link>
       </div>

@@ -36,7 +36,7 @@ export function StaffPhotoForm({ staffId, hasPhoto }: { staffId: string; hasPhot
           )}
         </div>
         {result && (
-          <p role={result.ok ? "status" : "alert"} className={`text-xs ${result.ok ? "text-status-confirmed-ink" : "text-danger"}`}>
+          <p role={result.ok ? "status" : "alert"} className={`text-xs ${result.ok ? "text-ink-muted" : "text-danger"}`}>
             {result.message}
           </p>
         )}

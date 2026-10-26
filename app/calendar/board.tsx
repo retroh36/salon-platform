@@ -1,5 +1,6 @@
 "use client";
 
+import { toastActionClass, toastClass } from "@/components/ui/feedback";
 import Link from "next/link";
 import { useLeaveGuard } from "@/components/unsaved";
 import { useRouter } from "next/navigation";
@@ -12,7 +13,7 @@ import { LEVEL_BG, LevelBadge } from "@/components/ui/level";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { FitText } from "@/components/ui/fit-text";
-import { CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, GripIcon, MoreIcon, PlusIcon, SendIcon } from "@/components/ui/icons";
+import { CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, GripIcon, MoreIcon, PlusIcon, SendIcon, SlidersIcon } from "@/components/ui/icons";
 import { Listbox } from "@/components/ui/listbox";
 import { Segmented } from "@/components/ui/segmented";
 import { Tabs } from "@/components/ui/tabs";
@@ -715,9 +716,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="font-serif text-4xl font-semibold tracking-tight text-navy-900">Appointments</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">Appointments</h1>
             <ViewTransition key={data.date} enter={DAY_SLIDE} exit="none" default="none">
-              <p className="mt-1 text-lg text-ink-muted" data-testid="calendar-date">
+              <p className="mt-1 text-base text-ink-muted" data-testid="calendar-date">
                 {formatLongDay(data.date)}
                 <span className="ml-2 text-sm">
                   {data.date === data.today ? "Today · " : ""}
@@ -804,18 +805,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           />
           {off.length > 0 && <OffChip off={off} shown={showOff} onShow={setShowOff} isToday={data.date === data.today} />}
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <Segmented label="Zoom" value={zoom} onChange={setZoom} options={ZOOMS.map((z) => ({ value: z, label: ZOOM_LABELS[z] }))} />
-            {zoom === "compact" && (
-              <button
-                type="button"
-                aria-pressed={fitAll}
-                title="Squeeze every stylist on screen"
-                onClick={() => setFitAll(!fitAll)}
-                className={buttonClass(fitAll ? "primary" : "secondary", "md")}
-              >
-                Fit all
-              </button>
-            )}
+            <ViewMenu zoom={zoom} onZoom={setZoom} fitAll={fitAll} onFitAll={setFitAll} />
             <Segmented
               label="View"
               value="day"
@@ -850,7 +840,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           <div
             ref={gridRef}
             // Sideways swipes scroll the stylists, never the browser back a page.
-            className="overflow-auto overscroll-x-contain rounded-xl border border-line bg-surface shadow-card lg:min-h-0 lg:flex-1"
+            className="overflow-auto overscroll-x-contain rounded-lg border border-line bg-surface lg:min-h-0 lg:flex-1"
             data-testid="calendar-grid"
             data-zoom={zoom}
             data-px-per-minute={PX_PER_MINUTE}
@@ -878,7 +868,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                           if (el) headerRefs.current.set(c.staffId, el);
                           else headerRefs.current.delete(c.staffId);
                         }}
-                        className={`relative flex min-w-0 animate-fade-in flex-col gap-1.5 border-l border-line py-3 ${squeezed ? "px-1.5" : "px-3"} ${columnDrag?.staffId === c.staffId ? "z-10 bg-navy-100 shadow-lift" : ""}`}
+                        className={`relative flex min-w-0 animate-fade-in flex-col gap-1 border-l border-line py-2.5 ${squeezed ? "px-1.5" : "px-2.5"} ${columnDrag?.staffId === c.staffId ? "z-10 bg-navy-100 shadow-lift" : ""}`}
                         data-column-header
                         data-level={c.level ?? undefined}
                       >
@@ -894,12 +884,12 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                             <GripIcon className="size-3.5 rotate-90" />
                           </span>
                         )}
-                        <div className="flex min-w-0 items-center gap-2.5">
+                        <div className="flex min-w-0 items-center gap-2">
                           {/* Squeezed (Fit all), the avatar goes so the name fits. */}
-                          {!squeezed && <Avatar name={c.name} color={c.color} level={c.level} />}
+                          {!squeezed && <Avatar name={c.name} color={c.color} level={c.level} size="sm" />}
                           <div className="min-w-0 flex-1">
                             <span title={squeezed ? `${c.name} · ${c.booked}` : c.name} className="block">
-                              <FitText variants={nameVariants(c.name, c.firstName, squeezed)} className={`font-semibold ${!squeezed && c.working && data.date >= data.today && (me.canBook || me.staffId === c.staffId) ? "pr-6" : ""}`} />
+                              <FitText variants={nameVariants(c.name, c.firstName, squeezed)} className="text-sm font-semibold" />
                             </span>
                             {/* One line, the full hours on hover. */}
                             <div title={c.hoursLabel} data-testid="column-hours" className="truncate text-xs leading-4 whitespace-nowrap text-ink-muted">
@@ -910,12 +900,12 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         {/* Their day at a glance, across the column: shortened to
                             fit, never cut off, with the full text on hover. */}
                         {!squeezed && (
-                          <div title={c.booked} className="text-sm text-ink-muted" data-testid="booked-summary">
+                          <div title={c.booked} className={`text-13 text-ink-muted ${c.working && data.date >= data.today && (me.canBook || me.staffId === c.staffId) ? "pr-7" : ""}`} data-testid="booked-summary">
                             <FitText variants={summaryVariants(c.booked)} />
                           </div>
                         )}
                         {!squeezed && c.working && data.date >= data.today && (me.canBook || me.staffId === c.staffId) && (
-                          <div className="absolute top-1.5 right-1">
+                          <div className="absolute right-1 bottom-1">
                             <OutMenu column={c} date={data.date} today={data.today} onMarkOut={markOut} />
                           </div>
                         )}
@@ -1113,12 +1103,12 @@ export function CalendarBoard({ data }: { data: BoardData }) {
         <div
           role="status"
           data-testid={undoable.kind === "check_in" ? "check-in-toast" : "no-show-toast"}
-          className="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 animate-toast-in items-center gap-4 rounded-xl bg-navy-900 px-5 py-3 text-white shadow-lift"
+          className={toastClass}
         >
           <span>{undoable.kind === "check_in" ? `${undoable.name} is checked in.` : `${undoable.name} is marked a no-show.`}</span>
           <button
             type="button"
-            className="font-semibold text-denise-200 underline underline-offset-2 hover:text-white"
+            className={toastActionClass}
             onClick={() => {
               const { kind, appointmentId } = undoable;
               setUndoable(null);
@@ -1330,6 +1320,54 @@ export function CalendarBoard({ data }: { data: BoardData }) {
 // The sticky stylist header at the top of the scrolling grid.
 const headerHeight = (grid: HTMLElement) => (grid.querySelector("[data-grid-header]") as HTMLElement | null)?.offsetHeight ?? 0;
 
+// The calendar's display options in one menu, to keep the toolbar simple:
+// the zoom (Compact, Comfortable, Detailed) and, in Compact, Fit all.
+function ViewMenu({ zoom, onZoom, fitAll, onFitAll }: { zoom: CalendarZoom; onZoom: (z: CalendarZoom) => void; fitAll: boolean; onFitAll: (on: boolean) => void }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [open]);
+  return (
+    <div ref={root} className="relative">
+      <button type="button" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)} className={buttonClass("secondary", "md")}>
+        <SlidersIcon className="size-4" />
+        {ZOOM_LABELS[zoom]}
+        <ChevronDownIcon className="size-4 text-ink-muted" />
+      </button>
+      {open && (
+        <div role="dialog" aria-label="Calendar display" className="absolute top-full right-0 z-50 mt-1.5 flex w-72 animate-pop-in flex-col gap-3 rounded-lg border border-line bg-surface p-3 shadow-lift">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-13 font-medium text-ink-muted">Zoom</span>
+            <Segmented label="Zoom" value={zoom} onChange={onZoom} options={ZOOMS.map((z) => ({ value: z, label: ZOOM_LABELS[z] }))} />
+          </div>
+          {zoom === "compact" && (
+            <button type="button" aria-pressed={fitAll} title="Squeeze every stylist on screen" onClick={() => onFitAll(!fitAll)} className={buttonClass(fitAll ? "primary" : "secondary", "md", "w-full")}>
+              Fit all
+            </button>
+          )}
+          <p className="text-xs text-ink-muted">Pinch the calendar, or ctrl + scroll, to zoom too.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Pinching the grid (or ctrl + scroll, a trackpad pinch) steps the zoom:
 // far enough apart for the next level, together for the one before.
 function usePinchZoom(grid: React.RefObject<HTMLDivElement | null>, zoom: CalendarZoom, setZoom: (z: CalendarZoom) => void) {
@@ -1409,7 +1447,7 @@ function AskDeniseBar({ onAsk, example }: { onAsk: (question: string) => void; e
   return (
     <form
       aria-label="Ask Denise"
-      className="flex items-center gap-3 rounded-xl border border-denise-200 bg-surface p-2 pl-2.5 shadow-card transition-[border-color,box-shadow] duration-(--motion-fast) focus-within:border-denise-500 focus-within:ring-2 focus-within:ring-denise-200"
+      className="flex items-center gap-3 rounded-lg border border-denise-200 bg-surface p-2 pl-2.5 transition-[border-color,box-shadow] duration-(--motion-fast) focus-within:border-denise-500 focus-within:ring-2 focus-within:ring-denise-200"
       onSubmit={(e) => {
         e.preventDefault();
         if (!question.trim()) return;
@@ -1469,9 +1507,9 @@ function ScopeDialog({
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.key === "Escape" && onCancel()}
-        className="flex w-full max-w-sm animate-pop-in flex-col gap-3 rounded-xl border border-line bg-surface p-5 shadow-lift"
+        className="flex w-full max-w-sm animate-pop-in flex-col gap-3 rounded-lg border border-line bg-surface p-5 shadow-lift"
       >
-        <h2 className="font-serif text-xl font-semibold text-navy-900">{title}</h2>
+        <h2 className="text-xl font-semibold text-ink">{title}</h2>
         <p className="text-sm text-ink-muted">{note}</p>
         {options.map(([value, label], i) => (
           <Button key={value} variant={i === 0 ? "primary" : "secondary"} autoFocus={i === 0} onClick={() => onPick(value)}>
@@ -1496,7 +1534,7 @@ function DeniseLauncher({ hidden, count, bounce, onOpen }: { hidden: boolean; co
       onClick={onOpen}
       aria-label={count ? `Open Denise (${count} to look at)` : "Open Denise"}
       data-testid="denise-launcher"
-      className="relative ml-auto flex size-11 shrink-0 animate-pop-in items-center justify-center rounded-full bg-surface shadow-card ring-1 ring-denise-200 transition-transform duration-(--motion-fast) hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:scale-95"
+      className="relative ml-auto flex size-11 shrink-0 animate-pop-in items-center justify-center rounded-full bg-surface ring-1 ring-denise-200 transition-transform duration-(--motion-fast) hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:scale-95"
     >
       <DeniseFace size={38} />
       {count > 0 && (
@@ -1577,7 +1615,7 @@ function OutMenu({ column, date, today, onMarkOut }: { column: ColumnData; date:
 
   return (
     <div ref={root} className="relative" onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
-      <IconButton label={`More for ${column.name}`} size="sm" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <IconButton label={`More for ${column.name}`} size="xs" aria-expanded={open} onClick={() => setOpen(!open)}>
         <MoreIcon className="size-4" />
       </IconButton>
       {open &&
@@ -1589,7 +1627,7 @@ function OutMenu({ column, date, today, onMarkOut }: { column: ColumnData; date:
             onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
             role="dialog"
             aria-label={`${column.firstName}'s day`}
-            className="fixed z-[60] flex origin-top-right animate-pop-in flex-col gap-3 rounded-xl border border-line bg-surface p-4 text-sm shadow-lift"
+            className="fixed z-[60] flex origin-top-right animate-pop-in flex-col gap-3 rounded-lg border border-line bg-surface p-4 text-sm shadow-lift"
             style={{ top: place.top, left: place.left, width: `min(${MENU_WIDTH}px, calc(100vw - ${2 * MENU_MARGIN}px))` }}
           >
             <p className="text-ink">
@@ -1666,10 +1704,10 @@ function CalendarKey({ families }: { families: ServiceFamily[] }) {
         <div
           role="dialog"
           aria-label="Calendar key"
-          className="absolute bottom-full left-0 z-[60] mb-2 grid w-[min(36rem,calc(100vw-2rem))] origin-bottom-left animate-pop-in gap-4 rounded-xl border border-line bg-surface p-4 text-sm text-ink-muted shadow-lift sm:grid-cols-3"
+          className="absolute bottom-full left-0 z-[60] mb-2 grid w-[min(36rem,calc(100vw-2rem))] origin-bottom-left animate-pop-in gap-4 rounded-lg border border-line bg-surface p-4 text-sm text-ink-muted shadow-lift sm:grid-cols-3"
         >
           <section className="flex flex-col gap-2">
-            <h3 className="text-xs font-semibold tracking-wider text-ink uppercase">Services</h3>
+            <h3 className="text-xs font-medium text-ink">Services</h3>
             <ul aria-label="Service families" className="flex flex-col gap-1.5">
               {families.map((f) => (
                 <li key={f} className="flex items-center gap-2" data-family={f}>
@@ -1694,7 +1732,7 @@ function CalendarKey({ families }: { families: ServiceFamily[] }) {
           {/* Where the client is in their visit: the block's fill (the
               service color until they're here). */}
           <section className="flex flex-col gap-2">
-            <h3 className="text-xs font-semibold tracking-wider text-ink uppercase">Visit status</h3>
+            <h3 className="text-xs font-medium text-ink">Visit status</h3>
             <ul aria-label="Visit status" className="flex flex-col gap-1.5" data-testid="status-legend">
               {(
                 [
@@ -1709,7 +1747,7 @@ function CalendarKey({ families }: { families: ServiceFamily[] }) {
                 </li>
               ))}
               <li className="flex items-center gap-2">
-                <ClockIcon className="size-4 shrink-0 text-status-late-ink" />
+                <ClockIcon className="size-4 shrink-0 text-block-attention" />
                 Running late, or not arrived
               </li>
             </ul>
@@ -1717,7 +1755,7 @@ function CalendarKey({ families }: { families: ServiceFamily[] }) {
           {/* Stylist levels: the ring around each avatar and the bar on top
               of their column. */}
           <section className="flex flex-col gap-2">
-            <h3 className="text-xs font-semibold tracking-wider text-ink uppercase">Stylist levels</h3>
+            <h3 className="text-xs font-medium text-ink">Stylist levels</h3>
             <ul aria-label="Stylist levels" className="flex flex-col gap-1.5" data-testid="level-legend">
               {[...STAFF_LEVELS].reverse().map((l) => (
                 <li key={l} className="flex items-center gap-2">
@@ -2044,9 +2082,9 @@ function AppointmentBlock({
         onBlur={(e) => onHint(null, e.currentTarget.getBoundingClientRect())}
         aria-describedby={`hint-${block.itemId}`}
         {...pointer}
-        className={`@container absolute block touch-pan-x touch-pan-y overflow-hidden [-webkit-touch-callout:none] rounded-md border-l-4 border-(--fam-accent) bg-surface text-left text-ink shadow-card select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
-          selected || highlight || grouped ? "" : "ring-1 ring-surface"
-        } ${draggable ? "cursor-grab" : "cursor-pointer"} ${dragging ? "opacity-40 shadow-none outline-2 outline-ink-subtle outline-dashed" : ""} ${settling ? "animate-settle" : ""}`}
+        className={`@container absolute block touch-pan-x touch-pan-y overflow-hidden [-webkit-touch-callout:none] rounded-md border-l-4 border-(--fam-accent) bg-surface text-left text-ink select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
+ selected || highlight || grouped ? "" : "ring-1 ring-surface"
+ } ${draggable ? "cursor-grab" : "cursor-pointer"} ${dragging ? "opacity-40 shadow-none outline-2 outline-ink-subtle outline-dashed" : ""} ${settling ? "animate-settle" : ""}`}
         style={{
           top: y(block.start),
           height,
@@ -2083,7 +2121,7 @@ function AppointmentBlock({
               <span
                 data-attention={notArrived ? "not-arrived" : "late"}
                 title={notArrived ? `Not arrived: due ${formatMinute(block.start)}` : lateBy ? `Running ${lateBy} min late` : "Due now, not here yet"}
-                className="hidden shrink-0 items-center gap-0.5 text-xs leading-4 font-semibold whitespace-nowrap text-status-late-ink @min-[6.5rem]:flex"
+                className="hidden shrink-0 items-center gap-0.5 text-xs leading-4 font-semibold whitespace-nowrap text-block-attention @min-[6.5rem]:flex"
               >
                 <ClockIcon className="size-3.5" />
                 {(notArrived || lateBy) && <span className={notArrived ? "hidden @min-[11rem]:inline" : "hidden @min-[8.5rem]:inline"}>{notArrived ? "Not arrived" : `+${lateBy}m`}</span>}

@@ -54,7 +54,7 @@ export function PromotionForm({ id, initial, options }: { id: string | null; ini
 
   return (
     <form
-      className="flex max-w-3xl flex-col gap-6"
+      className="flex max-w-3xl flex-col gap-8"
       aria-label="Promotion"
       onSubmit={(e) => {
         e.preventDefault();
@@ -72,7 +72,7 @@ export function PromotionForm({ id, initial, options }: { id: string | null; ini
       </label>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-ink">How it&rsquo;s used</span>
+        <span className="text-13 font-medium text-ink">How it&rsquo;s used</span>
         <Segmented
           label="How it's used"
           value={p.kind}
@@ -83,7 +83,7 @@ export function PromotionForm({ id, initial, options }: { id: string | null; ini
             { value: "last_minute", label: "Last-minute special" },
           ]}
         />
-        <p className="text-sm text-ink-muted">{KIND_HELP[p.kind]}</p>
+        <p className="text-13 text-ink-muted">{KIND_HELP[p.kind]}</p>
       </div>
 
       {p.kind === "code" && (
@@ -99,17 +99,19 @@ export function PromotionForm({ id, initial, options }: { id: string | null; ini
         </label>
       )}
 
-      <fieldset className="flex flex-wrap items-end gap-3">
-        <legend className="mb-1.5 text-sm font-medium text-ink">Discount</legend>
-        <select aria-label="Discount type" value={p.discountKind} onChange={(e) => set({ discountKind: e.target.value as "percent" | "amount" })} className={`${selectClass} w-40`}>
+      <fieldset>
+        <legend className="mb-3 text-base font-semibold text-ink">Discount</legend>
+        <div className="grid max-w-sm grid-cols-[minmax(0,10rem)_minmax(0,7rem)] gap-3">
+        <select aria-label="Discount type" value={p.discountKind} onChange={(e) => set({ discountKind: e.target.value as "percent" | "amount" })} className={selectClass}>
           <option value="percent">Percent off</option>
           <option value="amount">Amount off</option>
         </select>
-        <input aria-label={p.discountKind === "percent" ? "Percent off" : "Amount off ($)"} value={p.value} onChange={(e) => set({ value: e.target.value })} inputMode="decimal" className={`${fieldClass} w-28`} placeholder={p.discountKind === "percent" ? "15" : "10.00"} />
+        <input aria-label={p.discountKind === "percent" ? "Percent off" : "Amount off ($)"} value={p.value} onChange={(e) => set({ value: e.target.value })} inputMode="decimal" className={fieldClass} placeholder={p.discountKind === "percent" ? "15" : "10.00"} />
+        </div>
       </fieldset>
 
       <fieldset className="flex flex-col gap-3">
-        <legend className="mb-1.5 text-sm font-medium text-ink">What it covers</legend>
+        <legend className="mb-3 text-base font-semibold text-ink">What it covers</legend>
         <div className="flex flex-wrap gap-4">
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" className={checkboxClass} checked={p.services} disabled={p.kind === "last_minute"} onChange={(e) => set({ services: e.target.checked })} />
@@ -153,7 +155,7 @@ export function PromotionForm({ id, initial, options }: { id: string | null; ini
       </fieldset>
 
       <fieldset className="grid gap-3 sm:grid-cols-2">
-        <legend className="mb-1.5 text-sm font-medium text-ink">When and how often</legend>
+        <legend className="mb-3 text-base font-semibold text-ink">When and how often</legend>
         <label className={labelClass}>
           Starts
           <input type="date" value={p.startsOn} onChange={(e) => set({ startsOn: e.target.value })} className={fieldClass} />
@@ -177,7 +179,7 @@ export function PromotionForm({ id, initial, options }: { id: string | null; ini
       </fieldset>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1.5 text-sm font-medium text-ink">Who and with what</legend>
+        <legend className="mb-3 text-base font-semibold text-ink">Who and with what</legend>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" className={checkboxClass} checked={p.newClientsOnly} onChange={(e) => set({ newClientsOnly: e.target.checked })} />
           New clients only (added on or after the start date)
@@ -204,7 +206,7 @@ export function PromotionForm({ id, initial, options }: { id: string | null; ini
         </p>
       )}
       {error && <Alert>{error}</Alert>}
-      <div className="flex gap-2">
+      <div className="flex gap-2 border-t border-line pt-6">
         <Button type="submit" variant="primary" disabled={pending}>
           {id ? "Save changes" : "Create promotion"}
         </Button>
@@ -217,7 +219,7 @@ export function PromotionForm({ id, initial, options }: { id: string | null; ini
 function CheckGroup({ label, items, selected, onToggle }: { label: string; items: { value: string; label: string }[]; selected: readonly string[]; onToggle: (v: string) => void }) {
   return (
     <fieldset>
-      <legend className="mb-1.5 text-sm text-ink-muted">{label}</legend>
+      <legend className="mb-2 text-13 font-medium text-ink-muted">{label}</legend>
       <div className="flex flex-wrap gap-x-4 gap-y-2">
         {items.map((i) => (
           <label key={i.value} className="flex items-center gap-2 text-sm">
@@ -235,7 +237,7 @@ function CheckGroup({ label, items, selected, onToggle }: { label: string; items
 function Exclusions({ value, categories, onChange }: { value: PromotionInput["exclusions"]; categories: string[]; onChange: (v: PromotionInput["exclusions"]) => void }) {
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="mb-1.5 text-sm text-ink-muted">Never (for example, never Master stylists&rsquo; color)</legend>
+      <legend className="mb-2 text-13 font-medium text-ink-muted">Never (for example, never Master stylists&rsquo; color)</legend>
       {value.map((e, i) => (
         <div key={i} className="flex flex-wrap items-center gap-2" data-testid="exclusion">
           <select aria-label="Never this level" value={e.level ?? ""} onChange={(x) => onChange(value.map((v, j) => (j === i ? { ...v, level: (x.target.value || null) as Level | null } : v)))} className={`${selectClass} w-40`}>
@@ -254,7 +256,7 @@ function Exclusions({ value, categories, onChange }: { value: PromotionInput["ex
               </option>
             ))}
           </select>
-          <Button size="sm" variant="ghost" onClick={() => onChange(value.filter((_, j) => j !== i))}>
+          <Button size="sm" variant="quiet" onClick={() => onChange(value.filter((_, j) => j !== i))}>
             Remove
           </Button>
         </div>

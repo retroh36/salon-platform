@@ -6,6 +6,7 @@ import { visitsText } from "@/lib/insights/describe";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
+import { Alert, Badge, textLinkClass } from "@/components/ui/page";
 import { PlusIcon } from "@/components/ui/icons";
 import { MAX_NOTES, priceFor, visitSummary } from "@/lib/appointments";
 import { parseClientSearch } from "@/lib/clients";
@@ -246,17 +247,17 @@ export function BookingPanel({
       <form onSubmit={submit} className="flex flex-col gap-5 py-2 text-sm" aria-label={appointment ? "Edit booking" : "New booking"}>
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h2 className="font-serif text-2xl font-semibold text-navy-900">{appointment ? "Edit booking" : "New booking"}</h2>
+            <h2 className="text-xl font-semibold text-ink">{appointment ? "Edit booking" : "New booking"}</h2>
             <p className="text-ink-muted">{formatLongDay(date)}</p>
             {!appointment && (onBlockInstead || onGroupInstead) && (
-              <p className="mt-1 flex flex-wrap gap-x-4">
+              <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
                 {onGroupInstead && (
-                  <button type="button" onClick={onGroupInstead} className="text-sm font-medium text-link underline underline-offset-2 hover:text-link-hover">
+                  <button type="button" onClick={onGroupInstead} className={textLinkClass}>
                     Book a group instead
                   </button>
                 )}
                 {onBlockInstead && (
-                  <button type="button" onClick={onBlockInstead} className="text-sm font-medium text-link underline underline-offset-2 hover:text-link-hover">
+                  <button type="button" onClick={onBlockInstead} className={textLinkClass}>
                     Block this time instead
                   </button>
                 )}
@@ -265,11 +266,7 @@ export function BookingPanel({
           </div>
         </div>
 
-        {message && (
-          <p role="alert" className="animate-fade-in rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-danger">
-            {message}
-          </p>
-        )}
+        {message && <Alert>{message}</Alert>}
 
         <ClientPicker client={client} onChange={setClient} />
 
@@ -299,14 +296,21 @@ export function BookingPanel({
         )}
 
         {patchNow && patchNow.messages.length > 0 && (
-          <p role="alert" data-testid="patch-warning" className={`rounded-md border px-3 py-2 ${patchNow.blocks ? "border-danger/30 bg-danger-soft text-danger" : "border-status-late-ink/25 bg-status-late-bg text-status-late-ink"}`}>
-            <strong className="font-semibold">Patch test:</strong> {patchNow.messages.join(" ")}{" "}
-            {patchNow.blocks ? "The salon requires a valid patch test, so this can't be booked yet." : "You can still book; check with the client."}
+          <p
+            role="alert"
+            data-testid="patch-warning"
+            className={`flex animate-fade-in items-start gap-2.5 rounded-lg px-3 py-2.5 text-ink ${patchNow.blocks ? "bg-danger-soft" : "bg-warning-soft"}`}
+          >
+            <span aria-hidden className={`mt-[7px] size-1.5 shrink-0 rounded-full ${patchNow.blocks ? "bg-danger-dot" : "bg-warning-dot"}`} />
+            <span className="min-w-0">
+              <strong className="font-medium">Patch test:</strong> {patchNow.messages.join(" ")}{" "}
+              {patchNow.blocks ? "The salon requires a valid patch test, so this can't be booked yet." : "You can still book; check with the client."}
+            </span>
           </p>
         )}
 
         {policyText && (
-          <div role="note" className="flex items-start gap-2 rounded-md border border-denise-200 bg-denise-50 px-2.5 py-2 text-sm text-denise-900" data-testid="denise-policy">
+          <div role="note" className="flex items-start gap-2 rounded-lg bg-denise-50 px-3 py-2.5 text-sm text-denise-900" data-testid="denise-policy">
             <DeniseFace size={22} />
             <p className="flex-1">{policyText}</p>
           </div>
@@ -321,9 +325,9 @@ export function BookingPanel({
             <fieldset
               key={l.key}
               data-family={services.get(l.serviceId)?.family ?? "other"}
-              className={`flex animate-fade-in flex-col gap-3 rounded-lg border border-l-4 border-l-(--fam-accent) bg-surface p-3 ${errors.length ? "border-danger/50" : "border-line"}`}
+              className={`flex animate-fade-in flex-col gap-3 rounded-lg border border-l-4 border-l-(--fam-accent) bg-surface p-4 pt-3 ${errors.length ? "border-danger/50" : "border-line"}`}
             >
-              <legend className="px-1 font-semibold">Service {n + 1}</legend>
+              <legend className="px-1 text-13 font-medium text-ink">Service {n + 1}</legend>
               <LabeledSelect label="Service" value={l.serviceId} onChange={(v) => update(l.key, { serviceId: v })}>
                 <option value="">Choose a service</option>
                 {sortCategories(new Set(choices.map((s) => s.category))).map((category) => (
@@ -368,16 +372,16 @@ export function BookingPanel({
                   </option>
                 ))}
               </LabeledSelect>
-              <div className="flex items-center justify-between text-ink-muted">
-                <span data-testid="line-summary">
+              <div className="flex min-h-8 items-center justify-between gap-2 text-13 text-ink-muted">
+                <span data-testid="line-summary" className="tabular-nums">
                   {info && l.startMinute != null
                     ? `${formatMinute(l.startMinute)}–${formatMinute(l.startMinute + info.minutes)} · ${formatMinutes(info.minutes)} · ${formatPrice(info.priceCents)}`
                     : "Choose a service"}
                 </span>
                 {lines.length > 1 && (
-                  <button type="button" className="font-medium text-ink-muted underline underline-offset-2 hover:text-ink" onClick={() => setLines((all) => all.filter((x) => x.key !== l.key))}>
+                  <Button variant="quiet" size="xs" className="-mr-2.5 text-ink-muted" onClick={() => setLines((all) => all.filter((x) => x.key !== l.key))}>
                     Remove
-                  </button>
+                  </Button>
                 )}
               </div>
               {info && (
@@ -390,7 +394,7 @@ export function BookingPanel({
                 />
               )}
               {errors.length > 0 && (
-                <ul className="list-disc pl-5 text-danger">
+                <ul className="list-disc pl-5 text-13 text-danger">
                   {errors.map((e) => (
                     <li key={e}>{e}</li>
                   ))}
@@ -400,7 +404,7 @@ export function BookingPanel({
                 const level = columns.find((c) => c.staffId === l.staffId)?.level ?? null;
                 const offer = l.serviceId ? packageFor(clientPackages, l.serviceId, level) : null;
                 return offer && client ? (
-                  <p className="rounded-md bg-status-confirmed-bg px-2.5 py-1.5 text-status-confirmed-ink" data-testid="package-note">
+                  <p className="text-13 text-ink-muted" data-testid="package-note">
                     {client.name.split(" ")[0]} has {usesLeft(offer.item)} on a package. It&apos;s used at checkout.
                   </p>
                 ) : null;
@@ -430,7 +434,7 @@ export function BookingPanel({
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} maxLength={MAX_NOTES} className={fieldClass} />
         </label>
 
-        <div className="flex items-center justify-between rounded-lg bg-navy-100 px-3 py-2.5 font-semibold text-navy-900" aria-live="polite" data-testid="visit-total">
+        <div className="flex items-center justify-between border-t border-line pt-3 font-medium text-ink tabular-nums" aria-live="polite" data-testid="visit-total">
           {summary ? (
             <>
               <span>
@@ -439,12 +443,12 @@ export function BookingPanel({
               <span>{formatPrice(summary.priceCents)}</span>
             </>
           ) : (
-            <span className="font-normal">Total: choose a service</span>
+            <span className="font-normal text-ink-muted">Total: choose a service</span>
           )}
         </div>
 
         {!appointment && (
-          <fieldset className="flex flex-col gap-3 rounded-lg border border-line p-3">
+          <fieldset className="flex flex-col gap-3">
             <legend className="sr-only">Repeat</legend>
             <label className="flex items-center gap-2 font-medium text-ink">
               <input type="checkbox" className={checkboxClass} checked={repeat.on} onChange={(e) => changeRepeat({ on: e.target.checked })} />
@@ -498,10 +502,10 @@ export function BookingPanel({
             </p>
             <ul className="flex flex-col gap-2">
               {preview.map((v) => (
-                <li key={v.date} data-fits={v.ok || undefined} className={`rounded-lg border p-3 ${v.ok ? "border-line" : "border-denise-200 bg-denise-50"}`}>
+                <li key={v.date} data-fits={v.ok || undefined} className="rounded-lg border border-line px-3 py-2.5">
                   <p className="flex items-center justify-between gap-2">
                     <span className="font-medium text-ink">{v.label}</span>
-                    <span className={v.ok ? "text-status-confirmed-ink" : "text-danger"}>{v.ok ? "Fits" : "Doesn't fit"}</span>
+                    <Badge tone={v.ok ? "success" : "danger"}>{v.ok ? "Fits" : "Doesn't fit"}</Badge>
                   </p>
                   {!v.ok && (
                     <div className="mt-2 flex flex-col gap-1.5">
@@ -529,8 +533,8 @@ export function BookingPanel({
         )}
 
         {appointment?.series && (
-          <fieldset className="flex flex-col gap-1.5 rounded-lg border border-line p-3">
-            <legend className="px-1 font-medium text-ink">Change</legend>
+          <fieldset className="flex flex-col gap-1.5">
+            <legend className="mb-1.5 text-13 font-medium text-ink">Change</legend>
             {(
               [
                 ["this", "This visit only"],
@@ -585,18 +589,25 @@ export function ClientPicker({ client, onChange }: { client: ClientOption | null
 
   if (client) {
     return (
-      <section aria-label="Client" className="flex animate-fade-in flex-col gap-2 rounded-lg border border-line bg-sunken/50 p-3">
+      <section aria-label="Client" className="flex animate-fade-in flex-col gap-2">
         <div className="flex items-center gap-3">
           <Avatar name={client.name} />
           <div className="min-w-0 flex-1">
-            <div className="truncate font-semibold">{client.name}</div>
-            {client.phone && <div className="text-ink-muted">{client.phone}</div>}
+            <div className="truncate font-medium text-ink">{client.name}</div>
+            {client.phone && <div className="text-13 text-ink-muted">{client.phone}</div>}
           </div>
-          <button type="button" className="shrink-0 font-medium text-link underline underline-offset-2 hover:text-link-hover" onClick={() => onChange(null)}>
+          <Button size="xs" className="shrink-0" onClick={() => onChange(null)}>
             Change client
-          </button>
+          </Button>
         </div>
-        {client.allergies && <p className="rounded-md bg-danger-soft px-2 py-1 font-medium text-danger">Allergy: {client.allergies}</p>}
+        {client.allergies && (
+          <p className="flex items-start gap-2">
+            <Badge tone="danger" className="mt-px">
+              Allergy
+            </Badge>
+            <span className="min-w-0 text-ink wrap-anywhere">{client.allergies}</span>
+          </p>
+        )}
       </section>
     );
   }
@@ -619,14 +630,14 @@ export function ClientPicker({ client, onChange }: { client: ClientOption | null
 
   if (adding) {
     return (
-      <section aria-label="New client" className="flex animate-fade-in flex-col gap-3 rounded-lg border border-line bg-sunken/50 p-3">
-        <h3 className="font-semibold">New client</h3>
-        {errors.form && <p className="text-danger">{errors.form}</p>}
+      <section aria-label="New client" className="flex animate-fade-in flex-col gap-3">
+        <h3 className="font-medium text-ink">New client</h3>
+        {errors.form && <Alert>{errors.form}</Alert>}
         <div className="grid grid-cols-2 gap-2">
           <label className={labelClass}>
             First name
             <input value={fields.firstName} onChange={(e) => setFields({ ...fields, firstName: e.target.value })} className={fieldClass} aria-invalid={!!errors.first_name} />
-            {errors.first_name && <span className="font-normal text-danger">{errors.first_name}</span>}
+            {errors.first_name && <span className="text-xs font-normal text-danger">{errors.first_name}</span>}
           </label>
           <label className={labelClass}>
             Last name
@@ -636,7 +647,7 @@ export function ClientPicker({ client, onChange }: { client: ClientOption | null
         <label className={labelClass}>
           Phone
           <input value={fields.phone} onChange={(e) => setFields({ ...fields, phone: e.target.value })} inputMode="tel" className={fieldClass} aria-invalid={!!errors.phone} />
-          {errors.phone && <span className="font-normal text-danger">{errors.phone}</span>}
+          {errors.phone && <span className="text-xs font-normal text-danger">{errors.phone}</span>}
         </label>
         <div className="flex gap-2">
           <Button
@@ -663,7 +674,7 @@ export function ClientPicker({ client, onChange }: { client: ClientOption | null
 
   return (
     <section aria-label="Client" className="flex flex-col gap-2">
-      <label htmlFor="client-search" className="text-sm font-medium">
+      <label htmlFor="client-search" className="text-13 font-medium text-ink">
         Find a client
       </label>
       <input
@@ -677,12 +688,12 @@ export function ClientPicker({ client, onChange }: { client: ClientOption | null
       />
       {results && (
         <ul aria-label="Matching clients" className="animate-fade-in divide-y divide-line overflow-hidden rounded-lg border border-line">
-          {results.length === 0 && <li className="px-3 py-2 text-ink-muted">No clients match.</li>}
+          {results.length === 0 && <li className="px-3 py-2.5 text-ink-muted">No clients match.</li>}
           {results.map((c) => (
             <li key={c.id}>
-              <button type="button" className="flex w-full justify-between gap-3 px-3 py-2 text-left transition-colors duration-(--motion-fast) hover:bg-sunken active:bg-navy-100" onClick={() => onChange(c)}>
-                <span className="font-semibold">{c.name}</span>
-                <span className="text-ink-muted">{c.phone}</span>
+              <button type="button" className="flex w-full justify-between gap-3 px-3 py-2.5 text-left transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:bg-sunken focus-visible:outline-none active:bg-navy-100" onClick={() => onChange(c)}>
+                <span className="min-w-0 truncate font-medium text-ink">{c.name}</span>
+                <span className="shrink-0 text-ink-muted tabular-nums">{c.phone}</span>
               </button>
             </li>
           ))}
@@ -690,7 +701,7 @@ export function ClientPicker({ client, onChange }: { client: ClientOption | null
       )}
       <button
         type="button"
-        className="self-start font-medium text-link underline underline-offset-2 hover:text-link-hover"
+        className={`self-start ${textLinkClass}`}
         onClick={() => {
           // Start the form from what was searched for: a phone number or a name.
           const isPhone = parseClientSearch(query).kind === "phone";
@@ -731,11 +742,11 @@ function UsualLength({
     ) : null;
   }
   return (
-    <div role="note" className="flex items-start gap-2 rounded-md border border-denise-200 bg-denise-50 px-2.5 py-2 text-sm text-denise-900" data-testid="usual-length">
+    <div role="note" className="flex items-start gap-2 rounded-lg bg-denise-50 px-3 py-2.5 text-sm text-denise-900" data-testid="usual-length">
       <DeniseFace size={22} />
       <p className="flex-1">
         This is shorter than {stylist} usually takes: {formatMinutes(learned.medianMinutes)} for this ({visitsText(learned)}).{" "}
-        <button type="button" className="font-semibold text-denise-700 underline underline-offset-2 hover:text-denise-900" onClick={() => onUse(suggested)}>
+        <button type="button" className="font-medium text-denise-700 underline underline-offset-2 hover:text-denise-900" onClick={() => onUse(suggested)}>
           Book {formatMinutes(suggested)}
         </button>
       </p>
@@ -750,7 +761,7 @@ const SHORT_BY = 5;
 // work (one click puts it in the form).
 export function IdeasCard({ ideas, onPick }: { ideas: BookingIdeas; onPick: (o: BookingIdea) => void }) {
   return (
-    <section aria-label="Denise's suggestions" className="flex animate-fade-in gap-2.5 rounded-lg border border-denise-200 bg-denise-50 px-3 py-2.5" data-testid="denise-ideas">
+    <section aria-label="Denise's suggestions" className="flex animate-fade-in gap-2.5 rounded-lg bg-denise-50 px-3 py-2.5" data-testid="denise-ideas">
       <DeniseFace size={24} className="mt-0.5" />
       <div className="flex min-w-0 flex-col gap-2">
         <p className="text-denise-900">{ideas.text}</p>
@@ -761,7 +772,7 @@ export function IdeasCard({ ideas, onPick }: { ideas: BookingIdeas; onPick: (o: 
                 key={`${o.staffId}-${o.startMinute}`}
                 type="button"
                 onClick={() => onPick(o)}
-                className="inline-flex h-8 items-center rounded-full border border-denise-200 bg-surface px-3 text-sm font-medium text-denise-900 transition-[background-color,border-color,transform] duration-(--motion-fast) hover:border-denise-500 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                className="inline-flex h-8 items-center rounded-md border border-denise-200 bg-surface px-3 text-sm font-medium text-denise-900 transition-[background-color,border-color,transform] duration-(--motion-fast) hover:border-denise-500 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               >
                 {o.label}
               </button>

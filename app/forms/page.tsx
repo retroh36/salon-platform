@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { buttonClass } from "@/components/ui/button";
-import { Badge, Card, EmptyState, listClass, PageHeader, rowLinkClass } from "@/components/ui/page";
+import { Badge, Card, EmptyState, nameLinkClass, PageHeader, Section } from "@/components/ui/page";
+import { TableCard, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
 import { loadTemplates, patchSettings } from "@/lib/client-checks";
 import { PatchSettingsForm } from "./patch-settings";
@@ -46,31 +47,52 @@ async function Forms() {
         }
       />
 
-      <Card title="Form templates" titleId="templates-heading" flush>
-        {templates.length === 0 ? (
-          <EmptyState>No forms yet.</EmptyState>
-        ) : (
-          <ul className={listClass} aria-labelledby="templates-heading">
-            {templates.map((t) => (
-              <li key={t.id}>
-                <Link href={`/forms/${t.id}`} className={`${rowLinkClass} flex flex-wrap items-center justify-between gap-2`}>
-                  <span>
-                    <span className="font-semibold text-ink">{t.name}</span>
-                    <span className="block text-sm text-ink-muted">
+      <Section title="Form templates" titleId="templates-heading" count={templates.length}>
+        <TableCard className="mb-0!">
+          {templates.length === 0 ? (
+            <EmptyState>No forms yet.</EmptyState>
+          ) : (
+            <table className={tableClass} aria-labelledby="templates-heading">
+              <thead className={theadClass}>
+                <tr>
+                  <th scope="col" className={thClass}>
+                    Form
+                  </th>
+                  <th scope="col" className={thClass}>
+                    Questions
+                  </th>
+                  <th scope="col" className={thClass}>
+                    When it&apos;s needed
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {templates.map((t) => (
+                  <tr key={t.id} className={trClass}>
+                    <td className={tdClass}>
+                      <Link href={`/forms/${t.id}`} className={nameLinkClass}>
+                        {t.name}
+                      </Link>
+                      {!t.isActive && (
+                        <Badge tone="neutral" className="ml-2">
+                          Off
+                        </Badge>
+                      )}
+                    </td>
+                    <td className={`${tdClass} whitespace-nowrap text-ink-muted tabular-nums`}>
                       {t.fields.length} question{t.fields.length === 1 ? "" : "s"}
+                    </td>
+                    <td className={`${tdClass} text-ink-muted`}>
+                      {REQUIRED_LABELS[t.required]}
                       {t.required === "services" && ` · ${t.serviceIds.length} service${t.serviceIds.length === 1 ? "" : "s"}`}
-                    </span>
-                  </span>
-                  <span className="flex gap-2">
-                    <Badge tone={t.required === "none" ? "neutral" : "navy"}>{REQUIRED_LABELS[t.required]}</Badge>
-                    {!t.isActive && <Badge>Off</Badge>}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </TableCard>
+      </Section>
 
       <Card title="Patch tests" titleId="patch-heading" description={`${counts.length} services need one (set on each service).`}>
         <PatchSettingsForm initial={settings} readOnly={!owner} />

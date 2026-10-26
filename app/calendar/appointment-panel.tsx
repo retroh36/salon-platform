@@ -6,12 +6,13 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, buttonClass } from "@/components/ui/button";
 import { fieldClass, labelClass, selectClass } from "@/components/ui/field";
+import { Alert, Badge, nameLinkClass, textLinkClass, type Tone } from "@/components/ui/page";
 import { CheckCircleIcon, ChevronDownIcon, GlobeIcon, MoreIcon, PhoneIcon, WarningIcon } from "@/components/ui/icons";
 import { Tabs } from "@/components/ui/tabs";
 import { PatchTestForm } from "@/app/clients/patch-test-form";
 import { ClientInsightLine } from "@/components/client-insight-line";
 import { VisitPhotosTab } from "@/components/visit-photos";
-import { ACTION_LABELS, allowedActions, CANCEL_REASONS, canEditNotes, isEditable, MAX_NOTES, STATUS_LABELS, type AppointmentAction } from "@/lib/appointments";
+import { ACTION_LABELS, allowedActions, CANCEL_REASONS, canEditNotes, isEditable, MAX_NOTES, STATUS_LABELS, type AppointmentAction, type AppointmentStatus } from "@/lib/appointments";
 import type { ChecklistItem } from "@/lib/client-checks";
 import { nextStep, timerState, timerStatus, visitStatusText } from "@/lib/visit-times";
 import { CardLinkButton, FeeControls } from "@/components/policy-controls";
@@ -187,7 +188,7 @@ export function AppointmentPanel({
           <Avatar name={client?.name ?? appointment.group?.label ?? "Walk in"} size="lg" />
           <div className="min-w-0 flex-1">
             <div className="flex items-start gap-1">
-              <h3 className="min-w-0 font-serif text-xl font-semibold text-pretty wrap-anywhere" data-testid="client-name">
+              <h3 className="min-w-0 text-xl font-semibold text-pretty wrap-anywhere" data-testid="client-name">
                 {client ? (
                   <Link href={`/clients/${client.id}`} className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-focus">
                     {client.name}
@@ -204,21 +205,26 @@ export function AppointmentPanel({
                 </a>
               )}
             </div>
-            <p data-testid="visit-status" data-status={status} className="truncate text-ink-muted">
-              {visitStatusText(status, STATUS_LABELS, appointment, timeZone)}
-            </p>
-            {client?.messages.noTexts && (
-              <p className="text-sm font-medium text-status-late-ink" data-testid="no-texts">
-                {client.messages.noTexts}
-              </p>
-            )}
+            {/* One status line: where the visit's at, as a tag (and no texts, if so). */}
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <span data-testid="visit-status" data-status={status} className="inline-flex min-w-0">
+                <Badge tone={STATUS_TONES[status]}>{visitStatusText(status, STATUS_LABELS, appointment, timeZone)}</Badge>
+              </span>
+              {client?.messages.noTexts && (
+                <span data-testid="no-texts" className="inline-flex">
+                  <Badge tone="warning">{client.messages.noTexts}</Badge>
+                </span>
+              )}
+            </div>
           </div>
         </header>
 
         {client?.allergies && (
-          <p className="-mt-3 flex items-start gap-2 font-medium text-danger">
-            <WarningIcon className="mt-0.5 size-4" />
-            <span>Allergy: {client.allergies}</span>
+          <p className="-mt-3 flex items-start gap-2">
+            <Badge tone="danger" className="mt-px">
+              Allergy
+            </Badge>
+            <span className="min-w-0 text-ink wrap-anywhere">{client.allergies}</span>
           </p>
         )}
 
@@ -236,7 +242,7 @@ export function AppointmentPanel({
                 <li key={i.id} data-item-id={i.id} data-testid="service-timer" data-state={state} className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <p className="text-ink">
-                      <span className="font-semibold">{i.serviceName}</span> <span className="whitespace-nowrap text-ink-muted">with {i.staffName.split(" ")[0]}</span>
+                      <span className="font-medium">{i.serviceName}</span> <span className="whitespace-nowrap text-ink-muted">with {i.staffName.split(" ")[0]}</span>
                     </p>
                     <p className="text-ink-muted">
                       <span className="whitespace-nowrap">
@@ -262,17 +268,24 @@ export function AppointmentPanel({
             })}
           </ul>
           {several && (
-            <p className="flex justify-between border-t border-line pt-3 font-semibold">
+            <p className="flex justify-between border-t border-line pt-3 font-medium">
               <span>Total</span>
               <span className="tabular-nums">{formatPrice(total)}</span>
             </p>
           )}
           {appointment.membership && (
-            <p className={`flex items-start gap-1.5 ${appointment.membership.status === "past_due" ? "text-status-late-ink" : "text-ink-muted"}`} data-testid="membership-info">
+            <p className="flex items-start gap-1.5 text-ink-muted" data-testid="membership-info">
               <svg aria-hidden viewBox="0 0 24 24" className="mt-0.5 size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.75}>
                 <path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z" strokeLinejoin="round" />
               </svg>
-              <span>{appointment.membership.text}</span>
+              <span className="min-w-0">
+                {appointment.membership.status === "past_due" && (
+                  <>
+                    <Badge tone="warning">Payment failed</Badge>{" "}
+                  </>
+                )}
+                {appointment.membership.text}
+              </span>
             </p>
           )}
           {appointment.policy && client && <PolicyInfo appointment={appointment} firstName={firstName} />}
@@ -297,7 +310,7 @@ export function AppointmentPanel({
                         {m.clientName} · {m.staffName} · {formatMinute(m.start)} (this visit)
                       </span>
                     ) : (
-                      <button type="button" className="text-left text-link underline-offset-2 hover:underline" onClick={() => onOpenVisit(m.appointmentId)}>
+                      <button type="button" className={`text-left ${nameLinkClass}`} onClick={() => onOpenVisit(m.appointmentId)}>
                         {m.clientName} · {m.staffName} · {formatMinute(m.start)}
                       </button>
                     )}
@@ -350,12 +363,7 @@ export function AppointmentPanel({
       {/* One main button for the next step; everything else is under "⋯". */}
       {footer && (
         <footer aria-label="Actions" className="sticky bottom-0 mt-auto flex flex-col gap-3 border-t border-line bg-surface pt-3">
-          {message && (
-            <p role="alert" className="flex items-start gap-2 text-danger">
-              <WarningIcon className="mt-0.5 size-4" />
-              <span>{message}</span>
-            </p>
-          )}
+          {message && <Alert>{message}</Alert>}
           {sentNote && !messaging && (
             <p role="status" className="text-ink-muted" data-testid="message-sent">
               {sentNote}
@@ -383,7 +391,7 @@ export function AppointmentPanel({
               onCancel={() => setMoving(false)}
             />
           ) : confirmingNoShow ? (
-            <div role="group" aria-label="Mark no-show" className="flex flex-col gap-3 rounded-lg border border-line bg-sunken/60 p-3">
+            <div role="group" aria-label="Mark no-show" className="flex animate-fade-in flex-col gap-3">
               <p className="text-ink">
                 Mark {firstName} as a no-show? Their time opens up for other bookings. You can undo it if they turn up.
               </p>
@@ -403,7 +411,7 @@ export function AppointmentPanel({
                 <Button variant="danger" disabled={pending} onClick={() => run("no_show")}>
                   Mark no-show
                 </Button>
-                <Button variant="ghost" disabled={pending} onClick={() => setConfirmingNoShow(false)}>
+                <Button disabled={pending} onClick={() => setConfirmingNoShow(false)}>
                   Not yet
                 </Button>
               </div>
@@ -454,7 +462,7 @@ export function AppointmentPanel({
                     <>
                       {" "}
                       (
-                      <Link href={`/sales/${appointment.saleId}`} className="font-medium text-link underline underline-offset-2 hover:text-link-hover">
+                      <Link href={`/sales/${appointment.saleId}`} className={textLinkClass}>
                         view the sale
                       </Link>
                       ).
@@ -474,6 +482,16 @@ export function AppointmentPanel({
     </div>
   );
 }
+
+// The status line's tag (docs/brand.md, "Status: one set").
+const STATUS_TONES: Record<AppointmentStatus, Tone> = {
+  booked: "neutral",
+  confirmed: "success",
+  checked_in: "info",
+  completed: "neutral",
+  canceled: "neutral",
+  no_show: "danger",
+};
 
 type MenuAction = { key: string; label: string; onSelect: () => void; danger?: boolean };
 
@@ -520,7 +538,7 @@ function ActionsMenu({ actions, disabled }: { actions: MenuAction[]; disabled: b
           ref={menu}
           role="menu"
           aria-label="More actions"
-          className="absolute right-0 bottom-full z-10 mb-2 flex w-max max-w-[min(18rem,calc(100vw-2rem))] min-w-52 origin-bottom-right animate-pop-in flex-col rounded-xl border border-line bg-surface p-1.5 shadow-lift"
+          className="absolute right-0 bottom-full z-10 mb-2 flex w-max max-w-[min(18rem,calc(100vw-2rem))] min-w-52 origin-bottom-right animate-pop-in flex-col rounded-lg border border-line bg-surface p-1.5 shadow-lift"
         >
           {actions.map((a) => (
             <button
@@ -532,7 +550,7 @@ function ActionsMenu({ actions, disabled }: { actions: MenuAction[]; disabled: b
                 setOpen(false);
                 a.onSelect();
               }}
-              className={`flex w-full items-center rounded-lg px-3 py-2 text-left text-sm whitespace-nowrap transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:bg-sunken focus-visible:outline-none ${a.danger ? "text-danger" : "text-ink"}`}
+              className={`flex w-full items-center rounded-md px-3 py-2 text-left text-sm whitespace-nowrap transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:bg-sunken focus-visible:outline-none ${a.danger ? "text-danger" : "text-ink"}`}
             >
               <span className="truncate">{a.label}</span>
             </button>
@@ -544,7 +562,7 @@ function ActionsMenu({ actions, disabled }: { actions: MenuAction[]; disabled: b
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <h4 className="text-xs font-medium text-ink-muted">{children}</h4>;
+  return <h4 className="text-13 font-medium text-ink-muted">{children}</h4>;
 }
 
 // Past visits, how it was booked, and what's happened to it since.
@@ -568,7 +586,7 @@ function VisitHistory({ appointment }: { appointment: AppointmentDetail }) {
               ))}
             </ul>
           )}
-          <Link href={`/clients/${appointment.client.id}`} className="self-start font-medium text-link underline-offset-2 hover:underline">
+          <Link href={`/clients/${appointment.client.id}`} className={`self-start ${textLinkClass}`}>
             Client profile
           </Link>
         </section>
@@ -634,7 +652,7 @@ function NotesForm({ appointmentId, initial, editable }: { appointmentId: string
   return (
     <form aria-label="Notes" className="flex flex-col gap-1.5" onSubmit={(e) => e.preventDefault()}>
       <div className="flex items-baseline justify-between gap-3">
-        <label htmlFor="appointment-notes" className="text-xs font-medium text-ink-muted">
+        <label htmlFor="appointment-notes" className="text-13 font-medium text-ink-muted">
           Visit notes
         </label>
         <span aria-live="polite" className="text-xs">
@@ -661,10 +679,10 @@ function NotesForm({ appointmentId, initial, editable }: { appointmentId: string
         maxLength={MAX_NOTES}
         rows={4}
         placeholder="Anything the stylist should know"
-        className={`${fieldClass} bg-sunken/60`}
+        className={fieldClass}
       />
       {state.kind === "error" && (
-        <p role="alert" className="text-danger">
+        <p role="alert" className="text-13 text-danger">
           {state.message}
         </p>
       )}
@@ -700,7 +718,7 @@ function CancelForm({
   return (
     <form
       aria-label="Cancel booking"
-      className="flex animate-fade-in flex-col gap-3 rounded-lg border border-danger/30 bg-danger-soft/60 p-3"
+      className="flex animate-fade-in flex-col gap-3 rounded-lg bg-danger-soft/60 p-3"
       onSubmit={(e) => {
         e.preventDefault();
         onCancel(reason, detail, scope);
@@ -729,7 +747,7 @@ function CancelForm({
       )}
       {(series || group) && (
         <fieldset className="flex flex-col gap-1.5">
-          <legend className="mb-1 text-sm font-medium text-ink">Cancel</legend>
+          <legend className="mb-1 text-13 font-medium text-ink">Cancel</legend>
           {(
             [
               ["this", "This visit only"],
@@ -788,7 +806,7 @@ function MoveForm({
   return (
     <form
       aria-label="Move to another day"
-      className="flex animate-fade-in flex-col gap-3 rounded-lg border border-line bg-sunken/60 p-3"
+      className="flex animate-fade-in flex-col gap-3"
       onSubmit={(e) => {
         e.preventDefault();
         const startMinute = parseTime(time);
@@ -821,7 +839,7 @@ function MoveForm({
       </p>
       {appointment.series && (
         <fieldset className="flex flex-col gap-1.5">
-          <legend className="mb-1 text-sm font-medium text-ink">Move</legend>
+          <legend className="mb-1 text-13 font-medium text-ink">Move</legend>
           {(
             [
               ["this", "This visit only"],
@@ -836,12 +854,7 @@ function MoveForm({
           ))}
         </fieldset>
       )}
-      {message && (
-        <p role="alert" className="flex items-start gap-2 text-danger">
-          <WarningIcon className="mt-0.5 size-4" />
-          <span>{message}</span>
-        </p>
-      )}
+      {message && <Alert>{message}</Alert>}
       {ideas && <IdeasCard ideas={ideas} onPick={(o) => setTime(minuteToTime(o.startMinute))} />}
       <div className="flex gap-2">
         <Button type="submit" variant="primary" disabled={pending}>
@@ -884,7 +897,7 @@ function RunningLateForm({
   return (
     <form
       aria-label="Running late"
-      className="flex animate-fade-in flex-col gap-3 rounded-lg border border-line-strong bg-sunken/60 p-3"
+      className="flex animate-fade-in flex-col gap-3"
       onSubmit={(e) => {
         e.preventDefault();
         if (!minutes) return;
@@ -892,12 +905,12 @@ function RunningLateForm({
       }}
     >
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 font-semibold text-ink">{checkedIn ? "How far over is this running?" : `How late is ${firstName}?`}</legend>
+        <legend className="mb-2 font-medium text-ink">{checkedIn ? "How far over is this running?" : `How late is ${firstName}?`}</legend>
         <div className="flex flex-wrap gap-1.5">
           {LATE_MINUTES.map((m) => (
             <label key={m} className="cursor-pointer">
               <input type="radio" name="late-minutes" value={m} checked={minutes === m} onChange={() => setMinutes(m)} className="peer sr-only" />
-              <span className="inline-flex h-8 items-center rounded-full border border-line-strong bg-surface px-3 text-sm transition-colors duration-(--motion-fast) peer-checked:border-navy-900 peer-checked:bg-navy-900 peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-focus hover:bg-sunken peer-checked:hover:bg-navy-800">
+              <span className="inline-flex h-8 items-center rounded-md border border-line-strong bg-surface px-3 text-sm transition-colors duration-(--motion-fast) peer-checked:border-navy-900 peer-checked:bg-navy-900 peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-focus hover:bg-sunken peer-checked:hover:bg-navy-800">
                 {m} min
               </span>
             </label>
@@ -950,7 +963,7 @@ function FormulaSection({ appointment, date, products, canRecord }: { appointmen
           <FormulaEntry key={f.id} meta={`${serviceOf(f.itemId)} · ${f.author}`} products={f.products} text={f.text} notes={f.notes} testId="visit-formula-products" />
         ))}
         {result && (
-          <p role={result.error ? "alert" : "status"} className={`animate-fade-in ${result.error ? "text-danger" : "font-medium text-status-confirmed-ink"}`}>
+          <p role={result.error ? "alert" : "status"} className={`animate-fade-in ${result.error ? "text-danger" : "text-ink-muted"}`}>
             {result.text}
           </p>
         )}
@@ -958,7 +971,7 @@ function FormulaSection({ appointment, date, products, canRecord }: { appointmen
           (adding ? (
             <form
               aria-label="Record formula"
-              className="flex animate-fade-in flex-col gap-3 rounded-lg border border-line-strong bg-sunken/60 p-3"
+              className="flex animate-fade-in flex-col gap-3 rounded-lg border border-line p-4"
               onSubmit={(e) => {
                 e.preventDefault();
                 setResult(null);
@@ -1075,19 +1088,19 @@ function VisitChecklist({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left font-medium text-ink transition-colors duration-(--motion-fast) hover:bg-sunken/60 focus-visible:outline-2 focus-visible:outline-focus"
+        className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left font-medium text-ink transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:outline-2 focus-visible:outline-focus"
       >
-        <WarningIcon className="size-4 text-status-late-ink" />
+        <WarningIcon className="size-4 text-warning-dot" />
         <span className="flex-1">Before this visit ({outstanding})</span>
         <ChevronDownIcon className={`size-4 text-ink-muted transition-transform duration-(--motion-fast) ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <ul className="flex animate-fade-in flex-col gap-3 border-t border-line px-3 py-3">
+        <ul className="flex animate-fade-in flex-col gap-3 border-t border-line p-3">
           {items.map((c) => (
             <li key={c.key} data-done={c.done || undefined} className={`flex flex-col gap-2 ${c.done ? "opacity-60" : ""}`}>
               <div className="flex flex-wrap items-start gap-x-3 gap-y-1.5">
                 <p className="flex min-w-0 flex-1 basis-52 gap-2">
-                  {c.done ? <CheckCircleIcon className="mt-0.5 size-4 text-status-confirmed-ink" /> : <WarningIcon className="mt-0.5 size-4 text-status-late-ink" />}
+                  {c.done ? <CheckCircleIcon className="mt-0.5 size-4 shrink-0 text-success" /> : <WarningIcon className="mt-0.5 size-4 shrink-0 text-warning-dot" />}
                   <span className="min-w-0">
                     <span className="font-medium text-ink">{c.label}</span> <span className="text-ink-muted">— {c.status}</span>
                     {c.detail && <span className="block text-xs text-ink-muted">{c.detail}</span>}
@@ -1097,7 +1110,10 @@ function VisitChecklist({
                           Checked in without it by {override.by}, {override.at}: &ldquo;{override.reason}&rdquo;
                         </span>
                       ) : (
-                        <span className="block font-medium text-ink">Holds up this visit: the salon requires it before check-in.</span>
+                        <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                          <Badge tone="warning">Required</Badge>
+                          <span className="text-13 text-ink-muted">Holds up this visit: the salon requires it before check-in.</span>
+                        </span>
                       ))}
                   </span>
                 </p>
@@ -1105,7 +1121,7 @@ function VisitChecklist({
                   (c.action.kind === "form" ? (
                     <Link
                       href={`/clients/${clientId}/forms/new?template=${c.action.templateId}&back=${back}`}
-                      className="ml-6 shrink-0 font-medium whitespace-nowrap text-link underline underline-offset-2 hover:text-link-hover"
+                      className={`ml-6 shrink-0 whitespace-nowrap ${textLinkClass}`}
                     >
                       Fill it in now
                     </Link>
@@ -1149,15 +1165,16 @@ function CheckInWarning({
   const [reason, setReason] = useState("");
   const blocked = outstanding.some((c) => c.blocks);
   return (
-    <div role="group" aria-label="Before checking in" className="flex animate-fade-in flex-col gap-2 rounded-lg border border-status-late-ink/30 bg-status-late-bg px-3 py-2.5 text-status-late-ink">
-      <p className="font-semibold">
+    <div role="group" aria-label="Before checking in" className="flex animate-fade-in flex-col gap-2 rounded-lg bg-warning-soft p-3 text-ink">
+      <p className="flex items-start gap-2 font-medium">
+        <span aria-hidden className="mt-[7px] size-1.5 shrink-0 rounded-full bg-warning-dot" />
         {blocked ? `${firstName} can't be checked in yet: the salon requires a valid patch test first.` : `Still to do before ${firstName} checks in:`}
       </p>
-      <ul className="flex list-disc flex-col gap-0.5 pl-5">
+      <ul className="flex list-disc flex-col gap-0.5 pl-8 text-ink-muted">
         {outstanding.map((c) => (
           <li key={c.key}>
             {c.label} — {c.status}
-            {c.blocks && <span className="font-semibold"> (required)</span>}
+            {c.blocks && <span className="font-medium text-ink"> (required)</span>}
           </li>
         ))}
       </ul>
@@ -1179,11 +1196,11 @@ function CheckInWarning({
             if (reason.trim()) onOverride(reason);
           }}
         >
-          <label className={`${labelClass} text-ink`}>
+          <label className={labelClass}>
             Why check in without it?
             <input value={reason} onChange={(e) => setReason(e.target.value)} required maxLength={300} placeholder="e.g. Tested at another salon last week" className={fieldClass} />
           </label>
-          <p className="text-xs">It&apos;s kept in the visit&apos;s history with your name.</p>
+          <p className="text-xs text-ink-muted">It&apos;s kept in the visit&apos;s history with your name.</p>
           <div className="flex flex-wrap gap-2">
             <Button type="submit" variant="primary" disabled={pending || !reason.trim()}>
               Check in without the patch test
@@ -1195,7 +1212,7 @@ function CheckInWarning({
         </form>
       ) : (
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <p className="flex-1 basis-48">Record a patch test first, or ask a manager or owner: they can check {firstName} in with a reason.</p>
+          <p className="flex-1 basis-48 text-ink-muted">Record a patch test first, or ask a manager or owner: they can check {firstName} in with a reason.</p>
           <Button disabled={pending} onClick={onCancel}>
             Not yet
           </Button>
@@ -1226,9 +1243,11 @@ function PolicyInfo({ appointment, firstName }: { appointment: AppointmentDetail
     ) : null;
   return (
     <div className="flex flex-col gap-2" data-testid="policy-info">
-      <p className="font-medium text-status-late-ink" data-testid="card-needed">
-        {p.depositNeededCents > 0 ? `Deposit needed: ${formatPrice(p.depositNeededCents)}` : "Card needed to hold this booking"}
-        {p.linkOut && <span className="font-normal text-ink-muted"> · link sent</span>}
+      <p className="flex flex-wrap items-center gap-1.5">
+        <span data-testid="card-needed" className="inline-flex">
+          <Badge tone="warning">{p.depositNeededCents > 0 ? `Deposit needed: ${formatPrice(p.depositNeededCents)}` : "Card needed to hold this booking"}</Badge>
+        </span>
+        {p.linkOut && <span className="text-13 text-ink-muted">Link sent</span>}
       </p>
       {(strikes || p.depositNeededCents > 0) && (
         <p className="text-ink-muted">

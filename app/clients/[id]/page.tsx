@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Avatar } from "@/components/ui/avatar";
-import { Card, EmptyState, listClass } from "@/components/ui/page";
+import { Badge, EmptyState, nameLinkClass, Section } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { ClientInsightCard } from "@/components/client-insight";
 import { describeClient } from "@/lib/insights/describe";
@@ -37,7 +37,6 @@ import { stylistOptions } from "../stylist-options";
 import { PatchTestForm } from "../patch-test-form";
 import Link from "next/link";
 import { buttonClass } from "@/components/ui/button";
-import { Badge } from "@/components/ui/page";
 import { patchSettings } from "@/lib/client-checks";
 import { patchTestMessage, patchTestState } from "@/lib/scheduling/patch-tests";
 
@@ -121,41 +120,57 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
   );
   const contact = [client.phone, client.email].filter(Boolean).join(" · ");
 
+  const patchState = patchTestState(
+    patchTests.map((t) => ({ testedAt: new Date(t.tested_at), result: t.result })),
+    new Date(),
+    { ...settings, minHours: 0 },
+  );
+
   return (
     <AppShell section="clients" me={me}>
       <BackLink href="/clients">Clients</BackLink>
-      <div className="mb-6 flex flex-wrap items-center gap-4">
+      <header className="mb-6 flex flex-wrap items-center gap-4">
         <Avatar name={fullName(client)} size="lg" />
         <div className="min-w-0">
-          <h1 className="font-serif text-4xl font-semibold tracking-tight text-navy-900">{fullName(client)}</h1>
-          <p className="mt-1 text-ink-muted">{contact || "No contact details"}</p>
+          <h1 className="text-2xl font-semibold tracking-[-0.015em] text-ink">{fullName(client)}</h1>
+          <p className="mt-1 text-sm text-ink-muted">{contact || "No contact details"}</p>
           {onlineAccount && (
-            <p className="mt-0.5 text-sm text-ink-muted" data-testid="online-account">
+            <p className="mt-0.5 text-13 text-ink-subtle" data-testid="online-account">
               Has an online account{onlineAccount.last_sign_in_at ? `, last signed in ${formatDate(toLocal(new Date(onlineAccount.last_sign_in_at), tz).date)}` : ""}
             </p>
           )}
         </div>
-      </div>
+      </header>
+
+      {client.allergies && (
+        <div role="note" aria-label="Allergies" className="mb-6 flex animate-fade-in items-start gap-2.5 rounded-lg bg-danger-soft px-3 py-2.5 text-sm text-danger">
+          <span aria-hidden className="mt-[7px] size-1.5 shrink-0 rounded-full bg-danger-dot" />
+          <div className="min-w-0">
+            <p className="font-semibold">Allergies and sensitivities</p>
+            <p className="whitespace-pre-line">{client.allergies}</p>
+          </div>
+        </div>
+      )}
 
       {insight && (
-        <div className="mb-6">
+        <div className="mb-8">
           <ClientInsightCard insight={insight} />
         </div>
       )}
 
       {packages.length > 0 && (
-        <Card title="Packages" titleId="packages-heading" description="Uses left are offered at checkout.">
+        <Section title="Packages" titleId="packages-heading" description="Uses left are offered at checkout.">
           <PackagesList
             clientId={id}
             packages={packages}
             canCancel={me.role === "owner" || me.role === "manager"}
             expiresLabels={Object.fromEntries(packages.flatMap((p) => (p.expiresAt ? [[p.id, formatDate(toLocal(new Date(p.expiresAt), tz).date)]] : [])))}
           />
-        </Card>
+        </Section>
       )}
 
       {memberships.length > 0 && (
-        <Card title="Membership" titleId="membership-heading" description="Member prices and included services apply at checkout automatically.">
+        <Section title="Membership" titleId="membership-heading" description="Member prices and included services apply at checkout automatically.">
           <MembershipList
             memberships={memberships}
             history={membershipHistory}
@@ -164,165 +179,117 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
             canEndNow={me.role === "owner" || me.role === "manager"}
             testCards={currentProvider().testCards.map((c) => ({ ...c }))}
           />
-        </Card>
+        </Section>
       )}
 
       {canTakePayments(me.role) && <PolicyCard supabase={supabase} businessId={me.business_id} role={me.role} client={client} tz={tz} />}
       {canTakePayments(me.role) && <MessagesCard supabase={supabase} clientId={client.id} firstName={client.first_name} tz={tz} />}
 
-      {client.allergies && (
-        <div
-          role="note"
-          aria-label="Allergies"
-          className="mb-6 flex animate-fade-in gap-3 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-danger"
-        >
-          <span aria-hidden className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-danger font-bold text-white">
-            !
-          </span>
-          <div>
-            <p className="text-sm font-semibold">Allergies and sensitivities</p>
-            <p>{client.allergies}</p>
-          </div>
-        </div>
-      )}
-
-      <Card
+      <Section
         titleId="patch-heading"
         title="Patch tests"
-        description={(() => {
-          const state = patchTestState(
-            patchTests.map((t) => ({ testedAt: new Date(t.tested_at), result: t.result })),
-            new Date(),
-            { ...settings, minHours: 0 },
-          );
-          return state === "ok" ? "Valid today for services that need one." : patchTestMessage(state, settings).replace(" before this visit", " ago");
-        })()}
-        flush
+        count={patchTests.length}
+        description={patchState === "ok" ? "Valid today for services that need one." : patchTestMessage(patchState, settings).replace(" before this visit", " ago")}
       >
         <PatchTestForm clientId={client.id} today={today} me={me.id} staff={team.map((s) => ({ id: s.id, name: fullName(s) }))} />
         {patchTests.length === 0 ? (
-          <EmptyState>No patch tests recorded.</EmptyState>
+          <EmptyState className="border-t border-line">No patch tests recorded.</EmptyState>
         ) : (
-          <ol className={listClass} aria-label="Patch test history">
+          <ol className={recordsClass} aria-label="Patch test history">
             {patchTests.map((t) => (
-              <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5">
-                <span>
-                  <span className="font-semibold text-ink">{formatDate(toLocal(new Date(t.tested_at), tz).date)}</span>
+              <li key={t.id} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 py-3">
+                <span className="min-w-0">
+                  <span className="font-medium text-ink">{formatDate(toLocal(new Date(t.tested_at), tz).date)}</span>
                   <span className="text-ink-muted"> · {t.products} · {fullName(t.staff)}</span>
-                  {t.notes && <span className="block text-sm text-ink-muted">{t.notes}</span>}
+                  {t.notes && <span className="mt-0.5 block text-13 text-ink-muted">{t.notes}</span>}
                 </span>
-                <Badge tone={t.result === "reaction" ? "red" : "green"}>{t.result === "reaction" ? "Reaction" : "No reaction"}</Badge>
+                <Badge tone={t.result === "reaction" ? "danger" : "success"}>{t.result === "reaction" ? "Reaction" : "No reaction"}</Badge>
               </li>
             ))}
           </ol>
         )}
-      </Card>
+      </Section>
 
-      <Card
+      <Section
         titleId="forms-heading"
         title="Signed forms"
+        count={forms.length}
         actions={
           <Link href={`/clients/${client.id}/forms/new`} className={buttonClass("secondary", "sm")}>
             Fill in a form
           </Link>
         }
-        flush
       >
         {forms.length === 0 ? (
-          <EmptyState>No signed forms.</EmptyState>
+          <EmptyState className="border-t border-line">No signed forms.</EmptyState>
         ) : (
-          <ul className={listClass} aria-label="Signed forms">
+          <ul className={recordsClass} aria-label="Signed forms">
             {forms.map((f) => (
-              <li key={f.id}>
-                <Link href={`/clients/${client.id}/forms/${f.id}`} className="flex justify-between gap-2 px-5 py-3.5 transition-colors duration-(--motion-fast) hover:bg-sunken/60">
-                  <span className="font-semibold text-ink">{f.template_name}</span>
-                  <span className="text-ink-muted">Signed {formatDate(toLocal(new Date(f.signed_at), tz).date)}</span>
+              <li key={f.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3">
+                <Link href={`/clients/${client.id}/forms/${f.id}`} className={nameLinkClass}>
+                  {f.template_name}
                 </Link>
+                <span className="text-13 text-ink-muted">Signed {formatDate(toLocal(new Date(f.signed_at), tz).date)}</span>
               </li>
             ))}
           </ul>
         )}
-      </Card>
+      </Section>
 
-      <Card
-        titleId="formulas-heading"
-        title={
-          <>
-            Color formulas <span className="font-sans text-base font-normal text-ink-muted">({formulas.length})</span>
-          </>
-        }
-        flush
-      >
+      <Section titleId="formulas-heading" title="Color formulas" count={formulas.length}>
         <FormulaForm clientId={client.id} today={today} visits={visits} products={products} />
         {formulas.length === 0 ? (
-          <EmptyState>No formulas yet.</EmptyState>
+          <EmptyState className="border-t border-line">No formulas yet.</EmptyState>
         ) : (
-          <ol className={listClass} aria-label="Formula history">
+          <ol className={recordsClass} aria-label="Formula history">
             {formulas.map((f) => (
-              <li key={f.id} className="animate-fade-in px-5 py-4">
-                <p className="flex flex-wrap items-center gap-x-2 text-sm text-ink-muted">
-                  <span className="font-semibold text-ink">{formatDate(f.visit_date)}</span>
+              <li key={f.id} className="animate-fade-in py-3">
+                <p className="flex flex-wrap items-center gap-x-2 text-13 text-ink-muted">
+                  <span className="font-medium text-ink">{formatDate(f.visit_date)}</span>
                   <span aria-hidden>·</span>
                   {f.author ? fullName(f.author) : "Unknown"}
                 </p>
-                <p className="mt-2 rounded-md border-l-4 border-peach-accent bg-peach-fill/40 px-3 py-2 font-mono text-sm whitespace-pre-line text-ink">
-                  {f.formula}
-                </p>
+                <p className="mt-1.5 border-l-2 border-peach-accent pl-3 font-mono text-13 whitespace-pre-line text-ink">{f.formula}</p>
                 {f.formula_products.length > 0 && (
-                  <p className="mt-2 text-sm text-ink" data-testid="formula-products">
-                    <span className="font-medium text-ink-muted">{f.item ? `${f.item.service.name}: ` : "Products: "}</span>
+                  <p className="mt-1.5 text-13 text-ink" data-testid="formula-products">
+                    <span className="text-ink-muted">{f.item ? `${f.item.service.name}: ` : "Products: "}</span>
                     {[...f.formula_products]
                       .sort((a, b) => a.position - b.position)
                       .map((fp) => `${formatAmount(fp.amount, fp.product.unit)} ${productName(fp.product)}`)
                       .join(" + ")}
                   </p>
                 )}
-                {f.notes && <p className="mt-2 text-sm text-ink-muted">{f.notes}</p>}
+                {f.notes && <p className="mt-1.5 text-13 text-ink-muted">{f.notes}</p>}
               </li>
             ))}
           </ol>
         )}
-      </Card>
+      </Section>
 
-      <Card
-        titleId="photos-heading"
-        title={
-          <>
-            Before and after <span className="font-sans text-base font-normal text-ink-muted">({gallery.photos.length})</span>
-          </>
-        }
-        description="Saved to each visit. Only your salon can see them."
-      >
-        <PhotoGallery clientId={client.id} photos={gallery.photos} consent={gallery.consent} today={today} />
-      </Card>
+      <Section titleId="photos-heading" title="Before and after" count={gallery.photos.length} description="Saved to each visit. Only your salon can see them.">
+        <div className="border-t border-line pt-4">
+          <PhotoGallery clientId={client.id} photos={gallery.photos} consent={gallery.consent} today={today} />
+        </div>
+      </Section>
 
-      <h2 className="mb-3 font-serif text-2xl font-semibold text-navy-900">Details</h2>
-      {editable ? (
-        <ClientForm
-          key={client.updated_at}
-          clientId={client.id}
-          initial={toFields(client)}
-          stylists={await stylistOptions(supabase, client.preferred_staff_id)}
-          today={today}
-        />
-      ) : (
-        <Card>
-          <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+      <Section titleId="details-heading" title="Details">
+        {editable ? (
+          <ClientForm
+            key={client.updated_at}
+            clientId={client.id}
+            initial={toFields(client)}
+            stylists={await stylistOptions(supabase, client.preferred_staff_id)}
+            today={today}
+          />
+        ) : (
+          <dl className="divide-y divide-line border-y border-line">
             <Detail label="Phone" value={client.phone} />
             <Detail label="Email" value={client.email} />
-            <Detail
-              label="Preferred stylist"
-              value={client.preferred ? fullName(client.preferred) : null}
-              empty="No preference"
-            />
+            <Detail label="Preferred stylist" value={client.preferred ? fullName(client.preferred) : null} empty="No preference" />
             <Detail label="Preferences" value={client.preferences} />
             <Detail label="Birthday" value={client.birth_month && client.birth_day ? `${MONTHS[client.birth_month - 1]} ${client.birth_day}` : null} />
-            <Detail label="Notes" value={client.notes} wide />
-            <Detail
-              label="Consent form"
-              value={client.consent_signed_on ? `Signed ${formatDate(client.consent_signed_on)}` : null}
-              empty="Not signed"
-            />
+            <Detail label="Notes" value={client.notes} />
+            <Detail label="Consent form" value={client.consent_signed_on ? `Signed ${formatDate(client.consent_signed_on)}` : null} empty="Not signed" />
             <Detail
               label="Messages"
               value={
@@ -332,17 +299,21 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
               empty="No offers"
             />
           </dl>
-        </Card>
-      )}
+        )}
+      </Section>
     </AppShell>
   );
 }
 
-function Detail({ label, value, empty = "—", wide }: { label: string; value: string | null; empty?: string; wide?: boolean }) {
+// Records under a section's title: a thin rule above, one between each.
+const recordsClass = "divide-y divide-line border-y border-line";
+
+// A label and its value, side by side from a tablet up.
+function Detail({ label, value, empty = "—" }: { label: string; value: string | null; empty?: string }) {
   return (
-    <div className={wide ? "sm:col-span-2" : undefined}>
-      <dt className="text-xs font-semibold tracking-wider text-ink-muted uppercase">{label}</dt>
-      <dd className={`mt-1 ${value ? "whitespace-pre-line text-ink" : "text-ink-muted"}`}>{value || empty}</dd>
+    <div className="grid gap-1 py-3 sm:grid-cols-[12rem_1fr] sm:gap-4">
+      <dt className="text-13 text-ink-muted">{label}</dt>
+      <dd className={`text-sm ${value ? "whitespace-pre-line text-ink" : "text-ink-subtle"}`}>{value || empty}</dd>
     </div>
   );
 }

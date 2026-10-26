@@ -2,12 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { DemoBar } from "@/components/demo-bar";
 import { BRAND_NAVY, siteUrl, TAGLINE } from "@/lib/branding";
 import { isDemo } from "@/lib/demo";
-import { Fraunces, Inter } from "next/font/google";
+import { GeistMono } from "geist/font/mono";
+import { GeistSans } from "geist/font/sans";
 import "./globals.css";
-
-// Body text and headings; see the design tokens in globals.css.
-const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
-const fraunces = Fraunces({ variable: "--font-fraunces", subsets: ["latin"] });
 
 // Maestra's own brand: the browser tab, home-screen icon and link
 // previews. Icons and the preview image are the files in this folder
@@ -28,7 +25,7 @@ export const viewport: Viewport = { themeColor: BRAND_NAVY };
 export default function RootLayout({ children }: LayoutProps<"/">) {
   const demo = isDemo();
   return (
-    <html lang="en" className={`${inter.variable} ${fraunces.variable} h-full antialiased`} data-demo={demo ? "" : undefined}>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`} data-demo={demo ? "" : undefined}>
       <body className="flex min-h-full flex-col font-sans">
         {demo && <DemoBar />}
         {children}

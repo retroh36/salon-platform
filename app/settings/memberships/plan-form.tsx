@@ -104,7 +104,7 @@ export function PlanForm({ plan, services }: { plan: MembershipPlan | null; serv
           <PlusIcon className="size-4" />
           Add a service
         </Button>
-        <p className="text-xs text-ink-muted">Rolled-over services carry into the next period only (one period&apos;s worth at most).</p>
+        <p className="text-13 text-ink-muted">Rolled-over services carry into the next period only (one period&apos;s worth at most).</p>
       </fieldset>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className={labelClass}>
@@ -138,7 +138,7 @@ export function PlanForm({ plan, services }: { plan: MembershipPlan | null; serv
             </label>
           )}
         </div>
-        <p className="text-xs text-ink-muted sm:col-span-3">A membership always ends at the end of a period it&apos;s paid for, once the minimum term and notice are met.</p>
+        <p className="text-13 text-ink-muted sm:col-span-3">A membership always ends at the end of a period it&apos;s paid for, once the minimum term and notice are met.</p>
       </fieldset>
       {plan && (
         <label className="flex items-center gap-2 text-sm">

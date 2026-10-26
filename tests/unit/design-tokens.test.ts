@@ -76,8 +76,10 @@ const PAIRS: [string, string][] = [
   ...["ink", "ink-muted"].flatMap((t) => FILLS.map((f): [string, string] => [t, f])),
   // Calendar blocks: the name in ink, the rest in block-ink-muted, on a
   // service color or a visit status.
-  ...["ink", "block-ink-muted", "status-late-ink"].flatMap((t) => [...FILLS, ...VISITS].map((f): [string, string] => [t, f])),
+  ...["ink", "block-ink-muted", "block-attention"].flatMap((t) => [...FILLS, ...VISITS].map((f): [string, string] => [t, f])),
   ...STATUSES.map((s): [string, string] => [`status-${s}-ink`, `status-${s}-bg`]),
+  // Status tags, alerts and notices: the ink on its soft fill, and on the page.
+  ...["success", "warning", "info", "neutral"].flatMap((s): [string, string][] => [[s, `${s}-soft`], ...SURFACES.map((b): [string, string] => [s, b])]),
   ["white", "navy-900"],
   ["white", "navy-800"],
   ["navy-700", "navy-100"],
@@ -89,6 +91,8 @@ const PAIRS: [string, string][] = [
   ["denise-200", "navy-900"],
   ["white", "danger"],
   ["danger", "danger-soft"],
+  // Dark text on the soft fills (the check-in and patch test warnings).
+  ...["success-soft", "warning-soft", "info-soft", "neutral-soft", "danger-soft"].flatMap((b): [string, string][] => [["ink", b], ["ink-muted", b]]),
   ["white", "now"],
   // Denise's messages and badge.
   ...["ink", "ink-muted", "denise-700", "denise-900"].flatMap((t) => ["denise-50", "denise-100"].map((b): [string, string] => [t, b])),

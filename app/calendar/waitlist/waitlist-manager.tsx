@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
-import { Alert, Card, EmptyState, listClass } from "@/components/ui/page";
+import { Alert, Card, EmptyState, listClass, rowClass } from "@/components/ui/page";
+import { PlusIcon } from "@/components/ui/icons";
 import { formatDate } from "@/lib/clients";
 import { addDays } from "@/lib/scheduling/time";
 import { TIME_WINDOWS, type WindowName } from "@/lib/scheduling/waitlist";
@@ -58,30 +59,38 @@ export function WaitlistManager({
 
   return (
     <>
-      <Card title={`Waiting (${entries.length})`} titleId="waiting-heading" flush>
+      <Card
+        title={
+          <>
+            Waiting <span className="ml-1 text-13 font-normal text-ink-subtle tabular-nums">{entries.length}</span>
+          </>
+        }
+        titleId="waiting-heading"
+        flush
+      >
         {entries.length === 0 ? (
           <EmptyState>No one is on the waitlist.</EmptyState>
         ) : (
           <ul className={listClass} aria-labelledby="waiting-heading">
             {entries.map((e) => (
-              <li key={e.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-3.5">
+              <li key={e.id} className={`flex flex-wrap items-start justify-between gap-3 ${rowClass}`}>
                 <div className="min-w-0">
-                  <p className="font-semibold text-ink">
+                  <p className="font-medium text-ink">
                     {e.clientName}
-                    {e.phone && <span className="ml-2 font-normal text-ink-muted">{e.phone}</span>}
+                    {e.phone && <span className="ml-2 font-normal text-ink-muted tabular-nums">{e.phone}</span>}
                   </p>
                   <p className="text-sm text-ink">
                     {e.services} · {e.stylists}
                   </p>
-                  <p className="text-sm text-ink-muted">
+                  <p className="text-13 text-ink-muted">
                     {formatDate(e.fromDate)} – {formatDate(e.toDate)} · {e.windows.length ? e.windows.map((w) => TIME_WINDOWS[w].label).join(", ") : "Any time"}
                     {e.notes && ` · ${e.notes}`}
                   </p>
                 </div>
                 {canEdit && (
                   <Button
-                    size="sm"
-                    variant="ghost"
+                    size="xs"
+                    variant="quiet"
                     disabled={pending}
                     aria-label={`Remove ${e.clientName} from the waitlist`}
                     onClick={() => startTransition(async () => void (await removeFromWaitlist(e.id)))}
@@ -98,7 +107,7 @@ export function WaitlistManager({
       {canEdit && (
         <Card title="Add to the waitlist" titleId="add-heading">
           <form onSubmit={submit} aria-label="Add to the waitlist" className="flex flex-col gap-5 text-sm">
-            {message && (message.ok ? <p role="status" className="font-medium text-status-confirmed-ink">{message.text}</p> : <Alert>{message.text}</Alert>)}
+            {message && (message.ok ? <Alert tone="success">{message.text}</Alert> : <Alert>{message.text}</Alert>)}
             <ClientPicker client={client} onChange={setClient} />
             <div className="flex flex-col gap-2">
               {serviceIds.map((id, i) => (
@@ -126,13 +135,14 @@ export function WaitlistManager({
                 </label>
               ))}
               {serviceIds.length < 5 && (
-                <Button size="sm" variant="ghost" className="self-start" onClick={() => setServiceIds([...serviceIds, ""])}>
-                  + Another service
+                <Button size="sm" className="self-start" onClick={() => setServiceIds([...serviceIds, ""])}>
+                  <PlusIcon className="size-4" />
+                  Another service
                 </Button>
               )}
             </div>
             <fieldset className="flex flex-col gap-1.5">
-              <legend className="mb-1 font-medium text-ink">Stylists (none ticked: any stylist)</legend>
+              <legend className="mb-1 text-13 font-medium text-ink">Stylists (none ticked: any stylist)</legend>
               <div className="flex flex-wrap gap-x-5 gap-y-1.5">
                 {stylists.map((s) => (
                   <label key={s.id} className="flex items-center gap-2">
@@ -153,7 +163,7 @@ export function WaitlistManager({
               </label>
             </div>
             <fieldset className="flex flex-col gap-1.5">
-              <legend className="mb-1 font-medium text-ink">Times (none ticked: any time)</legend>
+              <legend className="mb-1 text-13 font-medium text-ink">Times (none ticked: any time)</legend>
               <div className="flex flex-wrap gap-x-5 gap-y-1.5">
                 {WINDOW_NAMES.map((w) => (
                   <label key={w} className="flex items-center gap-2">

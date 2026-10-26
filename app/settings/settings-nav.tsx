@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { pillClass } from "@/components/ui/page";
 import { can, type Permission } from "@/lib/permissions";
 
 type Page = "salon" | "booking" | "policies" | "checkout" | "gift-cards" | "packages" | "events" | "memberships" | "automations" | "messages" | "devices" | "payroll" | "commission" | "data" | "billing";
@@ -31,9 +30,16 @@ export function firstSettingsPage(me: { permissions: readonly string[] }): strin
 // Moves between the settings pages someone can open.
 export function SettingsNav({ current, me }: { current: Page; me: { permissions: readonly string[] } }) {
   return (
-    <nav aria-label="Settings" className="mb-6 flex flex-wrap gap-2">
+    <nav aria-label="Settings" className="mb-8 flex flex-wrap gap-x-1 gap-y-1 border-b border-line pb-3">
       {LINKS.filter(([, , , p]) => can(me, p)).map(([key, href, label]) => (
-        <Link key={key} href={href} aria-current={key === current ? "page" : undefined} className={pillClass(key === current)}>
+        <Link
+          key={key}
+          href={href}
+          aria-current={key === current ? "page" : undefined}
+          className={`touch-target inline-flex h-8 items-center rounded-md px-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+            key === current ? "bg-navy-100 text-ink" : "text-ink-muted hover:bg-sunken hover:text-ink"
+          }`}
+        >
           {label}
         </Link>
       ))}

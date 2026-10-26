@@ -43,13 +43,13 @@ export function DateStrip({
             aria-checked={on}
             aria-label={`${longDate(d.date)}${empty ? ", no times" : `, ${d.times.length} ${d.times.length === 1 ? "time" : "times"}`}`}
             onClick={() => onSelect(d.date)}
-            className={`flex min-h-18 w-15 shrink-0 snap-start flex-col items-center justify-center rounded-xl border text-center transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-              on ? "border-(--accent) bg-(--accent) text-white" : empty ? "border-line bg-sunken text-ink-subtle" : "border-line bg-surface text-ink hover:border-(--accent-line)"
-            }`}
+            className={`flex min-h-18 w-15 shrink-0 snap-start flex-col items-center justify-center rounded-lg border text-center transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+ on ? "border-(--accent) bg-(--accent) text-white" : empty ? "border-line bg-sunken text-ink-subtle" : "border-line bg-surface text-ink hover:border-(--accent-line)"
+ }`}
           >
-            <span className="text-xs font-medium uppercase">{asDate(d.date).toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" })}</span>
-            <span className="font-serif text-xl font-semibold">{asDate(d.date).getUTCDate()}</span>
-            <span className="text-[11px]">{asDate(d.date).toLocaleDateString("en-US", { month: "short", timeZone: "UTC" })}</span>
+            <span className={`text-xs font-medium ${on ? "text-white/90" : empty ? "" : "text-ink-muted"}`}>{asDate(d.date).toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" })}</span>
+            <span className="text-xl font-semibold">{asDate(d.date).getUTCDate()}</span>
+            <span className={`text-xs ${on ? "text-white/90" : empty ? "" : "text-ink-muted"}`}>{asDate(d.date).toLocaleDateString("en-US", { month: "short", timeZone: "UTC" })}</span>
           </button>
         );
       })}
@@ -58,7 +58,7 @@ export function DateStrip({
           type="button"
           onClick={onMore}
           disabled={loading}
-          className="flex min-h-18 w-24 shrink-0 items-center justify-center rounded-xl border border-dashed border-line-strong px-2 text-sm font-semibold text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+          className="flex min-h-18 w-24 shrink-0 items-center justify-center rounded-lg border border-line-strong bg-surface px-2 text-sm font-medium text-ink transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:outline-2 focus-visible:outline-focus disabled:opacity-55"
         >
           {loading ? "Loading…" : "Later dates"}
         </button>
@@ -94,7 +94,7 @@ export function TimeGrid<T extends { minute: number }>({
         if (!part.length) return null;
         return (
           <div key={name} role="radiogroup" aria-label={name}>
-            <p className="mb-2 text-xs font-semibold tracking-wider text-ink-muted uppercase">{name}</p>
+            <p className="mb-2 text-13 font-medium text-ink-muted">{name}</p>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {part.map((t) => {
                 const on = t.minute === selected;
@@ -107,14 +107,14 @@ export function TimeGrid<T extends { minute: number }>({
                     aria-checked={on}
                     aria-label={special ? `${formatMinute(t.minute)}, ${special}` : undefined}
                     onClick={() => onPick(t)}
-                    className={`flex min-h-12 flex-col items-center justify-center rounded-xl border px-1 text-base font-semibold tabular-nums transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-                      on ? "border-(--accent) bg-(--accent) text-white" : "border-line bg-surface text-ink hover:border-(--accent-line)"
-                    }`}
+                    className={`flex min-h-12 flex-col items-center justify-center rounded-lg border px-1 text-base font-medium tabular-nums transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+ on ? "border-(--accent) bg-(--accent) text-white" : "border-line bg-surface text-ink hover:border-(--accent-line)"
+ }`}
                   >
                     {formatMinute(t.minute)}
-                    {label && <span className={`max-w-full truncate text-[11px] font-medium ${on ? "text-white/90" : "text-ink-muted"}`}>{label(t)}</span>}
+                    {label && <span className={`max-w-full truncate text-xs font-normal ${on ? "text-white/90" : "text-ink-muted"}`}>{label(t)}</span>}
                     {special && (
-                      <span className={`mt-0.5 rounded-full px-1.5 text-[11px] font-semibold ${on ? "bg-white/20 text-white" : "bg-(--accent-soft) text-ink"}`} data-testid="special-badge">
+                      <span className={`mt-0.5 rounded-sm px-1.5 text-xs font-medium ${on ? "bg-white/20 text-white" : "bg-(--accent-soft) text-ink"}`} data-testid="special-badge">
                         {special}
                       </span>
                     )}

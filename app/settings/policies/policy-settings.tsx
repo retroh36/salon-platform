@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { checkboxClass, Eyebrow, fieldClass, labelClass, selectClass } from "@/components/ui/field";
+import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
 import { parseFeeRule, policyText, type CardRule, type FeeKind, type FeeRule, type PolicyErrors, type PolicySettings, type RepeatAction, type StaffPolicy } from "@/lib/policy";
 import { savePolicy, saveStaffPolicy, type PolicyResult } from "./actions";
@@ -26,9 +26,9 @@ const amountText = (r: FeeRule) => (r.kind === "fixed" ? String(r.amount / 100) 
 function FeeField({ name, label, value, error, onChange }: { name: string; label: string; value: { kind: FeeKind; amount: string }; error?: string; onChange: (v: { kind: FeeKind; amount: string }) => void }) {
   return (
     <fieldset className="flex flex-col gap-1.5">
-      <legend className="mb-1.5 text-sm font-medium text-ink">{label}</legend>
+      <legend className="mb-1.5 text-13 font-medium text-ink">{label}</legend>
       <div className="flex flex-wrap gap-2">
-        <select name={`${name}_kind`} aria-label={`${label} fee`} value={value.kind} onChange={(e) => onChange({ ...value, kind: e.target.value as FeeKind })} className={`${selectClass} w-auto`}>
+        <select name={`${name}_kind`} aria-label={`${label} fee`} value={value.kind} onChange={(e) => onChange({ ...value, kind: e.target.value as FeeKind })} className={`${selectClass} max-w-xs`}>
           {FEE_KINDS.map((k) => (
             <option key={k.value} value={k.value}>
               {k.label}
@@ -101,8 +101,8 @@ export function PolicyForm({
         start(async () => setResult(await savePolicy(form)));
       }}
     >
-      <section className="flex flex-col gap-3">
-        <Eyebrow>Card on file</Eyebrow>
+      <section className="flex flex-col gap-3 border-t border-line pt-6 first:border-t-0 first:pt-0">
+        <h3 className="text-sm font-semibold text-ink">Card on file</h3>
         <label className={`${labelClass} max-w-sm`}>
           Ask for a card to book
           <select name="card_required" value={card} onChange={(e) => setCard(e.target.value as CardRule)} className={selectClass}>
@@ -115,8 +115,8 @@ export function PolicyForm({
         </label>
         {card === "some" && (
           <div className="grid gap-4 sm:grid-cols-2">
-            <fieldset className="flex max-h-56 flex-col gap-1.5 overflow-y-auto rounded-md border border-line p-3">
-              <legend className="px-1 text-sm font-medium">Services</legend>
+            <fieldset className="flex max-h-56 flex-col gap-1.5 overflow-y-auto rounded-md border border-line-strong p-3">
+              <legend className="px-1 text-13 font-medium">Services</legend>
               {services.map((s) => (
                 <label key={s.id} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" name="card_service_ids" value={s.id} defaultChecked={initial.cardServiceIds.includes(s.id)} className={checkboxClass} />
@@ -124,8 +124,8 @@ export function PolicyForm({
                 </label>
               ))}
             </fieldset>
-            <fieldset className="flex max-h-56 flex-col gap-1.5 overflow-y-auto rounded-md border border-line p-3">
-              <legend className="px-1 text-sm font-medium">Stylists</legend>
+            <fieldset className="flex max-h-56 flex-col gap-1.5 overflow-y-auto rounded-md border border-line-strong p-3">
+              <legend className="px-1 text-13 font-medium">Stylists</legend>
               {stylists.map((s) => (
                 <label key={s.id} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" name="card_staff_ids" value={s.id} defaultChecked={initial.cardStaffIds.includes(s.id)} className={checkboxClass} />
@@ -136,11 +136,11 @@ export function PolicyForm({
           </div>
         )}
         {errors.cardRequired && <p className="text-sm text-danger">{errors.cardRequired}</p>}
-        <p className="text-sm text-ink-muted">Online, the card is saved before the booking is confirmed. At the desk, send the client a secure link; the booking shows &ldquo;Card needed&rdquo; until it&rsquo;s done.</p>
+        <p className="text-13 text-ink-muted">Online, the card is saved before the booking is confirmed. At the desk, send the client a secure link; the booking shows &ldquo;Card needed&rdquo; until it&rsquo;s done.</p>
       </section>
 
-      <section className="flex flex-col gap-4">
-        <Eyebrow>Cancellations and no-shows</Eyebrow>
+      <section className="flex flex-col gap-4 border-t border-line pt-6 first:border-t-0 first:pt-0">
+        <h3 className="text-sm font-semibold text-ink">Cancellations and no-shows</h3>
         <label className={`${labelClass} max-w-xs`}>
           Cancellation window (hours before the visit)
           <input name="window_hours" inputMode="numeric" value={window} onChange={(e) => setWindow(e.target.value)} aria-invalid={!!errors.windowHours} className={fieldClass} />
@@ -153,13 +153,13 @@ export function PolicyForm({
             Only charge the late-cancel fee for visits booked at least this many days ahead <span className="font-normal text-ink-muted">(optional)</span>
           </span>
           <input name="long_hold_days" inputMode="numeric" placeholder="e.g. 21" value={longHold} onChange={(e) => setLongHold(e.target.value)} aria-invalid={!!errors.longHoldDays} className={`${fieldClass} w-28`} />
-          <span className="text-xs font-normal text-ink-muted">For visits that held a spot for weeks. A deposit is always kept on a late cancellation.</span>
+          <span className="text-13 font-normal text-ink-muted">For visits that held a spot for weeks. A deposit is always kept on a late cancellation.</span>
           {errors.longHoldDays && <span className="text-sm font-normal text-danger">{errors.longHoldDays}</span>}
         </label>
       </section>
 
-      <section className="flex flex-col gap-3">
-        <Eyebrow>Repeat offenders</Eyebrow>
+      <section className="flex flex-col gap-3 border-t border-line pt-6 first:border-t-0 first:pt-0">
+        <h3 className="text-sm font-semibold text-ink">Repeat offenders</h3>
         <div className="flex flex-wrap items-end gap-3 text-sm">
           <label className={labelClass}>
             After
@@ -186,12 +186,13 @@ export function PolicyForm({
           )}
         </div>
         {(errors.repeatCount || errors.repeatMonths || errors.repeatDepositPercent) && <p className="text-sm text-danger">{errors.repeatCount ?? errors.repeatMonths ?? errors.repeatDepositPercent}</p>}
-        <p className="text-sm text-ink-muted">Waived fees don&rsquo;t count. Denise points them out when they book at the desk; online, they pay ahead to confirm.</p>
+        <p className="text-13 text-ink-muted">Waived fees don&rsquo;t count. Denise points them out when they book at the desk; online, they pay ahead to confirm.</p>
       </section>
 
+      <div className="border-t border-line pt-6 first:border-t-0 first:pt-0">
       <fieldset className="flex flex-col gap-1.5">
-        <legend className="mb-1.5 text-sm font-medium text-ink">Who can waive a fee</legend>
-        <p className="mb-1 text-sm text-ink-muted">Owners always can. A reason is always asked for, and every waiver is logged.</p>
+        <legend className="mb-1 text-sm font-semibold text-ink">Who can waive a fee</legend>
+        <p className="mb-1 text-13 text-ink-muted">Owners always can. A reason is always asked for, and every waiver is logged.</p>
         {(
           [
             ["manager", "Managers"],
@@ -204,18 +205,19 @@ export function PolicyForm({
           </label>
         ))}
       </fieldset>
+      </div>
 
-      <section aria-label="What clients see" className="rounded-lg border border-line bg-sunken/60 p-4">
-        <Eyebrow className="mb-2">What clients see</Eyebrow>
-        <div className="flex flex-col gap-1.5 text-sm text-ink" data-testid="policy-preview">
+      <section aria-label="What clients see" className="flex flex-col gap-3 border-t border-line pt-6 first:border-t-0 first:pt-0">
+        <h3 className="text-sm font-semibold text-ink">What clients see</h3>
+        <div className="flex flex-col gap-1.5 border-l-2 border-line-strong pl-3 text-sm text-ink" data-testid="policy-preview">
           {preview.map((line) => (
             <p key={line}>{line}</p>
           ))}
         </div>
-        <p className="mt-2 text-xs text-ink-muted">Anything else to add goes in Settings → Online booking, under Cancellation policy.</p>
+        <p className="text-13 text-ink-muted">Anything else to add goes in Settings → Online booking, under Cancellation policy.</p>
       </section>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
         <Button type="submit" variant="primary" disabled={pending}>
           Save policy
         </Button>
@@ -268,8 +270,8 @@ function StaffPolicyRow({ stylist, policy }: { stylist: { id: string; name: stri
     <li className="py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="font-medium">{stylist.name}</p>
-          <p className="text-sm text-ink-muted">{summary(policy)}</p>
+          <p className="font-medium text-ink">{stylist.name}</p>
+          <p className="text-13 text-ink-muted">{summary(policy)}</p>
         </div>
         <Button size="sm" variant="ghost" onClick={() => setOpen(!open)} aria-expanded={open}>
           {open ? "Close" : "Edit"}
@@ -288,11 +290,11 @@ function StaffPolicyRow({ stylist, policy }: { stylist: { id: string; name: stri
             Window (hours)
             <input inputMode="numeric" placeholder="The salon's" value={window} onChange={(e) => setWindow(e.target.value)} className={`${fieldClass} w-28`} />
           </label>
-          <div className="flex flex-col gap-1.5 text-sm font-medium">
+          <div className="flex flex-col gap-1.5 text-13 font-medium">
             Late cancellation
             {kinds("Late cancellation", late, setLate)}
           </div>
-          <div className="flex flex-col gap-1.5 text-sm font-medium">
+          <div className="flex flex-col gap-1.5 text-13 font-medium">
             No-show
             {kinds("No-show", noShow, setNoShow)}
           </div>

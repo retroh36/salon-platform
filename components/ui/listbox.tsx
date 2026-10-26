@@ -112,13 +112,13 @@ export function Listbox<T extends string>({
           aria-label={label}
           aria-activedescendant={`${id}-option-${active}`}
           onKeyDown={onListKey}
-          className="absolute top-full left-0 z-50 mt-2 max-h-[min(70vh,32rem)] min-w-full origin-top animate-pop-in overflow-y-auto rounded-xl border border-line bg-surface p-1 shadow-lift focus:outline-none"
+          className="absolute top-full left-0 z-50 mt-2 max-h-[min(70vh,32rem)] min-w-full origin-top animate-pop-in overflow-y-auto rounded-lg border border-line bg-surface p-1 shadow-lift focus:outline-none"
         >
           {options.flatMap((o, i) => {
             const selected = o.value === value && !o.action;
             const heading =
               o.group && o.group !== options[i - 1]?.group ? (
-                <li key={`group:${o.group}`} role="presentation" className="px-3 pt-2.5 pb-1 text-xs font-semibold tracking-wide text-ink-subtle uppercase">
+                <li key={`group:${o.group}`} role="presentation" className="px-3 pt-2.5 pb-1 text-xs font-medium text-ink-subtle">
                   {o.group}
                 </li>
               ) : null;

@@ -126,8 +126,9 @@ export function EventSettingsForm({ settings, terms, services }: { settings: Eve
         start(async () => setResult(await saveEventSettings(f)));
       }}
     >
+      <div className="border-t border-line pt-6 first:border-t-0 first:pt-0">
       <fieldset className="grid gap-3 sm:grid-cols-3">
-        <legend className="mb-2 font-semibold">Deposit and payments</legend>
+        <legend className="mb-2 text-sm font-semibold text-ink">Deposit and payments</legend>
         {num("depositPct", "Deposit to book (%)", { max: 100 })}
         {num("secondPaymentPct", "Second payment (%, 0 for none)", { max: 100 })}
         {num("secondPaymentDays", "Second payment due (days before)")}
@@ -138,21 +139,27 @@ export function EventSettingsForm({ settings, terms, services }: { settings: Eve
           The deposit can be given back
         </label>
       </fieldset>
+      </div>
+      <div className="border-t border-line pt-6 first:border-t-0 first:pt-0">
       <fieldset className="grid gap-3 sm:grid-cols-3">
-        <legend className="mb-2 font-semibold">Service charge</legend>
+        <legend className="mb-2 text-sm font-semibold text-ink">Service charge</legend>
         {num("serviceChargePct", "Service charge or gratuity (%)", { max: 50 })}
         {num("serviceChargeTeamPct", "Team's share, paid as tips (%)", { max: 100 })}
       </fieldset>
+      </div>
+      <div className="border-t border-line pt-6 first:border-t-0 first:pt-0">
       <fieldset className="grid gap-3 sm:grid-cols-3">
-        <legend className="mb-2 font-semibold">On-location travel</legend>
+        <legend className="mb-2 text-sm font-semibold text-ink">On-location travel</legend>
         {money("travelFee", "Travel fee ($)")}
         {num("travelFreeMiles", "Miles included")}
         {money("travelPerMile", "Then per mile ($)")}
         {num("travelTeamPct", "Team's share, paid as tips (%)", { max: 100 })}
         {num("travelMinutes", "Travel time each way (minutes)", { step: 5 })}
       </fieldset>
+      </div>
+      <div className="border-t border-line pt-6 first:border-t-0 first:pt-0">
       <fieldset className="grid gap-3 sm:grid-cols-3">
-        <legend className="mb-2 font-semibold">Early starts and the timeline</legend>
+        <legend className="mb-2 text-sm font-semibold text-ink">Early starts and the timeline</legend>
         <label className={labelClass}>
           Early start before
           <input type="time" step={300} value={f.earlyStart} onChange={(e) => setF({ ...f, earlyStart: e.target.value })} className={fieldClass} />
@@ -176,7 +183,8 @@ export function EventSettingsForm({ settings, terms, services }: { settings: Eve
           Take event inquiries on the booking site
         </label>
       </fieldset>
-      <label className={labelClass}>
+      </div>
+      <label className={`${labelClass} border-t border-line pt-6`}>
         Contract terms
         <span className="font-normal text-ink-muted">
           Clients agree to these when they book. A starter version to edit: have your own lawyer review it. &ldquo;{"{salon}"}&rdquo; becomes your salon&rsquo;s name. Each change is kept as a new version.

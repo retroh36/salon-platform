@@ -37,7 +37,7 @@ export function SupplierForm() {
             Add supplier
           </button>
           {state?.saved && (
-            <span role="status" className="animate-fade-in pb-2 text-sm font-medium text-status-confirmed-ink">
+            <span role="status" className="animate-fade-in pb-2 text-sm text-ink-muted">
               Added.
             </span>
           )}

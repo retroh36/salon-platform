@@ -9,9 +9,9 @@ import { forgetThisDevice, removeDevice, saveAutoLock, shareThisDevice, type Dev
 function Result({ result }: { result: DeviceResult | null }) {
   if (!result) return null;
   return result.ok ? (
-    <p role="status" className="text-sm font-medium text-status-confirmed-ink">
+    <Alert tone="success">
       {result.message}
-    </p>
+    </Alert>
   ) : (
     <Alert>{result.message}</Alert>
   );

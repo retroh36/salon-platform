@@ -91,7 +91,7 @@ export function ReceiveForm({ orderId, lines }: { orderId: string; lines: Receiv
                   value={received[l.id]}
                   onChange={(e) => setReceived({ ...received, [l.id]: e.target.value })}
                   aria-label={`${l.label} arrived`}
-                  className={`${fieldClass} h-12 w-24 text-center text-lg`}
+                  className={`${fieldClass} h-12 w-24 text-center text-base`}
                 />
               </label>
             </li>

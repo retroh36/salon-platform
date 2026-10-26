@@ -9,8 +9,8 @@ The month's late cancellations and no-shows, what the policy recovered, and who 
 
 1. In the sidebar, under Sales, tap **Policy**.
 2. Read the totals: **Recovered**, **Charged**, **Waived**, **Didn't go through** and **Card on file**.
-3. Use **Previous** and **Next** to change the month.
-4. Under **Late cancellations and no-shows**, waive a fee or try a card again.
+3. Use the arrows either side of the month to see an earlier or later one.
+4. Under **Late cancellations and no-shows**, each fee shows its status. At the end of its row, tap **Try the card again** or **Waive…** (with a reason); when there's both, **Waive…** is under **⋯**.
 5. Under **Repeat offenders**, tap a name to open their profile.
 
 ## Good to know

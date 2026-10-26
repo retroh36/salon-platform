@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Avatar } from "@/components/ui/avatar";
-import { Card, PageHeader } from "@/components/ui/page";
+import { EmptyState, PageHeader, Section } from "@/components/ui/page";
+import { numClass, TableCard, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import { minutesText } from "@/lib/insights/describe";
 import { MIN_VISITS } from "@/lib/insights/durations";
@@ -59,55 +60,78 @@ async function Durations() {
         const mine = rows.filter((d) => d.staffId === s.id).sort((a, b) => Number(Boolean(b.suggestedMinutes)) - Number(Boolean(a.suggestedMinutes)) || b.visits - a.visits);
         if (!mine.length) return null;
         return (
-          <Card key={s.id} flush title={<span className="flex items-center gap-3"><Avatar name={fullName(s)} color={s.color} level={s.level} size="sm" />{fullName(s)}</span>} titleId={`staff-${s.id}`}>
-            <table className="w-full text-sm" aria-labelledby={`staff-${s.id}`}>
-              <thead className="border-b border-line bg-sunken/50 text-left text-xs font-semibold tracking-wide text-ink-muted uppercase">
-                <tr>
-                  <th scope="col" className="px-5 py-2">Service</th>
-                  <th scope="col" className="px-3 py-2">Booked as</th>
-                  <th scope="col" className="px-3 py-2">Really takes</th>
-                  <th scope="col" className="px-3 py-2">From</th>
-                  <th scope="col" className="px-5 py-2 text-right">Denise suggests</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {mine.map((d) => {
-                  const key = `${d.staffId}:${d.serviceId}`;
-                  const current = ownLength.get(key) ?? d.menuMinutes;
-                  const actionId = ownLength.has(key) ? (undoable.get(`duration:${key}`) ?? null) : null;
-                  const name = serviceName.get(d.serviceId) ?? "Service";
-                  return (
-                    <tr key={key} data-testid="duration-row" data-service={name}>
-                      <th scope="row" className="px-5 py-2.5 text-left font-medium text-ink">{name}</th>
-                      <td className="px-3 py-2.5 tabular-nums">
-                        {minutesText(current)}
-                        {ownLength.has(key) && <span className="ml-1 text-xs text-ink-muted">(menu {minutesText(d.menuMinutes)})</span>}
-                      </td>
-                      <td className="px-3 py-2.5 tabular-nums">
-                        {d.trusted ? minutesText(d.medianMinutes) : <span className="text-ink-muted">Learning</span>}
-                        {d.trusted && d.trend !== "steady" && <span className="ml-1 text-xs text-ink-muted">({d.trend === "faster" ? "getting faster" : "getting slower"})</span>}
-                      </td>
-                      <td className="px-3 py-2.5 text-ink-muted">
-                        {d.visits} {d.visits === 1 ? "visit" : "visits"}
-                        {d.trusted && `, ${CONSISTENCY[d.consistency]}`}
-                        {d.basis === "check_in_out" && (
-                          <span className="block text-xs" data-testid="duration-basis">
-                            From check-in to checkout
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-5 py-2.5 text-right">
-                        <DurationButton staffId={d.staffId} serviceId={d.serviceId} suggested={d.suggestedMinutes && d.suggestedMinutes !== current ? minutesText(d.suggestedMinutes) : null} undoActionId={actionId} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </Card>
+          <Section
+            key={s.id}
+            title={
+              <span className="flex items-center gap-3">
+                <Avatar name={fullName(s)} color={s.color} level={s.level} size="sm" />
+                {fullName(s)}
+              </span>
+            }
+            titleId={`staff-${s.id}`}
+          >
+            <TableCard>
+              <table className={tableClass} aria-labelledby={`staff-${s.id}`}>
+                <thead className={theadClass}>
+                  <tr>
+                    <th scope="col" className={thClass}>
+                      Service
+                    </th>
+                    <th scope="col" className={`${thClass} text-right`}>
+                      Booked as
+                    </th>
+                    <th scope="col" className={`${thClass} text-right`}>
+                      Really takes
+                    </th>
+                    <th scope="col" className={thClass}>
+                      From
+                    </th>
+                    <th scope="col" className={`${thClass} text-right`}>
+                      Denise suggests
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mine.map((d) => {
+                    const key = `${d.staffId}:${d.serviceId}`;
+                    const current = ownLength.get(key) ?? d.menuMinutes;
+                    const actionId = ownLength.has(key) ? (undoable.get(`duration:${key}`) ?? null) : null;
+                    const name = serviceName.get(d.serviceId) ?? "Service";
+                    return (
+                      <tr key={key} className={trClass} data-testid="duration-row" data-service={name}>
+                        <th scope="row" className={`${tdClass} font-medium text-ink`}>
+                          {name}
+                        </th>
+                        <td className={`${tdClass} ${numClass}`}>
+                          {minutesText(current)}
+                          {ownLength.has(key) && <span className="block text-xs text-ink-subtle">(menu {minutesText(d.menuMinutes)})</span>}
+                        </td>
+                        <td className={`${tdClass} ${numClass}`}>
+                          {d.trusted ? minutesText(d.medianMinutes) : <span className="text-ink-subtle">Learning</span>}
+                          {d.trusted && d.trend !== "steady" && <span className="block text-xs text-ink-subtle">({d.trend === "faster" ? "getting faster" : "getting slower"})</span>}
+                        </td>
+                        <td className={`${tdClass} text-ink-muted`}>
+                          {d.visits} {d.visits === 1 ? "visit" : "visits"}
+                          {d.trusted && `, ${CONSISTENCY[d.consistency]}`}
+                          {d.basis === "check_in_out" && (
+                            <span className="block text-xs text-ink-subtle" data-testid="duration-basis">
+                              From check-in to checkout
+                            </span>
+                          )}
+                        </td>
+                        <td className={`${tdClass} text-right`}>
+                          <DurationButton staffId={d.staffId} serviceId={d.serviceId} suggested={d.suggestedMinutes && d.suggestedMinutes !== current ? minutesText(d.suggestedMinutes) : null} undoActionId={actionId} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </TableCard>
+          </Section>
         );
       })}
-      {rows.length === 0 && <p className="rounded-xl bg-sunken px-4 py-8 text-center text-ink-muted">No timed visits yet. Tap Started and Finished on services and Denise will learn.</p>}
+      {rows.length === 0 && <EmptyState>No timed visits yet. Tap Started and Finished on services and Denise will learn.</EmptyState>}
     </AppShell>
   );
 }

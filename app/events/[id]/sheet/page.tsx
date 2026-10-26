@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { LoadingShell, NotLinked } from "@/components/app-shell";
+import { Badge } from "@/components/ui/page";
 import { BackLink } from "@/components/ui/back-link";
 import { getCurrentStaff } from "@/lib/auth";
 import { daySheet } from "@/lib/events/day-sheet";
@@ -39,9 +40,9 @@ async function Sheet({ params, searchParams }: Pick<PageProps<"/events/[id]/shee
         <PrintButton auto={query.print === "1"} />
       </div>
       <header className="flex flex-col gap-1 border-b border-line-strong pb-4">
-        <p className="text-xs font-semibold tracking-wide text-ink-muted uppercase">{me.location.business.name} · Day-of sheet</p>
-        <h1 className="font-serif text-3xl font-semibold text-navy-900">{sheet.title}</h1>
-        <p className="text-base">
+        <p className="text-xs font-medium text-ink-muted">{me.location.business.name} · Day-of sheet</p>
+        <h1 className="text-2xl font-semibold text-ink">{sheet.title}</h1>
+        <p className="text-base text-ink">
           {formatEventDay(event.date)}
           {sheet.readyBy && <> · ready by <strong>{sheet.readyBy}</strong></>}
         </p>
@@ -55,7 +56,7 @@ async function Sheet({ params, searchParams }: Pick<PageProps<"/events/[id]/shee
       </header>
 
       <section aria-labelledby="sheet-team" className="break-inside-avoid">
-        <h2 id="sheet-team" className="mb-2 font-serif text-lg font-semibold text-navy-900">
+        <h2 id="sheet-team" className="mb-2 text-base font-semibold text-ink">
           Team
         </h2>
         <table className="w-full border-collapse text-left">
@@ -72,7 +73,7 @@ async function Sheet({ params, searchParams }: Pick<PageProps<"/events/[id]/shee
             {sheet.artists.map((a) => (
               <tr key={a.name} className="border-b border-line align-top">
                 <td className="py-1.5 pr-3">
-                  <span className="font-semibold">{a.name}</span> <span className="text-ink-muted">{a.roles.map((r) => ROLE_TEXT[r]).join(" + ")}</span>
+                  <span className="font-medium">{a.name}</span> <span className="text-ink-muted">{a.roles.map((r) => ROLE_TEXT[r]).join(" + ")}</span>
                 </td>
                 {event.onLocation && <td className="py-1.5 pr-3 tabular-nums">{a.leave}</td>}
                 <td className="py-1.5 pr-3 font-semibold tabular-nums">{a.call}</td>
@@ -82,18 +83,23 @@ async function Sheet({ params, searchParams }: Pick<PageProps<"/events/[id]/shee
             ))}
           </tbody>
         </table>
-        {sheet.unassigned > 0 && <p className="mt-2 font-medium text-danger">{sheet.unassigned === 1 ? "One artist isn't chosen yet." : `${sheet.unassigned} artists aren't chosen yet.`}</p>}
+        {sheet.unassigned > 0 && (
+          <p className="mt-2 flex items-center gap-2">
+            <Badge tone="warning">Not chosen</Badge>
+            <span className="text-ink-muted">{sheet.unassigned === 1 ? "One artist isn't chosen yet." : `${sheet.unassigned} artists aren't chosen yet.`}</span>
+          </p>
+        )}
       </section>
 
       <section aria-labelledby="sheet-order" className="break-inside-avoid">
-        <h2 id="sheet-order" className="mb-2 font-serif text-lg font-semibold text-navy-900">
+        <h2 id="sheet-order" className="mb-2 text-base font-semibold text-ink">
           Running order
         </h2>
         <table className="w-full border-collapse text-left" data-testid="running-order">
           <tbody>
             {sheet.order.map((r, i) => (
               <tr key={i} className="border-b border-line">
-                <td className="w-32 py-1.5 pr-3 tabular-nums">{r.time}</td>
+                <td className="w-40 py-1.5 pr-3 whitespace-nowrap tabular-nums">{r.time}</td>
                 <td className="py-1.5 pr-3 font-medium">{r.who}</td>
                 <td className="py-1.5 pr-3">{r.what}</td>
                 <td className="py-1.5 text-ink-muted">{r.artist}</td>
@@ -112,7 +118,7 @@ async function Sheet({ params, searchParams }: Pick<PageProps<"/events/[id]/shee
       </section>
 
       <section aria-labelledby="sheet-party" className="break-inside-avoid">
-        <h2 id="sheet-party" className="mb-2 font-serif text-lg font-semibold text-navy-900">
+        <h2 id="sheet-party" className="mb-2 text-base font-semibold text-ink">
           Party ({sheet.party.length})
         </h2>
         <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2 print:grid-cols-2">
@@ -126,7 +132,7 @@ async function Sheet({ params, searchParams }: Pick<PageProps<"/events/[id]/shee
 
       {(sheet.look || sheet.notes) && (
         <section aria-labelledby="sheet-look" className="break-inside-avoid">
-          <h2 id="sheet-look" className="mb-2 font-serif text-lg font-semibold text-navy-900">
+          <h2 id="sheet-look" className="mb-2 text-base font-semibold text-ink">
             The look and notes
           </h2>
           {sheet.look && <p className="whitespace-pre-line">{sheet.look}</p>}

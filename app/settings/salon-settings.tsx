@@ -36,9 +36,9 @@ export function SalonSettings({
     <div className="flex flex-col gap-6">
       {result &&
         (result.ok ? (
-          <p role="status" className="font-medium text-status-confirmed-ink">
+          <Alert tone="success">
             {result.message}
-          </p>
+          </Alert>
         ) : (
           <Alert>{result.message}</Alert>
         ))}
@@ -87,7 +87,7 @@ export function SalonSettings({
               className="text-sm"
             />
           </label>
-          <p className="text-xs text-ink-muted">
+          <p className="text-13 text-ink-muted">
             PNG, JPEG or WebP, up to 2 MB. A square image works best. Without a
             logo, the salon&apos;s initial shows.
           </p>
@@ -156,9 +156,9 @@ export function DeniseUsage({
       </dl>
       {result &&
         (result.ok ? (
-          <p role="status" className="font-medium text-status-confirmed-ink">
+          <Alert tone="success">
             {result.message}
-          </p>
+          </Alert>
         ) : (
           <Alert>{result.message}</Alert>
         ))}

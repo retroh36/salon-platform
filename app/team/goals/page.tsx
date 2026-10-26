@@ -49,16 +49,14 @@ async function TeamGoals() {
       )}
       <Card title="Goals" titleId="team-goals-heading" flush>
         {stylists.length === 0 ? (
-          <div className="p-5">
-            <EmptyState>No stylists yet.</EmptyState>
-          </div>
+          <EmptyState>No stylists yet.</EmptyState>
         ) : (
           <ul className="divide-y divide-line">
             {stylists.map((s) => {
               const pacings = paced.get(s.id) ?? [];
               return (
-                <li key={s.id} className="px-5 py-4" data-testid="team-goal-row" data-staff-id={s.id}>
-                  <p className="mb-2 font-semibold text-ink">{fullName(s)}</p>
+                <li key={s.id} className="px-4 py-3" data-testid="team-goal-row" data-staff-id={s.id}>
+                  <p className="mb-2 font-medium text-ink">{fullName(s)}</p>
                   {pacings.length === 0 ? (
                     <p className="text-sm text-ink-muted">No goals.</p>
                   ) : (

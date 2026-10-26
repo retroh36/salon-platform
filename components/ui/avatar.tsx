@@ -10,7 +10,7 @@ export function initials(name: string): string {
   return (firstLetter(parts[0] ?? "") + (parts.length > 1 ? firstLetter(parts.at(-1)!) : "")).toUpperCase() || "?";
 }
 
-const SIZES = { sm: "size-8 text-xs", md: "size-10 text-sm", lg: "size-14 text-lg font-serif", xl: "size-20 text-2xl font-serif" };
+const SIZES = { sm: "size-8 text-xs", md: "size-10 text-sm", lg: "size-14 text-base", xl: "size-20 text-2xl" };
 const BADGES = { sm: "size-3.5 -right-1 -bottom-1", md: "size-4 -right-1 -bottom-1", lg: "size-5 -right-0.5 -bottom-0.5", xl: "size-6 right-0 bottom-0" };
 
 export function Avatar({

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { errorDetails, errorRef } from "@/lib/app-errors";
-import { Button, buttonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 
 // What anyone sees when a page fails: what happened in plain words, a
 // reference to quote, Try again and Go back. A failure in the browser is
@@ -23,8 +23,8 @@ export function ErrorScreen({ error, retry }: { error: unknown; retry: () => voi
   }, [digest, error, ref]);
 
   return (
-    <div role="alert" className="mx-auto my-16 max-w-md rounded-lg border border-line bg-surface p-6 text-ink shadow-card" data-testid="error-screen">
-      <h1 className="font-serif text-xl font-semibold">Something went wrong</h1>
+    <div role="alert" className="mx-auto my-16 max-w-md rounded-lg border border-line bg-surface p-6 text-ink" data-testid="error-screen">
+      <h1 className="text-xl font-semibold">Something went wrong</h1>
       <p className="mt-2 text-sm text-ink-muted">
         This page couldn&apos;t finish loading or finish what you asked. Anything that was already saved is still saved. Check the connection and try again.
       </p>
@@ -35,9 +35,7 @@ export function ErrorScreen({ error, retry }: { error: unknown; retry: () => voi
         <Button variant="primary" onClick={() => retry()}>
           Try again
         </Button>
-        <button type="button" className={buttonClass("secondary")} onClick={() => history.back()}>
-          Go back
-        </button>
+        <Button onClick={() => history.back()}>Go back</Button>
       </div>
     </div>
   );

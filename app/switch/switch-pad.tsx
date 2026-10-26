@@ -2,13 +2,16 @@
 
 import { useActionState, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
-import { Button, buttonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/page";
 import { switchUser, type SwitchState } from "./actions";
 
 export type Person = { id: string; first_name: string; last_initial: string; role: string; color: string | null };
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"] as const;
+// A number pad key: the outlined button's look, 64px square.
+const KEY_CLASS =
+  "touch-target inline-flex size-16 items-center justify-center rounded-lg border border-line-strong bg-surface text-xl font-medium text-ink tabular-nums transition-[background-color,transform] duration-(--motion-fast) select-none hover:bg-sunken active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 
 // Tap your name, then your PIN on a big number pad (made for an iPad).
 export function SwitchPad({ people }: { people: Person[] }) {
@@ -25,7 +28,7 @@ export function SwitchPad({ people }: { people: Person[] }) {
             <button
               type="button"
               onClick={() => (setChosen(p.id), setPin(""))}
-              className="flex w-full items-center gap-3 rounded-lg border border-line bg-surface p-3 text-left font-medium shadow-card transition-[background-color] duration-(--motion-fast) hover:bg-sunken"
+              className="flex w-full items-center gap-3 rounded-lg border border-line bg-surface p-3 text-left text-sm font-medium text-ink transition-[background-color,border-color] duration-(--motion-fast) hover:border-line-strong hover:bg-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             >
               <Avatar name={`${p.first_name} ${p.last_initial}`} color={p.color} size="md" halo={false} />
               <span className="min-w-0 truncate">
@@ -44,7 +47,7 @@ export function SwitchPad({ people }: { people: Person[] }) {
       <input type="hidden" name="pin" value={pin} />
       <div className="flex items-center gap-3">
         <Avatar name={`${person.first_name} ${person.last_initial}`} color={person.color} size="lg" halo={false} />
-        <p className="font-serif text-xl font-semibold text-navy-900">Hi, {person.first_name}</p>
+        <p className="text-xl font-semibold text-ink">Hi, {person.first_name}</p>
       </div>
       <p aria-live="polite" className="flex h-6 gap-3" aria-label={`${pin.length} digits entered`} data-testid="pin-dots">
         {Array.from({ length: Math.max(4, pin.length) }, (_, i) => (
@@ -60,7 +63,7 @@ export function SwitchPad({ people }: { people: Person[] }) {
               type="button"
               aria-label={k === "⌫" ? "Delete" : k}
               onClick={() => press(k)}
-              className={buttonClass("secondary", "lg", "size-16 text-xl tabular-nums")}
+              className={KEY_CLASS}
             >
               {k}
             </button>

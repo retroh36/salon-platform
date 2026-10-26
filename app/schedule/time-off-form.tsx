@@ -33,7 +33,7 @@ export function TimeOffForm({ staffId, today, isRequest }: { staffId: string; to
       action={action}
       onSubmit={submitWithoutReset(action)}
       aria-label={isRequest ? "Request time off" : "Add time off"}
-      className="grid gap-4 p-5 sm:grid-cols-2"
+      className="grid gap-4 p-4 sm:grid-cols-2"
       noValidate
     >
       {state?.message && !state.saved && (

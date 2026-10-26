@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { buttonClass } from "@/components/ui/button";
-import { Card, PageHeader } from "@/components/ui/page";
+import { Card, EmptyState, PageHeader, Section } from "@/components/ui/page";
+import { TableCard, numClass, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
 import { formatDate } from "@/lib/clients";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
@@ -61,7 +62,7 @@ async function Data() {
               </li>
             ))}
           </ul>
-          <p className="text-sm text-ink-muted">
+          <p className="text-13 text-ink-muted">
             Card numbers are never stored, so they&apos;re never in it. Before and after photos stay in your private storage. Every download is logged below.
           </p>
           <form method="post" action="/settings/data/export">
@@ -71,29 +72,41 @@ async function Data() {
           </form>
         </div>
       </Card>
-      <Card title="Downloads" titleId="exports-heading" flush>
-        {exports.length === 0 ? (
-          <p className="px-5 py-4 text-sm text-ink-muted">No downloads yet.</p>
-        ) : (
-          <ul className="divide-y divide-line text-sm" aria-label="Data downloads">
-            {exports.map((e) => {
-              const l = toLocal(new Date(e.created_at), tz);
-              const counts = e.row_counts as Record<string, number>;
-              return (
-                <li key={e.id} className="flex flex-wrap justify-between gap-2 px-5 py-3" data-testid="data-export">
-                  <span>
-                    {formatDate(l.date)} at {formatMinute(l.minute)}
-                    {e.staff ? ` by ${e.staff.first_name}` : ""}
-                  </span>
-                  <span className="text-ink-muted tabular-nums">
-                    {counts.clients ?? 0} clients · {counts.visits ?? 0} visit lines · {counts.sales ?? 0} sales · {(e.bytes / 1024).toFixed(0)} KB
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
+      <Section title="Downloads" titleId="exports-heading" count={exports.length}>
+        <TableCard>
+          {exports.length === 0 ? (
+            <EmptyState>No downloads yet.</EmptyState>
+          ) : (
+            <table className={tableClass} aria-label="Data downloads">
+              <thead className={theadClass}>
+                <tr>
+                  <th className={thClass}>Downloaded</th>
+                  <th className={thClass}>What was in it</th>
+                  <th className={`${thClass} text-right`}>Size</th>
+                </tr>
+              </thead>
+              <tbody>
+                {exports.map((e) => {
+                  const l = toLocal(new Date(e.created_at), tz);
+                  const counts = e.row_counts as Record<string, number>;
+                  return (
+                    <tr key={e.id} className={trClass} data-testid="data-export">
+                      <td className={`${tdClass} text-ink`}>
+                        {formatDate(l.date)} at {formatMinute(l.minute)}
+                        {e.staff ? ` by ${e.staff.first_name}` : ""}
+                      </td>
+                      <td className={`${tdClass} text-ink-muted tabular-nums`}>
+                        {counts.clients ?? 0} clients · {counts.visits ?? 0} visit lines · {counts.sales ?? 0} sales
+                      </td>
+                      <td className={`${tdClass} ${numClass}`}>{(e.bytes / 1024).toFixed(0)} KB</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </TableCard>
+      </Section>
     </AppShell>
   );
 }

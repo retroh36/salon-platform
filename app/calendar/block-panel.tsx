@@ -101,7 +101,7 @@ export function BlockPanel({
   const header = (
     <div className="flex items-start justify-between gap-3">
       <div>
-        <h2 className="font-serif text-2xl font-semibold text-navy-900">{block ? BLOCK_LABELS[block.kind] : "Block time"}</h2>
+        <h2 className="text-xl font-semibold text-ink">{block ? BLOCK_LABELS[block.kind] : "Block time"}</h2>
         <p className="text-ink-muted">{formatLongDay(date)}</p>
       </div>
     </div>
@@ -142,15 +142,15 @@ export function BlockPanel({
             <Button onClick={() => setEditing(true)}>Change</Button>
             {repeating ? (
               <>
-                <Button variant="ghost" className="text-danger" disabled={pending} onClick={() => run(() => deleteBlock({ blockId: block.blockId, staffId: block.staffId, date, scope: "day" }))}>
+                <Button variant="danger-quiet" disabled={pending} onClick={() => run(() => deleteBlock({ blockId: block.blockId, staffId: block.staffId, date, scope: "day" }))}>
                   Remove this day
                 </Button>
-                <Button variant="ghost" className="text-danger" disabled={pending} onClick={() => run(() => deleteBlock({ blockId: block.blockId, staffId: block.staffId, date, scope: "all" }))}>
+                <Button variant="danger-quiet" disabled={pending} onClick={() => run(() => deleteBlock({ blockId: block.blockId, staffId: block.staffId, date, scope: "all" }))}>
                   Remove every day
                 </Button>
               </>
             ) : (
-              <Button variant="ghost" className="text-danger" disabled={pending} onClick={() => run(() => deleteBlock({ blockId: block.blockId, staffId: block.staffId, date, scope: "all" }))}>
+              <Button variant="danger-quiet" disabled={pending} onClick={() => run(() => deleteBlock({ blockId: block.blockId, staffId: block.staffId, date, scope: "all" }))}>
                 Remove
               </Button>
             )}
@@ -172,8 +172,8 @@ export function BlockPanel({
       {header}
       {message && <Alert>{message}</Alert>}
       {block && repeating && (
-        <fieldset className="flex flex-col gap-2 rounded-lg border border-line p-3">
-          <legend className="px-1 text-sm font-medium text-ink">Change</legend>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1.5 text-13 font-medium text-ink">Change</legend>
           {(["day", "all"] as const).map((v) => (
             <label key={v} className="flex items-center gap-2">
               <input type="radio" name="scope" value={v} checked={scope === v} onChange={() => setScope(v)} />
@@ -201,7 +201,7 @@ export function BlockPanel({
             </option>
           ))}
         </select>
-        {errors.kind && <span className="font-normal text-danger">{errors.kind}</span>}
+        {errors.kind && <span className="text-xs font-normal text-danger">{errors.kind}</span>}
       </label>
       <div className="grid grid-cols-2 gap-3">
         <label className={labelClass}>
@@ -213,7 +213,7 @@ export function BlockPanel({
           <input type="time" step={300} value={to} onChange={(e) => setTo(e.target.value)} className={fieldClass} required />
         </label>
       </div>
-      {errors.times && <p className="-mt-2 text-danger">{errors.times}</p>}
+      {errors.times && <p className="-mt-2 text-xs text-danger">{errors.times}</p>}
       {!(block && repeating && scope === "day") && (
         <>
           <label className="flex items-center gap-2 font-medium text-ink">
@@ -223,7 +223,7 @@ export function BlockPanel({
           {repeat && (
             <div className="flex animate-fade-in flex-col gap-3">
               <fieldset className="flex flex-wrap gap-1.5">
-                <legend className="mb-1.5 text-sm font-medium text-ink">On</legend>
+                <legend className="mb-1.5 text-13 font-medium text-ink">On</legend>
                 {DAYS.map(([d, label]) => (
                   <label key={d} className="cursor-pointer">
                     <input
@@ -232,19 +232,19 @@ export function BlockPanel({
                       checked={weekdays.includes(d)}
                       onChange={(e) => setWeekdays(e.target.checked ? [...weekdays, d] : weekdays.filter((w) => w !== d))}
                     />
-                    <span className="inline-flex h-9 min-w-11 items-center justify-center rounded-full border border-line-strong px-3 text-sm peer-checked:border-navy-900 peer-checked:bg-navy-900 peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:outline-focus">
+                    <span className="inline-flex h-9 min-w-11 items-center justify-center rounded-md border border-line-strong bg-surface px-3 text-sm transition-colors duration-(--motion-fast) hover:bg-sunken peer-checked:border-navy-900 peer-checked:bg-navy-900 peer-checked:text-white peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-focus">
                       {label}
                     </span>
                   </label>
                 ))}
               </fieldset>
-              {errors.weekdays && <p className="-mt-1 text-danger">{errors.weekdays}</p>}
+              {errors.weekdays && <p className="-mt-1 text-xs text-danger">{errors.weekdays}</p>}
               <label className={labelClass}>
                 <span>
                   Until <span className="font-normal text-ink-muted">(optional)</span>
                 </span>
                 <input type="date" value={until} min={date} onChange={(e) => setUntil(e.target.value)} className={fieldClass} />
-                {errors.until && <span className="font-normal text-danger">{errors.until}</span>}
+                {errors.until && <span className="text-xs font-normal text-danger">{errors.until}</span>}
               </label>
             </div>
           )}

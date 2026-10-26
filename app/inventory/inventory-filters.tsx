@@ -1,5 +1,6 @@
 "use client";
 
+import { pillClass } from "@/components/ui/page";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useTransition } from "react";
 import { fieldClass } from "@/components/ui/field";
@@ -73,14 +74,7 @@ export function InventoryFilters({ filter, brands }: { filter: InventoryFilter; 
           { value: "retail", label: "Retail" },
         ]}
       />
-      <button
-        type="button"
-        aria-pressed={filter.low}
-        onClick={() => go({ low: !filter.low })}
-        className={`inline-flex h-9 items-center rounded-full border px-3.5 text-sm font-medium transition-[background-color,color,border-color] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
-          filter.low ? "border-status-late-ink bg-status-late-bg text-status-late-ink" : "border-line-strong bg-surface text-ink hover:bg-sunken"
-        }`}
-      >
+      <button type="button" aria-pressed={filter.low} onClick={() => go({ low: !filter.low })} className={pillClass(filter.low)}>
         Low stock
       </button>
       {pending && (

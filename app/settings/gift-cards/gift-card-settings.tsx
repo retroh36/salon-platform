@@ -26,7 +26,7 @@ export function GiftCardSettingsForm({ initial }: { initial: { presets: string; 
       <label className={labelClass}>
         Bought cards expire after (months)
         <input inputMode="numeric" value={s.expiryMonths} onChange={(e) => setS({ ...s, expiryMonths: e.target.value })} className={fieldClass} placeholder="Never" />
-        <span className="text-xs font-normal text-ink-muted">Leave empty for no expiry (the default).</span>
+        <span className="text-13 font-normal text-ink-muted">Leave empty for no expiry (the default).</span>
       </label>
       <label className={labelClass}>
         Promotional cards last (days)

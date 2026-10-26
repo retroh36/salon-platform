@@ -30,7 +30,7 @@ export function DayChangeForm({ staffId, today }: { staffId: string; today: stri
       action={action}
       onSubmit={submitWithoutReset(action)}
       aria-label="Change hours for one day"
-      className="flex flex-wrap items-end gap-3 p-5"
+      className="flex flex-wrap items-end gap-3 p-4"
       noValidate
     >
       {state?.message && !state.saved && (

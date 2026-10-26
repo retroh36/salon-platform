@@ -16,7 +16,7 @@ function Result({ result }: { result: StockResult | null }) {
   return (
     <span
       role={result.ok ? "status" : "alert"}
-      className={`animate-fade-in text-sm ${result.ok ? "font-medium text-status-confirmed-ink" : "text-danger"}`}
+      className={`animate-fade-in text-sm ${result.ok ? "text-ink-muted" : "text-danger"}`}
     >
       {result.message}
     </span>

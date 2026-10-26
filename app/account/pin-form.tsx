@@ -39,11 +39,11 @@ export function PinForm({ hasPin, digits }: { hasPin: boolean; digits: 4 | 6 }) 
           <input value={again} onChange={(e) => setAgain(e.target.value.replace(/\D/g, ""))} type="password" inputMode="numeric" autoComplete="off" minLength={digits} maxLength={6} required className={fieldClass} />
         </label>
       </div>
-      <p className="text-xs text-ink-muted">{digits === 6 ? "6 digits" : "4 to 6 digits"}, not all the same and not a run like 1234.</p>
+      <p className="text-13 text-ink-muted">{digits === 6 ? "6 digits" : "4 to 6 digits"}, not all the same and not a run like 1234.</p>
       <Button type="submit" variant="primary" className="self-start" disabled={pending}>
         Save PIN
       </Button>
-      {result && (result.ok ? <p role="status" className="text-sm font-medium text-status-confirmed-ink">{result.message}</p> : <Alert>{result.message}</Alert>)}
+      {result && (result.ok ? <Alert tone="success">{result.message}</Alert> : <Alert>{result.message}</Alert>)}
     </form>
   );
 }

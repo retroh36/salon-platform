@@ -6,7 +6,8 @@ import { useEffect, useState, useTransition } from "react";
 import { formatMinute, type LocalDate } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { cancelBooking, findTimes, reschedule, type DayTimes } from "../../actions";
-import { choiceClass, primaryButton } from "../../booking-flow";
+import { Alert, Badge } from "@/components/ui/page";
+import { accentLink, dangerButton, dangerOutlineButton, pageLead, pageTitle, primaryButton, secondaryButton, sectionTitle } from "../../styles";
 import { DateStrip, longDate, TimeGrid } from "../../times";
 
 type Booking = {
@@ -50,38 +51,39 @@ export function ManageView({ slug, token, justBooked, today, booking, salon }: {
       <div>
         {justBooked && !canceled ? (
           <>
-            <p aria-hidden className="mb-3 inline-flex size-12 items-center justify-center rounded-full bg-(--accent) text-2xl text-white">✓</p>
-            <h1 className="font-serif text-3xl font-semibold tracking-tight">You&rsquo;re booked{booking.firstName && `, ${booking.firstName}`}</h1>
-            <p className="mt-2 text-ink-muted">We&rsquo;ve sent you the details with a link back to this page, where you can change or cancel.</p>
+            <p aria-hidden className="mb-4 inline-flex size-10 items-center justify-center rounded-full bg-(--accent) text-xl text-white">✓</p>
+            <h1 className={pageTitle}>You&rsquo;re booked{booking.firstName && `, ${booking.firstName}`}</h1>
+            <p className={pageLead}>We&rsquo;ve sent you the details with a link back to this page, where you can change or cancel.</p>
           </>
         ) : (
-          <h1 className="font-serif text-3xl font-semibold tracking-tight">{canceled ? "Booking canceled" : "Your booking"}</h1>
+          <h1 className={pageTitle}>{canceled ? "Booking canceled" : "Your booking"}</h1>
         )}
       </div>
 
       {message && (
-        <p role={message.tone === "error" ? "alert" : "status"} className={`rounded-xl px-4 py-3 text-sm ${message.tone === "error" ? "border border-danger/25 bg-danger-soft text-danger" : "bg-(--accent-soft) text-ink"}`}>
-          {message.text}
-        </p>
+        <Alert tone={message.tone === "error" ? "error" : "success"}>{message.text}</Alert>
       )}
 
-      <div className={`overflow-hidden rounded-xl border border-line bg-surface shadow-card ${canceled ? "opacity-70" : ""}`}>
-        <div className="border-b border-line bg-(--accent-soft) px-4 py-4">
-          <p className={`font-serif text-xl font-semibold ${canceled ? "line-through" : ""}`} data-testid="booking-when">
-            {longDate(booking.date)}
-          </p>
-          <p className="text-ink-muted">
-            {formatMinute(booking.minute)}–{formatMinute(booking.endMinute)} · {salon.location}
-          </p>
+      <div className={`overflow-hidden rounded-lg border border-line bg-surface ${canceled ? "opacity-70" : ""}`}>
+        <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
+          <div className="min-w-0">
+            <p className={`text-base font-semibold ${canceled ? "line-through" : ""}`} data-testid="booking-when">
+              {longDate(booking.date)}
+            </p>
+            <p className="text-sm text-ink-muted">
+              {formatMinute(booking.minute)}–{formatMinute(booking.endMinute)} · {salon.location}
+            </p>
+          </div>
+          {canceled && <Badge tone="neutral">Canceled</Badge>}
         </div>
         <ul className="divide-y divide-line">
           {booking.items.map((i, n) => (
             <li key={n} className="flex items-baseline justify-between gap-3 px-4 py-3">
               <span>
-                <span className="block font-semibold">{i.name}</span>
+                <span className="block font-medium">{i.name}</span>
                 <span className="text-sm text-ink-muted">with {i.stylist}</span>
               </span>
-              <span className="text-sm font-semibold tabular-nums">{formatPrice(i.priceCents)}</span>
+              <span className="text-sm font-medium tabular-nums">{formatPrice(i.priceCents)}</span>
             </li>
           ))}
         </ul>
@@ -108,23 +110,23 @@ export function ManageView({ slug, token, justBooked, today, booking, salon }: {
           <button type="button" className={primaryButton} onClick={() => (setMode("move"), setMessage(null))}>
             Reschedule
           </button>
-          <button type="button" className={`${choiceClass} justify-center border-line font-semibold text-danger`} onClick={() => (setMode("cancel"), setMessage(null))}>
+          <button type="button" className={dangerOutlineButton} onClick={() => (setMode("cancel"), setMessage(null))}>
             Cancel booking
           </button>
         </div>
       )}
 
       {!canceled && !booking.canChange && (
-        <p className="rounded-xl bg-sunken px-4 py-3 text-sm text-ink">
+        <Alert tone="info">
           It&rsquo;s less than {salon.cutoffHours} hours to your visit, so changes are by phone{salon.phone ? `: ${salon.phone}` : ""}.
-        </p>
+        </Alert>
       )}
 
       {mode === "cancel" && (
-        <div role="dialog" aria-label="Cancel booking" className="flex flex-col gap-3 rounded-xl border border-danger/25 bg-surface p-4 animate-pop-in">
-          <p className="font-semibold">Cancel this booking?</p>
+        <div role="dialog" aria-label="Cancel booking" className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4 animate-pop-in">
+          <p className="text-base font-semibold">Cancel this booking?</p>
           {booking.cancelFeeCents > 0 ? (
-            <p className="rounded-lg bg-sunken px-3 py-2 text-sm font-medium text-ink" data-testid="cancel-fee">
+            <p className="text-sm font-medium text-ink" data-testid="cancel-fee">
               It&rsquo;s inside the cancellation window, so canceling now costs {formatPrice(booking.cancelFeeCents)}
               {booking.depositPaidCents > 0
                 ? booking.cancelFeeCents > booking.depositPaidCents
@@ -141,10 +143,10 @@ export function ManageView({ slug, token, justBooked, today, booking, salon }: {
             ))}
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
-            <button type="button" className={`${primaryButton} bg-danger!`} onClick={cancel} disabled={pending}>
+            <button type="button" className={dangerButton} onClick={cancel} disabled={pending}>
               {pending ? "Canceling…" : "Yes, cancel it"}
             </button>
-            <button type="button" className={`${choiceClass} justify-center border-line font-semibold`} onClick={() => setMode("view")}>
+            <button type="button" className={secondaryButton} onClick={() => setMode("view")}>
               Keep it
             </button>
           </div>
@@ -165,7 +167,7 @@ export function ManageView({ slug, token, justBooked, today, booking, salon }: {
         />
       )}
 
-      <Link href={`/book/${slug}`} className="text-center text-sm font-semibold text-link hover:text-link-hover">
+      <Link href={`/book/${slug}`} className={`self-center text-sm ${accentLink}`}>
         Book another visit
       </Link>
     </div>
@@ -204,9 +206,9 @@ function Reschedule({ slug, token, today, onDone, onCancel }: { slug: string; to
     });
 
   return (
-    <section aria-label="Reschedule" className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-4 animate-pop-in">
-      <h2 className="font-serif text-xl font-semibold">Pick a new time</h2>
-      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+    <section aria-label="Reschedule" className="flex flex-col gap-4 animate-pop-in">
+      <h2 className={sectionTitle}>Pick a new time</h2>
+      {error && <Alert>{error}</Alert>}
       {!days ? (
         <p className="text-ink-muted" aria-busy="true">Finding times…</p>
       ) : (
@@ -216,7 +218,7 @@ function Reschedule({ slug, token, today, onDone, onCancel }: { slug: string; to
             (day.times.length ? (
               <TimeGrid times={day.times} selected={minute} onPick={(t) => setMinute(t.minute)} />
             ) : (
-              <p className="rounded-xl bg-sunken px-4 py-6 text-center text-ink-muted">No times this day. Try another date.</p>
+              <p className="py-8 text-center text-ink-muted">No times this day. Try another date.</p>
             ))}
         </>
       )}
@@ -224,7 +226,7 @@ function Reschedule({ slug, token, today, onDone, onCancel }: { slug: string; to
         <button type="button" className={primaryButton} disabled={minute === null || pending} onClick={save}>
           {pending && minute !== null ? "Moving…" : "Move my booking"}
         </button>
-        <button type="button" className={`${choiceClass} justify-center border-line font-semibold`} onClick={onCancel}>
+        <button type="button" className={secondaryButton} onClick={onCancel}>
           Keep the current time
         </button>
       </div>

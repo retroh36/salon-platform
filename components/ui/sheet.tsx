@@ -34,16 +34,16 @@ export function Sheet({ title, onClose, children, wide = false }: { title: strin
             onClose();
           }
         }}
-        className={`flex max-h-[92vh] w-full animate-pop-in flex-col overflow-hidden rounded-t-2xl bg-surface shadow-lift outline-none sm:rounded-2xl ${wide ? "sm:max-w-2xl" : "sm:max-w-md"}`}
+        className={`flex max-h-[92vh] w-full animate-pop-in flex-col overflow-hidden rounded-t-xl bg-surface shadow-lift outline-none sm:rounded-xl ${wide ? "sm:max-w-2xl" : "sm:max-w-md"}`}
       >
-        <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
-          <h2 className="font-serif text-xl font-semibold text-navy-900">{title}</h2>
+        <div className="flex items-center justify-between gap-3 border-b border-line py-2 pr-2 pl-5">
+          <h2 className="text-base font-semibold text-ink">{title}</h2>
           <button
             type="button"
             data-close
             aria-label="Close"
             onClick={onClose}
-            className="inline-flex size-11 items-center justify-center rounded-full text-ink-muted transition-colors duration-(--motion-fast) hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+            className="inline-flex size-9 items-center justify-center rounded-md text-ink-muted transition-colors duration-(--motion-fast) hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
           >
             <CloseIcon className="size-5" />
           </button>

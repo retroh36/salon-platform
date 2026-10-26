@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Ticket } from "@/lib/payroll";
 import { formatPrice } from "@/lib/services";
+import { Badge, nameLinkClass } from "@/components/ui/page";
+import { numClass, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 
 const KIND_LABELS = { sale: null, refund: "Refund", void: "Voided" } as const;
 
@@ -12,41 +14,45 @@ export const shortDay = (iso: string, timeZone: string) => new Date(iso).toLocal
 // period, with what each added or took back. Links to the sale for the
 // front of house and managers.
 export function PayTickets({ tickets, timeZone, linkSales, label }: { tickets: Ticket[]; timeZone: string; linkSales: boolean; label: string }) {
-  if (tickets.length === 0) return <p className="px-5 py-4 text-sm text-ink-muted">No tickets in this period.</p>;
+  if (tickets.length === 0) return <p className="px-4 py-3 text-sm text-ink-muted">No tickets in this period.</p>;
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm tabular-nums" aria-label={label}>
-        <thead>
-          <tr className="text-left text-ink-muted">
-            <th className="px-5 py-2 font-medium">Date</th>
-            <th className="py-2 pr-3 font-medium">Ticket</th>
-            <th className="py-2 pr-3 font-medium">Client and what</th>
-            <th className="py-2 pr-3 text-right font-medium">Services</th>
-            <th className="py-2 pr-3 text-right font-medium">Retail</th>
-            <th className="py-2 pr-5 text-right font-medium">Tip</th>
+    <div className="overflow-x-auto overscroll-x-contain">
+      <table className={`${tableClass} tabular-nums`} aria-label={label}>
+        <thead className={theadClass}>
+          <tr>
+            <th className={thClass}>Date</th>
+            <th className={thClass}>Ticket</th>
+            <th className={thClass}>Client and what</th>
+            <th className={`${thClass} text-right`}>Services</th>
+            <th className={`${thClass} text-right`}>Retail</th>
+            <th className={`${thClass} text-right`}>Tip</th>
           </tr>
         </thead>
         <tbody>
           {tickets.map((t) => (
-            <tr key={`${t.saleId}:${t.kind}:${t.at}`} className="border-t border-line align-top" data-testid="pay-ticket" data-kind={t.kind}>
-              <td className="px-5 py-2 whitespace-nowrap">{shortDay(t.at, timeZone)}</td>
-              <td className="py-2 pr-3 whitespace-nowrap">
+            <tr key={`${t.saleId}:${t.kind}:${t.at}`} className={trClass} data-testid="pay-ticket" data-kind={t.kind}>
+              <td className={`${tdClass} whitespace-nowrap`}>{shortDay(t.at, timeZone)}</td>
+              <td className={`${tdClass} whitespace-nowrap`}>
                 {linkSales ? (
-                  <Link href={`/sales/${t.saleId}`} className="text-link hover:underline">
+                  <Link href={`/sales/${t.saleId}`} className={nameLinkClass}>
                     #{t.number}
                   </Link>
                 ) : (
                   `#${t.number}`
                 )}
-                {KIND_LABELS[t.kind] && <span className="ml-1.5 rounded-full bg-sunken px-2 py-0.5 text-xs font-medium text-ink-muted">{KIND_LABELS[t.kind]}</span>}
+                {KIND_LABELS[t.kind] && (
+                  <Badge tone="neutral" className="ml-1.5">
+                    {KIND_LABELS[t.kind]}
+                  </Badge>
+                )}
               </td>
-              <td className="py-2 pr-3">
+              <td className={tdClass}>
                 <span className="block text-ink">{t.client ?? "Walk-in"}</span>
                 <span className="block text-xs text-ink-muted">{t.lines.map((l) => (l.quantity > 1 ? `${l.description} × ${l.quantity}` : l.description)).join(", ") || "Tip"}</span>
               </td>
-              <td className="py-2 pr-3 text-right">{money(t.serviceCents)}</td>
-              <td className="py-2 pr-3 text-right">{money(t.retailCents)}</td>
-              <td className="py-2 pr-5 text-right">{money(t.tipCents)}</td>
+              <td className={`${tdClass} ${numClass}`}>{money(t.serviceCents)}</td>
+              <td className={`${tdClass} ${numClass}`}>{money(t.retailCents)}</td>
+              <td className={`${tdClass} ${numClass}`}>{money(t.tipCents)}</td>
             </tr>
           ))}
         </tbody>

@@ -35,7 +35,7 @@ export function OffChip({ off, shown, onShow, isToday }: { off: ColumnData[]; sh
         aria-expanded={open}
         onClick={() => setOpen(!open)}
         data-testid="off-chip"
-        className={`inline-flex h-10 items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold whitespace-nowrap transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-focus ${
+        className={`inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium whitespace-nowrap transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-focus ${
           shown ? "border-navy-700 bg-navy-100 text-navy-900" : "border-line-strong bg-surface text-ink-muted hover:bg-sunken"
         }`}
       >
@@ -46,7 +46,7 @@ export function OffChip({ off, shown, onShow, isToday }: { off: ColumnData[]; sh
         <div
           role="dialog"
           aria-label={isToday ? "Off today" : "Off this day"}
-          className="absolute top-full left-0 z-50 mt-2 flex w-[min(22rem,calc(100vw-2rem))] origin-top-left animate-pop-in flex-col gap-3 rounded-xl border border-line bg-surface p-4 shadow-lift"
+          className="absolute top-full left-0 z-50 mt-2 flex w-[min(22rem,calc(100vw-2rem))] origin-top-left animate-pop-in flex-col gap-3 rounded-lg border border-line bg-surface p-4 shadow-lift"
         >
           <h2 className="text-sm font-semibold text-ink">{isToday ? "Off today" : "Off this day"}</h2>
           <ul aria-label="Who's off" className="-mx-1 flex max-h-72 flex-col overflow-y-auto">
@@ -142,7 +142,7 @@ export function ViewEditor({
         <label className={labelClass}>
           Name
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={VIEW_NAME_MAX} placeholder="Hair team, Color, My section…" className={fieldClass} aria-invalid={!!problems.name} />
-          {problems.name && <span className="text-sm font-normal text-danger">{problems.name}</span>}
+          {problems.name && <span className="text-xs font-normal text-danger">{problems.name}</span>}
         </label>
         {canShare && (
           <label className="flex cursor-pointer items-start gap-2.5 text-sm text-ink">
@@ -156,7 +156,7 @@ export function ViewEditor({
 
         <div className="grid gap-5 sm:grid-cols-2">
           <fieldset className="flex min-w-0 flex-col gap-2">
-            <legend className="mb-2 text-sm font-semibold text-ink">Who&apos;s in it</legend>
+            <legend className="mb-2 text-sm font-medium text-ink">Who&apos;s in it</legend>
             {departments.length > 0 && (
               <div className="flex flex-wrap gap-1.5" aria-label="Add a department" role="group">
                 {departments.map((d) => (
@@ -179,11 +179,13 @@ export function ViewEditor({
               ))}
               {found.length === 0 && <li className="px-2 py-3 text-sm text-ink-muted">No one by that name.</li>}
             </ul>
-            {problems.staff && <p className="text-sm text-danger">{problems.staff}</p>}
+            {problems.staff && <p className="text-xs text-danger">{problems.staff}</p>}
           </fieldset>
 
           <div className="flex min-w-0 flex-col gap-2">
-            <h3 className="text-sm font-semibold text-ink">In this order ({picked.length})</h3>
+            <h3 className="text-sm font-medium text-ink">
+              In this order <span className="font-normal text-ink-subtle tabular-nums">({picked.length})</span>
+            </h3>
             <p className="text-sm text-ink-muted">Left to right on the calendar. Drag or use the arrows.</p>
             {picked.length ? (
               <ReorderList
@@ -216,7 +218,7 @@ export function ViewEditor({
           <Button type="submit" variant="primary" disabled={pending}>
             {pending ? "Saving…" : "Save view"}
           </Button>
-          <Button variant="ghost" onClick={onClose} disabled={pending}>
+          <Button onClick={onClose} disabled={pending}>
             Cancel
           </Button>
           {view &&
@@ -226,12 +228,12 @@ export function ViewEditor({
                 <Button variant="danger" size="sm" disabled={pending} onClick={remove}>
                   Delete
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>
+                <Button size="sm" onClick={() => setConfirmDelete(false)}>
                   Keep it
                 </Button>
               </span>
             ) : (
-              <Button variant="ghost" className="ml-auto text-danger!" onClick={() => setConfirmDelete(true)}>
+              <Button variant="danger-quiet" className="ml-auto" onClick={() => setConfirmDelete(true)}>
                 Delete view
               </Button>
             ))}

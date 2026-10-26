@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { addDays, fromLocal, toLocal, todayIn } from "@/lib/scheduling/time";
-import { admin, openAllDay, SEED } from "../tests/db/helpers";
-import { AUTH, checkIn, expect, moreAction, openChecklist, pxPerMinute, test, ui, waitForHydration } from "./fixtures";
+import { admin, busyDay, openAllDay, SEED } from "../tests/db/helpers";
+import { AUTH, checkIn, expect, moreAction, openChecklist, openDisplayMenu, pxPerMinute, test, ui, waitForHydration } from "./fixtures";
 
 // The calendar's day: undoing a check-in, the patch test notice in booking
 // details, zoom, opening at the current time, and Denise's late-arrivals
@@ -142,11 +142,21 @@ test.describe("front desk", () => {
   });
 
   test("a checked-out visit points to voiding its sale instead", async ({ page }) => {
-    await openDay(page, addDays(today, -1));
+    // The last day before today with a checked-out visit (yesterday may be a closed day).
+    const { data: last } = await admin
+      .from("appointments")
+      .select("starts_at")
+      .eq("location_id", L)
+      .eq("status", "completed")
+      .lt("starts_at", fromLocal(today, 0, TZ)!.toISOString())
+      .order("starts_at", { ascending: false })
+      .limit(1)
+      .single();
+    await openDay(page, toLocal(new Date(last!.starts_at), TZ).date);
     await ui(page).locator("[data-block][data-visit=done]").first().click({ position: { x: 10, y: 5 } });
     const note = details(page).getByTestId("checked-out-note");
     await expect(note).toContainText("To reverse checkout, a manager or owner voids the sale");
-    // Yesterday's sale is a report: the front desk sees today's sales only.
+    // An earlier day's sale is a report: the front desk sees today's sales only.
     await expect(note.getByRole("link", { name: "view the sale" })).toHaveCount(0);
     await expect(details(page).getByRole("button", { name: "Undo check-in" })).toHaveCount(0);
   });
@@ -210,7 +220,7 @@ test.describe("front desk", () => {
     try {
       await openDay(page);
       const grid = ui(page).getByTestId("calendar-grid");
-      const zoom = ui(page).getByRole("radiogroup", { name: "Zoom" });
+      const zoom = (await openDisplayMenu(page)).getByRole("radiogroup", { name: "Zoom" });
       await expect(zoom.getByRole("radio", { name: "Comfortable" })).toHaveAttribute("aria-checked", "true");
       // About 40px a quarter hour, with every quarter labeled: hours bold,
       // quarters smaller and lighter.
@@ -346,7 +356,8 @@ for (const viewport of [
 
     test("never scrolls sideways", async ({ page }) => {
       test.setTimeout(60_000);
-      await openDay(page, today);
+      // Today when it has visits (here and done ones too), else the next day that does.
+      await openDay(page, (await busyDay(TZ)).date);
       const panel = details(page);
       const overflow = () =>
         panel.evaluate((el) => {

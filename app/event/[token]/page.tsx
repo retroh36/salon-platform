@@ -12,6 +12,8 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { formatPrice } from "@/lib/services";
 import { formatMinute } from "@/lib/scheduling/time";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { pageLead, pageTitle, sectionTitle } from "@/app/book/[slug]/styles";
+import { Alert, Badge } from "@/components/ui/page";
 import { AgreeForm, NewCardForm, ShareForm } from "./forms";
 
 export const metadata: Metadata = { title: { absolute: "Your event" }, robots: { index: false } };
@@ -26,14 +28,15 @@ export default function EventLinkPage({ params }: PageProps<"/event/[token]">) {
 
 function Row({ label, cents, strong }: { label: string; cents: number; strong?: boolean }) {
   return (
-    <p className={`flex justify-between gap-4 ${strong ? "font-semibold text-ink" : "text-ink-muted"}`}>
+    <p className={`flex justify-between gap-4 ${strong ? "mt-1 border-t border-line pt-3 font-semibold text-ink" : "text-sm text-ink-muted"}`}>
       <span>{label}</span>
       <span className="tabular-nums">{formatPrice(cents)}</span>
     </p>
   );
 }
 
-const box = "rounded-xl border border-line bg-surface px-4 py-4";
+// Each part of the page is a section: a title over a thin rule (no boxes).
+const box = "flex flex-col gap-2";
 
 // The client's page from a proposal or a pay link, in the salon's brand:
 // the day, the party and services, the total and payment schedule and the
@@ -50,17 +53,23 @@ async function EventPage({ params }: { params: Promise<{ token: string }> }) {
   return (
     <BookingFrame name={link.salon.name} logoUrl={salonLogoUrl(link.salon.logoPath)} accent={link.salon.accent ?? DEFAULT_ACCENT}>
       {closed ? (
-        <div className="flex flex-col gap-2" data-testid="link-closed">
-          <h1 className="font-serif text-3xl font-semibold text-ink">{link.expired ? "This link has expired" : "This link is no longer active"}</h1>
-          <p className="text-ink-muted">Ask {link.salon.name} for a new one.</p>
+        <div data-testid="link-closed">
+          <h1 className={pageTitle}>{link.expired ? "This link has expired" : "This link is no longer active"}</h1>
+          <p className={pageLead}>Ask {link.salon.name} for a new one.</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-7">
           <Day link={link} />
           {link.kind === "card" && link.owed ? (
             <>
-              <section className={`${box} flex flex-col gap-1`} aria-label="Your payments">
-                <p className="text-ink-muted">
+              <section className={box} aria-label="Your payments">
+                <h2 className={sectionTitle}>Your payments</h2>
+                {link.owed.failedCents > 0 && (
+                  <Badge tone="danger" className="self-start">
+                    Payment didn&rsquo;t go through
+                  </Badge>
+                )}
+                <p className="text-sm text-ink-muted">
                   {link.owed.failedCents > 0
                     ? `A payment of ${formatPrice(link.owed.failedCents)} didn't go through on ${link.owed.cardLabel ?? "your card"}. Add another card and it's paid straight away; later payments go on it too.`
                     : "Add the card for the rest of your payments."}
@@ -71,16 +80,16 @@ async function EventPage({ params }: { params: Promise<{ token: string }> }) {
             </>
           ) : link.kind === "member" && link.member ? (
             <>
-              <section className={`${box} flex flex-col gap-1`} aria-label="Your share">
-                <p className="font-semibold text-ink">{link.member.name}</p>
+              <section className={box} aria-label="Your share">
+                <h2 className={sectionTitle}>{link.member.name}</h2>
                 <Row label={link.member.packageName} cents={link.member.priceCents} />
                 <Row label="Service charge and tax" cents={link.member.shareCents - link.member.priceCents} />
                 <Row label="Your share" cents={link.member.shareCents} strong />
               </section>
               {link.member.paid || link.status === "done" ? (
-                <p className="font-medium text-ink" data-testid="share-paid">
-                  Your share is paid. Thank you.
-                </p>
+                <div data-testid="share-paid">
+                  <Alert tone="success">Your share is paid. Thank you.</Alert>
+                </div>
               ) : (
                 <ShareForm token={token} shareCents={link.member.shareCents} testMode={provider.testMode} cards={cards} />
               )}
@@ -98,8 +107,8 @@ async function EventPage({ params }: { params: Promise<{ token: string }> }) {
 function Day({ link }: { link: EventLink }) {
   return (
     <div>
-      <h1 className="font-serif text-3xl font-semibold text-ink">{link.kind === "member" && link.member ? `Hi ${link.member.name}` : `Hi ${link.clientFirstName}`}</h1>
-      <p className="text-ink-muted">
+      <h1 className={pageTitle}>{link.kind === "member" && link.member ? `Hi ${link.member.name}` : `Hi ${link.clientFirstName}`}</h1>
+      <p className={pageLead}>
         {link.title} · {formatLongDay(link.date)}
       </p>
       <p className="text-ink-muted">
@@ -114,11 +123,11 @@ function Proposal({ link, token, testMode, cards }: { link: EventLink; token: st
   const own = t.totalCents - t.mainCents;
   return (
     <>
-      <section className={box} aria-label="The party">
-        <h2 className="mb-2 font-semibold text-ink">The party</h2>
-        <ul className="flex flex-col gap-1.5" data-testid="proposal-party">
+      <section className="flex flex-col" aria-label="The party">
+        <h2 className={sectionTitle}>The party</h2>
+        <ul className="flex flex-col divide-y divide-line" data-testid="proposal-party">
           {link.party.map((m, i) => (
-            <li key={i} className="flex justify-between gap-4 text-sm">
+            <li key={i} className="flex justify-between gap-4 py-3 text-sm">
               <span>
                 <span className="font-medium text-ink">{m.name}</span> <span className="text-ink-muted">· {m.packageName}</span>
                 {m.paysOwn && <span className="text-ink-muted"> (pays their own)</span>}
@@ -128,7 +137,8 @@ function Proposal({ link, token, testMode, cards }: { link: EventLink; token: st
           ))}
         </ul>
       </section>
-      <section className={`${box} flex flex-col gap-1`} aria-label="Total" data-testid="proposal-total">
+      <section className={box} aria-label="Total" data-testid="proposal-total">
+        <h2 className={sectionTitle}>Total</h2>
         <Row label="Services" cents={t.subtotalCents} />
         {t.travelFeeCents > 0 && <Row label="Travel" cents={t.travelFeeCents} />}
         {t.earlyFeeCents > 0 && <Row label="Early start" cents={t.earlyFeeCents} />}
@@ -138,29 +148,29 @@ function Proposal({ link, token, testMode, cards }: { link: EventLink; token: st
         {own > 0 && <Row label="Paid by those paying their own" cents={-own} />}
       </section>
       {link.status === "done" ? (
-        <div className={box} data-testid="event-booked">
-          <h2 className="font-serif text-2xl font-semibold text-ink">You&rsquo;re booked</h2>
-          <p className="text-ink-muted">Agreed{link.agreedAs ? ` by ${link.agreedAs}` : ""}. Payments are charged to your card as scheduled, with a reminder before each.</p>
+        <div data-testid="event-booked">
+          <h2 className="text-xl font-semibold text-ink">You&rsquo;re booked</h2>
+          <p className={pageLead}>Agreed{link.agreedAs ? ` by ${link.agreedAs}` : ""}. Payments are charged to your card as scheduled, with a reminder before each.</p>
         </div>
       ) : (
         <>
-          <section className={`${box} flex flex-col gap-1`} aria-label="Payments" data-testid="proposal-schedule">
-            <h2 className="mb-1 font-semibold text-ink">Payments</h2>
+          <section className={box} aria-label="Payments" data-testid="proposal-schedule">
+            <h2 className={sectionTitle}>Payments</h2>
             {link.schedule.map((p) => (
               <p key={p.kind} className="flex justify-between gap-4 text-sm">
                 <span>
                   {SCHEDULED_LABELS[p.kind]}
                   <span className="text-ink-muted"> · {p.kind === "deposit" ? `today${link.depositRefundable ? "" : ", non-refundable"}` : formatLongDay(p.dueOn, false)}</span>
                 </span>
-                <span className="tabular-nums">{formatPrice(p.amountCents)}</span>
+                <span className="font-medium tabular-nums">{formatPrice(p.amountCents)}</span>
               </p>
             ))}
             <p className="mt-1 text-xs text-ink-subtle">Later payments are charged to the card you use today, with a reminder a few days before. Changes to the party are welcome until {formatLongDay(link.cutoff, false)}.</p>
           </section>
           {link.terms && (
             <section className={box} aria-label="Terms">
-              <h2 className="mb-2 font-semibold text-ink">Terms (version {link.terms.version})</h2>
-              <div className="flex max-h-72 flex-col gap-2 overflow-y-auto text-sm text-ink-muted" tabIndex={0} data-testid="proposal-terms">
+              <h2 className={sectionTitle}>Terms (version {link.terms.version})</h2>
+              <div className="flex max-h-72 flex-col gap-2 overflow-y-auto rounded-lg border border-line bg-surface p-4 text-sm text-ink-muted focus-visible:outline-2 focus-visible:outline-focus" tabIndex={0} data-testid="proposal-terms">
                 {link.terms.text.split(/\n{2,}/).map((para, i) => (
                   <p key={i}>{para}</p>
                 ))}

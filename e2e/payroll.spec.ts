@@ -25,7 +25,7 @@ test.describe("owner", () => {
     await expect(tickets.getByTestId("pay-ticket").first().getByRole("link", { name: /^#\d+$/ })).toHaveAttribute("href", /^\/sales\//);
 
     // Earlier and later periods, and custom dates.
-    await ui(page).getByRole("link", { name: "← Previous" }).click();
+    await ui(page).getByRole("link", { name: "Previous period" }).click();
     await expect(page).toHaveURL(/from=\d{4}-\d{2}-\d{2}&to=/);
     const form = ui(page).getByRole("form", { name: "Custom dates" });
     await form.getByLabel("From").fill("2026-10-01");

@@ -10,6 +10,7 @@ import type { LinkSnapshot } from "@/lib/payment-links";
 import { currentProvider } from "@/lib/payments";
 import { formatPrice } from "@/lib/services";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { pageLead, pageTitle } from "@/app/book/[slug]/styles";
 import { PayForm } from "./pay-form";
 
 export const metadata: Metadata = { title: { absolute: "Pay" }, robots: { index: false } };
@@ -46,9 +47,9 @@ async function Pay({ params }: { params: Promise<{ token: string }> }) {
       {link.status === "paid" ? (
         <Done salon={salon} totalCents={link.amount_cents + (link.tip_cents ?? 0)} tipCents={link.tip_cents ?? 0} />
       ) : link.status === "canceled" || expired ? (
-        <div className="flex flex-col gap-2" data-testid="link-closed">
-          <h1 className="font-serif text-3xl font-semibold text-ink">{expired ? "This link has expired" : "This link is no longer active"}</h1>
-          <p className="text-ink-muted">Ask {salon} for a new one, or pay at the desk.</p>
+        <div data-testid="link-closed">
+          <h1 className={pageTitle}>{expired ? "This link has expired" : "This link is no longer active"}</h1>
+          <p className={pageLead}>Ask {salon} for a new one, or pay at the desk.</p>
         </div>
       ) : (
         <PayForm
@@ -66,9 +67,9 @@ async function Pay({ params }: { params: Promise<{ token: string }> }) {
 
 function Done({ salon, totalCents, tipCents }: { salon: string; totalCents: number; tipCents: number }) {
   return (
-    <div className="flex flex-col gap-2" data-testid="link-paid">
-      <h1 className="font-serif text-3xl font-semibold text-ink">Paid. Thank you.</h1>
-      <p className="text-lg tabular-nums">
+    <div className="flex flex-col gap-1" data-testid="link-paid">
+      <h1 className={pageTitle}>Paid. Thank you.</h1>
+      <p className="mt-1.5 text-base font-medium tabular-nums">
         {formatPrice(totalCents)}
         {tipCents > 0 ? `, including ${formatPrice(tipCents)} in tips` : ""}
       </p>

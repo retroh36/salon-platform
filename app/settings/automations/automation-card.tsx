@@ -45,17 +45,17 @@ export function AutomationCard({
     });
 
   return (
-    <section aria-labelledby={`automation-${a.kind}`} className="mb-6 rounded-xl border border-line bg-surface shadow-card" data-testid="automation" data-kind={a.kind}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3.5">
+    <section aria-labelledby={`automation-${a.kind}`} className="mb-6 rounded-lg border border-line bg-surface" data-testid="automation" data-kind={a.kind}>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
         <div>
-          <h2 id={`automation-${a.kind}`} className="font-serif text-lg font-semibold text-ink">
+          <h2 id={`automation-${a.kind}`} className="text-base font-semibold text-ink">
             {AUTOMATION_LABELS[a.kind]}
           </h2>
           <p className="text-sm text-ink-muted">{AUTOMATION_DESCRIPTIONS[a.kind]}</p>
         </div>
         <Badge tone={a.enabled ? "green" : "neutral"}>{a.enabled ? "On" : "Off"}</Badge>
       </div>
-      <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+      <div className="grid gap-6 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <fieldset disabled={!canEdit} className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-wrap items-end gap-4">
             {a.kind === "rebook" && (
@@ -115,16 +115,19 @@ export function AutomationCard({
           <label className={labelClass}>
             Message
             <textarea value={a.body} onChange={(e) => set({ body: e.target.value })} rows={4} className={fieldClass} maxLength={1000} />
-            <span className="text-xs font-normal text-ink-muted">
+            <span className="text-13 font-normal text-ink-muted">
               Fields our system fills in: {TEMPLATE_FIELDS[a.kind].map((f) => `{${f}}`).join(", ")}. An opt-out is added to every message.
             </span>
           </label>
           {problems.length > 0 && (
-            <ul className="flex flex-col gap-1 text-sm text-status-late-ink" aria-label="Before it can go on" data-testid="automation-problems">
-              {problems.map((p) => (
-                <li key={p}>{p}</li>
-              ))}
-            </ul>
+            <div className="flex items-start gap-2.5 rounded-lg bg-warning-soft px-3 py-2.5 text-sm text-warning">
+              <span aria-hidden className="mt-[7px] size-1.5 shrink-0 rounded-full bg-warning-dot" />
+              <ul className="flex min-w-0 flex-1 flex-col gap-1" aria-label="Before it can go on" data-testid="automation-problems">
+                {problems.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            </div>
           )}
           {canEdit && (
           <div className="flex flex-wrap items-center gap-2">
@@ -158,7 +161,7 @@ export function AutomationCard({
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium">Preview</span>
+            <span className="text-13 font-medium text-ink">Preview</span>
             <Segmented<Channel>
               label={`Preview ${AUTOMATION_LABELS[a.kind]} as`}
               value={channel}
@@ -169,11 +172,11 @@ export function AutomationCard({
               ]}
             />
           </div>
-          <div className={`rounded-xl p-3 text-sm whitespace-pre-line ${channel === "sms" ? "bg-sunken" : "border border-line"}`} data-testid="automation-preview">
-            {channel === "email" && <p className="mb-2 font-semibold">{preview.subject}</p>}
+          <div className="border-l-2 border-line-strong py-0.5 pl-3 text-sm whitespace-pre-line text-ink" data-testid="automation-preview">
+            {channel === "email" && <p className="mb-2 font-medium">{preview.subject}</p>}
             {preview.body}
           </div>
-          <p className="text-xs text-ink-muted">Shown for a sample client, Ava, whose stylist is Bridget.</p>
+          <p className="text-13 text-ink-muted">Shown for a sample client, Ava, whose stylist is Bridget.</p>
           <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm tabular-nums" aria-label={`${AUTOMATION_LABELS[a.kind]} results`} data-testid="automation-results">
             <dt className="text-ink-muted">Sent (90 days)</dt>
             <dd className="text-right">{results.sent}</dd>
@@ -184,7 +187,7 @@ export function AutomationCard({
             <dt className="text-ink-muted">Opted out</dt>
             <dd className="text-right">{results.optedOut}</dd>
           </dl>
-          <p className="text-xs text-ink-muted">Booked: the client booked within 14 days of the message, any way. Revenue: those visits&apos; sales.</p>
+          <p className="text-13 text-ink-muted">Booked: the client booked within 14 days of the message, any way. Revenue: those visits&apos; sales.</p>
         </div>
       </div>
     </section>
@@ -200,14 +203,14 @@ export function Suggestions({ suggestions }: { suggestions: Suggestion[] }) {
   const decide = (id: string, d: "apply" | "reject" | "undo") => start(async () => setResult(await decideSuggestion(id, d)));
   if (!suggestions.length) return null;
   return (
-    <section aria-label="Denise's suggestions" className="mb-6 flex flex-col gap-2 rounded-xl border border-denise-200 bg-denise-50 p-4" data-testid="automation-suggestions">
-      <p className="font-semibold text-denise-900">Denise suggests</p>
-      <ul className="flex flex-col gap-2">
+    <section aria-label="Denise's suggestions" className="mb-6 rounded-lg border border-denise-200 bg-denise-50" data-testid="automation-suggestions">
+      <p className="border-b border-denise-200 px-4 py-3 text-sm font-semibold text-denise-900">Denise suggests</p>
+      <ul className="divide-y divide-denise-200">
         {suggestions.map((s) => (
-          <li key={s.id} className="flex flex-wrap items-start justify-between gap-3 rounded-lg bg-surface px-3 py-2.5" data-testid="automation-suggestion">
+          <li key={s.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3" data-testid="automation-suggestion">
             <span className="min-w-0 flex-1">
               <span className="block font-medium text-ink">{s.summary}</span>
-              <span className="block text-sm text-ink-muted">{s.reason}</span>
+              <span className="block text-13 font-normal text-ink-muted">{s.reason}</span>
             </span>
             {s.status === "proposed" ? (
               <span className="flex gap-1.5">
@@ -227,7 +230,7 @@ export function Suggestions({ suggestions }: { suggestions: Suggestion[] }) {
         ))}
       </ul>
       {result && (
-        <p role="status" className={`text-sm ${result.ok ? "text-ink-muted" : "text-danger"}`}>
+        <p role="status" className={`border-t border-denise-200 px-4 py-3 text-sm ${result.ok ? "text-ink-muted" : "text-danger"}`}>
           {result.message}
         </p>
       )}

@@ -113,7 +113,7 @@ async function Order({ params }: Pick<PageProps<"/inventory/orders/[id]">, "para
                 </li>
               ))}
             </ul>
-            <p className="flex justify-between border-t border-line px-5 py-3 font-semibold text-ink">
+            <p className="flex justify-between border-t border-line px-4 py-3 font-semibold text-ink">
               <span>Total</span>
               <span className="tabular-nums">{formatPrice(total)}</span>
             </p>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { dismissDeniseItem } from "@/app/calendar/denise-actions";
 import { CloseIcon } from "@/components/ui/icons";
+import { AllClear } from "./all-clear";
 import { briefItemKey, creditText, type BriefFacts } from "@/lib/denise/brief";
 
 // Shown per section before "See all".
@@ -75,23 +76,40 @@ export function BriefSections({ brief, today }: { brief: BriefFacts; today: stri
     },
   ];
 
+  const shown = sections.map((s) => {
+    const rows = s.rows.filter((r) => !dismissed.has(r.key));
+    return { ...s, rows, total: s.total - (s.rows.length - rows.length) };
+  });
+  const busy = shown.filter((s) => s.rows.length > 0 || s.total > 0);
+  const clear = shown.filter((s) => !(s.rows.length > 0 || s.total > 0));
+
+  // Only the sections with something in them, filling the row (no empty
+  // slots); the rest in one quiet "All clear" row.
   return (
-    <div className="grid gap-3 border-t border-denise-200 p-3 sm:grid-cols-2 sm:p-4 xl:grid-cols-3" data-testid="dashboard-brief">
-      {sections.map((s) => (
-        <BriefSection
-          key={s.id}
-          id={s.id}
-          title={s.title}
-          rows={s.rows.filter((r) => !dismissed.has(r.key))}
-          total={s.total - s.rows.filter((r) => dismissed.has(r.key)).length}
-          seeAll={s.seeAll}
-          empty={s.empty}
-          onDismiss={(key) => {
-            setDismissed((all) => new Set([...all, key]));
-            void dismissDeniseItem(key, today);
-          }}
-        />
-      ))}
+    <div className="flex flex-col gap-6" data-testid="dashboard-brief">
+      {busy.length > 0 && (
+        <div className="flex flex-wrap gap-x-8 gap-y-6">
+          {busy.map((s) => (
+            <BriefSection
+              key={s.id}
+              id={s.id}
+              title={s.title}
+              rows={s.rows}
+              total={s.total}
+              seeAll={s.seeAll}
+              onDismiss={(key) => {
+                setDismissed((all) => new Set([...all, key]));
+                void dismissDeniseItem(key, today);
+              }}
+            />
+          ))}
+        </div>
+      )}
+      <AllClear
+        tone="denise"
+        items={clear.map((s) => ({ title: s.title, why: s.empty, testId: `brief-${s.id}` }))}
+        className={busy.length ? "" : "py-1"}
+      />
     </div>
   );
 }
@@ -102,7 +120,6 @@ function BriefSection({
   rows,
   total,
   seeAll,
-  empty,
   onDismiss,
 }: {
   id: string;
@@ -111,34 +128,32 @@ function BriefSection({
   total: number;
   // A page with the whole list, when there's more than the brief holds.
   seeAll?: string;
-  empty: string;
   onDismiss: (key: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const shown = open ? rows : rows.slice(0, TOP);
   const more = total - shown.length;
+  const link = "self-start text-sm font-medium text-link underline-offset-2 hover:text-link-hover hover:underline";
   return (
-    <section aria-labelledby={`brief-${id}`} data-testid={`brief-${id}`} className="flex flex-col gap-2 rounded-xl border border-denise-200 bg-surface p-3">
-      <h3 id={`brief-${id}`} className="flex items-baseline justify-between gap-2 text-sm font-semibold text-denise-900">
+    <section aria-labelledby={`brief-${id}`} data-testid={`brief-${id}`} className="flex min-w-0 flex-1 basis-72 flex-col">
+      <h3 id={`brief-${id}`} className="flex items-baseline justify-between gap-2 border-b border-denise-200 pb-2 text-13 font-semibold text-denise-900">
         {title}
-        {total > 0 && <span className="text-xs font-medium text-ink-muted tabular-nums">{total}</span>}
+        {total > 0 && <span className="text-xs font-normal text-ink-subtle tabular-nums">{total}</span>}
       </h3>
-      {rows.length === 0 ? (
-        <p className="text-sm text-ink-muted">{empty}</p>
-      ) : (
-        <ul className="flex flex-col gap-1">
+      {shown.length > 0 && (
+        <ul className="divide-y divide-denise-100">
           {shown.map((r) => (
-            <li key={r.key} className="group flex animate-fade-in items-start gap-2 rounded-lg px-1.5 py-1 hover:bg-denise-50">
+            <li key={r.key} className="group flex animate-fade-in items-start gap-2 py-2.5">
               <Link href={r.href} className="min-w-0 flex-1 text-sm">
                 <span className="block font-medium text-ink underline-offset-2 group-hover:underline">{r.title}</span>
-                <span className="block text-ink-muted">{r.detail}</span>
+                <span className="block text-13 text-ink-muted">{r.detail}</span>
               </Link>
               <button
                 type="button"
                 aria-label={`Dismiss ${r.label ?? r.title}`}
                 title="Dismiss"
                 onClick={() => onDismiss(r.key)}
-                className="flex size-7 shrink-0 items-center justify-center rounded-md text-ink-subtle transition-colors duration-(--motion-fast) hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+                className="-mr-1.5 flex size-7 shrink-0 items-center justify-center rounded-md text-ink-subtle transition-colors duration-(--motion-fast) hover:bg-denise-100 hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
               >
                 <CloseIcon className="size-4" />
               </button>
@@ -148,16 +163,16 @@ function BriefSection({
       )}
       {more > 0 &&
         (seeAll && rows.length <= shown.length ? (
-          <Link href={seeAll} className="self-start text-sm font-medium text-link underline-offset-2 hover:underline">
+          <Link href={seeAll} className={`${link} mt-1`}>
             See all {total}
           </Link>
         ) : (
-          <button type="button" onClick={() => setOpen(true)} className="self-start text-sm font-medium text-link underline-offset-2 hover:underline">
+          <button type="button" onClick={() => setOpen(true)} className={`${link} mt-1`}>
             See all {total}
           </button>
         ))}
       {open && rows.length > TOP && (
-        <button type="button" onClick={() => setOpen(false)} className="self-start text-sm font-medium text-link underline-offset-2 hover:underline">
+        <button type="button" onClick={() => setOpen(false)} className={`${link} mt-1`}>
           Show fewer
         </button>
       )}

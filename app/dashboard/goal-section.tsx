@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { GoalAlertCard, StatusPill } from "@/components/goals";
-import { Card } from "@/components/ui/page";
+import { Card, textLinkClass } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import type { DashboardMe } from "@/lib/dashboard-load";
 import { loadMyGoals } from "@/lib/goals/mine";
@@ -20,18 +20,19 @@ export async function GoalSection({ me }: { me: DashboardMe }) {
         title="My goals"
         titleId="dashboard-goals-heading"
         actions={
-          <Link href="/my-day#goals-heading" className="text-sm font-medium text-link hover:underline">
+          <Link href="/my-day#goals-heading" className={`text-sm ${textLinkClass}`}>
             See all on My day
           </Link>
         }
+        flush
       >
         <ul className="flex flex-col divide-y divide-line">
           {goals.pacings.map((p) => (
-            <li key={p.goal.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-              <span>
-                {metricInfo(p.goal.metric).label} <span className="text-ink-muted">· this {p.goal.period}</span>
+            <li key={p.goal.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3 text-sm">
+              <span className="font-medium text-ink">
+                {metricInfo(p.goal.metric).label} <span className="font-normal text-ink-muted">· this {p.goal.period}</span>
               </span>
-              <span className="flex items-center gap-2 tabular-nums">
+              <span className="flex items-center gap-3 text-ink-muted tabular-nums">
                 {goalValue(p, p.current)} of {goalValue(p, p.target)}
                 <StatusPill status={p.status} />
               </span>

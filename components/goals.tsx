@@ -5,18 +5,14 @@ import type { GoalAlert } from "@/lib/goals/mine";
 import { formatDay } from "@/lib/schedule-format";
 import { formatPrice } from "@/lib/services";
 import { AlertDismiss } from "./goal-controls";
+import { Badge } from "@/components/ui/page";
 
-const STATUS_CLASS = {
-  hit: "bg-status-completed-bg text-status-completed-ink",
-  ahead: "bg-status-completed-bg text-status-completed-ink",
-  on_pace: "bg-status-confirmed-bg text-status-confirmed-ink",
-  behind: "bg-status-late-bg text-status-late-ink",
-} as const;
+const STATUS_TONE = { hit: "success", ahead: "success", on_pace: "info", behind: "warning" } as const;
 
 export function StatusPill({ status }: { status: Pacing["status"] }) {
   return (
-    <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_CLASS[status]}`} data-testid="goal-status">
-      {STATUS_LABELS[status]}
+    <span className="inline-flex shrink-0" data-testid="goal-status">
+      <Badge tone={STATUS_TONE[status]}>{STATUS_LABELS[status]}</Badge>
     </span>
   );
 }
@@ -28,13 +24,13 @@ export function GoalCard({ pacing, children }: { pacing: Pacing; children?: Reac
   const label = `${metricInfo(p.goal.metric).label} · ${GOAL_PERIODS.find((x) => x.value === p.goal.period)!.label.toLowerCase()} of ${p.goal.period === "week" ? formatDay(p.from) : periodName(p.goal.period, p.from)}`;
   const fill = Math.min(100, Math.max(0, p.percent));
   return (
-    <li className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-3" data-testid="goal" data-metric={p.goal.metric}>
+    <li className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4" data-testid="goal" data-metric={p.goal.metric}>
       <div className="flex items-start justify-between gap-2">
-        <p className="font-medium text-ink">{label}</p>
+        <p className="text-sm font-medium text-ink">{label}</p>
         <StatusPill status={p.status} />
       </div>
       <div
-        className="h-2 overflow-hidden rounded-full bg-sunken"
+        className="h-1.5 overflow-hidden rounded-full bg-sunken"
         role="progressbar"
         aria-label={label}
         aria-valuemin={0}
@@ -42,9 +38,9 @@ export function GoalCard({ pacing, children }: { pacing: Pacing; children?: Reac
         aria-valuenow={fill}
         aria-valuetext={`${goalValue(p, p.current)} of ${goalValue(p, p.target)}`}
       >
-        <div className={`h-full rounded-full ${p.status === "hit" ? "bg-status-completed-ink" : "bg-navy-700"}`} style={{ width: `${fill}%` }} />
+        <div className={`h-full rounded-full ${p.status === "hit" ? "bg-success-dot" : "bg-navy-700"}`} style={{ width: `${fill}%` }} />
       </div>
-      <dl className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-muted tabular-nums">
+      <dl className="flex flex-wrap gap-x-4 gap-y-1 text-13 text-ink-muted tabular-nums">
         <div>
           <dt className="sr-only">Progress</dt>
           <dd data-testid="goal-progress">
@@ -70,8 +66,9 @@ export function GoalCard({ pacing, children }: { pacing: Pacing; children?: Reac
           </div>
         )}
       </dl>
-      <p className="text-sm text-ink" data-testid="goal-line">
-        {goalLine(p)}
+      <p className="flex gap-2 text-sm text-denise-900" data-testid="goal-line">
+        <DeniseFace size={20} className="mt-px" />
+        <span className="min-w-0">{goalLine(p)}</span>
       </p>
       {children}
     </li>
@@ -82,8 +79,8 @@ export function GoalCard({ pacing, children }: { pacing: Pacing; children?: Reac
 // do next. "Got it" puts it away until the next one is due.
 export function GoalAlertCard({ alert, today }: { alert: GoalAlert; today: string }) {
   return (
-    <section aria-label="Denise on your goals" className="mb-6 flex gap-3 rounded-xl border border-denise-200 bg-denise-50 p-4 text-denise-900" data-testid="goal-alert">
-      <DeniseFace size={32} className="mt-0.5 shrink-0" />
+    <section aria-label="Denise on your goals" className="mb-6 flex gap-3 rounded-lg border border-denise-200 bg-denise-50 p-4 text-sm text-denise-900" data-testid="goal-alert">
+      <DeniseFace size={28} className="shrink-0" />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         {alert.celebrations.map((c) => (
           <p key={`${c.goalId}-${c.milestone}`} className="font-semibold" data-testid="goal-celebration">
@@ -96,7 +93,7 @@ export function GoalAlertCard({ alert, today }: { alert: GoalAlert; today: strin
           ))}
         </ul>
         {alert.actions.length > 0 && (
-          <ul className="flex list-disc flex-col gap-1 pl-5 text-sm" aria-label="Ideas from Denise" data-testid="goal-actions">
+          <ul className="flex list-disc flex-col gap-1 pl-5" aria-label="Ideas from Denise" data-testid="goal-actions">
             {alert.actions.map((a) => (
               <li key={a}>{a}</li>
             ))}

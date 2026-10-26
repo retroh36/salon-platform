@@ -352,7 +352,8 @@ test.describe("while she works", () => {
     const panel = denisePanel(page);
     await panel.locator("#denise-follow-up").fill("How do I ring up a gift card?");
     await panel.getByRole("button", { name: "Send" }).click();
-    await expect(panel).toContainText("2. Under the lines, tap Gift card.");
+    // Her steps as a real numbered list.
+    await expect(panel.locator("ol").last().getByRole("listitem")).toHaveText(["Tap New sale.", "Under the lines, tap Gift card."]);
     const button = panel.getByRole("link", { name: "Open new sale" });
     await expect(button).toHaveAttribute("href", "/checkout/new?from=/sales");
     await button.click();

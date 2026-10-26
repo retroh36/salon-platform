@@ -71,10 +71,10 @@ export function Tabs<T extends string>({
                 className={
                   quiet
                     ? `-mb-px flex h-9 items-center gap-1.5 border-b-2 text-sm font-medium whitespace-nowrap transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-focus ${
-                        selected ? "border-navy-900 text-ink" : "border-transparent text-ink-muted hover:text-ink"
+                        selected ? "border-ink text-ink" : "border-transparent text-ink-muted hover:text-ink"
                       }`
                     : `flex h-9 flex-1 items-center justify-center gap-2 rounded-md text-sm font-medium transition-[background-color,color,box-shadow,transform] duration-(--motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-focus ${
-                        selected ? "bg-surface text-navy-900 shadow-card" : "text-ink-muted hover:text-ink"
+                        selected ? "bg-surface text-ink ring-1 ring-line" : "text-ink-muted hover:text-ink"
                       }`
                 }
               >

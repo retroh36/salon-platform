@@ -135,7 +135,7 @@ export function AppFrame({
         <div className="flex items-center gap-3 px-5 pt-6 pb-5">
           <SalonMark name={businessName} logoUrl={logoUrl} />
           <div className="min-w-0">
-            <div className="font-serif text-lg leading-tight font-semibold text-navy-900">{businessName}</div>
+            <div className="text-base leading-tight font-semibold text-ink">{businessName}</div>
             <div className="mt-0.5 text-sm leading-tight text-ink-muted">{locationName}</div>
           </div>
         </div>
@@ -143,7 +143,7 @@ export function AppFrame({
         <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 pb-3">
           {groups.map((g) => (
             <div key={g.label} role="group" aria-labelledby={`nav-${g.label}`} className="flex flex-col gap-0.5">
-              <h2 id={`nav-${g.label}`} className="px-3 pb-1 text-[11px] font-semibold tracking-wider text-ink-muted uppercase">
+              <h2 id={`nav-${g.label}`} className="px-3 pb-1 text-[11px] font-medium text-ink-muted">
                 {g.label}
               </h2>
               {g.items.map((item) => (
@@ -188,11 +188,11 @@ export function AppFrame({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 border-b border-line bg-canvas px-4 py-3 sm:px-6">
+        <header className="flex items-center gap-3 border-b border-line bg-canvas px-4 py-2.5 sm:px-6">
           {/* Compact header for screens without the sidebar. */}
           <div className="flex items-center gap-2 lg:hidden">
             <SalonMark name={businessName} logoUrl={logoUrl} />
-            <span className="font-serif font-semibold text-navy-900">{businessName}</span>
+            <span className="font-semibold text-ink">{businessName}</span>
           </div>
           <form action="/clients" role="search" className="relative ml-auto w-full max-w-xl min-w-0 lg:ml-0">
             <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-muted" />
@@ -201,7 +201,7 @@ export function AppFrame({
               name="q"
               aria-label="Search clients"
               placeholder="Search clients by name or phone"
-              className="h-10 w-full rounded-md border border-line bg-surface pr-3 pl-9 text-sm placeholder:text-ink-subtle focus:border-focus focus:ring-2 focus:ring-focus/25 focus:outline-none"
+              className="h-9 w-full rounded-md border border-line bg-surface pr-3 pl-9 text-sm placeholder:text-ink-subtle focus:border-focus focus:ring-2 focus:ring-focus/25 focus:outline-none"
             />
           </form>
           {sharedDevice ? (
@@ -230,7 +230,7 @@ export function AppFrame({
             </Link>
           ))}
         </nav>
-        <main className="flex min-h-0 flex-1 flex-col lg:overflow-y-auto">{children}</main>
+        <main className="flex min-h-0 flex-1 flex-col text-sm lg:overflow-y-auto">{children}</main>
       </div>
       {sharedDevice && <AutoLock minutes={sharedDevice.autoLockMinutes} />}
     </div>

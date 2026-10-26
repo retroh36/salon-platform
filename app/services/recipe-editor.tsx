@@ -27,7 +27,7 @@ export function RecipeEditor({ serviceId, products, initial }: { serviceId: stri
           {pending ? "Saving…" : "Save recipe"}
         </Button>
         {result && (
-          <span role={result.ok ? "status" : "alert"} className={`animate-fade-in text-sm ${result.ok ? "font-medium text-status-confirmed-ink" : "text-danger"}`}>
+          <span role={result.ok ? "status" : "alert"} className={`animate-fade-in text-sm ${result.ok ? "text-ink-muted" : "text-danger"}`}>
             {result.ok ? "Recipe saved." : result.message}
           </span>
         )}

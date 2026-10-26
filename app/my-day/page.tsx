@@ -3,7 +3,8 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { ServiceTimer } from "@/components/service-timer";
 import { StatusChip } from "@/components/ui/status-chip";
-import { PageHeader } from "@/components/ui/page";
+import { EmptyState, PageHeader, Section } from "@/components/ui/page";
+import { TableCard } from "@/components/ui/table";
 import { bookedSummary } from "@/lib/calendar";
 import { getCurrentStaff } from "@/lib/auth";
 import { formatLongDay } from "@/lib/schedule-format";
@@ -27,6 +28,10 @@ import { LiveEarningsCard } from "./live-earnings";
 import { firstLetter } from "@/lib/initial";
 
 export const metadata: Metadata = { title: "My day" };
+
+// A disclosure's summary: a quiet text link with a turning chevron.
+const summaryClass =
+  "inline-flex cursor-pointer list-none items-center gap-1 text-sm font-medium text-link hover:text-link-hover hover:underline [&::-webkit-details-marker]:hidden before:inline-block before:text-ink-subtle before:transition-transform before:duration-(--motion-fast) before:content-['▸'] group-open:before:rotate-90";
 
 // A stylist's day on their phone: each client in order, with optional taps
 // for Start service, Processing, Back in chair and Finish service. The only
@@ -68,33 +73,36 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
   return (
     <AppShell section="my-day" me={me}>
       <PageHeader title="My day" description={`${stylist ? `${stylist.first_name}'s day, ` : ""}${formatLongDay(today, false)} · ${bookedSummary(counted)}`} />
+      <div className="max-w-2xl">
       {me.role === "assistant" ? (
-        <p className="mx-auto mb-4 max-w-xl text-sm text-ink-muted" data-testid="assisting">
+        <p className="mb-4 text-sm text-ink-muted" data-testid="assisting">
           {stylist ? `You're assisting ${stylist.first_name}: here's their day, as it's booked.` : "You're not assigned to a stylist yet. Ask a manager to choose one on your Team page."}
         </p>
       ) : (
-        <p className="mx-auto mb-4 max-w-xl text-sm text-ink-muted" data-testid="taps-optional">
+        <p className="mb-4 text-sm text-ink-muted" data-testid="taps-optional">
           Tapping your times is optional. When you do, Denise learns how long you really take; otherwise she goes by check-in and checkout.
         </p>
       )}
       {me.role === "assistant" && !book ? null : visits.length === 0 ? (
-        <p className="rounded-xl bg-sunken px-4 py-8 text-center text-ink-muted">Nothing booked {stylist ? `for ${stylist.first_name}` : "for you"} today.</p>
+        <div className="rounded-lg border border-line bg-surface">
+          <EmptyState>Nothing booked {stylist ? `for ${stylist.first_name}` : "for you"} today.</EmptyState>
+        </div>
       ) : (
-        <ol className="mx-auto flex max-w-xl flex-col gap-3" aria-label="Today's services">
+        <ol className="flex flex-col gap-3" aria-label="Today's services">
           {visits.map((i) => {
             const client = i.appointment.client;
             const name = client ? `${client.first_name}${client.last_name ? ` ${firstLetter(client.last_name)}.` : ""}` : "Walk-in";
             const status = i.appointment.status as AppointmentStatus;
             const start = toLocal(new Date(i.starts_at), tz).minute;
             return (
-              <li key={i.id} className="rounded-xl border border-line bg-surface p-4 shadow-card" data-item-id={i.id}>
+              <li key={i.id} className="rounded-lg border border-line bg-surface p-4" data-item-id={i.id}>
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-ink-muted tabular-nums">
+                    <p className="text-13 text-ink-muted tabular-nums">
                       {formatMinute(start)}–{formatMinute(start + i.minutes)}
                     </p>
-                    <p className="font-serif text-xl font-semibold text-ink">{name}</p>
-                    <p className="text-ink-muted">{i.service.name}</p>
+                    <p className="mt-0.5 text-base font-semibold text-ink">{name}</p>
+                    <p className="text-sm text-ink-muted">{i.service.name}</p>
                   </div>
                   <StatusChip status={status} />
                 </div>
@@ -117,6 +125,7 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
       {me.role !== "assistant" && <LiveEarningsSection supabase={supabase} me={me} />}
       {me.role !== "assistant" && <MyGoalsSection supabase={supabase} me={me} />}
       <MyEarnings supabase={supabase} me={me} last={params.pay === "last"} />
+      </div>
     </AppShell>
   );
 }
@@ -129,30 +138,26 @@ async function LiveEarningsSection({ supabase, me }: { supabase: Awaited<ReturnT
 async function MyGoalsSection({ supabase, me }: { supabase: Awaited<ReturnType<typeof getCurrentStaff>>["supabase"]; me: NonNullable<Awaited<ReturnType<typeof getCurrentStaff>>["staff"]> }) {
   const goals = await loadMyGoals(supabase, me);
   return (
-    <section aria-labelledby="goals-heading" className="mx-auto mt-8 max-w-xl" data-testid="my-goals">
+    <Section title="My goals" titleId="goals-heading" actions={<AlertFrequencyPicker value={goals.frequency} />} className="mt-10" data-testid="my-goals">
       {goals.alert && <GoalAlertCard alert={goals.alert} today={goals.today} />}
-      <div className="rounded-xl border border-line bg-surface p-4 shadow-card">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 id="goals-heading" className="font-serif text-xl font-semibold text-ink">
-            My goals
-          </h2>
-          <AlertFrequencyPicker value={goals.frequency} />
-        </div>
-        {goals.pacings.length ? (
-          <ul className="mb-3 flex flex-col gap-3">
-            {goals.pacings.map((p) => (
-              <GoalCard key={p.goal.id} pacing={p}>
-                {!p.setByOwner && <RemoveGoal goalId={p.goal.id} label={`${metricInfo(p.goal.metric).label} goal`} />}
-                {p.setByOwner && <p className="text-xs text-ink-muted">Set by the owner.</p>}
-              </GoalCard>
-            ))}
-          </ul>
-        ) : (
-          <p className="mb-3 text-sm text-ink-muted">No goals yet. Set one and Denise will keep you on pace.</p>
-        )}
-        <GoalForm fixedStaffId={me.id} />
-      </div>
-    </section>
+      {goals.pacings.length ? (
+        <ul className="mb-4 flex flex-col gap-3">
+          {goals.pacings.map((p) => (
+            <GoalCard key={p.goal.id} pacing={p}>
+              {!p.setByOwner && (
+                <div className="-mb-1 -ml-2.5">
+                  <RemoveGoal goalId={p.goal.id} label={`${metricInfo(p.goal.metric).label} goal`} />
+                </div>
+              )}
+              {p.setByOwner && <p className="text-xs text-ink-subtle">Set by the owner.</p>}
+            </GoalCard>
+          ))}
+        </ul>
+      ) : (
+        <p className="mb-4 text-sm text-ink-muted">No goals yet. Set one and Denise will keep you on pace.</p>
+      )}
+      <GoalForm fixedStaffId={me.id} />
+    </Section>
   );
 }
 
@@ -177,17 +182,11 @@ async function MyEarnings({ supabase, me, last }: { supabase: Awaited<ReturnType
     ...(pay.minutes !== null ? ([["Hourly pay", pay.hourlyPayCents, ratesText(pay.rates.hourly, (c) => `${formatPrice(c)}/h`)]] as [string, number, string][]) : []),
   ];
   return (
-    <section aria-labelledby="earnings-heading" className="mx-auto mt-8 max-w-xl rounded-xl border border-line bg-surface p-4 shadow-card" data-testid="my-earnings">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 id="earnings-heading" className="font-serif text-xl font-semibold text-ink">
-            My earnings
-          </h2>
-          <p className="text-sm text-ink-muted">
-            {formatLongDay(period.from, false)} to {formatLongDay(period.to, false)}
-            {last ? "" : " so far"}
-          </p>
-        </div>
+    <Section
+      title="My earnings"
+      titleId="earnings-heading"
+      description={`${formatLongDay(period.from, false)} to ${formatLongDay(period.to, false)}${last ? "" : " so far"}`}
+      actions={
         <nav aria-label="Earnings period" className="flex gap-2">
           <Link href="/my-day" className={pillClass(!last)} aria-current={!last ? "page" : undefined}>
             This period
@@ -196,45 +195,50 @@ async function MyEarnings({ supabase, me, last }: { supabase: Awaited<ReturnType
             Last period
           </Link>
         </nav>
-      </div>
-      <dl className="grid gap-x-6 gap-y-2 text-sm tabular-nums sm:grid-cols-2">
-        {rows.map(([label, cents, note]) => (
-          <div key={label} className="flex justify-between gap-2 border-b border-line pb-1.5">
-            <dt className="text-ink-muted">
-              {label}
-              {note && <span className="text-xs"> ({note})</span>}
-            </dt>
-            <dd>{formatPrice(cents)}</dd>
+      }
+      className="mt-10"
+      data-testid="my-earnings"
+    >
+      <div className="overflow-hidden rounded-lg border border-line bg-surface">
+        <dl className="divide-y divide-line text-sm tabular-nums">
+          {rows.map(([label, cents, note]) => (
+            <div key={label} className="flex justify-between gap-3 px-4 py-3">
+              <dt className="text-ink-muted">
+                {label}
+                {note && <span className="text-xs text-ink-subtle"> ({note})</span>}
+              </dt>
+              <dd className="text-right text-ink">{formatPrice(cents)}</dd>
+            </div>
+          ))}
+          <div className="flex justify-between gap-3 bg-sunken/50 px-4 py-3 font-semibold text-ink">
+            <dt>Total pay</dt>
+            <dd className="text-right" data-testid="my-pay-total">
+              {formatPrice(pay.totalCents)}
+            </dd>
           </div>
-        ))}
-      </dl>
-      <p className="mt-3 flex justify-between font-semibold">
-        <span>Total pay</span>
-        <span className="tabular-nums" data-testid="my-pay-total">
-          {formatPrice(pay.totalCents)}
-        </span>
-      </p>
-      <p className="mt-1 text-xs text-ink-muted">
+        </dl>
+      </div>
+      <p className="mt-2 text-xs text-ink-muted">
         Commission is on what clients paid before tax, at your rate{pay.rates.plans.length ? ` or plan (${pay.rates.plans.join(", ")})` : ""} when each sale was made. Refunds come off in the period they happen.
       </p>
       {pay.tipCents !== 0 && (
-        <details className="mt-3" data-testid="my-tips">
-          <summary className="cursor-pointer text-sm font-medium text-link">
+        <details className="group mt-6" data-testid="my-tips">
+          <summary className={summaryClass}>
             My tips ({formatPrice(pay.tipCents)}, {pctText(averageTipPct(pay.tickets))} average)
           </summary>
-          <div className="mt-3">
+          <div className="mt-3 overflow-hidden rounded-lg border border-line bg-surface p-4">
             <TipDetails tickets={pay.tickets} period={period} timeZone={tz} linkSales={false} ownView />
           </div>
         </details>
       )}
       {pay.tickets.length > 0 && (
-        <details className="mt-3">
-          <summary className="cursor-pointer text-sm font-medium text-link">Tickets behind it ({pay.tickets.length})</summary>
-          <div className="-mx-4 mt-2">
+        <details className="group mt-4">
+          <summary className={summaryClass}>Tickets behind it ({pay.tickets.length})</summary>
+          <TableCard className="mt-3">
             <PayTickets tickets={pay.tickets} timeZone={tz} linkSales={false} label="My tickets" />
-          </div>
+          </TableCard>
         </details>
       )}
-    </section>
+    </Section>
   );
 }

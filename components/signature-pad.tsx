@@ -34,7 +34,7 @@ export function SignaturePad({ label, onChange }: { label: string; onChange: (da
         role="img"
         aria-label={label}
         data-testid="signature-pad"
-        className="h-44 w-full touch-none rounded-lg border-2 border-dashed border-line-strong bg-surface text-ink"
+        className="h-44 w-full touch-none rounded-lg border border-dashed border-line-strong bg-surface text-ink"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           drawing.current = true;

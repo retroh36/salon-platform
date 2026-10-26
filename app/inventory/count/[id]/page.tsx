@@ -66,14 +66,14 @@ async function Stocktake({ params }: Pick<PageProps<"/inventory/count/[id]">, "p
           ["Found", formatPrice(summary.gainCents)],
           ["Missing", formatPrice(summary.lossCents)],
         ].map(([label, value]) => (
-          <div key={label} className="rounded-xl border border-line bg-surface p-4 shadow-card">
+          <div key={label} className="rounded-lg border border-line bg-surface p-4">
             <p className="text-sm text-ink-muted">{label}</p>
-            <p className="font-serif text-2xl font-semibold text-navy-900">{value}</p>
+            <p className="text-2xl font-semibold text-ink">{value}</p>
           </div>
         ))}
       </div>
       {summary.flagged > 0 && (
-        <p role="note" className="mb-6 rounded-xl border border-status-no-show-ink/25 bg-status-no-show-bg px-4 py-3 text-sm text-status-no-show-ink">
+        <p role="note" className="mb-6 rounded-lg border border-status-no-show-ink/25 bg-status-no-show-bg px-4 py-3 text-sm text-status-no-show-ink">
           <strong>Possible shrinkage on {summary.flagged === 1 ? "1 product" : `${summary.flagged} products`}:</strong> much less was on the shelf than services, sales
           and deliveries say there should be.
         </p>
@@ -99,7 +99,7 @@ async function Stocktake({ params }: Pick<PageProps<"/inventory/count/[id]">, "p
                   <span className="text-sm text-ink-muted tabular-nums">
                     {formatAmount(c.expected, c.product.unit)} expected → {formatAmount(c.counted, c.product.unit)}
                   </span>
-                  <span className={`w-28 text-right font-semibold tabular-nums ${diff < 0 ? "text-danger" : "text-status-confirmed-ink"}`}>
+                  <span className={`w-28 text-right font-semibold tabular-nums ${diff < 0 ? "text-danger" : "text-success"}`}>
                     {diff > 0 ? "+" : "−"}
                     {formatAmount(Math.abs(diff), c.product.unit)}
                   </span>

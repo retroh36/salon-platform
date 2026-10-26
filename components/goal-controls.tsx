@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { deleteGoal, saveGoal, seenGoalAlert, setGoalAlerts, type GoalResult } from "@/app/goals/actions";
 import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/page";
 import { fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { GOAL_METRICS, GOAL_PERIODS, metricInfo, type AlertFrequency, type GoalMetric } from "@/lib/goals/pacing";
 
@@ -41,7 +42,7 @@ export function GoalForm({ staff, fixedStaffId }: { staff?: { id: string; name: 
   return (
     <form
       aria-label="Set a goal"
-      className="flex flex-col gap-3 rounded-lg border border-line bg-sunken/60 p-3"
+      className="flex animate-fade-in flex-col gap-3"
       onSubmit={(e) => {
         e.preventDefault();
         start(async () => {
@@ -97,15 +98,11 @@ export function GoalForm({ staff, fixedStaffId }: { staff?: { id: string; name: 
         <Button type="submit" size="sm" variant="primary" disabled={pending}>
           Save goal
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+        <Button size="sm" variant="quiet" onClick={() => setOpen(false)}>
           Not now
         </Button>
       </div>
-      {result && !result.ok && (
-        <p role="alert" className="text-sm text-danger">
-          {result.message}
-        </p>
-      )}
+      {result && !result.ok && <Alert>{result.message}</Alert>}
     </form>
   );
 }
@@ -116,8 +113,8 @@ export function RemoveGoal({ goalId, label }: { goalId: string; label: string })
   return (
     <span className="flex items-center gap-2">
       <Button
-        size="sm"
-        variant="ghost"
+        size="xs"
+        variant="quiet"
         aria-label={`Remove ${label}`}
         disabled={pending}
         onClick={() =>
@@ -142,7 +139,7 @@ export function AlertFrequencyPicker({ value }: { value: AlertFrequency }) {
   const [current, setCurrent] = useState(value);
   const [pending, start] = useTransition();
   return (
-    <label className="flex items-center gap-2 text-sm text-ink-muted">
+    <label className="flex items-center gap-2 text-13 text-ink-muted">
       <span className="whitespace-nowrap">Denise&rsquo;s goal check-ins</span>
       <select
         value={current}

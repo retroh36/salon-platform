@@ -1,5 +1,6 @@
 "use client";
 
+import { toastActionClass, toastClass } from "@/components/ui/feedback";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -239,17 +240,17 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
       <header className="flex shrink-0 items-center gap-3 border-b border-line bg-surface px-4 py-2.5 sm:px-6">
         <Button
           size="lg"
-          variant="ghost"
+          variant="quiet"
           onClick={back}
           aria-label="Back (Escape)"
         >
           <ChevronLeftIcon className="size-5" />
           Back
         </Button>
-        <h1 className="font-serif text-2xl font-semibold text-navy-900">
+        <h1 className="text-xl font-semibold tracking-[-0.01em] text-ink">
           {data.draft.appointmentId ? "Check out" : "New sale"}
         </h1>
-        <span className="ml-auto hidden text-sm text-ink-muted sm:block">
+        <span className="ml-auto hidden text-13 text-ink-subtle sm:block">
           Saved as you go
         </span>
       </header>
@@ -260,7 +261,7 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
           aria-label="Ticket"
           inert={Boolean(linkOut)}
         >
-          <div className="shrink-0 space-y-3 border-b border-line bg-surface/60 px-4 py-4 sm:px-6">
+          <div className="shrink-0 space-y-4 border-b border-line bg-surface px-4 py-4 sm:px-6">
             <ClientHeader data={data} />
             <ProductPicker
               data={data}
@@ -331,7 +332,7 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
       {removed && (
         <div
           role="status"
-          className="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 animate-toast-in items-center gap-4 rounded-xl bg-navy-900 px-5 py-3 text-white shadow-lift"
+          className={toastClass}
         >
           Removed{" "}
           {removed.line.kind === "service" || removed.line.kind === "product"
@@ -340,7 +341,7 @@ export function CheckoutScreen({ data }: { data: CheckoutScreenData }) {
           <button
             type="button"
             onClick={undoRemove}
-            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-semibold underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-white"
+            className={`inline-flex items-center gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-white ${toastActionClass}`}
           >
             <UndoIcon className="size-4" />
             Undo

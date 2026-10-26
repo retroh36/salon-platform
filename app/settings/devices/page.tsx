@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
-import { Card, EmptyState, PageHeader } from "@/components/ui/page";
+import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { formatDay } from "@/lib/schedule-format";
@@ -52,22 +52,20 @@ async function Devices() {
         {devices.length ? (
           <ul className="divide-y divide-line" data-testid="shared-devices">
             {devices.map((d) => (
-              <li key={d.id} className="flex items-start justify-between gap-3 px-5 py-3">
+              <li key={d.id} className="flex items-start justify-between gap-3 px-4 py-3">
                 <div>
-                  <p className="font-medium">
+                  <p className="font-medium text-ink">
                     {d.name}
-                    {d === thisOne && <span className="ml-2 text-sm font-normal text-ink-muted">(this device)</span>}
+                    {d === thisOne && <Badge tone="info" className="ml-2 align-middle">This device</Badge>}
                   </p>
-                  <p className="text-sm text-ink-muted">{d.last_used_at ? `Last switch ${when(d.last_used_at)}` : "Not used yet"}</p>
+                  <p className="text-13 text-ink-muted">{d.last_used_at ? `Last switch ${when(d.last_used_at)}` : "Not used yet"}</p>
                 </div>
                 <RemoveDevice id={d.id} name={d.name} />
               </li>
             ))}
           </ul>
         ) : (
-          <div className="p-5">
-            <EmptyState>No shared devices yet.</EmptyState>
-          </div>
+          <EmptyState>No shared devices yet.</EmptyState>
         )}
       </Card>
       <Card title="Locking" titleId="locking-heading" description="So the next person at the desk can't carry on as whoever was there.">

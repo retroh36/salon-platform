@@ -16,7 +16,7 @@ export function PatchTestForm({ clientId, today, me, staff, compact = false }: {
   }, [state]);
 
   return (
-    <form ref={formRef} action={action} onSubmit={submitWithoutReset(action)} aria-label="Record patch test" className={compact ? "grid grid-cols-2 gap-3 rounded-lg border border-line bg-sunken/40 p-3 [&>*:nth-last-child(-n+3)]:col-span-2" : "grid gap-4 border-b border-line bg-sunken/40 p-5 sm:grid-cols-4"} noValidate>
+    <form ref={formRef} action={action} onSubmit={submitWithoutReset(action)} aria-label="Record patch test" className={compact ? "grid grid-cols-2 gap-3 rounded-lg border border-line bg-sunken/40 p-3 [&>*:nth-last-child(-n+3)]:col-span-2" : "grid gap-4 pb-4 sm:grid-cols-4"} noValidate>
       {state && !state.ok && <Alert className={compact ? "col-span-2" : "sm:col-span-4"}>{state.message}</Alert>}
       <Field label="Date">
         <input name="date" type="date" max={today} defaultValue={today} className={inputClass} />
@@ -50,7 +50,7 @@ export function PatchTestForm({ clientId, today, me, staff, compact = false }: {
           {pending ? "Saving…" : "Record patch test"}
         </button>
         {state?.ok && (
-          <span role="status" className="animate-fade-in text-sm font-medium text-status-confirmed-ink">
+          <span role="status" className="animate-fade-in text-sm text-ink-muted">
             Saved.
           </span>
         )}

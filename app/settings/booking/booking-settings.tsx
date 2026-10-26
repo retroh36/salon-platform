@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
 import { contrast } from "@/lib/color";
@@ -12,9 +12,9 @@ import { saveBookingSettings, saveServicesOnline, type BookingSettingsState } fr
 function Result({ state }: { state: BookingSettingsState }) {
   if (!state) return null;
   return state.ok ? (
-    <p role="status" className="font-medium text-status-confirmed-ink">
+    <Alert tone="success">
       {state.message}
-    </p>
+    </Alert>
   ) : (
     <Alert>{state.message}</Alert>
   );
@@ -36,7 +36,8 @@ export function BookingLink({ url, name, live }: { url: string; name: string; li
   };
   return (
     <div className="flex flex-col gap-5">
-      <p className={`text-sm font-medium ${live ? "text-status-confirmed-ink" : "text-ink-muted"}`} data-testid="booking-status">
+      <p className={`flex items-center gap-2 text-sm font-medium ${live ? "text-ink" : "text-ink-muted"}`} data-testid="booking-status">
+        <span aria-hidden className={`size-2 shrink-0 rounded-full ${live ? "bg-success-dot" : "bg-neutral-dot"}`} />
         {live ? "Online booking is on." : "Online booking is off: the link shows a note to call instead."}
       </p>
       <div className={labelClass}>
@@ -44,7 +45,7 @@ export function BookingLink({ url, name, live }: { url: string; name: string; li
         <div className="flex flex-wrap gap-2">
           <input readOnly value={url} aria-labelledby="booking-link-label" className={`${fieldClass} min-w-64 flex-1 font-mono text-sm`} onFocus={(e) => e.currentTarget.select()} />
           <Button onClick={() => copy("link", url)}>{copied === "link" ? "Copied" : "Copy link"}</Button>
-          <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center px-2 text-sm font-semibold text-link underline hover:text-link-hover">
+          <a href={url} target="_blank" rel="noreferrer" className={buttonClass("secondary", "md")}>
             Open
           </a>
         </div>
@@ -89,8 +90,8 @@ export function BookingRulesForm({ initial, services }: { initial: RulesFields; 
       <label className="flex items-start gap-3">
         <input type="checkbox" name="enabled" defaultChecked={initial.enabled} className={`${checkboxClass} mt-0.5`} />
         <span>
-          <span className="font-semibold text-ink">Take bookings online</span>
-          <span className="block text-sm text-ink-muted">Clients book themselves at your booking link. Bookings appear on the calendar right away, marked online.</span>
+          <span className="font-medium text-ink">Take bookings online</span>
+          <span className="block text-13 font-normal text-ink-muted">Clients book themselves at your booking link. Bookings appear on the calendar right away, marked online.</span>
         </span>
       </label>
 
@@ -137,8 +138,8 @@ export function BookingRulesForm({ initial, services }: { initial: RulesFields; 
       <label className="flex items-start gap-3">
         <input type="checkbox" name="allow_new_clients" defaultChecked={initial.allow_new_clients} className={`${checkboxClass} mt-0.5`} />
         <span>
-          <span className="font-semibold text-ink">New clients can book online</span>
-          <span className="block text-sm text-ink-muted">Otherwise only clients already on file can book; new clients are asked to call.</span>
+          <span className="font-medium text-ink">New clients can book online</span>
+          <span className="block text-13 font-normal text-ink-muted">Otherwise only clients already on file can book; new clients are asked to call.</span>
         </span>
       </label>
 
@@ -150,7 +151,7 @@ export function BookingRulesForm({ initial, services }: { initial: RulesFields; 
       </label>
 
       <fieldset className="flex flex-col gap-4">
-        <legend className="mb-2 font-serif text-lg font-semibold text-ink">Look</legend>
+        <legend className="mb-2 text-base font-semibold text-ink">Look</legend>
         <label className={labelClass}>
           Welcome line
           <input name="welcome" defaultValue={initial.welcome} maxLength={280} className={fieldClass} />
@@ -202,16 +203,16 @@ export function ServicesOnlineForm({ services }: { services: ServiceRow[] }) {
   return (
     <form action={action} aria-label="Services online" className="flex flex-col">
       {state && (
-        <div className="px-5 pt-4">
+        <div className="px-4 pt-4">
           <Result state={state} />
         </div>
       )}
       <ul className="divide-y divide-line">
         {services.map((s) => (
-          <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
+          <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
             <input type="hidden" name="service" value={s.id} />
             <span className="min-w-48 flex-1">
-              <span className="block font-semibold text-ink">{s.name}</span>
+              <span className="block font-medium text-ink">{s.name}</span>
               <span className="text-sm text-ink-muted">{s.category}</span>
             </span>
             <select name={`mode_${s.id}`} defaultValue={s.mode} aria-label={`${s.name}: online`} className={`${selectClass} w-48!`}>
@@ -244,7 +245,7 @@ export function ServicesOnlineForm({ services }: { services: ServiceRow[] }) {
           </li>
         ))}
       </ul>
-      <div className="border-t border-line px-5 py-4">
+      <div className="border-t border-line px-4 py-4">
         <Button type="submit" variant="primary" disabled={pending}>
           {pending ? "Saving…" : "Save services"}
         </Button>
@@ -278,7 +279,7 @@ export function ShareLinks({ links }: { links: ShareLink[] }) {
             <Button onClick={() => copy(l.source, l.url)}>{copied === l.source ? "Copied" : "Copy link"}</Button>
           </div>
           <details>
-            <summary className="cursor-pointer text-sm font-medium text-link">How to add it</summary>
+            <summary className="w-fit cursor-pointer text-13 font-medium text-ink-muted hover:text-ink">How to add it</summary>
             <ol className="mt-2 ml-5 flex list-decimal flex-col gap-1 text-sm text-ink-muted">
               {l.steps.map((step) => (
                 <li key={step}>{step}</li>

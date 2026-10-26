@@ -1,12 +1,13 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { primaryButton } from "@/app/book/[slug]/booking-flow";
+import { chipClass, inputClass, primaryButton } from "@/app/book/[slug]/styles";
+import { Alert } from "@/components/ui/page";
 import { shrinkPhoto } from "@/lib/photos";
 import { addInquiryPhoto, sendInquiry, type InquiryInput } from "./actions";
 
-const field = "h-12 w-full rounded-lg border border-line-strong bg-surface px-3 text-base";
-const label = "flex flex-col gap-1 text-sm font-medium text-ink";
+const field = inputClass;
+const label = "flex flex-col gap-1.5 text-sm font-medium text-ink";
 
 // The event inquiry: what, when, where, how many and what they need, a few
 // inspiration photos, and how to reach them. Phone-first, big targets.
@@ -21,7 +22,7 @@ export function InquiryForm({ slug, salon, today }: { slug: string; salon: strin
   if (sent)
     return (
       <div className="flex flex-col gap-2" data-testid="inquiry-sent">
-        <h2 className="font-serif text-2xl font-semibold text-ink">Thank you</h2>
+        <h2 className="text-xl font-semibold text-ink">Thank you</h2>
         <p className="text-ink-muted">
           {salon} has your inquiry{sent.photos ? ` and ${sent.photos} ${sent.photos === 1 ? "photo" : "photos"}` : ""} and will be in touch soon to plan the day.
           {sent.failed > 0 ? ` ${sent.failed === 1 ? "One photo" : `${sent.failed} photos`} didn't upload; you can send them when we reply.` : ""}
@@ -56,9 +57,9 @@ export function InquiryForm({ slug, salon, today }: { slug: string; salon: strin
       }}
     >
       <fieldset className="flex gap-2">
-        <legend className="mb-1 text-sm font-medium">What are you planning?</legend>
+        <legend className="mb-1.5 text-sm font-medium text-ink">What are you planning?</legend>
         {(["wedding", "event"] as const).map((k) => (
-          <label key={k} className={`flex h-12 flex-1 cursor-pointer items-center justify-center rounded-lg border font-medium ${f.kind === k ? "border-(--accent) bg-(--accent) text-white" : "border-line-strong bg-surface"}`}>
+          <label key={k} className={`${chipClass(f.kind === k)} h-12 flex-1 cursor-pointer has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus`}>
             <input type="radio" name="kind" className="sr-only" checked={f.kind === k} onChange={() => setF({ ...f, kind: k })} />
             {k === "wedding" ? "A wedding" : "Another event"}
           </label>
@@ -87,22 +88,22 @@ export function InquiryForm({ slug, salon, today }: { slug: string; salon: strin
         <input type="number" inputMode="numeric" min={1} max={100} required value={f.partySize} onChange={(e) => setF({ ...f, partySize: e.target.value })} className={field} />
       </label>
       <fieldset className="flex gap-6">
-        <legend className="mb-1 text-sm font-medium">Services</legend>
-        <label className="flex min-h-11 items-center gap-3 font-medium">
+        <legend className="mb-1 text-sm font-medium text-ink">Services</legend>
+        <label className="flex min-h-11 items-center gap-3 text-sm font-medium">
           <input type="checkbox" className="size-5 accent-(--accent)" checked={f.hair} onChange={(e) => setF({ ...f, hair: e.target.checked })} />
           Hair
         </label>
-        <label className="flex min-h-11 items-center gap-3 font-medium">
+        <label className="flex min-h-11 items-center gap-3 text-sm font-medium">
           <input type="checkbox" className="size-5 accent-(--accent)" checked={f.makeup} onChange={(e) => setF({ ...f, makeup: e.target.checked })} />
           Makeup
         </label>
       </fieldset>
       <label className={label}>
         Anything else
-        <textarea rows={3} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-base" maxLength={2000} placeholder="The look you're after, the schedule, questions" />
+        <textarea rows={3} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} className={`${inputClass} py-3`} maxLength={2000} placeholder="The look you're after, the schedule, questions" />
       </label>
       <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">Inspiration photos (up to 6)</span>
+        <span className="text-sm font-medium text-ink">Inspiration photos (up to 6)</span>
         <input
           ref={fileInput}
           type="file"
@@ -110,7 +111,7 @@ export function InquiryForm({ slug, salon, today }: { slug: string; salon: strin
           multiple
           aria-label="Inspiration photos"
           onChange={(e) => setPhotos([...(e.target.files ?? [])].slice(0, 6))}
-          className="text-sm"
+          className="text-sm text-ink-muted file:mr-3 file:inline-flex file:min-h-11 file:cursor-pointer file:rounded-lg file:border file:border-solid file:border-line-strong file:bg-surface file:px-4 file:text-sm file:font-medium file:text-ink hover:file:bg-sunken"
         />
         {photos.length > 0 && <p className="text-sm text-ink-muted">{photos.length === 1 ? "1 photo" : `${photos.length} photos`} chosen</p>}
       </div>
@@ -136,11 +137,7 @@ export function InquiryForm({ slug, salon, today }: { slug: string; salon: strin
         Website
         <input tabIndex={-1} autoComplete="off" value={f.website} onChange={(e) => setF({ ...f, website: e.target.value })} />
       </label>
-      {error && (
-        <p role="alert" className="font-medium text-danger">
-          {error}
-        </p>
-      )}
+      {error && <Alert>{error}</Alert>}
       <button type="submit" className={primaryButton} disabled={pending}>
         {pending ? "Sending…" : "Send inquiry"}
       </button>

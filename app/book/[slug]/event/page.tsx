@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { loadSite } from "@/lib/online-booking/site";
 import { todayIn } from "@/lib/scheduling/time";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { accentLink } from "../styles";
 import { BookingFrame } from "../frame";
 import { InquiryForm } from "./inquiry-form";
 
@@ -30,18 +31,18 @@ async function Inquiry({ params }: { params: Promise<{ slug: string }> }) {
   return (
     <BookingFrame name={site.business.name} logoUrl={site.business.logoUrl} accent={site.settings.accent}>
       <p className="-mt-2 mb-4 text-sm">
-        <Link href={`/book/${slug}`} className="font-medium text-(--accent) underline underline-offset-2">
+        <Link href={`/book/${slug}`} className={accentLink}>
           Book a visit instead
         </Link>
       </p>
-      <h1 className="font-serif text-3xl font-semibold tracking-tight text-ink">Plan your wedding or event</h1>
+      <h1 className="text-2xl font-semibold tracking-[-0.015em] text-ink">Plan your wedding or event</h1>
       {settings?.inquiries_enabled ? (
         <>
-          <p className="mt-2 mb-6 text-ink-muted">Tell us about the day and we&rsquo;ll send you a proposal with the timeline and prices.</p>
+          <p className="mt-1.5 mb-6 text-ink-muted">Tell us about the day and we&rsquo;ll send you a proposal with the timeline and prices.</p>
           <InquiryForm slug={slug} salon={site.business.name} today={todayIn(site.location.timezone)} />
         </>
       ) : (
-        <p className="mt-3 text-ink-muted">{site.location.phone ? `Please call us on ${site.location.phone} to plan your event.` : "Please call the salon to plan your event."}</p>
+        <p className="mt-1.5 text-ink-muted">{site.location.phone ? `Please call us on ${site.location.phone} to plan your event.` : "Please call the salon to plan your event."}</p>
       )}
     </BookingFrame>
   );

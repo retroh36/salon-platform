@@ -168,7 +168,7 @@ test.describe("front desk", () => {
     const done = await co.complete();
     await expect(done).toContainText("$22");
     await done.getByRole("link", { name: "Back to sales" }).click();
-    await expect(ui(page).getByRole("list", { name: "Sales" }).getByRole("listitem").first()).toContainText("Walk-in sale");
+    await expect(ui(page).getByRole("table", { name: "Sales" }).getByRole("row").nth(1)).toContainText("Walk-in sale");
   });
 });
 

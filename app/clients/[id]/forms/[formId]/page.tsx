@@ -50,7 +50,7 @@ async function SignedForm({ params }: Pick<PageProps<"/clients/[id]/forms/[formI
         description={`Signed ${formatDate(toLocal(new Date(form.signed_at), me.location.timezone).date)}${form.collector ? ` · collected by ${fullName(form.collector)}` : ""}`}
       />
       <Card>
-        <dl className="flex flex-col gap-5">
+        <dl className="flex flex-col gap-4">
           {fields.map((f) => (
             <div key={f.id}>
               <dt className="font-medium text-ink">{f.label}</dt>

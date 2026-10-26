@@ -27,8 +27,8 @@ export function PermissionsCard({ staffId, firstName, rows, canEdit }: { staffId
   const shown = PERMISSIONS.filter((p) => rows.some((r) => r.permission === p.key && r.toggleable));
   if (!shown.length) return null;
   return (
-    <section aria-label="What they can do" className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-5 shadow-card">
-      <h2 className="font-serif text-lg font-semibold text-ink">What {firstName} can do</h2>
+    <section aria-label="What they can do" className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
+      <h2 className="text-base font-semibold text-ink">What {firstName} can do</h2>
       <p className="text-sm text-ink-muted">{canEdit ? "Their role sets the starting point; switch anything here for just them." : "Set by their role and the owner."}</p>
       <ul className="flex flex-col gap-2" data-testid="permissions">
         {shown.map((p) => {
@@ -72,8 +72,8 @@ export function AssistingCard({ staffId, current, stylists }: { staffId: string;
   const [result, setResult] = useState<LoginResult | null>(null);
   const [pending, start] = useTransition();
   return (
-    <section aria-label="Assisting" className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-5 shadow-card">
-      <h2 className="font-serif text-lg font-semibold text-ink">Assisting</h2>
+    <section aria-label="Assisting" className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
+      <h2 className="text-base font-semibold text-ink">Assisting</h2>
       <label className={labelClass}>
         Stylist
         <select
@@ -107,10 +107,10 @@ export function EventWorkCard({ staffId, firstName, current }: { staffId: string
   const [result, setResult] = useState<LoginResult | null>(null);
   const [pending, start] = useTransition();
   return (
-    <section aria-label="Event work" className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-5 shadow-card">
-      <h2 className="font-serif text-lg font-semibold text-ink">Event work</h2>
+    <section aria-label="Event work" className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
+      <h2 className="text-base font-semibold text-ink">Event work</h2>
       <p className="text-sm text-ink-muted">What {firstName} does at weddings and events.</p>
-      <div className="flex gap-5">
+      <div className="flex gap-4">
         {(["hair", "makeup"] as const).map((role) => (
           <label key={role} className="flex min-h-11 items-center gap-2 text-sm font-medium">
             <input
@@ -137,8 +137,8 @@ export function PinCard({ staffId, firstName, hasPin }: { staffId: string; first
   const [result, setResult] = useState<LoginResult | null>(null);
   const [pending, start] = useTransition();
   return (
-    <section aria-label="PIN" className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-5 shadow-card">
-      <h2 className="font-serif text-lg font-semibold text-ink">Shared iPad PIN</h2>
+    <section aria-label="PIN" className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
+      <h2 className="text-base font-semibold text-ink">Shared iPad PIN</h2>
       <p className="text-sm text-ink-muted">{hasPin && !result?.ok ? `${firstName} has a PIN.` : `${firstName} sets a PIN on Your account.`}</p>
       {hasPin && !result?.ok && (
         <Button className="self-start" disabled={pending} onClick={() => start(async () => setResult(await clearMemberPin(staffId)))}>

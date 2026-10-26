@@ -43,7 +43,9 @@
     ".next-week/types/**/*.ts",
     ".next-week/dev/types/**/*.ts",
     ".next-demo/types/**/*.ts",
-    ".next-demo/dev/types/**/*.ts"
+    ".next-demo/dev/types/**/*.ts",
+    ".next-polish-cal/types/**/*.ts",
+    ".next-polish-cal/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

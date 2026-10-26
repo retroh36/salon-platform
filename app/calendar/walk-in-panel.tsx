@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass, selectClass } from "@/components/ui/field";
-import { Alert } from "@/components/ui/page";
+import { Alert, Badge } from "@/components/ui/page";
 import { formatMinute } from "@/lib/scheduling/time";
 import type { BoardData } from "./types";
 import { addWalkIn, bookWalkInNow, walkIns, walkInLeft, type WalkInView } from "./waitlist-actions";
@@ -54,10 +54,10 @@ export function WalkInPanel({ data, onClose, onBooked }: { data: BoardData; onCl
     <div className="flex flex-col gap-4 py-2 text-sm">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h2 className="font-serif text-2xl font-semibold text-navy-900">Walk-ins</h2>
+          <h2 className="text-xl font-semibold text-ink">Walk-ins</h2>
           <p className="text-ink-muted">Today{data.date !== data.today ? " (bookings go on today's calendar)" : ""}</p>
         </div>
-        <Button size="sm" variant="ghost" onClick={onClose}>
+        <Button size="sm" onClick={onClose}>
           Done
         </Button>
       </div>
@@ -72,27 +72,30 @@ export function WalkInPanel({ data, onClose, onBooked }: { data: BoardData; onCl
         ) : (
           <ol className="flex flex-col gap-2">
             {queue.map((w, i) => (
-              <li key={w.id} className="flex animate-fade-in flex-col gap-2 rounded-xl border border-line bg-surface p-3">
+              <li key={w.id} className="flex animate-fade-in flex-col gap-2 rounded-lg border border-line bg-surface p-4">
                 <p className="flex items-baseline justify-between gap-2">
-                  <span className="font-semibold text-ink">
+                  <span className="min-w-0 font-medium text-ink">
                     {i + 1}. {w.name}
                   </span>
-                  <span className="text-ink-muted">{serviceName(w.serviceId)}</span>
+                  <span className="shrink-0 text-13 text-ink-muted">{serviceName(w.serviceId)}</span>
                 </p>
                 {w.estimate ? (
-                  <p className="text-ink" data-testid="walk-in-estimate">
-                    Next free: <strong className="font-semibold">{staffName(w.estimate.staffId)}</strong> at {formatMinute(w.estimate.start)} · wait {waitLabel(w.estimate.wait)}
+                  <p className="text-ink-muted" data-testid="walk-in-estimate">
+                    Next free: <strong className="font-medium text-ink">{staffName(w.estimate.staffId)}</strong> at {formatMinute(w.estimate.start)} · wait {waitLabel(w.estimate.wait)}
                   </p>
                 ) : (
-                  <p className="text-danger">No one who does this service is free today.</p>
+                  <p className="flex flex-wrap items-center gap-1.5 text-ink-muted">
+                    <Badge tone="warning">No one free</Badge>
+                    <span>No one who does this service is free today.</span>
+                  </p>
                 )}
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {w.estimate && (
-                    <Button size="sm" variant="primary" disabled={pending} onClick={() => run(() => bookWalkInNow(w.id))}>
+                    <Button size="sm" variant={i === 0 ? "primary" : "secondary"} disabled={pending} onClick={() => run(() => bookWalkInNow(w.id))}>
                       Book with {staffName(w.estimate.staffId)} at {formatMinute(w.estimate.start)}
                     </Button>
                   )}
-                  <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(() => walkInLeft(w.id))}>
+                  <Button size="sm" variant="quiet" disabled={pending} onClick={() => run(() => walkInLeft(w.id))}>
                     Left
                   </Button>
                 </div>
@@ -104,7 +107,7 @@ export function WalkInPanel({ data, onClose, onBooked }: { data: BoardData; onCl
 
       <form
         aria-label="Add walk-in"
-        className="flex flex-col gap-3 rounded-xl border border-line bg-sunken/40 p-3"
+        className="flex flex-col gap-3 border-t border-line pt-4"
         onSubmit={(e) => {
           e.preventDefault();
           run(
@@ -117,7 +120,7 @@ export function WalkInPanel({ data, onClose, onBooked }: { data: BoardData; onCl
           );
         }}
       >
-        <p className="font-semibold text-ink">Add a walk-in</p>
+        <p className="font-medium text-ink">Add a walk-in</p>
         <label className={labelClass}>
           Name
           <input value={name} onChange={(e) => setName(e.target.value)} className={fieldClass} autoComplete="off" />

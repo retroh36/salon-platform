@@ -7,6 +7,7 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { fieldClass } from "@/components/ui/field";
+import { Badge } from "@/components/ui/page";
 import { smsCounterText } from "@/lib/messaging/templates";
 import { sendSpecial } from "./actions";
 
@@ -31,21 +32,22 @@ export function SendSpecial({
   const [pending, start] = useTransition();
   const counter = client.channel === "sms" ? smsCounterText(body) : null;
   return (
-    <li className="rounded-lg border border-line bg-surface px-3 py-2" data-testid="idea-client">
+    <li className="py-1.5" data-testid="idea-client">
       <div className="flex flex-wrap items-center gap-3">
         <span className="min-w-0 flex-1">
-          <span className="font-medium text-ink">{client.firstName}</span>
-          <span className="text-sm text-ink-muted">
+          <span className="text-sm font-medium text-ink">{client.firstName}</span>
+          <span className="text-13 text-ink-muted">
             {" "}
             · {client.overdueDays > 0 ? `${client.overdueDays} days overdue` : "due soon"} · offers by {client.channel === "sms" ? "text" : "email"}
           </span>
         </span>
         {result?.ok ? (
-          <span className="text-sm font-medium text-status-checked-out-ink" role="status">
-            {result.message}
+          <span className="flex items-center gap-2" role="status">
+            <Badge tone="success">Sent</Badge>
+            <span className="text-13 text-ink-muted">{result.message}</span>
           </span>
         ) : (
-          <Button size="sm" onClick={() => setOpen(!open)} aria-expanded={open}>
+          <Button size="xs" onClick={() => setOpen(!open)} aria-expanded={open}>
             {open ? "Close" : "Message"}
           </Button>
         )}
@@ -65,7 +67,7 @@ export function SendSpecial({
         >
           <textarea aria-label="Message" value={body} readOnly={!canWrite} onChange={(e) => setBody(e.target.value)} rows={4} maxLength={800} className={`${fieldClass} h-auto! py-2`} />
           <p className="text-xs text-ink-muted">
-            {counter && <span className={counter.warn ? "font-medium text-status-late-ink" : ""}>{counter.text} · </span>}
+            {counter && <span className={counter.warn ? "font-medium text-warning" : ""}>{counter.text} · </span>}
             How to stop offers is added at the end.{!canWrite && " Your role sends the message as written."}
           </p>
           {result && !result.ok && (

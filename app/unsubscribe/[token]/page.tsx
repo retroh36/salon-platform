@@ -7,6 +7,7 @@ import { BookingFrame } from "@/app/book/[slug]/frame";
 import { salonLogoUrl } from "@/lib/branding";
 import { DEFAULT_ACCENT } from "@/lib/online-booking/settings";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { pageLead, pageTitle } from "@/app/book/[slug]/styles";
 import { OptOutButton } from "./opt-out";
 
 export const metadata: Metadata = { title: { absolute: "Unsubscribe" }, robots: { index: false } };
@@ -39,8 +40,8 @@ async function Unsubscribe({ params }: { params: Promise<{ token: string }> }) {
   const what = m.channel === "sms" ? "texts" : "marketing emails";
   return (
     <BookingFrame name={m.business.name} logoUrl={salonLogoUrl(m.business.logo_path)} accent={m.business.online_booking_settings?.accent_color ?? DEFAULT_ACCENT}>
-      <h1 className="mb-2 font-serif text-3xl font-semibold text-ink">Stop {what}?</h1>
-      <p className="mb-6 text-ink-muted">
+      <h1 className={pageTitle}>Stop {what}?</h1>
+      <p className={`${pageLead} mb-6`}>
         You won&apos;t get reminders or offers by {m.channel === "sms" ? "text" : "email"} from {m.business.name} any more. Messages about bookings you make still come.
       </p>
       <OptOutButton token={token} channel={m.channel as "sms" | "email"} done={m.opted_out_at !== null} salon={m.business.name} />

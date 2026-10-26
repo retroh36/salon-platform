@@ -118,13 +118,13 @@ export function DatePicker({
           role="dialog"
           aria-label={label}
           onKeyDown={onKeyDown}
-          className="absolute top-full left-0 z-50 mt-2 w-72 origin-top-left animate-pop-in rounded-xl border border-line bg-surface p-3 shadow-lift"
+          className="absolute top-full left-0 z-50 mt-2 w-72 origin-top-left animate-pop-in rounded-lg border border-line bg-surface p-3 shadow-lift"
         >
           <div className="mb-2 flex items-center justify-between">
             <IconButton label="Previous month" size="sm" onClick={() => setMonth(addMonths(month, -1))}>
               <ChevronLeftIcon className="size-4" />
             </IconButton>
-            <span className="font-serif font-semibold text-navy-900" aria-live="polite">
+            <span className="font-semibold text-ink" aria-live="polite">
               {monthLabel(month)}
             </span>
             <IconButton label="Next month" size="sm" onClick={() => setMonth(addMonths(month, 1))}>

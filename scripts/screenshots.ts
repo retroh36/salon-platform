@@ -17,7 +17,9 @@
 // staff and clients would.
 //
 // --reuse takes the shots again without resetting, seeding or building
-// (the same day, after a full run).
+// (the same day, after a full run); with --build it builds again first (the
+// same data, the app as it is now). --out=<folder> saves them somewhere
+// else (screenshots/polish/… for before-and-after pairs, scripts/polish-pairs.ts).
 
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync, openSync, readFileSync } from "node:fs";
@@ -37,7 +39,7 @@ const BUSINESS = "b0000000-0000-4000-8000-000000000001";
 const SLUG = "maple-and-ash";
 const PORT = 3200;
 const BASE = `http://localhost:${PORT}`;
-const OUT = "screenshots";
+const OUT = process.argv.find((a) => a.startsWith("--out="))?.slice(6) || "screenshots";
 const DIST = ".next-screenshots";
 const PASSWORD = "password123";
 const VIEWPORT = { width: 1440, height: 900 };
@@ -88,23 +90,31 @@ console.log(`Demo moment: ${today} at ${hhmm(toLocal(moment, tz).minute)} (${tz}
 // path, for this session only), then what Denise has learned.
 // Each load gives a different day (the seed's choices hash random row ids),
 // so if today has no color in the chair with a client after it, or no
-// visit to check out, it loads again (up to five times).
+// visit to check out, it loads again (up to ten times).
+// Database functions with their own search path read the real clock, so the
+// one that decides whether an event's date has passed reads the demo clock
+// while the seed loads (the moment can be the day before: Rossi's wedding
+// "this Sunday" is then today), and is put back after.
+const eventToday = (clock: string) => `create or replace function private.event_today(p_event_id uuid) returns date language sql stable security definer set search_path = '' as $$
+  select (${clock} at time zone l.timezone)::date from public.events e join public.locations l on l.id = e.location_id where e.id = p_event_id;
+$$;\n`;
 const prelude = `create schema demo_clock;
 create function demo_clock.now() returns timestamptz language sql stable as $$ select '${moment.toISOString()}'::timestamptz $$;
-set search_path = demo_clock, public, extensions, pg_catalog;\n`;
+${eventToday(`'${moment.toISOString()}'::timestamptz`)}set search_path = demo_clock, public, extensions, pg_catalog;\n`;
+const postlude = `\nreset search_path;\n${eventToday("now()")}drop schema demo_clock cascade;\n`;
 for (let attempt = 1; !reuse; attempt++) {
   if (attempt > 1) run("npx", ["supabase", "db", "reset"]);
   console.log(`Loading the demo data${attempt > 1 ? ` (try ${attempt})` : ""}…`);
   for (const file of ["supabase/seed-demo.sql", "supabase/seed-large.sql"]) {
-    run("docker", ["exec", "-i", "supabase_db_salon-platform", "psql", "-q", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres"], {}, `${prelude}${readFileSync(file, "utf8")}\nreset search_path;\ndrop schema demo_clock cascade;\n`);
+    run("docker", ["exec", "-i", "supabase_db_salon-platform", "psql", "-q", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres"], {}, `${prelude}${readFileSync(file, "utf8")}${postlude}`);
   }
-  if (((await colorRunningOver()) && (await visitToCheckOut())) || attempt === 5) break;
+  if (((await colorRunningOver()) && (await visitToCheckOut())) || attempt === 10) break;
 }
 if (!reuse) run("node", ["--disable-warning=MODULE_TYPELESS_PACKAGE_JSON", "--import", "./scripts/demo-clock.ts", "scripts/insights.ts"], clock);
 
 // 3. A production build on its own port, on the demo clock.
 const appEnv = { NEXT_DIST_DIR: DIST, NEXT_PUBLIC_SITE_URL: BASE };
-if (!reuse) {
+if (!reuse || process.argv.includes("--build")) {
   console.log("Building for production…");
   run("npx", ["next", "build"], appEnv);
 }
@@ -144,6 +154,40 @@ async function capture(browser: Browser) {
     await page.goto("/calendar");
     await waitForReact(page, "section[data-staff-id]");
   });
+
+  // The whole app, page by page (for before-and-after comparisons).
+  const front = await signedIn(browser, "frontdesk@mapleandash.test");
+  const page_ = (name: string, ctx: BrowserContext, path: string, ready = "main h1") =>
+    shot(name, ctx, async (page) => {
+      await page.goto(path);
+      await waitForReact(page, ready);
+    });
+  await shot("14-booking-panel", front, async (page) => {
+    await page.goto("/calendar");
+    await waitForReact(page, "[data-block]");
+    await main(page).locator("[data-block]").nth(3).click();
+    await page.getByTestId("visit-status").waitFor();
+  });
+  await shot("15-denise-panel", front, async (page) => {
+    await page.goto("/calendar?denise=1");
+    await waitForReact(page, "section[data-staff-id]");
+    await page.getByRole("tabpanel", { name: /Denise/ }).waitFor();
+  });
+  await page_("16-dashboard-front-desk", front, "/dashboard", "[data-testid=dashboard-brief]");
+  await page_("17-events", owner, "/events");
+  await page_("18-clients", front, "/clients");
+  const { data: aurora } = await admin.from("clients").select("id").eq("business_id", BUSINESS).eq("email", "aurora.baker203@example.com").maybeSingle();
+  if (aurora) await page_("19-client-profile", front, `/clients/${aurora.id}`);
+  await page_("20-payroll", owner, "/payroll");
+  await page_("21-reports", owner, "/reports");
+  await page_("22-settings", owner, "/settings");
+  await page_("23-sales", owner, "/sales");
+  await page_("24-inventory", owner, "/inventory");
+  await page_("25-team", owner, "/team");
+  await page_("26-gift-cards", front, "/gift-cards");
+  await page_("27-settings-policies", owner, "/settings/policies");
+  await page_("28-my-day-full", stylist, "/my-day");
+  await page_("29-booking-site", await context(browser), `/book/${SLUG}`, "[data-testid=booking-flow] button[aria-pressed]");
 
   await shot("02-denise-fix", owner, async (page) => {
     const overrun = await colorRunningOver();

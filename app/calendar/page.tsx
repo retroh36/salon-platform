@@ -29,6 +29,7 @@ import { CalendarBoard } from "./board";
 import { loadVisitPolicies } from "@/lib/policy-visits";
 import type { AppointmentDetail, BlockData, BoardData, ColumnData } from "./types";
 import { can } from "@/lib/permissions";
+import { EmptyState } from "@/components/ui/page";
 
 export const metadata: Metadata = { title: "Calendar" };
 
@@ -530,7 +531,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   return (
     <AppShell section="calendar" me={me} bleed>
       {columns.length === 0 ? (
-        <p className="p-8 text-ink-muted">No one at this location takes appointments yet.</p>
+        <EmptyState className="py-16">No one at this location takes appointments yet.</EmptyState>
       ) : (
         <CalendarBoard data={data} />
       )}

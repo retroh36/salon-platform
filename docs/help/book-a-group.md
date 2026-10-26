@@ -11,7 +11,7 @@ Book several people as one party, all at once or one after another.
 2. Give it a **Group name** (for example "Ava's bridal party").
 3. Under **Timing**, set **First starts at**, then choose **Everyone at the same time**, **Staggered, every** some minutes, or **Set each guest's time**.
 4. For each guest, find the client (or leave it empty for a guest without a record), choose the **Service** and **Stylist**.
-5. Tap **+ Add a guest** for more people (up to 12).
+5. Tap **Add a guest** for more people (up to 12).
 6. Add **Notes for everyone (optional)**, then tap **Book** (it shows the number, for example **Book 4 guests**).
 
 ## Good to know

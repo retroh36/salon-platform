@@ -13,7 +13,7 @@ export function PasswordForm() {
       <label className={labelClass}>
         New password
         <input name="password" type="password" autoComplete="new-password" minLength={8} required className={`${fieldClass} h-11 text-base font-normal`} />
-        <span className="text-xs font-normal text-ink-muted">At least 8 characters.</span>
+        <span className="text-13 font-normal text-ink-muted">At least 8 characters.</span>
       </label>
       <label className={labelClass}>
         The same again

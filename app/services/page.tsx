@@ -4,7 +4,8 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { buttonClass } from "@/components/ui/button";
 import { ChevronRightIcon, PlusIcon } from "@/components/ui/icons";
-import { listClass, PageHeader, rowLinkClass } from "@/components/ui/page";
+import { listClass, nameLinkClass, PageHeader } from "@/components/ui/page";
+import { numClass, TableCard, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import { serviceFamily } from "@/lib/calendar";
 import { formatPriceRange, formatServiceTime, groupByCategory, levelPricesFrom, stylistPrice } from "@/lib/services";
@@ -58,62 +59,77 @@ async function Services() {
         }
       />
 
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col">
         {groupByCategory(active).map(({ category, services }) => (
-          <section
-            key={category}
-            data-family={serviceFamily(category)}
-            className="overflow-hidden rounded-xl border border-line border-l-4 border-l-(--fam-accent) bg-surface shadow-card"
-          >
-            <h2 className="flex items-center gap-2 border-b border-line bg-(--fam-fill)/40 px-5 py-3.5 font-serif text-lg font-semibold text-ink">
-              {category} <span className="font-sans text-sm font-medium text-ink-muted">({services.length})</span>
+          <section key={category} data-family={serviceFamily(category)} className="mb-8">
+            <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-ink">
+              <span aria-hidden className="size-2 shrink-0 rounded-full bg-(--fam-accent)" />
+              {category} <span className="text-13 font-normal text-ink-subtle tabular-nums">({services.length})</span>
             </h2>
-            <ul className={listClass}>
-              {services.map((service) => {
-                const offeredBy = service.staff_services
-                  .map((ss) => ({ ...ss, staff: staffById.get(ss.staff_id) }))
-                  .filter((ss) => ss.staff?.is_active)
-                  .sort((a, b) => a.staff!.first_name.localeCompare(b.staff!.first_name));
-                // What the stylists who offer it charge (or the menu price).
-                const priced = { price_cents: service.price_cents, levelPrices: levelPricesFrom(service.service_level_prices) };
-                const prices = offeredBy.length
-                  ? offeredBy.map((ss) => stylistPrice(priced, { level: ss.staff!.level, customCents: ss.price_cents }))
-                  : [service.price_cents];
+            <TableCard className="mb-0!">
+              <table className={tableClass} aria-label={category}>
+                <thead className={theadClass}>
+                  <tr>
+                    <th scope="col" className={thClass}>
+                      Service
+                    </th>
+                    <th scope="col" className={`${thClass} hidden sm:table-cell`}>
+                      Time
+                    </th>
+                    <th scope="col" className={`${thClass} text-right`}>
+                      Price
+                    </th>
+                    <th scope="col" className={`${thClass} hidden md:table-cell`}>
+                      Offered by
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {services.map((service) => {
+                    const offeredBy = service.staff_services
+                      .map((ss) => ({ ...ss, staff: staffById.get(ss.staff_id) }))
+                      .filter((ss) => ss.staff?.is_active)
+                      .sort((a, b) => a.staff!.first_name.localeCompare(b.staff!.first_name));
+                    // What the stylists who offer it charge (or the menu price).
+                    const priced = { price_cents: service.price_cents, levelPrices: levelPricesFrom(service.service_level_prices) };
+                    const prices = offeredBy.length
+                      ? offeredBy.map((ss) => stylistPrice(priced, { level: ss.staff!.level, customCents: ss.price_cents }))
+                      : [service.price_cents];
 
-                return (
-                  <li key={service.id}>
-                    <Link href={`/services/${service.id}`} className={`${rowLinkClass} items-baseline`}>
-                      <span className="min-w-52 flex-1 font-semibold text-ink">{service.name}</span>
-                      <span className="w-48 text-sm text-ink-muted">{formatServiceTime(service)}</span>
-                      <span className="w-28 text-sm font-medium text-ink tabular-nums">
-                        {formatPriceRange(prices)}
-                      </span>
-                      <span className="w-full text-sm text-ink-muted sm:w-auto sm:min-w-48">
-                        {offeredBy.length === 0
-                          ? "No one offers this yet"
-                          : offeredBy.map((ss) => ss.staff!.first_name).join(", ")}
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+                    return (
+                      <tr key={service.id} className={trClass}>
+                        <td className={tdClass}>
+                          <Link href={`/services/${service.id}`} className={nameLinkClass}>
+                            {service.name}
+                          </Link>
+                        </td>
+                        <td className={`${tdClass} hidden whitespace-nowrap text-ink-muted sm:table-cell`}>{formatServiceTime(service)}</td>
+                        <td className={`${tdClass} ${numClass} text-ink`}>{formatPriceRange(prices)}</td>
+                        <td className={`${tdClass} hidden text-ink-muted md:table-cell`}>
+                          {offeredBy.length === 0 ? <span className="text-ink-subtle">No one offers this yet</span> : offeredBy.map((ss) => ss.staff!.first_name).join(", ")}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </TableCard>
           </section>
         ))}
 
         {archived.length > 0 && (
-          <details className="group overflow-hidden rounded-xl border border-line bg-surface shadow-card">
-            <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3.5 font-medium text-ink-muted transition-colors duration-(--motion-fast) hover:bg-sunken [&::-webkit-details-marker]:hidden">
+          <details className="group">
+            <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-line pb-2 text-sm font-medium text-ink-muted transition-colors duration-(--motion-fast) hover:text-ink [&::-webkit-details-marker]:hidden">
               <ChevronRightIcon className="size-4 transition-transform duration-(--motion-fast) group-open:rotate-90" />
               <span>Archived ({archived.length})</span>
             </summary>
-            <ul className={`${listClass} animate-fade-in border-t border-line`}>
+            <ul className={`${listClass} animate-fade-in border-b border-line`}>
               {archived.map((service) => (
-                <li key={service.id}>
-                  <Link href={`/services/${service.id}`} className={`${rowLinkClass} text-ink-muted`}>
-                    <span className="min-w-52 flex-1">{service.name}</span>
-                    <span className="text-sm">{service.category}</span>
+                <li key={service.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3">
+                  <Link href={`/services/${service.id}`} className={`${nameLinkClass} text-ink-muted!`}>
+                    {service.name}
                   </Link>
+                  <span className="text-13 text-ink-subtle">{service.category}</span>
                 </li>
               ))}
             </ul>

@@ -1,6 +1,6 @@
 ---
 title: Use the Dashboard and Denise's brief
-keywords: dashboard, home, morning brief, events coming up, wedding risks, balance unpaid, trial not booked, headcount cutoff, Denise's brief, daily brief, today, overview, at a glance, risks today, might not show, due back, low stock, credit, team today, right now, opportunities
+keywords: dashboard, all clear, home, morning brief, events coming up, wedding risks, balance unpaid, trial not booked, headcount cutoff, Denise's brief, daily brief, today, overview, at a glance, risks today, might not show, due back, low stock, credit, team today, right now, opportunities
 who: owner, manager, front_desk, stylist, assistant
 open: /dashboard | Open Dashboard
 ---
@@ -17,6 +17,7 @@ The Dashboard is the day at a glance, starting with Denise's brief: what might g
 
 ## Good to know
 
+- Sections with nothing in them today are listed together in one **All clear** line, in the brief and under **Opportunities**.
 - A dismissed brief item is gone for the day for everyone at the location.
 - Stylists see their own day, clients and regulars, with no salon money.
 - Front desk sees everything except money.

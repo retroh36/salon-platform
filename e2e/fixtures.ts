@@ -143,3 +143,12 @@ export async function busyToday(): Promise<() => void> {
     if (days > 0) shiftBusiness(SEED.business, TZ, days);
   };
 }
+
+// Opens the calendar's display menu (the zoom and Fit all), named after the
+// zoom it's on.
+export async function openDisplayMenu(page: Page) {
+  const dialog = page.locator("main").filter({ visible: true }).getByRole("dialog", { name: "Calendar display" });
+  if (!(await dialog.count())) await page.locator("main").filter({ visible: true }).getByRole("button", { name: /^(Compact|Comfortable|Detailed)$/ }).click();
+  await dialog.waitFor();
+  return dialog;
+}

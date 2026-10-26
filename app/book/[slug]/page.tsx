@@ -11,6 +11,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 import { currentAccount } from "@/lib/online-booking/account";
 import { BookingFlow } from "./booking-flow";
+import { accentLink } from "./styles";
 import { BookingFrame } from "./frame";
 
 // The title, description and links Google and link previews use, from the
@@ -48,8 +49,8 @@ async function Booking({ params, searchParams }: { params: Promise<{ slug: strin
   if (found.status === "closed") {
     return (
       <BookingFrame name={found.name} logoUrl={found.logoUrl} accent="#17273b">
-        <h1 className="font-serif text-3xl font-semibold tracking-tight">Online booking is closed</h1>
-        <p className="mt-3 text-ink-muted">
+        <h1 className="text-2xl font-semibold tracking-[-0.015em]">Online booking is closed</h1>
+        <p className="mt-1.5 text-ink-muted">
           {found.phone ? `Please call us on ${found.phone} to book.` : "Please call the salon to book."}
         </p>
       </BookingFrame>
@@ -68,13 +69,13 @@ async function Booking({ params, searchParams }: { params: Promise<{ slug: strin
   return (
     <BookingFrame name={site.business.name} logoUrl={site.business.logoUrl} accent={site.settings.accent}>
       {info && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdText(seoFor(info, siteUrl()).jsonLd) }} />}
-      <p className="-mt-2 mb-4 flex flex-wrap justify-end gap-x-4 text-sm">
+      <p className="-mt-2 mb-4 flex flex-wrap justify-end gap-x-4 gap-y-1 text-sm">
         {events.data?.inquiries_enabled && (
-          <Link href={`/book/${slug}/event`} className="font-medium text-(--accent) underline underline-offset-2">
+          <Link href={`/book/${slug}/event`} className={accentLink}>
             Planning a wedding or event?
           </Link>
         )}
-        <Link href={`/book/${slug}/account`} className="font-medium text-(--accent) underline underline-offset-2">
+        <Link href={`/book/${slug}/account`} className={accentLink}>
           {account ? `${account.firstName}'s account` : "My account"}
         </Link>
       </p>

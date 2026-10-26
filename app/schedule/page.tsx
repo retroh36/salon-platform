@@ -38,9 +38,9 @@ export default function SchedulePage({ searchParams }: PageProps<"/schedule">) {
 
 // Cards with h3 titles (Card from components/ui/page.tsx uses h2, and the
 // staff member's name is this page's h2).
-const cardClass = "mb-6 overflow-hidden rounded-xl border border-line bg-surface shadow-card";
-const cardHeadClass = "border-b border-line px-5 py-3.5";
-const cardTitleClass = "font-serif text-lg font-semibold text-ink";
+const cardClass = "mb-6 overflow-hidden rounded-lg border border-line bg-surface";
+const cardHeadClass = "border-b border-line px-4 py-3";
+const cardTitleClass = "text-base font-semibold text-ink";
 
 async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchParams">) {
   const [params, { supabase, staff: me }] = await Promise.all([searchParams, getCurrentStaff()]);
@@ -131,8 +131,8 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
       <TeamTabs current="schedule" goals={manager} />
 
       {manager && pending.data.length > 0 && (
-        <section aria-labelledby="requests-heading" className={`${cardClass} border-status-late-ink/30`}>
-          <h2 id="requests-heading" className={`${cardHeadClass} bg-status-late-bg font-serif text-lg font-semibold text-status-late-ink`}>
+        <section aria-labelledby="requests-heading" className={cardClass}>
+          <h2 id="requests-heading" className={`${cardHeadClass} text-base font-semibold text-ink`}>
             Time off requests ({pending.data.length})
           </h2>
           <ul className={listClass}>
@@ -147,12 +147,12 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
                   {r.note && <span className="text-ink-muted"> · {r.note}</span>}
                 </span>
                 <form action={decideTimeOff.bind(null, r.id, "approved")}>
-                  <button type="submit" className={buttonClass("primary", "sm")}>
+                  <button type="submit" className={buttonClass("primary", "xs")}>
                     Approve
                   </button>
                 </form>
                 <form action={decideTimeOff.bind(null, r.id, "declined")}>
-                  <button type="submit" className={buttonClass("secondary", "sm")}>
+                  <button type="submit" className={buttonClass("secondary", "xs")}>
                     Decline
                   </button>
                 </form>
@@ -168,7 +168,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
             <Link key={s.id} href={link({ staff: s.id })} aria-current={s.id === target.id ? "page" : undefined} className={`${pillClass(s.id === target.id)} gap-2 pl-1`}>
               <span
                 aria-hidden
-                className={`inline-flex size-6 items-center justify-center rounded-full text-[10px] font-semibold ${s.id === target.id ? "bg-white/20 text-white" : "bg-navy-100 text-navy-900"}`}
+                className={`inline-flex size-6 items-center justify-center rounded-full text-xs font-semibold ${s.id === target.id ? "bg-white/20 text-white" : "bg-navy-100 text-navy-900"}`}
               >
                 {initials(fullName(s))}
               </span>
@@ -178,12 +178,12 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
         </nav>
       )}
 
-      <div className="mb-5 flex flex-wrap items-center gap-4">
+      <div className="mb-6 flex flex-wrap items-center gap-4">
         <Avatar name={fullName(target)} color={target.color} level={target.level} photoUrl={staffPhotoUrl(target.photo_path)} size="lg" />
         <div>
-          <h2 className="font-serif text-2xl font-semibold text-ink">
+          <h2 className="text-xl font-semibold text-ink">
             {fullName(target)}
-            {isSelf && <span className="ml-2 font-sans text-sm font-normal text-ink-muted">(you)</span>}
+            {isSelf && <span className="ml-2 text-13 font-normal text-ink-subtle">(you)</span>}
           </h2>
           <p className="text-sm text-ink-muted">
             {roleLabel(target.role)}
@@ -250,7 +250,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
         ) : (
           <dl className={listClass}>
             {WEEKDAYS.map((d) => (
-              <div key={d} className="flex gap-4 px-5 py-2.5 text-sm">
+              <div key={d} className="flex gap-4 px-4 py-2.5 text-sm">
                 <dt className="w-28 font-semibold">{WEEKDAY_NAMES[d]}</dt>
                 <dd className={weekly[d]?.length ? "" : "text-ink-muted"}>{weekly[d]?.length ? formatIntervals(weekly[d]) : "Off"}</dd>
               </div>
@@ -264,7 +264,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
           One-off changes
         </h3>
         {changes.size === 0 ? (
-          <p className="px-5 py-4 text-sm text-ink-muted">No upcoming changes.</p>
+          <p className="px-4 py-4 text-sm text-ink-muted">No upcoming changes.</p>
         ) : (
           <ul className={listClass} aria-label="Upcoming changes">
             {[...changes].map(([date, intervals]) => (
@@ -294,7 +294,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
           Time off
         </h3>
         {timeOff.length === 0 ? (
-          <p className="px-5 py-4 text-sm text-ink-muted">No time off in the last 60 days or coming up.</p>
+          <p className="px-4 py-4 text-sm text-ink-muted">No time off in the last 60 days or coming up.</p>
         ) : (
           <ul className={listClass} aria-label="Time off">
             {timeOff.map((t) => (
@@ -342,7 +342,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
             Level and commission
           </h3>
           {compensation.data?.plan_id && (
-            <p className="px-5 pt-4 text-sm text-ink-muted" data-testid="on-plan">
+            <p className="px-4 pt-4 text-sm text-ink-muted" data-testid="on-plan">
               Paid on a commission plan
               {can(me, "payroll") ? (
                 <>
@@ -367,7 +367,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
               hourlyRateCents={compensation.data?.hourly_rate_cents ?? null}
             />
           ) : (
-            <dl className="flex flex-wrap gap-8 px-5 py-4 text-sm">
+            <dl className="flex flex-wrap gap-8 px-4 py-4 text-sm">
               <div>
                 <dt className="text-ink-muted">Level</dt>
                 <dd className="font-semibold">{target.level ? LEVEL_LABELS[target.level] : "—"}</dd>

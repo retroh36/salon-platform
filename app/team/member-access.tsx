@@ -14,9 +14,9 @@ export function LoginCard({ staffId, firstName, state, email, canReset, active }
   const [pending, start] = useTransition();
   const run = (fn: () => Promise<LoginResult>) => start(async () => setResult(await fn()));
   return (
-    <section aria-label="Login" className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-5 shadow-card">
+    <section aria-label="Login" className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-serif text-lg font-semibold text-ink">Login</h2>
+        <h2 className="text-base font-semibold text-ink">Login</h2>
         <Badge tone={state === "active" ? "green" : state === "invited" ? "amber" : "neutral"}>{LOGIN_LABELS[state]}</Badge>
       </div>
       <p className="text-sm text-ink-muted" data-testid="login-note">
@@ -68,8 +68,8 @@ export function ActiveCard({ staffId, firstName, active, upcoming, isMe }: { sta
       setAsking(false);
     });
   return (
-    <section aria-label="Leaving" className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-5 shadow-card">
-      <h2 className="font-serif text-lg font-semibold text-ink">{active ? "Leaving the salon" : "Deactivated"}</h2>
+    <section aria-label="Leaving" className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
+      <h2 className="text-base font-semibold text-ink">{active ? "Leaving the salon" : "Deactivated"}</h2>
       {active ? (
         isMe ? (
           <p className="text-sm text-ink-muted">You can&apos;t deactivate yourself.</p>

@@ -31,7 +31,7 @@ export function CompensationForm({
       action={action}
       onSubmit={submitWithoutReset(action)}
       aria-label="Level and commission"
-      className="flex flex-wrap items-end gap-4 p-5"
+      className="flex flex-wrap items-end gap-4 p-4"
       noValidate
     >
       {state?.message && !state.saved && (

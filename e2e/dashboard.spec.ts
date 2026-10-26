@@ -40,7 +40,9 @@ test.describe("owner", () => {
     const denise = main.getByTestId("dashboard-denise");
     await expect(denise.getByTestId("dashboard-brief-visits")).toContainText(/visits? on the book today/);
     const brief = denise.getByTestId("dashboard-brief");
-    await expect(brief.getByRole("heading", { level: 3 })).toHaveText([/^Risks today/, /^Might not show/, /^Due back, nothing booked/, /^Low stock for today/, /^Coming in with credit/, /^Events coming up/]);
+    // Each section is shown with its items, or named in the one "All clear" row.
+    for (const id of ["risks", "no-shows", "due", "stock", "credit", "events"]) await expect(brief.getByTestId(`brief-${id}`)).toBeVisible();
+    for (const title of ["Risks today", "Might not show", "Due back, nothing booked", "Low stock for today", "Coming in with credit", "Events coming up"]) await expect(brief).toContainText(title);
     await expect(denise.getByTestId("dashboard-denise-says")).toHaveText(/Nothing to act on right now\.|need(s)? a look:/);
 
     // Five tiles, each compared with last week.
@@ -69,7 +71,7 @@ test.describe("owner", () => {
     await ui(page).getByTestId("opportunity-overdue").getByRole("link", { name: /See all/ }).click();
     await expect(page).toHaveURL("/clients?due=1");
     await expect(ui(page).getByRole("heading", { name: "Due back" })).toBeVisible();
-    expect(await ui(page).getByRole("list", { name: "Due back" }).getByRole("listitem").count()).toBeGreaterThan(3);
+    expect(await ui(page).getByRole("table", { name: "Due back" }).locator("tbody").getByRole("row").count()).toBeGreaterThan(3);
   });
 
   test("fits an iPad", async ({ page }) => {

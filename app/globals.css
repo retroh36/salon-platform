@@ -7,17 +7,17 @@
    --------------------------------------------------------------------------- */
 
 @theme {
-  /* Surfaces: warm off-white */
-  --color-canvas: #fbf8f5;
+  /* Surfaces: neutral, near white */
+  --color-canvas: #fafaf9;
   --color-surface: #ffffff;
-  --color-sunken: #f5f0eb;
-  --color-line: #ebe4dd;
-  --color-line-strong: #d9cfc5;
+  --color-sunken: #f4f4f3;
+  --color-line: #e6e7ea;
+  --color-line-strong: #d3d5da;
 
-  /* Text: navy-tinted neutrals */
-  --color-ink: #1d2532;
-  --color-ink-muted: #565e6b;
-  --color-ink-subtle: #666e7c;
+  /* Text: dark grays, a touch of the navy */
+  --color-ink: #191c22;
+  --color-ink-muted: #5c6170;
+  --color-ink-subtle: #696e7b;
 
   /* Primary: deep navy, the Maestra logo's #17273b (buttons, selected
      states, the active nav item, headings) */
@@ -42,21 +42,22 @@
   --color-denise-700: #3f49b0;
   --color-denise-900: #272d75;
 
-  /* Service families: a soft fill behind text and a stronger accent edge */
-  --color-peach-fill: #fbdfcf;
-  --color-peach-accent: #e2733d;
-  --color-lavender-fill: #e9e0f8;
-  --color-lavender-accent: #8a68d6;
-  --color-sage-fill: #dcecdf;
-  --color-sage-accent: #5a9969;
-  --color-teal-fill: #d5efeb;
-  --color-teal-accent: #3b9b93;
-  --color-sand-fill: #ede5dd;
-  --color-sand-accent: #a08870;
-  --color-rose-fill: #f9dde6;
-  --color-rose-accent: #c94f7c;
-  --color-sky-fill: #dce8f8;
-  --color-sky-accent: #4a7fc1;
+  /* Service families: a soft, slightly muted fill behind text and a
+     stronger accent edge */
+  --color-peach-fill: #f7e1d4;
+  --color-peach-accent: #d9733f;
+  --color-lavender-fill: #e7e1f5;
+  --color-lavender-accent: #8669cf;
+  --color-sage-fill: #dde9df;
+  --color-sage-accent: #5a9568;
+  --color-teal-fill: #d7ebe8;
+  --color-teal-accent: #3d968f;
+  --color-sand-fill: #ebe5df;
+  --color-sand-accent: #9c8771;
+  --color-rose-fill: #f4dfe6;
+  --color-rose-accent: #c3527d;
+  --color-sky-fill: #dde7f4;
+  --color-sky-accent: #4a7dbd;
 
   /* Stylist levels: a ring and badge on the avatar and a bar along the top
      of their calendar column (graphics, so 3:1 against the page). Gold,
@@ -66,19 +67,34 @@
   --color-level-senior: #7a1f55;
   --color-level-artisan: #0b6a3c;
 
-  /* Status chips */
-  --color-status-booked-bg: #efe9e3;
-  --color-status-booked-ink: #574a40;
-  --color-status-confirmed-bg: #dbeedf;
-  --color-status-confirmed-ink: #1e5730;
-  --color-status-checked-in-bg: #dbe8f6;
-  --color-status-checked-in-ink: #1d4a7a;
-  --color-status-completed-bg: #e7e9ed;
-  --color-status-completed-ink: #3a4352;
-  --color-status-late-bg: #fbecc8;
-  --color-status-late-ink: #7a4a05;
-  --color-status-no-show-bg: #fae1dd;
-  --color-status-no-show-ink: #9a2a1d;
+  /* Status: one set for every tag, alert and notice (a dot, a short label
+     in the ink on the soft fill). Never a colored sentence. */
+  --color-success: #15703a;
+  --color-success-soft: #ecf7ef;
+  --color-success-dot: #22a35a;
+  --color-warning: #a6460a;
+  --color-warning-soft: #fdf3e7;
+  --color-warning-dot: #ee8a1c;
+  --color-info: #1d55b8;
+  --color-info-soft: #edf3fd;
+  --color-info-dot: #3b7be0;
+  --color-neutral: #4d5361;
+  --color-neutral-soft: #f1f2f4;
+  --color-neutral-dot: #9aa0ab;
+
+  /* Appointment statuses, from the set above */
+  --color-status-booked-bg: #f1f2f4;
+  --color-status-booked-ink: #4d5361;
+  --color-status-confirmed-bg: #ecf7ef;
+  --color-status-confirmed-ink: #15703a;
+  --color-status-checked-in-bg: #edf3fd;
+  --color-status-checked-in-ink: #1d55b8;
+  --color-status-completed-bg: #f1f2f4;
+  --color-status-completed-ink: #4d5361;
+  --color-status-late-bg: #fdf3e7;
+  --color-status-late-ink: #a6460a;
+  --color-status-no-show-bg: #fdeeec;
+  --color-status-no-show-ink: #b42318;
 
   /* Where the client is in their visit, as a calendar block's fill (not
      yet here: the service color). Yellow and green differ in lightness,
@@ -86,27 +102,37 @@
      color vision; no-shows are grey and struck through (checked in the
      token tests). Secondary text on any block uses block-ink-muted, which
      passes AA on all of them. */
-  --color-visit-here: #fdf1a2;
-  --color-visit-done: #a9dbaf;
+  --color-visit-here: #fcf1ae;
+  --color-visit-done: #b3d9b8;
   --color-visit-off: #e3e5e9;
   --color-block-ink-muted: #454d5a;
+  /* "+5m" and "Not arrived" on a block: the warning, a step darker so it
+     reads on every fill. */
+  --color-block-attention: #8c3a08;
 
   --color-danger: #b42318;
-  --color-danger-soft: #fdecea;
+  --color-danger-soft: #fdeeec;
+  --color-danger-dot: #e5484d;
   --color-now: #c8323a;
 
-  /* Type */
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
+  /* Type: Geist for everything (docs/brand.md), Geist Mono only where
+     digits must line up as code (receipt numbers, gift card codes). The
+     scale is 12, 13, 14, 16, 20 and 24px: text-xs, text-13, text-sm,
+     text-base, text-xl and text-2xl. */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-13: 0.8125rem;
+  --text-13--line-height: 1.25rem;
 
-  /* Radius */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
+  /* Radius: 8px for buttons, fields and cards; 6px for small tags */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
 
-  /* Shadows */
-  --shadow-card: 0 1px 2px rgb(23 39 59 / 0.06);
+  /* Shadows: cards are flat (a 1px border, never a shadow too); only
+     things floating over the page lift (menus, popovers, a dragged block). */
+  --shadow-card: 0 0 #0000;
   --shadow-lift: 0 6px 16px -4px rgb(23 39 59 / 0.18), 0 2px 4px rgb(23 39 59 / 0.08);
   --shadow-panel: -8px 0 24px -12px rgb(23 39 59 / 0.2);
 
@@ -303,10 +329,13 @@ body {
   color: var(--color-ink);
 }
 
-/* Native radios and checkboxes in the app's navy. */
-input[type="radio"],
-input[type="checkbox"] {
-  accent-color: var(--color-navy-900);
+/* Native radios and checkboxes in the app's navy (in the base layer, so an
+   `accent-*` class, like the booking site's salon color, wins). */
+@layer base {
+  input[type="radio"],
+  input[type="checkbox"] {
+    accent-color: var(--color-navy-900);
+  }
 }
 
 /* ---------------------------------------------------------------------------

@@ -45,13 +45,13 @@ async function OpeningHours() {
           </>
         }
       />
-      <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
+      <section className="overflow-hidden rounded-lg border border-line bg-surface">
         {canManage(me.role) ? (
           <HoursEditor action={saveOpeningHours} initial={rows} label="Opening hours" />
         ) : (
           <dl className={listClass}>
             {WEEKDAYS.map((d) => (
-              <div key={d} className="flex gap-4 px-5 py-2.5 text-sm">
+              <div key={d} className="flex gap-4 px-4 py-2.5 text-sm">
                 <dt className="w-28 font-semibold">{WEEKDAY_NAMES[d]}</dt>
                 <dd className={weekly[d]?.length ? "" : "text-ink-muted"}>{weekly[d]?.length ? formatIntervals(weekly[d]) : "Closed"}</dd>
               </div>

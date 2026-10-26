@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, openDisplayMenu, test, ui, waitForHydration } from "./fixtures";
 
 // The calendar at a big salon (Harbor & Vine, supabase/seed-large.sql: 35
 // stylists, about ten off any day), on a laptop and an iPad: who's off is
@@ -125,9 +125,10 @@ for (const [device, viewport] of [
 
     test("fits everyone on screen in Compact with Fit all, and remembers it", async ({ page }) => {
       await openCalendar(page);
-      await ui(page).getByRole("radio", { name: "Compact" }).click();
+      await (await openDisplayMenu(page)).getByRole("radio", { name: "Compact" }).click();
       await ui(page).getByRole("button", { name: "Fit all" }).click();
       await expect(ui(page).getByRole("button", { name: "Fit all" })).toHaveAttribute("aria-pressed", "true");
+      await page.keyboard.press("Escape");
       await expect(grid(page)).toHaveAttribute("data-fit-all", "true");
       expect(await grid(page).evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
       // Names shorten (to initials if need be), never spill.
@@ -141,7 +142,7 @@ for (const [device, viewport] of [
       await expect(grid(page)).toHaveAttribute("data-fit-all", "true");
       // Not in the other zooms: the columns are readable again.
       await waitForHydration(page, "[role=radio]");
-      await ui(page).getByRole("radio", { name: "Comfortable" }).click();
+      await (await openDisplayMenu(page)).getByRole("radio", { name: "Comfortable" }).click();
       await expect(grid(page)).not.toHaveAttribute("data-fit-all");
       await expect(ui(page).getByRole("button", { name: "Fit all" })).toHaveCount(0);
     });
@@ -267,7 +268,8 @@ test.describe("on an iPad held upright", () => {
 
   test("still scrolls sideways under a sticky header", async ({ page }) => {
     await openCalendar(page);
-    await ui(page).getByRole("radio", { name: "Comfortable" }).click();
+    await (await openDisplayMenu(page)).getByRole("radio", { name: "Comfortable" }).click();
+    await page.keyboard.press("Escape");
     await checkLayout(page);
     await shot(page, "ipad-portrait");
   });

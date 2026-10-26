@@ -15,10 +15,21 @@ export function StatusDot({ status, className = "" }: { status: AppointmentStatu
   return <span aria-hidden data-status={status} title={STATUS_LABELS[status]} className={`inline-block size-2.5 shrink-0 rounded-full ring-1 ring-surface ${STYLES[status]} ${className}`} style={{ backgroundColor: "currentColor" }} />;
 }
 
+const DOTS: Record<AppointmentStatus, string> = {
+  booked: "bg-neutral-dot",
+  confirmed: "bg-success-dot",
+  checked_in: "bg-info-dot",
+  completed: "bg-neutral-dot",
+  canceled: "bg-danger-dot",
+  no_show: "bg-danger-dot",
+};
+
+// The status as a small tag: a dot and the label (the Badge look).
 export function StatusChip({ status, size = "md", className = "" }: { status: AppointmentStatus; size?: "sm" | "md"; className?: string }) {
-  const sizes = { sm: "h-4 px-1.5 text-[11px] leading-4", md: "h-6 px-2.5 text-xs leading-6" };
+  const sizes = { sm: "h-4 gap-1 px-1 text-[11px] leading-4", md: "h-5 gap-1.5 px-1.5 text-xs leading-5" };
   return (
-    <span data-status={status} className={`inline-block shrink-0 rounded-full font-semibold whitespace-nowrap ${sizes[size]} ${STYLES[status]} ${className}`}>
+    <span data-status={status} className={`inline-flex shrink-0 items-center rounded-sm font-medium whitespace-nowrap ${sizes[size]} ${STYLES[status]} ${className}`}>
+      <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${DOTS[status]}`} />
       {STATUS_LABELS[status]}
     </span>
   );

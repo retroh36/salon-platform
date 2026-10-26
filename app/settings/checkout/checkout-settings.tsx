@@ -21,9 +21,10 @@ export function CheckoutSettingsForm({ initial }: { initial: CheckoutSettingsInp
         start(async () => setResult(await saveCheckoutSettings(s)));
       }}
     >
+      <div className="border-t border-line pt-6 first:border-t-0 first:pt-0">
       <fieldset className="flex flex-col gap-3">
-        <legend className="mb-2 font-serif text-lg font-semibold">Sales tax</legend>
-        <p className="text-sm text-ink-muted">Added on top of prices at checkout. Rules differ by state and city; check what applies to you. Gift cards aren&apos;t taxed.</p>
+        <legend className="mb-1 text-sm font-semibold text-ink">Sales tax</legend>
+        <p className="text-13 text-ink-muted">Added on top of prices at checkout. Rules differ by state and city; check what applies to you. Gift cards aren&apos;t taxed.</p>
         <div className="grid max-w-md grid-cols-2 gap-3">
           <label className={labelClass}>
             Services (%)
@@ -35,10 +36,12 @@ export function CheckoutSettingsForm({ initial }: { initial: CheckoutSettingsInp
           </label>
         </div>
       </fieldset>
+      </div>
 
+      <div className="border-t border-line pt-6 first:border-t-0 first:pt-0">
       <fieldset className="flex flex-col gap-3">
-        <legend className="mb-2 font-serif text-lg font-semibold">Discounts</legend>
-        <p className="text-sm text-ink-muted">Owners can always give discounts. Every discount needs a reason.</p>
+        <legend className="mb-1 text-sm font-semibold text-ink">Discounts</legend>
+        <p className="text-13 text-ink-muted">Owners can always give discounts. Every discount needs a reason.</p>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" className={checkboxClass} checked={s.discountRoles.includes("manager")} onChange={(e) => toggleRole("manager", e.target.checked)} />
           Managers can give discounts
@@ -52,9 +55,11 @@ export function CheckoutSettingsForm({ initial }: { initial: CheckoutSettingsInp
           <input inputMode="numeric" value={s.discountMaxPercent} onChange={(e) => setS({ ...s, discountMaxPercent: e.target.value })} className={fieldClass} />
         </label>
       </fieldset>
+      </div>
 
+      <div className="border-t border-line pt-6 first:border-t-0 first:pt-0">
       <fieldset className="flex flex-col gap-3">
-        <legend className="mb-2 font-serif text-lg font-semibold">Receipts</legend>
+        <legend className="mb-1 text-sm font-semibold text-ink">Receipts</legend>
         <label className={labelClass}>
           A note at the bottom (optional)
           <textarea rows={2} maxLength={500} value={s.receiptFooter} onChange={(e) => setS({ ...s, receiptFooter: e.target.value })} className={fieldClass} placeholder="e.g. Thank you! Book online at …" />
@@ -64,20 +69,25 @@ export function CheckoutSettingsForm({ initial }: { initial: CheckoutSettingsInp
           Show who did each service
         </label>
       </fieldset>
+      </div>
 
+      <div className="border-t border-line pt-6 first:border-t-0 first:pt-0">
       <fieldset className="flex flex-col gap-3">
-        <legend className="mb-2 font-serif text-lg font-semibold">Cash drawer</legend>
-        <p className="text-sm text-ink-muted">The cash the drawer starts each day with. The close-out on Reports counts it in what should be there, and you can change it for a day there.</p>
+        <legend className="mb-1 text-sm font-semibold text-ink">Cash drawer</legend>
+        <p className="text-13 text-ink-muted">The cash the drawer starts each day with. The close-out on Reports counts it in what should be there, and you can change it for a day there.</p>
         <label className={`${labelClass} max-w-xs`}>
           Starting float ($)
           <input inputMode="decimal" value={s.cashFloat} onChange={(e) => setS({ ...s, cashFloat: e.target.value })} className={fieldClass} />
         </label>
       </fieldset>
+      </div>
 
-      <Button type="submit" variant="primary" disabled={pending} className="self-start">
-        Save
-      </Button>
-      {result && <Alert tone={result.ok ? "success" : "error"}>{result.message}</Alert>}
+      <div className="flex flex-col gap-3 border-t border-line pt-4">
+        <Button type="submit" variant="primary" disabled={pending} className="self-start">
+          Save
+        </Button>
+        {result && <Alert tone={result.ok ? "success" : "error"}>{result.message}</Alert>}
+      </div>
     </form>
   );
 }

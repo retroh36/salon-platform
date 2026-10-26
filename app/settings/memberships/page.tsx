@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
-import { Alert, Badge, Card, PageHeader } from "@/components/ui/page";
+import { Alert, Badge, Card, PageHeader, Section } from "@/components/ui/page";
+import { buttonClass } from "@/components/ui/button";
 import { getCurrentStaff } from "@/lib/auth";
 import { benefitsText, periodName, priceText } from "@/lib/memberships";
 import { loadPlans } from "@/lib/memberships-load";
@@ -49,8 +50,11 @@ async function MembershipsSettings() {
       <Card title="New membership" titleId="new-membership-heading">
         <PlanForm plan={null} services={services} />
       </Card>
+      {plans.length > 0 && (
+      <Section title="Memberships" titleId="plans-heading" count={plans.length}>
       {plans.map((p) => (
         <Card
+          className="mb-3"
           key={p.id}
           title={p.name}
           titleId={`plan-${p.id}`}
@@ -59,13 +63,15 @@ async function MembershipsSettings() {
           data-testid="membership-plan"
         >
           <details>
-            <summary className="cursor-pointer text-sm font-medium text-link">Edit</summary>
-            <div className="mt-4">
+            <summary className={buttonClass("secondary", "sm", "cursor-pointer list-none")}>Edit</summary>
+            <div className="mt-4 border-t border-line pt-4">
               <PlanForm plan={p} services={services} />
             </div>
           </details>
         </Card>
       ))}
+      </Section>
+      )}
     </AppShell>
   );
 }

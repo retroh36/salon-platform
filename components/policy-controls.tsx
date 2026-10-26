@@ -9,6 +9,7 @@ import { useState, useTransition } from "react";
 import { sendCardLink, retryFee, waiveFee, type PolicyActionResult } from "@/app/policy/actions";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
+import { Badge } from "@/components/ui/page";
 import { FEE_KIND_LABELS, FEE_STATUS_LABELS, type FeeStatus } from "@/lib/policy";
 import { formatPrice } from "@/lib/services";
 
@@ -41,10 +42,14 @@ export function FeeControls({ fee, canWaive, canRetry }: { fee: FeeView; canWaiv
   const [result, setResult] = useState<PolicyActionResult | null>(null);
   const [pending, start] = useTransition();
   const waivable = canWaive && ["pending", "charged", "failed", "no_card"].includes(fee.status);
-  const tone = fee.status === "failed" || fee.status === "no_card" ? "text-status-late-ink" : "text-ink-muted";
+  // Needs attention: a tag, then the fee in quiet text.
+  const flag = fee.status === "failed" ? <Badge tone="danger">Failed</Badge> : fee.status === "no_card" ? <Badge tone="warning">No card</Badge> : null;
   return (
     <div className="flex flex-col gap-2" data-testid="policy-fee" data-fee-status={fee.status}>
-      <p className={tone}>{feeText(fee)}</p>
+      <p className="text-ink-muted">
+        {flag && <>{flag} </>}
+        {feeText(fee)}
+      </p>
       {waiving ? (
         <form
           aria-label="Waive fee"
@@ -66,7 +71,7 @@ export function FeeControls({ fee, canWaive, canRetry }: { fee: FeeView; canWaiv
             <Button type="submit" size="sm" variant="primary" disabled={pending || !reason.trim()}>
               {fee.status === "charged" ? "Waive and refund" : "Waive fee"}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setWaiving(false)}>
+            <Button size="sm" onClick={() => setWaiving(false)}>
               Keep it
             </Button>
           </div>
@@ -136,7 +141,7 @@ export function CardLinkButton({
         });
       }}
     >
-      <div className="flex gap-3 text-sm">
+      <div className="flex gap-4 text-sm">
         {(
           [
             ["sms", "Text"],
@@ -166,7 +171,7 @@ export function CardLinkButton({
         <Button type="submit" size="sm" variant="primary" disabled={pending}>
           Send link
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+        <Button size="sm" onClick={() => setOpen(false)}>
           Not now
         </Button>
       </div>

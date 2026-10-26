@@ -47,12 +47,13 @@ async function Dashboard() {
 
   return (
     <AppShell section="dashboard" me={me} wide>
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      {/* PageHeader's look, with the Ask Denise bar taking the full width on a phone. */}
+      <header className="mb-8 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
-          <h1 className="font-serif text-4xl font-semibold tracking-tight text-navy-900">
+          <h1 className="text-2xl font-semibold tracking-[-0.015em] text-ink">
             {greeting(tz)}, {me.first_name}
           </h1>
-          <p className="mt-1 text-ink-muted">
+          <p className="mt-1 text-sm text-ink-muted">
             {longToday(tz)} · {me.location.name}
           </p>
         </div>

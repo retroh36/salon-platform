@@ -10,6 +10,7 @@ import { loadCardLink } from "@/lib/policy-link";
 import { formatLongDay } from "@/lib/schedule-format";
 import { formatMinute } from "@/lib/scheduling/time";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { pageLead, pageTitle } from "@/app/book/[slug]/styles";
 import { CardForm } from "./card-form";
 
 export const metadata: Metadata = { title: { absolute: "Add your card" }, robots: { index: false } };
@@ -35,27 +36,27 @@ async function Card({ params }: { params: Promise<{ token: string }> }) {
   return (
     <BookingFrame name={link.salon.name} logoUrl={salonLogoUrl(link.salon.logoPath)} accent={link.salon.accent ?? DEFAULT_ACCENT}>
       {link.status === "done" ? (
-        <div className="flex flex-col gap-2" data-testid="card-saved">
-          <h1 className="font-serif text-3xl font-semibold text-ink">Your card is saved</h1>
-          <p className="text-ink-muted">Thank you. {link.salon.name} has what it needs for your booking.</p>
+        <div data-testid="card-saved">
+          <h1 className={pageTitle}>Your card is saved</h1>
+          <p className={pageLead}>Thank you. {link.salon.name} has what it needs for your booking.</p>
         </div>
       ) : link.status === "canceled" || link.expired ? (
-        <div className="flex flex-col gap-2" data-testid="link-closed">
-          <h1 className="font-serif text-3xl font-semibold text-ink">{link.expired ? "This link has expired" : "This link is no longer active"}</h1>
-          <p className="text-ink-muted">Ask {link.salon.name} for a new one.</p>
+        <div data-testid="link-closed">
+          <h1 className={pageTitle}>{link.expired ? "This link has expired" : "This link is no longer active"}</h1>
+          <p className={pageLead}>Ask {link.salon.name} for a new one.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-6">
           <div>
-            <h1 className="font-serif text-3xl font-semibold text-ink">Hi {link.clientFirstName}</h1>
-            <p className="text-ink-muted">
+            <h1 className={pageTitle}>Hi {link.clientFirstName}</h1>
+            <p className={pageLead}>
               {link.depositCents > 0 ? `${link.salon.name} asks for a deposit and a card to hold your booking.` : `${link.salon.name} asks for a card to hold your booking.`}
             </p>
           </div>
           {link.visit && (
-            <div className="rounded-xl border border-line bg-surface px-4 py-4">
-              <p className="font-serif text-xl font-semibold text-ink">{formatLongDay(link.visit.date, false)}</p>
-              <p className="text-ink-muted">
+            <div className="rounded-lg border border-line bg-surface px-4 py-3">
+              <p className="text-base font-semibold text-ink">{formatLongDay(link.visit.date, false)}</p>
+              <p className="text-sm text-ink-muted">
                 {formatMinute(link.visit.minute)} · {link.visit.services.join(", ")}
               </p>
             </div>

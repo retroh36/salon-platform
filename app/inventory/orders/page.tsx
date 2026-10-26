@@ -6,7 +6,8 @@ import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { BackLink } from "@/components/ui/back-link";
 import { buttonClass } from "@/components/ui/button";
 import { PlusIcon } from "@/components/ui/icons";
-import { Badge, Card, EmptyState, listClass, PageHeader, rowLinkClass } from "@/components/ui/page";
+import { Badge, EmptyState, nameLinkClass, PageHeader } from "@/components/ui/page";
+import { numClass, TableCard, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
 import { canManageInventory, canReceiveOrders } from "@/lib/inventory";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES, orderNumber } from "@/lib/purchase-orders";
@@ -52,30 +53,53 @@ async function Orders() {
           )
         }
       />
-      <Card flush>
-        {orders.length === 0 ? (
+      {orders.length === 0 ? (
+        <TableCard>
           <EmptyState>No orders yet.</EmptyState>
-        ) : (
-          <ul className={listClass} aria-label="Orders">
-            {orders.map((o) => (
-              <li key={o.id}>
-                <Link href={`/inventory/orders/${o.id}`} className={rowLinkClass}>
-                  <span className="w-24 font-semibold text-ink tabular-nums">{orderNumber(o.number)}</span>
-                  <span className="min-w-48 flex-1 text-ink">
-                    {o.supplier.name}
-                    {o.ai_action_id && <span className="ml-2 text-sm text-denise-700">Drafted by Denise</span>}
-                  </span>
-                  <Badge tone={ORDER_STATUS_TONES[o.status]}>{ORDER_STATUS_LABELS[o.status]}</Badge>
-                  <span className="w-32 text-sm text-ink-muted">{o.sent_at ? `Sent ${day(o.sent_at)}` : `Started ${day(o.created_at)}`}</span>
-                  <span className="w-24 text-right text-sm font-medium text-ink tabular-nums">
-                    {formatPrice(o.purchase_order_lines.reduce((sum, l) => sum + l.quantity * l.unit_cost_cents, 0))}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+        </TableCard>
+      ) : (
+        <TableCard>
+          <table className={tableClass} aria-label="Orders">
+            <thead className={theadClass}>
+              <tr>
+                <th scope="col" className={thClass}>
+                  Order
+                </th>
+                <th scope="col" className={thClass}>
+                  Supplier
+                </th>
+                <th scope="col" className={thClass}>
+                  Status
+                </th>
+                <th scope="col" className={`${thClass} hidden sm:table-cell`}>
+                  Date
+                </th>
+                <th scope="col" className={`${thClass} text-right`}>
+                  Total
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((o) => (
+                <tr key={o.id} className={trClass}>
+                  <td className={`${tdClass} whitespace-nowrap text-ink-muted tabular-nums`}>{orderNumber(o.number)}</td>
+                  <td className={tdClass}>
+                    <Link href={`/inventory/orders/${o.id}`} className={nameLinkClass}>
+                      {o.supplier.name}
+                    </Link>
+                    {o.ai_action_id && <span className="block text-xs text-denise-700">Drafted by Denise</span>}
+                  </td>
+                  <td className={tdClass}>
+                    <Badge tone={ORDER_STATUS_TONES[o.status]}>{ORDER_STATUS_LABELS[o.status]}</Badge>
+                  </td>
+                  <td className={`${tdClass} hidden whitespace-nowrap text-ink-muted sm:table-cell`}>{o.sent_at ? `Sent ${day(o.sent_at)}` : `Started ${day(o.created_at)}`}</td>
+                  <td className={`${tdClass} ${numClass} font-medium text-ink`}>{formatPrice(o.purchase_order_lines.reduce((sum, l) => sum + l.quantity * l.unit_cost_cents, 0))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableCard>
+      )}
     </AppShell>
   );
 }

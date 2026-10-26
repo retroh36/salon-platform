@@ -17,7 +17,7 @@ export function TeamTabs({ current, goals = false }: { current: (typeof TABS)[nu
           href={t.href}
           aria-current={t.value === current ? "page" : undefined}
           className={`flex h-9 flex-1 items-center justify-center rounded-md text-sm font-medium transition-[background-color,color,box-shadow,transform] duration-(--motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-focus ${
-            t.value === current ? "bg-surface text-navy-900 shadow-card" : "text-ink-muted hover:text-ink"
+            t.value === current ? "bg-surface text-ink shadow-[0_0_0_1px_var(--color-line)]" : "text-ink-muted hover:text-ink"
           }`}
         >
           {t.label}

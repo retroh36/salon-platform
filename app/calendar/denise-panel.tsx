@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { DeniseFace, DenisePose, type Pose } from "@/components/denise";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
+import { DeniseText } from "@/components/denise-text";
 import { Eyebrow } from "@/components/ui/field";
 import { CheckCircleIcon, ChevronDownIcon, ClockIcon, CloseIcon, SendIcon, UndoIcon } from "@/components/ui/icons";
 import { noFixAdvice } from "@/lib/denise/respond";
@@ -103,19 +104,19 @@ export function DenisePanel({
   else if (notices.length) says = "Nothing's clashing, but keep an eye on this:";
   else if (openings.length) says = "Some time opened up, and your waitlist could use it:";
   else if (state.reorders.length) says = state.reorders.length === 1 ? "The calendar's clear. One thing about stock:" : "The calendar's clear. A few things about stock:";
-  else says = isToday ? "All clear today!" : "All clear for this day!";
+  else says = isToday ? "All clear today." : "All clear for this day.";
 
   return (
     <div className="flex min-h-full flex-col gap-4 py-2 text-sm">
       <div className="flex items-end gap-3">
         <DenisePose pose={pose} className="w-20" />
-        <p data-testid="denise-says" aria-live="polite" className="relative mb-3 rounded-xl rounded-bl-sm border border-denise-200 bg-denise-50 px-3 py-2 font-medium text-denise-900">
+        <p data-testid="denise-says" aria-live="polite" className="relative mb-3 rounded-lg rounded-bl-sm bg-denise-50 px-3 py-2 font-medium text-denise-900">
           {says}
         </p>
       </div>
 
       {outcome && (
-        <div role="status" className={`flex animate-fade-in items-start gap-3 rounded-xl border p-3 ${outcome.error ? "border-danger/30 bg-danger-soft text-danger" : "border-denise-200 bg-denise-50 text-ink"}`}>
+        <div role="status" className={`flex animate-fade-in items-start gap-3 rounded-lg p-3 ${outcome.error ? "bg-danger-soft text-danger" : "bg-denise-50 text-ink"}`}>
           {!outcome.error && <CheckCircleIcon className="mt-0.5 size-5 text-denise-700" />}
           <p className="flex-1">{outcome.message}</p>
           {outcome.undoActionId && (
@@ -145,7 +146,7 @@ export function DenisePanel({
       {/* Clients who haven't arrived 15 minutes after they were due: one
           card, a line each, to call them or mark a no-show. */}
       {notices.length > 0 && (
-        <section aria-label="Not arrived" data-testid="denise-late" className="flex animate-fade-in flex-col gap-2 rounded-xl border border-denise-200 bg-denise-50 p-3">
+        <section aria-label="Not arrived" data-testid="denise-late" className="flex animate-fade-in flex-col gap-2 rounded-lg border border-denise-200 bg-surface p-3">
           <p className="flex items-center gap-2 font-semibold text-denise-900">
             <ClockIcon className="size-4 shrink-0 text-denise-700" />
             {notices.length === 1 ? "Not arrived yet" : `${notices.length} not arrived yet`}
@@ -154,7 +155,7 @@ export function DenisePanel({
             {notices.map((n) => (
               // The full name on its own line (never cut off), when they were
               // due under it, then small actions; dismiss in the corner.
-              <li key={n.id} className="relative flex animate-fade-in flex-col gap-2 rounded-lg bg-surface px-2.5 py-2">
+              <li key={n.id} className="relative flex animate-fade-in flex-col gap-2 border-t border-line pt-2.5 first:border-t-0 first:pt-0">
                 <span className={data.me.canBook ? "pr-8" : ""}>
                   <span data-testid="late-name" className="block font-medium break-words text-ink">
                     {n.clientName}
@@ -183,7 +184,7 @@ export function DenisePanel({
                     ))}
                 </span>
                 {data.me.canBook && (
-                  <IconButton label={`Dismiss ${n.clientName}`} size="xs" variant="ghost" className="absolute top-1.5 right-1.5" onClick={() => onDismissNotice(n.id)}>
+                  <IconButton label={`Dismiss ${n.clientName}`} size="xs" variant="ghost" className="absolute top-1.5 -right-1.5" onClick={() => onDismissNotice(n.id)}>
                     <CloseIcon className="size-3.5" />
                   </IconButton>
                 )}
@@ -199,13 +200,13 @@ export function DenisePanel({
       {openings.length > 0 && (
         <section aria-label="Waitlist" className="flex flex-col gap-2">
           {openings.map((o) => (
-            <div key={o.key} data-testid="denise-opening" className="flex animate-fade-in gap-2.5 rounded-xl border border-denise-200 bg-denise-50 p-3">
+            <div key={o.key} data-testid="denise-opening" className="flex animate-fade-in gap-2.5 rounded-lg border border-denise-200 bg-surface p-3">
               <DeniseFace size={24} className="mt-0.5" />
               <div className="flex flex-1 flex-col gap-2">
                 <p className="font-semibold text-denise-900">{o.headline}</p>
                 <ol className="flex flex-col gap-1.5" aria-label={`Waitlist matches for ${o.staffName} at ${formatMinute(o.startMinute)}`}>
                   {o.matches.map((m, i) => (
-                    <li key={m.entryId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface px-2.5 py-2">
+                    <li key={m.entryId} className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2 first:border-t-0 first:pt-0">
                       <span>
                         <span className="font-medium text-ink">
                           {i + 1}. {m.clientName}
@@ -233,7 +234,7 @@ export function DenisePanel({
       {(state?.reorders.length ?? 0) > 0 && (
         // Every reorder she's drafted in one card: a line per supplier, and
         // one way to the Inventory page to review them.
-        <section aria-label="Reorders" data-testid="denise-reorders" className="flex animate-fade-in gap-2.5 rounded-xl border border-denise-200 bg-denise-50 p-3">
+        <section aria-label="Reorders" data-testid="denise-reorders" className="flex animate-fade-in gap-2.5 rounded-lg border border-denise-200 bg-surface p-3">
           <DeniseFace size={24} className="mt-0.5" />
           <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
             <p className="font-semibold text-denise-900">
@@ -241,7 +242,7 @@ export function DenisePanel({
             </p>
             <ul className="flex w-full flex-col gap-1.5">
               {state!.reorders.map((r) => (
-                <li key={r.supplierId} data-testid="denise-reorder" className="flex items-baseline justify-between gap-3 rounded-lg bg-surface px-2.5 py-2">
+                <li key={r.supplierId} data-testid="denise-reorder" className="flex items-baseline justify-between gap-3 border-t border-line pt-2 first:border-t-0 first:pt-0">
                   <span className="min-w-0">
                     <span className="block font-medium break-words text-ink">{r.supplier}</span>
                     <span className="block text-xs text-ink-muted">
@@ -265,14 +266,14 @@ export function DenisePanel({
         <section aria-label="Conversation with Denise" className="flex flex-col gap-3">
           {chat.map((m, i) =>
             m.role === "user" ? (
-              <p key={i} className="max-w-[85%] animate-fade-in self-end rounded-xl rounded-br-sm bg-navy-900 px-3 py-2 text-white">
+              <p key={i} className="max-w-[85%] animate-fade-in self-end rounded-lg rounded-br-sm bg-navy-900 px-3 py-2 text-white">
                 {m.text}
               </p>
             ) : (
               <div key={i} className="flex max-w-[92%] animate-fade-in gap-2">
                 <DeniseFace size={24} className="mt-1" />
                 <div className="flex min-w-0 flex-col gap-2">
-                  <p className="rounded-xl rounded-tl-sm border border-denise-200 bg-denise-50 px-3 py-2 whitespace-pre-line text-ink">{m.text}</p>
+                  <DeniseText text={m.text} className="rounded-lg rounded-tl-sm bg-denise-50 px-3 py-2 text-ink" />
                   {m.links?.map((l) => (
                     // A plain link: some screens start in a route handler (/checkout/new).
                     <a key={l.path} href={l.path} className={`${buttonClass("secondary", "sm")} self-start`} data-testid="denise-help-link">
@@ -337,7 +338,7 @@ function ConflictCard({
   });
 
   return (
-    <section aria-label={conflict.headline} data-conflict={conflict.kind} className="flex animate-fade-in flex-col gap-3 rounded-xl border border-denise-200 bg-denise-50 p-4 shadow-card">
+    <section aria-label={conflict.headline} data-conflict={conflict.kind} className="flex animate-fade-in flex-col gap-3 rounded-lg border border-denise-200 bg-surface p-4">
       <div className="flex items-start gap-2.5">
         <DeniseFace size={28} />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -350,7 +351,7 @@ function ConflictCard({
 
       {top && (
         <div {...previewProps(0)} data-previewing={previewing(0) || undefined} className="flex flex-col gap-3">
-          <p className="rounded-lg bg-surface/70 px-3 py-2 text-ink-muted">
+          <p className="text-ink-muted">
             <span className="font-semibold text-denise-700">Why it works: </span>
             {top.reason}
           </p>
@@ -376,24 +377,24 @@ function ConflictCard({
       )}
 
       {others.length > 0 && (
-        <div className="flex flex-col gap-2 border-t border-denise-200 pt-3">
+        <div className="flex flex-col gap-2 border-t border-line pt-3">
           <button
             type="button"
             aria-expanded={open}
             onClick={() => setOpen(!open)}
-            className="flex items-center gap-1 self-start text-xs font-semibold tracking-wider text-denise-700 uppercase hover:text-denise-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className="flex items-center gap-1 self-start text-xs font-medium text-denise-700 hover:text-denise-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
             Other options ({others.length})
             <ChevronDownIcon className={`size-3.5 transition-transform duration-(--motion-fast) ${open ? "rotate-180" : ""}`} />
           </button>
           {open && (
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col divide-y divide-line">
               {others.map((o, i) => (
                 <li
                   key={o.actionId ?? i}
                   {...previewProps(i + 1)}
                   data-previewing={previewing(i + 1) || undefined}
-                  className="flex animate-fade-in flex-col gap-2 rounded-lg border border-denise-200 bg-surface p-3 transition-[border-color,box-shadow] duration-(--motion-fast) hover:border-denise-500 data-previewing:border-denise-500"
+                  className="-mx-2 flex animate-fade-in flex-col gap-2 rounded-md px-2 py-2 transition-colors duration-(--motion-fast) hover:bg-denise-50 data-previewing:bg-denise-50"
                 >
                   <p className="font-medium text-ink">{o.summary}</p>
                   <p className="text-xs text-ink-muted">{meta(o)}</p>
@@ -423,12 +424,12 @@ function UpNext({ data, onOpen }: { data: BoardData; onOpen: (appointmentId: str
   const visit = next ? data.appointments[next.appointmentId] : null;
   if (!next || !visit) return null;
   return (
-    <section aria-labelledby="up-next" className="rounded-xl border border-line p-4">
+    <section aria-labelledby="up-next" className="rounded-lg border border-line p-4">
       <Eyebrow className="flex items-center gap-1.5">
         <ClockIcon className="size-4" />
         <span id="up-next">Up next</span>
       </Eyebrow>
-      <p className="mt-2 font-serif text-xl font-semibold text-ink">
+      <p className="mt-2 text-xl font-semibold text-ink">
         {next.clientName} · {formatMinute(next.start)}
       </p>
       <p className="text-ink-muted">{next.service}</p>
@@ -445,7 +446,7 @@ function AskForm({ onAsk, disabled }: { onAsk: (question: string) => void; disab
   return (
     <form
       aria-label="Ask Denise a follow-up"
-      className="sticky bottom-0 mt-auto flex items-center gap-2 rounded-xl border border-line bg-surface p-1.5 pl-2 focus-within:border-denise-500 focus-within:ring-2 focus-within:ring-denise-200"
+      className="sticky bottom-0 mt-auto flex items-center gap-2 rounded-lg border border-line bg-surface p-1.5 pl-2 focus-within:border-denise-500 focus-within:ring-2 focus-within:ring-denise-200"
       onSubmit={(e) => {
         e.preventDefault();
         if (!question.trim() || disabled) return;
@@ -492,7 +493,7 @@ function SuggestionCard({
   const [done, setDone] = useState<"booked" | "dismissed" | null>(null);
   const day = suggestion.date === today ? "Today" : formatLongDay(suggestion.date, false);
   return (
-    <section aria-label="Suggested booking" data-testid="denise-suggestion" className="flex animate-fade-in flex-col gap-3 rounded-xl border border-denise-200 bg-surface p-3 shadow-card">
+    <section aria-label="Suggested booking" data-testid="denise-suggestion" className="flex animate-fade-in flex-col gap-3 rounded-lg border border-denise-200 bg-surface p-3">
       <div>
         <p className="font-semibold text-ink">
           {suggestion.serviceName} with {suggestion.staffName}
@@ -547,9 +548,9 @@ function Thinking({ run }: { run: DeniseRun }) {
       <DeniseFace size={24} className="mt-1" />
       <div className="flex min-w-0 flex-col gap-1.5">
         {run.text ? (
-          <p className="rounded-xl rounded-tl-sm border border-denise-200 bg-denise-50 px-3 py-2 whitespace-pre-line text-ink">{run.text}</p>
+          <DeniseText text={run.text} className="rounded-lg rounded-tl-sm bg-denise-50 px-3 py-2 text-ink" />
         ) : (
-          <p className="flex items-center gap-1.5 rounded-xl rounded-tl-sm border border-denise-200 bg-denise-50 px-3 py-2 font-medium text-denise-900">
+          <p className="flex items-center gap-1.5 rounded-lg rounded-tl-sm bg-denise-50 px-3 py-2 font-medium text-denise-900">
             {run.slow ? "Still working on it" : "Denise is thinking"}
             <span aria-hidden className="inline-flex gap-0.5">
               {[0, 1, 2].map((i) => (

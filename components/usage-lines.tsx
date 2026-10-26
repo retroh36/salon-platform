@@ -1,6 +1,6 @@
 "use client";
 
-import { IconButton } from "@/components/ui/button";
+import { Button, IconButton } from "@/components/ui/button";
 import { fieldClass, selectClass } from "@/components/ui/field";
 import { CloseIcon, PlusIcon } from "@/components/ui/icons";
 import { MAX_LINES } from "@/lib/color-usage";
@@ -39,7 +39,7 @@ export function UsageLinesEditor({
 
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="mb-1.5 text-sm font-medium text-ink">{label}</legend>
+      <legend className="mb-1.5 text-13 font-medium text-ink">{label}</legend>
       {name && <input type="hidden" name={name} value={toUsageJson(lines)} />}
       {lines.map((line, i) => {
         const unit = byId.get(line.productId)?.unit;
@@ -83,14 +83,10 @@ export function UsageLinesEditor({
         );
       })}
       {lines.length < MAX_LINES && (
-        <button
-          type="button"
-          onClick={() => onChange([...lines, { productId: "", amount: "" }])}
-          className="inline-flex items-center gap-1.5 self-start rounded-md text-sm font-medium text-navy-900 hover:text-navy-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-        >
+        <Button variant="quiet" size="xs" className="-ml-2.5 self-start" onClick={() => onChange([...lines, { productId: "", amount: "" }])}>
           <PlusIcon className="size-4" />
           Add a product
-        </button>
+        </Button>
       )}
     </fieldset>
   );

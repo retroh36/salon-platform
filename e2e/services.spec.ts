@@ -11,7 +11,7 @@ test.afterAll(async () => {
 
 // A service's row in the list, matched on its exact name.
 function serviceRow(page: Page, name: string) {
-  return ui(page).getByRole("listitem").filter({ has: page.getByText(name, { exact: true }) });
+  return ui(page).getByRole("row").filter({ has: page.getByText(name, { exact: true }) });
 }
 
 async function menuCount(page: Page) {

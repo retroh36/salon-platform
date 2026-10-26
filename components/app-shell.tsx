@@ -35,8 +35,8 @@ export async function AppShell({ section, me, bleed = false, wide = false, child
 export function NotLinked() {
   return (
     <div className="flex min-h-screen flex-1 items-center justify-center bg-canvas p-6">
-      <div className="max-w-sm animate-fade-in rounded-xl border border-line bg-surface p-6 text-center shadow-card">
-        <h1 className="font-serif text-2xl font-semibold text-navy-900">Not linked to a salon</h1>
+      <div className="max-w-sm animate-fade-in rounded-lg border border-line bg-surface p-6 text-center">
+        <h1 className="text-2xl font-semibold text-ink">Not linked to a salon</h1>
         <p className="mt-2 text-sm text-ink-muted">Your account isn&apos;t linked to a salon yet. Ask the salon owner to add you as staff.</p>
       </div>
     </div>

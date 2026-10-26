@@ -11,8 +11,9 @@ import { saveClient, type ClientFormFields } from "./actions";
 
 export type StylistOption = { id: string; name: string };
 
-const sectionClass = "grid gap-4 rounded-xl border border-line bg-surface p-5 shadow-card sm:grid-cols-2";
-const sectionTitle = "font-serif text-lg font-semibold text-ink sm:col-span-2";
+// Each group of fields: its title over a thin rule, no box.
+const sectionClass = "grid gap-4 sm:grid-cols-2";
+const sectionTitle = "border-b border-line pb-2 text-sm font-semibold text-ink sm:col-span-2";
 const checkLabel = "flex cursor-pointer items-center gap-2.5 text-sm text-ink";
 
 export function ClientForm({
@@ -39,7 +40,7 @@ export function ClientForm({
         <Alert>{state.message}</Alert>
       )}
 
-      <fieldset disabled={pending} className="flex flex-col gap-6">
+      <fieldset disabled={pending} className="flex flex-col gap-8">
         <section className={sectionClass}>
           <h2 className={sectionTitle}>Contact</h2>
           <Field label="First name" error={errors.first_name}>
@@ -133,10 +134,10 @@ export function ClientForm({
       </fieldset>
 
       <div className="flex items-center gap-3">
-        <button type="submit" disabled={pending} className={buttonClass("primary", "lg")}>
+        <button type="submit" disabled={pending} className={buttonClass("primary", "md")}>
           {pending ? "Saving…" : clientId ? "Save changes" : "Add client"}
         </button>
-        <Link href={clientId ? `/clients/${clientId}` : "/clients"} className={buttonClass("ghost", "lg")}>
+        <Link href={clientId ? `/clients/${clientId}` : "/clients"} className={buttonClass("quiet", "md")}>
           Cancel
         </Link>
       </div>

@@ -1,17 +1,18 @@
 // Shared look for text inputs, selects and text areas.
 export const fieldClass = [
-  "w-full rounded-md border border-line-strong bg-surface px-3 py-2 text-sm text-ink",
+  "w-full rounded-md border border-line-strong bg-surface px-3 py-[7px] text-sm leading-5 text-ink",
   "transition-[border-color,box-shadow] duration-(--motion-fast)",
   "placeholder:text-ink-subtle hover:border-ink-subtle",
   "focus:border-focus focus:ring-2 focus:ring-focus/25 focus:outline-none",
   "disabled:bg-sunken disabled:text-ink-muted aria-invalid:border-danger",
 ].join(" ");
 
-export const labelClass = "flex flex-col gap-1.5 text-sm font-medium text-ink";
+export const labelClass = "flex flex-col gap-1.5 text-13 font-medium text-ink";
 
-// Small uppercase heading for a group of details, as in the mockups.
+// A small, quiet heading for a group of details (sentence case, never
+// shouting in capitals).
 export function Eyebrow({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <h3 className={`text-xs font-semibold tracking-wider text-ink-muted uppercase ${className}`}>{children}</h3>;
+  return <h3 className={`text-13 font-medium text-ink-muted ${className}`}>{children}</h3>;
 }
 
 // Native selects with the shared look and a chevron (.select-chevron in

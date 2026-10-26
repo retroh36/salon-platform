@@ -4,8 +4,9 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
-import { ChevronRightIcon, PlusIcon } from "@/components/ui/icons";
-import { Badge, Card, listClass, PageHeader, rowLinkClass } from "@/components/ui/page";
+import { PlusIcon } from "@/components/ui/icons";
+import { Badge, nameLinkClass, PageHeader } from "@/components/ui/page";
+import { TableCard, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
 import { searchClients } from "@/lib/client-search";
 import { canEditClients, SEARCH_LIMIT } from "@/lib/clients";
@@ -57,24 +58,40 @@ async function Clients({ searchParams }: Pick<PageProps<"/clients">, "searchPara
       </p>
 
       {clients.length > 0 && (
-        <Card flush>
-          <ul className={listClass} aria-label="Clients">
-            {clients.map((client) => (
-              <li key={client.id} className="animate-fade-in">
-                <Link href={`/clients/${client.id}`} className={rowLinkClass}>
-                  <span className="flex min-w-0 flex-1 basis-56 items-center gap-3">
-                    <Avatar name={fullName(client)} size="sm" />
-                    <span className="truncate font-semibold text-ink">{fullName(client)}</span>
-                    {client.allergies && <Badge tone="red">Allergy</Badge>}
-                  </span>
-                  <span className="w-36 text-sm text-ink-muted tabular-nums">{client.phone}</span>
-                  <span className="hidden w-64 truncate text-sm text-ink-muted md:block">{client.email}</span>
-                  <ChevronRightIcon className="hidden size-4 text-ink-muted sm:block" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Card>
+        <TableCard>
+          <table className={tableClass} aria-label="Clients">
+            <thead className={theadClass}>
+              <tr>
+                <th scope="col" className={thClass}>
+                  Name
+                </th>
+                <th scope="col" className={thClass}>
+                  Phone
+                </th>
+                <th scope="col" className={`${thClass} hidden md:table-cell`}>
+                  Email
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {clients.map((client) => (
+                <tr key={client.id} className={`${trClass} animate-fade-in`}>
+                  <td className={tdClass}>
+                    <span className="flex min-w-0 items-center gap-3">
+                      <Avatar name={fullName(client)} size="sm" />
+                      <Link href={`/clients/${client.id}`} className={`${nameLinkClass} truncate`}>
+                        {fullName(client)}
+                      </Link>
+                      {client.allergies && <Badge tone="danger">Allergy</Badge>}
+                    </span>
+                  </td>
+                  <td className={`${tdClass} whitespace-nowrap text-ink-muted tabular-nums`}>{client.phone}</td>
+                  <td className={`${tdClass} hidden max-w-72 truncate text-ink-muted md:table-cell`}>{client.email}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableCard>
       )}
     </AppShell>
   );
@@ -101,23 +118,36 @@ async function DueBack({ me }: { me: DashboardMe }) {
         {overdueTotal > overdue.length ? ` · showing the first ${overdue.length}` : ""}
       </p>
       {overdue.length > 0 && (
-        <Card flush>
-          <ul className={listClass} aria-label="Due back">
-            {overdue.map((c) => (
-              <li key={c.clientId}>
-                <Link href={`/clients/${c.clientId}`} className={rowLinkClass}>
-                  <span className="flex min-w-0 flex-1 basis-56 items-center gap-3">
-                    <Avatar name={c.name} size="sm" />
-                    <span className="truncate font-semibold text-ink">{c.name}</span>
-                    {c.risk === "high" && <Badge tone="amber">At risk</Badge>}
-                  </span>
-                  <span className="text-sm text-ink-muted">{c.reason}</span>
-                  <ChevronRightIcon className="hidden size-4 text-ink-muted sm:block" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Card>
+        <TableCard>
+          <table className={tableClass} aria-label="Due back">
+            <thead className={theadClass}>
+              <tr>
+                <th scope="col" className={thClass}>
+                  Name
+                </th>
+                <th scope="col" className={thClass}>
+                  Why
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {overdue.map((c) => (
+                <tr key={c.clientId} className={trClass}>
+                  <td className={tdClass}>
+                    <span className="flex min-w-0 items-center gap-3">
+                      <Avatar name={c.name} size="sm" />
+                      <Link href={`/clients/${c.clientId}`} className={`${nameLinkClass} truncate`}>
+                        {c.name}
+                      </Link>
+                      {c.risk === "high" && <Badge tone="warning">At risk</Badge>}
+                    </span>
+                  </td>
+                  <td className={`${tdClass} text-ink-muted`}>{c.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableCard>
       )}
     </AppShell>
   );

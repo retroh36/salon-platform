@@ -110,7 +110,7 @@ export function StatusControls({ eventId, status }: { eventId: string; status: s
   if (status === "completed") return null;
   if (!asking)
     return (
-      <Button variant="ghost" size="md" onClick={() => setAsking(true)}>
+      <Button variant="danger-quiet" size="md" onClick={() => setAsking(true)}>
         Mark as lost
       </Button>
     );

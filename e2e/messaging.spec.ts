@@ -1,4 +1,4 @@
-import { admin, SEED } from "../tests/db/helpers";
+import { admin, makeRoom, SEED } from "../tests/db/helpers";
 import { addDays, fromLocal, todayIn } from "../lib/scheduling/time";
 import { AUTH, expect, moreAction, test, ui, waitForHydration } from "./fixtures";
 import type { Page } from "@playwright/test";
@@ -32,6 +32,8 @@ test.beforeAll(async () => {
   const { data: s } = await admin.from("services").select("id").eq("business_id", B).eq("name", "Women's Cut & Style").single();
   const start = fromLocal(DAY, 10 * 60, TZ)!;
   const end = new Date(start.getTime() + 3_600_000);
+  // The demo calendar may have Bridget busy then; the database refuses a double-booking.
+  await makeRoom(SEED.staff.bridget, start, end);
   const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: clientId, starts_at: start.toISOString(), ends_at: end.toISOString(), status: "booked" }).select("id").single();
   visitId = a!.id;
   await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: visitId, service_id: s!.id, staff_id: SEED.staff.bridget, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: 60, price_cents: 8_500 });

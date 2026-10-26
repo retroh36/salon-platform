@@ -5,7 +5,9 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { DeniseFace } from "@/components/denise";
 import { buttonClass } from "@/components/ui/button";
-import { Badge, Card, EmptyState, listClass, PageHeader, rowClass } from "@/components/ui/page";
+import { PlusIcon } from "@/components/ui/icons";
+import { Badge, EmptyState, PageHeader, Section } from "@/components/ui/page";
+import { TableCard, actionsClass, numClass, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
 import { canSendAt } from "@/lib/automations";
 import { can } from "@/lib/permissions";
@@ -75,41 +77,38 @@ async function Promotions() {
         actions={
           manage && (
             <Link href="/promotions/new" className={buttonClass("primary")}>
+              <PlusIcon className="size-4" />
               New promotion
             </Link>
           )
         }
       />
 
-      <Card
-        title={
-          <span className="flex items-center gap-2">
+      <section aria-labelledby="ideas-heading" className="mb-8 rounded-lg border border-denise-200 bg-denise-50" data-testid="opening-ideas">
+        <div className="px-4 py-3">
+          <h2 id="ideas-heading" className="flex items-center gap-2 text-base font-semibold text-denise-900">
             <DeniseFace size={24} />
             Ideas for open time
-          </span>
-        }
-        titleId="ideas-heading"
-        description={
-          special
-            ? `Openings in the next ${special.hoursAhead} hours, with regulars who are due back and said yes to offers. ${special.name}: ${promotionSummary(special, names)}.`
-            : "Set up a last-minute special, and I'll suggest regulars to tell about openings."
-        }
-        flush
-        data-testid="opening-ideas"
-      >
+          </h2>
+          <p className="mt-0.5 text-13 text-denise-700">
+            {special
+              ? `Openings in the next ${special.hoursAhead} hours, with regulars who are due back and said yes to offers. ${special.name}: ${promotionSummary(special, names)}.`
+              : "Set up a last-minute special, and I'll suggest regulars to tell about openings."}
+          </p>
+        </div>
         {!special ? (
-          <EmptyState>No last-minute special is running.</EmptyState>
+          <p className="border-t border-denise-200 px-4 py-3 text-sm text-denise-900">No last-minute special is running.</p>
         ) : ideas.length === 0 ? (
-          <EmptyState>No openings of an hour or more coming up with a regular who fits. I&rsquo;ll keep looking.</EmptyState>
+          <p className="border-t border-denise-200 px-4 py-3 text-sm text-denise-900">No openings of an hour or more coming up with a regular who fits. I&rsquo;ll keep looking.</p>
         ) : (
-          <ul className={listClass}>
+          <ul className="divide-y divide-denise-200 border-t border-denise-200">
             {ideas.map((i) => (
-              <li key={`${i.gap.staffId}:${i.gap.date}:${i.gap.start}`} className={rowClass} data-testid="opening-idea">
-                <p className="font-semibold text-ink">
+              <li key={`${i.gap.staffId}:${i.gap.date}:${i.gap.start}`} className="px-4 py-3" data-testid="opening-idea">
+                <p className="text-sm font-semibold text-ink">
                   {i.staffName} is free {i.when}
                   <span className="font-normal text-ink-muted"> · {Math.floor((i.gap.end - i.gap.start) / 60)}h{(i.gap.end - i.gap.start) % 60 ? ` ${(i.gap.end - i.gap.start) % 60}m` : ""} open</span>
                 </p>
-                <ul className="mt-2 flex flex-col gap-2">
+                <ul className="mt-1 flex flex-col">
                   {i.clients.map((c) => (
                     <SendSpecial
                       key={c.clientId}
@@ -126,45 +125,60 @@ async function Promotions() {
             ))}
           </ul>
         )}
-      </Card>
+      </section>
 
-      <Card title="Running now" titleId="promotions-heading" flush>
-        {rules.length === 0 ? (
-          <EmptyState>No promotions yet.{manage ? " Create one to offer a code, an automatic offer or a last-minute special." : ""}</EmptyState>
-        ) : (
-          <ul className={listClass} aria-labelledby="promotions-heading">
-            {rules.map((r) => (
-              <li key={r.id} className={`${rowClass} flex flex-wrap items-center gap-3`} data-testid="promotion-row">
-                <div className="min-w-0 flex-1">
-                  <p className="flex flex-wrap items-center gap-2 font-semibold text-ink">
-                    {r.name}
-                    <Badge tone={r.kind === "last_minute" ? "amber" : r.kind === "automatic" ? "green" : "navy"}>{r.kind === "code" ? `Code ${r.code}` : KIND[r.kind]}</Badge>
-                  </p>
-                  <p className="text-sm text-ink-muted">{promotionSummary(r, names)}</p>
-                  <p className="text-xs text-ink-muted">
-                    {[
-                      r.startsOn && `from ${formatDay(r.startsOn)}`,
-                      r.endsOn && `until ${formatDay(r.endsOn)}`,
-                      `${uses[r.id]?.uses ?? 0} used${r.maxUses ? ` of ${r.maxUses}` : ""}`,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                  {results && <ResultLine result={resultOf.get(r.id)} lastMinute={r.kind === "last_minute"} />}
-                </div>
-                {manage && (
-                  <div className="flex gap-2">
-                    <Link href={`/promotions/${r.id}`} className={buttonClass("secondary", "sm")}>
-                      Edit
-                    </Link>
-                    <EndPromotion id={r.id} name={r.name} />
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+      <Section title="Running now" titleId="promotions-heading" count={rules.length}>
+        <TableCard>
+          {rules.length === 0 ? (
+            <EmptyState>No promotions yet.{manage ? " Create one to offer a code, an automatic offer or a last-minute special." : ""}</EmptyState>
+          ) : (
+            <table className={tableClass} aria-labelledby="promotions-heading">
+              <thead className={theadClass}>
+                <tr>
+                  <th className={thClass}>Promotion</th>
+                  <th className={thClass}>Type</th>
+                  <th className={thClass}>Dates</th>
+                  <th className={`${thClass} text-right`}>Used</th>
+                  {manage && (
+                    <th className={thClass}>
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {rules.map((r) => (
+                  <tr key={r.id} className={trClass} data-testid="promotion-row">
+                    <td className={`${tdClass} py-3`}>
+                      <p className="font-medium text-ink">{r.name}</p>
+                      <p className="text-13 text-ink-muted">{promotionSummary(r, names)}</p>
+                      {results && <ResultLine result={resultOf.get(r.id)} lastMinute={r.kind === "last_minute"} />}
+                    </td>
+                    <td className={`${tdClass} py-3`}>
+                      <Badge tone={r.kind === "last_minute" ? "warning" : r.kind === "automatic" ? "success" : "neutral"}>{r.kind === "code" ? `Code ${r.code}` : KIND[r.kind]}</Badge>
+                    </td>
+                    <td className={`${tdClass} py-3 whitespace-nowrap text-ink-muted`}>{[r.startsOn && `From ${formatDay(r.startsOn)}`, r.endsOn && `Until ${formatDay(r.endsOn)}`].filter(Boolean).join(" · ") || "Always"}</td>
+                    <td className={`${tdClass} ${numClass} py-3`}>
+                      {uses[r.id]?.uses ?? 0}
+                      {r.maxUses ? <span className="text-ink-subtle"> of {r.maxUses}</span> : null}
+                    </td>
+                    {manage && (
+                      <td className={actionsClass}>
+                        <span className="inline-flex items-center gap-1">
+                          <Link href={`/promotions/${r.id}`} className={buttonClass("quiet", "xs")}>
+                            Edit
+                          </Link>
+                          <EndPromotion id={r.id} name={r.name} />
+                        </span>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </TableCard>
+      </Section>
     </AppShell>
   );
 }
@@ -172,7 +186,7 @@ async function Promotions() {
 // "Last 90 days: 58 sales · $5,210 in sales · $547.50 off · 58 openings
 // filled · 4 first visits" (Reports' figures, for those who see Reports).
 function ResultLine({ result, lastMinute }: { result: Awaited<ReturnType<typeof loadPromotionResults>>[number] | undefined; lastMinute: boolean }) {
-  if (!result) return <p className="mt-1 text-sm text-ink-muted" data-testid="promotion-results">Not used in the last {RESULT_DAYS} days.</p>;
+  if (!result) return <p className="mt-1 text-13 text-ink-subtle" data-testid="promotion-results">Not used in the last {RESULT_DAYS} days.</p>;
   const parts = [
     `${result.redemptions} ${result.redemptions === 1 ? "sale" : "sales"}`,
     `${formatPrice(result.revenueCents)} in sales`,
@@ -181,8 +195,8 @@ function ResultLine({ result, lastMinute }: { result: Awaited<ReturnType<typeof 
     `${result.newClients} first ${result.newClients === 1 ? "visit" : "visits"}`,
   ].filter(Boolean);
   return (
-    <p className="mt-1 text-sm text-ink" data-testid="promotion-results">
-      <span className="text-ink-muted">Last {RESULT_DAYS} days: </span>
+    <p className="mt-1 text-13 text-ink tabular-nums" data-testid="promotion-results">
+      <span className="text-ink-subtle">Last {RESULT_DAYS} days: </span>
       {parts.join(" · ")}
     </p>
   );

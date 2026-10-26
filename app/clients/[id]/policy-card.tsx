@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CardLinkButton, FeeControls } from "@/components/policy-controls";
-import { Card } from "@/components/ui/page";
+import { Section } from "@/components/ui/page";
 import type { Database } from "@/lib/database.types";
 import { FEE_KIND_LABELS, type FeeStatus } from "@/lib/policy";
 import { clientStanding, loadPolicy } from "@/lib/policy-load";
@@ -27,19 +27,19 @@ export async function PolicyCard({ supabase, businessId, role, client, tz }: { s
       : null;
   if (!card.data && !fees.data.length && !strikes && policy.settings.cardRequired === "off") return null;
   return (
-    <Card title="Cancellation policy" titleId="policy-heading" description={strikes ?? "Late cancellation and no-show fees are charged to the card on file."}>
-      <div className="flex flex-col gap-4" data-testid="client-policy">
+    <Section title="Cancellation policy" titleId="policy-heading" description={strikes ?? "Late cancellation and no-show fees are charged to the card on file."}>
+      <div className="divide-y divide-line border-y border-line" data-testid="client-policy">
         {card.data ? (
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="font-medium" data-testid="card-on-file">
+          <div className="flex flex-wrap items-start justify-between gap-3 py-3">
+            <div className="min-w-0">
+              <p className="font-medium text-ink" data-testid="card-on-file">
                 {card.data.label} on file
               </p>
-              <details className="text-sm text-ink-muted">
-                <summary className="cursor-pointer">
+              <details className="mt-0.5 text-13 text-ink-muted">
+                <summary className="cursor-pointer hover:text-ink">
                   Agreed to the policy {card.data.consent.channel === "online" ? "online" : "by link"} on {day(card.data.consent.agreed_at)}
                 </summary>
-                <div className="mt-2 flex flex-col gap-1 rounded-md bg-sunken/60 p-3">
+                <div className="mt-2 flex max-w-2xl flex-col gap-1 border-l-2 border-line pl-3">
                   {card.data.consent.policy_text.split("\n").map((line) => (
                     <p key={line}>{line}</p>
                   ))}
@@ -49,16 +49,16 @@ export async function PolicyCard({ supabase, businessId, role, client, tz }: { s
             <RemoveCardButton clientId={client.id} label={card.data.label} />
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 py-3">
             <p className="text-ink-muted">No card on file.</p>
             <CardLinkButton clientId={client.id} appointmentId={null} phone={client.phone} email={client.email} depositCents={0} sent={(link.data?.length ?? 0) > 0} />
           </div>
         )}
         {fees.data.length > 0 && (
-          <ul className="flex flex-col divide-y divide-line border-t border-line">
+          <ul className="flex flex-col divide-y divide-line">
             {fees.data.map((f) => (
               <li key={f.id} className="flex flex-col gap-1 py-3">
-                <p className="text-sm font-medium">
+                <p className="text-sm font-medium text-ink">
                   {FEE_KIND_LABELS[f.kind as "late_cancel" | "no_show"]} · visit on {day(f.appointment.starts_at)}
                 </p>
                 <FeeControls
@@ -71,6 +71,6 @@ export async function PolicyCard({ supabase, businessId, role, client, tz }: { s
           </ul>
         )}
       </div>
-    </Card>
+    </Section>
   );
 }

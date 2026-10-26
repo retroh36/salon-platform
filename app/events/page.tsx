@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { buttonClass } from "@/components/ui/button";
-import { Alert, Card, EmptyState, PageHeader } from "@/components/ui/page";
+import { PlusIcon } from "@/components/ui/icons";
+import { Alert, Badge, EmptyState, PageHeader, nameLinkClass } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { loadEventList, type EventSummary } from "@/lib/events/load";
 import { PIPELINE, pipelineColumn } from "@/lib/events/pipeline";
@@ -42,39 +43,46 @@ async function Events() {
         title="Events"
         description="Weddings and other events, from inquiry to the day."
         actions={
-          <Link href="/events/new" className={buttonClass("primary", "md")}>
+          <Link href="/events/new" className={buttonClass("primary")}>
+            <PlusIcon className="size-4" />
             New event
           </Link>
         }
       />
       {failedFor.size > 0 && (
-        <Alert className="mb-4">
-          {failedFor.size === 1 ? "A payment didn't go through" : `${failedFor.size} payments didn't go through`}:{" "}
-          {events
-            .filter((e) => failedFor.has(e.id))
-            .map((e, i) => (
-              <span key={e.id}>
-                {i > 0 && ", "}
-                <Link href={`/events/${e.id}`} className="font-semibold underline underline-offset-2">
-                  {e.title}
-                </Link>
-              </span>
-            ))}
-          . Try the card again or ask for another from the event.
+        <Alert className="mb-6">
+          <ul className="flex flex-col gap-1">
+            {events
+              .filter((e) => failedFor.has(e.id))
+              .map((e) => (
+                <li key={e.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <span>
+                    A payment didn&rsquo;t go through for the{" "}
+                    <Link href={`/events/${e.id}`} className="font-semibold underline-offset-2 hover:underline">
+                      {e.title}
+                    </Link>
+                    .
+                  </span>
+                  <Link href={`/events/${e.id}`} className="font-medium whitespace-nowrap underline-offset-2 hover:underline">
+                    Open event &rarr;
+                  </Link>
+                </li>
+              ))}
+          </ul>
         </Alert>
       )}
       {events.length === 0 ? (
-        <EmptyState>No events yet. Tap New event and describe it to Denise.</EmptyState>
+        <EmptyState action={<Link href="/events/new" className={buttonClass("secondary")}>New event</Link>}>No events yet. Start one and describe it to Denise.</EmptyState>
       ) : (
         <>
           <div className="-mx-4 overflow-x-auto overscroll-x-contain px-4 pb-2">
-            <ol className="grid min-w-[66rem] grid-cols-6 gap-3" aria-label="Pipeline">
+            <ol className="grid min-w-[66rem] grid-cols-6 gap-4" aria-label="Pipeline">
               {PIPELINE.map((col) => {
                 const list = events.filter((e) => column(e) === col.key);
                 return (
-                  <li key={col.key} className="flex min-w-0 flex-col gap-2 rounded-xl bg-sunken p-2" aria-labelledby={`col-${col.key}`} data-testid={`column-${col.key}`}>
-                    <h2 id={`col-${col.key}`} className="px-1 pt-1 text-sm font-semibold text-ink-muted">
-                      {col.label} <span className="font-normal">({list.length})</span>
+                  <li key={col.key} className="flex min-w-0 flex-col gap-3" aria-labelledby={`col-${col.key}`} data-testid={`column-${col.key}`}>
+                    <h2 id={`col-${col.key}`} className="border-b border-line pb-2 text-13 font-medium text-ink">
+                      {col.label} <span className="ml-1 font-normal text-ink-subtle tabular-nums">{list.length}</span>
                     </h2>
                     <ul className="flex flex-col gap-2">
                       {list.map((e) => (
@@ -89,23 +97,19 @@ async function Events() {
             </ol>
           </div>
           {lost.length > 0 && (
-            <Card title={`Lost (${lost.length})`} titleId="lost" flush className="mt-6">
-              <ul className="divide-y divide-line" data-testid="column-lost">
-                {lost.map((e) => (
-                  <li key={e.id}>
-                    <Link href={`/events/${e.id}`} className="flex items-baseline justify-between gap-3 px-5 py-3 hover:bg-sunken">
-                      <span className="min-w-0">
-                        <span className="font-semibold">{e.title}</span>
-                        <span className="block text-sm text-ink-muted">
-                          {formatEventDay(e.date)}
-                          {e.lostReason && ` · ${e.lostReason}`}
-                        </span>
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </Card>
+            <p className="mt-8 border-t border-line pt-4 text-13 text-ink-muted" data-testid="column-lost">
+              <span className="font-medium text-ink">Lost ({lost.length})</span>
+              {lost.map((e) => (
+                <span key={e.id}>
+                  {" · "}
+                  <Link href={`/events/${e.id}`} className={nameLinkClass}>
+                    {e.title}
+                  </Link>
+                  , {formatEventDay(e.date)}
+                  {e.lostReason && ` · ${e.lostReason}`}
+                </span>
+              ))}
+            </p>
           )}
         </>
       )}
@@ -115,21 +119,30 @@ async function Events() {
 
 function EventCard({ e, failedCents }: { e: EventSummary; failedCents?: number }) {
   return (
-    <Link href={`/events/${e.id}`} className="flex flex-col gap-0.5 rounded-lg border border-line bg-surface px-3 py-2.5 shadow-card hover:border-line-strong">
-      <span className="font-semibold">{e.title}</span>
-      <span className="text-sm text-ink-muted">
+    <Link
+      href={`/events/${e.id}`}
+      className="flex flex-col gap-1 rounded-lg border border-line bg-surface p-3 transition-colors duration-(--motion-fast) hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+    >
+      <span className="text-sm font-semibold text-ink">{e.title}</span>
+      <span className="text-13 text-ink-muted">
         {formatEventDay(e.date)}
         {e.readyBy != null && ` · ${formatMinute(e.readyBy)}`}
       </span>
-      <span className="flex justify-between gap-2 text-sm text-ink-muted">
-        <span>
-          {e.partySize} {e.partySize === 1 ? "person" : "people"}
-          {e.onLocation && " · on location"}
-          {e.source === "online" && " · online"}
+      <span className="flex items-baseline justify-between gap-2 text-13 text-ink-muted">
+        <span className="min-w-0">
+          <span className="whitespace-nowrap">
+            {e.partySize} {e.partySize === 1 ? "person" : "people"}
+          </span>
+          {e.onLocation && <> <span className="whitespace-nowrap">· On location</span></>}
+          {e.source === "online" && <> <span className="whitespace-nowrap">· Online</span></>}
         </span>
-        <span className="tabular-nums text-ink">{e.totalCents ? formatPrice(e.totalCents) : ""}</span>
+        <span className="text-ink tabular-nums">{e.totalCents ? formatPrice(e.totalCents) : ""}</span>
       </span>
-      {failedCents != null && <span className="text-sm font-medium text-danger">{formatPrice(failedCents)} didn&rsquo;t go through</span>}
+      {failedCents != null && (
+        <span className="mt-1">
+          <Badge tone="danger" className="h-auto! min-h-5 py-0.5 whitespace-normal!">Payment failed · {formatPrice(failedCents)}</Badge>
+        </span>
+      )}
     </Link>
   );
 }

@@ -13,8 +13,8 @@ import { saveMember } from "./actions";
 export type MemberFields = { first_name: string; last_name: string; email: string; phone: string; role: StaffRole; level: string; service_ids: string[] };
 export type ServiceGroup = { category: string; services: { id: string; name: string }[] };
 
-const sectionClass = "grid gap-4 rounded-xl border border-line bg-surface p-5 shadow-card sm:grid-cols-2";
-const sectionTitle = "font-serif text-lg font-semibold text-ink sm:col-span-2";
+const sectionClass = "grid gap-4 rounded-lg border border-line bg-surface p-4 sm:grid-cols-2";
+const sectionTitle = "text-base font-semibold text-ink sm:col-span-2";
 
 // Adding someone (staffId null, with their weekly hours and an invite), or
 // editing their details, role, level and services.
@@ -84,7 +84,7 @@ export function MemberForm({
 
         <section className={sectionClass} aria-label="Services they do">
           <div className="flex flex-wrap items-center justify-between gap-2 sm:col-span-2">
-            <h2 className="font-serif text-lg font-semibold text-ink">Services they do</h2>
+            <h2 className="text-base font-semibold text-ink">Services they do</h2>
             <span className="flex gap-3 text-sm">
               <button type="button" className="font-medium text-link underline underline-offset-2" onClick={() => setPicked(new Set(all))}>
                 Tick all
@@ -116,7 +116,7 @@ export function MemberForm({
             {errors.hours && <p className="text-sm text-danger sm:col-span-2">{errors.hours}</p>}
             {WEEKDAYS.map((day) => (
               <div key={day} className="flex flex-wrap items-center gap-2" role="group" aria-label={WEEKDAY_NAMES[day]}>
-                <span className="w-24 text-sm font-semibold">{WEEKDAY_NAMES[day]}</span>
+                <span className="w-24 text-sm font-medium">{WEEKDAY_NAMES[day]}</span>
                 <input type="time" step={300} name={`start_${day}`} defaultValue={hours[day]?.start ?? ""} aria-label={`${WEEKDAY_NAMES[day]} start`} className={`${inputClass} w-32! py-1.5`} />
                 <span className="text-sm text-ink-muted">to</span>
                 <input type="time" step={300} name={`end_${day}`} defaultValue={hours[day]?.end ?? ""} aria-label={`${WEEKDAY_NAMES[day]} end`} className={`${inputClass} w-32! py-1.5`} />
@@ -133,7 +133,7 @@ export function MemberForm({
           </label>
         )}
 
-        <button type="submit" className={buttonClass("primary", "lg", "self-start")}>
+        <button type="submit" className={buttonClass("primary", "md", "self-start")}>
           {pending ? "Saving…" : staffId ? "Save changes" : "Add to the team"}
         </button>
       </fieldset>

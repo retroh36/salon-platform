@@ -39,7 +39,7 @@ test.afterAll(async () => {
 const name = (c: { first_name: string; last_name: string }) => `${c.first_name} ${c.last_name}`;
 
 function results(page: Page) {
-  return ui(page).getByRole("list", { name: "Clients" }).getByRole("listitem");
+  return ui(page).getByRole("table", { name: "Clients" }).locator("tbody").getByRole("row");
 }
 
 async function openClients(page: Page) {

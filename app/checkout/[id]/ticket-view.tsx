@@ -9,6 +9,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button, IconButton } from "@/components/ui/button";
 import { fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { ChevronDownIcon, CloseIcon, PlusIcon } from "@/components/ui/icons";
+import { Alert, Badge, EmptyState } from "@/components/ui/page";
 import { parseDollars } from "@/lib/checkout";
 import type { CheckoutScreenData } from "@/lib/checkout-screen";
 import { usesLeft } from "@/lib/packages";
@@ -31,40 +32,40 @@ export function ClientHeader({ data }: { data: CheckoutScreenData }) {
       <div className="flex flex-wrap items-center gap-3">
         <Avatar name={data.client.name} size="lg" />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-serif text-2xl font-semibold text-navy-900" data-testid="checkout-client">
+          <p className="truncate text-xl font-semibold tracking-[-0.01em] text-ink" data-testid="checkout-client">
             {data.client.name}
           </p>
           <div className="mt-1 flex flex-wrap gap-1.5">
             {usesLeftTotal > 0 && (
-              <span className="rounded-full bg-status-confirmed-bg px-2.5 py-0.5 text-xs font-semibold text-status-confirmed-ink" data-testid="badge-package">
-                Package: {data.packages.flatMap((p) => p.items.filter((i) => i.used < i.total).map(usesLeft)).join(", ")}
+              <span data-testid="badge-package" className="max-w-full">
+                <Badge wrap tone="info">Package: {data.packages.flatMap((p) => p.items.filter((i) => i.used < i.total).map(usesLeft)).join(", ")}</Badge>
               </span>
             )}
             {data.memberships.map((m) => (
-              <span
-                key={m.id}
-                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${m.status === "past_due" ? "bg-status-late-bg text-status-late-ink" : "bg-denise-50 text-navy-900"}`}
-                data-testid="badge-membership"
-              >
-                {m.name}
-                {m.status === "past_due"
-                  ? ": payment failed, no member benefits"
-                  : m.status === "paused"
-                    ? ": paused"
-                    : m.credits.length
-                      ? ` · ${m.credits.map((c) => `${c.serviceName}: ${c.allowance - c.used} left`).join(", ")}`
-                      : ""}
+              <span key={m.id} data-testid="badge-membership" className="max-w-full">
+                <Badge wrap tone={m.status === "past_due" ? "warning" : m.status === "paused" ? "neutral" : "info"}>
+                  {m.name}
+                  {m.status === "past_due"
+                    ? ": payment failed, no member benefits"
+                    : m.status === "paused"
+                      ? ": paused"
+                      : m.credits.length
+                        ? ` · ${m.credits.map((c) => `${c.serviceName}: ${c.allowance - c.used} left`).join(", ")}`
+                        : ""}
+                </Badge>
               </span>
             ))}
             {giftCents > 0 && (
-              <span className="rounded-full bg-status-checked-in-bg px-2.5 py-0.5 text-xs font-semibold text-status-checked-in-ink" data-testid="badge-gift-card">
-                Gift card: {formatPrice(giftCents)}
+              <span data-testid="badge-gift-card" className="max-w-full">
+                <Badge tone="info">
+                  Gift card: <span className="tabular-nums">{formatPrice(giftCents)}</span>
+                </Badge>
               </span>
             )}
           </div>
         </div>
         {!data.draft.appointmentId && (
-          <Button variant="ghost" onClick={() => setSaleClient(data.draft.id, null).then(() => router.refresh())}>
+          <Button variant="quiet" onClick={() => setSaleClient(data.draft.id, null).then(() => router.refresh())}>
             Remove client
           </Button>
         )}
@@ -73,9 +74,9 @@ export function ClientHeader({ data }: { data: CheckoutScreenData }) {
             type="button"
             aria-expanded={open}
             onClick={() => setOpen(!open)}
-            className="inline-flex h-11 items-center gap-2 rounded-full border border-denise-200 bg-denise-50 px-3 text-sm font-medium text-denise-900 transition-colors duration-(--motion-fast) hover:border-denise-500 focus-visible:outline-2 focus-visible:outline-focus"
+            className="touch-target inline-flex h-9 items-center gap-2 rounded-md border border-denise-200 bg-denise-50 px-3 text-sm font-medium text-denise-900 transition-colors duration-(--motion-fast) hover:border-denise-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
-            <DeniseFace size={24} />
+            <DeniseFace size={20} />
             What Denise knows
             <ChevronDownIcon className={`size-4 transition-transform duration-(--motion-fast) ${open ? "rotate-180" : ""}`} />
           </button>
@@ -112,13 +113,13 @@ function ChooseClient({ draftId }: { draftId: string }) {
     <div className="flex flex-wrap items-center gap-3">
       <Avatar name="Walk in" size="lg" />
       <div className="min-w-0">
-        <p className="font-serif text-xl font-semibold text-navy-900">Walk-in sale</p>
+        <p className="text-xl font-semibold tracking-[-0.01em] text-ink">Walk-in sale</p>
         <p className="text-sm text-ink-muted">No client yet: add one for a package or their gift cards.</p>
       </div>
       <div className="relative ml-auto w-72 max-w-full">
         <input aria-label="Find a client" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find a client" className={`${fieldClass} h-12`} autoComplete="off" />
         {shown.length > 0 && (
-          <ul aria-label="Matching clients" className="absolute inset-x-0 top-full z-40 mt-1 overflow-hidden rounded-xl border border-line bg-surface shadow-lift">
+          <ul aria-label="Matching clients" className="absolute inset-x-0 top-full z-40 mt-1 overflow-hidden rounded-lg border border-line bg-surface shadow-lift">
             {shown.map((c) => (
               <li key={c.id}>
                 <button
@@ -196,16 +197,16 @@ export function TicketList({
   return (
     <div className="flex flex-col gap-4">
       {groups.length === 0 && (
-        <p className="rounded-xl border border-dashed border-line-strong bg-surface px-5 py-8 text-center text-ink-muted">Nothing on the ticket yet. Search for a product above, or add a service.</p>
+        <EmptyState className="rounded-lg border border-dashed border-line-strong">Nothing on the ticket yet. Search for a product above, or add a service.</EmptyState>
       )}
       {groups.map((g) => {
         const stylist = g.staffId ? names.get(g.staffId) : null;
         return (
-          <section key={g.staffId ?? "none"} aria-label={stylist ? `${stylist.name}'s lines` : "Other lines"} className="rounded-xl border border-line bg-surface shadow-card">
+          <section key={g.staffId ?? "none"} aria-label={stylist ? `${stylist.name}'s lines` : "Other lines"} className="rounded-lg border border-line bg-surface">
             {/* Stays in view while the stylist's lines scroll under it. */}
-            <div className="sticky top-0 z-10 flex items-center gap-3 rounded-t-xl border-b border-line bg-sunken px-4 py-2.5">
+            <div className="sticky top-0 z-10 flex items-center gap-3 rounded-t-lg border-b border-line bg-surface px-4 py-3">
               {stylist ? <Avatar name={stylist.name} color={stylist.color} level={stylist.level} size="sm" /> : null}
-              <span className="font-semibold text-ink">{stylist ? stylist.name : "Not credited to a stylist"}</span>
+              <span className="text-sm font-semibold text-ink">{stylist ? stylist.name : "Not credited to a stylist"}</span>
               <span className="ml-auto text-sm text-ink-muted tabular-nums" data-testid="stylist-subtotal">
                 Subtotal <span className="font-semibold text-ink">{formatPrice(g.subtotalCents)}</span>
               </span>
@@ -233,9 +234,9 @@ export function TicketList({
       {promos.rules.length > 0 && (
         <ul aria-label="Promotions" className="flex flex-col gap-2">
           {promos.rules.map((r) => (
-            <li key={r.id} className="flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-2 shadow-card" data-testid="applied-promotion">
-              <span className="w-16 shrink-0 text-xs font-semibold tracking-wide text-ink-muted uppercase">Promo</span>
-              <span className="min-w-0 flex-1 truncate font-medium text-ink">{r.name}</span>
+            <li key={r.id} className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2" data-testid="applied-promotion">
+              <span className="w-16 shrink-0 text-xs font-medium text-ink-muted">Promo</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{r.name}</span>
               <span className="font-semibold text-ink tabular-nums">−{formatPrice(promos.perPromotion[r.id] ?? 0)}</span>
               <IconButton label={`Remove ${r.name}`} onClick={() => onRemovePromotion(r.id)} className="size-11">
                 <CloseIcon className="size-5" />
@@ -249,29 +250,29 @@ export function TicketList({
           <PlusIcon className="size-5" />
           Add service
         </Button>
-        <Button size="lg" variant="ghost" onClick={() => onDialog({ kind: "sell-gift-card" })}>
+        <Button size="lg" variant="quiet" onClick={() => onDialog({ kind: "sell-gift-card" })}>
           <PlusIcon className="size-5" />
           Gift card
         </Button>
         {data.templates.length > 0 && (
-          <Button size="lg" variant="ghost" onClick={() => onDialog({ kind: "sell-package" })}>
+          <Button size="lg" variant="quiet" onClick={() => onDialog({ kind: "sell-package" })}>
             <PlusIcon className="size-5" />
             Package
           </Button>
         )}
         {data.plans.length > 0 && (
-          <Button size="lg" variant="ghost" onClick={() => onDialog({ kind: "sell-membership" })}>
+          <Button size="lg" variant="quiet" onClick={() => onDialog({ kind: "sell-membership" })}>
             <PlusIcon className="size-5" />
             Membership
           </Button>
         )}
         {data.promo.rules.length > 0 && (
-          <Button size="lg" variant="ghost" onClick={() => onDialog({ kind: "promotion" })}>
+          <Button size="lg" variant="quiet" onClick={() => onDialog({ kind: "promotion" })}>
             <PlusIcon className="size-5" />
             Promotion
           </Button>
         )}
-        <Button size="lg" variant="ghost" onClick={() => onDialog({ kind: "sale-discount" })}>
+        <Button size="lg" variant="quiet" onClick={() => onDialog({ kind: "sale-discount" })}>
           {ticket.saleDiscount && ticket.saleDiscount.value > 0 ? "Change discount" : "Discount the whole sale"}
         </Button>
       </div>
@@ -370,21 +371,21 @@ function TicketRow({
           onClick={onToggle}
           className="flex min-h-16 min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left transition-colors duration-(--motion-fast) hover:bg-sunken/60 focus-visible:bg-sunken focus-visible:outline-none"
         >
-          <span className="w-16 shrink-0 text-xs font-semibold tracking-wide text-ink-muted uppercase">{KIND_LABEL[line.kind]}</span>
+          <span className="w-16 shrink-0 text-xs font-medium text-ink-muted">{KIND_LABEL[line.kind]}</span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-medium text-ink">{title}</span>
-            <span className="block truncate text-sm text-ink-muted">{detailOf(line, data, rates).join(" · ")}</span>
+            <span className="block truncate text-sm font-medium text-ink">{title}</span>
+            <span className="block truncate text-13 text-ink-muted">{detailOf(line, data, rates).join(" · ")}</span>
             {short !== null && (
-              <span className="mt-0.5 block text-sm font-medium text-status-late-ink" data-testid="out-of-stock">
-                Only {short} in stock
+              <span className="mt-1 block" data-testid="out-of-stock">
+                <Badge tone="warning">Only {short} in stock</Badge>
               </span>
             )}
           </span>
           <span className="shrink-0 text-right tabular-nums">
-            <span className="block text-sm text-ink-muted">
+            <span className="block text-13 text-ink-muted">
               {qty} × {formatPrice(unit)}
             </span>
-            <span className="block text-lg font-semibold text-ink" data-testid="line-total">
+            <span className="block text-base font-semibold text-ink" data-testid="line-total">
               {formatPrice(total)}
             </span>
           </span>
@@ -418,7 +419,7 @@ function LineEditor({
   const [price, setPrice] = useState(line.kind === "service" ? centsToInput(line.unitPriceCents) : "");
   const canQuantity = line.kind === "product" || (line.kind === "service" && !line.appointmentItemId && !isCovered(line));
   return (
-    <div className="flex animate-fade-in flex-col gap-4 border-t border-line bg-sunken/40 px-4 py-4" aria-label={`Edit ${lineTitle(line)}`} role="group">
+    <div className="flex animate-fade-in flex-col gap-4 border-t border-line px-4 py-4" aria-label={`Edit ${lineTitle(line)}`} role="group">
       {line.kind === "service" && line.packageItemId && (
         // Back to its price, paid like any other service (the use stays on the package).
         <Button className="self-start" onClick={() => onUpdate({ packageItemId: null, unitPriceCents: line.basePriceCents, priceReason: "" } as Partial<TicketLine>)}>
@@ -442,7 +443,7 @@ function LineEditor({
                 const cents = parseDollars(e.target.value);
                 if (cents !== null) onUpdate({ unitPriceCents: cents });
               }}
-              className={`${fieldClass} h-12 text-lg tabular-nums`}
+              className={`${fieldClass} h-12 text-base tabular-nums`}
             />
           </label>
           {line.unitPriceCents !== line.basePriceCents && (
@@ -456,7 +457,7 @@ function LineEditor({
       <div className="flex flex-wrap items-end gap-4">
         {canQuantity && (
           <div className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Quantity</span>
+            <span className="text-13 font-medium text-ink">Quantity</span>
             <div className="flex items-center gap-2" role="group" aria-label="Quantity">
               <Button size="lg" square aria-label="One fewer" disabled={(line as { quantity: number }).quantity <= 1} onClick={() => onUpdate({ quantity: (line as { quantity: number }).quantity - 1 })}>
                 −
@@ -492,14 +493,16 @@ function LineEditor({
         <LineDiscount discount={line.discount} onChange={(discount) => onUpdate({ discount })} />
       )}
       {short !== null && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-status-late-ink/25 bg-status-late-bg px-3 py-2 text-status-late-ink">
-          <span>The system shows only {short} in stock.</span>
-          <Button size="sm" onClick={onOverride}>
-            {data.canOverride ? "Sell anyway" : "Manager OK"}
-          </Button>
-        </div>
+        <Alert tone="warning">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>The system shows only {short} in stock.</span>
+            <Button size="sm" onClick={onOverride}>
+              {data.canOverride ? "Sell anyway" : "Manager OK"}
+            </Button>
+          </div>
+        </Alert>
       )}
-      <Button variant="ghost" className="self-start text-danger" onClick={onRemove}>
+      <Button variant="danger-quiet" className="self-start" onClick={onRemove}>
         Remove from ticket
       </Button>
     </div>
@@ -511,7 +514,7 @@ function LineDiscount({ discount, onChange }: { discount: TicketDiscount; onChan
   const [value, setValue] = useState(d.value ? (d.kind === "amount" ? centsToInput(d.value) : String(d.value)) : "");
   return (
     <fieldset className="grid gap-3 sm:grid-cols-[9rem_8rem_1fr]">
-      <legend className="mb-1.5 text-sm font-medium">Discount on this line</legend>
+      <legend className="mb-1.5 text-13 font-medium text-ink">Discount on this line</legend>
       <select
         aria-label="Discount type"
         value={d.kind}

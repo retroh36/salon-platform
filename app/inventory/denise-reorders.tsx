@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { DeniseFace, DenisePose } from "@/components/denise";
+import { DenisePose } from "@/components/denise";
 import { Button, buttonClass } from "@/components/ui/button";
 import {
   CheckCircleIcon,
@@ -65,14 +65,14 @@ export function DeniseReorders({ canManage }: { canManage: boolean }) {
   return (
     <section
       aria-label="Denise's reorder suggestions"
-      className="mb-6 animate-fade-in rounded-xl border border-denise-200 bg-denise-50 p-4 shadow-card"
+      className="mb-6 animate-fade-in rounded-lg border border-denise-200 bg-denise-50"
     >
-      <div className="flex items-center gap-3">
-        <DenisePose pose={pose} className="w-14" />
+      <div className="flex items-center gap-3 px-4 py-3">
+        <DenisePose pose={pose} className="w-10" />
         <p
           data-testid="denise-reorder-says"
           aria-live="polite"
-          className="font-medium text-denise-900"
+          className="text-sm font-medium text-denise-900"
         >
           {says}
         </p>
@@ -81,23 +81,23 @@ export function DeniseReorders({ canManage }: { canManage: boolean }) {
       {outcome && (
         <div
           role="status"
-          className={`mt-3 flex animate-fade-in flex-wrap items-center gap-3 rounded-lg border px-3 py-2 ${outcome.error ? "border-danger/30 bg-danger-soft text-danger" : "border-denise-200 bg-surface text-ink"}`}
+          className={`flex animate-fade-in flex-wrap items-center gap-3 border-t border-denise-200 px-4 py-3 text-sm ${outcome.error ? "text-danger" : "text-ink"}`}
         >
           {!outcome.error && (
-            <CheckCircleIcon className="size-5 text-denise-700" />
+            <CheckCircleIcon className="size-4 text-denise-700" />
           )}
           <span className="flex-1">{outcome.message}</span>
           {outcome.orderId && (
             <Link
               href={`/inventory/orders/${outcome.orderId}`}
-              className={buttonClass("secondary", "sm")}
+              className={buttonClass("secondary", "xs")}
             >
               Open order
             </Link>
           )}
           {outcome.undoActionId && (
             <Button
-              size="sm"
+              size="xs"
               disabled={working}
               onClick={() =>
                 act(async () => ({
@@ -114,17 +114,16 @@ export function DeniseReorders({ canManage }: { canManage: boolean }) {
       )}
 
       {suggestions && suggestions.length > 0 && (
-        <ul className="mt-3 flex flex-col gap-3">
+        <ul className="divide-y divide-denise-200 border-t border-denise-200">
           {suggestions.map((s) => (
             <li
               key={s.supplierId}
               data-testid="reorder-suggestion"
-              className="flex animate-fade-in flex-col gap-3 rounded-lg border border-denise-200 bg-surface p-3"
+              className="flex animate-fade-in flex-col gap-2 px-4 py-3"
             >
-              <div className="flex items-start gap-2.5">
-                <DeniseFace size={28} />
-                <p className="text-ink">
-                  <strong className="font-semibold text-denise-900">
+              <div>
+                <p className="text-sm text-ink">
+                  <strong className="font-medium text-denise-900">
                     {s.headline}
                   </strong>{" "}
                   I&apos;ve put together an order for {s.supplier}:{" "}
@@ -135,24 +134,24 @@ export function DeniseReorders({ canManage }: { canManage: boolean }) {
                 </p>
               </div>
               <details className="group">
-                <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-semibold tracking-wider text-denise-700 uppercase [&::-webkit-details-marker]:hidden">
+                <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-medium text-denise-700 [&::-webkit-details-marker]:hidden">
                   What&apos;s in it
                   <ChevronDownIcon className="size-3.5 transition-transform duration-(--motion-fast) group-open:rotate-180" />
                 </summary>
-                <ul className="mt-2 divide-y divide-line text-sm">
+                <ul className="mt-2 divide-y divide-denise-200 text-13">
                   {s.lines.map((l) => (
                     <li
                       key={l.productId}
                       className="flex flex-wrap gap-x-3 py-1.5"
                     >
-                      <span className="min-w-48 flex-1 font-medium text-ink">
+                      <span className="min-w-48 flex-1 text-ink">
                         {l.product}
                       </span>
-                      <span className="w-24 text-ink-muted">{l.quantity}</span>
+                      <span className="w-24 text-ink-muted tabular-nums">{l.quantity}</span>
                       <span className="w-20 text-right text-ink tabular-nums">
                         {formatPrice(l.costCents)}
                       </span>
-                      <span className="w-full text-xs text-ink-muted">
+                      <span className="w-full text-xs text-ink-subtle">
                         {l.reason}
                       </span>
                     </li>
@@ -163,7 +162,7 @@ export function DeniseReorders({ canManage }: { canManage: boolean }) {
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="primary"
-                    size="sm"
+                    size="xs"
                     disabled={working}
                     onClick={() =>
                       act(async () => {
@@ -182,8 +181,8 @@ export function DeniseReorders({ canManage }: { canManage: boolean }) {
                     Draft this order
                   </Button>
                   <Button
-                    variant="ghost"
-                    size="sm"
+                    variant="quiet"
+                    size="xs"
                     disabled={working}
                     onClick={() =>
                       act(async () => {

@@ -50,7 +50,7 @@ export function PatchSettingsForm({ initial, readOnly }: { initial: PatchSetting
           </label>
         </div>
       </fieldset>
-      {message && (message.ok ? <p role="status" className="text-sm font-medium text-status-confirmed-ink">{message.text}</p> : <Alert>{message.text}</Alert>)}
+      {message && (message.ok ? <p role="status" className="text-sm text-ink-muted">{message.text}</p> : <Alert>{message.text}</Alert>)}
       {!readOnly && (
         <div>
           <Button type="submit" variant="primary" disabled={pending}>

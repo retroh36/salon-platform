@@ -4,7 +4,8 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { buttonClass } from "@/components/ui/button";
 import { PlusIcon } from "@/components/ui/icons";
-import { Badge, Card, EmptyState, listClass, PageHeader, rowLinkClass } from "@/components/ui/page";
+import { Badge, EmptyState, nameLinkClass, PageHeader } from "@/components/ui/page";
+import { numClass, TableCard, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
 import { canManageInventory, canReceiveOrders, describeStock, filterInventory, formatAmount, isLow, productName, readFilter, stockValueCents, TYPE_LABELS } from "@/lib/inventory";
 import { loadInventory } from "@/lib/inventory-load";
@@ -84,14 +85,15 @@ async function Inventory({ searchParams }: Pick<PageProps<"/inventory">, "search
         <Link
           href="/inventory?low=1"
           data-testid="low-stock-alert"
-          className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-status-late-ink/25 bg-status-late-bg px-4 py-3 text-sm text-status-late-ink transition-[filter] duration-(--motion-fast) hover:brightness-[0.98]"
+          className="mb-4 flex items-start gap-2.5 rounded-lg bg-warning-soft px-3 py-2.5 text-sm text-warning transition-[filter] duration-(--motion-fast) hover:brightness-[0.98]"
         >
-          <span>
-            <strong className="font-semibold">{low.length} {low.length === 1 ? "product is" : "products are"} below the reorder point:</strong>{" "}
+          <span aria-hidden className="mt-[7px] size-1.5 shrink-0 rounded-full bg-warning-dot" />
+          <span className="min-w-0 flex-1">
+            <span className="font-medium">{low.length} {low.length === 1 ? "product is" : "products are"} below the reorder point:</span>{" "}
             {low.slice(0, 3).map(productName).join(", ")}
             {low.length > 3 ? ` and ${low.length - 3} more` : ""}.
           </span>
-          <span className="shrink-0 font-semibold underline underline-offset-2">Show</span>
+          <span className="shrink-0 font-medium underline underline-offset-2">Show</span>
         </Link>
       )}
 
@@ -101,51 +103,63 @@ async function Inventory({ searchParams }: Pick<PageProps<"/inventory">, "search
         {rows.length === all.length ? `${rows.length} products` : `${rows.length} of ${all.length} products${costs ? ` · ${formatPrice(shownValue)} at cost` : ""}`}
       </p>
 
-      <Card flush>
-        {rows.length === 0 ? (
+      {rows.length === 0 ? (
+        <TableCard>
           <EmptyState>No products match. Try another search or filter.</EmptyState>
-        ) : (
-          <>
-            <div aria-hidden className="hidden gap-4 border-b border-line bg-sunken/50 px-5 py-2 text-xs font-semibold tracking-wider text-ink-muted uppercase md:flex">
-              <span className="flex-1">Product</span>
-              <span className="w-36 text-right">On hand</span>
-              <span className="w-28 text-right">Reorder at</span>
-              {costs && <span className="w-24 text-right">Value</span>}
-            </div>
-            <ul className={listClass} aria-label="Products">
+        </TableCard>
+      ) : (
+        <TableCard>
+          <table className={tableClass} aria-label="Products">
+            <thead className={theadClass}>
+              <tr>
+                <th scope="col" className={thClass}>
+                  Product
+                </th>
+                <th scope="col" className={`${thClass} hidden sm:table-cell`}>
+                  Type
+                </th>
+                <th scope="col" className={`${thClass} text-right`}>
+                  On hand
+                </th>
+                <th scope="col" className={`${thClass} hidden text-right md:table-cell`}>
+                  Reorder at
+                </th>
+                {costs && (
+                  <th scope="col" className={`${thClass} text-right`}>
+                    Value
+                  </th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
               {rows.map((p) => {
                 const stock = describeStock(p.on_hand, p);
                 const lowStock = isLow(p.on_hand, p.reorder_point);
                 return (
-                  <li key={p.id}>
-                    <Link href={`/inventory/${p.id}`} className={`${rowLinkClass} md:flex-nowrap`} data-low={lowStock || undefined}>
-                      <span className="min-w-0 flex-1 basis-full md:basis-0">
-                        <span className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold text-ink">{productName(p)}</span>
-                          <Badge tone={p.type === "retail" ? "blue" : "navy"}>{TYPE_LABELS[p.type]}</Badge>
-                          {lowStock && <Badge tone="amber">Low stock</Badge>}
-                        </span>
-                        <span className="block text-sm text-ink-muted">
-                          {[p.sku, p.supplier?.name].filter(Boolean).join(" · ")}
-                        </span>
+                  <tr key={p.id} className={trClass} data-low={lowStock || undefined}>
+                    <td className={tdClass}>
+                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <Link href={`/inventory/${p.id}`} className={nameLinkClass}>
+                          {productName(p)}
+                        </Link>
+                        {lowStock && <Badge tone="warning">Low stock</Badge>}
                       </span>
-                      <span className="tabular-nums md:w-36 md:text-right">
-                        <span className={`block font-medium ${p.on_hand < 0 ? "text-danger" : "text-ink"}`}>{stock.main}</span>
-                        {stock.containers && <span className="block text-xs text-ink-muted">{stock.containers}</span>}
-                      </span>
-                      <span className="text-sm text-ink-muted tabular-nums md:w-28 md:text-right">
-                        <span className="md:hidden">Reorder at </span>
-                        {p.reorder_point > 0 ? formatAmount(p.reorder_point, p.unit) : "—"}
-                      </span>
-                      {costs && <span className="ml-auto text-sm font-medium text-ink tabular-nums md:ml-0 md:w-24 md:text-right">{formatPrice(stockValueCents(p.on_hand, p))}</span>}
-                    </Link>
-                  </li>
+                      {(p.sku || p.supplier?.name) && <span className="block text-13 text-ink-muted">{[p.sku, p.supplier?.name].filter(Boolean).join(" · ")}</span>}
+                    </td>
+                    <td className={`${tdClass} hidden whitespace-nowrap text-ink-muted sm:table-cell`}>{TYPE_LABELS[p.type]}</td>
+                    <td className={`${tdClass} ${numClass}`}>
+                      <span className={`block font-medium ${p.on_hand < 0 ? "text-danger" : "text-ink"}`}>{stock.main}</span>
+                      {stock.containers && <span className="block text-xs text-ink-subtle">{stock.containers}</span>}
+                    </td>
+                    <td className={`${tdClass} ${numClass} hidden text-ink-muted md:table-cell`}>{p.reorder_point > 0 ? formatAmount(p.reorder_point, p.unit) : "—"}</td>
+                    {costs && <td className={`${tdClass} ${numClass} text-ink`}>{formatPrice(stockValueCents(p.on_hand, p))}</td>}
+                  </tr>
                 );
               })}
-            </ul>
-          </>
-        )}
-      </Card>
+            </tbody>
+          </table>
+        </TableCard>
+      )}
     </AppShell>
   );
 }

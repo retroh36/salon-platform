@@ -41,7 +41,7 @@ export function HoursEditor({ action, initial, label }: { action: Action; initia
           const dayRows = rows[day] ?? [];
           const error = state?.errors?.[day];
           return (
-            <li key={day} className={`flex flex-wrap items-start gap-x-4 gap-y-2 px-5 py-3 transition-colors duration-(--motion-fast) ${error ? "bg-danger-soft/50" : "hover:bg-sunken/50"}`} aria-label={WEEKDAY_NAMES[day]}>
+            <li key={day} className={`flex flex-wrap items-start gap-x-4 gap-y-2 px-4 py-3 transition-colors duration-(--motion-fast) ${error ? "bg-danger-soft/50" : "hover:bg-sunken/50"}`} aria-label={WEEKDAY_NAMES[day]}>
               <span className="w-28 pt-2 text-sm font-semibold">{WEEKDAY_NAMES[day]}</span>
               <div className="flex flex-1 flex-col gap-2">
                 {dayRows.length === 0 && <span className="pt-2 text-sm text-ink-muted">Off</span>}
@@ -92,7 +92,7 @@ export function HoursEditor({ action, initial, label }: { action: Action; initia
           );
         })}
       </ul>
-      <div className="flex items-center gap-3 border-t border-line bg-sunken/40 px-5 py-4">
+      <div className="flex items-center gap-3 border-t border-line px-4 py-3">
         <button type="submit" disabled={pending} className={buttonClass("primary", "md")}>
           {pending ? "Saving…" : "Save hours"}
         </button>

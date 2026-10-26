@@ -68,9 +68,9 @@ test.describe("owner", () => {
     await form.getByRole("button", { name: "Create form" }).click();
 
     await expect(page).toHaveURL(/\/forms$/);
-    const row = page.getByRole("link", { name: new RegExp(`${PREFIX} Keratin waiver`) });
-    await expect(row).toContainText("3 questions · 1 service");
-    await expect(row).toContainText("Before some services");
+    const row = page.getByRole("row").filter({ has: page.getByRole("link", { name: new RegExp(`${PREFIX} Keratin waiver`) }) });
+    await expect(row).toContainText("3 questions");
+    await expect(row).toContainText("Before some services · 1 service");
     const { data: t } = await admin.from("form_templates").select("fields, required").eq("name", `${PREFIX} Keratin waiver`).single();
     expect(t!.required).toBe("services");
     expect((t!.fields as { type: string; label: string }[]).map((f) => [f.type, f.label])).toEqual([

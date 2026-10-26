@@ -89,7 +89,7 @@ function FeedbackSheet({ onClose }: { onClose: () => void }) {
 export function DemoCode({ code }: { code?: string }) {
   if (!code) return null;
   return (
-    <p data-testid="demo-code" className="rounded-xl border border-line bg-sunken px-3 py-2 text-sm text-ink">
+    <p data-testid="demo-code" className="rounded-lg bg-sunken px-3 py-2.5 text-sm text-ink">
       Demo: your code is <span className="font-mono font-semibold tracking-wider">{code}</span>. A real salon texts or emails it (see the{" "}
       <a href="/dev/outbox" target="_blank" rel="noopener" className="text-link underline underline-offset-2">
         demo outbox
