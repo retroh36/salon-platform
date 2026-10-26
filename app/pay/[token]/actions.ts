@@ -18,7 +18,7 @@ export async function payLink(token: string, tips: Record<string, number>, cardR
   const admin = createAdminClient();
   const { data: link } = await admin.from("payment_links").select("id, status, expires_at, snapshot").eq("token_hash", createHash("sha256").update(token).digest("hex")).maybeSingle();
   if (!link) return { ok: false, message: "This link doesn't work." };
-  if (link.status !== "open") return { ok: false, message: link.status === "paid" ? "This has already been paid. Thank you!" : "This link is no longer active. Ask the salon for a new one." };
+  if (link.status !== "open") return { ok: false, message: link.status === "paid" ? "This has already been paid. Thank you." : "This link is no longer active. Ask the salon for a new one." };
   if (Date.parse(link.expires_at) <= Date.now()) return { ok: false, message: "This link has expired. Ask the salon for a new one." };
   const snapshot = link.snapshot as unknown as LinkSnapshot;
   const chosen = parseTips(tips, snapshot);
@@ -35,7 +35,7 @@ export async function payLink(token: string, tips: Record<string, number>, cardR
     // charge, and it's the one that paid, so it stays.
     const { data: recorded } = await admin.from("payment_links").select("id").eq("provider_reference", charge.reference).maybeSingle();
     if (!recorded) await provider.refund(charge.reference);
-    if (error.hint === "used") return { ok: false, message: "This has already been paid. Thank you!" };
+    if (error.hint === "used") return { ok: false, message: "This has already been paid. Thank you." };
     if (error.hint === "expired") return { ok: false, message: "This link has expired. Ask the salon for a new one." };
     return { ok: false, message: "We couldn't take this payment, and you haven't been charged. Please let the salon know." };
   }

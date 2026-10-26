@@ -224,7 +224,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     let stopped = false;
     const check = async () => {
       if (document.visibilityState !== "visible" || dragRef.current) return;
-      const now = await calendarStamp();
+      // Offline, this check is skipped; the next one tries again.
+      const now = await calendarStamp().catch(() => null);
       if (!stopped && now && now !== data.stamp) router.refresh();
     };
     const timer = window.setInterval(check, LIVE_CHECK_MS);
@@ -288,9 +289,13 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const scans = useRef(0);
   useEffect(() => {
     const id = ++scans.current;
-    scanDenise(data.date).then((state) => {
-      if (state && id === scans.current) showDenise(state, data);
-    });
+    // Offline, she looks again when the calendar next changes.
+    scanDenise(data.date).then(
+      (state) => {
+        if (state && id === scans.current) showDenise(state, data);
+      },
+      () => {},
+    );
   }, [data, showDenise]);
 
   // Escape closes the panel (unless a menu or picker inside it is open).

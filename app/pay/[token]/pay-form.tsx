@@ -6,6 +6,7 @@ import { linkTotal, tipChoices } from "@/lib/payment-links";
 import { parseDollars } from "@/lib/checkout";
 import { formatPrice } from "@/lib/services";
 import { payLink, type PayResult } from "./actions";
+import { CLIENT_NO_CONNECTION, reach } from "@/lib/reach";
 
 type Tip = { kind: "none" } | { kind: "percent"; percent: number; cents: number } | { kind: "custom"; text: string };
 
@@ -25,7 +26,7 @@ export function PayForm({ token, salon, snapshot, testMode, cards }: { token: st
   if (result?.ok)
     return (
       <div className="flex flex-col gap-2" data-testid="link-paid">
-        <h1 className="font-serif text-3xl font-semibold text-ink">Paid. Thank you!</h1>
+        <h1 className="font-serif text-3xl font-semibold text-ink">Paid. Thank you.</h1>
         <p className="text-lg tabular-nums">
           {formatPrice(result.totalCents)}
           {result.tipCents > 0 ? `, including ${formatPrice(result.tipCents)} in tips` : ""}
@@ -39,7 +40,7 @@ export function PayForm({ token, salon, snapshot, testMode, cards }: { token: st
       className="flex flex-col gap-6"
       onSubmit={(e) => {
         e.preventDefault();
-        start(async () => setResult(await payLink(token, Object.fromEntries(chosen.map((t) => [t.staff_id, t.amount_cents])), card)));
+        start(async () => setResult(await reach(payLink(token, Object.fromEntries(chosen.map((t) => [t.staff_id, t.amount_cents])), card), CLIENT_NO_CONNECTION)));
       }}
     >
       <div>

@@ -13,6 +13,14 @@ export const AUTH = {
   largeFrontDesk: "e2e/.auth/large-front-desk.json",
 };
 
+// A test that takes the browser offline on purpose: Chrome logs each request
+// it couldn't send ("Failed to load resource: net::ERR_INTERNET_DISCONNECTED"),
+// which no page can stop. Only that line is let through; anything our code
+// throws (an uncaught "Failed to fetch") still fails the test.
+export function allowOfflineLogs(pageErrors: string[]) {
+  pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => e !== "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"));
+}
+
 // Fails the test if the page logs a console error or throws. In dev this
 // includes Next.js errors shown in the dev overlay, such as prerendering
 // problems.

@@ -67,7 +67,7 @@ async function Pay({ params }: { params: Promise<{ token: string }> }) {
 function Done({ salon, totalCents, tipCents }: { salon: string; totalCents: number; tipCents: number }) {
   return (
     <div className="flex flex-col gap-2" data-testid="link-paid">
-      <h1 className="font-serif text-3xl font-semibold text-ink">Paid. Thank you!</h1>
+      <h1 className="font-serif text-3xl font-semibold text-ink">Paid. Thank you.</h1>
       <p className="text-lg tabular-nums">
         {formatPrice(totalCents)}
         {tipCents > 0 ? `, including ${formatPrice(tipCents)} in tips` : ""}

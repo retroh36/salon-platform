@@ -1,6 +1,6 @@
 import type { Browser, Page } from "@playwright/test";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, visitTab, waitForHydration } from "./fixtures";
+import { allowOfflineLogs, AUTH, expect, test, visitTab, waitForHydration } from "./fixtures";
 
 // The public booking site, on a phone. Signed out, like a client.
 const SLUG = "maple-and-ash";
@@ -278,7 +278,7 @@ test("the connection drops as they book: it says so, and tapping Book again show
   const { data: log } = await admin.from("online_booking_log").select("action").eq("client_id", client!.id);
   expect(log).toEqual([{ action: "booked" }]);
   // The dropped request is the browser's one complaint.
-  pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !/ERR_INTERNET_DISCONNECTED|Failed to fetch|Failed to load resource/.test(e)));
+  allowOfflineLogs(pageErrors);
 });
 
 test("a client reschedules, then cancels, with their private link", async ({ page }) => {

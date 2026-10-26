@@ -66,7 +66,7 @@ test("sends a payment link; the client tips and pays on their phone; the checkou
     await expect(client.getByTestId("link-paid")).toContainText("$120, including $20 in tips");
     // The link works once.
     await client.reload();
-    await expect(client.getByTestId("link-paid")).toContainText("Paid. Thank you!");
+    await expect(client.getByTestId("link-paid")).toContainText("Paid. Thank you.");
   } finally {
     await phone.close();
   }

@@ -3,7 +3,7 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { onCheckout } from "./checkout-helpers";
-import { AUTH, expect, test, ui, waitForHydration, pxPerMinute, slotAt, checkIn, checkOut, moreAction, visitTab } from "./fixtures";
+import { allowOfflineLogs, AUTH, expect, test, ui, waitForHydration, pxPerMinute, slotAt, checkIn, checkOut, moreAction, visitTab } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -242,7 +242,7 @@ test.describe("front desk", () => {
     await page.context().setOffline(false);
     await checkIn(detail);
     await expect(detail.locator("[data-status]")).toHaveText(/^Checked in/);
-    pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !/ERR_INTERNET_DISCONNECTED|Failed to fetch|Failed to load resource/.test(e)));
+    allowOfflineLogs(pageErrors);
   });
 
   test("cancels with a reason, taking the visit off the calendar", async ({ page }) => {
@@ -425,6 +425,6 @@ test.describe("stylists", () => {
     await expect(block).toHaveAccessibleName(/^10am–11am/);
     expect((await appointment(mine)).appointment_items[0].starts_at).toBe(at(10).toISOString().replace(".000Z", "+00:00"));
     // Going offline is the browser's one complaint.
-    pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !/ERR_INTERNET_DISCONNECTED|Failed to fetch|Failed to load resource/.test(e)));
+    allowOfflineLogs(pageErrors);
   });
 });

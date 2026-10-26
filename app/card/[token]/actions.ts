@@ -16,7 +16,7 @@ export async function completeCardLink(token: string, cardRef: string, agreed: b
   const admin = createAdminClient();
   const link = await loadCardLink(admin, token);
   if (!link) return { ok: false, message: "This link doesn't work." };
-  if (link.status === "done") return { ok: false, message: "Your card is already saved. Thank you!" };
+  if (link.status === "done") return { ok: false, message: "Your card is already saved. Thank you." };
   if (link.status !== "open" || link.expired) return { ok: false, message: `This link is no longer active. Ask ${link.salon.name} for a new one.` };
 
   const provider = currentProvider();
@@ -40,7 +40,7 @@ export async function completeCardLink(token: string, cardRef: string, agreed: b
     // the deposit on record, so it stays.
     const { data: recorded } = deposit ? await admin.from("appointments").select("id").eq("deposit_reference", deposit.reference).maybeSingle() : { data: null };
     if (deposit && !recorded) await provider.refund(deposit.reference);
-    if (error.hint === "used") return { ok: false, message: "Your card is already saved. Thank you!" };
+    if (error.hint === "used") return { ok: false, message: "Your card is already saved. Thank you." };
     if (error.hint === "expired") return { ok: false, message: `This link has expired. Ask ${link.salon.name} for a new one.` };
     return { ok: false, message: `We couldn't save your card, and you haven't been charged. Please let ${link.salon.name} know.` };
   }

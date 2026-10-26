@@ -1,7 +1,7 @@
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { checkout, openCheckout } from "./checkout-helpers";
-import { AUTH, expect, test } from "./fixtures";
+import { allowOfflineLogs, AUTH, expect, test } from "./fixtures";
 
 // The full-screen checkout on an iPad at the front desk: a busy ticket with
 // two stylists, products by search and quick-add, editing and removing
@@ -232,7 +232,7 @@ test("the connection drops as the sale completes: it says so, and tapping again 
   const { data: sales } = await admin.from("sale_items").select("sale_id").eq("product_id", spray!.id);
   expect(new Set(sales!.map((s) => s.sale_id)).size).toBe(1);
   // The dropped request is the browser's one complaint.
-  pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !/ERR_INTERNET_DISCONNECTED|Failed to fetch|Failed to load resource/.test(e)));
+  allowOfflineLogs(pageErrors);
 });
 
 test("offline, going back keeps the checkout open and says so, so the ticket isn't lost", async ({ page, pageErrors }) => {
@@ -250,5 +250,5 @@ test("offline, going back keeps the checkout open and says so, so the ticket isn
   await expect(page).toHaveURL(`/calendar?date=${DAY}`);
   await openCheckout(page, { appointmentId });
   await expect(checkout(page).ticket).toContainText("Shine Spray");
-  pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !/ERR_INTERNET_DISCONNECTED|Failed to fetch|Failed to load resource/.test(e)));
+  allowOfflineLogs(pageErrors);
 });

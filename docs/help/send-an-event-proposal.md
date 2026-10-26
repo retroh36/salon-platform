@@ -15,6 +15,7 @@ Send the client a link to the party, prices, payment schedule and terms. They bo
 
 ## Good to know
 
+- If the client's connection drops as they tap, their page says so and asks them to try again. They're never charged twice: if it went through, trying again says so.
 - Before you send, **Proposal** shows the payment schedule as it would be if they booked today.
 - The link works for 14 days. Tap **Send it again** for a new link. The old one stops working.
 - If you change the event after sending, the client sees the new version. If they had the page open, they're asked to reload it before they can sign.

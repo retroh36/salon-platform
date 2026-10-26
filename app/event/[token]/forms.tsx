@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { primaryButton } from "@/app/book/[slug]/booking-flow";
 import { formatPrice } from "@/lib/services";
 import { acceptProposal, payShare, updateCard, type EventLinkResult } from "./actions";
+import { CLIENT_NO_CONNECTION, reach } from "@/lib/reach";
 
 type Card = { ref: string; label: string; outcome: string };
 
@@ -44,7 +45,7 @@ export function AgreeForm({ token, totalCents, depositCents, testMode, cards }: 
       className="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
-        start(async () => setResult(await acceptProposal(token, { typedName: name, agreed, cardRef: card, shownTotalCents: totalCents })));
+        start(async () => setResult(await reach(acceptProposal(token, { typedName: name, agreed, cardRef: card, shownTotalCents: totalCents }), CLIENT_NO_CONNECTION)));
       }}
     >
       <label className="flex flex-col gap-1 text-sm font-medium">
@@ -78,7 +79,7 @@ export function ShareForm({ token, shareCents, testMode, cards }: { token: strin
       className="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
-        start(async () => setResult(await payShare(token, { cardRef: card, shownCents: shareCents })));
+        start(async () => setResult(await reach(payShare(token, { cardRef: card, shownCents: shareCents }), CLIENT_NO_CONNECTION)));
       }}
     >
       {testMode && <CardPicker cards={cards} value={card} onChange={setCard} />}
@@ -104,7 +105,7 @@ export function NewCardForm({ token, dueCents, testMode, cards }: { token: strin
       className="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
-        start(async () => setResult(await updateCard(token, card)));
+        start(async () => setResult(await reach(updateCard(token, card), CLIENT_NO_CONNECTION)));
       }}
     >
       {testMode && <CardPicker cards={cards} value={card} onChange={setCard} />}

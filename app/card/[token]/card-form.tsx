@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { primaryButton } from "@/app/book/[slug]/booking-flow";
 import { formatPrice } from "@/lib/services";
 import { completeCardLink, type CardLinkResult } from "./actions";
+import { CLIENT_NO_CONNECTION, reach } from "@/lib/reach";
 
 // The policy to agree to, the card, and save (paying the deposit first,
 // when there is one). Big targets, for a phone.
@@ -28,7 +29,7 @@ export function CardForm({ token, lines, depositCents, testMode, cards }: { toke
       className="flex flex-col gap-5"
       onSubmit={(e) => {
         e.preventDefault();
-        start(async () => setResult(await completeCardLink(token, card, agreed)));
+        start(async () => setResult(await reach(completeCardLink(token, card, agreed), CLIENT_NO_CONNECTION)));
       }}
     >
       <section aria-labelledby="policy-heading" className="rounded-xl border border-line bg-surface px-4 py-4" data-testid="policy">
