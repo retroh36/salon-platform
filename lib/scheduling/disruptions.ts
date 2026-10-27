@@ -33,9 +33,10 @@ export async function reportRunningLate(supabase: Supabase, itemId: string, minu
   return { ok: true, id: data };
 }
 
-// The stylist is out from `from` to the end of that day.
-export async function reportCallOut(supabase: Supabase, staffId: string, from: Date): Promise<ReportResult> {
-  const { data, error } = await supabase.rpc("report_call_out", { p_staff_id: staffId, p_from: from.toISOString() });
+// The stylist is out from `from` to the end of that day, or until `until`
+// (coming in late).
+export async function reportCallOut(supabase: Supabase, staffId: string, from: Date, until: Date | null = null): Promise<ReportResult> {
+  const { data, error } = await supabase.rpc("report_call_out", { p_staff_id: staffId, p_from: from.toISOString(), ...(until ? { p_until: until.toISOString() } : {}) });
   const known = reportError(error?.code);
   if (known) return known;
   if (error) throw error;
@@ -47,7 +48,7 @@ export async function reportCallOut(supabase: Supabase, staffId: string, from: D
 export async function loadDisruptions(supabase: Supabase, locationId: string, date: LocalDate): Promise<Disruption[]> {
   const { data, error } = await supabase
     .from("schedule_disruptions")
-    .select("id, kind, item_id, appointment_id, staff_id, minutes, starts_at, resolved_by_action")
+    .select("id, kind, item_id, appointment_id, staff_id, minutes, starts_at, ends_at, resolved_by_action")
     .eq("location_id", locationId)
     .eq("on_date", date)
     .order("created_at");
@@ -58,7 +59,9 @@ export async function loadDisruptions(supabase: Supabase, locationId: string, da
     if (d.kind === "client_late" && d.appointment_id && d.minutes && !d.resolved_by_action) {
       disruptions.push({ id: d.id, kind: "client_late", appointmentId: d.appointment_id, minutes: d.minutes });
     }
-    if (d.kind === "call_out" && d.staff_id && d.starts_at) disruptions.push({ id: d.id, kind: "call_out", staffId: d.staff_id, from: new Date(d.starts_at) });
+    if (d.kind === "call_out" && d.staff_id && d.starts_at) {
+      disruptions.push({ id: d.id, kind: "call_out", staffId: d.staff_id, from: new Date(d.starts_at), ...(d.ends_at ? { until: new Date(d.ends_at) } : {}) });
+    }
   }
   return disruptions;
 }

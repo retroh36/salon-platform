@@ -1,6 +1,6 @@
-// Sick-day rescue (pure): a plan for every visit of a stylist who's out,
-// all day or from a time. For each visit, in order of how little it asks
-// of the client:
+// Marking a stylist out (pure): a plan for every visit of a stylist who's
+// out, all day, from a time (leaving early) or until a time (coming in
+// late). For each visit, in order of how little it asks of the client:
 //   1. the same time with a qualified stylist at the same level,
 //   2. a qualified stylist at another level at the same time, then anyone
 //      qualified up to an hour later (SHIFT_STEPS),
@@ -71,8 +71,9 @@ const SAME_DAY_OPTIONS = 4;
 export type RescueInput = {
   staffId: string;
   date: LocalDate;
-  // Out from this instant to the end of the day.
+  // Out from this instant to the end of the day, or until `until`.
   from: Date;
+  until?: Date | null;
   visits: RescueVisit[];
   stylists: RescueStylist[];
   // The stylist's length for a service: their usual time where it's
@@ -83,13 +84,14 @@ export type RescueInput = {
   days?: number;
 };
 
-const overlapsOut = (item: BookedItem, from: Date) => itemEnd(item).getTime() > from.getTime();
+const overlapsOut = (item: BookedItem, from: Date, until: Date | null) => itemEnd(item).getTime() > from.getTime() && (!until || item.start.getTime() < until.getTime());
 
-// The visits a call-out touches: the stylist's items from `from` on, by
-// start, then booked first, always in the same order.
-export function affectedVisits<T extends RescueVisit>(visits: readonly T[], staffId: string, from: Date): T[] {
+// The visits a call-out touches: the stylist's items while they're out
+// (from `from`, until `until` if they come in late), by start, then booked
+// first, always in the same order.
+export function affectedVisits<T extends RescueVisit>(visits: readonly T[], staffId: string, from: Date, until: Date | null = null): T[] {
   return visits
-    .filter((v) => v.items.some((i) => i.staffId === staffId && overlapsOut(i, from)))
+    .filter((v) => v.items.some((i) => i.staffId === staffId && overlapsOut(i, from, until)))
     .sort(
       (a, b) =>
         a.items[0].start.getTime() - b.items[0].start.getTime() ||
@@ -255,7 +257,7 @@ const sameOption = (a: RescueOption, b: RescueOption) => a.staffId === b.staffId
 
 export function planRescue(ctx: BookingContext, input: RescueInput): RescueLine[] {
   let calendar = ctx;
-  return affectedVisits(input.visits, input.staffId, input.from).map((visit): RescueLine => {
+  return affectedVisits(input.visits, input.staffId, input.from, input.until ?? null).map((visit): RescueLine => {
     if (!visit.movable) return { visit, options: [], choice: null, note: "in_chair" };
     // Options on the calendar as it is (so staff can swap clients around),
     // and those that fit around the clients placed before this one.

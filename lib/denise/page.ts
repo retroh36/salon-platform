@@ -18,7 +18,6 @@ type Where = { label: string; clientFrom?: { kind: "client" | "draft" | "sale" |
 const LABELS: [RegExp, string][] = [
   [/^\/dashboard/, "the Dashboard"],
   [/^\/my-day/, "My day"],
-  [/^\/calendar\/rescue/, "the sick-day rescue"],
   [/^\/calendar\/waitlist/, "the Waitlist"],
   [/^\/calendar/, "the Calendar"],
   [/^\/clients\/new/, "the new client form"],

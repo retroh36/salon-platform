@@ -59,10 +59,11 @@ export function IconButton({
   size = "md",
   className = "",
   children,
+  ref,
   ...props
-}: Omit<ButtonProps, "aria-label"> & { label: string }) {
+}: Omit<ButtonProps, "aria-label"> & { label: string; ref?: React.Ref<HTMLButtonElement> }) {
   return (
-    <Button aria-label={label} title={label} variant={variant} size={size} square className={className} {...props}>
+    <Button ref={ref} aria-label={label} title={label} variant={variant} size={size} square className={className} {...props}>
       {children}
     </Button>
   );

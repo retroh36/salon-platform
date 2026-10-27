@@ -18,7 +18,8 @@ import { CalendarIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRight
 import { Listbox } from "@/components/ui/listbox";
 import { Segmented } from "@/components/ui/segmented";
 import { Tabs } from "@/components/ui/tabs";
-import { isEditable, STATUS_LABELS } from "@/lib/appointments";
+import { isEditable, STATUS_LABELS, type AppointmentStatus } from "@/lib/appointments";
+import { reach } from "@/lib/reach";
 import type { DeniseRequest, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
 import { FAMILIES, FAMILY_LABELS, laneBox, layoutColumn, NOT_ARRIVED_MINUTES, quarterMarks, summaryVariants, timeRangeVariants, ZOOM_LABELS, ZOOM_PX_PER_MINUTE, ZOOMS, type CalendarZoom, type ServiceFamily } from "@/lib/calendar";
 import { LEVEL_LABELS, STAFF_LEVELS } from "@/lib/schedule-forms";
@@ -30,6 +31,8 @@ import type { Scope } from "@/lib/scheduling/series";
 import { moveBlock } from "./block-actions";
 import { BlockPanel, repeatLabel } from "./block-panel";
 import { AppointmentPanel } from "./appointment-panel";
+import { OutPanel, type OutPreview } from "./out-panel";
+import type { OutWhen } from "@/lib/rescue";
 import { approveDeniseFix, bookFromWaitlist, dismissDeniseItem, rejectDeniseFix, scanDenise, undoDeniseFix } from "./denise-actions";
 import { appendDenise, askDenise, focusDenise, hydrateDenise, startDenise, takeAdjust, useDenise } from "@/components/denise-chat/store";
 import { useDeniseShortcut } from "@/components/denise-chat/bubble";
@@ -54,6 +57,9 @@ const PINCH_STEP = 1.3;
 const WHEEL_STEP = 60;
 // How long "Undo" stays on the toast after a check-in or a no-show.
 const UNDO_MS = 10_000;
+// A status change shown before the day reloads is held at most this long
+// after it's saved (the day normally shows it well before).
+const HOLD_MS = 15_000;
 // Moves snap to 5 minutes; a click on an empty slot to the quarter hour.
 const MOVE_STEP = 5;
 const SLOT_STEP = 15;
@@ -82,7 +88,9 @@ type Selection =
   | { kind: "edit"; appointmentId: string }
   | { kind: "detail"; appointmentId: string }
   | { kind: "walk-ins" }
-  | { kind: "group"; start: BookingStart };
+  | { kind: "group"; start: BookingStart }
+  // "Mark … out" on a stylist's column (./out-panel.tsx).
+  | { kind: "out"; staffId: string; leaves: number | null };
 
 type Tab = "denise" | "details";
 
@@ -158,8 +166,16 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const linked = data.focus.appointmentId && data.appointments[data.focus.appointmentId] ? data.focus.appointmentId : null;
   // "Book" on a client's profile: a new booking for them, open on arrival.
   const [selection, setSelection] = useState<Selection>(
-    linked ? { kind: "detail", appointmentId: linked } : data.focus.book ? { kind: "book", start: data.focus.book.start, client: data.focus.book.client } : { kind: "none" },
+    linked
+      ? { kind: "detail", appointmentId: linked }
+      : data.focus.book
+        ? { kind: "book", start: data.focus.book.start, client: data.focus.book.client }
+        : data.focus.out
+          ? { kind: "out", staffId: data.focus.out.staffId, leaves: data.focus.out.leaves }
+          : { kind: "none" },
   );
+  // While "Mark … out" is open: their time out and where clients would go.
+  const [outPreview, setOutPreview] = useState<OutPreview | null>(null);
   // Denise: her view of the day (for the board's data she last looked at),
   // and what she's doing.
   const [denise, setDenise] = useState<{ state: DeniseState; for: BoardData } | null>(null);
@@ -186,7 +202,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const [tab, setTab] = useState<Tab>(linked || data.focus.book ? "details" : "denise");
   // The panel is closed until something opens it: a booking, a new
   // booking, Denise spotting something, or a question for her.
-  const [panelOpen, setPanelOpen] = useState(Boolean(linked || data.focus.book || data.focus.denise || data.focus.ask));
+  const [panelOpen, setPanelOpen] = useState(Boolean(linked || data.focus.book || data.focus.out || data.focus.denise || data.focus.ask));
   // What Denise has that hasn't been looked at in her panel yet.
   const [unseen, setUnseen] = useState<ReadonlySet<string>>(new Set());
 
@@ -223,6 +239,57 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   }, [undoable]);
   const offerUndo = (kind: "check_in" | "no_show", appointmentId: string, name?: string) =>
     setUndoable({ kind, appointmentId, name: name ?? data.appointments[appointmentId]?.client?.name.split(" ")[0] ?? "The client", at: Date.now() });
+  // A status change (check in, no-show, cancel, and their undos) shows at
+  // once, on the block and in booking details, and saves in the
+  // background; the day then reloads behind it. Each is held until the day
+  // shows it (or, if the visit changed some other way meanwhile, for
+  // HOLD_MS after saving), and put back, saying why, if the save fails:
+  // through `failed` when the caller says it itself, else on the calendar.
+  // A change made while another is still on its way keeps the one before,
+  // to go back to if it fails.
+  type ShownStatus = { to: AppointmentStatus; at: string; n: number; before?: ShownStatus };
+  const [statuses, setStatuses] = useState<Record<string, ShownStatus>>({});
+  const statusCount = useRef(0);
+  const shownStatus = (appointmentId: string) => {
+    const s = statuses[appointmentId];
+    return s && data.appointments[appointmentId] && data.appointments[appointmentId].status !== s.to ? s : null;
+  };
+  const dropStatus = (appointmentId: string, n: number, putBack = false) =>
+    setStatuses((all) => {
+      const s = all[appointmentId];
+      if (!s || s.n !== n) return all;
+      const rest = { ...all };
+      if (putBack && s.before) {
+        rest[appointmentId] = s.before;
+        const back = s.before.n;
+        window.setTimeout(() => dropStatus(appointmentId, back), HOLD_MS);
+      }
+      else delete rest[appointmentId];
+      return rest;
+    });
+  // Once the day shows a change, it's the day's to show.
+  const [statusData, setStatusData] = useState(data);
+  if (statusData !== data) {
+    setStatusData(data);
+    const left = Object.entries(statuses).filter(([id, s]) => data.appointments[id] && data.appointments[id].status !== s.to);
+    if (left.length !== Object.keys(statuses).length) setStatuses(Object.fromEntries(left));
+  }
+  async function setStatusNow(appointmentId: string, to: AppointmentStatus, save: () => Promise<{ ok: boolean; message?: string }>, failed?: (message: string) => void): Promise<boolean> {
+    const n = ++statusCount.current;
+    setStatuses((all) => ({ ...all, [appointmentId]: { to, at: new Date().toISOString(), n, before: all[appointmentId] } }));
+    const result = await reach(save());
+    if (result.ok) {
+      startTransition(() => router.refresh());
+      window.setTimeout(() => dropStatus(appointmentId, n), HOLD_MS);
+      return true;
+    }
+    dropStatus(appointmentId, n, true);
+    setUndoable((u) => (u?.appointmentId === appointmentId ? null : u));
+    const message = result.message ?? "That didn't save. Try again.";
+    if (failed) failed(message);
+    else setNotice(`That didn't save for ${data.appointments[appointmentId]?.client?.name.split(" ")[0] ?? "the client"}, so it's back as it was. ${message}`);
+    return false;
+  }
   // The tooltip for a short block: its details and where it is.
   const [hint, setHint] = useState<{ id: string; details: string[]; rect: DOMRect } | null>(null);
   // A drag of a repeating visit, waiting for "this / following / all".
@@ -456,8 +523,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     router.refresh();
   }
   const firstNameOf = (staffId: string) => data.columns.find((c) => c.staffId === staffId)?.firstName ?? "the stylist";
-  const markOut = (staffId: string) =>
-    trigger({ action: "report_out", date: data.date, staffId }, `Looking at ${firstNameOf(staffId)}'s clients${data.date === data.today ? " for the rest of today" : ""}…`);
+  const openOut = (staffId: string) => select({ kind: "out", staffId, leaves: null });
+  const markOut = (staffId: string, when: OutWhen) =>
+    trigger({ action: "report_out", date: data.date, staffId, when }, `Looking at ${firstNameOf(staffId)}'s clients…`);
   const reportLate = (itemId: string, minutes: number) => trigger({ action: "report_late", date: data.date, itemId, minutes }, "Checking what that pushes into…");
   const onCanceled = (appointmentId: string) => trigger({ action: "canceled", date: data.date, appointmentId }, "Looking at the time that opened up…");
   // Following a link from the Dashboard (the panel and column are set up
@@ -467,8 +535,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   useEffect(() => {
     if (followed.current) return;
     followed.current = true;
-    const { staffId, denise: openDenise, appointmentId, ask: question, book } = data.focus;
-    if (!staffId && !openDenise && !appointmentId && !question && !book) return;
+    const { staffId, denise: openDenise, appointmentId, ask: question, book, out } = data.focus;
+    if (!staffId && !openDenise && !appointmentId && !question && !book && !out) return;
     if (staffId) columnRefs.current.get(staffId)?.scrollIntoView({ inline: "center", block: "nearest" });
     if (staffId) setTimeout(() => setFocusedStaff(null), 2500);
     if (question) queueMicrotask(() => ask(question));
@@ -488,12 +556,18 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const highlighted = new Set(previewConflict?.itemIds ?? []);
   // Copies of the moved blocks at their new places, laid out with the
   // column's blocks so nothing overlaps.
+  // The same for "Mark … out": where each client would move that day.
+  const outShown = panelOpen && selection.kind === "out" && outPreview?.staffId === selection.staffId ? outPreview : null;
+  const ghostMoves = [
+    ...(previewOption?.moves ?? []).map((m) => ({ itemId: m.itemId, staffId: m.to.staffId, minute: m.to.minute, move: m as FixMove | undefined })),
+    ...(outShown?.moves ?? []).map((m) => ({ ...m, move: undefined })),
+  ];
   const fixGhosts = (staffId: string): Placed[] =>
-    (previewOption?.moves ?? []).flatMap((m) => {
+    ghostMoves.flatMap((m) => {
       const b = blocks.find((x) => x.itemId === m.itemId);
-      if (!b || m.to.staffId !== staffId) return [];
-      const shift = m.to.minute - b.start;
-      return [{ ...b, itemId: `ghost:${b.itemId}`, staffId, start: b.start + shift, end: b.end + shift, segments: [], ghost: true, move: m }];
+      if (!b || m.staffId !== staffId) return [];
+      const shift = m.minute - b.start;
+      return [{ ...b, itemId: `ghost:${b.itemId}`, staffId, start: b.start + shift, end: b.end + shift, segments: [], ghost: true, move: m.move }];
     });
 
   // Stylists who do any service in the chosen department.
@@ -505,17 +579,28 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const ordered = (list: ColumnData[]) => (savedOrder ? [...list].sort((a, b) => savedOrder.indexOf(a.staffId) - savedOrder.indexOf(b.staffId)) : list);
   const inView = ordered(viewColumns(data.columns, view, data.views, offersFamily));
 
-  const placed = (b: BlockData): BlockData => {
+  const placed = (block: BlockData): BlockData => {
+    const shown = shownStatus(block.appointmentId);
+    const b = shown ? { ...block, status: shown.to } : block;
     const m = moves[b.itemId];
     if (!m) return b;
     const shift = m.start - b.start;
     return { ...b, staffId: m.staffId, start: b.start + shift, end: b.end + shift, segments: b.segments.map((s) => ({ ...s, start: s.start + shift, end: s.end + shift })) };
   };
-  const blocks = data.blocks.map(placed);
+  // Canceled visits leave the calendar.
+  const blocks = data.blocks.map(placed).filter((b) => b.status !== "canceled");
   // Booking details with the same moves, so it never shows the old time
   // while a move is saving.
   const detailOf = (appointmentId: string): AppointmentDetail => {
-    const a = data.appointments[appointmentId];
+    const saved = data.appointments[appointmentId];
+    const shown = shownStatus(appointmentId);
+    const a = shown
+      ? {
+          ...saved,
+          status: shown.to,
+          checkedInAt: shown.to === "checked_in" ? shown.at : shown.to === "booked" || shown.to === "confirmed" ? null : saved.checkedInAt,
+        }
+      : saved;
     if (!a.items.some((i) => moves[i.id])) return a;
     const items = a.items.map((i) => {
       const m = moves[i.id];
@@ -530,7 +615,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // client to.
   // Booked with a client, or at an event: on the calendar even on a day off.
   const off = offColumns(inView, new Set([...data.blocks.map((b) => b.staffId), ...data.timeBlocks.filter((b) => b.kind === "event").map((b) => b.staffId)]));
-  const keep = new Set([data.focus.staffId, ...(previewOption?.moves ?? []).map((m) => m.to.staffId)]);
+  const keep = new Set([data.focus.staffId, ...ghostMoves.map((m) => m.staffId), outShown?.staffId]);
   const hidden = showOff ? new Set<string>() : new Set(off.filter((c) => !keep.has(c.staffId)).map((c) => c.staffId));
   const shownColumns = inView.filter((c) => !hidden.has(c.staffId));
   const columns = columnDrag ? moveItem(shownColumns, shownColumns.findIndex((c) => c.staffId === columnDrag.staffId), columnDrag.to) : shownColumns;
@@ -996,7 +1081,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         )}
                         {!squeezed && c.working && data.date >= data.today && (me.canBook || me.staffId === c.staffId) && (
                           <div className="absolute right-1 bottom-1">
-                            <OutMenu column={c} date={data.date} today={data.today} onMarkOut={markOut} canRescue={me.canBook} />
+                            <OutMenu column={c} self={me.staffId === c.staffId} onMarkOut={openOut} />
                           </div>
                         )}
                       </div>
@@ -1063,6 +1148,21 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                             <span className="sr-only"> for {c.name}</span>
                           </div>
                         ))}
+
+                        {outShown?.staffId === c.staffId && (
+                          <div
+                            data-out-preview
+                            aria-hidden
+                            className="pointer-events-none absolute inset-x-0 z-[25] animate-fade-in"
+                            style={{
+                              top: y(Math.max(outShown.from, range.start)),
+                              height: ((outShown.until ?? range.end) - Math.max(outShown.from, range.start)) * PX_PER_MINUTE,
+                              backgroundImage: "repeating-linear-gradient(135deg, rgb(23 39 59 / 0.04) 0 6px, rgb(23 39 59 / 0.14) 6px 12px)",
+                            }}
+                          >
+                            <span className="absolute top-1 right-1 rounded-sm border border-line bg-surface px-1.5 py-0.5 text-xs font-medium text-ink">{outShown.label}</span>
+                          </div>
+                        )}
 
                         {timeBlocks
                           .filter((b) => b.staffId === c.staffId)
@@ -1198,10 +1298,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             onClick={() => {
               const { kind, appointmentId } = undoable;
               setUndoable(null);
-              startTransition(async () => {
-                const result = kind === "check_in" ? await undoVisitCheckIn(appointmentId) : await undoVisitNoShow(appointmentId);
-                if (!result.ok) setNotice(result.message);
-              });
+              setStatusNow(appointmentId, "booked", () => (kind === "check_in" ? undoVisitCheckIn(appointmentId) : undoVisitNoShow(appointmentId)));
             }}
           >
             Undo
@@ -1219,6 +1316,30 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             panelOpen ? "visible translate-x-0" : "invisible translate-x-full"
           }`}
         >
+          {selection.kind === "out" ? (
+            <OutPanel
+              key={`${selection.staffId}:${data.date}`}
+              staffId={selection.staffId}
+              firstName={me.staffId === selection.staffId && !me.canBook ? "You" : firstNameOf(selection.staffId)}
+              date={data.date}
+              today={data.today}
+              timeZone={data.timeZone}
+              canPlan={me.canBook}
+              hours={workingHours(data.columns.find((c) => c.staffId === selection.staffId), range)}
+              leaves={selection.leaves}
+              onPreview={setOutPreview}
+              onClose={() => leave(closeDetails)}
+              onApplied={() => router.refresh()}
+              onMarkOutOnly={(when) => {
+                // Denise marks them out and offers her fixes, one client at a
+                // time, in her tab.
+                leave(() => {
+                  setSelection({ kind: "none" });
+                  markOut(selection.staffId, when);
+                });
+              }}
+            />
+          ) : (
           <Tabs
             label="Assistant"
             value={tab}
@@ -1263,16 +1384,14 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                 }}
                 onNoShow={(n) => {
                   setDismissed((all) => new Set(all).add(n.id));
-                  startTransition(async () => {
-                    const result = await changeVisitStatus(n.appointmentId, "no_show");
-                    if (result.ok) offerUndo("no_show", n.appointmentId, n.clientName.split(" ")[0]);
-                    else setOutcome({ message: result.message ?? "That didn't work. Try again from the booking.", error: true, undoActionId: null });
-                    if (!result.ok)
-                      setDismissed((all) => {
-                        const next = new Set(all);
-                        next.delete(n.id);
-                        return next;
-                      });
+                  offerUndo("no_show", n.appointmentId, n.clientName.split(" ")[0]);
+                  setStatusNow(n.appointmentId, "no_show", () => changeVisitStatus(n.appointmentId, "no_show"), (message) => {
+                    setOutcome({ message, error: true, undoActionId: null });
+                    setDismissed((all) => {
+                      const next = new Set(all);
+                      next.delete(n.id);
+                      return next;
+                    });
                   });
                 }}
                 onBookWaitlist={(o, m) => decide(() => bookFromWaitlist(m.entryId, o.staffId, data.date, m.startMinute), null)}
@@ -1304,6 +1423,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                 // eslint-disable-next-line @next/next/no-location-assign-relative-destination
                 onCheckout={() => window.location.assign(`/checkout/new?appointment=${selection.appointmentId}&from=${encodeURIComponent(window.location.pathname + window.location.search)}`)}
                 onOpenVisit={(appointmentId) => select({ kind: "detail", appointmentId })}
+                onStatusNow={setStatusNow}
                 onCheckedIn={(appointmentId) => offerUndo("check_in", appointmentId)}
                 onNoShow={(appointmentId) => offerUndo("no_show", appointmentId)}
                 onMoved={(date, appointmentId, message) => {
@@ -1384,6 +1504,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               </div>
             )}
           </Tabs>
+          )}
         </aside>
       </guard.Provider>
 
@@ -1643,51 +1764,78 @@ function BlockHint({ id, details, rect }: { id: string; details: string[]; rect:
   );
 }
 
-// "Out for the day" on a stylist's column.
-const MENU_WIDTH = 340;
+// A stylist's working day on the calendar: from the first bookable minute
+// to the last (the calendar's own hours if none).
+function workingHours(column: ColumnData | undefined, range: { start: number; end: number }) {
+  const free = (m: number) => !column?.offHours.some((o) => o.start <= m && m < o.end);
+  let start = range.start;
+  while (start < range.end && !free(start)) start += 15;
+  let end = range.end;
+  while (end > start && !free(end - 1)) end -= 15;
+  return start < end ? { start, end } : range;
+}
+
+// The stylist's column menu: "Mark … out…", which opens the panel to
+// choose when and plan where their clients go.
 const MENU_MARGIN = 8;
 
-function OutMenu({ column, date, today, onMarkOut, canRescue }: { column: ColumnData; date: string; today: string; onMarkOut: (staffId: string) => void; canRescue: boolean }) {
+function OutMenu({ column, self, onMarkOut }: { column: ColumnData; self: boolean; onMarkOut: (staffId: string) => void }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const popover = useRef<HTMLDivElement>(null);
-  // Where the popover sits: just below the stylist's header (never over
-  // their name), right-aligned to it, kept inside the screen.
-  const [place, setPlace] = useState<{ top: number; left: number } | null>(null);
-  const restOfDay = date === today;
+  const menu = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const byKeys = useRef(false);
+  // Just below the stylist's header, right-aligned to it, kept on screen.
+  const [place, setPlace] = useState<{ top: number; right: number } | null>(null);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e: PointerEvent) => {
-      if (!root.current?.contains(e.target as Node) && !popover.current?.contains(e.target as Node)) setOpen(false);
+      if (!root.current?.contains(e.target as Node) && !menu.current?.contains(e.target as Node)) setOpen(false);
     };
     const position = () => {
       const header = root.current?.closest("[data-column-header]")?.getBoundingClientRect();
       if (!header) return;
-      const width = Math.min(MENU_WIDTH, window.innerWidth - 2 * MENU_MARGIN);
-      const left = Math.min(Math.max(header.right - width, MENU_MARGIN), window.innerWidth - width - MENU_MARGIN);
-      setPlace({ top: header.bottom + 6, left });
+      setPlace({ top: header.bottom + 6, right: Math.max(MENU_MARGIN, window.innerWidth - header.right) });
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      setOpen(false);
     };
     position();
+    document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onDown);
     window.addEventListener("resize", position);
     window.addEventListener("scroll", position, true);
     return () => {
+      document.removeEventListener("keydown", onKey);
       document.removeEventListener("pointerdown", onDown);
       window.removeEventListener("resize", position);
       window.removeEventListener("scroll", position, true);
     };
   }, [open]);
-
-  // Denise takes it from here, in her panel (and says if it didn't work).
-  function markOut() {
+  useEffect(() => {
+    if (open && place && byKeys.current) menu.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
+  }, [open, place]);
+  const close = () => {
     setOpen(false);
-    onMarkOut(column.staffId);
-  }
+    button.current?.focus();
+  };
 
   return (
-    <div ref={root} className="relative" onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
-      <IconButton label={`More for ${column.name}`} size="xs" aria-expanded={open} onClick={() => setOpen(!open)}>
+    <div ref={root} className="relative">
+      <IconButton
+        ref={button}
+        label={`More for ${column.name}`}
+        size="xs"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={(e) => {
+          byKeys.current = e.detail === 0;
+          setOpen(!open);
+        }}
+      >
         <MoreIcon className="size-4" />
       </IconButton>
       {open &&
@@ -1695,31 +1843,30 @@ function OutMenu({ column, date, today, onMarkOut, canRescue }: { column: Column
         // On the page itself: the calendar grid would clip it.
         createPortal(
           <div
-            ref={popover}
-            onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
-            role="dialog"
+            ref={menu}
+            role="menu"
             aria-label={`${column.firstName}'s day`}
-            className="fixed z-[60] flex origin-top-right animate-pop-in flex-col gap-3 rounded-lg border border-line bg-surface p-4 text-sm shadow-lift"
-            style={{ top: place.top, left: place.left, width: `min(${MENU_WIDTH}px, calc(100vw - ${2 * MENU_MARGIN}px))` }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                close();
+              }
+            }}
+            className="fixed z-[60] flex min-w-44 origin-top-right animate-pop-in flex-col rounded-lg border border-line bg-surface p-1.5 shadow-lift"
+            style={{ top: place.top, right: place.right }}
           >
-            <p className="text-ink">
-              {canRescue
-                ? `${column.firstName} is out? Plan the rescue to see where every client goes and apply it all at once, or mark them out and Denise suggests fixes one at a time.`
-                : `Mark ${column.firstName} out ${restOfDay ? "for the rest of the day" : "for the day"}? Denise will find new places for ${column.firstName}'s clients.`}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {canRescue && (
-                <a href={`/calendar/rescue?staff=${column.staffId}&date=${date}`} className={buttonClass("primary", "sm", "whitespace-nowrap")}>
-                  Plan the rescue
-                </a>
-              )}
-              <Button variant={canRescue ? "secondary" : "primary"} size="sm" onClick={markOut} className="whitespace-nowrap">
-                {restOfDay ? "Out for the rest of the day" : "Out for the day"}
-              </Button>
-              <Button size="sm" onClick={() => setOpen(false)} className="whitespace-nowrap">
-                Cancel
-              </Button>
-            </div>
+            <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm whitespace-nowrap text-ink transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:bg-sunken focus-visible:outline-none"
+              onClick={() => {
+                setOpen(false);
+                onMarkOut(column.staffId);
+              }}
+            >
+              {self ? "Mark myself out…" : `Mark ${column.firstName} out…`}
+            </button>
           </div>,
           document.body,
         )}

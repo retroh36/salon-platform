@@ -21,4 +21,4 @@ Ask for time off. Managers and owners can also add approved time off for anyone.
 - Only approved time off blocks bookings.
 - You can **Withdraw** your own request while it's still pending.
 - Time off a manager adds is approved straight away.
-- If a stylist is out unexpectedly today, see "Mark a stylist out for the day" so Denise can move their clients.
+- If a stylist is out unexpectedly today, see "Mark a stylist out" so Denise can plan where their clients go.

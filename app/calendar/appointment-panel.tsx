@@ -12,7 +12,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { PatchTestForm } from "@/app/clients/patch-test-form";
 import { ClientInsightLine } from "@/components/client-insight-line";
 import { VisitPhotosTab } from "@/components/visit-photos";
-import { ACTION_LABELS, allowedActions, CANCEL_REASONS, canEditNotes, isEditable, MAX_NOTES, STATUS_LABELS, type AppointmentAction, type AppointmentStatus } from "@/lib/appointments";
+import { ACTION_LABELS, ACTION_STATUS, allowedActions, CANCEL_REASONS, canEditNotes, cancelReason, isEditable, MAX_NOTES, STATUS_LABELS, type AppointmentAction, type AppointmentStatus } from "@/lib/appointments";
 import type { ChecklistItem } from "@/lib/client-checks";
 import { nextStep, timerState, timerStatus, visitStatusText } from "@/lib/visit-times";
 import { CardLinkButton, FeeControls } from "@/components/policy-controls";
@@ -44,6 +44,7 @@ export function AppointmentPanel({
   onCanceled,
   onCheckout,
   onOpenVisit,
+  onStatusNow,
   onCheckedIn,
   onNoShow,
   onMoved,
@@ -65,6 +66,9 @@ export function AppointmentPanel({
   onCheckout: () => void;
   // Open another guest's visit in the same group.
   onOpenVisit: (appointmentId: string) => void;
+  // A status change for this visit: shown at once, saved in the
+  // background, and put back (saying why, through `failed`) if it fails.
+  onStatusNow: (appointmentId: string, to: AppointmentStatus, save: () => Promise<{ ok: boolean; message?: string }>, failed?: (message: string) => void) => Promise<boolean>;
   // Just checked in from here: the calendar offers Undo for a few seconds.
   onCheckedIn: (appointmentId: string) => void;
   // Just marked a no-show from here: the calendar offers Undo too.
@@ -104,6 +108,26 @@ export function AppointmentPanel({
 
   function run(action: AppointmentAction, reason = "", detail = "", scope: Scope | "group" = "this") {
     setMessage(null);
+    // This visit only: on screen at once, saved behind it.
+    if (scope === "this" && action !== "check_out") {
+      const save = () => changeVisitStatus(appointment.id, action, reason, detail);
+      if (action === "check_in") {
+        onCheckedIn(appointment.id);
+        onStatusNow(appointment.id, "checked_in", save, setMessage);
+      } else if (action === "no_show") {
+        setConfirmingNoShow(false);
+        onNoShow(appointment.id);
+        onStatusNow(appointment.id, "no_show", save, setMessage);
+      } else {
+        // The reason is checked here, while the form is still open.
+        if (!cancelReason(reason, detail)) return setMessage(reason === "Other" ? "Say why it was canceled." : "Choose a reason.");
+        // Canceled visits leave the calendar; once it's saved, Denise looks
+        // at the time freed (the calendar says so if it didn't save).
+        onClose();
+        onStatusNow(appointment.id, ACTION_STATUS[action], save).then((ok) => ok && onCanceled(appointment.id));
+      }
+      return;
+    }
     startTransition(async () => {
       const result = await reach(
         scope === "this"
@@ -135,28 +159,22 @@ export function AppointmentPanel({
   // A manager or owner, past a patch test the salon requires.
   function overrideCheckIn(reason: string) {
     setMessage(null);
-    startTransition(async () => {
-      const result = await reach(checkInWithPatchOverride(appointment.id, reason));
-      if (!result.ok) return setMessage(result.message);
-      setConfirmingCheckIn(false);
-      onCheckedIn(appointment.id);
+    setConfirmingCheckIn(false);
+    onCheckedIn(appointment.id);
+    onStatusNow(appointment.id, "checked_in", () => checkInWithPatchOverride(appointment.id, reason), (m) => {
+      setMessage(m);
+      setConfirmingCheckIn(true);
     });
   }
 
   function undoCheckIn() {
     setMessage(null);
-    startTransition(async () => {
-      const result = await reach(undoVisitCheckIn(appointment.id));
-      if (!result.ok) setMessage(result.message);
-    });
+    onStatusNow(appointment.id, "booked", () => undoVisitCheckIn(appointment.id), setMessage);
   }
 
   function undoNoShow() {
     setMessage(null);
-    startTransition(async () => {
-      const result = await reach(undoVisitNoShow(appointment.id));
-      if (!result.ok) setMessage(result.message);
-    });
+    onStatusNow(appointment.id, "booked", () => undoVisitNoShow(appointment.id), setMessage);
   }
 
   function primary() {

@@ -324,7 +324,9 @@ export async function changeVisitStatus(
   }
   // Denise learns from the visit once the response has gone.
   if (action === "check_out") after(() => recomputeForVisit(createAdminClient(), appointmentId));
-  refresh();
+  // No reload of the calendar here: it shows the change at once and loads
+  // the day again in the background (setStatusNow in board.tsx), so the
+  // answer comes back as soon as it's saved.
   return { ok: true };
 }
 
@@ -352,7 +354,7 @@ export async function undoVisitCheckIn(appointmentId: string): Promise<ActionRes
     };
     return { ok: false, message: messages[result.error] };
   }
-  refresh();
+  // Shown at once on the calendar, which reloads in the background.
   return { ok: true };
 }
 
@@ -374,7 +376,7 @@ export async function undoVisitNoShow(appointmentId: string): Promise<ActionResu
     };
     return { ok: false, message: messages[result.error] };
   }
-  refresh();
+  // Shown at once on the calendar, which reloads in the background.
   return { ok: true };
 }
 
@@ -395,7 +397,7 @@ export async function checkInWithPatchOverride(appointmentId: string, reason: st
     };
     return { ok: false, message: messages[result.error] };
   }
-  refresh();
+  // Shown at once on the calendar, which reloads in the background.
   return { ok: true };
 }
 
@@ -594,7 +596,11 @@ export async function moveVisitItemScoped(input: { itemId: string; staffId: stri
 
 // Cancels or marks a series visit: this one, this and following, or all.
 export async function changeVisitStatusScoped(appointmentId: string, action: AppointmentAction, scope: Scope, reason = "", detail = ""): Promise<ActionResult & { message?: string }> {
-  if (scope === "this") return changeVisitStatus(appointmentId, action, reason, detail);
+  if (scope === "this") {
+    const result = await changeVisitStatus(appointmentId, action, reason, detail);
+    refresh();
+    return result;
+  }
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
   if (!isUuid(appointmentId) || !(action in ACTION_LABELS)) return { ok: false, message: "That appointment no longer exists." };

@@ -518,7 +518,7 @@ const CASES: Case[] = [
     },
     check: (a, f) => (has(a, f.first) || /\b(mon|tue|wed|thu|fri|sat|sun)/i.test(a) ? null : "should give that client's next visit"),
   },
-  howToCase("How do I move all of a sick stylist's clients at once?", "front_desk", "Plan a sick-day rescue", says(/plan the rescue|apply all/i, "should mention Plan the rescue or Apply all")),
+  howToCase("How do I move all of a sick stylist's clients at once?", "front_desk", "Mark a stylist out", says(/mark .* out|apply plan/i, "should mention Mark … out or Apply plan")),
   howToCase("A client wants to redeem their points for a free gloss. How do I do that?", "front_desk", "Use a reward at checkout", says(/reward/i, "should mention Rewards")),
   howToCase("How do I send a client a link to pay on their phone?", "front_desk", "Send a payment link", says(/link/i, "should mention the payment link")),
   howToCase("How do I block off my lunch?", "stylist", "Block time", says(/block|lunch/i, "should mention blocking time")),

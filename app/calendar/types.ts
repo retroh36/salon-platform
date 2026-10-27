@@ -213,5 +213,13 @@ export type BoardData = {
   // What a link asked to show (from the Dashboard): a stylist's column,
   // Denise's panel, a booking, or a question for Denise.
   // book: "Book" on a client's profile (`?book=`), a new booking for them.
-  focus: { staffId: string | null; denise: boolean; appointmentId: string | null; ask: string | null; book: { client: ClientOption; start: BookingStart } | null };
+  focus: {
+    staffId: string | null;
+    denise: boolean;
+    appointmentId: string | null;
+    ask: string | null;
+    book: { client: ClientOption; start: BookingStart } | null;
+    // ?out=<staff>[&leaves=13:00]: the "Mark … out" panel (from Denise or Team).
+    out: { staffId: string; leaves: number | null } | null;
+  };
 };

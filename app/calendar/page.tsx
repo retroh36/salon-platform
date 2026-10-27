@@ -22,7 +22,7 @@ import { describeClient } from "@/lib/insights/describe";
 import { loadClientInsights, loadDurations } from "@/lib/insights/read";
 import { loadMembershipsByClient, type ClientMembership } from "@/lib/memberships-load";
 import { loadPackagesByClient, withPackages } from "@/lib/packages";
-import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, todayIn, toLocal, WEEKDAYS, type LocalDate } from "@/lib/scheduling/time";
+import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, parseTime, todayIn, toLocal, WEEKDAYS, type LocalDate } from "@/lib/scheduling/time";
 import { visitWarnings } from "@/lib/client-checks";
 import { fullName, sortForCalendar } from "@/lib/staff";
 import { CalendarBoard } from "./board";
@@ -54,7 +54,13 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   // Read before the calendar, so a change made while it loads still shows
   // as new.
   const stamp = await loadCalendarStamp(supabase, me.location.id);
-  const [staffResult, itemsResult, servicesResult, resourcesResult, location, viewsResult] = await Promise.all([
+  // "Book" on a client's profile: the booking starts with them.
+  const bookId = typeof params.book === "string" && isUuid(params.book) ? params.book : null;
+  // The day loads in three rounds, each all at once: what needs only who's
+  // signed in, then what needs the day's visits and team, then what needs
+  // the visits put together. (One query after another, each a trip to the
+  // database, made the calendar slow to load and to reload.)
+  const [staffResult, itemsResult, servicesResult, resourcesResult, location, viewsResult, products, timeBlocks, { data: business }, { data: bookRow }] = await Promise.all([
     // Everyone in the business, for "booked by" names; columns are this location's.
     supabase.from("staff").select("id, first_name, last_name, role, level, color, is_active, location_id, calendar_position"),
     supabase
@@ -73,6 +79,11 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     loadLocationSchedule(supabase, me.location),
     // Shared views and this person's own (RLS).
     supabase.from("calendar_views").select("id, name, staff_ids, owner_staff_id").eq("location_id", me.location.id).order("name"),
+    loadBackBarProducts(supabase),
+    loadBlocks(supabase, me.location.id),
+    // Who may write their own messages to clients (owners always).
+    supabase.from("businesses").select("free_text_roles").eq("id", me.business_id).single(),
+    bookId ? supabase.from("clients").select("id, first_name, last_name, phone, allergies").eq("id", bookId).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   if (staffResult.error) throw staffResult.error;
   if (viewsResult.error) throw viewsResult.error;
@@ -81,7 +92,13 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   if (resourcesResult.error) throw resourcesResult.error;
 
   const items = itemsResult.data;
-  const [formulaResult, products, timeBlocks] = await Promise.all([
+  // Events holding time today (those this person can see), and how many
+  // visits each series on the day has.
+  const eventIds = [...new Set(timeBlocks.filter((b) => b.eventId && occurrences(b, date, date).length).map((b) => b.eventId!))];
+  const seriesIds = [...new Set(items.map((i) => i.appointment.series_id).filter((id): id is string => !!id))];
+  const team = staffResult.data.filter((s) => s.is_active && s.location_id === me.location.id);
+  const teamIds = team.map((s) => s.id);
+  const [formulaResult, eventsResult, seriesResult, offers, schedules, timings, learned] = await Promise.all([
     items.length
       ? supabase
           .from("client_formulas")
@@ -89,36 +106,20 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
           .in("appointment_item_id", items.map((i) => i.id))
           .order("created_at")
       : Promise.resolve({ data: [], error: null }),
-    loadBackBarProducts(supabase),
-    loadBlocks(supabase, me.location.id),
-  ]);
-  if (formulaResult.error) throw formulaResult.error;
-
-  // Events holding time today (those this person can see).
-  const eventIds = [...new Set(timeBlocks.filter((b) => b.eventId && occurrences(b, date, date).length).map((b) => b.eventId!))];
-  const events = new Map<string, { id: string; title: string; travelMinutes: number }>();
-  if (eventIds.length) {
-    const { data, error } = await supabase.from("events").select("id, title, on_location, travel_minutes").in("id", eventIds);
-    if (error) throw error;
-    for (const e of data) events.set(e.id, { id: e.id, title: e.title, travelMinutes: e.on_location ? e.travel_minutes : 0 });
-  }
-
-  // How many visits each series on the day has.
-  const seriesIds = [...new Set(items.map((i) => i.appointment.series_id).filter((id): id is string => !!id))];
-  const seriesCounts = new Map<string, number>();
-  if (seriesIds.length) {
-    const { data, error } = await supabase.from("appointments").select("series_id").in("series_id", seriesIds).neq("status", "canceled");
-    if (error) throw error;
-    for (const r of data) seriesCounts.set(r.series_id!, (seriesCounts.get(r.series_id!) ?? 0) + 1);
-  }
-  const team = staffResult.data.filter((s) => s.is_active && s.location_id === me.location.id);
-  const teamIds = team.map((s) => s.id);
-  const [offers, schedules, timings, learned] = await Promise.all([
+    eventIds.length ? supabase.from("events").select("id, title, on_location, travel_minutes").in("id", eventIds) : Promise.resolve({ data: [], error: null }),
+    seriesIds.length ? supabase.from("appointments").select("series_id").in("series_id", seriesIds).neq("status", "canceled") : Promise.resolve({ data: [], error: null }),
     loadOffers(supabase, teamIds),
     loadStaffSchedules(supabase, teamIds, date, date),
     loadStaffTimings(supabase, teamIds),
     loadDurations(supabase, me.business_id, teamIds),
   ]);
+  if (formulaResult.error) throw formulaResult.error;
+  if (eventsResult.error) throw eventsResult.error;
+  if (seriesResult.error) throw seriesResult.error;
+  const events = new Map<string, { id: string; title: string; travelMinutes: number }>();
+  for (const e of eventsResult.data) events.set(e.id, { id: e.id, title: e.title, travelMinutes: e.on_location ? e.travel_minutes : 0 });
+  const seriesCounts = new Map<string, number>();
+  for (const r of seriesResult.data) seriesCounts.set(r.series_id!, (seriesCounts.get(r.series_id!) ?? 0) + 1);
 
   // A column for everyone who takes clients, or has any that day.
   const busyToday = new Set(items.map((i) => i.staff_id));
@@ -282,63 +283,44 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       start: fromLocal(date, Math.min(...a.items.map((i) => i.start)), tz) ?? dayStart,
       items: a.items.map((i) => ({ serviceId: i.serviceId, start: fromLocal(date, i.start, tz) ?? dayStart })),
     }));
-  for (const [id, w] of await visitWarnings(supabase, me.business_id, toCheck, tz)) appointments[id].warnings = w;
 
   // The cancellation policy on each visit (front of house): a card or
   // deposit still needed, the client's strikes, a no-show's fee.
-  if (canBook(me.role)) {
-    const rows = new Map(items.map((row) => [row.appointment_id, row.appointment]));
-    const visits = Object.values(appointments)
-      .filter((a) => a.client)
-      .map((a) => ({
-        id: a.id,
-        clientId: a.client!.id,
-        status: a.status,
-        serviceIds: a.items.map((i) => i.serviceId),
-        staffIds: [...new Set(a.items.map((i) => i.staffId))],
-        visitCents: a.items.reduce((sum, i) => sum + i.priceCents, 0),
-        serviceDepositCents: rows.get(a.id)?.deposit_cents ?? 0,
-        depositPaidCents: rows.get(a.id)?.deposit_paid_cents ?? 0,
-        bookedAt: rows.get(a.id)?.created_at ?? "",
-        startsAt: rows.get(a.id)?.starts_at ?? "",
-      }));
-    for (const [id, p] of await loadVisitPolicies(supabase, me.business_id, me.role, visits)) appointments[id].policy = p;
-  }
+  const rows = new Map(items.map((row) => [row.appointment_id, row.appointment]));
+  const policyVisits = canBook(me.role)
+    ? Object.values(appointments)
+        .filter((a) => a.client)
+        .map((a) => ({
+          id: a.id,
+          clientId: a.client!.id,
+          status: a.status,
+          serviceIds: a.items.map((i) => i.serviceId),
+          staffIds: [...new Set(a.items.map((i) => i.staffId))],
+          visitCents: a.items.reduce((sum, i) => sum + i.priceCents, 0),
+          serviceDepositCents: rows.get(a.id)?.deposit_cents ?? 0,
+          depositPaidCents: rows.get(a.id)?.deposit_paid_cents ?? 0,
+          bookedAt: rows.get(a.id)?.created_at ?? "",
+          startsAt: rows.get(a.id)?.starts_at ?? "",
+        }))
+    : null;
 
-  // The sale each checked-out visit was paid on (front of house only: RLS).
   const checkedOut = Object.values(appointments).filter((a) => a.status === "completed").map((a) => a.id);
-  if (checkedOut.length) {
-    const { data: sales, error: salesError } = await supabase.from("sales").select("id, appointment_id").in("appointment_id", checkedOut).neq("status", "voided").order("created_at");
-    if (salesError) throw salesError;
-    for (const s of sales) if (s.appointment_id) appointments[s.appointment_id].saleId = s.id;
-  }
-
-  // What's happened to each visit (front of house only: RLS): clients a
-  // manager or owner checked in without the patch test the salon requires,
-  // and why; check-ins taken back.
   const visitIds = Object.keys(appointments);
-  if (visitIds.length) {
-    const { data: events, error: eventsError } = await supabase
-      .from("appointment_events")
-      .select("appointment_id, kind, staff_id, detail, created_at")
-      .in("appointment_id", visitIds)
-      .order("created_at");
-    if (eventsError) throw eventsError;
-    for (const e of events) {
-      const who = staffName(e.staff_id) ?? "A former team member";
-      if (e.kind === "patch_test_override") {
-        const detail = e.detail as { reason?: string };
-        appointments[e.appointment_id].patchOverride = { by: who, reason: detail.reason ?? "", at: when(e.created_at) };
-        appointments[e.appointment_id].log.push(`Checked in without the patch test by ${who} · ${when(e.created_at)}`);
-      } else if (e.kind === "check_in_undone") {
-        appointments[e.appointment_id].log.push(`Check-in undone by ${who} · ${when(e.created_at)}`);
-      }
-    }
-  }
-
-  // What Denise knows about each client.
   const clientIds = [...new Set(Object.values(appointments).flatMap((a) => (a.client ? [a.client.id] : [])))];
-  const [insights, packages, past, pastFormulas, memberships] = await Promise.all([
+  const [warnings, policies, salesResult, eventsLog, insights, packages, past, pastFormulas, memberships] = await Promise.all([
+    visitWarnings(supabase, me.business_id, toCheck, tz),
+    policyVisits ? loadVisitPolicies(supabase, me.business_id, me.role, policyVisits) : Promise.resolve(null),
+    // The sale each checked-out visit was paid on (front of house only: RLS).
+    checkedOut.length
+      ? supabase.from("sales").select("id, appointment_id").in("appointment_id", checkedOut).neq("status", "voided").order("created_at")
+      : Promise.resolve({ data: [], error: null }),
+    // What's happened to each visit (front of house only: RLS): clients a
+    // manager or owner checked in without the patch test the salon
+    // requires, and why; check-ins taken back.
+    visitIds.length
+      ? supabase.from("appointment_events").select("appointment_id, kind, staff_id, detail, created_at").in("appointment_id", visitIds).order("created_at")
+      : Promise.resolve({ data: [], error: null }),
+    // What Denise knows about each client.
     loadClientInsights(supabase, me.business_id, clientIds),
     loadPackagesByClient(supabase, clientIds),
     clientIds.length
@@ -363,6 +345,21 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       : Promise.resolve({ data: [], error: null }),
     loadMembershipsByClient(supabase, clientIds),
   ]);
+  for (const [id, w] of warnings) appointments[id].warnings = w;
+  if (policies) for (const [id, p] of policies) appointments[id].policy = p;
+  if (salesResult.error) throw salesResult.error;
+  for (const s of salesResult.data) if (s.appointment_id) appointments[s.appointment_id].saleId = s.id;
+  if (eventsLog.error) throw eventsLog.error;
+  for (const e of eventsLog.data) {
+    const who = staffName(e.staff_id) ?? "A former team member";
+    if (e.kind === "patch_test_override") {
+      const detail = e.detail as { reason?: string };
+      appointments[e.appointment_id].patchOverride = { by: who, reason: detail.reason ?? "", at: when(e.created_at) };
+      appointments[e.appointment_id].log.push(`Checked in without the patch test by ${who} · ${when(e.created_at)}`);
+    } else if (e.kind === "check_in_undone") {
+      appointments[e.appointment_id].log.push(`Check-in undone by ${who} · ${when(e.created_at)}`);
+    }
+  }
   if (past.error) throw past.error;
   if (pastFormulas.error) throw pastFormulas.error;
   // Each client's last few visits: services in the order they were done.
@@ -464,11 +461,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     lastView && ((FAMILIES as readonly string[]).includes(lastView) || views.some((v) => viewKey(v.id) === lastView)) ? (lastView as ViewKey) : "all";
 
   // Who may write their own messages to clients (owners always).
-  const { data: business } = await supabase.from("businesses").select("free_text_roles").eq("id", me.business_id).single();
   const freeText = me.role === "owner" || Boolean(business?.free_text_roles.includes(me.role));
-  // "Book" on a client's profile: the booking starts with them.
-  const bookId = typeof params.book === "string" && isUuid(params.book) ? params.book : null;
-  const { data: bookRow } = bookId ? await supabase.from("clients").select("id, first_name, last_name, phone, allergies").eq("id", bookId).maybeSingle() : { data: null };
   // With their stylist (or the first working), at the next quarter hour from now.
   const bookColumn = columns.find((c) => c.staffId === params.staff && c.working) ?? columns.find((c) => c.working) ?? columns[0];
   const nowMinute = date === today ? toLocal(new Date(), tz).minute : range.start;
@@ -487,6 +480,10 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       appointmentId: typeof params.open === "string" && isUuid(params.open) ? params.open : null,
       ask: typeof params.ask === "string" && params.ask.trim() ? params.ask.trim().slice(0, 300) : null,
       book,
+      out:
+        typeof params.out === "string" && isUuid(params.out) && date >= today && (canBook(me.role) || params.out === me.id)
+          ? { staffId: params.out, leaves: typeof params.leaves === "string" ? parseTime(params.leaves) : null }
+          : null,
     },
     date,
     today,

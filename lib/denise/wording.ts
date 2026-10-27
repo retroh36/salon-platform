@@ -81,7 +81,7 @@ export function headline(c: Conflict, l: Lookup, firstNames = false): string {
       return `${firstNames ? firstName(l, visit) : clientName(l, visit)} is running ${formatDuration(c.minutes ?? 0)} late.`;
     }
     case "call_out":
-      return `${staff} is out for the rest of the day.`;
+      return c.until ? `${staff} is out until ${clock(minuteOf(l, c.until))}.` : `${staff} is out for the rest of the day.`;
     case "double_booking": {
       const [a, b] = c.causeItemIds.map((id) => l.items.get(id)!);
       const at = clock(minuteOf(l, a.start > b.start ? a.start : b.start));

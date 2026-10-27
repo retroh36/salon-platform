@@ -27,6 +27,7 @@ import { askerOf, deniseSession, type DeniseSession } from "@/lib/denise/session
 import { replyToCallOut, replyToCancel, replyToLate } from "@/lib/denise/triggers";
 import type { DeniseEvent, DeniseRequest } from "@/lib/denise/types";
 import { isUuid } from "@/lib/ids";
+import { outWindow } from "@/lib/rescue";
 import { LATE_MINUTES, reportCallOut, reportRunningLate } from "@/lib/scheduling/disruptions";
 import { startOfLocalDay } from "@/lib/scheduling/load";
 import { formatMinute, isLocalDate, minuteToTime } from "@/lib/scheduling/time";
@@ -105,22 +106,23 @@ async function staffName(s: DeniseSession, staffId: string) {
   return data?.first_name ?? "this stylist";
 }
 
-// A question saying a stylist is out: a link to plan the rescue (front of
-// house), or how to mark yourself out.
+// A question saying a stylist is out: a link to the calendar's "Mark … out"
+// panel with my plan for their clients (front of house), or how to mark
+// yourself out.
 async function callOutIn(s: DeniseSession, text: string, date: string) {
   const { data: team } = await s.supabase.from("staff").select("id, first_name, staff_services(service_id)").eq("location_id", s.viewer.location.id).eq("is_active", true);
   const read = readCallOut(text, (team ?? []).filter((t) => t.staff_services.length > 0).map((t) => ({ id: t.id, firstName: t.first_name })));
   if (!read) return null;
   if (!canBook(s.me.role)) {
-    const text = read.staffId === s.me.id ? "Mark yourself out from the ⋯ on your column on the calendar, and I'll find new places for your clients." : `The front desk can plan where ${read.firstName}'s clients go.`;
+    const text = read.staffId === s.me.id ? "Mark yourself out from the ⋯ on your column on the calendar (Mark myself out…), and the front desk will find new places for your clients." : `The front desk can plan where ${read.firstName}'s clients go.`;
     return { t: "done" as const, reply: { text, kind: "nothing" as const } };
   }
-  const from = read.from === null ? "" : `&from=${minuteToTime(read.from)}`;
+  const from = read.from === null ? "" : `&leaves=${minuteToTime(read.from)}`;
   const when = read.from === null ? "" : ` from ${formatMinute(read.from)}`;
   return {
     t: "done" as const,
     reply: { text: `Sorry to hear ${read.firstName} is out${when}. I'll plan where each of ${read.firstName}'s clients goes, and you check it before anything moves.`, kind: "fixes" as const },
-    links: [{ path: `/calendar/rescue?staff=${read.staffId}&date=${date}${from}`, label: "Open sick-day rescue" }],
+    links: [{ path: `/calendar?date=${date}&out=${read.staffId}${from}`, label: `Mark ${read.firstName} out` }],
   };
 }
 
@@ -181,7 +183,13 @@ async function run(s: DeniseSession, body: DeniseRequest, send: Send) {
       const name = await staffName(s, body.staffId);
       status(`Marking ${name} out…`);
       const isToday = body.date === s.today;
-      const result = await reportCallOut(s.supabase, body.staffId, isToday ? new Date() : startOfLocalDay(body.date, s.viewer.location.timezone));
+      // A time out from "Mark … out" (all day, leaving early, coming in
+      // late); without one, from now (today) or all day.
+      const span = body.when ? outWindow(body.date, body.when, s.viewer.location.timezone) : null;
+      if (body.when && !span) return send(reply(REPORT_ERRORS.invalid, "error"));
+      const result = span
+        ? await reportCallOut(s.supabase, body.staffId, span.from, span.until)
+        : await reportCallOut(s.supabase, body.staffId, isToday ? new Date() : startOfLocalDay(body.date, s.viewer.location.timezone));
       if (!result.ok) return send(reply(result.error === "forbidden" ? "Only the front desk, managers and owners can mark someone else out." : REPORT_ERRORS[result.error], "error"));
       revalidatePath("/calendar", "layout");
       status(`Looking at ${name}'s clients${isToday ? " for the rest of today" : ""}…`);
@@ -208,7 +216,7 @@ async function run(s: DeniseSession, body: DeniseRequest, send: Send) {
       return send({ t: "done", reply: said ?? { text: "That's canceled. Nothing else changes.", kind: "nothing" }, state });
     }
     case "ask": {
-      // "Nola called out", "Gil has to leave at 1": the sick-day rescue,
+      // "Nola called out", "Gil has to leave at 1": marking them out,
       // read by our code (no Claude needed).
       const last = [...(Array.isArray(body.history) ? body.history : [])].reverse().find((m) => m.role === "user");
       const out = last ? await callOutIn(s, String(last.text), isLocalDate(body.date) && body.date > s.today ? body.date : s.today) : null;

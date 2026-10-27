@@ -2977,14 +2977,14 @@ isOneToOne: false
                   ]
                 },"schedule_disruptions": {
                   Row: {
-                    "appointment_id": string | null,"business_id": string,"created_at": string,"id": string,"item_id": string | null,"kind": Database["public"]['Enums']["disruption_kind"],"location_id": string,"minutes": number | null,"on_date": string,"reported_by": string | null,"resolved_by_action": string | null,"staff_id": string | null,"starts_at": string | null,"time_off_id": string | null,"updated_at": string
+                    "appointment_id": string | null,"business_id": string,"created_at": string,"ends_at": string | null,"id": string,"item_id": string | null,"kind": Database["public"]['Enums']["disruption_kind"],"location_id": string,"minutes": number | null,"on_date": string,"reported_by": string | null,"resolved_by_action": string | null,"staff_id": string | null,"starts_at": string | null,"time_off_id": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_id"?: string | null,"business_id": string,"created_at"?: string,"id"?: string,"item_id"?: string | null,"kind": Database["public"]['Enums']["disruption_kind"],"location_id": string,"minutes"?: number | null,"on_date": string,"reported_by"?: string | null,"resolved_by_action"?: string | null,"staff_id"?: string | null,"starts_at"?: string | null,"time_off_id"?: string | null,"updated_at"?: string
+                    "appointment_id"?: string | null,"business_id": string,"created_at"?: string,"ends_at"?: string | null,"id"?: string,"item_id"?: string | null,"kind": Database["public"]['Enums']["disruption_kind"],"location_id": string,"minutes"?: number | null,"on_date": string,"reported_by"?: string | null,"resolved_by_action"?: string | null,"staff_id"?: string | null,"starts_at"?: string | null,"time_off_id"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "appointment_id"?: string | null,"business_id"?: string,"created_at"?: string,"id"?: string,"item_id"?: string | null,"kind"?: Database["public"]['Enums']["disruption_kind"],"location_id"?: string,"minutes"?: number | null,"on_date"?: string,"reported_by"?: string | null,"resolved_by_action"?: string | null,"staff_id"?: string | null,"starts_at"?: string | null,"time_off_id"?: string | null,"updated_at"?: string
+                    "appointment_id"?: string | null,"business_id"?: string,"created_at"?: string,"ends_at"?: string | null,"id"?: string,"item_id"?: string | null,"kind"?: Database["public"]['Enums']["disruption_kind"],"location_id"?: string,"minutes"?: number | null,"on_date"?: string,"reported_by"?: string | null,"resolved_by_action"?: string | null,"staff_id"?: string | null,"starts_at"?: string | null,"time_off_id"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -4220,7 +4220,7 @@ isOneToOne: false
 { Args: { "p_business_id": string,"p_client_id": string }; Returns: undefined
                            },
 "report_call_out":
-{ Args: { "p_from": string,"p_staff_id": string }; Returns: string
+{ Args: { "p_from": string,"p_staff_id": string,"p_until"?: string }; Returns: string
                            },
 "report_running_late":
 { Args: { "p_item_id": string,"p_minutes": number }; Returns: string

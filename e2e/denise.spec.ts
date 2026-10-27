@@ -225,7 +225,8 @@ test.describe("front desk", () => {
     const grace = await seedCut(await newClient("Grace"), BRIDGET, at(10));
     await openDay(page);
     await ui(page).getByRole("button", { name: "More for Bridget Callahan" }).click();
-    await page.getByRole("dialog", { name: "Bridget's day" }).getByRole("button", { name: "Out for the day" }).click();
+    await page.getByRole("menu", { name: "Bridget's day" }).getByRole("menuitem", { name: "Mark Bridget out…" }).click();
+    await page.getByRole("region", { name: "Mark Bridget out" }).getByRole("button", { name: "Mark out only, I'll handle clients" }).click();
 
     const panel = denisePanel(page);
     await expect(panel.getByTestId("denise-message")).toHaveText(

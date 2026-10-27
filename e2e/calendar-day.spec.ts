@@ -101,6 +101,36 @@ test.describe("front desk", () => {
     ]);
   });
 
+  test("a check-in shows at once while it saves, and goes back, saying why, if it can't be saved", async ({ page }) => {
+    const id = await book(await client("Quick"), "Men's Cut", fromLocal(DAY, 11 * 60, TZ)!);
+    await openDay(page);
+    const block = ui(page).locator("[data-block]").filter({ hasText: `${PREFIX}Quick` }).first();
+    await block.click();
+    // Hold the save for a couple of seconds: the block is yellow meanwhile.
+    let release = () => {};
+    const held = new Promise<void>((r) => (release = r));
+    await page.route("**/calendar**", async (route) => {
+      if (route.request().method() === "POST" && route.request().headers()["next-action"]) await held;
+      await route.continue();
+    });
+    await details(page).getByRole("button", { name: "Check in", exact: true }).click();
+    await details(page).getByRole("button", { name: "Check in anyway" }).click();
+    await expect(block).toHaveAttribute("data-visit", "here", { timeout: 500 });
+    await expect(details(page).getByTestId("primary-action")).toHaveText("Check out");
+    expect(await status(id)).toBe("booked");
+    release();
+    await expect.poll(() => status(id)).toBe("checked_in");
+    await page.unroute("**/calendar**");
+    await expect(block).toHaveAttribute("data-visit", "here");
+
+    // Canceled behind the calendar's back: Undo check-in can't be saved, so
+    // it's put back as it was, and booking details says why.
+    await admin.from("appointments").update({ status: "canceled", canceled_at: new Date().toISOString(), cancel_reason: "Test" }).eq("id", id);
+    await moreAction(details(page), "Undo check-in");
+    await expect(details(page).getByRole("alert")).toBeVisible();
+    await expect(block).toHaveAttribute("data-visit", "here");
+  });
+
   test("booking details: who and where it's at, the visit, tabs, and one main button with the rest under ⋯", async ({ page }) => {
     const calm = await client("Calm");
     await admin.from("clients").update({ phone: "+15555550123", preferences: "Likes it quiet" }).eq("id", calm);

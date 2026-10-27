@@ -5,6 +5,7 @@ import type { ConflictKind } from "@/lib/scheduling/resolve";
 import type { BriefFacts } from "./brief";
 import type { BookingCard, BookingState } from "./booking-chat";
 import type { PageRef } from "./page";
+import type { OutWhen } from "@/lib/rescue";
 
 export type FixMove = {
   itemId: string;
@@ -116,7 +117,7 @@ export type DeniseRequest =
   // would change (the last booking card in the chat).
   | { action: "ask"; date: string; history: ChatMessage[]; page?: PageRef; booking?: BookingState | null }
   | { action: "report_late"; date: string; itemId: string; minutes: number }
-  | { action: "report_out"; date: string; staffId: string }
+  | { action: "report_out"; date: string; staffId: string; when?: OutWhen }
   | { action: "canceled"; date: string; appointmentId: string };
 
 export type DeniseEvent =

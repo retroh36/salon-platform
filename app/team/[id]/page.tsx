@@ -104,9 +104,9 @@ async function Member({ params, searchParams }: { params: Promise<{ id: string }
           <LoginCard staffId={member.id} firstName={member.first_name} state={loginState(login)} email={login?.email ?? member.email} canReset={canResetPassword(me)} active={member.is_active} />
           {member.role === "stylist" && member.is_active && (
             <Card title="Out sick?" className="mb-0">
-              <p className="text-sm text-ink-muted">Mark {member.first_name} out, all day or from a time, and see where each of their clients can go.</p>
-              <Link href={`/calendar/rescue?staff=${member.id}`} className={`${buttonClass("secondary", "sm")} mt-3`}>
-                Plan the rescue
+              <p className="text-sm text-ink-muted">Mark {member.first_name} out, all day, leaving early or coming in late, and see where each of their clients can go.</p>
+              <Link href={`/calendar?out=${member.id}`} className={`${buttonClass("secondary", "sm")} mt-3`}>
+                Mark {member.first_name} out…
               </Link>
             </Card>
           )}

@@ -1,5 +1,5 @@
-// Applying a sick-day rescue (server): the moves staff reviewed on
-// /calendar/rescue, checked and saved through the AI action log.
+// Applying the plan for a stylist who is out (server): the moves staff reviewed on
+// the calendar's "Mark … out" panel, checked and saved through the AI action log.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";

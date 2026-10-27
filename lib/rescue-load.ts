@@ -1,6 +1,7 @@
-// Loading a sick-day rescue (server): who's out and from when (their
-// call-out), every visit it touches, the team, the calendar for the next
-// two weeks and each stylist's usual lengths, planned by
+// Loading the plan for a stylist who's out (server): when they're out
+// (their call-out, or, before they're marked out, the time chosen in the
+// calendar's panel), every visit it touches, the team, the calendar for the
+// next two weeks and each stylist's usual lengths, planned by
 // lib/scheduling/rescue.ts and put in rows by lib/rescue.ts. Read as the
 // signed-in staff member (RLS decides).
 
@@ -18,15 +19,18 @@ import { fullName } from "@/lib/staff";
 type Supabase = SupabaseClient<Database>;
 type Location = { id: string; timezone: string };
 
-export type RescueOut = { disruptionId: string; from: string; allDay: boolean; text: string };
+export type RescueOut = { disruptionId: string; from: string; until: string | null; allDay: boolean; text: string };
+
+// When they're out, before it's saved: from, and until (coming in late).
+export type OutWindow = { from: Date; until: Date | null };
 
 export type RescuePlan = {
   staff: { id: string; firstName: string; name: string };
   date: LocalDate;
-  // Null until they're marked out.
+  // Null until they're marked out (the plan is then for `window`).
   out: RescueOut | null;
   rows: RescueRow[];
-  // A rescue applied for this stylist and day, with Undo, and what it did
+  // A plan applied for this stylist and day, with Undo, and what it did
   // to each visit (for the messages).
   applied: { actionId: string; at: string; by: string | null; lines: { appointmentId: string; kind: "cover" | "shift" | "reschedule" | "leave" }[] } | null;
 };
@@ -39,7 +43,7 @@ export const rescueSubject = (staffId: string, date: LocalDate) => `rescue:${sta
 export async function loadCallOut(supabase: Supabase, location: Location, staffId: string, date: LocalDate): Promise<RescueOut | null> {
   const { data } = await supabase
     .from("schedule_disruptions")
-    .select("id, starts_at")
+    .select("id, starts_at, ends_at")
     .eq("location_id", location.id)
     .eq("kind", "call_out")
     .eq("staff_id", staffId)
@@ -48,21 +52,32 @@ export async function loadCallOut(supabase: Supabase, location: Location, staffI
   if (!data?.starts_at) return null;
   const from = new Date(data.starts_at);
   const minute = toLocal(from, location.timezone).minute;
-  // Out before the salon opens counts as the whole day.
-  const allDay = toLocal(from, location.timezone).date < date || minute <= 6 * 60;
-  return { disruptionId: data.id, from: data.starts_at, allDay, text: allDay ? "all day" : `from ${formatMinute(minute)}` };
+  const until = data.ends_at ? toLocal(new Date(data.ends_at), location.timezone).minute : null;
+  // Out before the salon opens (and not back later) counts as the whole day.
+  const allDay = until === null && (toLocal(from, location.timezone).date < date || minute <= 6 * 60);
+  const text = until !== null ? `until ${formatMinute(until)}` : allDay ? "all day" : `from ${formatMinute(minute)}`;
+  return { disruptionId: data.id, from: data.starts_at, until: data.ends_at, allDay, text };
 }
 
-export async function loadRescue(supabase: Supabase, location: Location, businessId: string, staffId: string, date: LocalDate, now = new Date()): Promise<RescuePlan | null> {
+export async function loadRescue(
+  supabase: Supabase,
+  location: Location,
+  businessId: string,
+  staffId: string,
+  date: LocalDate,
+  now = new Date(),
+  window: OutWindow | null = null,
+): Promise<RescuePlan | null> {
   const tz = location.timezone;
   const { data: person } = await supabase.from("staff").select("id, first_name, last_name, level, location_id").eq("id", staffId).maybeSingle();
   if (!person || person.location_id !== location.id) return null;
   const staff = { id: person.id, firstName: person.first_name, name: fullName(person) };
   const [out, applied] = await Promise.all([loadCallOut(supabase, location, staffId, date), loadApplied(supabase, location, staffId, date)]);
-  if (!out) return { staff, date, out: null, rows: [], applied };
-  if (applied) {
+  const span: OutWindow | null = out ? { from: new Date(out.from), until: out.until ? new Date(out.until) : null } : window;
+  if (!span) return { staff, date, out: null, rows: [], applied };
+  if (out && applied) {
     // Visits it left with them: the client needs a call to move.
-    const left = await stillWith(supabase, location, staffId, date, new Date(out.from));
+    const left = await stillWith(supabase, location, staffId, date, span);
     for (const id of left) if (!applied.lines.some((l) => l.appointmentId === id)) applied.lines.push({ appointmentId: id, kind: "leave" });
     return { staff, date, out, rows: [], applied };
   }
@@ -121,7 +136,7 @@ export async function loadRescue(supabase: Supabase, location: Location, busines
 
   const stylists = (team.data ?? []).filter((s) => ctx.staff.has(s.id)).map((s) => ({ id: s.id, firstName: s.first_name, level: (s.level ?? null) as Level }));
   const { timingOf } = usualTimings(ctx, learned);
-  const lines = planRescue(ctx, { staffId, date, from: new Date(out.from), visits, stylists, timingOf, now });
+  const lines = planRescue(ctx, { staffId, date, from: span.from, until: span.until, visits, stylists, timingOf, now });
 
   const serviceRows = new Map((services.data ?? []).map((s) => [s.id, s]));
   const levelOf = new Map((team.data ?? []).map((s) => [s.id, s.level ?? null]));
@@ -146,7 +161,7 @@ export async function loadRescue(supabase: Supabase, location: Location, busines
   return { staff, date, out, rows: rescueRows(lines, facts, staffId, clients), applied };
 }
 
-// The rescue applied for this stylist and day, while it can be undone.
+// The plan applied for this stylist and day, while it can be undone.
 async function loadApplied(supabase: Supabase, location: Location, staffId: string, date: LocalDate): Promise<RescuePlan["applied"]> {
   const { data } = await supabase
     .from("ai_actions")
@@ -168,9 +183,9 @@ async function loadApplied(supabase: Supabase, location: Location, staffId: stri
   return { actionId: data.id, at: data.decided_at!, by: data.decider?.first_name ?? null, lines: [...lines].map(([appointmentId, kind]) => ({ appointmentId, kind })) };
 }
 
-// Upcoming visits still with the stylist after they're out.
-async function stillWith(supabase: Supabase, location: Location, staffId: string, date: LocalDate, from: Date): Promise<string[]> {
-  const end = fromLocal(addDays(date, 1), 0, location.timezone)!;
+// Upcoming visits still with the stylist while they're out.
+async function stillWith(supabase: Supabase, location: Location, staffId: string, date: LocalDate, { from, until }: OutWindow): Promise<string[]> {
+  const end = until ?? fromLocal(addDays(date, 1), 0, location.timezone)!;
   const { data } = await supabase
     .from("appointment_items")
     .select("appointment_id, ends_at, appointment:appointments!inner(status)")

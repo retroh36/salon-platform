@@ -1,4 +1,4 @@
-// Sick-day rescue, for the review screen (pure): the plan from
+// Marking a stylist out, for the calendar's panel (pure): the plan from
 // lib/scheduling/rescue.ts as rows and choices staff can read and change,
 // in our own words, the client message each change calls for, the notices
 // for the stylists covering, and the check that staff's choices still fit
@@ -8,7 +8,29 @@ import { formatPrice } from "./services";
 import { formatDuration } from "./duration.ts";
 import { durationMinutes, itemEnd, staffBusySpans, type ServiceTiming } from "./scheduling/booking.ts";
 import type { RescueLine, RescueOption } from "./scheduling/rescue.ts";
-import { daysBetween, formatMinute, toLocal, type LocalDate } from "./scheduling/time.ts";
+import { daysBetween, formatMinute, fromLocal, toLocal, type LocalDate } from "./scheduling/time.ts";
+
+// When a stylist is out: all day, leaving early at a minute, or coming in
+// late at a minute (minutes since midnight on the day).
+export type OutWhen = { kind: "all" } | { kind: "early" | "late"; minute: number };
+
+export function isOutWhen(v: unknown): v is OutWhen {
+  const w = v as OutWhen | null;
+  if (!w || typeof w !== "object") return false;
+  if (w.kind === "all") return true;
+  return (w.kind === "early" || w.kind === "late") && Number.isInteger(w.minute) && w.minute > 0 && w.minute < 24 * 60;
+}
+
+// The time out as instants: all day from midnight, leaving early from the
+// minute to the end of the day, coming in late from midnight until then.
+export function outWindow(date: LocalDate, when: OutWhen, tz: string): { from: Date; until: Date | null } | null {
+  if (!isOutWhen(when)) return null;
+  const dayStart = fromLocal(date, 0, tz)!;
+  if (when.kind === "all") return { from: dayStart, until: null };
+  const at = fromLocal(date, when.minute, tz);
+  if (!at) return null;
+  return when.kind === "early" ? { from: at, until: null } : { from: dayStart, until: at };
+}
 
 const DAY = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
 const dayLabel = (date: LocalDate) => DAY.format(new Date(`${date}T12:00:00Z`));
@@ -21,9 +43,11 @@ export type RescueMoveJson = { itemId: string; staffId: string; resourceId: stri
 
 export type RescueChoice = {
   kind: RescueOption["kind"] | "leave";
-  // "Lois at 10am", "Wed, Oct 28 at 10am with Nola", "Leave it and call".
+  // "Moves to Lois, same time", "Moves to Gil at 1pm", "Reschedule with
+  // Nola", "Leave it and call the client".
   label: string;
-  // "Same level", "Master · $20 more", "45 minutes later", "Takes 15 minutes longer".
+  // Why, in a line: "Same level · Lois is free", "15 min later · same
+  // level", "Next opening Thu, Oct 29 at 11am", "Master · $20 more".
   detail: string | null;
   moves: RescueMoveJson[];
   holds: Hold[];
@@ -34,10 +58,18 @@ export type RescueRow = {
   clientId: string | null;
   clientName: string;
   firstName: string | null;
-  // "Women's Cut & Style, Gloss" and "10am–11:30am".
+  // "Women's Cut & Style, Gloss", "10am–11:30am", "10am" and "1 hr 30 min".
   services: string;
   when: string;
+  start: string;
+  length: string;
+  // When the stylist who's out is on the visit, so the panel can show
+  // which visits a different time out touches straight away.
+  outFrom: string;
+  outTo: string;
   note: string | null;
+  // The note in a few words, for the reason line: "Only sees Sandra".
+  noteShort: string | null;
   // Holds of the visit's other stylists where they are now (for "leave").
   stays: Hold[];
   choices: RescueChoice[];
@@ -65,27 +97,25 @@ function holdOf(m: { appointmentId: string; staffId: string; resourceId: string 
 
 const timeRange = (start: Date, end: Date, tz: string) => `${formatMinute(toLocal(start, tz).minute)}–${formatMinute(toLocal(end, tz).minute)}`;
 
-function describe(o: RescueOption, line: RescueLine, f: RescueFacts, absentId: string): { label: string; detail: string | null } {
+function describe(o: RescueOption, line: RescueLine, f: RescueFacts, absentId: string, firstOwn: boolean): { label: string; detail: string | null } {
   const name = f.names.get(o.staffId) ?? "another stylist";
   const time = formatMinute(toLocal(o.start, f.tz).minute);
-  const details: string[] = [];
+  const level = o.sameLevel ? "Same level" : (LEVEL_NAMES[f.levels.get(o.staffId) ?? ""] ?? "Another level");
   if (o.kind === "reschedule") {
-    const label = `${dayLabel(o.date)} at ${time} with ${name}`;
-    if (o.staffId !== absentId && o.sameLevel) details.push("Same level");
-    return { label, detail: details.join(" · ") || null };
+    const when = `${dayLabel(o.date)} at ${time}`;
+    if (o.staffId === absentId) return { label: `Reschedule with ${name}`, detail: firstOwn ? `Next opening ${when}` : when };
+    return { label: `Reschedule with ${name}`, detail: [o.sameLevel ? "Same level" : null, when].filter(Boolean).join(" · ") };
   }
-  if (o.sameLevel) details.push("Same level");
-  else details.push(LEVEL_NAMES[f.levels.get(o.staffId) ?? ""] ?? "Another level");
-  if (o.shift) details.push(`${formatDuration(o.shift)} later`);
   // What the client pays, and how long it takes, with the new stylist.
+  const extra: string[] = [];
   const out = line.visit.items.filter((i) => i.staffId === absentId);
   const before = out.reduce((sum, i) => sum + (f.priceOf(absentId, i.serviceId) ?? 0), 0);
   const after = out.reduce((sum, i) => sum + (f.priceOf(o.staffId, i.serviceId) ?? 0), 0);
-  if (after !== before) details.push(`${formatPrice(Math.abs(after - before))} ${after > before ? "more" : "less"}`);
+  if (after !== before) extra.push(`${formatPrice(Math.abs(after - before))} ${after > before ? "more" : "less"}`);
   const longer = o.moves.reduce((sum, m) => sum + durationMinutes(m.timing), 0) - line.visit.items.reduce((sum, i) => sum + durationMinutes(i), 0);
-  if (longer >= 10) details.push(`takes ${formatDuration(longer)} longer`);
-  const label = `${name} at ${time}`;
-  return { label, detail: details.join(" · ").replace(/^./, (c) => c.toUpperCase()) };
+  if (longer >= 10) extra.push(`takes ${formatDuration(longer)} longer`);
+  if (o.shift) return { label: `Moves to ${name} at ${time}`, detail: [`${formatDuration(o.shift)} later`, level.toLowerCase(), ...extra].join(" · ") };
+  return { label: `Moves to ${name}, same time`, detail: [level, ...(extra.length ? extra : [`${name} is free`])].join(" · ") };
 }
 
 const NOTES: Record<NonNullable<RescueLine["note"]>, string> = {
@@ -93,6 +123,13 @@ const NOTES: Record<NonNullable<RescueLine["note"]>, string> = {
   only_sees: "Only sees {absent}: offered {absent}'s next openings.",
   prefers: "Usually sees {absent}: starts on a new day with them.",
   none_fit: "Nothing fits. Leave it and call to rebook.",
+};
+
+const SHORT_NOTES: Record<NonNullable<RescueLine["note"]>, string | null> = {
+  in_chair: null,
+  only_sees: "Only sees {absent}",
+  prefers: "Usually sees {absent}",
+  none_fit: null,
 };
 
 export function rescueRows(
@@ -106,14 +143,22 @@ export function rescueRows(
     const items = v.items;
     const client = v.clientId ? clients.get(v.clientId) : undefined;
     const end = new Date(Math.max(...items.map((i) => itemEnd(i).getTime())));
+    const theirs = items.filter((i) => i.staffId === absentId);
     const stays = items.filter((i) => i.staffId !== absentId).map((i) => holdOf({ ...i, appointmentId: v.appointmentId, resourceId: i.resourceId ?? null, timing: i }));
+    const firstOwn = line.options.find((o) => o.kind === "reschedule" && o.staffId === absentId);
     const choices: RescueChoice[] = line.options.map((o) => ({
       kind: o.kind,
-      ...describe(o, line, f, absentId),
+      ...describe(o, line, f, absentId, o === firstOwn),
       moves: o.moves.map((m) => ({ itemId: m.itemId, staffId: m.staffId, resourceId: m.resourceId, start: m.start.toISOString(), timing: m.timing })),
       holds: o.moves.map((m) => holdOf({ ...m, serviceId: items.find((i) => i.id === m.itemId)!.serviceId })),
     }));
-    choices.push({ kind: "leave", label: line.note === "in_chair" ? "Leave it" : "Leave it and call the client", detail: null, moves: [], holds: [] });
+    choices.push({
+      kind: "leave",
+      label: line.note === "in_chair" ? "Leave it" : "Leave it and call the client",
+      detail: line.note === "in_chair" ? "In the chair already" : line.note === "none_fit" ? "Nothing fits" : null,
+      moves: [],
+      holds: [],
+    });
     return {
       appointmentId: v.appointmentId,
       clientId: v.clientId,
@@ -121,7 +166,12 @@ export function rescueRows(
       firstName: client?.firstName ?? null,
       services: items.map((i) => f.services.get(i.serviceId) ?? "Service").join(", "),
       when: timeRange(items[0].start, end, f.tz),
+      start: formatMinute(toLocal(items[0].start, f.tz).minute),
+      length: formatDuration(Math.round((end.getTime() - items[0].start.getTime()) / 60_000)),
+      outFrom: new Date(Math.min(...theirs.map((i) => i.start.getTime()))).toISOString(),
+      outTo: new Date(Math.max(...theirs.map((i) => itemEnd(i).getTime()))).toISOString(),
       note: line.note ? NOTES[line.note].replaceAll("{absent}", f.absentName) : null,
+      noteShort: line.note ? (SHORT_NOTES[line.note]?.replaceAll("{absent}", f.absentName) ?? null) : null,
       stays,
       choices,
       choice: line.choice ?? choices.length - 1,

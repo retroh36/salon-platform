@@ -74,21 +74,51 @@ afterAll(async () => {
 const plan = () => loadRescue(frontDesk, location, B, BRIDGET, DAY, at(7));
 const toInput = (moves: ReturnType<typeof movesOf>): RescueMoveInput[] => moves.map((m) => ({ appointmentId: m.appointmentId, itemId: m.itemId, staffId: m.staffId, resourceId: m.resourceId, start: m.start }));
 
-describe("a sick-day rescue", () => {
+describe("marking a stylist out", () => {
+  it("coming in late: time off until then, and the plan only for visits before it, before anything is saved", async () => {
+    const day = "2031-07-01";
+    const { loadRescue: load } = await import("@/lib/rescue-load");
+    await client("Dot");
+    const item: BookingItemInput = { serviceId: services.get("Women's Cut & Style")!, staffId: BRIDGET, start: at(15, 0, day), resource: { kind: "any" } };
+    const booked = await saveBooking(frontDesk, location, { clientId: clients.Dot, notes: null, items: [item] });
+    if (!booked.ok) throw new Error("Couldn't book Dot");
+    visits.Dot = booked.appointmentId;
+    try {
+      // Not marked out yet: a plan for coming in at 11 has nobody; for all day, Dot.
+      const late = (await load(frontDesk, location, B, BRIDGET, day, at(7, 0, day), { from: at(0, 0, day), until: at(11, 0, day) }))!;
+      expect(late.out).toBeNull();
+      expect(late.rows).toEqual([]);
+      const all = (await load(frontDesk, location, B, BRIDGET, day, at(7, 0, day), { from: at(0, 0, day), until: null }))!;
+      expect(all.rows.map((r) => r.appointmentId)).toEqual([visits.Dot]);
+      const out = await reportCallOut(frontDesk, BRIDGET, at(0, 0, day), at(11, 0, day));
+      expect(out.ok).toBe(true);
+      const { data } = await admin.from("schedule_disruptions").select("ends_at, time_off:staff_time_off(start_minute, end_minute, note)").eq("staff_id", BRIDGET).eq("on_date", day).single();
+      expect(Date.parse(data!.ends_at!)).toBe(at(11, 0, day).getTime());
+      expect(data!.time_off).toMatchObject({ start_minute: 0, end_minute: 11 * 60, note: "Coming in late" });
+      const marked = (await load(frontDesk, location, B, BRIDGET, day, at(7, 0, day)))!;
+      expect(marked.out).toMatchObject({ allDay: false, text: "until 11am" });
+      expect(marked.rows).toEqual([]);
+    } finally {
+      const { data: d } = await admin.from("schedule_disruptions").select("id, time_off_id").eq("staff_id", BRIDGET).eq("on_date", day);
+      await admin.from("schedule_disruptions").delete().in("id", (d ?? []).map((x) => x.id));
+      await admin.from("staff_time_off").delete().in("id", (d ?? []).flatMap((x) => (x.time_off_id ? [x.time_off_id] : [])));
+    }
+  });
+
   it("plans each client: the same level at the same time, another level, and their own stylist later for those who only see her", async () => {
     const p = (await plan())!;
     expect(p.out).toMatchObject({ allDay: true });
     const byVisit = new Map(p.rows.map((r) => [r.appointmentId, r]));
     const ava = byVisit.get(visits.Ava)!;
-    expect(ava.choices[ava.choice]).toMatchObject({ kind: "cover", label: "Sandra at 9am" });
+    expect(ava.choices[ava.choice]).toMatchObject({ kind: "cover", label: "Moves to Sandra, same time" });
     // Same level; and her own length for it, if Denise has learned one.
-    expect(ava.choices[ava.choice].detail).toMatch(/^Same level( · takes \d+ minutes (longer|less))?$/);
+    expect(ava.choices[ava.choice].detail).toMatch(/^Same level · (Sandra is free|takes .+ longer)$/);
     const ben = byVisit.get(visits.Ben)!;
-    expect(ben.choices[ben.choice]).toMatchObject({ kind: "cover", label: "Shae at 2pm" });
+    expect(ben.choices[ben.choice]).toMatchObject({ kind: "cover", label: "Moves to Shae, same time" });
     expect(ben.choices[ben.choice].detail).toMatch(/^Artisan/);
     const cleo = byVisit.get(visits.Cleo)!;
     expect(cleo.note).toBe("Only sees Bridget: offered Bridget's next openings.");
-    expect(cleo.choices.filter((c) => c.kind !== "leave").every((c) => c.kind === "reschedule" && c.label.endsWith("with Bridget"))).toBe(true);
+    expect(cleo.choices.filter((c) => c.kind !== "leave").every((c) => c.kind === "reschedule" && c.label === "Reschedule with Bridget")).toBe(true);
     expect(cleo.choices[cleo.choice].kind).toBe("reschedule");
   });
 
@@ -155,7 +185,7 @@ describe("a sick-day rescue", () => {
       const before = (await itemsOf("Ava"))[0];
       const p = (await plan())!;
       const ava = p.rows.find((r) => r.appointmentId === visits.Ava)!;
-      const sandraAt9 = ava.choices.findIndex((c) => c.label === "Sandra at 9am");
+      const sandraAt9 = ava.choices.findIndex((c) => c.label === "Moves to Sandra, same time");
       const result = await applyRescuePlan(frontDesk, admin, location, B, BRIDGET, DAY, toInput(movesOf([ava], [sandraAt9])));
       expect(result.ok).toBe(true);
       const moved = (await itemsOf("Ava"))[0];

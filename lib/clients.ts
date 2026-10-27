@@ -110,7 +110,7 @@ export type ClientInput = {
   email: string | null;
   phone: string | null;
   preferred_staff_id: string | null;
-  // Books only with their preferred stylist (a sick-day rescue offers them
+  // Books only with their preferred stylist (marking a stylist out offers them
   // their stylist's next openings, never someone else).
   only_sees_preferred: boolean;
   preferences: string | null;

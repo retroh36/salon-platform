@@ -162,15 +162,15 @@ test("the stylist menu opens below the header, inside the screen", async ({ page
     const header = ui(page).locator("[data-column-header]").filter({ has: page.getByRole("button", { name: /^More for / }) }).last();
     const button = header.getByRole("button", { name: /^More for / });
     await button.click();
-    const dialog = page.getByRole("dialog", { name: /'s day$/ });
+    const dialog = page.getByRole("menu", { name: /'s day$/ });
     await expect(dialog).toBeVisible();
     const [d, h] = [(await dialog.boundingBox())!, (await header.boundingBox())!];
     // Below the name and hours, never over them, and on screen.
     expect(d.y).toBeGreaterThanOrEqual(h.y + h.height);
     expect(d.x).toBeGreaterThanOrEqual(0);
     expect(d.x + d.width).toBeLessThanOrEqual(1280);
-    // The buttons each fit on one line (36px; a second line would make them taller than 40).
-    for (const b of await dialog.getByRole("button").all()) expect((await b.boundingBox())!.height).toBeLessThanOrEqual(40);
+    // Its one item, "Mark … out…", on one line.
+    for (const b of await dialog.getByRole("menuitem").all()) expect((await b.boundingBox())!.height).toBeLessThanOrEqual(40);
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
   } finally {

@@ -151,7 +151,7 @@ export function stylistToday(
   const local = (d: Date) => toLocal(d, tz).minute;
   const staff = ctx.staff.get(staffId);
   const hours = staff ? dayView(staff.schedule, ctx.location, date).available : [];
-  const callOut = disruptions.some((d) => d.kind === "call_out" && d.staffId === staffId && local(d.from) <= nowMinute);
+  const callOut = disruptions.some((d) => d.kind === "call_out" && d.staffId === staffId && local(d.from) <= nowMinute && (!d.until || local(d.until) > nowMinute));
   const overrun = disruptions.some((d) => d.kind === "overrun" && mine.some((v) => v.itemId === d.itemId && !v.finished));
   const current = mine.find((v) => v.status === "checked_in" && !v.finished && (v.started || (v.start <= nowMinute && v.end > nowMinute)));
   const onBreak = (ctx.blocks ?? []).some((b) => b.staffId === staffId && b.date === date && local(b.start) <= nowMinute && local(b.end) > nowMinute);

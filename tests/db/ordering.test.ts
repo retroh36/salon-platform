@@ -136,8 +136,9 @@ describe("Denise's reorders", () => {
     await admin.from("stock_levels").upsert({ business_id: B, location_id: L, product_id: tube, on_hand: 60, reorder_point: 60, reorder_quantity: 4 }, { onConflict: "location_id,product_id" });
     const ids: string[] = [];
     for (const [i, days] of [2, 3, 3, 4].entries()) {
-      // Early, before the salon's day, and apart: never over Bridget's own.
-      const start = fromLocal(addDays(today, days), (1 + 2 * i) * 60, TZ)!;
+      // In the small hours, apart on the day two share: never near Bridget's
+      // own (the demo books some from 8am).
+      const start = fromLocal(addDays(today, days), (i === 2 ? 3 : 1) * 60, TZ)!;
       const end = new Date(start.getTime() + service!.duration_minutes! * 60_000);
       const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: client!.id, starts_at: start.toISOString(), ends_at: end.toISOString(), status: "confirmed" }).select("id").single();
       const { data: it } = await admin

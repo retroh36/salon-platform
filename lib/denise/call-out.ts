@@ -1,5 +1,6 @@
 // "Nola called out", "Gil has to leave at 1": a stylist out, read by our
-// code (no Claude), so Denise can open the sick-day rescue for them. Pure.
+// code (no Claude), so Denise can open "Mark … out" on the calendar for
+// them. Pure.
 
 export type CallOutRead = { staffId: string; firstName: string; from: number | null };
 

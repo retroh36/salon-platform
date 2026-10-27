@@ -397,17 +397,20 @@ async function capture(browser: Browser) {
     await ticket.getByTestId("applied-reward").waitFor();
   });
 
-  // Sick-day rescue: the stylist with the most clients on the next day with
-  // visits marked out all day, and the plan for every client. Last, since
-  // it adds time off.
-  await shot("32-sick-day-rescue", front, async (page) => {
-    const out = await busiestTomorrow();
-    if (!out) throw new Error("no stylist with visits on a day after today");
-    await page.goto(`/calendar/rescue?staff=${out.staffId}&date=${out.date}`);
-    const form = page.getByRole("form", { name: /^Mark .* out$/ });
-    await waitForReact(page, "form[aria-label^='Mark'] button[type=submit]");
-    await form.getByRole("button", { name: /^Mark .* out$/ }).click();
-    await page.getByTestId("rescue-row").first().waitFor();
+  // Marking a stylist out: the stylist with the most clients on the next
+  // day with visits, Denise's plan for every client all day, then leaving
+  // early at 1pm, with the moves dashed on the calendar (nothing is saved).
+  const out = await busiestTomorrow();
+  if (!out) throw new Error("no stylist with visits on a day after today");
+  await shot("32-mark-out-all-day", front, async (page) => {
+    await page.goto(`/calendar?date=${out.date}&out=${out.staffId}`);
+    await page.getByTestId("out-row").first().waitFor();
+    await page.getByTestId("apply-plan").and(page.locator(":enabled")).waitFor();
+  });
+  await shot("32b-mark-out-leaving-early", front, async (page) => {
+    await page.goto(`/calendar?date=${out.date}&out=${out.staffId}&leaves=13:00`);
+    await page.getByTestId("out-row").first().waitFor();
+    await page.getByTestId("apply-plan").and(page.locator(":enabled")).waitFor();
   });
 }
 

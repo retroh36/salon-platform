@@ -81,24 +81,26 @@ function setup(visits: RescueVisit[]) {
 describe("the rows staff review", () => {
   it("say where each client goes, what changes, and always offer to leave it", () => {
     const rows = setup([visit("a", "10:00", "c1")]);
-    expect(rows[0]).toMatchObject({ clientName: "Client a", services: "Women's Cut", when: "10am–11am" });
-    expect(rows[0].choices[0]).toMatchObject({ kind: "cover", label: "Lois at 10am", detail: "Same level" });
-    expect(rows[0].choices[1]).toMatchObject({ kind: "cover", label: "Gil at 10am", detail: "Master · $20 more" });
-    expect(rows[0].choices.some((c) => c.kind === "reschedule" && c.label === "Wed, Oct 28 at 10am with Nola")).toBe(true);
+    expect(rows[0]).toMatchObject({ clientName: "Client a", services: "Women's Cut", when: "10am–11am", start: "10am", length: "1 hr" });
+    expect(rows[0].choices[0]).toMatchObject({ kind: "cover", label: "Moves to Lois, same time", detail: "Same level · Lois is free" });
+    expect(rows[0].choices[1]).toMatchObject({ kind: "cover", label: "Moves to Gil, same time", detail: "Master · $20 more" });
+    // Her own next opening first, then the same level's.
+    const later = rows[0].choices.filter((c) => c.kind === "reschedule");
+    expect(later[0]).toMatchObject({ label: "Reschedule with Nola", detail: "Next opening Wed, Oct 28 at 10am" });
     expect(rows[0].choices.at(-1)).toMatchObject({ kind: "leave", label: "Leave it and call the client", moves: [] });
   });
 
   it("catch two lines given the same stylist at the same time", () => {
     const rows = setup([visit("a", "10:00", "c1"), visit("b", "10:00", "c2")]);
     // Planned: a with Lois, b with Gil.
-    expect(rows.map((r) => r.choices[r.choice].label)).toEqual(["Lois at 10am", "Gil at 10am"]);
+    expect(rows.map((r) => r.choices[r.choice].label)).toEqual(["Moves to Lois, same time", "Moves to Gil, same time"]);
     expect(clashingRows(rows, rows.map((r) => r.choice))).toEqual([]);
     // Staff put a on Gil too.
-    const gil = rows[0].choices.findIndex((c) => c.label === "Gil at 10am");
+    const gil = rows[0].choices.findIndex((c) => c.label === "Moves to Gil, same time");
     expect(clashingRows(rows, [gil, rows[1].choice])).toEqual([1]);
     // Leaving a frees Lois for b.
     const leave = rows[0].choices.length - 1;
-    const lois = rows[1].choices.findIndex((c) => c.label.startsWith("Lois"));
+    const lois = rows[1].choices.findIndex((c) => c.label.startsWith("Moves to Lois"));
     expect(clashingRows(rows, [leave, lois])).toEqual([]);
     expect(movesOf(rows, [leave, lois]).map((m) => [m.appointmentId, m.staffId])).toEqual([["b", "lois"]]);
   });

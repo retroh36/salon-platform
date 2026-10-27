@@ -51,7 +51,8 @@ export type Disruption =
   // `estimated` when that's from check-in to checkout times, not taps.
   | { id: string; kind: "likely_overrun"; itemId: string; minutes: number; estimated?: boolean }
   | { id: string; kind: "client_late"; appointmentId: string; minutes: number }
-  | { id: string; kind: "call_out"; staffId: string; from: Date };
+  // Out from `from` to the end of the day, or until `until` (coming in late).
+  | { id: string; kind: "call_out"; staffId: string; from: Date; until?: Date };
 
 export type ConflictKind = Disruption["kind"] | "double_booking";
 
@@ -88,6 +89,8 @@ export type Conflict = {
   minutes: number | null;
   // A likely overrun known from check-in to checkout times, not taps.
   estimated?: boolean;
+  // A call-out for a stylist coming in late: when they're back.
+  until?: Date;
   // What caused it: the overrunning item, the late visit's items, or both
   // double-booked items.
   causeItemIds: string[];
@@ -235,6 +238,7 @@ export function findConflicts(day: Day): Conflict[] {
           (b) =>
             b.staffId === d.staffId &&
             itemEnd(b) > d.from &&
+            (!d.until || b.start < d.until) &&
             plainProblems.get(b.id)!.some((p) => p.code === "staff_unavailable" && p.reason === "time_off"),
         )
         .map((b) => b.id);
@@ -247,6 +251,7 @@ export function findConflicts(day: Day): Conflict[] {
           disruptionId: d.id,
           staffId: d.staffId,
           minutes: null,
+          ...(d.until ? { until: d.until } : {}),
           causeItemIds: [],
           displaced: hit.filter(movable),
           stuck: hit.filter((id) => !movable(id)),

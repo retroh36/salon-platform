@@ -88,9 +88,15 @@ const denisePanel = (page: Page) => page.getByRole("tabpanel", { name: /Denise/ 
 const details = (page: Page) => page.getByRole("tabpanel", { name: "Booking details" });
 const block = (page: Page, client: string) => ui(page).getByRole("button", { name: new RegExp(`${PREFIX}${client} Lewis`) });
 
-async function markOut(page: Page, fullName: string, firstName: string, restOfDay: boolean) {
+// "Mark … out…" on their column, all day: with clients, "Mark out only"
+// hands them to Denise; with none, the panel says so itself.
+async function markOut(page: Page, fullName: string, firstName: string, clients: boolean) {
   await ui(page).getByRole("button", { name: `More for ${fullName}` }).click();
-  await page.getByRole("dialog", { name: `${firstName}'s day` }).getByRole("button", { name: restOfDay ? "Out for the rest of the day" : "Out for the day" }).click();
+  await page.getByRole("menu", { name: `${firstName}'s day` }).getByRole("menuitem", { name: `Mark ${firstName} out…` }).click();
+  const panel = page.getByRole("region", { name: `Mark ${firstName} out` });
+  if (clients) await panel.getByRole("button", { name: "Mark out only, I'll handle clients" }).click();
+  else await panel.getByRole("button", { name: `Mark ${firstName} out` }).click();
+  return panel;
 }
 
 async function reportLate(page: Page, client: string, minutes: number) {
@@ -111,7 +117,7 @@ function zoneAt(hour: number) {
 }
 
 test.describe("at 10pm", () => {
-  test("marking Gil out for the rest of the day: there's no one left to move, and Denise says so", async ({ page }) => {
+  test("marking Gil out for the rest of the day: there's no one left to move, and the panel says so", async ({ page }) => {
     const zone = zoneAt(22);
     const today = todayIn(zone);
     const outReports = () => admin.from("schedule_disruptions").select("id, time_off_id").eq("staff_id", GIL).eq("kind", "call_out").eq("on_date", today);
@@ -137,11 +143,8 @@ test.describe("at 10pm", () => {
     try {
       await page.goto("/calendar");
       await waitForHydration(page, "section[data-staff-id]");
-      await markOut(page, "Gil Navarro", "Gil", true);
-      const panel = denisePanel(page);
-      await expect(panel).toBeVisible();
-      await expect(panel).toContainText(/Gil's day is already over|Gil has no clients left today/);
-      await expect(panel).toContainText("nothing to move");
+      const panel = await markOut(page, "Gil Navarro", "Gil", false);
+      await expect(panel).toContainText("Gil is marked out. No clients affected.");
     } finally {
       await reopen();
       await admin.from("locations").update({ timezone: TZ }).eq("id", L);
@@ -180,16 +183,16 @@ test.describe("at 9pm", () => {
 });
 
 test.describe("out for the day", () => {
-  test("with no clients that day: nothing to move, and she says why", async ({ page }) => {
+  test("with no clients that day: nothing to move, and the panel says so", async ({ page }) => {
     await openDay(page);
-    await markOut(page, "Bridget Callahan", "Bridget", false);
-    await expect(denisePanel(page)).toContainText("Bridget has no clients that day, so there's nothing to move.");
+    const panel = await markOut(page, "Bridget Callahan", "Bridget", false);
+    await expect(panel).toContainText("Bridget is marked out. No clients affected.");
   });
 
   test("with clients: her options appear", async ({ page }) => {
     await seed(await newClient("Grace"), BRIDGET, at(10));
     await openDay(page);
-    await markOut(page, "Bridget Callahan", "Bridget", false);
+    await markOut(page, "Bridget Callahan", "Bridget", true);
     const panel = denisePanel(page);
     await expect(panel.getByRole("button", { name: "Apply fix" })).toBeVisible();
     await expect(panel).toContainText(/cover Bridget's client/);
@@ -319,7 +322,7 @@ test.describe("while she works", () => {
       await new Promise((r) => setTimeout(r, 1500));
       await route.continue();
     });
-    await markOut(page, "Bridget Callahan", "Bridget", false);
+    await markOut(page, "Bridget Callahan", "Bridget", true);
     const panel = denisePanel(page);
     await expect(panel.getByTestId("denise-thinking")).toContainText("Denise is thinking");
     await expect(panel.locator("[data-pose]").first()).toHaveAttribute("data-pose", "think");
@@ -374,7 +377,7 @@ test.describe("while she works", () => {
     await openDay(page);
     // A reply that isn't what she sends (as when the server falls over).
     await page.route("**/api/denise", (route) => route.fulfill({ status: 200, contentType: "application/x-ndjson", body: "not json\n" }));
-    await markOut(page, "Bridget Callahan", "Bridget", false);
+    await markOut(page, "Bridget Callahan", "Bridget", true);
     await expect(denisePanel(page)).toContainText("Something went wrong on my end.");
   });
 });
