@@ -1,6 +1,9 @@
 import { admin, SEED } from "../tests/db/helpers";
 import { openCheckout } from "./checkout-helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, putBackSales, test, ui, waitForHydration } from "./fixtures";
+
+// Stock and sales this file uses are put back afterwards.
+putBackSales();
 
 // Rewards: the front desk sees a client's points and tier at checkout with
 // Denise's line, takes a reward in one tap, and the points move when the

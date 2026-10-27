@@ -1,7 +1,10 @@
 import { chargeDuePayments } from "@/lib/events/billing";
 import { addDays, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED, signIn } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, putBackSales, test, ui, waitForHydration } from "./fixtures";
+
+// Stock and sales this file uses are put back afterwards.
+putBackSales();
 
 // Bridal and events, stage 2: the desk sends the proposal, the client signs
 // and pays the deposit on its page, a bridesmaid pays her own share by link,

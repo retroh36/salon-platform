@@ -4,7 +4,10 @@ import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time"
 import { runMembershipBilling } from "@/lib/memberships-billing";
 import { admin, SEED, signIn } from "../tests/db/helpers";
 import { openCheckout } from "./checkout-helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, putBackSales, test, ui, waitForHydration } from "./fixtures";
+
+// Stock and sales this file uses are put back afterwards.
+putBackSales();
 
 const B = SEED.business;
 const L = SEED.location;

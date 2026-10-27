@@ -29,6 +29,9 @@ export type RescueVisit = {
   // The client's preferred stylist, and whether they only see them.
   preferredStaffId: string | null;
   onlySees: boolean;
+  // When it was booked: visits starting together are planned in booking
+  // order, so whoever booked first gets the first pick.
+  bookedAt?: Date;
 };
 
 export type RescueMove = { itemId: string; appointmentId: string; staffId: string; resourceId: string | null; start: Date; timing: ServiceTiming };
@@ -82,11 +85,17 @@ export type RescueInput = {
 
 const overlapsOut = (item: BookedItem, from: Date) => itemEnd(item).getTime() > from.getTime();
 
-// The visits a call-out touches: the stylist's items from `from` on.
+// The visits a call-out touches: the stylist's items from `from` on, by
+// start, then booked first, always in the same order.
 export function affectedVisits<T extends RescueVisit>(visits: readonly T[], staffId: string, from: Date): T[] {
   return visits
     .filter((v) => v.items.some((i) => i.staffId === staffId && overlapsOut(i, from)))
-    .sort((a, b) => a.items[0].start.getTime() - b.items[0].start.getTime());
+    .sort(
+      (a, b) =>
+        a.items[0].start.getTime() - b.items[0].start.getTime() ||
+        (a.bookedAt?.getTime() ?? 0) - (b.bookedAt?.getTime() ?? 0) ||
+        a.appointmentId.localeCompare(b.appointmentId),
+    );
 }
 
 // The calendar with these moves made: each item at its new place and length.

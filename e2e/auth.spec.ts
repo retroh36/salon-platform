@@ -28,6 +28,10 @@ test("signing in greets you on the Dashboard, the team is under Team, and signin
   await expect(ui(page).getByRole("heading", { name: `Staff (${await countFor("staff", SEED.business, SEED.location)})` })).toBeVisible();
   await expect(ui(page).getByText("Olivia Bennett(you)")).toBeVisible();
 
+  // Signing out while the page's links are still prefetching would answer
+  // them signed out: sent on to sign-in, which has no such page (a 404 in
+  // the console). A person never signs out that fast.
+  await page.waitForLoadState("networkidle");
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL("/login");
   await page.goto("/dashboard");

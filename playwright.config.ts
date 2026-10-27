@@ -10,8 +10,13 @@ try {
 delete process.env.ANTHROPIC_API_KEY;
 
 // Its own server, apart from `npm run dev` on 3000 (which may have the API
-// key), with its own build folder.
+// key), with its own build folder. A production build by default: the dev
+// server's memory grows with every page it renders until it slows to a crawl
+// and its worker runs out of heap partway through a full run, and dev runs
+// every effect twice. E2E_DEV=1 uses the dev server instead (no build, so
+// quicker for one file, and React's development checks run).
 const PORT = 3100;
+const DEV = process.env.E2E_DEV === "1";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -37,11 +42,17 @@ export default defineConfig({
   ],
   // Reuses the test server if one is already running on its port.
   webServer: {
-    command: `next dev --port ${PORT}`,
+    command: DEV ? `next dev --port ${PORT}` : `next build && next start --port ${PORT}`,
     url: `http://localhost:${PORT}/login`,
     reuseExistingServer: true,
-    timeout: 180_000,
-    // Set but empty, so .env.local's key isn't loaded.
-    env: { ANTHROPIC_API_KEY: "", NEXT_DIST_DIR: ".next-e2e", NEXT_PUBLIC_SITE_URL: `http://localhost:${PORT}` },
+    timeout: 600_000,
+    // Set but empty, so .env.local's key isn't loaded. MAESTRA_TEST_SERVER
+    // opens the dev outbox on the production build (`outboxOpen`).
+    env: {
+      ANTHROPIC_API_KEY: "",
+      NEXT_DIST_DIR: ".next-e2e",
+      NEXT_PUBLIC_SITE_URL: `http://localhost:${PORT}`,
+      MAESTRA_TEST_SERVER: "true",
+    },
   },
 });

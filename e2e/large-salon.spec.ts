@@ -18,16 +18,18 @@ const IPAD_PORTRAIT = { width: 820, height: 1180 };
 // A column's narrowest, in px (9.5rem).
 const COLUMN_MIN = 152;
 
-let order: { id: string; calendar_position: number | null }[] = [];
+// The salon's calendar order as the seed sets it (stylist …00NN at NN − 10),
+// before the file starts, whatever an earlier run left, and again after.
+async function seededOrder() {
+  const { data } = await admin.from("staff").select("id").eq("business_id", LARGE.business).gte("id", "d1000000-0000-4000-8000-000000000010").lte("id", "d1000000-0000-4000-8000-000000000099");
+  for (const s of data ?? []) await admin.from("staff").update({ calendar_position: Number(s.id.slice(-2)) - 10 }).eq("id", s.id);
+}
 
-test.beforeAll(async () => {
-  const { data } = await admin.from("staff").select("id, calendar_position").eq("business_id", LARGE.business);
-  order = data!;
-});
+test.beforeAll(seededOrder);
 
 test.afterAll(async () => {
   await admin.from("calendar_views").delete().eq("business_id", LARGE.business).like("name", `${TAG}%`);
-  for (const s of order) await admin.from("staff").update({ calendar_position: s.calendar_position }).eq("id", s.id);
+  await seededOrder();
 });
 
 const grid = (page: Page) => ui(page).getByTestId("calendar-grid");

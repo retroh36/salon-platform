@@ -2,7 +2,10 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { onCheckout, openCheckout } from "./checkout-helpers";
-import { AUTH, expect, test, ui, waitForHydration, checkIn, checkOut } from "./fixtures";
+import { AUTH, checkIn, checkOut, expect, putBackSales, test, ui, waitForHydration } from "./fixtures";
+
+// Stock and sales this file uses are put back afterwards.
+putBackSales();
 
 const B = SEED.business;
 const TZ = "America/Chicago";

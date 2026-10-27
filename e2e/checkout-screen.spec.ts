@@ -1,7 +1,10 @@
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { checkout, openCheckout } from "./checkout-helpers";
-import { allowOfflineLogs, AUTH, expect, test } from "./fixtures";
+import { allowOfflineLogs, AUTH, expect, putBackSales, test } from "./fixtures";
+
+// Stock and sales this file uses are put back afterwards.
+putBackSales();
 
 // The full-screen checkout on an iPad at the front desk: a busy ticket with
 // two stylists, products by search and quick-add, editing and removing

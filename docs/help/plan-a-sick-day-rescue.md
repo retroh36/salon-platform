@@ -17,6 +17,7 @@ When a stylist is out (all day or from a time), see where every one of their cli
 ## Good to know
 
 - Each option is checked with the booking rules: who does the service, each stylist's own length for it (where Denise knows it), processing time and chairs. A stylist at another level charges their own price, shown on the option ("Master · $20 more").
+- Clients are planned in the order of their visits; two who start at the same time go in the order they booked, so whoever booked first gets the first pick.
 - The stylists taking on a client get a notice under **Changes to your day** on My day.
 - Checkout credits the stylist who does the service, so commission and tips go to them.
 - **Undo all** puts everyone back where they were, as long as nothing has changed since. Messages already sent aren't taken back, so message those clients again.

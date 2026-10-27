@@ -4,13 +4,15 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { isDemo } from "@/lib/demo";
+import { outboxOpen } from "@/lib/dev-outbox";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = { title: "Dev outbox", robots: { index: false } };
 
 // Development and the public demo only: the texts and emails Maestra would have sent (booking
 // codes and confirmations, receipts, gift cards), newest first, until a real provider is
-// connected. Shows nothing in production, unless it's the demo.
+// connected. Shows nothing in production, unless it's the demo (or the browser
+// tests' build: `outboxOpen`).
 export default function OutboxPage({ searchParams }: PageProps<"/dev/outbox">) {
   return (
     <Suspense fallback={<main className="p-6" aria-busy="true" />}>
@@ -22,7 +24,7 @@ export default function OutboxPage({ searchParams }: PageProps<"/dev/outbox">) {
 // ?to= shows only what went to one number or address.
 async function Outbox({ searchParams }: Pick<PageProps<"/dev/outbox">, "searchParams">) {
   await connection();
-  if (process.env.NODE_ENV === "production" && !isDemo()) notFound();
+  if (!outboxOpen()) notFound();
   const to = (await searchParams).to;
   let query = createAdminClient()
     .from("outbox_messages")

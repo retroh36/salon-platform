@@ -4,7 +4,10 @@
 // sale at iPad width, and never on the client's booking site.
 import { busyDay } from "../tests/db/helpers";
 import { openCheckout } from "./checkout-helpers";
-import { AUTH, expect, test, waitForHydration } from "./fixtures";
+import { AUTH, expect, putBackSales, test, waitForHydration } from "./fixtures";
+
+// Stock and sales this file uses are put back afterwards.
+putBackSales();
 
 test.use({ storageState: AUTH.frontDesk });
 

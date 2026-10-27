@@ -84,7 +84,7 @@ export async function loadRescue(supabase: Supabase, location: Location, busines
       ? supabase
           .from("appointments")
           .select(
-            "id, status, client_id, client:clients(first_name, last_name, preferred_staff_id, only_sees_preferred), items:appointment_items(id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes)",
+            "id, status, client_id, created_at, client:clients(first_name, last_name, preferred_staff_id, only_sees_preferred), items:appointment_items(id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes)",
           )
           .in("id", ids)
           .in("status", ["booked", "confirmed", "checked_in"])
@@ -116,6 +116,7 @@ export async function loadRescue(supabase: Supabase, location: Location, busines
       })),
     preferredStaffId: a.client?.preferred_staff_id ?? null,
     onlySees: Boolean(a.client?.only_sees_preferred && a.client.preferred_staff_id === staffId),
+    bookedAt: new Date(a.created_at),
   }));
 
   const stylists = (team.data ?? []).filter((s) => ctx.staff.has(s.id)).map((s) => ({ id: s.id, firstName: s.first_name, level: (s.level ?? null) as Level }));

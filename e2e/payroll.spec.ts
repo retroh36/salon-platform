@@ -1,5 +1,15 @@
+import { formatLongDay } from "@/lib/schedule-format";
+import { addDays, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, putBackSales, test, ui, waitForHydration } from "./fixtures";
+
+// Stock and sales this file uses are put back afterwards.
+putBackSales();
+
+// Three days of last week (Thursday to Saturday), within the demo history
+// however long ago it was loaded.
+const FROM = addDays(startOfWeek(todayIn("America/Chicago")), -4);
+const TO = addDays(FROM, 2);
 
 // Payroll: owners and managers see everyone's pay for a period with every
 // ticket behind it and a CSV; stylists see only their own, on My day.
@@ -28,15 +38,15 @@ test.describe("owner", () => {
     await ui(page).getByRole("link", { name: "Previous period" }).click();
     await expect(page).toHaveURL(/from=\d{4}-\d{2}-\d{2}&to=/);
     const form = ui(page).getByRole("form", { name: "Custom dates" });
-    await form.getByLabel("From").fill("2026-10-01");
-    await form.getByLabel("To").fill("2026-10-03");
+    await form.getByLabel("From").fill(FROM);
+    await form.getByLabel("To").fill(TO);
     await form.getByRole("button", { name: "Show" }).click();
-    await expect(ui(page).getByRole("heading", { level: 1, name: "Payroll" }).locator("..")).toContainText("Thursday, October 1 to Saturday, October 3, 2026");
+    await expect(ui(page).getByRole("heading", { level: 1, name: "Payroll" }).locator("..")).toContainText(`${formatLongDay(FROM, false)} to ${formatLongDay(TO)}`);
 
     const download = page.waitForEvent("download");
     await ui(page).getByRole("link", { name: "Export CSV" }).click();
     const file = await download;
-    expect(file.suggestedFilename()).toBe("payroll-2026-10-01-to-2026-10-03.csv");
+    expect(file.suggestedFilename()).toBe(`payroll-${FROM}-to-${TO}.csv`);
     const csv = await (await file.createReadStream()).toArray().then((chunks) => Buffer.concat(chunks).toString("utf8"));
     const [header, ...rows] = csv.trimEnd().split("\r\n");
     expect(header).toContain("Service commission,Retail sales");

@@ -22,10 +22,16 @@ async function learned(staffId: string, service: string) {
 
 const hm = formatDuration;
 
+// Bridget's own lengths for her services, put back exactly as they were.
+let lengths: { service_id: string; active_minutes: number | null; processing_minutes: number | null; finishing_minutes: number | null }[] = [];
+test.beforeAll(async () => {
+  lengths = (await admin.from("staff_services").select("service_id, active_minutes, processing_minutes, finishing_minutes").eq("staff_id", SEED.staff.bridget)).data ?? [];
+});
+
 test.afterAll(async () => {
   await admin.from("appointments").delete().eq("location_id", L).gte("starts_at", at(0).toISOString()).lt("starts_at", at(23).toISOString());
   await admin.from("clients").delete().like("first_name", `${PREFIX}%`);
-  await admin.from("staff_services").update({ active_minutes: null, processing_minutes: null, finishing_minutes: null }).eq("staff_id", SEED.staff.bridget);
+  for (const { service_id, ...was } of lengths) await admin.from("staff_services").update(was).eq("staff_id", SEED.staff.bridget).eq("service_id", service_id);
   await admin.from("ai_actions").delete().eq("feature", "duration");
 });
 

@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
-import { admin, SEED } from "../tests/db/helpers";
+import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
+import { admin, makeRoom, SEED } from "../tests/db/helpers";
 import { expect, test, waitForHydration } from "./fixtures";
 
 // A client's own account on the booking site, on a phone: sign in with a
@@ -15,38 +16,30 @@ test.describe.configure({ mode: "serial" });
 
 let client: { id: string; first_name: string; email: string };
 
+// Its own client: an email, a past visit that can be booked again straight
+// online (no consultation first), so "Book again" skips the services, and a
+// visit coming up.
+const PREFIX = `Ca${Date.now().toString(36).replace(/\d/g, (d) => "abcdefghij"[Number(d)])}`;
+const TZ = "America/Chicago";
+const undo: (() => Promise<void>)[] = [];
+
 test.beforeAll(async () => {
-  // A regular with an email and a visit coming up, whose last visit can be
-  // booked again straight online (no consultation-first services), so
-  // "Book again" skips the services. In a set order, so it's always the same.
-  const { data } = await admin
-    .from("appointments")
-    .select("client:clients!inner(id, first_name, email)")
-    .eq("business_id", B)
-    .eq("status", "booked")
-    .gt("starts_at", new Date(Date.now() + 2 * 86_400_000).toISOString())
-    .not("client.email", "is", null)
-    .order("starts_at")
-    .order("id")
-    .limit(100);
-  const { data: online } = await admin.from("services").select("id").eq("business_id", B).eq("online_booking", "bookable");
-  const bookable = new Set(online!.map((s) => s.id));
-  for (const row of data!) {
-    const candidate = row.client as unknown as typeof client;
-    const { data: last } = await admin
-      .from("appointments")
-      .select("appointment_items(service_id)")
-      .eq("client_id", candidate.id)
-      .eq("status", "completed")
-      .order("starts_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (last?.appointment_items.length && last.appointment_items.every((i) => bookable.has(i.service_id))) {
-      client = candidate;
-      break;
-    }
+  const check = <T>(r: { data: T; error: unknown }): NonNullable<T> => {
+    if (r.error) throw r.error;
+    return r.data as NonNullable<T>;
+  };
+  const email = `${PREFIX.toLowerCase()}@example.test`;
+  client = check(await admin.from("clients").insert({ business_id: B, first_name: `${PREFIX}Lou`, last_name: "Test", email }).select("id, first_name, email").single()) as typeof client;
+  const service = check(await admin.from("services").select("id, active_minutes, price_cents").eq("business_id", B).eq("name", "Blowout").eq("online_booking", "bookable").single());
+  const monday = startOfWeek(todayIn(TZ));
+  // Twenty weeks back (before the demo history) and nine weeks ahead, both Tuesdays at 10am.
+  for (const [date, status] of [[addDays(monday, -7 * 20 + 1), "completed"], [addDays(monday, 7 * 9 + 1), "booked"]] as const) {
+    const start = fromLocal(date, 10 * 60, TZ)!;
+    const end = new Date(start.getTime() + service.active_minutes * 60_000);
+    undo.push(await makeRoom(SEED.staff.bridget, start, end));
+    const visit = check(await admin.from("appointments").insert({ business_id: B, location_id: SEED.location, client_id: client.id, starts_at: start.toISOString(), ends_at: end.toISOString(), status }).select("id").single());
+    check(await admin.from("appointment_items").insert({ business_id: B, location_id: SEED.location, appointment_id: visit.id, service_id: service.id, staff_id: SEED.staff.bridget, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: service.active_minutes, price_cents: service.price_cents }));
   }
-  expect(client, "a client whose last visit can be booked again online").toBeTruthy();
 });
 
 test.beforeEach(async () => {
@@ -55,6 +48,9 @@ test.beforeEach(async () => {
 
 test.afterAll(async () => {
   await admin.from("client_accounts").delete().eq("client_id", client.id);
+  await admin.from("appointments").delete().eq("client_id", client.id);
+  for (const putBack of undo) await putBack();
+  await admin.from("clients").delete().eq("id", client.id);
 });
 
 async function newestTo(page: Page, to: string): Promise<string> {

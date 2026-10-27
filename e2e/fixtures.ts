@@ -1,6 +1,6 @@
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
 import { daysBetween, todayIn } from "@/lib/scheduling/time";
-import { busyDay, SEED } from "../tests/db/helpers";
+import { admin, busyDay, SEED } from "../tests/db/helpers";
 import { shiftBusiness } from "../e2e-week/time-machine";
 import { freshAuth } from "./fresh-auth";
 
@@ -23,6 +23,15 @@ export const AUTH = {
 // throws (an uncaught "Failed to fetch") still fails the test.
 export function allowOfflineLogs(pageErrors: string[]) {
   pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => e !== "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"));
+}
+
+// A test that opens a page that isn't there on purpose: on the production
+// build the page's shell has already been sent when `notFound()` runs inside
+// its Suspense boundary, so React shows "We can't find that page" in the
+// browser and logs error #419 ("could not finish this Suspense boundary").
+// Only that line is let through (docs/backlog.md).
+export function allowNotFoundLogs(pageErrors: string[]) {
+  pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !e.startsWith("Minified React error #419;")));
 }
 
 // Fails the test if the page logs a console error or throws. In dev this
@@ -168,6 +177,43 @@ export async function busyToday(): Promise<() => void> {
   return () => {
     if (days > 0) shiftBusiness(SEED.business, TZ, days);
   };
+}
+
+// For a test file that sells or checks out: afterwards, puts back the stock
+// its checkouts and sales took (and gave back: voids and refunds) and
+// removes the sales it made, walk-ins included, so no other file, or the
+// next run, sees them. Single worker: everything since the file started is
+// its own. Call it once at the top of the file.
+export function putBackSales() {
+  let since = "";
+  test.beforeAll(() => {
+    since = new Date().toISOString();
+  });
+  test.afterAll(async () => {
+    await undoSalesSince(since);
+  });
+}
+
+export async function undoSalesSince(since: string) {
+  const { data: moves, error } = await admin.from("stock_movements").select("id, product_id, location_id, change").in("reason", ["service_use", "sale"]).gte("created_at", since);
+  if (error) throw error;
+  const back = new Map<string, { product: string; location: string; change: number }>();
+  for (const m of moves ?? []) {
+    const key = `${m.product_id}:${m.location_id}`;
+    const b = back.get(key) ?? { product: m.product_id, location: m.location_id, change: 0 };
+    b.change += Number(m.change);
+    back.set(key, b);
+  }
+  for (const b of back.values()) {
+    if (Math.abs(b.change) < 0.005) continue;
+    const { data: level } = await admin.from("stock_levels").select("on_hand").eq("product_id", b.product).eq("location_id", b.location).single();
+    await admin.from("stock_levels").update({ on_hand: Number(level!.on_hand) - b.change }).eq("product_id", b.product).eq("location_id", b.location);
+  }
+  if (moves?.length) await admin.from("stock_movements").delete().in("id", moves.map((m) => m.id));
+  // Points the sales earned (or spent), then the sales themselves.
+  await admin.from("reward_points").delete().gte("created_at", since).not("sale_id", "is", null);
+  const { error: salesError } = await admin.from("sales").delete().gte("created_at", since);
+  if (salesError) throw salesError;
 }
 
 // Opens the calendar's display menu (the zoom and Fit all), named after the

@@ -2,7 +2,10 @@ import type { Page } from "@playwright/test";
 import { fromLocal, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { onCheckout } from "./checkout-helpers";
-import { AUTH, checkOut, clientTab, expect, test, ui, visitTab, waitForHydration } from "./fixtures";
+import { AUTH, checkOut, clientTab, expect, putBackSales, test, ui, visitTab, waitForHydration } from "./fixtures";
+
+// Stock and sales this file uses are put back afterwards.
+putBackSales();
 
 const B = SEED.business;
 const L = SEED.location;
@@ -119,17 +122,23 @@ test.describe("formulas and stock", () => {
   test("a manager sets a service's default recipe", async ({ browser }) => {
     const page = await browser.newPage({ storageState: AUTH.owner });
     const { data: s } = await admin.from("services").select("id").eq("business_id", B).eq("name", "Scalp Treatment").single();
-    await page.goto(`/services/${s!.id}`);
-    await waitForHydration(page, "form[aria-label='Product recipe'] button");
-    const recipe = ui(page).getByRole("form", { name: "Product recipe" });
-    await recipe.getByRole("button", { name: "Add a product" }).click();
-    await recipe.getByRole("group", { name: "Product 1" }).getByLabel("Product", { exact: true }).selectOption({ label: "Acidic Bonding Concentrate Intensive Treatment (back bar) (ml)" });
-    await recipe.getByRole("group", { name: "Product 1" }).getByLabel("Amount").fill("20");
-    await recipe.getByRole("button", { name: "Save recipe" }).click();
-    await expect(recipe.getByRole("status")).toHaveText("Recipe saved.");
-    const { data } = await admin.from("service_products").select("amount").eq("service_id", s!.id);
-    expect(data).toEqual([{ amount: 20 }]);
-    await admin.from("service_products").delete().eq("service_id", s!.id);
+    // The service's recipe goes back to what it was, however the test ends.
+    const { data: was } = await admin.from("service_products").select("business_id, service_id, product_id, amount").eq("service_id", s!.id);
+    try {
+      await page.goto(`/services/${s!.id}`);
+      await waitForHydration(page, "form[aria-label='Product recipe'] button");
+      const recipe = ui(page).getByRole("form", { name: "Product recipe" });
+      await recipe.getByRole("button", { name: "Add a product" }).click();
+      await recipe.getByRole("group", { name: "Product 1" }).getByLabel("Product", { exact: true }).selectOption({ label: "Acidic Bonding Concentrate Intensive Treatment (back bar) (ml)" });
+      await recipe.getByRole("group", { name: "Product 1" }).getByLabel("Amount").fill("20");
+      await recipe.getByRole("button", { name: "Save recipe" }).click();
+      await expect(recipe.getByRole("status")).toHaveText("Recipe saved.");
+      const { data } = await admin.from("service_products").select("amount").eq("service_id", s!.id);
+      expect(data).toEqual([{ amount: 20 }]);
+    } finally {
+      await admin.from("service_products").delete().eq("service_id", s!.id);
+      if (was?.length) await admin.from("service_products").insert(was);
+    }
     await page.close();
   });
 

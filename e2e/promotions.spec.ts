@@ -1,7 +1,10 @@
 import type { Page } from "@playwright/test";
 import { admin, SEED } from "../tests/db/helpers";
 import { openCheckout } from "./checkout-helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, putBackSales, test, ui, waitForHydration } from "./fixtures";
+
+// Stock and sales this file uses are put back afterwards.
+putBackSales();
 
 // Promotions: an owner sets up a code, the front desk applies it at
 // checkout (not with another discount), and the booking site shows the

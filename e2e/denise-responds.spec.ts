@@ -2,7 +2,10 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, openAllDay, restoreLearnedDurations, SEED, setAsideLearnedDurations } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration, moreAction } from "./fixtures";
+import { AUTH, expect, moreAction, putBackSales, test, ui, waitForHydration } from "./fixtures";
+
+// Stock and sales this file uses are put back afterwards.
+putBackSales();
 
 // Denise always responds: whatever triggers her, she shows she's thinking,
 // then says something (fixes, why there's nothing to do, or what staff can

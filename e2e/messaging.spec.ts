@@ -18,6 +18,7 @@ const DIGITS = `312555${String(Date.now() % 10_000).padStart(4, "0")}`;
 const PHONE = `(${DIGITS.slice(0, 3)}) ${DIGITS.slice(3, 6)}-${DIGITS.slice(6)}`;
 let clientId: string;
 let visitId: string;
+let putBack: () => Promise<void> = async () => {};
 
 test.describe.configure({ mode: "serial" });
 
@@ -33,7 +34,7 @@ test.beforeAll(async () => {
   const start = fromLocal(DAY, 10 * 60, TZ)!;
   const end = new Date(start.getTime() + 3_600_000);
   // The demo calendar may have Bridget busy then; the database refuses a double-booking.
-  await makeRoom(SEED.staff.bridget, start, end);
+  putBack = await makeRoom(SEED.staff.bridget, start, end);
   const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: clientId, starts_at: start.toISOString(), ends_at: end.toISOString(), status: "booked" }).select("id").single();
   visitId = a!.id;
   await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: visitId, service_id: s!.id, staff_id: SEED.staff.bridget, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: 60, price_cents: 8_500 });
@@ -42,6 +43,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await admin.from("sms_suppressions").delete().eq("phone_digits", DIGITS);
   await admin.from("appointments").delete().eq("client_id", clientId);
+  await putBack();
   await admin.from("clients").delete().eq("id", clientId);
   await admin.from("businesses").update({ free_text_roles: ["manager", "front_desk", "stylist"] }).eq("id", B);
 });

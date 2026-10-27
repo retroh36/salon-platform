@@ -9,8 +9,17 @@ async function product(sku: string) {
 }
 const level = async (sku: string) => (await admin.from("stock_levels").select("on_hand").eq("product_id", await product(sku)).eq("location_id", L).single()).data!.on_hand;
 
-// Put stock back the way the seed left it.
+// 7N at the 144 g the seed gives it (two full tubes counted is then 24 g
+// short), whatever earlier tests used; put back afterwards.
+let sevenNWas: number | null = null;
+test.beforeAll(async () => {
+  sevenNWas = await level("GW-TC-7N");
+  await admin.from("stock_levels").update({ on_hand: 144 }).eq("product_id", await product("GW-TC-7N")).eq("location_id", L);
+});
+
+// Put stock back the way it was.
 test.afterAll(async () => {
+  if (sevenNWas !== null) await admin.from("stock_levels").update({ on_hand: sevenNWas }).eq("product_id", await product("GW-TC-7N")).eq("location_id", L);
   const { data: takes } = await admin.from("stocktakes").select("id").eq("location_id", L);
   const ids = (takes ?? []).map((t) => t.id);
   if (!ids.length) return;
@@ -58,7 +67,9 @@ test.describe("on an iPad", () => {
     await dryspun.getByLabel("Units").fill(String(before.dryspun));
     await dryspun.getByRole("button", { name: "Save count" }).tap();
     await expect(dryspun.getByTestId("count-result")).toContainText("Matches");
-    await expect(ui(page).getByTestId("count-progress")).toHaveText("3 of 47 counted");
+    // Every active product is on the count.
+    const { count: active } = await admin.from("products").select("id", { count: "exact", head: true }).eq("business_id", SEED.business).eq("is_active", true);
+    await expect(ui(page).getByTestId("count-progress")).toHaveText(`3 of ${active} counted`);
 
     await ui(page).getByRole("button", { name: "Review and finish" }).tap();
     const review = ui(page).getByRole("region", { name: "Review stocktake" });

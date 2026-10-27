@@ -10,6 +10,7 @@ Known gaps to pick up later. Move an item into a task when it's scheduled.
 
 ## Calendar and booking
 
+- [ ] **A console line on "We can't find that page".** Pages load their data inside a Suspense boundary (Cache Components), so when a link is bad (an old manage link, a salon that isn't there) the page's shell has already been sent when `notFound()` runs: the visitor sees the right page, rendered in the browser, with a 200 status and React's error #419 in the console. The browser tests let only that line through where they open a missing page on purpose (`allowNotFoundLogs`). If search engines or monitoring ever count it, check the slug or token before the Suspense boundary so the server can answer 404.
 - [ ] **Rules checked in the app only.** The database itself refuses a double-booking (a stylist's busy time or a chair held twice), but the other booking rules (hours, time off, blocked time) and status changes run in `lib/scheduling/` before the database functions save. A staff member who can book could skip them by calling those functions directly with their own login. If that matters (e.g. before opening an API), have the functions accept only calls from the server.
 - [ ] **Move a whole visit.** Dragging moves one service; a visit with two stylists needs each moved separately (or edited in the panel).
 - [ ] **Undo a move.** A drag saves straight away; offer "Undo" in the notice.

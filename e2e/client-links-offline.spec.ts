@@ -3,7 +3,10 @@ import type { Page } from "@playwright/test";
 import { linkSnapshot, type LinkSnapshot } from "@/lib/payment-links";
 import { EMPTY_TICKET, type Ticket } from "@/lib/ticket";
 import { admin, SEED, signIn, throwawayStylist } from "../tests/db/helpers";
-import { allowOfflineLogs, expect, test } from "./fixtures";
+import { allowOfflineLogs, expect, putBackSales, test } from "./fixtures";
+
+// Stock and sales this file uses are put back afterwards.
+putBackSales();
 
 // The client's own pages on a phone (pay by link, save a card, agree to an
 // event proposal) when the connection drops just as they tap: the salon

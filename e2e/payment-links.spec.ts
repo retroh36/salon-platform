@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import { admin, makeRoom, SEED } from "../tests/db/helpers";
 import { openCheckout } from "./checkout-helpers";
-import { AUTH, expect, test } from "./fixtures";
+import { AUTH, expect, putBackSales, test } from "./fixtures";
+
+// Stock and sales this file uses are put back afterwards.
+putBackSales();
 
 // Text-to-pay: the front desk sends a payment link from checkout; the
 // client opens it on their phone, adds a tip and pays; the checkout

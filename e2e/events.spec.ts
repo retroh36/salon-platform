@@ -30,6 +30,7 @@ test.afterAll(async () => {
   const ids = (inquiries ?? []).map((c) => c.id);
   await admin.from("events").delete().in("client_id", ids);
   await admin.from("clients").delete().in("id", ids);
+  await admin.from("event_packages").delete().ilike("name", `${PREFIX}%`);
 });
 
 test.use({ viewport: { width: 1440, height: 1100 } });
@@ -126,6 +127,5 @@ test("an owner sets up event packages and bridal settings", async ({ browser }) 
   await page.reload();
   await expect(ui(page).getByRole("list", { name: "Event packages" })).toContainText(`${PREFIX} Groom grooming`);
   await expect(ui(page).getByLabel("Contract terms")).toHaveValue(/Booking\. Your date is held/);
-  await admin.from("event_packages").delete().ilike("name", `${PREFIX}%`);
   await page.close();
 });

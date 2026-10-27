@@ -96,6 +96,8 @@ test.describe("the shared iPad", () => {
 
     try {
       await page.goto("/dashboard");
+      // Prefetches answered after the switch would be sent to the PIN screen (auth.spec.ts).
+      await page.waitForLoadState("networkidle");
       await page.getByRole("button", { name: "Switch user" }).first().click();
       await expect(page).toHaveURL("/switch");
       await expect(page.getByRole("heading", { name: "Who's at the desk?" })).toBeVisible();

@@ -1,21 +1,78 @@
-import { admin, SEED } from "../tests/db/helpers";
+import { admin, SEED, throwawayStylist } from "../tests/db/helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
+const B = SEED.business;
 const L = SEED.location;
-const START = new Date().toISOString();
+// Everything here is the file's own: two suppliers, their products, a
+// service whose recipe uses the first, and a client booked on it in a few
+// minutes with none of it in stock. Nothing else can run out sooner, so
+// Denise's first suggestion is always this supplier's, whatever earlier
+// tests (or runs) did to the salon's own stock.
+const PREFIX = `Ord${Date.now().toString(36).replace(/\d/g, (d) => "abcdefghij"[Number(d)])}`;
+const SUPPLIER = `${PREFIX} Beauty Supply`;
+const WHOLESALE = `${PREFIX} Wholesale`;
+const PRODUCT = `${PREFIX} Labs Bond Builder`;
+const TONER = `${PREFIX} Labs Toner`;
+let supplierId: string;
+let wholesaleId: string;
+let productId: string;
+let tonerId: string;
+let serviceId: string;
+let deliveryId: string;
+let clientId: string;
+let stylist: Awaited<ReturnType<typeof throwawayStylist>>;
 
-// Put back stock that orders received during the tests, and remove the
-// orders and suggestions they made.
+const check = <T>(r: { data: T; error: unknown }): NonNullable<T> => {
+  if (r.error) throw r.error;
+  return r.data as NonNullable<T>;
+};
+
+test.beforeAll(async () => {
+  const suppliers = check(await admin.from("suppliers").insert([{ business_id: B, name: SUPPLIER, lead_time_days: 3 }, { business_id: B, name: WHOLESALE, lead_time_days: 5 }]).select("id, name"));
+  supplierId = suppliers.find((x) => x.name === SUPPLIER)!.id;
+  wholesaleId = suppliers.find((x) => x.name === WHOLESALE)!.id;
+  const products = check(
+    await admin
+      .from("products")
+      .insert([
+        { business_id: B, supplier_id: supplierId, brand: `${PREFIX} Labs`, name: "Bond Builder", type: "back_bar", unit: "ml", size: 1000, cost_cents: 1500 },
+        { business_id: B, supplier_id: wholesaleId, brand: `${PREFIX} Labs`, name: "Toner", type: "back_bar", unit: "ml", size: 60, cost_cents: 900 },
+      ])
+      .select("id, name"),
+  );
+  productId = products.find((x) => x.name === "Bond Builder")!.id;
+  tonerId = products.find((x) => x.name === "Toner")!.id;
+  check(await admin.from("stock_levels").insert([
+    { business_id: B, location_id: L, product_id: productId, on_hand: 0, reorder_point: 500, reorder_quantity: 1 },
+    { business_id: B, location_id: L, product_id: tonerId, on_hand: 120, reorder_point: 0, reorder_quantity: 1 },
+  ]));
+  serviceId = check(await admin.from("services").insert({ business_id: B, name: `${PREFIX} Bond Treatment`, category: "Treatments", active_minutes: 30, price_cents: 4000 }).select("id").single()).id;
+  check(await admin.from("service_products").insert({ business_id: B, service_id: serviceId, product_id: productId, amount: 20 }));
+  stylist = await throwawayStylist(`${PREFIX}Ivy`);
+  clientId = check(await admin.from("clients").insert({ business_id: B, first_name: `${PREFIX}Pat`, last_name: "Test" }).select("id").single()).id;
+  const start = new Date(Date.now() + 10 * 60_000);
+  const end = new Date(start.getTime() + 30 * 60_000);
+  const visit = check(await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: clientId, starts_at: start.toISOString(), ends_at: end.toISOString(), status: "booked" }).select("id").single());
+  check(await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: visit.id, service_id: serviceId, staff_id: stylist.id, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: 30, price_cents: 4000 }));
+  // A delivery on its way from the wholesaler, for the front desk.
+  const po = check(await admin.from("purchase_orders").insert({ business_id: B, location_id: L, supplier_id: wholesaleId, status: "sent", sent_at: new Date().toISOString(), notes: `${PREFIX} restock` }).select("id").single());
+  deliveryId = po.id;
+  check(await admin.from("purchase_order_lines").insert({ business_id: B, purchase_order_id: po.id, product_id: tonerId, quantity: 6, unit_cost_cents: 900 }));
+});
+
+// Everything the file made goes, with the suggestions Denise recorded.
 test.afterAll(async () => {
-  const { data: moves } = await admin.from("stock_movements").select("id, product_id, change").eq("reason", "order_received").gte("created_at", START);
-  for (const m of moves ?? []) {
-    const { data: level } = await admin.from("stock_levels").select("on_hand").eq("product_id", m.product_id).eq("location_id", L).single();
-    await admin.from("stock_levels").update({ on_hand: level!.on_hand - m.change }).eq("product_id", m.product_id).eq("location_id", L);
-    await admin.from("stock_movements").delete().eq("id", m.id);
-  }
-  await admin.from("purchase_order_lines").update({ received_quantity: 0 }).gte("received_quantity", 1);
-  await admin.from("purchase_orders").update({ status: "sent", received_at: null }).neq("status", "draft").eq("notes", "Toner restock");
-  await admin.from("purchase_orders").delete().gte("created_at", START);
+  const mine = [productId, tonerId].filter(Boolean);
+  await admin.from("purchase_orders").delete().in("supplier_id", [supplierId, wholesaleId].filter(Boolean));
+  await admin.from("appointments").delete().eq("client_id", clientId);
+  await stylist?.remove();
+  await admin.from("clients").delete().eq("id", clientId);
+  await admin.from("service_products").delete().eq("service_id", serviceId);
+  await admin.from("services").delete().eq("id", serviceId);
+  await admin.from("stock_movements").delete().in("product_id", mine);
+  await admin.from("stock_levels").delete().in("product_id", mine);
+  await admin.from("products").delete().in("id", mine);
+  await admin.from("suppliers").delete().in("id", [supplierId, wholesaleId].filter(Boolean));
   await admin.from("ai_actions").delete().eq("feature", "reorder");
 });
 
@@ -29,7 +86,8 @@ test.describe("owner", () => {
     await expect(card.locator("[data-pose]")).toHaveAttribute("data-pose", "point");
     const first = card.getByTestId("reorder-suggestion").first();
     await expect(first).toContainText(/You'll run out of .+ before .+ — \d+ (color )?appointments? needs? it\./);
-    await expect(first).toContainText("I've put together an order for Northline Beauty Supply");
+    await expect(first).toContainText(`You'll run out of ${PRODUCT} before the end of today — 1 appointment needs it.`);
+    await expect(first).toContainText(`I've put together an order for ${SUPPLIER}`);
 
     await first.getByText("What's in it").click();
     await expect(first.getByRole("listitem").first()).toContainText(/Runs out/);
@@ -44,10 +102,11 @@ test.describe("owner", () => {
 
     // She suggests it again; draft it and open it: Denise's lines, ready to
     // review and send.
-    const northline = card.getByTestId("reorder-suggestion").filter({ hasText: "Northline Beauty Supply" });
-    await northline.getByRole("button", { name: "Draft this order" }).click();
+    const mine = card.getByTestId("reorder-suggestion").filter({ hasText: SUPPLIER });
+    await mine.getByRole("button", { name: "Draft this order" }).click();
     await card.getByRole("link", { name: "Open order" }).click();
-    await expect(ui(page).getByRole("heading", { level: 1 })).toContainText("Northline Beauty Supply");
+    await expect(page).toHaveURL(/\/inventory\/orders\/[0-9a-f-]{36}$/);
+    await expect(ui(page).getByRole("heading", { level: 1 })).toContainText(SUPPLIER);
     await expect(ui(page).getByText("Drafted by Denise")).toBeVisible();
     await expect(ui(page).getByRole("region", { name: "Why Denise suggested these" })).toContainText("Runs out");
     await waitForHydration(page, "form[aria-label='Edit order'] select");
@@ -59,15 +118,15 @@ test.describe("owner", () => {
     await page.goto("/inventory/orders/new");
     await waitForHydration(page, "form[aria-label='New order'] select");
     const form = ui(page).getByRole("form", { name: "New order" });
-    await form.getByLabel("Supplier").selectOption({ label: "Prairie Pro Distributors" });
+    await form.getByLabel("Supplier").selectOption({ label: WHOLESALE });
     await form.getByRole("button", { name: "Add a product" }).click();
     const line = form.getByRole("group", { name: "Line 1" });
-    await line.getByLabel("Product", { exact: true }).selectOption({ label: "Olaplex No.3 Hair Perfector 100 ml" });
+    await line.getByLabel("Product", { exact: true }).selectOption({ label: `${TONER} (60 ml)` });
     await line.getByLabel("Quantity").fill("12");
-    await expect(form.getByTestId("order-total")).toHaveText("$180");
+    await expect(form.getByTestId("order-total")).toHaveText("$108");
     await form.getByRole("button", { name: "Create draft" }).click();
     await expect(page).toHaveURL(/\/inventory\/orders\/[0-9a-f-]{36}$/);
-    await expect(ui(page).getByRole("heading", { level: 1 })).toContainText("Prairie Pro Distributors");
+    await expect(ui(page).getByRole("heading", { level: 1 })).toContainText(WHOLESALE);
   });
 
   test("sees stock upcoming services need on the dashboard", async ({ page }) => {
@@ -83,26 +142,26 @@ test.describe("front desk", () => {
   test.use({ storageState: AUTH.frontDesk });
 
   test("receives a delivery into stock, part now and the rest later", async ({ page }) => {
-    const { data: po } = await admin.from("purchase_orders").select("id, purchase_order_lines(product_id, quantity, product:products(sku))").eq("notes", "Toner restock").single();
-    const t18 = po!.purchase_order_lines.find((l) => l.product.sku === "WE-CC-T18")!;
-    const level = async () => (await admin.from("stock_levels").select("on_hand").eq("product_id", t18.product_id).single()).data!.on_hand;
+    const level = async () => Number((await admin.from("stock_levels").select("on_hand").eq("product_id", tonerId).single()).data!.on_hand);
     const before = await level();
+    const arrived = new RegExp(`^${TONER} .* arrived$`);
 
     await page.goto("/inventory/orders");
-    await ui(page).getByRole("table", { name: "Orders" }).getByRole("link", { name: /Lakeshore Salon Wholesale/ }).click();
+    // The sent one (an owner may have drafted another for the same supplier).
+    await ui(page).getByRole("table", { name: "Orders" }).locator(`a[href$="/inventory/orders/${deliveryId}"]`).first().click();
     await waitForHydration(page, "form[aria-label='Receive delivery'] input");
     const form = ui(page).getByRole("form", { name: "Receive delivery" });
-    // Only 4 of the 6 T18 arrived; the other lines came in full.
-    await form.getByLabel(/T18 .* arrived/).fill("4");
+    // Only 4 of the 6 arrived.
+    await form.getByLabel(arrived).fill("4");
     await form.getByRole("button", { name: "Receive into stock" }).click();
     await expect(form.getByRole("status")).toHaveText("Received. Stock is updated; the rest is still due.");
     await expect(ui(page).getByText("Partly received")).toBeVisible();
-    await expect.poll(level).toBeCloseTo(before + 4 * 42, 2);
+    await expect.poll(level).toBeCloseTo(before + 4 * 60, 2);
 
-    await expect(form.getByLabel(/T18 .* arrived/)).toHaveValue("2");
+    await expect(form.getByLabel(arrived)).toHaveValue("2");
     await form.getByRole("button", { name: "Receive into stock" }).click();
     await expect(ui(page).getByText("Received", { exact: true })).toBeVisible();
-    await expect.poll(level).toBeCloseTo(before + 6 * 42, 2);
+    await expect.poll(level).toBeCloseTo(before + 6 * 60, 2);
   });
 
   test("sees Denise's suggestions but leaves approving to managers", async ({ page }) => {

@@ -1,14 +1,27 @@
 import type { Page } from "@playwright/test";
 import { admin, SEED } from "../tests/db/helpers";
 import { onCheckout } from "./checkout-helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, putBackSales, test, ui, waitForHydration } from "./fixtures";
+
+// Stock and sales this file uses are put back afterwards.
+putBackSales();
 
 const B = SEED.business;
 const L = SEED.location;
 const RUN = `Inv${Date.now().toString(36)}`;
 
+// 7N as the seed has it (144 g, reorder at 180 g), whatever earlier tests
+// used; put back afterwards.
+let sevenN: { product_id: string; on_hand: number; reorder_point: number } | null = null;
+test.beforeAll(async () => {
+  const { data: p } = await admin.from("products").select("id").eq("business_id", B).eq("sku", "GW-TC-7N").single();
+  sevenN = (await admin.from("stock_levels").select("product_id, on_hand, reorder_point").eq("product_id", p!.id).eq("location_id", L).single()).data;
+  await admin.from("stock_levels").update({ on_hand: 144, reorder_point: 180 }).eq("product_id", p!.id).eq("location_id", L);
+});
+
 test.afterAll(async () => {
   await admin.from("products").delete().like("brand", `${RUN}%`);
+  if (sevenN) await admin.from("stock_levels").update({ on_hand: sevenN.on_hand, reorder_point: sevenN.reorder_point }).eq("product_id", sevenN.product_id).eq("location_id", L);
 });
 
 async function openInventory(page: Page, query = "") {

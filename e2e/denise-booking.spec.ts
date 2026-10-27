@@ -23,6 +23,10 @@ const PAT = `${PREFIX}Pat`;
 const TWIN = `${PREFIX}Twin`;
 
 let clientId: string;
+// What Denise has learned about Bridget's cuts depends on the demo history;
+// without it the menu's hour applies, so her afternoon has the same times
+// whatever was loaded. Put back afterwards.
+let learnedCut: { business_id: string; kind: string; key: string; data: unknown } | null = null;
 const serviceId = async (name: string) => (await admin.from("services").select("id").eq("business_id", B).eq("name", name).single()).data!.id;
 
 test.beforeAll(async () => {
@@ -35,6 +39,9 @@ test.beforeAll(async () => {
     ])
     .select("id, first_name");
   clientId = data!.find((c) => c.first_name === PAT)!.id;
+  const key = `${SEED.staff.bridget}:${await serviceId("Women's Cut & Style")}`;
+  learnedCut = (await admin.from("insights").select("business_id, kind, key, data").eq("business_id", B).eq("kind", "duration").eq("key", key).maybeSingle()).data;
+  await admin.from("insights").delete().eq("business_id", B).eq("kind", "duration").eq("key", key);
 });
 
 test.afterAll(async () => {
@@ -44,6 +51,7 @@ test.afterAll(async () => {
     await admin.from("appointments").delete().eq("client_id", c.id);
   }
   await admin.from("clients").delete().like("first_name", `${PREFIX}%`);
+  if (learnedCut) await admin.from("insights").upsert(learnedCut as never, { onConflict: "business_id,kind,key" });
 });
 
 test.use({ storageState: AUTH.frontDesk });

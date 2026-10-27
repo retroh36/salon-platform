@@ -10,12 +10,15 @@ type Supabase = SupabaseClient<Database>;
 
 type HourRow = { weekday: number; start_minute: number; end_minute: number };
 
-function toWeekly(rows: HourRow[]): WeeklyHours {
+export function toWeekly(rows: HourRow[]): WeeklyHours {
   const weekly: WeeklyHours = {};
   for (const r of rows) {
     const day = r.weekday as Weekday;
     (weekly[day] ??= []).push({ start: r.start_minute, end: r.end_minute });
   }
+  // Earliest shift first, whatever order the rows came back in: pages show
+  // them as they are ("9am–1pm, 2pm–6pm").
+  for (const shifts of Object.values(weekly)) shifts.sort((a, b) => a.start - b.start);
   return weekly;
 }
 

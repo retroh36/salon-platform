@@ -1,6 +1,9 @@
 import type { Browser, Page } from "@playwright/test";
 import { admin, SEED } from "../tests/db/helpers";
-import { allowOfflineLogs, AUTH, expect, test, visitTab, waitForHydration } from "./fixtures";
+import { allowNotFoundLogs, allowOfflineLogs, AUTH, expect, putBackSales, test, visitTab, waitForHydration } from "./fixtures";
+
+// Stock and sales this file uses are put back afterwards.
+putBackSales();
 
 // The public booking site, on a phone. Signed out, like a client.
 const SLUG = "maple-and-ash";
@@ -9,6 +12,7 @@ const RUN = Date.now().toString(36);
 // Made-up numbers in the 555-01xx range, in an area code the seed doesn't use.
 const newPhone = () => `(4${String(Math.floor(Math.random() * 90) + 10)}) 555-01${String(Math.floor(Math.random() * 100)).padStart(2, "0")}`;
 const created: string[] = [];
+const STARTED = new Date().toISOString();
 
 const phone = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true };
 test.use({ ...phone, storageState: { cookies: [], origins: [] } });
@@ -27,6 +31,8 @@ test.afterAll(async () => {
     await admin.from("clients").delete().in("id", ids);
   }
   await admin.from("appointments").delete().eq("business_id", B).eq("source", "online").like("notes", `%${RUN}%`);
+  // Online visits booked for seeded clients during this file.
+  await admin.from("appointments").delete().eq("business_id", B).eq("source", "online").gte("created_at", STARTED);
 });
 
 const flow = (page: Page) => page.getByTestId("booking-flow");
@@ -206,7 +212,6 @@ test("a returning client confirms with a code and is matched to their profile (a
 
   const { data: visits } = await admin.from("appointments").select("id, online_source").eq("client_id", client!.id).eq("source", "online").gte("created_at", new Date(Date.now() - 60_000).toISOString());
   expect(visits).toEqual([{ id: expect.any(String), online_source: "google" }]);
-  await admin.from("appointments").delete().in("id", visits!.map((v) => v.id));
 });
 
 test("two people can't book the same time: the second is told and picks again", async ({ browser }) => {
@@ -403,7 +408,7 @@ test("a new client reads the policy, agrees, saves a card and pays the deposit b
   await outbox.close();
 });
 
-test("a bad manage link or salon shows nothing", async ({ page }) => {
+test("a bad manage link or salon shows nothing", async ({ page, pageErrors }) => {
   await page.goto(`/book/${SLUG}/manage/${"x".repeat(43)}`);
   await expect(page.getByRole("heading", { name: "We can't find that page" })).toBeVisible();
   await expect(page.getByTestId("manage-booking")).toHaveCount(0);
@@ -414,4 +419,5 @@ test("a bad manage link or salon shows nothing", async ({ page }) => {
   await page.goto("/book/no-such-salon");
   await expect(page.getByRole("heading", { name: "We can't find that page" })).toBeVisible();
   await expect(page.getByRole("link")).toHaveCount(0);
+  allowNotFoundLogs(pageErrors);
 });

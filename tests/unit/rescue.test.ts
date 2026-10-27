@@ -85,6 +85,13 @@ describe("who's affected", () => {
     // Leaving at 1: the 12:30 cut runs past it, so it's affected too.
     expect(affectedVisits(visits, "nola", at("13:00")).map((v) => v.appointmentId)).toEqual(["b", "c"]);
   });
+
+  it("puts visits that start together in booking order, whatever order they came in", () => {
+    const first = { ...visit("z", [item(CUT, "nola", "9:00", "z")]), bookedAt: at("1:00") };
+    const second = { ...visit("a", [item(CUT, "nola", "9:00", "a")]), bookedAt: at("2:00") };
+    expect(affectedVisits([second, first], "nola", at("0:00")).map((v) => v.appointmentId)).toEqual(["z", "a"]);
+    expect(affectedVisits([first, second], "nola", at("0:00")).map((v) => v.appointmentId)).toEqual(["z", "a"]);
+  });
 });
 
 describe("the plan", () => {

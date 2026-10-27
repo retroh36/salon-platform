@@ -1,11 +1,15 @@
 import { todayIn } from "@/lib/scheduling/time";
-import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, checkIn, expect, test, ui, waitForHydration } from "./fixtures";
+import { admin, makeRoom, SEED } from "../tests/db/helpers";
+import { AUTH, checkIn, expect, putBackSales, test, ui, waitForHydration } from "./fixtures";
+
+// Stock and sales this file uses are put back afterwards.
+putBackSales();
 
 const B = SEED.business;
 const L = SEED.location;
 const PREFIX = `At${Date.now().toString(36)}`;
 let appointmentId: string;
+let putBack: () => Promise<void> = async () => {};
 
 // A visit with Bridget that started a few minutes ago: a color with a
 // processing gap.
@@ -14,13 +18,17 @@ test.beforeAll(async () => {
   const { data: service } = await admin.from("services").select("id").eq("business_id", B).eq("name", "Root Touch-Up").single();
   const start = new Date(Math.floor(Date.now() / 300_000) * 300_000 - 5 * 60_000);
   const end = new Date(start.getTime() + 85 * 60_000);
+  // The demo calendar may have Bridget busy now; the database refuses a double-booking.
+  putBack = await makeRoom(SEED.staff.bridget, start, end);
   const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: client!.id, starts_at: start.toISOString(), ends_at: end.toISOString(), status: "confirmed" }).select("id").single();
   appointmentId = a!.id;
-  await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: appointmentId, service_id: service!.id, staff_id: SEED.staff.bridget, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: 30, processing_minutes: 35, finishing_minutes: 20, price_cents: 9500 });
+  const { error } = await admin.from("appointment_items").insert({ business_id: B, location_id: L, appointment_id: appointmentId, service_id: service!.id, staff_id: SEED.staff.bridget, starts_at: start.toISOString(), ends_at: end.toISOString(), active_minutes: 30, processing_minutes: 35, finishing_minutes: 20, price_cents: 9500 });
+  if (error) throw error;
 });
 
 test.afterAll(async () => {
   await admin.from("appointments").delete().eq("id", appointmentId);
+  await putBack();
   await admin.from("clients").delete().like("first_name", `${PREFIX}%`);
 });
 
