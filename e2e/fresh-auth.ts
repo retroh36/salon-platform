@@ -42,7 +42,7 @@ export function expiresAt(state: State): number | null {
 
 export async function freshAuth(file: string | undefined) {
   const email = file && EMAILS[file];
-  if (!email) return;
+  if (!email || process.env.E2E_NO_SAVED_SIGN_INS) return;
   const state = JSON.parse(readFileSync(file, "utf8")) as State;
   const expires = expiresAt(state);
   if (expires && expires - Date.now() > MIN_LEFT_MS) return;
