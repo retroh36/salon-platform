@@ -8,7 +8,7 @@ open: /clients | Open Clients
 Notes are what everyone should know about a client. They sit in a big box near the top of their profile.
 
 1. Go to **Clients** and open the client's profile.
-2. Tap the **Notes** box (or **Edit notes** under it).
+2. Tap the **Notes** box (on a keyboard, move to it and press Enter).
 3. Type your notes. They save as you type; you'll see "Notes saved."
 4. Tap **Done** when you're finished.
 

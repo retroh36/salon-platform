@@ -72,7 +72,7 @@ test.describe("front desk", () => {
     await page.goto(`/clients/${clientId}`);
     const card = ui(page).getByTestId("client-rewards");
     await expect(card.getByTestId("points-balance")).toHaveText("92 points");
-    await card.getByText("Points history").click();
+    await card.getByText("View history").click();
     await expect(card.getByTestId("points-history")).toContainText("Redeemed: 20% off retail");
     await expect(card.getByRole("button", { name: "Adjust points" })).toHaveCount(0);
   });
@@ -90,7 +90,9 @@ test.describe("manager", () => {
     await form.getByLabel("Points").fill("10");
     await form.getByLabel("Why").fill("Missed points from last visit");
     await form.getByRole("button", { name: "Save" }).click();
-    await expect(form).toContainText("Saved. 102 points now.");
+    // Saved: the form closes, saying the new balance.
+    await expect(card.getByRole("status")).toHaveText("Saved. 102 points now.");
+    await expect(form).toHaveCount(0);
     const { data } = await admin.from("reward_points").select("reason, staff_id").eq("client_id", clientId).eq("kind", "adjust").order("created_at", { ascending: false }).limit(1).single();
     expect(data).toEqual({ reason: "Missed points from last visit", staff_id: SEED.staff.manager });
   });

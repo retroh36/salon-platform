@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkoutVisit, clientSince, clientTags, notesEditedText, profileTab, saleTotals, splitVisits, type ProfileVisit } from "@/lib/client-profile";
+import { checkoutVisit, clientSince, clientTags, notesEditedText, profileTab, saleTotals, splitVisits, visitsSummary, type ProfileVisit } from "@/lib/client-profile";
 
 const NOW = new Date("2026-10-26T16:00:00Z");
 
@@ -8,8 +8,10 @@ function visit(id: string, startsAt: string, status = "completed", hours = 1): P
 }
 
 describe("splitVisits", () => {
-  it("puts upcoming visits first, soonest first, then the past newest first", () => {
-    const { upcoming, past } = splitVisits(
+  const isToday = (iso: string) => iso.startsWith("2026-10-26");
+
+  it("puts today's visits first, then upcoming ones soonest first, then the past newest first", () => {
+    const { today, upcoming, past } = splitVisits(
       [
         visit("old", "2026-08-01T15:00:00Z"),
         visit("next-week", "2026-11-02T15:00:00Z", "booked"),
@@ -19,15 +21,33 @@ describe("splitVisits", () => {
         visit("canceled-ahead", "2026-10-30T15:00:00Z", "canceled"),
       ],
       NOW,
+      isToday,
     );
-    expect(upcoming.map((v) => v.id)).toEqual(["in-chair", "tomorrow", "next-week"]);
+    expect(today.map((v) => v.id)).toEqual(["in-chair"]);
+    expect(upcoming.map((v) => v.id)).toEqual(["tomorrow", "next-week"]);
     expect(past.map((v) => v.id)).toEqual(["canceled-ahead", "last-week", "old"]);
   });
 
-  it("counts a booked visit that's over as past", () => {
-    const { upcoming, past } = splitVisits([visit("missed", "2026-10-26T12:00:00Z", "booked")], NOW);
+  it("keeps a visit here now under Today even once its booked time is over, and today's done ones too", () => {
+    const { today, past } = splitVisits(
+      [visit("overrun", "2026-10-26T13:00:00Z", "checked_in"), visit("done", "2026-10-26T10:00:00Z"), visit("called-off", "2026-10-26T18:00:00Z", "canceled")],
+      NOW,
+      isToday,
+    );
+    expect(today.map((v) => v.id)).toEqual(["done", "overrun"]);
+    expect(past.map((v) => v.id)).toEqual(["called-off"]);
+  });
+
+  it("counts a booked visit that's over as past on another day", () => {
+    const { upcoming, past } = splitVisits([visit("missed", "2026-10-25T12:00:00Z", "booked")], NOW, isToday);
     expect(upcoming).toEqual([]);
     expect(past.map((v) => v.id)).toEqual(["missed"]);
+  });
+
+  it("sums the tab's visits up so they agree with completed visits", () => {
+    const visits = [visit("a", "2026-08-01T15:00:00Z"), visit("b", "2026-09-01T15:00:00Z"), visit("c", "2026-09-08T15:00:00Z", "no_show"), visit("d", "2026-09-09T15:00:00Z", "canceled"), visit("e", "2026-11-02T15:00:00Z", "booked")];
+    expect(visitsSummary(visits, { today: 0, upcoming: 1 })).toBe("5 visits: 2 completed, 1 upcoming, 1 no-show, 1 cancelled");
+    expect(visitsSummary([visits[0]], { today: 0, upcoming: 0 })).toBe("1 visit: 1 completed");
   });
 });
 
@@ -87,12 +107,12 @@ describe("the rest of the profile", () => {
   });
 
   it("checks out today's visit, the one in the chair first", () => {
-    const today = (iso: string) => iso.startsWith("2026-10-26");
     const later = visit("later", "2026-10-26T20:00:00Z", "booked");
     const here = visit("here", "2026-10-26T18:00:00Z", "checked_in");
-    expect(checkoutVisit([later, here], today)?.id).toBe("here");
-    expect(checkoutVisit([later], today)?.id).toBe("later");
-    expect(checkoutVisit([visit("tomorrow", "2026-10-27T15:00:00Z", "booked")], today)).toBeNull();
+    expect(checkoutVisit([later, here])?.id).toBe("here");
+    expect(checkoutVisit([later])?.id).toBe("later");
+    // Today's visit already checked out: nothing to check out.
+    expect(checkoutVisit([visit("done", "2026-10-26T10:00:00Z")])).toBeNull();
   });
 
   it("remembers only a real tab", () => {

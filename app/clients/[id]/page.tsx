@@ -7,12 +7,13 @@ import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Avatar } from "@/components/ui/avatar";
 import { BackLink } from "@/components/ui/back-link";
 import { buttonClass } from "@/components/ui/button";
-import { Badge, nameLinkClass, Section } from "@/components/ui/page";
+import { BoxIcon, ChartIcon, TagIcon, UserIcon } from "@/components/ui/icons";
+import { Badge, nameLinkClass } from "@/components/ui/page";
 import { ClientInsightCard } from "@/components/client-insight";
 import { PhotoGallery } from "@/components/visit-photos";
 import { getCurrentStaff } from "@/lib/auth";
 import { patchSettings } from "@/lib/client-checks";
-import { checkoutVisit, clientSince, clientTags, editedLine, PROFILE_TAB_COOKIE, profileTab, saleTotals, splitVisits, type ProfileVisit } from "@/lib/client-profile";
+import { checkoutVisit, clientSince, clientTags, editedLine, PROFILE_TAB_COOKIE, profileTab, saleTotals, splitVisits, visitsSummary, type ProfileVisit } from "@/lib/client-profile";
 import { canEditClients, formatDate, MONTHS } from "@/lib/clients";
 import type { Database } from "@/lib/database.types";
 import { isUuid } from "@/lib/ids";
@@ -42,17 +43,20 @@ import { MembershipList, type MembershipHistory } from "./memberships/membership
 import { MessagesCard } from "./messages-card";
 import { RewardsCard } from "./rewards/rewards-card";
 import { PackagesList } from "./packages/packages-card";
-import { PolicyCard } from "./policy-card";
+import { PolicyCards } from "./policy-card";
 import { ProfileTabs } from "./profile-tabs";
 import { QuickActions } from "./quick-actions";
+import { Row, SideCard } from "./side-card";
 
 export const metadata: Metadata = { title: "Client" };
 
 // The client profile, the same layout for every role (RLS decides what
 // each sees): allergies first, the header (contact, stylist, client since,
 // tags and actions), their notes, Denise's summary, then their history in
-// tabs; beside it (under it on narrow screens) the numbers, details,
-// packages and memberships, the card on file and messages.
+// tabs; beside it (under it on narrow screens) a card each, in the same
+// order for everyone, leaving out what a role can't see: At a glance,
+// Details, Packages, Membership, Rewards, Card on file, Cancellation policy
+// and Messages.
 export default function ClientPage({ params }: PageProps<"/clients/[id]">) {
   return (
     <Suspense fallback={<LoadingShell />}>
@@ -163,7 +167,9 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
       tipCents: sale?.tipCents ?? null,
     };
   });
-  const { upcoming, past } = splitVisits(visits, now);
+  const isToday = (iso: string) => toLocal(new Date(iso), tz).date === today;
+  const split = splitVisits(visits, now, isToday);
+  const { upcoming, past } = split;
   const completed = visits.filter((v) => v.status === "completed");
   const firstVisit = completed.at(-1)?.startsAt ?? null;
   const consent = consentOf(client);
@@ -172,17 +178,17 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
   const usual = known?.habits.preferredStaffId ? names.get(known.habits.preferredStaffId) : null;
   const stylistLine = client.preferred ? `${client.only_sees_preferred ? "Only sees" : "Prefers"} ${fullName(client.preferred)}` : usual ? `Usually sees ${usual}` : null;
   const dayOf = (iso: string) => formatDay(toLocal(new Date(iso), tz).date, true);
-  const isToday = (iso: string) => toLocal(new Date(iso), tz).date === today;
+  // Today's visit still open (in the chair first), else the next one.
+  const toCheckOut = checkoutVisit(split.today);
 
   // Message: about their next visit, for the front of house or a stylist on it.
-  const nextVisit = upcoming[0] ?? null;
+  const nextVisit = toCheckOut ?? upcoming[0] ?? null;
   const freeText = me.role === "owner" || Boolean(business?.free_text_roles.includes(me.role));
   const message = nextVisit
     ? { appointmentId: nextVisit.id, channels: { appointment: allowedChannels(consent, "appointment"), marketing: allowedChannels(consent, "marketing") }, freeText }
     : frontOfHouse
       ? { reason: `Messages are about a visit: book ${client.first_name}'s next one first.` }
       : null;
-  const toCheckOut = checkoutVisit(upcoming, isToday);
   const from = encodeURIComponent(`/clients/${id}`);
 
   const patchState = patchTestState(
@@ -193,7 +199,14 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
 
   const visitsPanel = (
     <div className="flex flex-col gap-6" data-testid="client-visits">
-      {visits.length === 0 && <p className={quietLine}>No visits yet.</p>}
+      {visits.length === 0 ? (
+        <p className={quietLine}>No visits yet.</p>
+      ) : (
+        <p className="-mb-2 text-13 text-ink-muted" data-testid="visits-summary">
+          {visitsSummary(visits, { today: split.today.length, upcoming: upcoming.length })}
+        </p>
+      )}
+      {split.today.length > 0 && <VisitList title="Today" visits={split.today} tz={tz} today={today} money={frontOfHouse} />}
       {upcoming.length > 0 && <VisitList title="Upcoming" visits={upcoming} tz={tz} today={today} money={frontOfHouse} />}
       {past.length > 0 && <VisitList title="Past" visits={past.slice(0, PAST_VISITS)} tz={tz} today={today} money={frontOfHouse} />}
     </div>
@@ -291,16 +304,20 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
   );
 
   const lastVisit = completed[0] ?? null;
-  const stats: [string, string, string?][] = [
-    ["Visits", String(completed.length), "visits"],
+  const nextText = nextVisit
+    ? `${isToday(nextVisit.startsAt) ? "Today" : formatDay(toLocal(new Date(nextVisit.startsAt), tz).date, toLocal(new Date(nextVisit.startsAt), tz).date.slice(0, 4) !== today.slice(0, 4))}, ${formatMinute(toLocal(new Date(nextVisit.startsAt), tz).minute)}`
+    : "Nothing booked";
+  // At a glance's grid: completed visits (not the tab's every visit),
+  // spend for those who see it, and the next visit.
+  const stats: [string, string, string][] = [
+    ["Completed visits", String(completed.length), "visits"],
     ...(spend
       ? ([
           ["Total spend", formatPrice(spend.lifetimeSpendCents), "spend"],
           ["Average ticket", spend.averageVisitCents != null ? formatPrice(spend.averageVisitCents) : "—", "average"],
         ] as [string, string, string][])
       : []),
-    ["Last visit", lastVisit ? dayOf(lastVisit.startsAt) : "None yet", "last"],
-    ["Next visit", nextVisit ? `${dayOf(nextVisit.startsAt)}, ${formatMinute(toLocal(new Date(nextVisit.startsAt), tz).minute)}` : "Nothing booked", "next"],
+    ["Next visit", nextText, "next"],
   ];
 
   return (
@@ -359,7 +376,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
       </header>
 
       <div className="@container">
-        <div className="grid gap-x-10 gap-y-2 @3xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="grid gap-x-8 gap-y-8 @3xl:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="min-w-0">
             <ClientNotes
               clientId={client.id}
@@ -385,46 +402,60 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
             />
           </div>
 
-          <aside aria-label="About this client" className="min-w-0">
-            <Section title="At a glance" titleId="glance-heading">
-              <dl className={recordsClass} data-testid="client-stats">
+          <aside aria-label="About this client" className="flex min-w-0 flex-col gap-4">
+            <SideCard title="At a glance" icon={<ChartIcon />} testId="client-glance">
+              <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line" data-testid="client-stats">
                 {stats.map(([label, value, key]) => (
-                  <div key={label} className="flex items-baseline justify-between gap-3 py-2" data-stat={key}>
-                    <dt className="text-13 text-ink-muted">{label}</dt>
-                    <dd className="text-right text-sm font-medium text-ink tabular-nums">{value}</dd>
+                  <div key={label} className="flex flex-col gap-1 bg-surface p-3" data-stat={key}>
+                    <dt className="text-xs text-ink-muted">{label}</dt>
+                    <dd className="text-base font-semibold text-ink tabular-nums">{value}</dd>
                   </div>
                 ))}
               </dl>
-            </Section>
+              <dl>
+                <Row label="Last visit" testId="last-visit">
+                  {lastVisit ? dayOf(lastVisit.startsAt) : "None yet"}
+                </Row>
+              </dl>
+            </SideCard>
 
-            <Section title="Details" titleId="details-heading">
-              <dl className={recordsClass}>
-                <Detail label="Birthday" value={client.birth_month && client.birth_day ? `${MONTHS[client.birth_month - 1]} ${client.birth_day}` : null} />
-                <Detail label="Preferences" value={client.preferences} />
-                <Detail label="Consent form" value={client.consent_signed_on ? `Signed ${formatDate(client.consent_signed_on)}` : null} empty="Not signed" />
+            <SideCard
+              title="Details"
+              icon={<UserIcon />}
+              testId="client-details"
+              action={
+                editable ? (
+                  <Link href={`/clients/${id}/edit`} className={buttonClass("quiet", "sm", "-mr-2")} aria-label={`Edit ${client.first_name}'s details`}>
+                    Edit
+                  </Link>
+                ) : undefined
+              }
+            >
+              <dl className="flex flex-col gap-2.5">
+                <Row label="Birthday">{client.birth_month && client.birth_day ? `${MONTHS[client.birth_month - 1]} ${client.birth_day}` : <Empty />}</Row>
+                <Row label="Preferences">{client.preferences ? <span className="whitespace-pre-line">{client.preferences}</span> : <Empty />}</Row>
+                <Row label="Consent form">{client.consent_signed_on ? `Signed ${formatDate(client.consent_signed_on)}` : <Empty>Not signed</Empty>}</Row>
                 {onlineAccount && (
-                  <Detail
-                    label="Online account"
-                    value={`Yes${onlineAccount.last_sign_in_at ? `, last signed in ${formatDate(toLocal(new Date(onlineAccount.last_sign_in_at), tz).date)}` : ""}`}
-                    testId="online-account"
-                  />
+                  <Row label="Online account" testId="online-account">
+                    {`Yes${onlineAccount.last_sign_in_at ? `, last signed in ${formatDate(toLocal(new Date(onlineAccount.last_sign_in_at), tz).date)}` : ""}`}
+                  </Row>
                 )}
               </dl>
-            </Section>
+            </SideCard>
 
             {packages.length > 0 && (
-              <Section title="Packages" titleId="packages-heading" description="Uses left are offered at checkout.">
+              <SideCard title="Packages" icon={<BoxIcon />} testId="client-packages" note="Uses left are offered at checkout.">
                 <PackagesList
                   clientId={id}
                   packages={packages}
                   canCancel={me.role === "owner" || me.role === "manager"}
                   expiresLabels={Object.fromEntries(packages.flatMap((p) => (p.expiresAt ? [[p.id, formatDate(toLocal(new Date(p.expiresAt), tz).date)]] : [])))}
                 />
-              </Section>
+              </SideCard>
             )}
 
             {memberships.length > 0 && (
-              <Section title="Membership" titleId="membership-heading" description="Member prices and included services apply at checkout.">
+              <SideCard title="Membership" icon={<TagIcon />} testId="client-memberships" note="Member prices and included services apply at checkout.">
                 <MembershipList
                   memberships={memberships}
                   history={membershipHistory}
@@ -433,11 +464,11 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
                   canEndNow={me.role === "owner" || me.role === "manager"}
                   testCards={currentProvider().testCards.map((c) => ({ ...c }))}
                 />
-              </Section>
+              </SideCard>
             )}
 
             {canTakePayments(me.role) && <RewardsCard supabase={supabase} me={me} clientId={client.id} firstName={client.first_name} tz={tz} />}
-            {canTakePayments(me.role) && <PolicyCard supabase={supabase} businessId={me.business_id} role={me.role} client={client} tz={tz} />}
+            {canTakePayments(me.role) && <PolicyCards supabase={supabase} businessId={me.business_id} role={me.role} client={client} tz={tz} />}
             {canTakePayments(me.role) && <MessagesCard supabase={supabase} clientId={client.id} firstName={client.first_name} tz={tz} />}
           </aside>
         </div>
@@ -451,14 +482,9 @@ const recordsClass = "divide-y divide-line border-y border-line";
 // An empty tab: one quiet line.
 const quietLine = "py-2 text-sm text-ink-muted";
 
-// A side-column detail: the label over its value.
-function Detail({ label, value, empty = "—", testId }: { label: string; value: string | null; empty?: string; testId?: string }) {
-  return (
-    <div className="flex flex-col gap-0.5 py-2" data-testid={testId}>
-      <dt className="text-13 text-ink-muted">{label}</dt>
-      <dd className={`text-sm ${value ? "whitespace-pre-line text-ink" : "text-ink-subtle"}`}>{value || empty}</dd>
-    </div>
-  );
+// A detail with nothing in it.
+function Empty({ children = "—" }: { children?: string }) {
+  return <span className="text-ink-subtle">{children}</span>;
 }
 
 const STATUS_TAGS: Record<string, { label: string; tone: "info" | "success" | "warning" | "danger" | "neutral" }> = {

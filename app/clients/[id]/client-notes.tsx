@@ -6,8 +6,9 @@ import { fieldClass } from "@/components/ui/field";
 import { MAX_CLIENT_NOTES } from "@/lib/client-profile";
 import { saveClientNotes } from "../actions";
 
-// The client's notes, right under the header: a click (or Edit) opens the
-// box, which saves as you type and when you leave it; Done closes it. Who
+// The client's notes, right under the header: clicking the box (or Enter
+// on it) opens it for editing; it saves as you type and when you leave it,
+// and Done closes it. Who
 // changed them last and when is underneath. Read-only for stylists.
 export function ClientNotes({ clientId, initial, edited, editable }: { clientId: string; initial: string; edited: string | null; editable: boolean }) {
   const [editing, setEditing] = useState(false);
@@ -95,22 +96,28 @@ export function ClientNotes({ clientId, initial, edited, editable }: { clientId:
       ) : (
         <>
           <div
-            onClick={editable ? () => setEditing(true) : undefined}
-            className={`min-h-24 rounded-lg border border-line bg-surface px-4 py-3 text-sm leading-6 whitespace-pre-wrap wrap-anywhere ${editable ? "cursor-text transition-colors duration-(--motion-fast) hover:border-line-strong" : ""} ${notes.trim() ? "text-ink" : "text-ink-muted"}`}
+            {...(editable && {
+              role: "button",
+              tabIndex: 0,
+              "aria-label": notes.trim() ? `Notes: ${notes.trim()}. Edit` : "Add notes",
+              onClick: () => setEditing(true),
+              onKeyDown: (e: React.KeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setEditing(true);
+                }
+              },
+            })}
+            className={`min-h-24 rounded-lg border border-line bg-surface px-4 py-3 text-sm leading-6 whitespace-pre-wrap wrap-anywhere ${editable ? "cursor-text transition-colors duration-(--motion-fast) hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus" : ""} ${notes.trim() ? "text-ink" : "text-ink-muted"}`}
             data-testid="notes-text"
           >
             {notes.trim() || (editable ? "No notes yet. Click to add what everyone should know." : "No notes yet.")}
           </div>
-          <div className="mt-2 flex items-center justify-between gap-3">
-            <p className="text-13 text-ink-subtle" data-testid="notes-edited">
+          {editedText && (
+            <p className="mt-2 text-13 text-ink-subtle" data-testid="notes-edited">
               {editedText}
             </p>
-            {editable && (
-              <Button size="sm" variant="quiet" onClick={() => setEditing(true)}>
-                Edit notes
-              </Button>
-            )}
-          </div>
+          )}
         </>
       )}
       {state.kind === "error" && (

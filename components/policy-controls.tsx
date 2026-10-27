@@ -105,6 +105,7 @@ export function CardLinkButton({
   email,
   depositCents,
   sent,
+  onClose,
 }: {
   clientId: string;
   appointmentId: string | null;
@@ -112,8 +113,11 @@ export function CardLinkButton({
   email: string | null;
   depositCents: number;
   sent: boolean;
+  // Already open, from a card's corner: closing it (or sending) hands back.
+  onClose?: (message?: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [opened, setOpen] = useState(false);
+  const open = Boolean(onClose) || opened;
   const [channel, setChannel] = useState<"sms" | "email">(phone ? "sms" : "email");
   const [to, setTo] = useState((phone ? phone : email) ?? "");
   const [result, setResult] = useState<PolicyActionResult | null>(null);
@@ -137,7 +141,10 @@ export function CardLinkButton({
         start(async () => {
           const r = await sendCardLink({ clientId, appointmentId, channel, to });
           setResult(r);
-          if (r.ok) setOpen(false);
+          if (r.ok) {
+            setOpen(false);
+            onClose?.(r.message);
+          }
         });
       }}
     >
@@ -171,7 +178,7 @@ export function CardLinkButton({
         <Button type="submit" size="sm" variant="primary" disabled={pending}>
           Send link
         </Button>
-        <Button size="sm" onClick={() => setOpen(false)}>
+        <Button size="sm" onClick={() => (onClose ? onClose() : setOpen(false))}>
           Not now
         </Button>
       </div>

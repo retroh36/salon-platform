@@ -14,7 +14,7 @@ const STATUS = { active: { label: "Active", tone: "success" }, canceled: { label
 // with a pro-rated refund.
 export function PackagesList({ clientId, packages, canCancel, expiresLabels }: { clientId: string; packages: ClientPackage[]; canCancel: boolean; expiresLabels: Record<string, string> }) {
   return (
-    <ul className="divide-y divide-line border-y border-line" aria-label="Packages">
+    <ul className="-my-3 divide-y divide-line" aria-label="Packages">
       {packages.map((p) => {
         const expired = p.status === "active" && p.expiresAt !== null && new Date(p.expiresAt) <= new Date();
         return (

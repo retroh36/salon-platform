@@ -31,7 +31,7 @@ export function MembershipList({
   testCards: { ref: string; label: string; outcome: string }[];
 }) {
   return (
-    <ul className="divide-y divide-line border-y border-line" aria-label="Memberships">
+    <ul className="-my-3 divide-y divide-line" aria-label="Memberships">
       {memberships.map((m) => (
         <li key={m.id} className="py-3" data-testid="client-membership" data-status={m.status}>
           <div className="flex flex-wrap items-center justify-between gap-2">

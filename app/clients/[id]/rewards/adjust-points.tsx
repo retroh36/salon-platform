@@ -4,21 +4,17 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
+import { useCloseCardAction } from "../side-card";
 import { adjustPoints } from "./actions";
 
-// Adds or takes off points, with a reason (logged with who did it).
+// Adds or takes off points, with a reason (logged with who did it), opened
+// from the Rewards card's corner; saving closes it, saying the new balance.
 export function AdjustPoints({ clientId }: { clientId: string }) {
-  const [open, setOpen] = useState(false);
+  const close = useCloseCardAction();
   const [delta, setDelta] = useState("");
   const [reason, setReason] = useState("");
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [pending, start] = useTransition();
-  if (!open)
-    return (
-      <Button size="sm" onClick={() => setOpen(true)}>
-        Adjust points
-      </Button>
-    );
   return (
     <form
       aria-label="Adjust points"
@@ -27,11 +23,8 @@ export function AdjustPoints({ clientId }: { clientId: string }) {
         e.preventDefault();
         start(async () => {
           const r = await adjustPoints(clientId, delta, reason);
-          setResult(r);
-          if (r.ok) {
-            setDelta("");
-            setReason("");
-          }
+          if (r.ok) close(r.message);
+          else setResult(r);
         });
       }}
     >
@@ -49,11 +42,11 @@ export function AdjustPoints({ clientId }: { clientId: string }) {
         <Button type="submit" variant="primary" size="sm" disabled={pending}>
           Save
         </Button>
-        <Button size="sm" variant="quiet" onClick={() => setOpen(false)}>
+        <Button size="sm" variant="quiet" onClick={() => close()}>
           Cancel
         </Button>
       </div>
-      {result && <Alert tone={result.ok ? "success" : "error"}>{result.message}</Alert>}
+      {result && <Alert>{result.message}</Alert>}
     </form>
   );
 }

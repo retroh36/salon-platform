@@ -1,5 +1,5 @@
 // The client profile's facts (pure, unit-tested): the tags in its header,
-// the visits in the Visits tab (upcoming first, then past) and the numbers
+// the visits in the Visits tab (today, upcoming, then past) and the numbers
 // in its side column. Loading is in `app/clients/[id]/page.tsx`.
 
 import type { Tone } from "@/components/ui/page";
@@ -29,15 +29,35 @@ export type ProfileVisit = {
 };
 
 const UPCOMING = ["booked", "confirmed", "checked_in"];
+const OFF = ["canceled", "no_show"];
 
-// Upcoming visits (not over yet, still on), soonest first; then the rest,
-// newest first.
-export function splitVisits(visits: ProfileVisit[], now: Date): { upcoming: ProfileVisit[]; past: ProfileVisit[] } {
-  const isUpcoming = (v: ProfileVisit) => UPCOMING.includes(v.status) && new Date(v.endsAt) >= now;
+// Today's visits (not canceled or missed: in the chair, still to come or
+// already done), earliest first; then upcoming ones (not over yet, still
+// on), soonest first; then the rest, newest first.
+export function splitVisits(visits: ProfileVisit[], now: Date, isToday: (iso: string) => boolean): { today: ProfileVisit[]; upcoming: ProfileVisit[]; past: ProfileVisit[] } {
+  const today = (v: ProfileVisit) => isToday(v.startsAt) && !OFF.includes(v.status);
+  const isUpcoming = (v: ProfileVisit) => !today(v) && UPCOMING.includes(v.status) && new Date(v.endsAt) >= now;
   return {
+    today: visits.filter(today).sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
     upcoming: visits.filter(isUpcoming).sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
-    past: visits.filter((v) => !isUpcoming(v)).sort((a, b) => b.startsAt.localeCompare(a.startsAt)),
+    past: visits.filter((v) => !today(v) && !isUpcoming(v)).sort((a, b) => b.startsAt.localeCompare(a.startsAt)),
   };
+}
+
+// Above the Visits tab's list, so its count and At a glance's completed
+// visits never look at odds: "9 visits: 4 completed, 1 today, 3 no-shows,
+// 1 cancelled".
+export function visitsSummary(visits: ProfileVisit[], parts: { today: number; upcoming: number }): string {
+  const count = (status: string) => visits.filter((v) => v.status === status).length;
+  const bits: [number, string, string][] = [
+    [count("completed"), "completed", "completed"],
+    [parts.today, "today", "today"],
+    [parts.upcoming, "upcoming", "upcoming"],
+    [count("no_show"), "no-show", "no-shows"],
+    [count("canceled"), "cancelled", "cancelled"],
+  ];
+  const shown = bits.filter(([n]) => n > 0).map(([n, one, many]) => `${n} ${n === 1 ? one : many}`);
+  return `${visits.length} ${visits.length === 1 ? "visit" : "visits"}${shown.length ? `: ${shown.join(", ")}` : ""}`;
 }
 
 // A visit's sale: what was paid less the tip and anything refunded, and
@@ -95,9 +115,9 @@ export function clientSince(createdAt: string, firstVisit: string | null): strin
 
 // The visit to check out from the profile: one today that's still open
 // (in the chair first), if any.
-export function checkoutVisit(upcoming: ProfileVisit[], today: (iso: string) => boolean): ProfileVisit | null {
-  const todays = upcoming.filter((v) => today(v.startsAt));
-  return todays.find((v) => v.status === "checked_in") ?? todays[0] ?? null;
+export function checkoutVisit(today: ProfileVisit[]): ProfileVisit | null {
+  const open = today.filter((v) => UPCOMING.includes(v.status));
+  return open.find((v) => v.status === "checked_in") ?? open[0] ?? null;
 }
 
 // Client notes are long-lived: room for a lot more than a visit's.

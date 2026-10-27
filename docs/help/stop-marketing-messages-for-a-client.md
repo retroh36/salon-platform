@@ -16,6 +16,6 @@ If a client asks for no more offers, untick their consent on their profile. Mess
 
 - Offers (automations and offers staff send) only go to clients with one of these ticked. Tick them only when the client has said yes.
 - Every offer has its own opt-out (**Reply STOP** or **Unsubscribe**). When a client uses it, that box is unticked by itself.
-- Turning off offers never stops confirmations, reminders or messages about their visits. To stop those too, use **About their visits** in the **Messages** card on their profile.
+- Turning off offers never stops confirmations, reminders or messages about their visits. To stop those too, switch off **Visit texts** and **Visit emails** in the **Messages** card on their profile.
 - Every change is in **Consent history** in the **Messages** card, with when, how and who.
 - The **Messages** card on their profile says which offers they get.

@@ -19,5 +19,5 @@ When the policy needs a card (or a deposit) for a booking made at the desk, send
 - If the client's connection drops as they tap, their page says so and asks them to try again. They're never charged twice: if it went through, trying again says so.
 - Booking details says **link sent** until they've done it, then shows the card on file.
 - Links work once, for 3 days.
-- You can also send one from the client's profile, under **Cancellation policy**.
+- You can also send one from the client's profile: **Send card link** in the corner of the **Card on file** card. Once they have a card, that card shows it, when they agreed to the policy, and **Remove card**.
 - Texts and email wait in the outbox for now, and cards are test cards.
