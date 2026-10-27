@@ -287,9 +287,12 @@ test.describe("front desk", () => {
     // grace period.
     await book(ana, "Men's Cut", new Date(Date.now() - 15 * 60_000));
     await book(ben, "Men's Cut", new Date(Date.now() - 50 * 60_000));
-    const cyVisit = await book(cy, "Men's Cut", new Date(Date.now() - 30 * 60_000), SEED.staff.nola);
+    // Free stylists, since the demo books most of them at any hour.
+    const cyStart = new Date(Date.now() - 30 * 60_000);
+    const cyStylist = await freeStylist(cyStart, new Date(cyStart.getTime() + 30 * 60_000), [SEED.staff.lois]);
+    const cyVisit = await book(cy, "Men's Cut", cyStart, cyStylist);
     const deeStart = new Date(Date.now() - 5 * 60_000);
-    await book(dee, "Men's Cut", deeStart, await freeStylist(deeStart, new Date(deeStart.getTime() + 30 * 60_000), [SEED.staff.lois, SEED.staff.nola]));
+    await book(dee, "Men's Cut", deeStart, await freeStylist(deeStart, new Date(deeStart.getTime() + 30 * 60_000), [SEED.staff.lois, cyStylist]));
     await openDay(page, today);
     await page.getByTestId("denise-launcher").click();
     const card = page.getByTestId("denise-late");

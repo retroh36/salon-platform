@@ -10,7 +10,7 @@ On the salon's shared iPad, switch to yourself with a PIN instead of signing out
 1. Set your PIN once: tap your name at the bottom of the sidebar to open **Your account**, enter a **PIN** twice (6 digits for owners and managers, 4 to 6 for everyone else) and tap **Save PIN**.
 2. On the shared iPad, tap **Switch user** at the bottom of the sidebar.
 3. On **Who's at the desk?**, tap your name.
-4. Enter your PIN and tap **Unlock**.
+4. Enter your PIN and tap **Unlock**. The **Calendar** opens (**My day** for stylists and assistants).
 
 ## Good to know
 

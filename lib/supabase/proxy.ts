@@ -50,7 +50,7 @@ export async function updateSession(request: NextRequest) {
     return redirectWithCookies(request, response, request.cookies.has(DEVICE_COOKIE) ? "/switch" : "/login");
   }
   if (isSignedIn && isPublic) {
-    return redirectWithCookies(request, response, "/dashboard");
+    return redirectWithCookies(request, response, "/");
   }
 
   return response;

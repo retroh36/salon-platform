@@ -20,9 +20,18 @@ test("a wrong password shows an error and keeps the email", async ({ page }) => 
   await expect(page).toHaveURL("/login");
 });
 
-test("signing in greets you on the Dashboard, the team is under Team, and signing out ends the session", async ({ page }) => {
+test("signing in opens the calendar, the Dashboard is a tap away, the team is under Team, and signing out ends the session", async ({ page }) => {
   await signIn(page, "owner@mapleandash.test");
+  await expect(ui(page).getByRole("heading", { level: 1, name: "Appointments" })).toBeVisible();
+  const sidebar = page.locator("aside").first();
+  await expect(sidebar.getByRole("link", { name: "Calendar" })).toHaveAttribute("aria-current", "page");
+  // Signed in, the sign-in page and "/" go to the calendar too, and so does the logo.
+  await page.goto("/login");
+  await expect(page).toHaveURL("/calendar");
+  await sidebar.getByRole("link", { name: "Dashboard" }).click();
   await expect(ui(page).getByRole("heading", { level: 1 })).toHaveText(/^Good (morning|afternoon|evening), Olivia$/);
+  await sidebar.getByRole("link", { name: "Maestra, home" }).click();
+  await expect(page).toHaveURL("/calendar");
   await page.locator("aside").first().getByRole("link", { name: "Team" }).click();
   await expect(page).toHaveURL("/team");
   await expect(ui(page).getByRole("heading", { name: `Staff (${await countFor("staff", SEED.business, SEED.location)})` })).toBeVisible();

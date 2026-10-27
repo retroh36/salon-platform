@@ -490,7 +490,7 @@ async function signedIn(browser: Browser, email: string) {
   await main(page).getByLabel("Email").fill(email);
   await main(page).getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL("**/dashboard");
+  await page.waitForURL(/\/(calendar|my-day)$/);
   await page.close();
   return ctx;
 }

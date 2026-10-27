@@ -144,8 +144,13 @@ export function AppFrame({
             10px to the left at this size), which the negative margins take
             back so the space here is what shows. */}
         <div className="px-5 pt-8 pb-7">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/maestra/maestra-logo-white.png" alt="Maestra" width={1462} height={414} data-testid="sidebar-logo" className="-mt-[9px] -mb-[10px] -ml-[10px] block h-[50px] w-auto" />
+          {/* Home: the calendar, or My day for stylists (app/route.ts). */}
+          {/* A plain link: "/" is a route handler (app/route.ts), not a page. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+          <a href="/" aria-label="Maestra, home" className="-mt-[9px] -mb-[10px] -ml-[10px] block w-fit rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-focus">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/maestra/maestra-logo-white.png" alt="Maestra" width={1462} height={414} data-testid="sidebar-logo" className="block h-[50px] w-auto" />
+          </a>
         </div>
         <div className="px-3 pb-5">
           <SalonSwitcher

@@ -29,6 +29,6 @@ setup("sign in at the large salon", async ({ page }) => {
 });
 
 setup("sign in as stylist", async ({ page }) => {
-  await signIn(page, "bridget@mapleandash.test");
+  await signIn(page, "bridget@mapleandash.test", "/my-day");
   await page.context().storageState({ path: AUTH.stylist });
 });

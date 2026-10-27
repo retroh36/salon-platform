@@ -67,7 +67,7 @@ test.describe("an owner's toggles", () => {
 
 test.describe("an assistant", () => {
   test("sees their stylist's day, read-only, with no money or settings", async ({ page }) => {
-    await signIn(page, "ari@mapleandash.test");
+    await signIn(page, "ari@mapleandash.test", "/my-day");
     await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "My day" })).toBeVisible();
     const links = await navLinks(page);
     expect(links).toContain("My day");
@@ -111,7 +111,7 @@ test.describe("the shared iPad", () => {
       for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Delete" }).click();
       for (const d of "4826") await page.getByRole("button", { name: d, exact: true }).click();
       await page.getByRole("button", { name: "Unlock" }).click();
-      await expect(page).toHaveURL("/dashboard");
+      await expect(page).toHaveURL("/calendar");
       await expect(page.getByTestId("sidebar-user").first()).toHaveText("Sam");
 
       // Nobody touches it for the salon's idle time (5 minutes).

@@ -46,6 +46,7 @@ async function signedOut(browser: Browser): Promise<Page> {
   return (await browser.newContext()).newPage();
 }
 
+// Rae is a stylist, so a new password lands on My day.
 async function choosePassword(page: Page, link: string, password: string, heading: string) {
   await page.goto(link);
   await expect(page.getByRole("heading", { name: heading })).toBeVisible();
@@ -53,7 +54,7 @@ async function choosePassword(page: Page, link: string, password: string, headin
   await page.getByLabel("New password").fill(password);
   await page.getByLabel("The same again").fill(password);
   await page.getByRole("button", { name: "Save password and sign in" }).click();
-  await expect(page).toHaveURL("/dashboard");
+  await expect(page).toHaveURL("/my-day");
 }
 
 test.describe.configure({ mode: "serial" });

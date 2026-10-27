@@ -15,8 +15,8 @@ export type DemoLogin = { key: string; role: string; name: string; salon: string
 // The seeded accounts the demo's sign-in page offers (supabase/seed.sql,
 // seed-large.sql). Nobody else can sign in: sign-up and invites are off.
 export const DEMO_LOGINS: DemoLogin[] = [
-  { key: "owner", role: "Owner", name: "Olivia Bennett", salon: "Maple & Ash", email: "owner@mapleandash.test", goTo: "/dashboard" },
-  { key: "manager", role: "Manager", name: "Daniel Okafor", salon: "Maple & Ash", email: "manager@mapleandash.test", goTo: "/dashboard" },
+  { key: "owner", role: "Owner", name: "Olivia Bennett", salon: "Maple & Ash", email: "owner@mapleandash.test", goTo: "/calendar" },
+  { key: "manager", role: "Manager", name: "Daniel Okafor", salon: "Maple & Ash", email: "manager@mapleandash.test", goTo: "/calendar" },
   { key: "front-desk", role: "Front desk", name: "Sam Rivera", salon: "Maple & Ash", email: "frontdesk@mapleandash.test", goTo: "/calendar" },
   { key: "stylist", role: "Stylist", name: "Bridget Callahan", salon: "Maple & Ash", email: "bridget@mapleandash.test", goTo: "/my-day" },
   { key: "large-owner", role: "Owner", name: "Renata Albright", salon: "Harbor & Vine, 35 stylists", email: "owner@harborvine.test", goTo: "/calendar" },

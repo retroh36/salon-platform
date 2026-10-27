@@ -24,7 +24,7 @@ for (const l of DEMO_LOGINS) {
     await page.goto("/login");
     await page.getByRole("button", { name: new RegExp(`${l.role}.*${l.name}`) }).click();
     // The calendar opens on the next day with visits.
-    await expect(page).toHaveURL(new RegExp(`${l.goTo}(\\?date=[\\d-]+)?$`));
+    await expect(page).toHaveURL(new RegExp(`${l.goTo}(\\?date=[\\d-]+)?$`), { timeout: 15_000 });
     await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
     await expect(page.getByText(l.name.split(" ")[0], { exact: false }).first()).toBeVisible();
     await expect(bar(page)).toBeVisible();
@@ -39,7 +39,8 @@ for (const key of ["front-desk", "large-owner"]) {
     test.skip(!remote, "The local database keeps the salons' real hours (closed Sundays and Mondays at Maple & Ash).");
     await page.goto("/login");
     await page.getByRole("button", { name: new RegExp(`${l.role}.*${l.name}`) }).click();
-    await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
+    // The first sign-in after a release opens a cold calendar.
+    await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible({ timeout: 15_000 });
     await page.goto("/calendar");
     await expect(page.locator("[data-block]").first()).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(/The salon is closed/)).toHaveCount(0);
@@ -96,7 +97,7 @@ test("feedback is saved with the page, role and time", async ({ page }) => {
   const note = `Demo test note ${Date.now()}`;
   await page.goto("/login");
   await page.getByRole("button", { name: /^Owner.*Olivia/ }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/calendar(\?date=[\d-]+)?$/);
   await bar(page).getByRole("button", { name: "Feedback" }).click();
   const sheet = page.getByRole("dialog", { name: "Send feedback" });
   await sheet.getByLabel("Your note").fill(note);
@@ -104,6 +105,6 @@ test("feedback is saved with the page, role and time", async ({ page }) => {
   await sheet.getByRole("button", { name: "Send feedback" }).click();
   await expect(sheet).toContainText("Thanks");
   const { data } = await admin.from("demo_feedback").select("note, name, page, role, salon, created_at").eq("note", note).single();
-  expect(data).toMatchObject({ name: "Pat", page: "/dashboard", role: "Owner", salon: "Maple & Ash Hair Studio" });
+  expect(data).toMatchObject({ name: "Pat", page: "/calendar", role: "Owner", salon: "Maple & Ash Hair Studio" });
   await admin.from("demo_feedback").delete().eq("note", note);
 });

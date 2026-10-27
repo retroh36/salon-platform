@@ -22,6 +22,13 @@ export function isFrontOfHouse(role: StaffRole): boolean {
   return role === "owner" || role === "manager" || role === "front_desk";
 }
 
+// Where someone lands after signing in (and from the logo, "/"): the
+// calendar, or My day for stylists and assistants, who see only their own
+// (or their stylist's) book.
+export function homeFor(role: StaffRole): string {
+  return isFrontOfHouse(role) ? "/calendar" : "/my-day";
+}
+
 export function roleLabel(role: StaffRole): string {
   return ROLE_LABELS[role];
 }

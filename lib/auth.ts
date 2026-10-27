@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import type { StaffRole } from "@/lib/staff";
+import { homeFor, type StaffRole } from "@/lib/staff";
 import { createClient } from "@/lib/supabase/server";
 
 // The signed-in user's staff record, with their location and business.
@@ -31,6 +31,14 @@ export const getCurrentStaff = cache(async () => {
   if (permError) throw permError;
   return { supabase, staff: { ...staff, location: staff.location, permissions: permissions ?? [] } };
 });
+
+// Where a sign-in goes: the calendar, or My day for stylists and assistants
+// (homeFor), looked up straight after signing in (getCurrentStaff is cached
+// for the request, from before). Not linked: the calendar says so.
+export async function landingFor(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string> {
+  const { data } = await supabase.from("staff").select("role").eq("user_id", userId).eq("is_active", true).limit(1).maybeSingle();
+  return data ? homeFor(data.role) : "/calendar";
+}
 
 const MANAGER_ROLES: StaffRole[] = ["owner", "manager"];
 

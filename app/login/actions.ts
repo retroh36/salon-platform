@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { landingFor } from "@/lib/auth";
 import { DEMO_OFF, isDemo } from "@/lib/demo";
 import { requestInfo, withinLimits } from "@/lib/online-booking/security";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -25,14 +26,14 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     // Same message for unknown email and wrong password.
     return { error: "That email and password don't match.", email };
   }
 
-  redirect("/dashboard");
+  redirect(await landingFor(supabase, data.user.id));
 }
 
 export async function logout() {
@@ -68,9 +69,9 @@ export async function choosePassword(_prev: PasswordState, formData: FormData): 
   if (password.length < 8) return { error: "Use at least 8 characters." };
   if (password !== again) return { error: "The two passwords don't match." };
   const supabase = await createClient();
-  const { error } = await supabase.auth.updateUser({ password });
+  const { data, error } = await supabase.auth.updateUser({ password });
   if (error?.code === "same_password") return { error: "Choose a password you haven't used for this account." };
   if (error?.code === "weak_password") return { error: "Choose a stronger password." };
   if (error) return { error: "That didn't save. Open the link from your email again." };
-  redirect("/dashboard");
+  redirect(await landingFor(supabase, data.user.id));
 }

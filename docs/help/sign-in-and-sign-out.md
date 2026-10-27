@@ -1,6 +1,6 @@
 ---
 title: Sign in and sign out
-keywords: log in, login, sign in, log out, logout, sign out, password, can't sign in, wrong password, forgot password, switch user, shared iPad
+keywords: log in, login, home, start page, first page, sign in, log out, logout, sign out, password, can't sign in, wrong password, forgot password, switch user, shared iPad
 who: owner, manager, front_desk, stylist, assistant
 open: /login | Open sign in
 ---
@@ -9,7 +9,7 @@ Everyone has their own login, so the app shows what your role can use and record
 
 1. Open Maestra. You'll see the sign-in screen.
 2. Enter your **Email** and **Password**.
-3. Tap **Sign in**. You land on the **Dashboard**.
+3. Tap **Sign in**. You land on the **Calendar** (stylists and assistants on **My day**). The **Dashboard** is in the sidebar, and the Maestra logo at the top brings you back to where you started.
 4. To sign out, tap the sign-out icon next to your name at the bottom of the sidebar (on a phone or narrow screen, it's at the top right).
 
 ## Good to know

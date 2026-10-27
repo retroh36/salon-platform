@@ -52,7 +52,7 @@ test.describe("as the owner", () => {
 
 test.describe("as a stylist on a plan", () => {
   test("sees running totals that match what Payroll pays", async ({ page }) => {
-    await signIn(page, "gil@mapleandash.test");
+    await signIn(page, "gil@mapleandash.test", "/my-day");
     await page.goto("/my-day");
     const live = page.getByTestId("live-earnings");
     await expect(live.getByRole("heading", { name: "Today’s earnings" })).toBeVisible();

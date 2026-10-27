@@ -15,11 +15,6 @@ const nextConfig: NextConfig = {
   // Denise answers "how do I…" from the help guide, read at runtime.
   outputFileTracingIncludes: { "/api/denise": ["./docs/help/*.md"] },
   partialPrefetching: true,
-  // The app starts at the dashboard (the proxy sends signed-out users on to
-  // /login). Temporary, so "/" can become a real page later.
-  async redirects() {
-    return [{ source: "/", destination: "/dashboard", permanent: false }];
-  },
   turbopack: {
     rules: {
       "*.css": {

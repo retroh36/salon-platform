@@ -96,13 +96,15 @@ export function ui(page: Page) {
   return page.locator("main").filter({ visible: true });
 }
 
-export async function signIn(page: Page, email: string) {
+// Everyone lands on the calendar, stylists and assistants on My day
+// (homeFor in lib/staff.ts).
+export async function signIn(page: Page, email: string, landing: "/calendar" | "/my-day" = "/calendar") {
   await page.goto("/login");
   await waitForHydration(page, "input[name=email]");
   await ui(page).getByLabel("Email").fill(email);
   await ui(page).getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL("/dashboard");
+  await expect(page).toHaveURL(landing);
 }
 
 // The calendar's scale: px per minute, from the person's zoom.

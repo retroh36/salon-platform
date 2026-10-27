@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { landingFor } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
 import { deviceTokenHash } from "@/lib/shared-device";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -40,7 +41,7 @@ export async function switchUser(_prev: SwitchState, formData: FormData): Promis
   if (linkError) throw linkError;
   const supabase = await createClient();
   await supabase.auth.signOut({ scope: "local" });
-  const { error: verifyError } = await supabase.auth.verifyOtp({ type: "magiclink", token_hash: link.properties.hashed_token });
+  const { data: verified, error: verifyError } = await supabase.auth.verifyOtp({ type: "magiclink", token_hash: link.properties.hashed_token });
   if (verifyError) throw verifyError;
-  redirect("/dashboard");
+  redirect(await landingFor(supabase, verified.user!.id));
 }
