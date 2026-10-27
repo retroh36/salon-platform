@@ -70,7 +70,8 @@ function succeeds(command: string, args: string[]): boolean {
 
 async function liveCommit(): Promise<string | null | undefined> {
   try {
-    const response = await fetch(`${SITE}/api/demo/status?t=${Date.now()}`, { cache: "no-store" });
+    // A hung connection counts as no answer, so the deploy wait's deadline still applies.
+    const response = await fetch(`${SITE}/api/demo/status?t=${Date.now()}`, { cache: "no-store", signal: AbortSignal.timeout(15_000) });
     if (!response.ok) return undefined;
     return ((await response.json()) as { commit?: string | null }).commit ?? null;
   } catch {
