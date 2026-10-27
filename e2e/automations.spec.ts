@@ -13,10 +13,13 @@ async function reset() {
   await admin.from("ai_actions").delete().eq("business_id", B).eq("feature", "automation");
 }
 
+// Opening the page sets up the four automations, so every part of the
+// file leaves none behind.
+test.afterAll(reset);
+
 test.describe("owner", () => {
   test.use({ storageState: AUTH.owner });
   test.beforeEach(reset);
-  test.afterAll(reset);
 
   test("approves Denise's suggestion to turn one on, and can undo it", async ({ page }) => {
     await page.goto("/settings/automations");

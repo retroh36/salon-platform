@@ -23,7 +23,7 @@ export function ClientInsightLine({ insight }: { insight: { summary: string; lin
       >
         <DeniseFace size={20} />
         <span className="min-w-0 flex-1 text-pretty">{line}</span>
-        <ChevronDownIcon className={`mt-0.5 size-4 transition-transform duration-(--motion-fast) ${open ? "rotate-180" : ""}`} />
+        <ChevronDownIcon className={`mt-0.5 size-4 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <div className="flex animate-fade-in flex-col gap-2 pt-1.5 pl-8.5">

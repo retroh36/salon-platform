@@ -15,6 +15,7 @@ import { Badge, nameLinkClass, type Tone } from "@/components/ui/page";
 import { actionsClass, numClass, tdClass, trClass } from "@/components/ui/table";
 import { FEE_STATUS_LABELS, type FeeStatus } from "@/lib/policy";
 import { cents } from "./money";
+import { useKeepOnScreen } from "@/components/ui/keep-on-screen";
 
 export type FeeRowData = {
   id: string;
@@ -145,6 +146,8 @@ export function FeeRow({ fee, canWaive }: { fee: FeeRowData; canWaive: boolean }
 function RowMenu({ label, items }: { label: string; items: { label: string; onSelect: () => void }[] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
+  const pop = useRef<HTMLSpanElement>(null);
+  useKeepOnScreen(pop, open);
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent | KeyboardEvent) => {
@@ -163,7 +166,7 @@ function RowMenu({ label, items }: { label: string; items: { label: string; onSe
         <MoreIcon className="size-4" />
       </IconButton>
       {open && (
-        <span role="menu" className="absolute top-full right-0 z-20 mt-1 flex min-w-44 flex-col rounded-lg border border-line bg-surface p-1 text-left shadow-lift">
+        <span ref={pop} role="menu" className="absolute top-full right-0 z-20 mt-1 flex min-w-44 flex-col rounded-lg border border-line bg-surface p-1 text-left shadow-lift">
           {items.map((item) => (
             <button
               key={item.label}

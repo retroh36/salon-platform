@@ -163,3 +163,20 @@ Never set `PHOREST_*`, `STRIPE_SECRET_KEY`, `TWILIO_AUTH_TOKEN` or the photo bac
 **Releasing to it.** `npm run release:demo` from a clean, pushed main: the local checks and the week, the demo database's migrations and safety check, the demo data again if a seed changed, then the `demo` branch pushed (Vercel builds the demo from it: Settings → Environments → Production → Branch Tracking is `demo`), a wait until `/api/demo/status` shows the new commit, and the demo's checks against the live site. It stops at the first failure, and says what changed by then. If the live checks fail after the push, roll back in Vercel (Deployments → the previous one → Instant Rollback).
 
 **Checking it.** `npm run test:demo` runs the demo's checks (`e2e-demo/`) against a local server with `DEMO_MODE=true`, or with `DEMO_URL=https://…` against a deployment (only reading, apart from a client's sign-in code). For a protected preview, put the project's `VERCEL_AUTOMATION_BYPASS_SECRET` in `.env.local`.
+
+## Local development: stale styles
+
+**What happened.** After the navy sidebar arrived, a dev server that had been running since before it showed the sidebar with white text on the old light background: the Maestra logo, the salon's name, the current page and the signed-in name were all invisible. Restarting the dev server fixed it. Classes the app already used elsewhere, like `text-white`, applied; the new color classes (`bg-sidebar`, `text-sidebar-text`) didn't.
+
+**Why.** The dev server (Next.js 16 with Turbopack) can serve `app/globals.css` one save behind: on Oct 27, 2026, saving a value of 74% served the 75% from the save before, and saving 75% again then served 74%. Touching the file without changing it doesn't rebuild it. So the stylesheet reaching the browser can be missing whatever the last save added, until the next save or a restart. Production builds (Vercel, and the test, week and screenshot builds) compile from scratch and aren't affected.
+
+**Why the sidebar can't break the same way again.** Its background and text colors are now also set in plain CSS in `app/globals.css` (`[data-sidebar]`, with the colors written in), so they don't depend on a new class being in the stylesheet. `e2e/sidebar.spec.ts` checks the sidebar's real background and that its salon name, links and signed-in name pass AA.
+
+**If styles look wrong or old in development** (colors missing, a component unstyled, a change not showing): save `app/globals.css` once more with any real change (and undo it), or stop the dev server, delete the cache and start it again:
+
+```
+rm -rf .next
+npm run dev
+```
+
+The first load of each page is slower afterwards while it compiles. The test, week and screenshot builds have their own folders (`.next-e2e`, `.next-week`, `.next-screenshots`) and aren't affected.

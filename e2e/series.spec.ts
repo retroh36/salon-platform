@@ -20,6 +20,10 @@ async function clear() {
 test.beforeEach(clear);
 test.afterAll(async () => {
   await clear();
+  // The file's series, before its clients (removing a client only clears
+  // the series' client).
+  const { data: mine } = await admin.from("clients").select("id").like("first_name", `${PREFIX}%`);
+  await admin.from("appointment_series").delete().in("client_id", (mine ?? []).map((c) => c.id));
   await admin.from("appointment_series").delete().eq("location_id", L).is("client_id", null);
   await admin.from("clients").delete().like("first_name", `${PREFIX}%`);
 });

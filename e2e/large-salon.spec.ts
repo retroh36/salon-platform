@@ -27,8 +27,11 @@ async function seededOrder() {
 
 test.beforeAll(seededOrder);
 
+// Puts back what the file changed: its views (and any an earlier run left,
+// all named "Lv…"), the seeded order, and the front desk's zoom.
 test.afterAll(async () => {
-  await admin.from("calendar_views").delete().eq("business_id", LARGE.business).like("name", `${TAG}%`);
+  await admin.from("calendar_views").delete().eq("business_id", LARGE.business).like("name", "Lv%");
+  await admin.from("staff").update({ calendar_zoom: "comfortable" }).eq("email", "frontdesk@harborvine.test");
   await seededOrder();
 });
 

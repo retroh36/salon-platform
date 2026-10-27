@@ -27,6 +27,8 @@ test.beforeEach(clear);
 test.afterAll(async () => {
   await clear();
   await admin.from("appointment_groups").delete().like("label", `${PREFIX}%`);
+  const { data: mine } = await admin.from("clients").select("id").like("first_name", `${PREFIX}%`);
+  await admin.from("appointment_series").delete().in("client_id", (mine ?? []).map((c) => c.id));
   await admin.from("clients").delete().like("first_name", `${PREFIX}%`);
 });
 

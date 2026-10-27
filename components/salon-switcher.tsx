@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { CheckCircleIcon, ChevronDownIcon } from "@/components/ui/icons";
 import { SalonMark } from "@/components/ui/salon-mark";
 import { locationLabel } from "@/lib/branding";
+import { useKeepOnScreen } from "@/components/ui/keep-on-screen";
 
 export type SwitcherLocation = { id: string; name: string; city: string | null; region: string | null };
 
@@ -30,11 +31,15 @@ export function SalonSwitcher({
   const root = useRef<HTMLDivElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
+  // Focus moves into the menu only when it was opened from the keyboard (a
+  // click from Enter or Space has no detail), so a mouse never leaves a ring.
+  const byKeys = useRef(false);
+  useKeepOnScreen(menu, open);
   const current = locations.find((l) => l.id === currentId) ?? locations[0];
 
   useEffect(() => {
     if (!open) return;
-    menu.current?.querySelector<HTMLElement>("[role^=menuitem]:not([aria-disabled=true])")?.focus();
+    if (byKeys.current) menu.current?.querySelector<HTMLElement>("[role^=menuitem]:not([aria-disabled=true])")?.focus();
     const onDown = (e: PointerEvent) => {
       if (!root.current?.contains(e.target as Node)) setOpen(false);
     };
@@ -66,9 +71,13 @@ export function SalonSwitcher({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`${businessName}, ${current ? locationLabel(businessName, current.name) : ""}. Locations`}
-        onClick={() => setOpen(!open)}
+        onClick={(e) => {
+          byKeys.current = e.detail === 0;
+          setOpen(!open);
+        }}
         data-testid="salon-switcher"
-        className="flex w-full items-center gap-3 rounded-lg border border-sidebar-line bg-sidebar-card p-2.5 text-left transition-colors duration-(--motion-fast) hover:bg-sidebar-hover focus-visible:outline-2 focus-visible:outline-sidebar-focus"
+        // A filled card with no border, and a ring only for keyboard focus.
+        className="flex w-full items-center gap-3 rounded-lg bg-sidebar-card p-2.5 text-left transition-colors duration-(--motion-fast) hover:bg-sidebar-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-focus"
       >
         <SalonMark name={businessName} logoUrl={logoUrl} onDark />
         <span className="min-w-0 flex-1">
@@ -77,7 +86,7 @@ export function SalonSwitcher({
           </span>
           {current && <span className="mt-0.5 block truncate text-xs leading-tight text-sidebar-muted">{locationLabel(businessName, current.name)}</span>}
         </span>
-        <ChevronDownIcon className={`size-4 shrink-0 text-sidebar-muted transition-transform duration-(--motion-fast) ${open ? "rotate-180" : ""}`} />
+        <ChevronDownIcon className={`size-4 shrink-0 text-sidebar-muted ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <div

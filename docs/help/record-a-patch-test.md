@@ -9,7 +9,7 @@ Record a patch test once it's been done, so color services can go ahead.
 
 1. Open the client's profile (search for them under **Clients**), or open their visit in booking details on the calendar.
 2. On the profile, tap the **Patch tests** tab, then **Add patch test**. In booking details, tap **Before this visit** and then **Record patch test**.
-3. Set the **Date** and **Time** of the test.
+3. Set the **Date** and **Time** of the test. They start on today at 10am, or the time now if it's earlier: a test can't be recorded before it's done.
 4. Choose who did it under **Done by**.
 5. Choose the **Result**: **No reaction** or **Reaction**.
 6. Enter the **Products tested**, and any **Notes (optional)**.

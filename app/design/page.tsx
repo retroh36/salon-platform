@@ -44,7 +44,7 @@ const COLORS: [string, string[]][] = [
   ["Sidebar", ["sidebar", "sidebar-hover", "sidebar-card", "sidebar-active", "sidebar-accent", "sidebar-text", "sidebar-muted", "sidebar-focus"]],
   ["Denise only", ["denise-50", "denise-100", "denise-200", "denise-500", "denise-600", "denise-700", "denise-900"]],
   ["Service colors", ["peach-fill", "lavender-fill", "sage-fill", "teal-fill", "sand-fill", "rose-fill", "sky-fill"]],
-  ["Where the client is", ["visit-here", "visit-done", "visit-off"]],
+  ["Where the client is", ["visit-here", "visit-off"]],
 ];
 
 const TONES: [Tone, string][] = [

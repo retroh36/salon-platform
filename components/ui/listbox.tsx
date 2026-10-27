@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { buttonClass } from "@/components/ui/button";
 import { ChevronDownIcon } from "@/components/ui/icons";
+import { useKeepOnScreen } from "@/components/ui/keep-on-screen";
 
 // `group` puts a small heading above the first option of each group
 // ("Saved views"); `action` marks an option that does something (opens a
@@ -31,6 +32,7 @@ export function Listbox<T extends string>({
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLUListElement>(null);
+  useKeepOnScreen(list, open);
   const current = options.find((o) => o.value === value && !o.action) ?? options[0];
 
   function show() {
@@ -96,13 +98,15 @@ export function Listbox<T extends string>({
             show();
           }
         }}
-        className={buttonClass("secondary", "md", "w-full justify-between")}
+        // The label on the left and the arrow on the right (the button's own
+        // centering would otherwise win), the label shortened before the arrow.
+        className={buttonClass("secondary", "md", "w-full justify-between!")}
       >
-        <span id={`${id}-value`} className="flex items-center gap-2 truncate">
+        <span id={`${id}-value`} className="flex min-w-0 items-center gap-2 truncate">
           {current.icon}
           {current.label}
         </span>
-        <ChevronDownIcon className={`size-4 text-ink-muted transition-transform duration-(--motion-fast) ${open ? "rotate-180" : ""}`} />
+        <ChevronDownIcon className={`size-4 text-ink-muted ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <ul

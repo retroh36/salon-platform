@@ -5,6 +5,7 @@ import { buttonClass, IconButton } from "@/components/ui/button";
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, startOfWeek, type LocalDate } from "@/lib/scheduling/time";
+import { useKeepOnScreen } from "@/components/ui/keep-on-screen";
 
 const WEEKDAY_LETTERS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 
@@ -48,6 +49,8 @@ export function DatePicker({
   const [focused, setFocused] = useState(value);
   const [month, setMonth] = useState(monthOf(value));
   const root = useRef<HTMLDivElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  useKeepOnScreen(pop, open);
   const grid = useRef<HTMLDivElement>(null);
 
   function show() {
@@ -106,14 +109,17 @@ export function DatePicker({
         aria-controls={open ? `${id}-dialog` : undefined}
         aria-label={`${label}: ${formatLongDay(value)}`}
         onClick={() => (open ? setOpen(false) : show())}
-        className={buttonClass("secondary", "md", "min-w-44 justify-start")}
+        className={buttonClass("secondary", "md", "justify-start! xl:min-w-44")}
       >
         <CalendarIcon className="size-4 text-navy-700" />
-        {formatLongDay(value, false).replace(/^(\w{3})\w*,/, "$1,")}
+        {/* "Tue, Oct 27" where room is short (an iPad), "Tue, October 27" on a wide screen. */}
+        <span className="xl:hidden">{formatLongDay(value, false).replace(/^(\w{3})\w*, (\w{3})\w*/, "$1, $2")}</span>
+        <span className="hidden xl:inline">{formatLongDay(value, false).replace(/^(\w{3})\w*,/, "$1,")}</span>
       </button>
 
       {open && (
         <div
+          ref={pop}
           id={`${id}-dialog`}
           role="dialog"
           aria-label={label}

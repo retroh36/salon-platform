@@ -115,6 +115,11 @@ export const CheckCircleIcon = (p: IconProps) => (
     <path d="m8.5 12.2 2.4 2.3 4.6-4.8" />
   </Icon>
 );
+export const CheckIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="m5.5 12.5 4.2 4 8.8-9" />
+  </Icon>
+);
 export const LogOutIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M14.5 4.5h3a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h9" />

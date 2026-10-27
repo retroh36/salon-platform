@@ -136,7 +136,7 @@ export function DeniseReorders({ canManage }: { canManage: boolean }) {
               <details className="group">
                 <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-medium text-denise-700 [&::-webkit-details-marker]:hidden">
                   What&apos;s in it
-                  <ChevronDownIcon className="size-3.5 transition-transform duration-(--motion-fast) group-open:rotate-180" />
+                  <ChevronDownIcon className="size-3.5 group-open:rotate-180" />
                 </summary>
                 <ul className="mt-2 divide-y divide-denise-200 text-13">
                   {s.lines.map((l) => (

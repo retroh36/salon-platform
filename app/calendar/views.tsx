@@ -11,12 +11,15 @@ import { Sheet } from "@/components/ui/sheet";
 import { offLabel, viewProblems, VIEW_NAME_MAX, type CalendarView } from "@/lib/calendar-views";
 import type { ColumnData } from "./types";
 import { deleteCalendarView, saveCalendarView } from "./view-actions";
+import { useKeepOnScreen } from "@/components/ui/keep-on-screen";
 
 // The "10 off today" chip in the calendar's toolbar: who's off and why,
 // and a switch to show them anyway.
 export function OffChip({ off, shown, onShow, isToday }: { off: ColumnData[]; shown: boolean; onShow: (show: boolean) => void; isToday: boolean }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  useKeepOnScreen(pop, open);
   useEffect(() => {
     if (!open) return;
     const onDown = (e: PointerEvent) => {
@@ -44,6 +47,7 @@ export function OffChip({ off, shown, onShow, isToday }: { off: ColumnData[]; sh
       </button>
       {open && (
         <div
+          ref={pop}
           role="dialog"
           aria-label={isToday ? "Off today" : "Off this day"}
           className="absolute top-full left-0 z-50 mt-2 flex w-[min(22rem,calc(100vw-2rem))] origin-top-left animate-pop-in flex-col gap-3 rounded-lg border border-line bg-surface p-4 shadow-lift"

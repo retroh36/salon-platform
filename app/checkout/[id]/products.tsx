@@ -83,7 +83,7 @@ export function ProductPicker({ data, onAdd }: { data: CheckoutScreenData; onAdd
             }}
             placeholder="Add a product: name, brand, SKU or scan"
             autoComplete="off"
-            className="h-12 w-full rounded-md border border-line-strong bg-surface pr-4 pl-12 text-base placeholder:text-ink-subtle focus:border-focus focus:ring-2 focus:ring-focus/25 focus:outline-none"
+            className="h-12 w-full rounded-md border border-line-strong bg-surface pr-4 pl-12 text-base placeholder:text-ink-subtle focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25 focus:outline-none"
           />
           {results.length > 0 && (
             <ul aria-label="Matching products" className="absolute inset-x-0 top-full z-40 mt-1 max-h-96 overflow-y-auto rounded-lg border border-line bg-surface p-1 shadow-lift">

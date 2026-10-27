@@ -1,6 +1,9 @@
 import type { Page } from "@playwright/test";
 import { addDays, startOfWeek, todayIn } from "@/lib/scheduling/time";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, putBackSales, test, ui, waitForHydration } from "./fixtures";
+
+// Opening a new sale starts a checkout; removed afterwards.
+putBackSales();
 
 // On the front desk's iPad every button is at least 44px each way, so a
 // finger never misses (calendar blocks excepted: their height is the

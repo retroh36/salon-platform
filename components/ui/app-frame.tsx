@@ -137,10 +137,15 @@ export function AppFrame({
   return (
     // One screen tall on large screens: the calendar and panels scroll inside.
     <div className="flex min-h-screen flex-1 bg-canvas text-ink lg:h-[calc(100vh-var(--demo-bar))] lg:min-h-0 lg:flex-none lg:overflow-hidden">
-      <aside className="hidden w-60 shrink-0 flex-col bg-sidebar text-sidebar-text lg:flex" data-testid="sidebar">
-        <div className="px-5 pt-6 pb-5">
+      <aside className="hidden w-60 shrink-0 flex-col bg-sidebar text-sidebar-text lg:flex" data-sidebar data-testid="sidebar">
+        {/* The biggest brand mark in the sidebar: about 31px of visible logo.
+            The image is 1462px wide (sharp at 2x) with transparent padding
+            round the logo (a fifth of its height above, as much below and
+            10px to the left at this size), which the negative margins take
+            back so the space here is what shows. */}
+        <div className="px-5 pt-8 pb-7">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/maestra/maestra-logo-white.png" alt="Maestra" data-testid="sidebar-logo" className="-ml-1.5 h-8 w-auto" />
+          <img src="/brand/maestra/maestra-logo-white.png" alt="Maestra" width={1462} height={414} data-testid="sidebar-logo" className="-mt-[9px] -mb-[10px] -ml-[10px] block h-[50px] w-auto" />
         </div>
         <div className="px-3 pb-5">
           <SalonSwitcher
@@ -227,7 +232,7 @@ export function AppFrame({
               name="q"
               aria-label="Search clients"
               placeholder="Search clients by name or phone"
-              className="h-9 w-full rounded-md border border-line bg-surface pr-3 pl-9 text-sm placeholder:text-ink-subtle focus:border-focus focus:ring-2 focus:ring-focus/25 focus:outline-none"
+              className="h-9 w-full rounded-md border border-line bg-surface pr-3 pl-9 text-sm placeholder:text-ink-subtle focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25 focus:outline-none"
             />
           </form>
           )}

@@ -30,6 +30,7 @@ import type { Scope } from "@/lib/scheduling/series";
 import { useNow } from "./now-line";
 import type { AppointmentDetail, BoardData } from "./types";
 import { reach } from "@/lib/reach";
+import { useKeepOnScreen } from "@/components/ui/keep-on-screen";
 
 export function AppointmentPanel({
   date,
@@ -322,7 +323,7 @@ export function AppointmentPanel({
         </section>
 
         {/* Only while something's outstanding: one row that opens the checklist. */}
-        {client && outstanding.length > 0 && <VisitChecklist items={checklist} override={appointment.patchOverride} clientId={client.id} date={date} today={today} me={me} team={team} />}
+        {client && outstanding.length > 0 && <VisitChecklist items={checklist} override={appointment.patchOverride} clientId={client.id} date={date} today={today} timeZone={timeZone} me={me} team={team} />}
 
         {appointment.insight && <ClientInsightLine insight={appointment.insight} />}
 
@@ -502,10 +503,14 @@ function ActionsMenu({ actions, disabled }: { actions: MenuAction[]; disabled: b
   const root = useRef<HTMLDivElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
+  // Focus moves into the menu only when it was opened from the keyboard (a
+  // click from Enter or Space has no detail), so a mouse never leaves a ring.
+  const byKeys = useRef(false);
+  useKeepOnScreen(menu, open);
 
   useEffect(() => {
     if (!open) return;
-    menu.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
+    if (byKeys.current) menu.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
     const onDown = (e: PointerEvent) => {
       if (!root.current?.contains(e.target as Node)) setOpen(false);
     };
@@ -530,7 +535,10 @@ function ActionsMenu({ actions, disabled }: { actions: MenuAction[]; disabled: b
 
   return (
     <div ref={root} className="relative" onKeyDown={onKeyDown}>
-      <Button ref={button} aria-label="More actions" title="More actions" size="lg" square aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen(!open)}>
+      <Button ref={button} aria-label="More actions" title="More actions" size="lg" square aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={(e) => {
+          byKeys.current = e.detail === 0;
+          setOpen(!open);
+        }}>
         <MoreIcon />
       </Button>
       {open && (
@@ -1067,6 +1075,7 @@ function VisitChecklist({
   clientId,
   date,
   today,
+  timeZone,
   me,
   team,
 }: {
@@ -1075,6 +1084,7 @@ function VisitChecklist({
   clientId: string;
   date: LocalDate;
   today: LocalDate;
+  timeZone: string;
   me: BoardData["me"];
   team: { id: string; name: string }[];
 }) {
@@ -1093,7 +1103,7 @@ function VisitChecklist({
       >
         <WarningIcon className="size-4 text-warning-dot" />
         <span className="flex-1">Before this visit ({outstanding})</span>
-        <ChevronDownIcon className={`size-4 text-ink-muted transition-transform duration-(--motion-fast) ${open ? "rotate-180" : ""}`} />
+        <ChevronDownIcon className={`size-4 text-ink-muted ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <ul className="flex animate-fade-in flex-col gap-3 border-t border-line p-3">
@@ -1134,7 +1144,7 @@ function VisitChecklist({
                     )
                   ))}
               </div>
-              {!c.done && c.action.kind === "patch_test" && recordingPatch && <PatchTestForm clientId={clientId} today={today} me={me.staffId} staff={team} compact />}
+              {!c.done && c.action.kind === "patch_test" && recordingPatch && <PatchTestForm clientId={clientId} today={today} timeZone={timeZone} me={me.staffId} staff={team} compact />}
             </li>
           ))}
         </ul>

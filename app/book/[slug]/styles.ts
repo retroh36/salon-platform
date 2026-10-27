@@ -20,7 +20,7 @@ export const accentLink = "font-medium text-(--accent) underline underline-offse
 export const choiceClass =
   "group flex min-h-16 w-full items-center gap-4 rounded-lg border bg-surface px-4 py-3 text-left transition-[border-color,background-color,box-shadow] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 export const inputClass =
-  "min-h-12 w-full rounded-lg border border-line-strong bg-surface px-3.5 text-base text-ink placeholder:text-ink-subtle focus:border-focus focus:ring-3 focus:ring-focus/25 focus:outline-none";
+  "min-h-12 w-full rounded-lg border border-line-strong bg-surface px-3.5 text-base text-ink placeholder:text-ink-subtle focus-visible:border-focus focus-visible:ring-3 focus-visible:ring-focus/25 focus:outline-none";
 // A section on a client page: a title over a thin rule, no box.
 export const sectionTitle = "border-b border-line pb-2 text-base font-semibold text-ink";
 // One of a few choices (a tip, what they're planning): the salon's color

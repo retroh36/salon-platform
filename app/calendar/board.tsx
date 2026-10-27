@@ -14,7 +14,7 @@ import { LEVEL_BG, LevelBadge } from "@/components/ui/level";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { FitText } from "@/components/ui/fit-text";
-import { CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, GripIcon, MoreIcon, PlusIcon, SlidersIcon } from "@/components/ui/icons";
+import { CalendarIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, GripIcon, MoreIcon, PlusIcon, SlidersIcon } from "@/components/ui/icons";
 import { Listbox } from "@/components/ui/listbox";
 import { Segmented } from "@/components/ui/segmented";
 import { Tabs } from "@/components/ui/tabs";
@@ -44,6 +44,7 @@ import { OffChip, ViewEditor, type Department } from "./views";
 import { saveCalendarView, setCalendarOrder } from "./view-actions";
 import type { AppointmentDetail, BlockData, BoardData, ColumnData, TimeBlockData } from "./types";
 import { firstLetter } from "@/lib/initial";
+import { useKeepOnScreen } from "@/components/ui/keep-on-screen";
 
 // How tall time is drawn (px per minute), from the zoom; blocks read it.
 const ScaleContext = createContext(ZOOM_PX_PER_MINUTE.comfortable);
@@ -869,7 +870,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               else if (next === "action:edit") setEditing({ viewId: currentView!.id });
               else setView(next as ViewKey);
             }}
-            className="w-56"
+            className="w-48 xl:w-56"
             options={[
               { value: "all", label: "All departments" },
               ...departments.map((f) => ({
@@ -1422,6 +1423,8 @@ const headerHeight = (grid: HTMLElement) => (grid.querySelector("[data-grid-head
 function ViewMenu({ zoom, onZoom, fitAll, onFitAll }: { zoom: CalendarZoom; onZoom: (z: CalendarZoom) => void; fitAll: boolean; onFitAll: (on: boolean) => void }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  useKeepOnScreen(pop, open);
   useEffect(() => {
     if (!open) return;
     const onDown = (e: PointerEvent) => {
@@ -1442,13 +1445,15 @@ function ViewMenu({ zoom, onZoom, fitAll, onFitAll }: { zoom: CalendarZoom; onZo
   }, [open]);
   return (
     <div ref={root} className="relative">
-      <button type="button" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)} className={buttonClass("secondary", "md")}>
+      <button type="button" aria-expanded={open} aria-haspopup="dialog" aria-label={ZOOM_LABELS[zoom]} title="Calendar display" onClick={() => setOpen(!open)} className={buttonClass("secondary", "md")}>
         <SlidersIcon className="size-4" />
-        {ZOOM_LABELS[zoom]}
+        {/* Its name where there's room; the icon alone on an iPad, so the
+            toolbar stays on one row (the name is still its label). */}
+        <span className="hidden xl:inline">{ZOOM_LABELS[zoom]}</span>
         <ChevronDownIcon className="size-4 text-ink-muted" />
       </button>
       {open && (
-        <div role="dialog" aria-label="Calendar display" className="absolute top-full right-0 z-50 mt-1.5 flex w-72 animate-pop-in flex-col gap-3 rounded-lg border border-line bg-surface p-3 shadow-lift">
+        <div ref={pop} role="dialog" aria-label="Calendar display" className="absolute top-full right-0 z-50 mt-1.5 flex w-72 animate-pop-in flex-col gap-3 rounded-lg border border-line bg-surface p-3 shadow-lift">
           <div className="flex flex-col gap-1.5">
             <span className="text-13 font-medium text-ink-muted">Zoom</span>
             <Segmented label="Zoom" value={zoom} onChange={onZoom} options={ZOOMS.map((z) => ({ value: z, label: ZOOM_LABELS[z] }))} />
@@ -1758,6 +1763,8 @@ function FixGhost({ block, y }: { block: Placed & { lane: number; lanes: number 
 function CalendarKey({ families }: { families: ServiceFamily[] }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  useKeepOnScreen(pop, open);
   useEffect(() => {
     if (!open) return;
     const onDown = (e: PointerEvent) => {
@@ -1772,10 +1779,11 @@ function CalendarKey({ families }: { families: ServiceFamily[] }) {
     <div ref={root} className="relative" onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
       <Button size="sm" variant="ghost" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)}>
         Key
-        <ChevronDownIcon className={`size-4 transition-transform duration-(--motion-fast) ${open ? "" : "rotate-180"}`} />
+        <ChevronDownIcon className={`size-4 ${open ? "" : "rotate-180"}`} />
       </Button>
       {open && (
         <div
+          ref={pop}
           role="dialog"
           aria-label="Calendar key"
           className="absolute bottom-full left-0 z-[60] mb-2 grid w-[min(36rem,calc(100vw-2rem))] origin-bottom-left animate-pop-in gap-4 rounded-lg border border-line bg-surface p-4 text-sm text-ink-muted shadow-lift sm:grid-cols-3"
@@ -1815,8 +1823,11 @@ function CalendarKey({ families }: { families: ServiceFamily[] }) {
                   ["off", "No-show"],
                 ] as const
               ).map(([visit, text]) => (
-                <li key={visit} className="flex items-center gap-2" data-visit={visit}>
-                  <span aria-hidden className={`${swatch} border-l-[3px] border-ink-subtle bg-(--visit-fill)`} />
+                // Checked out is shown on a service's own color, faded, with its check.
+                <li key={visit} className="flex items-center gap-2" data-visit={visit} data-family={visit === "done" ? (families[0] ?? "cut") : undefined}>
+                  <span aria-hidden className={`${swatch} flex items-center justify-end border-l-[3px] bg-(--visit-fill) ${visit === "done" ? "border-(--fam-accent) text-(--visit-ink-muted)" : "border-ink-subtle"}`}>
+                    {visit === "done" && <CheckIcon className="size-3" />}
+                  </span>
                   <span className={visit === "off" ? "line-through" : ""}>{text}</span>
                 </li>
               ))}
@@ -2002,8 +2013,9 @@ function DragGhost({ block, start, stylist, y }: { block: BlockData; start: numb
 }
 
 // Where the client is in their visit, as the block's fill: the service
-// color until they're here, then yellow (checked in), green (checked out),
-// or grey and struck through (no-show). The service color stays as the
+// color until they're here, then yellow (checked in), the service color
+// slightly faded with a check (checked out), or grey and struck through
+// (no-show). The service color stays as the
 // stripe down the left edge.
 type Visit = "upcoming" | "here" | "done" | "off";
 
@@ -2203,6 +2215,12 @@ function AppointmentBlock({
                 {(notArrived || lateBy) && <span className={notArrived ? "hidden @min-[11rem]:inline" : "hidden @min-[8.5rem]:inline"}>{notArrived ? "Not arrived" : `+${lateBy}m`}</span>}
               </span>
             )}
+            {/* Checked out: a check, which goes before the name does. */}
+            {visit === "done" && (
+              <span data-checked-out title="Checked out" className="hidden shrink-0 text-(--visit-ink-muted) @min-[6.5rem]:flex">
+                <CheckIcon className="size-3.5" />
+              </span>
+            )}
           </span>
         )}
         {show.service && (
@@ -2230,9 +2248,13 @@ function MoreMenu({ items }: { items: MoreItem[] }) {
   const root = useRef<HTMLDivElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
+  // Focus moves into the menu only when it was opened from the keyboard (a
+  // click from Enter or Space has no detail), so a mouse never leaves a ring.
+  const byKeys = useRef(false);
+  useKeepOnScreen(menu, open);
   useEffect(() => {
     if (!open) return;
-    menu.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
+    if (byKeys.current) menu.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
     const onDown = (e: PointerEvent) => {
       if (!root.current?.contains(e.target as Node)) setOpen(false);
     };
@@ -2260,9 +2282,12 @@ function MoreMenu({ items }: { items: MoreItem[] }) {
         all[(i + (e.key === "ArrowDown" ? 1 : -1) + all.length) % all.length]?.focus();
       }}
     >
-      <button ref={button} type="button" className={buttonClass("secondary", "lg")} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button ref={button} type="button" className={buttonClass("secondary", "lg")} aria-haspopup="menu" aria-expanded={open} onClick={(e) => {
+          byKeys.current = e.detail === 0;
+          setOpen(!open);
+        }}>
         More
-        <ChevronDownIcon className={`size-4 transition-transform duration-(--motion-fast) ${open ? "rotate-180" : ""}`} />
+        <ChevronDownIcon className={`size-4 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <div ref={menu} role="menu" aria-label="More" className="absolute top-full right-0 z-50 mt-2 flex min-w-44 origin-top-right animate-pop-in flex-col rounded-lg border border-line bg-surface p-1.5 shadow-lift">

@@ -67,7 +67,10 @@ function deltaE(a: string, b: string, sim?: Matrix): number {
 const SURFACES = ["canvas", "surface", "sunken"];
 const LEVELS = ["level-master", "level-senior", "level-artisan"];
 const FILLS = ["peach-fill", "lavender-fill", "sage-fill", "teal-fill", "rose-fill", "sky-fill", "sand-fill"];
-const VISITS = ["visit-here", "visit-done", "visit-off"];
+// Checked in and no-show fill the block; checked out keeps the service's
+// color, faded to DONE_FADE over white, with its own tinted text.
+const VISITS = ["visit-here", "visit-off"];
+const DONE_FADE = 0.75;
 const STATUSES = ["booked", "confirmed", "checked-in", "completed", "late", "no-show"];
 
 // [text, background]: normal-size text needs 4.5:1.
@@ -126,8 +129,10 @@ describe("design tokens", () => {
 
   it("keeps text readable on the lighter processing part of a block, and on faded (checked-out) blocks", () => {
     // Processing is the family fill at about half strength over white; a
-    // checked-out block at 40%.
+    // checked-out block at DONE_FADE, and its processing lighter still.
     for (const fill of FILLS) {
+      expect(contrast(color(fill.replace("-fill", "-ink")), overWhite(color(fill), DONE_FADE))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(color(fill.replace("-fill", "-ink-muted")), overWhite(color(fill), DONE_FADE))).toBeGreaterThanOrEqual(4.5);
       expect(contrast(color(fill.replace("-fill", "-ink-muted")), overWhite(color(fill), 0.45))).toBeGreaterThanOrEqual(4.5);
       expect(contrast(color(fill.replace("-fill", "-ink")), overWhite(color(fill), 0.45))).toBeGreaterThanOrEqual(4.5);
       expect(contrast(color("ink-muted"), overWhite(color(fill), 0.45))).toBeGreaterThanOrEqual(4.5);
@@ -144,23 +149,19 @@ describe("design tokens", () => {
     }
   });
 
-  it("keeps the visit colors apart from each other and the service colors, by lightness too", () => {
-    // Checked in (yellow) and checked out (green) differ in lightness, not
-    // just hue, so they read with any color vision.
+  it("keeps checked in apart from the service colors, booked or checked out, with any color vision", () => {
+    // Checked in (yellow) against every service color, and against every
+    // checked-out (faded) one; checked out also has its check mark, so it's
+    // never color alone. (No-shows are grey and struck through.)
     const lightness = (name: string) => lab(color(name))[0];
-    expect(lightness("visit-here") - lightness("visit-done")).toBeGreaterThanOrEqual(10);
     for (const [vision, sim] of [["normal", undefined] as const, ...Object.entries(SIMULATIONS)]) {
-      expect(deltaE(color("visit-here"), color("visit-done"), sim), `here vs done (${vision})`).toBeGreaterThanOrEqual(10);
-      for (const v of ["visit-here", "visit-done"]) {
-        for (const f of FILLS) expect(deltaE(color(v), color(f), sim), `${v} vs ${f} (${vision})`).toBeGreaterThanOrEqual(6);
+      for (const f of FILLS) {
+        expect(deltaE(color("visit-here"), color(f), sim), `here vs ${f} (${vision})`).toBeGreaterThanOrEqual(6);
+        expect(deltaE(color("visit-here"), overWhite(color(f), DONE_FADE), sim), `here vs checked-out ${f} (${vision})`).toBeGreaterThanOrEqual(6);
       }
     }
-    // Checked out is clearly darker than every service color; checked in
-    // lighter. (No-shows are grey and struck through, so not color alone.)
-    for (const f of FILLS) {
-      expect(lightness(f) - lightness("visit-done")).toBeGreaterThanOrEqual(5);
-      expect(lightness("visit-here")).toBeGreaterThan(lightness(f));
-    }
+    // Checked in is lighter than every service color.
+    for (const f of FILLS) expect(lightness("visit-here")).toBeGreaterThan(lightness(f));
   });
 
   it("gives family accents and the current-time line 3:1 against the page (non-text)", () => {

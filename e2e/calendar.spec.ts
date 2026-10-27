@@ -378,10 +378,26 @@ test.describe("design", () => {
     // Four different fills, and the same service stripe on every one.
     expect(new Set(await Promise.all(["Rey", "Ida", "Dot", "Ned"].map(fill))).size).toBe(4);
     expect(new Set(await Promise.all(["Lou", "Rey", "Ida", "Dot", "Ned"].map(stripe))).size).toBe(1);
+    // Checked out keeps the service's color, a little paler, with a check
+    // by the name (and only there).
+    // As 0–255 (a color-mix() fill reads back as "color(srgb 0.9 0.8 1)").
+    const rgb = async (name: string) => {
+      const css = await fill(name);
+      const parts = css.match(/[\d.]+/g)!.slice(0, 3).map(Number);
+      return css.startsWith("color(") ? parts.map((v) => v * 255) : parts;
+    };
+    const [booked, faded] = [await rgb("Rey"), await rgb("Dot")];
+    for (let i = 0; i < 3; i++) {
+      expect(faded[i]).toBeGreaterThanOrEqual(booked[i]);
+      expect(faded[i]).toBeLessThan(booked[i] + (255 - booked[i]) * 0.4);
+    }
+    await expect(block("Dot").locator("[data-checked-out]")).toBeVisible();
+    await expect(nola.locator("[data-checked-out]")).toHaveCount(1);
     // Matching the key.
     await ui(page).getByRole("button", { name: "Key" }).click();
     const legend = ui(page).getByTestId("status-legend");
-    for (const [name, visit] of [["Ida", "here"], ["Dot", "done"], ["Ned", "off"]]) {
+    await expect(legend.locator("[data-visit=done] svg")).toBeVisible();
+    for (const [name, visit] of [["Ida", "here"], ["Ned", "off"]]) {
       expect(await legend.locator(`[data-visit=${visit}] > span`).first().evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(await fill(name));
     }
     // A no-show's name is struck through.

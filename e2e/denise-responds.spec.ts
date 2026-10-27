@@ -2,7 +2,10 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, openAllDay, restoreLearnedDurations, SEED, setAsideLearnedDurations } from "../tests/db/helpers";
-import { AUTH, expect, moreAction, putBackSales, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, knownBridgetBalayage, moreAction, putBackSales, setBridgetBalayage, test, ui, waitForHydration } from "./fixtures";
+
+// Bridget's Balayage as these tests expect it, whatever the seed gave her.
+knownBridgetBalayage();
 
 // Stock and sales this file uses are put back afterwards.
 putBackSales();
@@ -253,6 +256,9 @@ test.describe("running late", () => {
 });
 
 test.describe("on the calendar", () => {
+  // "running late" recomputed what Denise has learned from the seed.
+  test.beforeAll(() => setBridgetBalayage());
+
   test("a double-booking (from an import) gets fixes", async ({ page }) => {
     await seed(await newClient("Ann"), BRIDGET, at(10), undefined, "booked", true);
     await seed(await newClient("Bea"), BRIDGET, at(10, 30), undefined, "booked", true);

@@ -1,6 +1,6 @@
 ---
 title: Read the calendar colors
-keywords: calendar key, legend, colors, colours, what does yellow mean, green appointment, grey appointment, striped, clock icon, stylist level, badge, status
+keywords: calendar key, legend, colors, colours, what does yellow mean, check mark, checked out, pale appointment, grey appointment, striped, clock icon, stylist level, badge, status
 who: owner, manager, front_desk, stylist, assistant
 open: /calendar | Open calendar
 ---
@@ -9,7 +9,7 @@ What the colors, stripes and icons on the calendar mean.
 
 1. Tap **Key** under the calendar to see the full legend.
 2. The stripe on the left of a visit, and its fill until the client arrives, is the service color: Color, Cuts, Gloss & blowouts, Treatments, Nails or Skin. The key lists the ones your salon has.
-3. The fill shows where the client is in their visit: yellow once **Checked in**, green once **Checked out**, grey with the name struck through for a **No-show**.
+3. The fill shows where the client is in their visit: yellow once **Checked in**; once **Checked out** it keeps its service color, a little paler, with a check mark by the name; grey with the name struck through for a **No-show**.
 4. Lighter striped parts are processing time: the stylist is free, the chair isn't.
 5. A clock with "+5m" means the client is due and not checked in; "Not arrived" from 15 minutes late.
 6. Grey hatched areas are **Not bookable** (outside working hours). Blocked time and time off are labeled.

@@ -3,7 +3,7 @@ export const fieldClass = [
   "w-full rounded-md border border-line-strong bg-surface px-3 py-[7px] text-sm leading-5 text-ink",
   "transition-[border-color,box-shadow] duration-(--motion-fast)",
   "placeholder:text-ink-subtle hover:border-ink-subtle",
-  "focus:border-focus focus:ring-2 focus:ring-focus/25 focus:outline-none",
+  "focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25 focus:outline-none",
   "disabled:bg-sunken disabled:text-ink-muted aria-invalid:border-danger",
 ].join(" ");
 

@@ -4,7 +4,10 @@ import type { DurationInsight } from "@/lib/insights/durations";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, busyDay, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration, slotAt } from "./fixtures";
+import { AUTH, expect, knownBridgetBalayage, slotAt, test, ui, waitForHydration } from "./fixtures";
+
+// Bridget's Balayage as these tests expect it, whatever the seed gave her.
+knownBridgetBalayage();
 
 const B = SEED.business;
 const L = SEED.location;

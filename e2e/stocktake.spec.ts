@@ -17,12 +17,16 @@ test.beforeAll(async () => {
   await admin.from("stock_levels").update({ on_hand: 144 }).eq("product_id", await product("GW-TC-7N")).eq("location_id", L);
 });
 
-// Put stock back the way it was.
+// Put stock back the way it was: undo the counts, then 7N exactly as it
+// was (last, so its count isn't undone on top of it).
 test.afterAll(async () => {
-  if (sevenNWas !== null) await admin.from("stock_levels").update({ on_hand: sevenNWas }).eq("product_id", await product("GW-TC-7N")).eq("location_id", L);
   const { data: takes } = await admin.from("stocktakes").select("id").eq("location_id", L);
   const ids = (takes ?? []).map((t) => t.id);
-  if (!ids.length) return;
+  if (ids.length) await undoCounts(ids);
+  if (sevenNWas !== null) await admin.from("stock_levels").update({ on_hand: sevenNWas }).eq("product_id", await product("GW-TC-7N")).eq("location_id", L);
+});
+
+async function undoCounts(ids: string[]) {
   const { data: moves } = await admin.from("stock_movements").select("id, product_id, change").in("stocktake_id", ids);
   for (const m of moves ?? []) {
     const { data: l } = await admin.from("stock_levels").select("on_hand").eq("product_id", m.product_id).eq("location_id", L).single();
@@ -30,7 +34,7 @@ test.afterAll(async () => {
     await admin.from("stock_movements").delete().eq("id", m.id);
   }
   await admin.from("stocktakes").delete().in("id", ids);
-});
+}
 
 test.describe("on an iPad", () => {
   test.use({ storageState: AUTH.owner, viewport: { width: 820, height: 1180 }, hasTouch: true });

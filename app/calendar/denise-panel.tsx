@@ -333,7 +333,7 @@ function ConflictCard({
             className="flex items-center gap-1 self-start text-xs font-medium text-denise-700 hover:text-denise-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
             Other options ({others.length})
-            <ChevronDownIcon className={`size-3.5 transition-transform duration-(--motion-fast) ${open ? "rotate-180" : ""}`} />
+            <ChevronDownIcon className={`size-3.5 ${open ? "rotate-180" : ""}`} />
           </button>
           {open && (
             <ul className="flex flex-col divide-y divide-line">

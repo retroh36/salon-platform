@@ -102,7 +102,7 @@ export function ClientHeader({ data, walkIn, onWalkIn }: { data: CheckoutScreenD
           >
             <DeniseFace size={20} />
             What Denise knows
-            <ChevronDownIcon className={`size-4 transition-transform duration-(--motion-fast) ${open ? "rotate-180" : ""}`} />
+            <ChevronDownIcon className={`size-4 ${open ? "rotate-180" : ""}`} />
           </button>
         )}
       </div>

@@ -66,7 +66,7 @@
   /* Service families ("A · Richer"): a clear, saturated tint behind the
      text, a 4px edge in the full color, and dark text tinted to match
      (the name in -ink, the rest in -ink-muted). Apart from the checked-in
-     yellow and checked-out green (checked in the token tests). */
+     yellow, booked or checked out (checked in the token tests). */
   --color-peach-fill: #ffd8c2;
   --color-peach-accent: #f2603d;
   --color-peach-ink: #5a250a;
@@ -140,7 +140,6 @@
      token tests). Secondary text on any block uses block-ink-muted, which
      passes AA on all of them. */
   --color-visit-here: #fcf1ae;
-  --color-visit-done: #9ccfa6;
   --color-visit-off: #e3e5e9;
   --color-block-ink-muted: #454d5a;
   /* "+5m" and "Not arrived" on a block: the warning, a step darker so it
@@ -366,8 +365,14 @@
 [data-visit="here"] {
   --visit-fill: var(--color-visit-here);
 }
+/* Checked out: still the service's color, slightly faded (a quarter of the
+   way to white: any further and faded peach comes too close to checked-in
+   yellow for some color vision, DONE_FADE in the token tests), with its own
+   tinted text and a check on the block; not a fill of its own. */
 [data-visit="done"] {
-  --visit-fill: var(--color-visit-done);
+  --visit-fill: color-mix(in srgb, var(--fam-fill) 75%, white);
+  --visit-ink: var(--fam-ink);
+  --visit-ink-muted: var(--fam-ink-muted);
 }
 [data-visit="off"] {
   --visit-fill: var(--color-visit-off);
@@ -384,6 +389,26 @@
 body {
   background: var(--color-canvas);
   color: var(--color-ink);
+}
+
+/* Focus rings are for the keyboard: nothing draws one when a click or a tap
+   (or code after a click) focuses something. `focus-visible:` utilities draw
+   the rings; this stops the browser's own ring anywhere they don't. */
+@layer base {
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+/* The staff sidebar's navy and light text, in plain CSS with the colors
+   written in as well: a dev server whose cache missed new class names once
+   showed the sidebar's white text on the old light background, so these
+   never depend on a utility class being generated (docs/operations.md). */
+@layer base {
+  [data-sidebar] {
+    background-color: var(--color-sidebar, #17273b);
+    color: var(--color-sidebar-text, #c3cbd8);
+  }
 }
 
 /* Native radios and checkboxes in the app's navy (in the base layer, so an

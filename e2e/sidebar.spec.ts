@@ -54,6 +54,63 @@ test.describe("owner", () => {
     await expect(sidebar(page).getByRole("link", { name: "New sale" })).toHaveCount(0);
   });
 
+  test("is navy with readable text, the logo is the biggest brand element, and focus rings are for the keyboard", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/dashboard");
+    const aside = sidebar(page);
+    // The real colors on screen (a stale dev build once drew white text on
+    // a light background: docs/operations.md).
+    expect(await aside.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(23, 39, 59)");
+    const contrast = (el: Locator) =>
+      el.evaluate((node) => {
+        const rgb = (c: string) => c.match(/\d+/g)!.slice(0, 3).map(Number);
+        const lum = (c: number[]) => {
+          const [r, g, b] = c.map((v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4));
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        };
+        // The nearest background that isn't transparent.
+        let bg = "";
+        for (let n: Element | null = node; n && !bg; n = n.parentElement) {
+          const c = getComputedStyle(n).backgroundColor;
+          if (!/rgba\(.*, 0\)$/.test(c) && c !== "transparent") bg = c;
+        }
+        const [a, b] = [lum(rgb(getComputedStyle(node).color)), lum(rgb(bg))];
+        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      });
+    const card = aside.getByTestId("salon-switcher");
+    const salonName = card.locator(".font-semibold").first();
+    for (const [what, el] of [
+      ["salon name", salonName],
+      ["current page", aside.getByRole("link", { name: "Dashboard" })],
+      ["another link", aside.getByRole("link", { name: "Clients" })],
+      ["signed in", page.getByTestId("sidebar-user")],
+    ] as const) {
+      expect(await contrast(el), what).toBeGreaterThanOrEqual(4.5);
+    }
+
+    // The logo's drawn letters (61% of the image's height) are about 30px,
+    // well above the salon card's name.
+    const logo = aside.getByTestId("sidebar-logo");
+    const drawn = ((await logo.boundingBox())!.height * 253) / 414;
+    expect(drawn).toBeGreaterThanOrEqual(29);
+    expect(drawn).toBeLessThanOrEqual(33);
+    expect(drawn).toBeGreaterThan(2 * Number.parseFloat(await salonName.evaluate((el) => getComputedStyle(el).fontSize)));
+
+    // No ring after loading or a click; one from the keyboard.
+    const outline = () => card.evaluate((el) => getComputedStyle(el).outlineStyle);
+    expect(await outline()).toBe("none");
+    await card.click();
+    await expect(card).toBeFocused();
+    expect(await outline()).toBe("none");
+    await page.keyboard.press("Escape");
+    // From the top of a fresh page, Tab reaches the card in a few steps.
+    await page.reload();
+    await expect(card).toBeVisible();
+    for (let i = 0; i < 10 && !(await card.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Tab");
+    await expect(card).toBeFocused();
+    expect(await outline()).toBe("solid");
+  });
+
   for (const [width, height] of [
     [1024, 600],
     [1180, 820],

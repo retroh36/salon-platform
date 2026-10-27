@@ -240,7 +240,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
         {patchState === "ok" ? "Valid today for services that need one." : patchTestMessage(patchState, settings).replace(" before this visit", " ago")}
       </p>
       <AddRecord label="Add patch test">
-        <PatchTestForm clientId={client.id} today={today} me={me.id} staff={team.map((s) => ({ id: s.id, name: fullName(s) }))} />
+        <PatchTestForm clientId={client.id} today={today} timeZone={tz} me={me.id} staff={team.map((s) => ({ id: s.id, name: fullName(s) }))} />
       </AddRecord>
       {patchTests.length === 0 ? (
         <p className={quietLine}>No patch tests yet.</p>

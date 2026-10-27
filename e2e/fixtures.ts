@@ -191,7 +191,8 @@ export async function busyToday(): Promise<() => void> {
 
 // For a test file that sells or checks out: afterwards, puts back the stock
 // its checkouts and sales took (and gave back: voids and refunds) and
-// removes the sales it made, walk-ins included, so no other file, or the
+// removes the sales it made, walk-ins included, with the checkouts it
+// opened and the payment links it sent, so no other file, or the
 // next run, sees them. Single worker: everything since the file started is
 // its own. Call it once at the top of the file.
 export function putBackSales() {
@@ -224,6 +225,9 @@ export async function undoSalesSince(since: string) {
   await admin.from("reward_points").delete().gte("created_at", since).not("sale_id", "is", null);
   const { error: salesError } = await admin.from("sales").delete().gte("created_at", since);
   if (salesError) throw salesError;
+  // Checkouts opened and payment links sent, finished or not.
+  await admin.from("payment_links").delete().gte("created_at", since);
+  await admin.from("sale_drafts").delete().gte("created_at", since);
 }
 
 // Opens the calendar's display menu (the zoom and Fit all), named after the
@@ -233,4 +237,52 @@ export async function openDisplayMenu(page: Page) {
   if (!(await dialog.count())) await page.locator("main").filter({ visible: true }).getByRole("button", { name: /^(Compact|Comfortable|Detailed)$/ }).click();
   await dialog.waitFor();
   return dialog;
+}
+
+// Bridget's learned length for Balayage as tests expect it (tapped,
+// trusted, about 3 hours against the menu's 2 hr 35 min, so Denise suggests
+// longer), whatever the seed gave her: which visits she tapped is random
+// in each seed, so some seeds leave her a visit short of trusted. Call it
+// once at the top of a file; afterwards the seeded figure is put back.
+// After something recomputes what Denise has learned, set it again with
+// `setBridgetBalayage`.
+export function knownBridgetBalayage() {
+  let was: unknown = null;
+  let key = "";
+  test.beforeAll(async () => {
+    key = await setBridgetBalayage((row) => (was = row));
+  });
+  test.afterAll(async () => {
+    if (was) await admin.from("insights").upsert(was as never, { onConflict: "business_id,kind,key" });
+    else await admin.from("insights").delete().eq("business_id", SEED.business).eq("kind", "duration").eq("key", key);
+  });
+}
+
+export async function setBridgetBalayage(keep?: (row: unknown) => void): Promise<string> {
+  const { data: s } = await admin.from("services").select("id, duration_minutes").eq("business_id", SEED.business).eq("name", "Balayage").single();
+  const key = `${SEED.staff.bridget}:${s!.id}`;
+  keep?.((await admin.from("insights").select("*").eq("business_id", SEED.business).eq("kind", "duration").eq("key", key).maybeSingle()).data);
+  const menu = s!.duration_minutes!;
+  const data = {
+    staffId: SEED.staff.bridget,
+    serviceId: s!.id,
+    basis: "tapped",
+    visits: 6,
+    outliers: 0,
+    trusted: true,
+    medianMinutes: 178,
+    p25Minutes: 174,
+    p75Minutes: 184,
+    consistency: "steady",
+    trend: "steady",
+    trendMinutes: 0,
+    menuMinutes: menu,
+    bookedMinutes: menu,
+    overrunRate: 1,
+    suggestedMinutes: 180,
+    lastVisit: new Date(Date.now() - 13 * 86_400_000).toISOString(),
+  };
+  const { error } = await admin.from("insights").upsert({ business_id: SEED.business, kind: "duration", key, data } as never, { onConflict: "business_id,kind,key" });
+  if (error) throw error;
+  return key;
 }

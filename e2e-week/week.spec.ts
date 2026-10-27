@@ -558,7 +558,7 @@ test("the week reconciles: calendar, Sales, Payroll, Inventory, Policy and Repor
     }
   });
 
-  await test.step("Calendar: the visits checked out are green on their days", async () => {
+  await test.step("Calendar: the visits checked out show as checked out on their days", async () => {
     let done = 0;
     for (const date of week) {
       await page.goto(`/calendar?date=${date}`);

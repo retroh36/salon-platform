@@ -103,14 +103,19 @@ keep a quarter of its height clear.
 ### The sidebar
 
 The staff sidebar is the logo's navy, with Maestra's white logo alone at
-the top, the salon as a card under it, and the navigation below. Every
-text pair passes AA (`tests/unit/design-tokens.test.ts`).
+the top, the salon as a card under it, and the navigation below. The logo
+is the biggest brand element there: its letters about 30px tall (the
+1462×414 white PNG drawn 50px high, so it stays sharp on any screen, its padding trimmed by negative
+margins), with room above and below, well over twice the salon name's
+size. The salon card is a filled card with no border. Every text pair
+passes AA (`tests/unit/design-tokens.test.ts`), and `e2e/sidebar.spec.ts`
+checks the colors on screen.
 
 | Token | Hex | Role |
 | --- | --- | --- |
 | `sidebar` | `#17273B` | The sidebar (the logo's navy) |
 | `sidebar-hover` / `sidebar-card` | `#22354D` / `#1F3149` | A link on hover; the salon card |
-| `sidebar-line` | `#2C405A` | The card's border and the rules above Settings and the footer |
+| `sidebar-line` | `#2C405A` | The rules above Settings and the footer |
 | `sidebar-text` | `#C3CBD8` | Links: light gray (white on hover and for names) |
 | `sidebar-muted` | `#9AA6B8` | Group headings, the location, the role |
 | `sidebar-active` / `sidebar-accent` | `#1D3F75` / `#5B9BFF` | The current page: the bright blue's tint behind white text, and an accent bar on its left edge |
@@ -180,11 +185,13 @@ calendar is striped but an event's travel.
 | Skin | `#D3E4FC` sky | `#2F72D6` | `#153A72` / `#2F528B` |
 | Other | `#EBE1D9` sand | `#877462` | `#4A3516` / `#654D2C` |
 
-Where the client is in their visit fills the block instead, in plain ink:
-`visit-here` `#FCF1AE` (checked in, lighter than every service color),
-`visit-done` `#9CCFA6` (checked out, clearly darker than every one),
-`visit-off` `#E3E5E9` (no-show, name struck through). The token tests keep
-them apart from the service colors with every kind of color vision.
+Where the client is in their visit: checked in fills the block with
+`visit-here` `#FCF1AE` (lighter than every service color) and a no-show
+with `visit-off` `#E3E5E9` (name struck through), both in plain ink. A
+checked-out visit keeps its service color, slightly faded (75% over white)
+with its own tinted text, and a check mark by the name. The token tests keep
+checked in apart from every service color, booked or checked out, with every
+kind of color vision.
 
 ### Stylist levels
 
