@@ -14,7 +14,7 @@ import { LEVEL_BG, LevelBadge } from "@/components/ui/level";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { FitText } from "@/components/ui/fit-text";
-import { CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, GripIcon, MoreIcon, PlusIcon, SendIcon, SlidersIcon } from "@/components/ui/icons";
+import { CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, GripIcon, MoreIcon, PlusIcon, SlidersIcon } from "@/components/ui/icons";
 import { Listbox } from "@/components/ui/listbox";
 import { Segmented } from "@/components/ui/segmented";
 import { Tabs } from "@/components/ui/tabs";
@@ -842,8 +842,6 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           </div>
         </div>
 
-        <AskDeniseBar onAsk={ask} example={askExample(data)} />
-
         <div className="flex flex-wrap items-center gap-2">
           <nav aria-label="Date" className="flex flex-wrap items-center gap-2">
             <Link href={dayLink(addDays(data.date, -1))} transitionTypes={["nav-back"]} aria-label="Previous day" title="Previous day" className={buttonClass("secondary", "md", "", { square: true })}>
@@ -1283,6 +1281,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                   today={data.today}
                   date={data.date}
                   appointmentId={openVisit}
+                  placeholder={me.canBook ? askExample(data) : undefined}
                   onBooked={(appointmentId, date) => {
                     router.refresh();
                     if (date !== data.date) openOn(date, appointmentId);
@@ -1531,43 +1530,13 @@ function deniseKeys(state: DeniseState): string[] {
   ];
 }
 
-// An example question naming someone on the team who does cuts (working
-// today if possible): "Find a haircut with Gil after 1 PM".
+// An example for Denise's message box, naming someone on the team who does
+// cuts (working today if possible): "Find a haircut with Gil after 1 PM".
 function askExample({ columns, menu }: BoardData): string {
   const cuts = new Set(menu.services.filter((s) => s.family === "cut" && !s.archived).map((s) => s.id));
   const cutsHair = (c: ColumnData) => Object.keys(menu.offers[c.staffId] ?? {}).some((id) => cuts.has(id));
   const who = columns.find((c) => c.working && cutsHair(c)) ?? columns.find(cutsHair);
   return who ? `Find a haircut with ${who.firstName} after 1 PM` : "Who's free for a haircut after 1 PM?";
-}
-
-function AskDeniseBar({ onAsk, example }: { onAsk: (question: string) => void; example: string }) {
-  const [question, setQuestion] = useState("");
-  return (
-    <form
-      aria-label="Ask Denise"
-      className="flex items-center gap-3 rounded-lg border border-denise-200 bg-denise-50 p-2 pl-2.5 transition-[border-color,box-shadow] duration-(--motion-fast) focus-within:border-denise-500 focus-within:ring-2 focus-within:ring-denise-200"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!question.trim()) return;
-        onAsk(question.trim());
-        setQuestion("");
-      }}
-    >
-      <DeniseFace size={36} />
-      <label className="flex min-w-0 flex-1 flex-col">
-        <span className="text-xs font-semibold text-denise-700">Ask Denise</span>
-        <input
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          placeholder={example}
-          className="w-full bg-transparent text-sm text-ink placeholder:text-ink-muted focus:outline-none"
-        />
-      </label>
-      <IconButton type="submit" label="Ask" variant="primary">
-        <SendIcon className="size-5" />
-      </IconButton>
-    </form>
-  );
 }
 
 // How many things Denise wants looked at, on her tab and button.
@@ -2296,7 +2265,7 @@ function MoreMenu({ items }: { items: MoreItem[] }) {
         <ChevronDownIcon className={`size-4 transition-transform duration-(--motion-fast) ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div ref={menu} role="menu" aria-label="More" className="absolute top-full right-0 z-40 mt-2 flex min-w-44 origin-top-right animate-pop-in flex-col rounded-lg border border-line bg-surface p-1.5 shadow-lift">
+        <div ref={menu} role="menu" aria-label="More" className="absolute top-full right-0 z-50 mt-2 flex min-w-44 origin-top-right animate-pop-in flex-col rounded-lg border border-line bg-surface p-1.5 shadow-lift">
           {items.map((item) =>
             item.href ? (
               <Link key={item.label} href={item.href} role="menuitem" tabIndex={-1} className={itemClass} onClick={() => setOpen(false)}>

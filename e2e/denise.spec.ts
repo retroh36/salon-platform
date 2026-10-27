@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, restoreLearnedDurations, SEED, setAsideLearnedDurations } from "../tests/db/helpers";
-import { AUTH, expect, moreAction, test, ui, waitForHydration } from "./fixtures";
+import { askOnCalendar, AUTH, expect, moreAction, test, ui, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -262,9 +262,7 @@ test.describe("front desk", () => {
 
   test("is not connected for questions without an API key", async ({ page }) => {
     await openDay(page);
-    const bar = ui(page).getByRole("form", { name: "Ask Denise", exact: true });
-    await bar.getByRole("textbox").fill("Who's free for a color at 3?");
-    await bar.getByRole("button", { name: "Ask" }).click();
+    await askOnCalendar(page, "Who's free for a color at 3?");
     const panel = denisePanel(page);
     await expect(panel.getByRole("region", { name: "Conversation with Denise" })).toContainText("Who's free for a color at 3?");
     await expect(panel.getByRole("region", { name: "Conversation with Denise" })).toContainText("I'm not connected yet");

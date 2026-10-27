@@ -31,6 +31,21 @@ for (const l of DEMO_LOGINS) {
   });
 }
 
+// The demo's reset opens both salons every day (seed-demo-open-daily.sql),
+// with visits today, so a tester never lands on a closed salon.
+for (const key of ["front-desk", "large-owner"]) {
+  const l = DEMO_LOGINS.find((d) => d.key === key)!;
+  test(`${l.salon.split(",")[0]} is open today, with visits`, async ({ page }) => {
+    test.skip(!remote, "The local database keeps the salons' real hours (closed Sundays and Mondays at Maple & Ash).");
+    await page.goto("/login");
+    await page.getByRole("button", { name: new RegExp(`${l.role}.*${l.name}`) }).click();
+    await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
+    await page.goto("/calendar");
+    await expect(page.locator("[data-block]").first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/The salon is closed/)).toHaveCount(0);
+  });
+}
+
 test("one tap signs in as a client, to her account on the booking site", async ({ page }) => {
   await page.goto("/login");
   await page.getByRole("button", { name: /Client/ }).click();

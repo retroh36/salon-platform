@@ -4,7 +4,7 @@
 import type { Page } from "@playwright/test";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { askOnCalendar, AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -138,9 +138,7 @@ test("flags two clients given the same stylist at the same time", async ({ page 
 
 test("Denise opens the rescue when told someone called out", async ({ page }) => {
   await openDay(page);
-  const bar = ui(page).getByRole("form", { name: "Ask Denise", exact: true });
-  await bar.getByRole("textbox").fill("Bridget has to leave at 1");
-  await bar.getByRole("button", { name: "Ask" }).click();
+  await askOnCalendar(page, "Bridget has to leave at 1");
   const conversation = page.getByRole("region", { name: "Conversation with Denise" });
   await expect(conversation).toContainText("Sorry to hear Bridget is out from 1pm");
   await conversation.getByRole("link", { name: "Open sick-day rescue" }).click();

@@ -1,9 +1,9 @@
 import type { Locator, Page } from "@playwright/test";
 import { AUTH, expect, test } from "./fixtures";
 
-// The sidebar: navigation in groups (Daily, Sales, Salon, then Settings),
-// only what a role can use, and a footer (who's signed in, sign out,
-// "Powered by Maestra") that never overlaps at any window size.
+// The sidebar: Maestra's logo, the salon's card, navigation in groups
+// (Daily, Sales, Salon, then Settings), only what a role can use, and a
+// footer (who's signed in, sign out) that never overlaps at any window size.
 
 const sidebar = (page: Page) => page.locator("aside").filter({ has: page.getByTestId("sidebar-footer") });
 
@@ -45,6 +45,13 @@ test.describe("owner", () => {
       ["Salon", ["Team", "Services", "Durations", "Inventory", "Forms"]],
     ]);
     await expect(sidebar(page).getByRole("link", { name: "Settings" })).toBeVisible();
+    // The current page: marked, with the accent bar; New sale is in page
+    // headers, not here.
+    const current = sidebar(page).getByRole("link", { name: "Dashboard" });
+    await expect(current).toHaveAttribute("aria-current", "page");
+    await expect(current.getByTestId("nav-accent")).toBeVisible();
+    await expect(sidebar(page).getByTestId("nav-accent")).toHaveCount(1);
+    await expect(sidebar(page).getByRole("link", { name: "New sale" })).toHaveCount(0);
   });
 
   for (const [width, height] of [
@@ -59,11 +66,11 @@ test.describe("owner", () => {
       const footer = page.getByTestId("sidebar-footer");
       const user = footer.getByTestId("sidebar-user");
       const signOut = footer.getByRole("button", { name: "Sign out" });
-      const powered = footer.getByTestId("powered-by");
-      for (const el of [user, signOut, powered]) await expect(el).toBeInViewport({ ratio: 1 });
+      const logo = sidebar(page).getByTestId("sidebar-logo");
+      const salon = sidebar(page).getByTestId("salon-switcher");
+      for (const el of [user, signOut, logo, salon]) await expect(el).toBeInViewport({ ratio: 1 });
       expect(await overlap(user, signOut)).toBe(false);
-      expect(await overlap(user, powered)).toBe(false);
-      expect(await overlap(signOut, powered)).toBe(false);
+      expect(await overlap(logo, salon)).toBe(false);
       // The nav (scrolling if it must) ends above the footer.
       const nav = (await sidebar(page).getByRole("navigation", { name: "Main" }).boundingBox())!;
       expect(nav.y + nav.height).toBeLessThanOrEqual((await footer.boundingBox())!.y + 1);

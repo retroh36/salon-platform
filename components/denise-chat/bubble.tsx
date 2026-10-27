@@ -76,6 +76,7 @@ export function DeniseBubble({ me, launcher = "corner" }: { me: BubbleMe; launch
               canBook={me.canBook}
               today={me.today}
               date={me.today}
+              placeholder={me.canBook ? "Find a haircut after 1 PM" : undefined}
               intro={
                 <p className="rounded-lg rounded-bl-sm bg-denise-50 px-3 py-2 text-denise-900">
                   {me.canBook

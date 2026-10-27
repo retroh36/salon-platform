@@ -1,5 +1,5 @@
-// New sale, one tap from anywhere: the sidebar and the calendar header
-// open the full-screen checkout for a sale without a visit. A walk-in
+// New sale, in page headers (the calendar and Sales; not the sidebar): it
+// opens the full-screen checkout for a sale without a visit. A walk-in
 // guest buys a product, credited to whoever is signed in unless changed,
 // and stock comes down.
 import { admin, busyDay, SEED } from "../tests/db/helpers";
@@ -35,10 +35,12 @@ test.afterAll(async () => {
   await admin.from("products").delete().eq("id", productId);
 });
 
-test("New sale from the sidebar: a walk-in guest, credited to whoever is signed in", async ({ page }) => {
+test("New sale on Sales: a walk-in guest, credited to whoever is signed in", async ({ page }) => {
+  // Not in the sidebar any more: the page headers have it.
   await page.goto("/clients");
-  await waitForHydration(page, "[data-testid=new-sale]");
-  await page.getByTestId("new-sale").first().click();
+  await expect(page.getByTestId("sidebar").getByRole("link", { name: "New sale" })).toHaveCount(0);
+  await page.goto("/sales");
+  await ui(page).getByRole("link", { name: "New sale" }).click();
   const co = await onCheckout(page);
   await expect(page.getByRole("heading", { name: "New sale" })).toBeVisible();
 

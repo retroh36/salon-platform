@@ -79,6 +79,16 @@ export async function waitForHydration(page: Page, selector: string) {
   );
 }
 
+// Asks Denise on the calendar: her face in the corner opens her panel, and
+// the question goes in her message box.
+export async function askOnCalendar(page: Page, question: string) {
+  await waitForHydration(page, "[data-testid=denise-launcher]");
+  await page.getByTestId("denise-launcher").click();
+  const box = page.getByRole("form", { name: "Message Denise" });
+  await box.getByRole("textbox").fill(question);
+  await box.getByRole("button", { name: "Send" }).click();
+}
+
 // The visible page's main content. Next.js keeps pages you navigated away
 // from mounted but hidden (so back/forward keep their state), and text and
 // label queries would otherwise also match those hidden copies.

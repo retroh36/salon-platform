@@ -240,8 +240,12 @@ test("two people can't book the same time: the second is told and picks again", 
   await second.getByRole("button", { name: /^Book appointment$/ }).click();
   await expect(flow(second).getByRole("alert")).toHaveText("Sorry, that time was just taken. Please pick another.");
   await expect(flow(second).getByRole("heading", { name: "Pick a date and time" })).toBeVisible();
-  // The time is no longer offered.
-  await expect(flow(second).getByRole("radiogroup", { name: /Morning|Afternoon|Evening/ }).first()).toBeVisible();
+  // The time is no longer offered that day. Late in the day it may have been
+  // the day's last, and then the page moves on to the next day with times,
+  // where the same time can be free: so the same day is chosen first.
+  const sameDay = flow(second).getByRole("radiogroup", { name: "Date" }).getByRole("radio", { name: new RegExp(`^${picked[0].day},`) });
+  await sameDay.click();
+  await expect(sameDay).toHaveAttribute("aria-checked", "true");
   await expect(flow(second).getByRole("radiogroup", { name: /Morning|Afternoon|Evening/ }).getByRole("radio", { name: new RegExp(`^${picked[0].time}(,|$)`) })).toHaveCount(0);
 
   const { data: clients } = await admin.from("clients").select("id").eq("business_id", B).like("first_name", `Ob${RUN}Race%`);

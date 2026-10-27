@@ -27,9 +27,20 @@ test.describe("owner", () => {
     await page.goto("/dashboard");
     await expect(page).toHaveTitle("Dashboard · Maestra");
     const sidebar = page.locator("aside").first();
+    // Maestra's logo at the top, the salon as a card under it (its initial,
+    // name and location), and no "Powered by" on staff screens.
+    await expect(sidebar.getByTestId("sidebar-logo")).toHaveAccessibleName("Maestra");
     await expect(sidebar.getByTestId("salon-initial")).toHaveText("M");
-    await expect(sidebar).toContainText(NAME);
-    await expect(sidebar.getByTestId("powered-by")).toHaveText("Powered byMaestra");
+    await expect(sidebar.getByTestId("salon-switcher")).toContainText(`${NAME}Downtown`);
+    await expect(sidebar.getByTestId("powered-by")).toHaveCount(0);
+    // The card opens the salon's locations, this one ticked.
+    await waitForHydration(page, "[data-testid=salon-switcher]");
+    await sidebar.getByTestId("salon-switcher").click();
+    const locations = sidebar.getByRole("menu", { name: "Locations" });
+    await expect(locations.getByRole("menuitemradio", { name: /Maple & Ash Downtown/ })).toHaveAttribute("aria-checked", "true");
+    await expect(locations).toContainText("Your salon has one location.");
+    await page.keyboard.press("Escape");
+    await expect(locations).toHaveCount(0);
 
     await sidebar.getByRole("link", { name: "Settings" }).click();
     await expect(page).toHaveTitle("Your salon · Maestra");

@@ -8,7 +8,7 @@ open: /dashboard | Open dashboard
 Ask Denise about the day, availability, clients or the salon, in your own words, from any page.
 
 1. Open Denise: tap her face in the bottom right corner, or press **⌘K** or **Ctrl+K** from anywhere. On the calendar she's a tab in the side panel; at checkout her button is at the top.
-2. Type your question in the **Ask Denise…** box, for example "Who's free for a color at 3?", and send it. She shows what she's doing while she works.
+2. Type your question in her message box at the bottom, for example "Who's free for a color at 3?", and send it. The box shows an example to start from (on the calendar, one naming someone on your team). She shows what she's doing while she works.
 3. Read her answer, and ask a follow-up in the same box.
 4. If she suggests a booking, find the client in the card, then tap **Book it** (or **Dismiss**).
 

@@ -106,6 +106,10 @@ const PAIRS: [string, string][] = [
   ...["ink", "ink-muted", "denise-700", "denise-900"].flatMap((t) => ["denise-50", "denise-100"].map((b): [string, string] => [t, b])),
   ["denise-700", "surface"],
   ["white", "denise-600"],
+  // The staff sidebar: names and the current page in white, links in
+  // light gray, headings and the location muted.
+  ...["white", "sidebar-text"].flatMap((t) => ["sidebar", "sidebar-hover", "sidebar-card", "sidebar-active"].map((b): [string, string] => [t, b])),
+  ...["sidebar-muted"].flatMap((t) => ["sidebar", "sidebar-card"].map((b): [string, string] => [t, b])),
 ];
 
 describe("design tokens", () => {
@@ -163,6 +167,11 @@ describe("design tokens", () => {
     for (const accent of ["peach-accent", "lavender-accent", "sage-accent", "teal-accent", "rose-accent", "sky-accent", "now", "denise-500"]) {
       expect(contrast(color(accent), color("surface"))).toBeGreaterThanOrEqual(3);
     }
+  });
+
+  it("shows the sidebar's current-page bar and focus rings at 3:1 against it (non-text)", () => {
+    for (const b of ["sidebar", "sidebar-hover", "sidebar-card", "sidebar-active"]) expect(contrast(color("sidebar-focus"), color(b))).toBeGreaterThanOrEqual(3);
+    for (const b of ["sidebar", "sidebar-active"]) expect(contrast(color("sidebar-accent"), color(b))).toBeGreaterThanOrEqual(3);
   });
 
   it("shows focus rings at 3:1 against every surface (non-text)", () => {

@@ -9,8 +9,10 @@
 //   migrate  applies every migration (supabase db push)
 //   reset    the nightly reset (.github/workflows/demo-reset.yml): empties
 //            the files and every table but demo_feedback, signs everyone
-//            out, loads the seed, the busy month and the large salon again,
-//            sets Denise's allowance and recalculates what she's learned
+//            out, loads the seed, the demo's extra opening days (Maple & Ash
+//            open every day, seed-demo-open-daily.sql), the busy month and
+//            the large salon again, sets Denise's allowance and recalculates
+//            what she's learned
 //   check    Row Level Security on every table, the seeded salons and, given
 //            the app's address, what the deployed app has set (yes or no)
 //
@@ -33,6 +35,10 @@ try {
 
 const SEEDED = ["b0000000-0000-4000-8000-000000000001", "b1000000-0000-4000-8000-000000000001"];
 const LOCAL_DB = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+// The demo's data, in order. seed-demo-open-daily.sql (demo only) opens
+// Maple & Ash every day before the busy month is booked around the hours.
+const DEMO_SEEDS = ["seed.sql", "seed-demo-open-daily.sql", "seed-demo.sql", "seed-large.sql"];
+
 // Kept by the reset (not salon data; see its migration).
 const KEEP = ["demo_feedback"];
 
@@ -147,7 +153,7 @@ if (command === "migrate") {
   await onlySeededSalons();
   await emptyStorage();
   psql(WIPE, "Emptied the tables (feedback kept)");
-  for (const file of ["seed.sql", "seed-demo.sql", "seed-large.sql"]) psql(readFileSync(`supabase/${file}`, "utf8"), `Loaded ${file}`);
+  for (const file of DEMO_SEEDS) psql(readFileSync(`supabase/${file}`, "utf8"), `Loaded ${file}`);
   psql(`update public.businesses set ai_daily_token_limit = ${demoTokenLimit()};`, "Set Denise's daily allowance");
   const insights = spawnSync(process.execPath, ["--disable-warning=MODULE_TYPELESS_PACKAGE_JSON", "scripts/insights.ts"], { encoding: "utf8", env: { ...process.env, MAESTRA_ENV_FILE: envFile } });
   console.log(redact(insights.stdout).trim());

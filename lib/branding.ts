@@ -36,3 +36,16 @@ export function staffPhotoUrl(path: string | null | undefined): string | null {
 export function salonInitial(name: string): string {
   return name.trim()[0]?.toUpperCase() ?? "S";
 }
+
+// A location as the sidebar's salon card shows it, under the salon's name:
+// without the words it shares with the salon ("Maple & Ash Downtown" at
+// "Maple & Ash Hair Studio" is "Downtown"), when they share at least two
+// words or the salon's whole name; else in full ("Maple Street").
+export function locationLabel(businessName: string, locationName: string): string {
+  const salon = businessName.trim().split(/\s+/);
+  const words = locationName.trim().split(/\s+/);
+  let shared = 0;
+  while (shared < words.length && words[shared].toLowerCase() === salon[shared]?.toLowerCase()) shared++;
+  const sharesName = shared >= 2 || (shared > 0 && shared === salon.length);
+  return sharesName && shared < words.length ? words.slice(shared).join(" ") : locationName.trim();
+}

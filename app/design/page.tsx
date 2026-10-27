@@ -41,6 +41,7 @@ const COLORS: [string, string[]][] = [
   ["Surfaces and text", ["canvas", "surface", "sunken", "line", "line-strong", "ink", "ink-muted", "ink-subtle"]],
   ["Brand", ["navy-900", "navy-800", "navy-700", "navy-200", "navy-100", "link", "focus"]],
   ["Status", ["success", "success-soft", "warning", "warning-soft", "danger", "danger-soft", "info", "info-soft", "neutral", "neutral-soft"]],
+  ["Sidebar", ["sidebar", "sidebar-hover", "sidebar-card", "sidebar-active", "sidebar-accent", "sidebar-text", "sidebar-muted", "sidebar-focus"]],
   ["Denise only", ["denise-50", "denise-100", "denise-200", "denise-500", "denise-600", "denise-700", "denise-900"]],
   ["Service colors", ["peach-fill", "lavender-fill", "sage-fill", "teal-fill", "sand-fill", "rose-fill", "sky-fill"]],
   ["Where the client is", ["visit-here", "visit-done", "visit-off"]],

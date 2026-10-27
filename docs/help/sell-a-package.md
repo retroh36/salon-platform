@@ -7,7 +7,7 @@ open: /checkout/new?from=/sales | Open new sale
 
 Sell a client a set of services up front at one price, to use over several visits.
 
-1. Open the checkout: tap **Check out** in booking details, or **New sale** (in the sidebar, on the calendar or on **Sales**).
+1. Open the checkout: tap **Check out** in booking details, or **New sale** (at the top of the calendar or on **Sales**).
 2. For a new sale, find the client with **Find a client** at the top (a package needs a client).
 3. Under the lines, tap **Package**.
 4. Tap the package the client wants. It's added to the ticket.

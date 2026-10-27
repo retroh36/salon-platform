@@ -26,7 +26,7 @@ import { existsSync } from "node:fs";
 
 const SITE = (process.env.DEMO_URL ?? "https://maestra-demo.vercel.app").replace(/\/+$/, "");
 const ENV_FILE = ".env.demo.local";
-const SEEDS = ["supabase/seed.sql", "supabase/seed-demo.sql", "supabase/seed-large.sql"];
+const SEEDS = ["supabase/seed.sql", "supabase/seed-demo-open-daily.sql", "supabase/seed-demo.sql", "supabase/seed-large.sql"];
 const DEPLOY_MINUTES = 20;
 
 let step = 0;

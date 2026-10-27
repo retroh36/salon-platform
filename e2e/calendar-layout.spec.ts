@@ -186,22 +186,25 @@ test("the current-time pill takes the hour label's place when they'd meet", asyn
   await expect(ui(page).locator("[data-hour-label='660']")).toHaveCSS("opacity", "1");
 });
 
-test("Ask Denise's example names a stylist on the team", async ({ page }) => {
+test("Denise's message box gives an example naming a stylist on the team, with no Ask bar on top", async ({ page }) => {
   await openDay(page);
-  const placeholder = await ui(page).getByRole("textbox", { name: /Ask Denise/ }).getAttribute("placeholder");
+  await expect(ui(page).getByRole("form", { name: "Ask Denise", exact: true })).toHaveCount(0);
+  await waitForHydration(page, "[data-testid=denise-launcher]");
+  await page.getByTestId("denise-launcher").click();
+  const placeholder = await page.getByRole("form", { name: "Message Denise" }).getByRole("textbox").getAttribute("placeholder");
   expect(placeholder).toMatch(/^Find a haircut with (Bridget|Gil|Hannah|Lois|Shae|Sandra|Nola) after 1 PM$/);
 });
 
-test("the sidebar footer keeps the name, sign-out and Powered by Maestra apart", async ({ page }) => {
+test("the sidebar footer keeps the name, role and sign-out apart", async ({ page }) => {
   for (const [width, height] of [[1440, 900], [1280, 640]]) {
     await page.setViewportSize({ width, height });
     await openDay(page);
     const footer = page.getByTestId("sidebar-footer");
-    const boxes = await Promise.all([footer.getByText("Sam", { exact: true }), footer.getByText("Front desk"), footer.getByRole("button", { name: "Sign out" }), footer.getByTestId("powered-by")].map(async (l) => (await l.boundingBox())!));
+    const boxes = await Promise.all([footer.getByText("Sam", { exact: true }), footer.getByText("Front desk"), footer.getByRole("button", { name: "Sign out" })].map(async (l) => (await l.boundingBox())!));
     const overlap = (a: { x: number; y: number; width: number; height: number }, b: typeof a) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
     for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) expect(overlap(boxes[i], boxes[j]), `${i} and ${j} at ${width}x${height}`).toBe(false);
     // All on screen, and clear of the navigation above.
-    expect(boxes[3].y + boxes[3].height).toBeLessThanOrEqual(height);
+    for (const b of boxes) expect(b.y + b.height).toBeLessThanOrEqual(height);
     const nav = (await page.getByRole("navigation", { name: "Main" }).first().boundingBox())!;
     expect(nav.y + nav.height).toBeLessThanOrEqual((await footer.boundingBox())!.y + 1);
   }

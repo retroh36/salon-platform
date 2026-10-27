@@ -38,7 +38,7 @@ Known gaps to pick up later. Move an item into a task when it's scheduled.
 - [ ] **Barcode scanning.** Products have barcodes, but counting and receiving are by hand; a camera scanner would speed up both on an iPad.
 - [ ] **Who counts.** Stocktakes are owners and managers only, per the permissions; salons may want the front desk to count without finishing.
 - [ ] **Usage history in forecasts.** Denise forecasts from upcoming bookings (formulas and recipes); walk-ins, retail sales trends and waste aren't in it yet.
-- [ ] **Several locations.** Stock is per location, but there are no transfers between locations.
+- [ ] **Several locations.** Stock is per location, but there are no transfers between locations. Each team member works at one location (`staff.location_id`), so the sidebar's salon card lists the salon's locations but can't switch to another yet: that needs people who work at several, and the pages to follow the chosen one.
 
 ## Phorest import
 

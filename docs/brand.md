@@ -22,11 +22,12 @@ Maestra is the platform. Each salon has its own brand, and the two never mix.
 
 | Maestra (the product) | The salon (e.g. Maple & Ash) |
 | --- | --- |
-| Login screen, loading screen | Top of the sidebar: its logo (or initial) and name |
+| Login screen, loading screen | The salon card under Maestra's logo in the sidebar: its logo (or initial), name and location |
 | Browser tab, app icon, home-screen icon | Messages to its clients (texts, emails, confirmations) and its booking site |
 | Link previews (social image) | |
 | Emails from the platform (sign-in, invites, password reset) | |
-| "Powered by Maestra", small, at the foot of the sidebar | |
+| The white logo at the top of the navy sidebar (staff screens carry no "Powered by Maestra") | |
+| "Powered by Maestra", small, at the foot of pages clients see (booking site, account, pay and card links) | |
 
 The salon's booking site (`/book/<salon>`) is the salon's: its logo or
 initial, its name and its own color lead, in Maestra's type, layout and
@@ -34,7 +35,8 @@ calm feel, with "Powered by Maestra" small at the foot. A salon's color
 must pass WCAG AA with white text on it (Settings checks this).
 
 Salon owners set their salon's name and logo on the Settings page. Without
-a logo, the salon's initial shows in a navy leaf shape. Never put the
+a logo, the salon's initial shows in a navy leaf shape (on the bright blue
+in the navy sidebar). Never put the
 Maestra logo on a message a salon sends its clients, and never put a
 salon's logo on a Maestra screen like the login page.
 
@@ -92,11 +94,27 @@ keep a quarter of its height clear.
 | `navy-200` | `#CFD8E5` | Borders on navy tints |
 | `navy-100` | `#E8EDF4` | Tints: avatars, selected rows |
 | `active` | `#1963D6` | **Maestra's bright blue**, on the navy's hue: the selected Day/Week (and every segmented choice), with white text |
-| `active-soft` / `active-ink` | `#EAF2FE` / `#124C9F` | The active tint and its text: the current sidebar item, Today when it's today |
+| `active-soft` / `active-ink` | `#EAF2FE` / `#124C9F` | The active tint and its text: Today when it's today, the current item on the narrow screen's nav |
 | `link` | `#1963D6` | **Links** (underlined text actions), in the same bright blue |
 | `link-hover` | `#1556B8` | Links on hover |
 | `focus` | `#1963D6` | Keyboard focus rings |
 | (wordmark) | `#141414` | The wordmark's near-black; only in the logo |
+
+### The sidebar
+
+The staff sidebar is the logo's navy, with Maestra's white logo alone at
+the top, the salon as a card under it, and the navigation below. Every
+text pair passes AA (`tests/unit/design-tokens.test.ts`).
+
+| Token | Hex | Role |
+| --- | --- | --- |
+| `sidebar` | `#17273B` | The sidebar (the logo's navy) |
+| `sidebar-hover` / `sidebar-card` | `#22354D` / `#1F3149` | A link on hover; the salon card |
+| `sidebar-line` | `#2C405A` | The card's border and the rules above Settings and the footer |
+| `sidebar-text` | `#C3CBD8` | Links: light gray (white on hover and for names) |
+| `sidebar-muted` | `#9AA6B8` | Group headings, the location, the role |
+| `sidebar-active` / `sidebar-accent` | `#1D3F75` / `#5B9BFF` | The current page: the bright blue's tint behind white text, and an accent bar on its left edge |
+| `sidebar-focus` | `#8AB8FF` | Focus rings on the navy (the usual blue is too dark there) |
 
 ### Surfaces and text
 
@@ -104,7 +122,7 @@ keep a quarter of its height clear.
 | --- | --- | --- |
 | `canvas` | `#FAF8F5` | The page: a warm off-white |
 | `surface` | `#FFFFFF` | Cards, panels, fields: white on the warm page |
-| `sunken` | `#F4F2EE` | Recessed areas, the sidebar, table headers, hover |
+| `sunken` | `#F4F2EE` | Recessed areas, table headers, hover |
 | `line` / `line-strong` | `#E7E4DF` / `#D4D0CA` | Dividers and borders (fields and outlined buttons use `line-strong`) |
 | `off-hours` | `#F3F0EA` | The calendar outside someone's hours: a very light flat tint (no stripes) |
 | `ink` | `#191C22` | Body text, names, titles (names are dark text, not link blue) |
@@ -240,7 +258,7 @@ the one main action, one layer of containers.
   header row, aligned columns, money right-aligned in tabular figures, a
   thin rule between rows, quiet actions at the end.
 - **The bright blue** is for where you are and what's live: the current
-  sidebar item, the selected Day/Week, Today when it's today, focus rings,
+  sidebar item (its tint and accent bar on the navy), the selected Day/Week, Today when it's today, focus rings,
   and links that read as links ("See all", "Open event"). Names of people
   and records are dark text, underlined on hover (`nameLinkClass`).
 - **Empty, loading, toasts:** `EmptyState` (Denise waving, then one quiet

@@ -34,6 +34,7 @@ export function DeniseChat({
   appointmentId = null,
   onBooked,
   intro,
+  placeholder,
 }: {
   canBook: boolean;
   today: string;
@@ -42,6 +43,8 @@ export function DeniseChat({
   onBooked?: (appointmentId: string, date: string) => void;
   // What shows above an empty conversation.
   intro?: React.ReactNode;
+  // An example in her message box ("Find a haircut with Gil after 1 PM").
+  placeholder?: string;
 }) {
   const { chat, run, focus } = useDenise();
   const path = usePathname();
@@ -84,12 +87,12 @@ export function DeniseChat({
         </section>
       )}
       <div ref={end} />
-      <AskForm onAsk={ask} disabled={run.working} focus={focus} canBook={canBook} />
+      <AskForm onAsk={ask} disabled={run.working} focus={focus} canBook={canBook} placeholder={placeholder} />
     </div>
   );
 }
 
-function AskForm({ onAsk, disabled, focus, canBook }: { onAsk: (question: string) => void; disabled: boolean; focus: number; canBook: boolean }) {
+function AskForm({ onAsk, disabled, focus, canBook, placeholder }: { onAsk: (question: string) => void; disabled: boolean; focus: number; canBook: boolean; placeholder?: string }) {
   const [question, setQuestion] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const [opening, start] = useTransition();
@@ -128,7 +131,7 @@ function AskForm({ onAsk, disabled, focus, canBook }: { onAsk: (question: string
           ref={input}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder={canBook ? "Ask Denise, or type a booking…" : "Ask Denise…"}
+          placeholder={placeholder ?? (canBook ? "Ask Denise, or type a booking…" : "Ask Denise…")}
           autoComplete="off"
           className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-ink-subtle focus:outline-none"
         />

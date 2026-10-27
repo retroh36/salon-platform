@@ -40,6 +40,19 @@
   --color-link-hover: #1556b8;
   --color-focus: #1963d6;
 
+  /* The staff sidebar: the logo's navy, with light gray links and the
+     bright blue for the current page (a tinted row and an accent bar). On
+     navy the usual focus blue is too dark, so the sidebar has its own. */
+  --color-sidebar: #17273b;
+  --color-sidebar-hover: #22354d;
+  --color-sidebar-card: #1f3149;
+  --color-sidebar-line: #2c405a;
+  --color-sidebar-text: #c3cbd8;
+  --color-sidebar-muted: #9aa6b8;
+  --color-sidebar-active: #1d3f75;
+  --color-sidebar-accent: #5b9bff;
+  --color-sidebar-focus: #8ab8ff;
+
   /* Denise (the AI assistant): periwinkle, only for her messages,
      suggestions and badge */
   --color-denise-50: #edefff;

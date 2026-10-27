@@ -7,7 +7,7 @@ open: /checkout/new?from=/sales | Open new sale
 
 Sign a client up for a membership at checkout. Today's payment covers the first period, and it renews by itself after that.
 
-1. Open the checkout: tap **Check out** in booking details, or **New sale** (in the sidebar, on the calendar or on **Sales**).
+1. Open the checkout: tap **Check out** in booking details, or **New sale** (at the top of the calendar or on **Sales**).
 2. For a new sale, find the client with **Find a client** at the top.
 3. Under the lines, tap **Membership**.
 4. Choose the plan. Each shows its price and what's included.

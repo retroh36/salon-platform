@@ -4,6 +4,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
 import { BoxIcon, CalendarIcon, RingIcon, ChartIcon, GiftIcon, ReceiptIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, ShieldIcon, TagIcon, UserIcon, WalletIcon } from "@/components/ui/icons";
 import { SalonMark } from "@/components/ui/salon-mark";
+import { SalonSwitcher, type SwitcherLocation } from "@/components/salon-switcher";
 import { firstSettingsPage } from "@/app/settings/settings-nav";
 import { AutoLock } from "@/components/auto-lock";
 import { DeniseBubble, type BubbleMe } from "@/components/denise-chat/bubble";
@@ -79,42 +80,37 @@ function shown(item: NavItem, user: User): boolean {
   );
 }
 
+// A sidebar link: light gray on the navy; the current page in white on the
+// bright blue's tint, with an accent bar on its left edge.
 function NavLink({ item, current }: { item: NavItem; current: boolean }) {
   const { href, label, Icon } = item;
   return (
     <Link
       href={href}
       aria-current={current ? "page" : undefined}
-      className={`flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-[background-color,color,transform] duration-(--motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-focus ${
-        current ? "bg-active-soft text-active-ink" : "text-ink-muted hover:bg-surface hover:text-ink"
+      className={`relative flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-[background-color,color,transform] duration-(--motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-sidebar-focus ${
+        current ? "bg-sidebar-active text-white" : "text-sidebar-text hover:bg-sidebar-hover hover:text-white"
       }`}
     >
+      {current && <span aria-hidden data-testid="nav-accent" className="absolute top-1.5 bottom-1.5 -left-3 w-[3px] rounded-r-full bg-sidebar-accent" />}
       <Icon className="size-5 shrink-0" />
       <span className="truncate">{label}</span>
     </Link>
   );
 }
 
-// "Powered by Maestra", small, at the foot of the sidebar.
-function PoweredBy() {
-  return (
-    <p className="flex items-center justify-center gap-1.5 text-xs whitespace-nowrap text-ink-subtle" data-testid="powered-by">
-      Powered by
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/brand/maestra/maestra-mark.svg" alt="" className="h-3 w-auto" />
-      <span className="font-semibold text-ink-muted">Maestra</span>
-    </p>
-  );
-}
-
-// The redesigned app layout (docs/design/): sidebar with the salon and
-// navigation, a client search bar on top of the Calendar and Clients. Pages move to it one at a time; the rest
-// still use AppShell.
+// The app layout (docs/design/): the navy sidebar (Maestra's logo, the
+// salon as a card that opens its locations, then the navigation), and a
+// client search bar on top of the Calendar and Clients. Staff screens carry
+// Maestra's logo instead of "Powered by Maestra", which stays on pages
+// clients see.
 export function AppFrame({
   section,
   businessName,
   logoUrl,
   locationName,
+  locationId = "",
+  locations = [],
   user,
   sharedDevice = null,
   denise = null,
@@ -124,6 +120,9 @@ export function AppFrame({
   businessName: string;
   logoUrl: string | null;
   locationName: string;
+  locationId?: string;
+  // The salon's locations, for the card's menu (this one if not given).
+  locations?: SwitcherLocation[];
   user: User;
   // On the shared front-desk iPad: switch to someone else, and lock after
   // the salon's idle time.
@@ -138,25 +137,25 @@ export function AppFrame({
   return (
     // One screen tall on large screens: the calendar and panels scroll inside.
     <div className="flex min-h-screen flex-1 bg-canvas text-ink lg:h-[calc(100vh-var(--demo-bar))] lg:min-h-0 lg:flex-none lg:overflow-hidden">
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-line bg-sunken/60 lg:flex">
-        <div className="flex items-center gap-3 px-5 pt-6 pb-5">
-          <SalonMark name={businessName} logoUrl={logoUrl} />
-          <div className="min-w-0">
-            <div className="text-base leading-tight font-semibold text-ink">{businessName}</div>
-            <div className="mt-0.5 text-sm leading-tight text-ink-muted">{locationName}</div>
-          </div>
+      <aside className="hidden w-60 shrink-0 flex-col bg-sidebar text-sidebar-text lg:flex" data-testid="sidebar">
+        <div className="px-5 pt-6 pb-5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/maestra/maestra-logo-white.png" alt="Maestra" data-testid="sidebar-logo" className="-ml-1.5 h-8 w-auto" />
         </div>
-        {/* A sale without a visit, one tap from anywhere (the front of house). */}
-        {canTakePayments(user.role) && (
-          <div className="px-3 pb-4">
-            <NewSaleLink className="w-full" />
-          </div>
-        )}
+        <div className="px-3 pb-5">
+          <SalonSwitcher
+            businessName={businessName}
+            logoUrl={logoUrl}
+            currentId={locationId}
+            locations={locations.length ? locations : [{ id: locationId, name: locationName, city: null, region: null }]}
+            settingsHref={can(user, "settings") ? "/settings" : null}
+          />
+        </div>
         {/* Scrolls on short screens, so it never runs into the footer. */}
         <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 pb-3">
           {groups.map((g) => (
             <div key={g.label} role="group" aria-labelledby={`nav-${g.label}`} className="flex flex-col gap-0.5">
-              <h2 id={`nav-${g.label}`} className="px-3 pb-1 text-[11px] font-medium text-ink-muted">
+              <h2 id={`nav-${g.label}`} className="px-3 pb-1 text-[11px] font-medium tracking-wider text-sidebar-muted uppercase">
                 {g.label}
               </h2>
               {g.items.map((item) => (
@@ -165,25 +164,34 @@ export function AppFrame({
             </div>
           ))}
           {settings && (
-            <div className="mt-auto border-t border-line pt-3">
+            <div className="mt-auto border-t border-sidebar-line pt-3">
               <NavLink item={settings} current={section === "settings"} />
             </div>
           )}
         </nav>
-        {/* The footer: who's signed in, sign out, and "Powered by Maestra",
-            each on its own line, never under anything else. */}
-        <div className="flex shrink-0 flex-col gap-3 border-t border-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]" data-testid="sidebar-footer">
+        {/* The footer: who's signed in and sign out (or Switch user on the
+            shared iPad), never under anything else. */}
+        <div className="flex shrink-0 flex-col gap-3 border-t border-sidebar-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]" data-testid="sidebar-footer">
           <div className="flex min-w-0 items-center gap-3">
             <Avatar name={user.name} size="sm" halo={false} />
             <div className="min-w-0 flex-1">
-              <Link href="/account" className="block truncate text-sm font-medium hover:underline" data-testid="sidebar-user">
+              <Link
+                href="/account"
+                className="block truncate rounded-sm text-sm font-medium text-white hover:underline focus-visible:outline-2 focus-visible:outline-sidebar-focus"
+                data-testid="sidebar-user"
+              >
                 {user.name}
               </Link>
-              <div className="truncate text-xs text-ink-muted">{roleLabel(user.role)}</div>
+              <div className="truncate text-xs text-sidebar-muted">{roleLabel(user.role)}</div>
             </div>
             {!sharedDevice && (
               <form action={logout} className="shrink-0">
-                <button type="submit" aria-label="Sign out" title="Sign out" className={buttonClass("ghost", "sm", "", { square: true })}>
+                <button
+                  type="submit"
+                  aria-label="Sign out"
+                  title="Sign out"
+                  className="inline-flex size-8 items-center justify-center rounded-md text-sidebar-text transition-colors duration-(--motion-fast) hover:bg-sidebar-hover hover:text-white focus-visible:outline-2 focus-visible:outline-sidebar-focus"
+                >
                   <LogOutIcon className="size-4" />
                 </button>
               </form>
@@ -191,12 +199,14 @@ export function AppFrame({
           </div>
           {sharedDevice && (
             <form action="/switch/lock" method="post">
-              <button type="submit" className={buttonClass("secondary", "sm", "w-full")}>
+              <button
+                type="submit"
+                className="h-9 w-full rounded-md border border-sidebar-line text-sm font-medium text-white transition-colors duration-(--motion-fast) hover:bg-sidebar-hover focus-visible:outline-2 focus-visible:outline-sidebar-focus"
+              >
                 Switch user
               </button>
             </form>
           )}
-          <PoweredBy />
         </div>
       </aside>
 
