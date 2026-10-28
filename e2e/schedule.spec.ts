@@ -91,29 +91,6 @@ test.describe("managers", () => {
     }
   });
 
-  test("add and remove a one-off change", async ({ page }) => {
-    const date = addDays(nextMonday, 2); // Gil normally works 10-7 on Wednesdays
-    try {
-      await openSchedule(page, "Gil");
-      await waitForHydration(page, "form[aria-label='Change hours for one day'] button");
-      const form = ui(page).getByRole("form", { name: "Change hours for one day" });
-      await form.getByLabel("Date").fill(date);
-      await form.getByLabel("From", { exact: true }).fill("13:00");
-      await form.getByLabel("To", { exact: true }).fill("20:00");
-      await form.getByRole("button", { name: "Save change" }).click();
-      await expect(form.getByRole("status")).toHaveText("Saved.");
-
-      const changes = ui(page).getByRole("list", { name: "Upcoming changes" });
-      await expect(changes).toContainText(formatDay(date));
-      await expect(changes).toContainText("1pm–8pm");
-
-      await changes.getByRole("button", { name: `Remove change on ${formatDay(date)}` }).click();
-      await expect(ui(page).getByText("No upcoming changes.")).toBeVisible();
-    } finally {
-      await admin.from("staff_schedule_overrides").delete().eq("staff_id", SEED.staff.gil).eq("on_date", date);
-    }
-  });
-
   test("approve a pending time off request", async ({ page }) => {
     const { data: request } = await admin.from("staff_time_off").select("id").eq("staff_id", SEED.staff.shae).eq("status", "requested").single();
     try {

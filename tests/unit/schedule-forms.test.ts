@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCompensationForm, parseDayChangeForm, parseTimeOffForm, parseWeeklyHoursForm } from "@/lib/schedule-forms";
+import { parseCompensationForm, parseTimeOffForm, parseWeeklyHoursForm } from "@/lib/schedule-forms";
 
 function form(entries: [string, string][]) {
   const data = new FormData();
@@ -52,24 +52,6 @@ describe("parseWeeklyHoursForm", () => {
 
   it("accepts a week with no hours", () => {
     expect(parseWeeklyHoursForm(form([]))).toEqual({ ok: true, hours: [] });
-  });
-});
-
-describe("parseDayChangeForm", () => {
-  it("parses a date and hours", () => {
-    expect(parseDayChangeForm(form([["on_date", "2026-10-30"], ["start_day", "12:00"], ["end_day", "20:00"]]))).toEqual({
-      ok: true,
-      date: "2026-10-30",
-      hours: [{ start_minute: 720, end_minute: 1200 }],
-    });
-  });
-
-  it("treats no hours as removing the change", () => {
-    expect(parseDayChangeForm(form([["on_date", "2026-10-30"]]))).toEqual({ ok: true, date: "2026-10-30", hours: [] });
-  });
-
-  it("requires a valid date", () => {
-    expect(parseDayChangeForm(form([["on_date", "2026-02-30"]]))).toEqual({ ok: false, errors: { date: "Choose a date." } });
   });
 });
 

@@ -19,9 +19,9 @@
 import { monthStart, payLines, type Basis, type LinePay, type PayInput, type PlanRules } from "./commission.ts";
 import { csvTable, dollars } from "./csv.ts";
 import { averageTipPct } from "./tips.ts";
-import { mergeIntervals, subtractIntervals } from "./scheduling/intervals.ts";
-import type { StaffSchedule } from "./scheduling/availability.ts";
-import { addDays, datesBetween, weekdayOf, type LocalDate } from "./scheduling/time.ts";
+import { subtractIntervals } from "./scheduling/intervals.ts";
+import { hoursOn, type StaffSchedule } from "./scheduling/availability.ts";
+import { addDays, datesBetween, type LocalDate } from "./scheduling/time.ts";
 
 export type PayPeriodKind = "weekly" | "biweekly" | "semi_monthly" | "custom";
 
@@ -213,9 +213,9 @@ export function ticketsFor(sales: readonly PayrollSale[], staffId: string, from:
 }
 
 // Scheduled minutes on a day: their hours (a one-off change, else their
-// weekly hours) less approved time off.
+// repeating pattern) less approved time off.
 function minutesOn(schedule: StaffSchedule, date: LocalDate): number {
-  const hours = mergeIntervals(schedule.overrides[date] ?? schedule.weekly[weekdayOf(date)] ?? []);
+  const hours = hoursOn(schedule, date);
   const off = schedule.timeOff
     .filter((t) => t.status === "approved" && date >= t.startsOn && date <= t.endsOn)
     .map((t) => (t.startMinute != null && t.endMinute != null ? { start: t.startMinute, end: t.endMinute } : { start: 0, end: 1440 }));

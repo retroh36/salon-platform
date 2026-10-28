@@ -10,16 +10,17 @@ import { Badge, listClass, PageHeader, pillClass, rowClass, type Tone } from "@/
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import { staffPhotoUrl } from "@/lib/branding";
 import { isUuid } from "@/lib/ids";
-import { describeTimeOff, formatDay, formatIntervals, STATUS_LABELS } from "@/lib/schedule-format";
+import { describeTimeOff, formatDay, formatDayAt, formatIntervals, STATUS_LABELS } from "@/lib/schedule-format";
 import { LEVEL_LABELS, WEEKDAY_NAMES } from "@/lib/schedule-forms";
 import { dayView, type TimeOff } from "@/lib/scheduling/availability";
 import { loadLocationSchedule, loadStaffSchedules } from "@/lib/scheduling/load";
 import { addDays, datesBetween, isLocalDate, minuteToTime, startOfWeek, todayIn, WEEKDAYS } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { fullName, roleLabel, sortStaff } from "@/lib/staff";
-import { decideTimeOff, deleteTimeOff, removeDayChange, saveWeeklyHours } from "./actions";
+import { patternLabel } from "@/lib/team-schedule";
+import { Notices } from "../my-day/notices";
+import { decideTimeOff, deleteTimeOff, saveWeeklyHours } from "./actions";
 import { CompensationForm } from "./compensation-form";
-import { DayChangeForm } from "./day-change-form";
 import { HoursEditor, type HoursRows } from "./hours-editor";
 import { StaffPhotoForm } from "./staff-photo";
 import { TeamTabs } from "../team/team-tabs";
@@ -55,7 +56,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
 
   const { data: allStaff, error: staffError } = await supabase
     .from("staff")
-    .select("id, first_name, last_name, role, level, color, photo_path, is_active, location_id");
+    .select("id, first_name, last_name, role, level, color, photo_path, is_active, location_id, hours_cycle_weeks");
   if (staffError) throw staffError;
   const team = sortStaff(allStaff.filter((s) => s.is_active && s.location_id === me.location.id));
 
@@ -64,17 +65,10 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
   const isSelf = target.id === me.id;
 
   const historyFrom = addDays(today, -60);
-  const [location, schedules, history, upcomingChanges, compensation, pending] = await Promise.all([
+  const [location, schedules, history, compensation, pending] = await Promise.all([
     loadLocationSchedule(supabase, me.location),
     loadStaffSchedules(supabase, [target.id], week, weekEnd),
     loadStaffSchedules(supabase, [target.id], historyFrom, addDays(today, 366)),
-    supabase
-      .from("staff_schedule_overrides")
-      .select("on_date, start_minute, end_minute")
-      .eq("staff_id", target.id)
-      .gte("on_date", today)
-      .order("on_date")
-      .order("start_minute"),
     supabase
       .from("staff_compensation")
       .select("service_commission_pct, retail_commission_pct, hourly_rate_cents, plan_id")
@@ -89,7 +83,10 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
           .order("starts_on")
       : Promise.resolve({ data: [], error: null }),
   ]);
-  if (upcomingChanges.error) throw upcomingChanges.error;
+  // Their own notices (a published change to their hours), on their own page.
+  const { data: notices } = isSelf
+    ? await supabase.from("notifications").select("id, body, created_at").eq("staff_id", me.id).eq("channel", "app").is("read_at", null).order("created_at", { ascending: false }).limit(20)
+    : { data: [] };
   if (compensation.error) throw compensation.error;
   if (pending.error) throw pending.error;
 
@@ -103,10 +100,12 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
     WEEKDAYS.map((d) => [d, (weekly[d] ?? []).map((i) => ({ start: minuteToTime(i.start), end: minuteToTime(i.end) }))]),
   );
 
-  const changes = new Map<string, { start: number; end: number }[]>();
-  for (const c of upcomingChanges.data) {
-    changes.set(c.on_date, [...(changes.get(c.on_date) ?? []), { start: c.start_minute, end: c.end_minute }]);
-  }
+  // Published changes from today: different hours, or a day off.
+  const changes = new Map(
+    Object.entries(history.get(target.id)!.overrides)
+      .filter(([date]) => date >= today)
+      .sort(([a], [b]) => a.localeCompare(b)),
+  );
 
   const link = (q: { staff?: string; week?: string }) => {
     const search = new URLSearchParams();
@@ -122,13 +121,23 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
         title="Team"
         description="Working hours, one-off changes and time off."
         actions={
-          <Link href="/schedule/opening-hours" className={buttonClass("secondary", "md")}>
-            <ClockIcon className="size-4" />
-            Opening hours
-          </Link>
+          <>
+            {seesEveryone && (
+              <Link href={`/scheduling${week !== startOfWeek(today) ? `?week=${week}` : ""}`} className={buttonClass("secondary", "md")}>
+                Team schedule
+              </Link>
+            )}
+            {manager && (
+              <Link href="/schedule/opening-hours" className={buttonClass("secondary", "md")}>
+                <ClockIcon className="size-4" />
+                Opening hours
+              </Link>
+            )}
+          </>
         }
       />
       <TeamTabs current="schedule" goals={manager} />
+      {isSelf && <Notices notices={(notices ?? []).map((n) => ({ id: n.id, body: n.body, when: formatDayAt(n.created_at, me.location.timezone) }))} />}
 
       {manager && pending.data.length > 0 && (
         <section aria-labelledby="requests-heading" className={cardClass}>
@@ -245,7 +254,21 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
         <h3 id="weekly-heading" className={`${cardHeadClass} ${cardTitleClass}`}>
           Weekly hours
         </h3>
-        {manager ? (
+        {target.hours_cycle_weeks > 1 ? (
+          <p className="px-4 py-4 text-sm text-ink-muted" data-testid="repeating-pattern">
+            {patternLabel(target.hours_cycle_weeks)}: the week above shows this week&rsquo;s hours.
+            {manager && (
+              <>
+                {" "}
+                Change the pattern in{" "}
+                <Link href="/scheduling" className="text-link hover:underline">
+                  Scheduling
+                </Link>
+                .
+              </>
+            )}
+          </p>
+        ) : manager ? (
           <HoursEditor key={target.id} action={saveWeeklyHours.bind(null, target.id)} initial={hoursRows} label="Weekly hours" />
         ) : (
           <dl className={listClass}>
@@ -270,22 +293,19 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
             {[...changes].map(([date, intervals]) => (
               <li key={date} className={`${rowClass} flex flex-wrap items-center gap-4 text-sm hover:bg-sunken/60`}>
                 <span className="w-28 font-semibold">{formatDay(date)}</span>
-                <span className="flex-1">{formatIntervals(intervals)}</span>
-                {manager && (
-                  <form action={removeDayChange.bind(null, target.id, date)}>
-                    <button type="submit" className={buttonClass("secondary", "sm")} aria-label={`Remove change on ${formatDay(date)}`}>
-                      Remove
-                    </button>
-                  </form>
-                )}
+                <span className="flex-1">{intervals.length ? formatIntervals(intervals) : "Off"}</span>
               </li>
             ))}
           </ul>
         )}
         {manager && (
-          <div className="border-t border-line bg-sunken/40">
-            <DayChangeForm key={target.id} staffId={target.id} today={today} />
-          </div>
+          <p className="border-t border-line bg-sunken/40 px-4 py-3 text-sm text-ink-muted">
+            To change a day, open the week in{" "}
+            <Link href={`/scheduling${week !== startOfWeek(today) ? `?week=${week}` : ""}`} className="text-link hover:underline">
+              Scheduling
+            </Link>{" "}
+            and publish it.
+          </p>
         )}
       </section>
 

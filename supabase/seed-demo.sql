@@ -44,6 +44,17 @@ select 'b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-00000000
          + (8 - extract(isodow from (now() at time zone 'America/Chicago')::date))::int + 4,
        12 * 60, 20 * 60;
 
+-- Lois works every other Saturday: a pattern over two weeks, this week
+-- the one with Saturday. The visits below follow it (private.live_hours).
+update public.staff
+set hours_cycle_weeks = 2,
+    hours_cycle_starts_on = (now() at time zone 'America/Chicago')::date - (extract(isodow from (now() at time zone 'America/Chicago')::date)::int - 1)
+where id = 'd0000000-0000-4000-8000-000000000010';
+insert into public.staff_working_hours (business_id, staff_id, cycle_week, weekday, start_minute, end_minute)
+select business_id, staff_id, 1, weekday, start_minute, end_minute
+from public.staff_working_hours
+where staff_id = 'd0000000-0000-4000-8000-000000000010' and cycle_week = 0 and weekday <> 6;
+
 -- ---------------------------------------------------------------------------
 -- Appointments: 16 weeks back to nine days ahead, about 60% of the
 -- stylists' bookable time (clients come on their own cycles).
@@ -77,18 +88,10 @@ language sql stable as $$
       where lh.location_id = 'c0000000-0000-4000-8000-000000000001'
         and lh.weekday = extract(isodow from d) and lh.start_minute <= p_from and p_to <= lh.end_minute
     )
-    and case
-      when exists (select 1 from public.staff_schedule_overrides o where o.staff_id = p_staff and o.on_date = d) then
-        exists (
-          select 1 from public.staff_schedule_overrides o
-          where o.staff_id = p_staff and o.on_date = d and o.start_minute <= p_from and p_to <= o.end_minute
-        )
-      else
-        exists (
-          select 1 from public.staff_working_hours w
-          where w.staff_id = p_staff and w.weekday = extract(isodow from d) and w.start_minute <= p_from and p_to <= w.end_minute
-        )
-    end
+    and exists (
+      select 1 from jsonb_array_elements(private.live_hours(p_staff, d)) h
+      where (h ->> 'start')::int <= p_from and p_to <= (h ->> 'end')::int
+    )
     and not exists (
       select 1 from public.staff_time_off t
       where t.staff_id = p_staff and t.status = 'approved' and d between t.starts_on and t.ends_on
@@ -247,11 +250,8 @@ begin
       order by n
     loop
       for sh in
-        select o.start_minute, o.end_minute from public.staff_schedule_overrides o where o.staff_id = st.staff_id and o.on_date = d
-        union all
-        select w.start_minute, w.end_minute from public.staff_working_hours w
-        where w.staff_id = st.staff_id and w.weekday = extract(isodow from d)
-          and not exists (select 1 from public.staff_schedule_overrides o where o.staff_id = st.staff_id and o.on_date = d)
+        select (h ->> 'start')::int as start_minute, (h ->> 'end')::int as end_minute
+        from jsonb_array_elements(private.live_hours(st.staff_id, d)) h
         order by 1
       loop
         cur := sh.start_minute;
@@ -1441,3 +1441,17 @@ begin
     where private.points_balance(v_linda) <> 360;
   end if;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- The team schedule: this week published by Daniel on Saturday, and a
+-- draft for next week he hasn't published (Sandra picking up a Saturday).
+-- ---------------------------------------------------------------------------
+insert into public.schedule_publishes (business_id, location_id, week_start, published_by, published_at, days_changed, people_notified)
+select 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', w.monday,
+       'd0000000-0000-4000-8000-000000000002', ((w.monday - 2)::timestamp + time '16:30') at time zone 'America/Chicago', 0, 0
+from (select (now() at time zone 'America/Chicago')::date - (extract(isodow from (now() at time zone 'America/Chicago')::date)::int - 1) as monday) w;
+
+insert into public.schedule_drafts (business_id, location_id, staff_id, on_date, shifts, updated_by)
+select 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000008',
+       w.monday + 12, '[{"start": 540, "end": 900}]'::jsonb, 'd0000000-0000-4000-8000-000000000002'
+from (select (now() at time zone 'America/Chicago')::date - (extract(isodow from (now() at time zone 'America/Chicago')::date)::int - 1) as monday) w;

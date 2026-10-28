@@ -74,6 +74,10 @@ describe("finding the page", () => {
     ["client wants to spend their points", "Use a reward at checkout"],
     ["redeem a free gloss with points", "Use a reward at checkout"],
     ["add points to a client", "Adjust a client's points"],
+    ["how do I make next week's rota", "Plan the team's week"],
+    ["copy last week's shifts", "Plan the team's week"],
+    ["how do I give someone every other Saturday off", "Set someone's repeating schedule pattern"],
+    ["when am I working this week", "See my schedule"],
   ])("%s → %s", (question, title) => {
     expect(searchHelp(pages, question)[0]?.title).toBe(title);
   });

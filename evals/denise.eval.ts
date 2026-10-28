@@ -497,6 +497,7 @@ const CASES: Case[] = [
   howToCase("How do I book someone every 6 weeks?", "front_desk", "Book a repeating appointment", says(/repeat/i, "should mention repeating")),
   howToCase("How do I find a time for someone on the phone?", "front_desk", "Book by asking Denise", says(/denise|chat|type/i, "should say to type it in Denise's chat")),
   howToCase("How do I sell shampoo to someone without an appointment?", "front_desk", "Sell a product on its own", says(/new sale/i, "should mention New sale")),
+  howToCase("How do I publish next week's schedule?", "owner", "Plan the team's week", says(/publish/i, "should mention Publish week")),
   {
     // Asked on the client's profile: "their" is that client.
     question: "When's their next visit?",

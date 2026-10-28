@@ -227,3 +227,20 @@ export const SlidersIcon = (p: IconProps) => (
     <circle cx="9" cy="17" r="2" />
   </Icon>
 );
+// The team schedule: shifts as bars on a week.
+export const ShiftsIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+    <path d="M3.5 9h17" />
+    <path d="M7 13h5" />
+    <path d="M10 16.5h7" />
+  </Icon>
+);
+export const RepeatIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M17 3.5 20 6.5 17 9.5" />
+    <path d="M4 11.5v-1a4 4 0 0 1 4-4h12" />
+    <path d="M7 20.5 4 17.5 7 14.5" />
+    <path d="M20 12.5v1a4 4 0 0 1-4 4H4" />
+  </Icon>
+);

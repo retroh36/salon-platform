@@ -6,7 +6,6 @@ import { LOGO_TYPES, MAX_LOGO_BYTES } from "@/lib/branding";
 import { isUuid } from "@/lib/ids";
 import {
   parseCompensationForm,
-  parseDayChangeForm,
   parseTimeOffForm,
   parseWeeklyHoursForm,
   type CompensationErrors,
@@ -64,45 +63,6 @@ export async function saveOpeningHours(
   if (error?.code === "42501") return { message: "Only owners and managers can change opening hours." };
   if (error) throw error;
   return done();
-}
-
-export async function saveDayChange(
-  staffId: string,
-  _prev: FormState<{ date?: string; hours?: string }>,
-  formData: FormData,
-): Promise<FormState<{ date?: string; hours?: string }>> {
-  const { supabase, staff: me } = await getCurrentStaff();
-  if (!me || !canManage(me.role) || !isUuid(staffId)) return { message: NO_PERMISSION };
-
-  const parsed = parseDayChangeForm(formData);
-  if (!parsed.ok) return { errors: parsed.errors, message: "Fix the highlighted fields." };
-  if (parsed.hours.length === 0) {
-    return { errors: { hours: "Add the hours they'll work that day. For a day off, add time off instead." } };
-  }
-
-  const { error } = await supabase.rpc("set_staff_day_override", {
-    p_business_id: me.business_id,
-    p_staff_id: staffId,
-    p_on_date: parsed.date,
-    p_hours: parsed.hours,
-  });
-  if (error?.code === "42501") return { message: NO_PERMISSION };
-  if (error) throw error;
-  return done();
-}
-
-export async function removeDayChange(staffId: string, date: string) {
-  const { supabase, staff: me } = await getCurrentStaff();
-  if (!me || !canManage(me.role) || !isUuid(staffId)) return;
-
-  const { error } = await supabase.rpc("set_staff_day_override", {
-    p_business_id: me.business_id,
-    p_staff_id: staffId,
-    p_on_date: date,
-    p_hours: [],
-  });
-  if (error) throw error;
-  done();
 }
 
 // Managers add approved time off for anyone (including past days, such as a

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { logout } from "@/app/login/actions";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
-import { BoxIcon, CalendarIcon, RingIcon, ChartIcon, GiftIcon, ReceiptIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, TeamIcon, ShieldIcon, TagIcon, UserIcon, WalletIcon } from "@/components/ui/icons";
+import { BoxIcon, CalendarIcon, RingIcon, ChartIcon, GiftIcon, ReceiptIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, ShiftsIcon, TeamIcon, ShieldIcon, TagIcon, UserIcon, WalletIcon } from "@/components/ui/icons";
 import { SalonMark } from "@/components/ui/salon-mark";
 import { SalonSwitcher, type SwitcherLocation } from "@/components/salon-switcher";
 import { firstSettingsPage } from "@/app/settings/settings-nav";
@@ -13,7 +13,7 @@ import { canTakePayments } from "@/lib/sales";
 import { can, type Permission } from "@/lib/permissions";
 import { isFrontOfHouse, roleLabel, type StaffRole } from "@/lib/staff";
 
-export type Section = "account" | "dashboard" | "my-day" | "calendar" | "events" | "sales" | "gift-cards" | "reports" | "payroll" | "policy" | "promotions" | "clients" | "team" | "services" | "durations" | "inventory" | "forms" | "settings";
+export type Section = "account" | "dashboard" | "my-day" | "calendar" | "events" | "sales" | "gift-cards" | "reports" | "payroll" | "policy" | "promotions" | "clients" | "team" | "scheduling" | "services" | "durations" | "inventory" | "forms" | "settings";
 
 type NavItem = {
   section: Section;
@@ -58,6 +58,7 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
     label: "Salon",
     items: [
       { section: "team", href: "/team", label: "Team", Icon: TeamIcon },
+      { section: "scheduling", href: "/scheduling", label: "Scheduling", Icon: ShiftsIcon, managersOnly: true },
       { section: "services", href: "/services", label: "Services", Icon: ScissorsIcon },
       { section: "durations", href: "/durations", label: "Durations", Icon: ClockIcon, managersOnly: true },
       { section: "inventory", href: "/inventory", label: "Inventory", Icon: BoxIcon },

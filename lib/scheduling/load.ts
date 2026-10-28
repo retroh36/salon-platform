@@ -8,7 +8,7 @@ import { addDays, fromLocal, MINUTES_PER_DAY, type LocalDate, type Weekday } fro
 
 type Supabase = SupabaseClient<Database>;
 
-type HourRow = { weekday: number; start_minute: number; end_minute: number };
+type HourRow = { weekday: number; start_minute: number; end_minute: number; cycle_week?: number };
 
 export function toWeekly(rows: HourRow[]): WeeklyHours {
   const weekly: WeeklyHours = {};
@@ -34,6 +34,12 @@ export async function loadLocationSchedule(
   return { timeZone: location.timezone, weekly: toWeekly(data) };
 }
 
+// A repeating pattern's weeks, from its rows (null for a one-week pattern).
+export function toCycle(rows: HourRow[], weeks: number, startsOn: LocalDate | null): StaffSchedule["cycle"] {
+  if (weeks <= 1 || !startsOn) return null;
+  return { startsOn, weeks: Array.from({ length: weeks }, (_, n) => toWeekly(rows.filter((r) => (r.cycle_week ?? 0) === n))) };
+}
+
 // Schedules for the given staff between two local dates (inclusive). Time off
 // includes every status the caller can see (RLS hides other people's
 // pending and declined requests); availability only counts approved.
@@ -43,14 +49,16 @@ export async function loadStaffSchedules(
   from: LocalDate,
   to: LocalDate,
 ): Promise<Map<string, StaffSchedule>> {
-  const [hours, overrides, timeOff] = await Promise.all([
-    supabase.from("staff_working_hours").select("staff_id, weekday, start_minute, end_minute").in("staff_id", staffIds),
+  const [hours, cycles, overrides, daysOff, timeOff] = await Promise.all([
+    supabase.from("staff_working_hours").select("staff_id, cycle_week, weekday, start_minute, end_minute").in("staff_id", staffIds),
+    supabase.from("staff").select("id, hours_cycle_weeks, hours_cycle_starts_on").in("id", staffIds),
     supabase
       .from("staff_schedule_overrides")
       .select("staff_id, on_date, start_minute, end_minute")
       .in("staff_id", staffIds)
       .gte("on_date", from)
       .lte("on_date", to),
+    supabase.from("staff_days_off").select("staff_id, on_date").in("staff_id", staffIds).gte("on_date", from).lte("on_date", to),
     supabase
       .from("staff_time_off")
       .select("id, staff_id, starts_on, ends_on, start_minute, end_minute, reason, note, status")
@@ -60,14 +68,22 @@ export async function loadStaffSchedules(
       .order("starts_on"),
   ]);
   if (hours.error) throw hours.error;
+  if (cycles.error) throw cycles.error;
   if (overrides.error) throw overrides.error;
+  if (daysOff.error) throw daysOff.error;
+  const cycleOf = new Map(cycles.data.map((c) => [c.id, c]));
   if (timeOff.error) throw timeOff.error;
 
   const schedules = new Map<string, StaffSchedule>(
     staffIds.map((id) => [
       id,
       {
-        weekly: toWeekly(hours.data.filter((r) => r.staff_id === id)),
+        weekly: toWeekly(hours.data.filter((r) => r.staff_id === id && r.cycle_week === 0)),
+        cycle: toCycle(
+          hours.data.filter((r) => r.staff_id === id),
+          cycleOf.get(id)?.hours_cycle_weeks ?? 1,
+          cycleOf.get(id)?.hours_cycle_starts_on ?? null,
+        ),
         overrides: {} as Record<LocalDate, Interval[]>,
         timeOff: [] as TimeOff[],
       },
@@ -77,6 +93,8 @@ export async function loadStaffSchedules(
   for (const o of overrides.data) {
     (schedules.get(o.staff_id)!.overrides[o.on_date] ??= []).push({ start: o.start_minute, end: o.end_minute });
   }
+  // A day off in a published week: no hours that day.
+  for (const d of daysOff.data) schedules.get(d.staff_id)!.overrides[d.on_date] = [];
   for (const t of timeOff.data) {
     schedules.get(t.staff_id)!.timeOff.push({
       id: t.id,

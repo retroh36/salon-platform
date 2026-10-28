@@ -7,9 +7,10 @@ import { EmptyState, PageHeader, Section } from "@/components/ui/page";
 import { TableCard } from "@/components/ui/table";
 import { bookedSummary } from "@/lib/calendar";
 import { getCurrentStaff } from "@/lib/auth";
-import { formatLongDay } from "@/lib/schedule-format";
-import { startOfLocalDay } from "@/lib/scheduling/load";
-import { addDays, formatMinute, todayIn, toLocal } from "@/lib/scheduling/time";
+import { describeTimeOff, formatDay, formatIntervals, formatLongDay } from "@/lib/schedule-format";
+import { dayView } from "@/lib/scheduling/availability";
+import { loadLocationSchedule, loadStaffSchedules, startOfLocalDay } from "@/lib/scheduling/load";
+import { addDays, datesBetween, formatMinute, todayIn, toLocal } from "@/lib/scheduling/time";
 import type { AppointmentStatus } from "@/lib/appointments";
 import { PayTickets } from "@/components/pay-tickets";
 import { pillClass } from "@/components/ui/page";
@@ -140,11 +141,40 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
           })}
         </ol>
       )}
+      <MyWeekSection supabase={supabase} me={me} />
       {me.role !== "assistant" && <LiveEarningsSection supabase={supabase} me={me} />}
       {me.role !== "assistant" && <MyGoalsSection supabase={supabase} me={me} />}
       <MyEarnings supabase={supabase} me={me} last={params.pay === "last"} />
       </div>
     </AppShell>
+  );
+}
+
+// Their published hours for the week ahead (what the team schedule
+// published; drafts never show here), with approved time off.
+async function MyWeekSection({ supabase, me }: { supabase: Awaited<ReturnType<typeof getCurrentStaff>>["supabase"]; me: NonNullable<Awaited<ReturnType<typeof getCurrentStaff>>["staff"]> }) {
+  const today = todayIn(me.location.timezone);
+  const end = addDays(today, 6);
+  const [location, schedules] = await Promise.all([loadLocationSchedule(supabase, me.location), loadStaffSchedules(supabase, [me.id], today, end)]);
+  const schedule = schedules.get(me.id)!;
+  return (
+    <Section title="My week" titleId="my-week-heading" className="mt-10" data-testid="my-week">
+      <ol className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
+        {datesBetween(today, end).map((date) => {
+          const day = dayView(schedule, location, date);
+          const off = day.timeOff.filter((t) => t.status === "approved");
+          return (
+            <li key={date} className="flex items-baseline justify-between gap-4 px-4 py-2.5 text-sm">
+              <span className="font-medium text-ink">{date === today ? "Today" : formatDay(date)}</span>
+              <span className={day.hours.length ? "text-right text-ink tabular-nums" : "text-ink-muted"}>
+                {day.hours.length ? formatIntervals(day.hours) : "Off"}
+                {off.length > 0 && <span className="block text-13 text-ink-muted">{off.map(describeTimeOff).join(", ")}</span>}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </Section>
   );
 }
 

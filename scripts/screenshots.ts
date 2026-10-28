@@ -27,7 +27,7 @@ import { createInterface } from "node:readline/promises";
 import { chromium, type Browser, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../lib/database.types.ts";
-import { addDays, fromLocal, todayIn, toLocal, weekdayOf, type LocalDate } from "../lib/scheduling/time.ts";
+import { addDays, fromLocal, startOfWeek, todayIn, toLocal, weekdayOf, type LocalDate } from "../lib/scheduling/time.ts";
 
 try {
   process.loadEnvFile(".env.local");
@@ -395,6 +395,13 @@ async function capture(browser: Browser) {
     await ticket.getByRole("list", { name: "Matching products" }).getByRole("button").first().click();
     await ticket.getByTestId("rewards").getByRole("button", { name: /^\$10 off/ }).click();
     await ticket.getByTestId("applied-reward").waitFor();
+  });
+
+  // The team schedule: next week, with Daniel's draft (Sandra picking up a
+  // Saturday) dashed and the publish button ready.
+  await shot("35-team-schedule", owner, async (page) => {
+    await page.goto(`/scheduling?week=${addDays(startOfWeek(today), 7)}`);
+    await page.getByTestId("team-schedule").locator("[data-draft]").first().waitFor();
   });
 
   // Marking a stylist out: the stylist with the most clients on the next

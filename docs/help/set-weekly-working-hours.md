@@ -18,7 +18,8 @@ Set the regular hours a team member works each week. They can only be booked dur
 ## Good to know
 
 - These hours repeat every week and stay the same across daylight saving.
-- To change just one date, see "Change someone's hours for one day".
+- To change just one date, see "Change someone's hours for one day". For a pattern over several weeks (every other Saturday off), see "Set someone's repeating schedule pattern".
+- Saving here changes the weeks ahead straight away; someone on a pattern over several weeks has theirs changed in **Scheduling** instead.
 - For lunch or breaks, see "Block time" instead of splitting the shift.
 - **Week of** at the top shows the hours that apply each day, including changes and time off. Use **← Previous**, **This week** and **Next →** to move between weeks.
 - Front desk and stylists can see schedules but can't change them.

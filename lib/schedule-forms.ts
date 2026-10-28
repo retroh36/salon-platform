@@ -60,22 +60,6 @@ export function parseWeeklyHoursForm(
   return Object.keys(errors).length > 0 ? { ok: false, errors } : { ok: true, hours };
 }
 
-// A one-off change: on_date plus start_day / end_day rows. No rows means
-// "remove the change".
-export function parseDayChangeForm(
-  form: FormLike,
-): { ok: true; date: LocalDate; hours: { start_minute: number; end_minute: number }[] } | { ok: false; errors: { date?: string; hours?: string } } {
-  const errors: { date?: string; hours?: string } = {};
-  const date = text(form, "on_date");
-  if (!isLocalDate(date)) errors.date = "Choose a date.";
-
-  const rows = parseRows(form, "day");
-  if ("error" in rows) errors.hours = rows.error;
-
-  if (Object.keys(errors).length > 0 || "error" in rows) return { ok: false, errors };
-  return { ok: true, date, hours: rows.intervals.map((i) => ({ start_minute: i.start, end_minute: i.end })) };
-}
-
 export const TIME_OFF_REASONS = ["vacation", "sick", "personal", "other"] as const;
 export type TimeOffReason = (typeof TIME_OFF_REASONS)[number];
 

@@ -42,7 +42,7 @@ test.describe("owner", () => {
     expect(await groups(page)).toEqual([
       ["Daily", ["Dashboard", "Calendar", "Clients", "Events"]],
       ["Sales", ["Sales", "Gift cards", "Promotions", "Reports", "Payroll", "Policy"]],
-      ["Salon", ["Team", "Services", "Durations", "Inventory", "Forms"]],
+      ["Salon", ["Team", "Scheduling", "Services", "Durations", "Inventory", "Forms"]],
     ]);
     await expect(sidebar(page).getByRole("link", { name: "Settings" })).toBeVisible();
     // The current page: marked, with the accent bar; New sale is in page
