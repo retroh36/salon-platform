@@ -15,6 +15,7 @@ const L = SEED.location;
 const RUN = Date.now().toString(36);
 let productId: string;
 let clientId: string;
+let lowId: string;
 
 test.describe.configure({ mode: "serial" });
 
@@ -29,13 +30,16 @@ test.beforeAll(async () => {
   const { data: c } = await admin.from("clients").insert({ business_id: B, first_name: `Rw${RUN}`, last_name: "Test" }).select("id").single();
   clientId = c!.id;
   await admin.from("reward_points").insert({ business_id: B, client_id: clientId, delta: 360, kind: "adjust", reason: "Test" });
+  const { data: low } = await admin.from("clients").insert({ business_id: B, first_name: `Rw${RUN}`, last_name: "Low" }).select("id").single();
+  lowId = low!.id;
+  await admin.from("reward_points").insert({ business_id: B, client_id: lowId, delta: 150, kind: "adjust", reason: "Test" });
 });
 
 test.afterAll(async () => {
   await admin.from("sales").delete().in("id", (await admin.from("sale_items").select("sale_id").eq("product_id", productId)).data?.map((r) => r.sale_id) ?? []);
   await admin.from("stock_levels").delete().eq("product_id", productId);
   await admin.from("products").delete().eq("id", productId);
-  await admin.from("clients").delete().eq("id", clientId);
+  await admin.from("clients").delete().in("id", [clientId, lowId]);
   await admin.from("rewards").delete().eq("business_id", B).like("name", `Rw${RUN}%`);
 });
 
@@ -44,7 +48,7 @@ test.describe("front desk", () => {
 
   test("takes a reward in one tap at checkout, and the points move when the sale completes", async ({ page }) => {
     const co = await openCheckout(page, { productId, from: "/sales" });
-    await co.ticket.getByLabel("Find a client").fill(`Rw${RUN}`);
+    await co.ticket.getByLabel("Find a client").fill(`Rw${RUN} Test`);
     await co.ticket.getByRole("list", { name: "Matching clients" }).getByRole("button").first().click();
     await expect(page.getByTestId("badge-points")).toHaveText("360 points");
     await expect(page.getByTestId("rewards-line")).toHaveText(`Rw${RUN} has 360 points: enough for 20% off retail, and 40 points from a free gloss.`);
@@ -66,6 +70,16 @@ test.describe("front desk", () => {
       { kind: "redeem", delta: -300 },
       { kind: "earn", delta: 32 },
     ]);
+  });
+
+  test("below the program's minimum, says so once rather than under every reward", async ({ page }) => {
+    const co = await openCheckout(page, { productId, from: "/sales" });
+    await co.ticket.getByLabel("Find a client").fill(`Rw${RUN} Low`);
+    await co.ticket.getByRole("list", { name: "Matching clients" }).getByRole("button").first().click();
+    await expect(page.getByTestId("badge-points")).toHaveText("150 points");
+    const rewards = co.ticket.getByTestId("rewards");
+    await expect(rewards.getByText("Rewards start at 200 points.")).toHaveCount(1);
+    for (const button of await rewards.getByRole("button").all()) await expect(button).toBeDisabled();
   });
 
   test("sees the points history on the profile, and can't adjust points", async ({ page }) => {

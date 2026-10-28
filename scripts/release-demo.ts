@@ -15,7 +15,9 @@
 //      demo from it (its production branch)
 //   6. waits for the live site to say it's running this commit
 //      (/api/demo/status)
-//   7. the demo's browser checks against the live site (test:demo)
+//   7. the main pages loaded once (demo:warm), so the first tester doesn't
+//      wait for the new version's servers to start; its times are printed
+//   8. the demo's browser checks against the live site (test:demo)
 //
 // Until step 5 the live site runs what it ran before (steps 3 and 4 change
 // only its database, and only with migrations and seeds that passed step 2).
@@ -134,7 +136,12 @@ for (;;) {
 }
 console.log(`\nLive: ${SITE} runs ${head.slice(0, 7)}.`);
 
-// 7. The demo's browser checks, on the live site
+// 7. Warm-up: the new version's servers start on the first requests, so
+// load the main pages once now rather than leave it to the first tester.
+heading("warming up the main pages");
+run("The warm-up", "npm", ["run", "demo:warm", "--", SITE]);
+
+// 8. The demo's browser checks, on the live site
 heading("the demo's checks on the live site");
 run("The demo's checks", "npm", ["run", "test:demo"], { DEMO_URL: SITE });
 

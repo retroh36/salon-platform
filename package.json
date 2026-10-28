@@ -23,6 +23,7 @@
     "jobs": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/jobs.ts",
     "demo:db": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/demo-db.ts",
     "test:demo": "playwright test --config playwright.demo.config.ts",
+    "demo:warm": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/warm-demo.ts",
     "release:demo": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/release-demo.ts",
     "screenshots": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/screenshots.ts"
   },

@@ -70,6 +70,9 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
         "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, price_cents, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, checked_in_at, checked_out_at, created_at, updated_at, created_by, updated_by, deposit_cents, deposit_paid_cents, starts_at, series_id, series_index, series:appointment_series(interval_weeks), group:appointment_groups(id, label), client:clients(id, first_name, last_name, phone, email, allergies, preferences, appointment_sms_ok, appointment_email_ok, sms_opt_in, email_opt_in, sms_stopped_at))",
       )
       .eq("location_id", me.location.id)
+      // From a day before (no service lasts longer), so the index reads only
+      // around the day rather than all the salon's history before it.
+      .gt("starts_at", new Date(dayStart.getTime() - 86_400_000).toISOString())
       .lt("starts_at", dayEnd.toISOString())
       .gt("ends_at", dayStart.toISOString())
       // Canceled visits are off the calendar; no-shows stay, marked.
@@ -327,12 +330,14 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     // What Denise knows about each client.
     loadClientInsights(supabase, me.business_id, clientIds),
     loadPackagesByClient(supabase, clientIds),
+    // Their visits before today, newest first, from the clients (by their
+    // index): starting from the items read the salon's whole history.
     clientIds.length
       ? supabase
-          .from("appointment_items")
-          .select("starts_at, staff_id, service:services(name), appointment:appointments!inner(id, client_id, status)")
-          .in("appointment.client_id", clientIds)
-          .eq("appointment.status", "completed")
+          .from("appointments")
+          .select("id, client_id, items:appointment_items(starts_at, staff_id, service:services(name))")
+          .in("client_id", clientIds)
+          .eq("status", "completed")
           .lt("starts_at", dayStart.toISOString())
           .order("starts_at", { ascending: false })
           .limit(3000)
@@ -371,14 +376,16 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   // "Oct 2", with the year when it isn't this one ("Dec 12, 2025").
   const shortDay = (d: LocalDate) => formatDay(d, d.slice(0, 4) !== date.slice(0, 4)).replace(/^\w+, /, "");
   const pastByClient = new Map<string, Map<string, { date: string; services: string[]; staff: Set<string> }>>();
-  for (const row of past.data) {
-    const visits = pastByClient.get(row.appointment.client_id!) ?? new Map();
-    pastByClient.set(row.appointment.client_id!, visits);
-    const visit = visits.get(row.appointment.id) ?? (visits.size < PAST ? { date: shortDay(toLocal(new Date(row.starts_at), tz).date), services: [], staff: new Set() } : null);
-    if (!visit) continue;
-    visits.set(row.appointment.id, visit);
-    visit.services.unshift(row.service.name);
-    visit.staff.add(staffById.get(row.staff_id)?.first_name ?? "Former staff");
+  for (const a of past.data) {
+    const visits = pastByClient.get(a.client_id!) ?? new Map();
+    pastByClient.set(a.client_id!, visits);
+    if (visits.size >= PAST || !a.items.length) continue;
+    const items = [...a.items].sort((x, y) => x.starts_at.localeCompare(y.starts_at));
+    visits.set(a.id, {
+      date: shortDay(toLocal(new Date(items[0].starts_at), tz).date),
+      services: items.map((i) => i.service.name),
+      staff: new Set(items.map((i) => staffById.get(i.staff_id)?.first_name ?? "Former staff")),
+    });
   }
   const formulasByClient = new Map<string, AppointmentDetail["pastFormulas"]>();
   for (const f of pastFormulas.data) {

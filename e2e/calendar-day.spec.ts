@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { addDays, fromLocal, toLocal, todayIn } from "@/lib/scheduling/time";
-import { admin, busyDay, openAllDay, SEED } from "../tests/db/helpers";
+import { admin, busyDay, openAllDay, SEED, throwawayStylist } from "../tests/db/helpers";
 import { AUTH, checkIn, expect, moreAction, openChecklist, openDisplayMenu, pxPerMinute, test, ui, waitForHydration } from "./fixtures";
 
 // The calendar's day: undoing a check-in, the patch test notice in booking
@@ -25,19 +25,6 @@ async function client(first: string) {
 
 // A stylist with nothing else on between these times, so a test visit
 // gets a lane of its own whatever the demo data has booked.
-async function freeStylist(from: Date, to: Date, except: string[]) {
-  const candidates = [SEED.staff.shae, SEED.staff.hannah, SEED.staff.sandra, SEED.staff.gil, SEED.staff.bridget].filter((id) => !except.includes(id));
-  const { data } = await admin
-    .from("appointment_items")
-    .select("staff_id, appointment:appointments!inner(status)")
-    .in("staff_id", candidates)
-    .not("appointment.status", "in", "(canceled,no_show)")
-    .lt("starts_at", to.toISOString())
-    .gt("ends_at", from.toISOString());
-  const busy = new Set(data!.map((i) => i.staff_id));
-  return candidates.find((id) => !busy.has(id))!;
-}
-
 async function book(clientId: string, service: string, start: Date, staffId = SEED.staff.lois) {
   const { data: s } = await admin.from("services").select("id, duration_minutes").eq("business_id", B).eq("name", service).single();
   const end = new Date(start.getTime() + s!.duration_minutes! * 60_000);
@@ -312,68 +299,76 @@ test.describe("front desk", () => {
     // Ben's name is long: it wraps, never cut off.
     const BEN = "Benedetta-Alessandrina Featherstonehaugh-Montgomery";
     const [ana, ben, cy, dee] = await Promise.all([client("Ana"), client(BEN), client("Cy"), client("Dee")]);
-    // Due 15 and 50 minutes ago, one after the other (not a clash), and
-    // 30 minutes ago with another stylist; 5 minutes ago is still in the
-    // grace period.
-    await book(ana, "Men's Cut", new Date(Date.now() - 15 * 60_000));
-    await book(ben, "Men's Cut", new Date(Date.now() - 50 * 60_000));
-    // Free stylists, since the demo books most of them at any hour.
-    const cyStart = new Date(Date.now() - 30 * 60_000);
-    const cyStylist = await freeStylist(cyStart, new Date(cyStart.getTime() + 30 * 60_000), [SEED.staff.lois]);
-    const cyVisit = await book(cy, "Men's Cut", cyStart, cyStylist);
-    const deeStart = new Date(Date.now() - 5 * 60_000);
-    await book(dee, "Men's Cut", deeStart, await freeStylist(deeStart, new Date(deeStart.getTime() + 30 * 60_000), [SEED.staff.lois, cyStylist]));
-    await openDay(page, today);
-    await page.getByTestId("denise-launcher").click();
-    const card = page.getByTestId("denise-late");
-    await expect(card).toContainText(/not arrived yet/);
-    await expect(card).toContainText("Give them a call");
-    const line = (name: string) => card.getByRole("listitem").filter({ hasText: `${PREFIX}${name}` });
-    await expect(line("Ana")).toContainText(/Due \d/);
-    await expect(line("Ben").getByRole("button", { name: "Open" })).toBeVisible();
-    // Each row: the full name on its own line, the due time under it, the
-    // actions below that, and dismiss in the top right corner.
-    const name = line("Ben").getByTestId("late-name");
-    await expect(name).toHaveText(`${PREFIX}${BEN} Test`);
-    expect(await name.evaluate((el) => el.scrollWidth <= el.clientWidth && getComputedStyle(el).textOverflow !== "ellipsis")).toBe(true);
-    const [row, nameBox, due, open, noShow, dismiss] = await Promise.all([
-      line("Ben").boundingBox(),
-      name.boundingBox(),
-      line("Ben").getByText(/^Due \d/).boundingBox(),
-      line("Ben").getByRole("button", { name: "Open" }).boundingBox(),
-      line("Ben").getByRole("button", { name: "Mark no-show" }).boundingBox(),
-      line("Ben").getByRole("button", { name: /^Dismiss/ }).boundingBox(),
-    ]);
-    expect(due!.y).toBeGreaterThanOrEqual(nameBox!.y + nameBox!.height - 1);
-    expect(open!.y).toBeGreaterThanOrEqual(due!.y + due!.height - 1);
-    expect(noShow!.y).toBeCloseTo(open!.y, 0);
-    expect(open!.height).toBeLessThanOrEqual(32);
-    expect(dismiss!.y - row!.y).toBeLessThan(10);
-    expect(row!.x + row!.width - (dismiss!.x + dismiss!.width)).toBeLessThan(10);
-    expect(dismiss!.x).toBeGreaterThanOrEqual(nameBox!.x + nameBox!.width - 1);
-    await expect(line("Dee")).toHaveCount(0);
-    // On the calendar: "Not arrived", not a growing count; still a count
-    // in the grace period.
-    await expect(ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Ben`) }).locator("[data-attention=not-arrived]")).toHaveText("Not arrived");
-    await expect(ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Dee`) }).locator("[data-attention=late]")).toHaveText(/^\+\d+m$|^$/);
+    // Stylists of the test's own, working all day today: the demo books
+    // its stylists at any hour, and a client waiting for a stylist still
+    // with someone isn't late.
+    const team = await Promise.all(["Uma", "Vic", "Wren"].map((n) => throwawayStylist(`${PREFIX}${n}`)));
+    const [anaBen, cyStylist, deeStylist] = team.map((t) => t.id);
+    const reopen = await openAllDay([anaBen, cyStylist, deeStylist]);
+    try {
+      // Due 15 and 50 minutes ago, one after the other (not a clash), and
+      // 30 minutes ago with another stylist; 5 minutes ago is still in the
+      // grace period.
+      await book(ana, "Men's Cut", new Date(Date.now() - 15 * 60_000), anaBen);
+      await book(ben, "Men's Cut", new Date(Date.now() - 50 * 60_000), anaBen);
+      const cyVisit = await book(cy, "Men's Cut", new Date(Date.now() - 30 * 60_000), cyStylist);
+      await book(dee, "Men's Cut", new Date(Date.now() - 5 * 60_000), deeStylist);
+      await openDay(page, today);
+      await page.getByTestId("denise-launcher").click();
+      const card = page.getByTestId("denise-late");
+      await expect(card).toContainText(/not arrived yet/);
+      await expect(card).toContainText("Give them a call");
+      const line = (name: string) => card.getByRole("listitem").filter({ hasText: `${PREFIX}${name}` });
+      await expect(line("Ana")).toContainText(/Due \d/);
+      await expect(line("Ben").getByRole("button", { name: "Open" })).toBeVisible();
+      // Each row: the full name on its own line, the due time under it, the
+      // actions below that, and dismiss in the top right corner.
+      const name = line("Ben").getByTestId("late-name");
+      await expect(name).toHaveText(`${PREFIX}${BEN} Test`);
+      expect(await name.evaluate((el) => el.scrollWidth <= el.clientWidth && getComputedStyle(el).textOverflow !== "ellipsis")).toBe(true);
+      const [row, nameBox, due, open, noShow, dismiss] = await Promise.all([
+        line("Ben").boundingBox(),
+        name.boundingBox(),
+        line("Ben").getByText(/^Due \d/).boundingBox(),
+        line("Ben").getByRole("button", { name: "Open" }).boundingBox(),
+        line("Ben").getByRole("button", { name: "Mark no-show" }).boundingBox(),
+        line("Ben").getByRole("button", { name: /^Dismiss/ }).boundingBox(),
+      ]);
+      expect(due!.y).toBeGreaterThanOrEqual(nameBox!.y + nameBox!.height - 1);
+      expect(open!.y).toBeGreaterThanOrEqual(due!.y + due!.height - 1);
+      expect(noShow!.y).toBeCloseTo(open!.y, 0);
+      expect(open!.height).toBeLessThanOrEqual(32);
+      expect(dismiss!.y - row!.y).toBeLessThan(10);
+      expect(row!.x + row!.width - (dismiss!.x + dismiss!.width)).toBeLessThan(10);
+      expect(dismiss!.x).toBeGreaterThanOrEqual(nameBox!.x + nameBox!.width - 1);
+      await expect(line("Dee")).toHaveCount(0);
+      // On the calendar: "Not arrived", not a growing count; still a count
+      // in the grace period.
+      await expect(ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Ben`) }).locator("[data-attention=not-arrived]")).toHaveText("Not arrived");
+      await expect(ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Dee`) }).locator("[data-attention=late]")).toHaveText(/^\+\d+m$|^$/);
 
-    await line("Cy").getByRole("button", { name: "Mark no-show" }).click();
-    await line("Cy").getByRole("button", { name: "Yes, no-show" }).click();
-    await expect(line("Cy")).toHaveCount(0);
-    await expect(page.getByTestId("no-show-toast")).toContainText("is marked a no-show.");
-    await expect.poll(() => status(cyVisit)).toBe("no_show");
+      await line("Cy").getByRole("button", { name: "Mark no-show" }).click();
+      await line("Cy").getByRole("button", { name: "Yes, no-show" }).click();
+      await expect(line("Cy")).toHaveCount(0);
+      await expect(page.getByTestId("no-show-toast")).toContainText("is marked a no-show.");
+      await expect.poll(() => status(cyVisit)).toBe("no_show");
 
-    await line("Ana").getByRole("button", { name: `Dismiss ${PREFIX}Ana Test` }).click();
-    await expect(line("Ana")).toHaveCount(0);
-    await expect.poll(async () => (await admin.from("denise_dismissals").select("id").eq("location_id", L).eq("day", today).like("item_key", "late:%")).data!.length).toBeGreaterThan(0);
-    await page.reload();
-    await waitForHydration(page, "section[data-staff-id]");
-    await page.getByTestId("denise-launcher").click();
-    await expect(page.getByTestId("denise-late").getByRole("listitem").filter({ hasText: `${PREFIX}Ben` })).toBeVisible();
-    await expect(page.getByTestId("denise-late").getByRole("listitem").filter({ hasText: `${PREFIX}Ana` })).toHaveCount(0);
+      await line("Ana").getByRole("button", { name: `Dismiss ${PREFIX}Ana Test` }).click();
+      await expect(line("Ana")).toHaveCount(0);
+      await expect.poll(async () => (await admin.from("denise_dismissals").select("id").eq("location_id", L).eq("day", today).like("item_key", "late:%")).data!.length).toBeGreaterThan(0);
+      await page.reload();
+      await waitForHydration(page, "section[data-staff-id]");
+      await page.getByTestId("denise-launcher").click();
+      await expect(page.getByTestId("denise-late").getByRole("listitem").filter({ hasText: `${PREFIX}Ben` })).toBeVisible();
+      await expect(page.getByTestId("denise-late").getByRole("listitem").filter({ hasText: `${PREFIX}Ana` })).toHaveCount(0);
 
-    await line("Ben").getByRole("button", { name: "Open" }).click();
-    await expect(details(page).getByTestId("client-name")).toHaveText(`${PREFIX}${BEN} Test`);
+      await line("Ben").getByRole("button", { name: "Open" }).click();
+      await expect(details(page).getByTestId("client-name")).toHaveText(`${PREFIX}${BEN} Test`);
+    } finally {
+      await reopen();
+      await admin.from("appointments").delete().in("client_id", [ana, ben, cy, dee]);
+      await Promise.all(team.map((t) => t.remove()));
+    }
   });
 });
 
