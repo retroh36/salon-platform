@@ -21,6 +21,7 @@ const NO_PERMISSION = "Only owners and managers can change schedules.";
 
 function done() {
   revalidatePath("/schedule", "layout");
+  revalidatePath("/time-off");
   return { saved: true };
 }
 
@@ -81,31 +82,32 @@ export async function addTimeOff(
   const parsed = parseTimeOffForm(formData, { today: todayIn(me.location.timezone), allowPast: manager });
   if (!parsed.ok) return { errors: parsed.errors, message: "Fix the highlighted fields." };
 
-  const { error } = await supabase.from("staff_time_off").insert({
-    ...parsed.value,
-    business_id: me.business_id,
-    staff_id: staffId,
-    requested_by: me.id,
-    ...(manager
-      ? { status: "approved" as const, decided_by: me.id, decided_at: new Date().toISOString() }
-      : { status: "requested" as const }),
-  });
+  // Staff asking go through the request (notice period, blackouts, and a
+  // notice to owners and managers); time off a manager adds is approved.
+  const { error } =
+    manager
+      ? await supabase.from("staff_time_off").insert({
+          ...parsed.value,
+          business_id: me.business_id,
+          staff_id: staffId,
+          requested_by: me.id,
+          status: "approved" as const,
+          decided_by: me.id,
+          decided_at: new Date().toISOString(),
+        })
+      : await supabase.rpc("request_time_off", {
+          p_starts_on: parsed.value.starts_on,
+          p_ends_on: parsed.value.ends_on,
+          p_start_minute: parsed.value.start_minute ?? undefined,
+          p_end_minute: parsed.value.end_minute ?? undefined,
+          p_reason: parsed.value.reason,
+          p_note: parsed.value.note ?? undefined,
+        });
   if (error?.code === "42501") return { message: "You don't have permission to add this time off." };
+  if (error?.code === "22023") return { message: error.message };
   if (error) throw error;
+  revalidatePath("/scheduling", "layout");
   return done();
-}
-
-export async function decideTimeOff(id: string, decision: "approved" | "declined") {
-  const { supabase, staff: me } = await getCurrentStaff();
-  if (!me || !canManage(me.role) || !isUuid(id)) return;
-
-  const { error } = await supabase
-    .from("staff_time_off")
-    .update({ status: decision, decided_by: me.id, decided_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("status", "requested");
-  if (error) throw error;
-  done();
 }
 
 // Managers can remove any time off; staff can withdraw their own pending

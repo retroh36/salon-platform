@@ -91,24 +91,6 @@ test.describe("managers", () => {
     }
   });
 
-  test("approve a pending time off request", async ({ page }) => {
-    const { data: request } = await admin.from("staff_time_off").select("id").eq("staff_id", SEED.staff.shae).eq("status", "requested").single();
-    try {
-      await page.goto("/schedule");
-      const requests = ui(page).getByRole("region", { name: /Time off requests/ });
-      await expect(requests).toContainText("Shae Morgan");
-      await expect(requests).toContainText("Sister's graduation");
-      await requests.getByRole("button", { name: "Approve" }).click();
-      await expect(ui(page).getByRole("region", { name: /Time off requests/ })).toHaveCount(0);
-
-      await pickStaff(page, "Shae");
-      const entry = ui(page).getByRole("list", { name: "Time off" }).getByRole("listitem").filter({ hasText: "Sister's graduation" });
-      await expect(entry).toContainText("Approved");
-    } finally {
-      await admin.from("staff_time_off").update({ status: "requested", decided_by: null, decided_at: null }).eq("id", request!.id);
-    }
-  });
-
   test("add part-day time off for a stylist, then remove it", async ({ page }) => {
     const date = addDays(nextMonday, 1); // Bridget works Tuesdays
     try {
@@ -220,8 +202,8 @@ test.describe("stylists", () => {
       // The owner sees it waiting.
       const ownerContext = await browser.newContext({ storageState: AUTH.owner });
       const ownerPage = await ownerContext.newPage();
-      await ownerPage.goto("/schedule");
-      await expect(ui(ownerPage).getByRole("region", { name: /Time off requests/ })).toContainText("Moving house");
+      await ownerPage.goto("/scheduling/requests");
+      await expect(ui(ownerPage).locator("[data-request]").filter({ hasText: "Moving house" })).toContainText("Bridget Callahan");
       await ownerContext.close();
 
       await entry.getByRole("button", { name: "Withdraw" }).click();

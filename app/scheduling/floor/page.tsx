@@ -7,6 +7,7 @@ import { canManage, getCurrentStaff } from "@/lib/auth";
 import { loadFloor } from "@/lib/floor-load";
 import { isLocalDate, todayIn } from "@/lib/scheduling/time";
 import { isFrontOfHouse } from "@/lib/staff";
+import { countPendingRequests } from "@/lib/time-off-requests-load";
 import { SchedulingTabs } from "../scheduling-tabs";
 import { FloorView } from "./floor-view";
 
@@ -28,12 +29,12 @@ async function FloorDay({ searchParams }: Pick<PageProps<"/scheduling/floor">, "
   if (!isFrontOfHouse(me.role)) redirect("/schedule");
   const today = todayIn(me.location.timezone);
   const date = typeof params.date === "string" && isLocalDate(params.date) ? params.date : today;
-  const floor = await loadFloor(supabase, me.location, date);
   const editable = canManage(me.role);
+  const [floor, pending] = await Promise.all([loadFloor(supabase, me.location, date), editable ? countPendingRequests(supabase, me.location, today) : null]);
   return (
     <AppShell section={editable ? "scheduling" : "team"} me={me} wide>
       <PageHeader title="Scheduling" description="Who's at each chair and station, and when." />
-      <SchedulingTabs current="floor" />
+      <SchedulingTabs current="floor" pending={pending} />
       <FloorView floor={floor} today={today} editable={editable && date >= today} />
     </AppShell>
   );

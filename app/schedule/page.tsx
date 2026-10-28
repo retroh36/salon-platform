@@ -6,7 +6,7 @@ import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Avatar, initials } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
 import { ClockIcon } from "@/components/ui/icons";
-import { Badge, listClass, PageHeader, pillClass, rowClass, type Tone } from "@/components/ui/page";
+import { Alert, Badge, listClass, PageHeader, pillClass, rowClass, textLinkClass, type Tone } from "@/components/ui/page";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import { staffPhotoUrl } from "@/lib/branding";
 import { isUuid } from "@/lib/ids";
@@ -19,7 +19,7 @@ import { formatPrice } from "@/lib/services";
 import { fullName, roleLabel, sortStaff } from "@/lib/staff";
 import { patternLabel } from "@/lib/team-schedule";
 import { Notices } from "../my-day/notices";
-import { decideTimeOff, deleteTimeOff, saveWeeklyHours } from "./actions";
+import { deleteTimeOff, saveWeeklyHours } from "./actions";
 import { CompensationForm } from "./compensation-form";
 import { HoursEditor, type HoursRows } from "./hours-editor";
 import { StaffPhotoForm } from "./staff-photo";
@@ -93,7 +93,6 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
   const schedule = schedules.get(target.id)!;
   const days = datesBetween(week, weekEnd).map((date) => dayView(schedule, location, date));
   const timeOff = history.get(target.id)!.timeOff.sort((a, b) => b.startsOn.localeCompare(a.startsOn));
-  const staffName = new Map(allStaff.map((s) => [s.id, fullName(s)]));
 
   const weekly = schedule.weekly;
   const hoursRows: HoursRows = Object.fromEntries(
@@ -140,35 +139,12 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
       {isSelf && <Notices notices={(notices ?? []).map((n) => ({ id: n.id, body: n.body, when: formatDayAt(n.created_at, me.location.timezone) }))} />}
 
       {manager && pending.data.length > 0 && (
-        <section aria-labelledby="requests-heading" className={cardClass}>
-          <h2 id="requests-heading" className={`${cardHeadClass} text-base font-semibold text-ink`}>
-            Time off requests ({pending.data.length})
-          </h2>
-          <ul className={listClass}>
-            {pending.data.map((r) => (
-              <li key={r.id} className={`${rowClass} flex flex-wrap items-center gap-x-4 gap-y-2 hover:bg-sunken/60`}>
-                <span className="flex min-w-40 items-center gap-2 font-medium">
-                  <Avatar name={staffName.get(r.staff_id) ?? "?"} size="sm" />
-                  {staffName.get(r.staff_id)}
-                </span>
-                <span className="flex-1 text-sm">
-                  {describeTimeOff({ startsOn: r.starts_on, endsOn: r.ends_on, startMinute: r.start_minute, endMinute: r.end_minute, status: r.status, reason: r.reason })}
-                  {r.note && <span className="text-ink-muted"> · {r.note}</span>}
-                </span>
-                <form action={decideTimeOff.bind(null, r.id, "approved")}>
-                  <button type="submit" className={buttonClass("primary", "xs")}>
-                    Approve
-                  </button>
-                </form>
-                <form action={decideTimeOff.bind(null, r.id, "declined")}>
-                  <button type="submit" className={buttonClass("secondary", "xs")}>
-                    Decline
-                  </button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <Alert tone="info" className="mb-6">
+          {pending.data.length === 1 ? "1 time-off request is" : `${pending.data.length} time-off requests are`} waiting.{" "}
+          <Link href="/scheduling/requests" className={textLinkClass}>
+            Review requests
+          </Link>
+        </Alert>
       )}
 
       {seesEveryone && (
@@ -325,18 +301,9 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
                 </span>
                 <Badge tone={statusTone(t)}>{STATUS_LABELS[t.status]}</Badge>
                 {manager && t.status === "requested" && (
-                  <>
-                    <form action={decideTimeOff.bind(null, t.id!, "approved")}>
-                      <button type="submit" className={buttonClass("primary", "sm")}>
-                        Approve
-                      </button>
-                    </form>
-                    <form action={decideTimeOff.bind(null, t.id!, "declined")}>
-                      <button type="submit" className={buttonClass("secondary", "sm")}>
-                        Decline
-                      </button>
-                    </form>
-                  </>
+                  <Link href="/scheduling/requests" className={buttonClass("quiet", "sm")}>
+                    Review
+                  </Link>
                 )}
                 {(manager || (isSelf && t.status === "requested")) && (
                   <form action={deleteTimeOff.bind(null, t.id!)}>

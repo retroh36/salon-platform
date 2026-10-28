@@ -18,6 +18,7 @@ import { formatPrice } from "@/lib/services";
 import { periodContaining, previousPeriod, ratesText } from "@/lib/payroll";
 import { loadPayroll, loadPaySettings } from "@/lib/payroll-load";
 import Link from "next/link";
+import { buttonClass } from "@/components/ui/button";
 import { TipDetails } from "@/components/tip-details";
 import { GoalAlertCard, GoalCard } from "@/components/goals";
 import { AlertFrequencyPicker, GoalForm, RemoveGoal } from "@/components/goal-controls";
@@ -158,7 +159,17 @@ async function MyWeekSection({ supabase, me }: { supabase: Awaited<ReturnType<ty
   const [location, schedules] = await Promise.all([loadLocationSchedule(supabase, me.location), loadStaffSchedules(supabase, [me.id], today, end)]);
   const schedule = schedules.get(me.id)!;
   return (
-    <Section title="My week" titleId="my-week-heading" className="mt-10" data-testid="my-week">
+    <Section
+      title="My week"
+      titleId="my-week-heading"
+      className="mt-10"
+      data-testid="my-week"
+      actions={
+        <Link href="/time-off" className={buttonClass("quiet", "sm")}>
+          Ask for time off
+        </Link>
+      }
+    >
       <ol className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
         {datesBetween(today, end).map((date) => {
           const day = dayView(schedule, location, date);

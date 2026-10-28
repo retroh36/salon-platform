@@ -8,7 +8,7 @@ import { addInterval } from "@/lib/memberships";
 import { runMembershipBilling } from "@/lib/memberships-billing";
 import { loadMembershipRows } from "@/lib/memberships-load";
 import { membershipReport } from "@/lib/memberships";
-import { todayIn } from "@/lib/scheduling/time";
+import { addDays, fromLocal, todayIn } from "@/lib/scheduling/time";
 import { admin, createOtherSalon, SEED, signIn, type Client } from "./helpers";
 
 const B = SEED.business;
@@ -252,8 +252,10 @@ describe("billing", () => {
     const { membership: m } = await join(c, plans.club, "test_visa_0002");
     await dueToday(m.id);
     expect(await runMembershipBilling(admin, { membershipId: m.id })).toMatchObject({ failed: 1 });
-    // "Tomorrow" has come, but the run is a little earlier than the failure was.
-    await admin.from("client_memberships").update({ next_retry_at: new Date(Date.now() + 30 * 60_000).toISOString() }).eq("id", m.id);
+    // "Tomorrow" has come, but the run is a little earlier than the failure
+    // was: later today, never past the salon's midnight.
+    const endOfToday = fromLocal(addDays(todayIn(TZ), 1), 0, TZ)!.getTime() - 1000;
+    await admin.from("client_memberships").update({ next_retry_at: new Date(Math.min(Date.now() + 30 * 60_000, endOfToday)).toISOString() }).eq("id", m.id);
     expect(await runMembershipBilling(admin, { membershipId: m.id })).toMatchObject({ checked: 1, failed: 1 });
   });
 

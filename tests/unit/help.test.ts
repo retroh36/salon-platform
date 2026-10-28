@@ -80,6 +80,10 @@ describe("finding the page", () => {
     ["when am I working this week", "See my schedule"],
     ["how do I add a shampoo bowl", "Set up chairs and stations"],
     ["give Gil a home chair", "Set up chairs and stations"],
+    ["how do I ask for a day off", "Request time off"],
+    ["where do I approve vacation requests", "Approve time off"],
+    ["how do I decline a time off request", "Approve time off"],
+    ["how do I add blackout dates", "Set time-off rules"],
     ["how do I let someone use another stylist's chair", "Lend someone's chair for a day"],
   ])("%s → %s", (question, title) => {
     expect(searchHelp(pages, question)[0]?.title).toBe(title);

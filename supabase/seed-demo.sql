@@ -37,6 +37,32 @@ from d, lateral (values
    'personal', 'Long weekend', 'declined', 'd0000000-0000-4000-8000-000000000004', 'd0000000-0000-4000-8000-000000000001')
 ) as t (staff_id, starts_on, ends_on, start_minute, end_minute, reason, note, status, requested_by, decided_by);
 
+-- Time-off requests (Scheduling → Requests): Hannah asks for the coming
+-- Saturday, short notice with clients booked; Lois asks for a day in the
+-- salon's holiday blackout; Bridget's was declined with a reason.
+insert into public.time_off_blackouts (business_id, starts_on, ends_on, label)
+select 'b0000000-0000-4000-8000-000000000001', d.next_monday + 33, d.next_monday + 39, 'Holiday week'
+from (select (now() at time zone 'America/Chicago')::date
+             + (8 - extract(isodow from (now() at time zone 'America/Chicago')::date))::int as next_monday) d;
+
+with d as (
+  select (now() at time zone 'America/Chicago')::date as today,
+         (now() at time zone 'America/Chicago')::date
+           + (8 - extract(isodow from (now() at time zone 'America/Chicago')::date))::int as next_monday
+)
+insert into public.staff_time_off (business_id, staff_id, starts_on, ends_on, reason, note, status, requested_by, short_notice, in_blackout, created_at)
+select 'b0000000-0000-4000-8000-000000000001', t.staff_id::uuid, t.starts_on, t.starts_on, t.reason::public.time_off_reason, t.note, 'requested',
+       t.staff_id::uuid, t.short_notice, t.in_blackout, now() - interval '1 day'
+from d, lateral (values
+  ('d0000000-0000-4000-8000-000000000006', d.today + ((6 - extract(isodow from d.today)::int + 7) % 7 + case when extract(isodow from d.today) = 6 then 7 else 0 end), 'personal', 'Cousin''s wedding', true, false),
+  ('d0000000-0000-4000-8000-000000000010', d.next_monday + 36, 'vacation', 'Visiting family', false, true)
+) as t (staff_id, starts_on, reason, note, short_notice, in_blackout);
+
+update public.staff_time_off set short_notice = true
+where staff_id = 'd0000000-0000-4000-8000-000000000009' and status = 'requested' and note = 'Sister''s graduation';
+update public.staff_time_off set decline_reason = 'Saturday is fully booked. Could you take the Monday instead?'
+where staff_id = 'd0000000-0000-4000-8000-000000000004' and status = 'declined' and note = 'Long weekend';
+
 -- Nola covers a late Friday next week, 12:00 to 20:00 instead of 9 to 5.
 insert into public.staff_schedule_overrides (business_id, staff_id, on_date, start_minute, end_minute)
 select 'b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000007',

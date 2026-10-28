@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/page";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import { isLocalDate, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { isFrontOfHouse } from "@/lib/staff";
+import { countPendingRequests } from "@/lib/time-off-requests-load";
 import { loadWeekGrid } from "@/lib/team-schedule-load";
 import { SchedulingTabs } from "./scheduling-tabs";
 import { WeekGridView } from "./week-grid";
@@ -30,12 +31,15 @@ async function Scheduling({ searchParams }: Pick<PageProps<"/scheduling">, "sear
   const editable = canManage(me.role);
   const today = todayIn(me.location.timezone);
   const week = typeof params.week === "string" && isLocalDate(params.week) ? startOfWeek(params.week) : startOfWeek(today);
-  const grid = await loadWeekGrid(supabase, me.location, week, { drafts: editable });
+  const [grid, pending] = await Promise.all([
+    loadWeekGrid(supabase, me.location, week, { drafts: editable }),
+    editable ? countPendingRequests(supabase, me.location, today) : null,
+  ]);
 
   return (
     <AppShell section={editable ? "scheduling" : "team"} me={me} wide>
       <PageHeader title="Scheduling" description={editable ? "Plan the team's week, then publish it." : "The team's published schedule."} />
-      <SchedulingTabs current="team" />
+      <SchedulingTabs current="team" pending={pending} />
       <WeekGridView grid={grid} today={today} editable={editable} />
     </AppShell>
   );

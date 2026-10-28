@@ -3,13 +3,15 @@ import Link from "next/link";
 const TABS = [
   { value: "team", href: "/scheduling", label: "Team schedule" },
   { value: "floor", href: "/scheduling/floor", label: "Floor today" },
+  { value: "requests", href: "/scheduling/requests", label: "Requests" },
 ] as const;
 
-// Scheduling's pages, as links.
-export function SchedulingTabs({ current }: { current: (typeof TABS)[number]["value"] }) {
+// Scheduling's pages, as links. Requests are for owners and managers, with
+// how many are waiting.
+export function SchedulingTabs({ current, pending }: { current: (typeof TABS)[number]["value"]; pending?: number | null }) {
   return (
     <nav aria-label="Scheduling pages" className="mb-6 flex w-full max-w-xl gap-1 rounded-lg bg-sunken p-1">
-      {TABS.map((t) => (
+      {TABS.filter((t) => t.value !== "requests" || pending != null).map((t) => (
         <Link
           key={t.value}
           href={t.href}
@@ -19,6 +21,7 @@ export function SchedulingTabs({ current }: { current: (typeof TABS)[number]["va
           }`}
         >
           {t.label}
+          {t.value === "requests" && pending ? ` (${pending})` : ""}
         </Link>
       ))}
     </nav>
