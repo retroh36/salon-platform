@@ -26,10 +26,13 @@ function next(weekday: number): LocalDate {
 }
 // Sandra (Chair 4) doesn't work Saturdays or Mondays; Shae (Chair 5) works Saturdays.
 const saturday = next(6);
-const tuesday = next(2);
+// A Tuesday Sandra works: the first from a week out without demo time off.
+let tuesday = next(2);
 
 beforeAll(async () => {
   [manager, frontDesk, bridget] = await Promise.all([signIn("manager@mapleandash.test"), signIn("frontdesk@mapleandash.test"), signIn("bridget@mapleandash.test")]);
+  const { data: off } = await admin.from("staff_time_off").select("starts_on, ends_on").eq("staff_id", SEED.staff.sandra).eq("status", "approved");
+  while (off!.some((t) => t.starts_on <= tuesday && t.ends_on >= tuesday)) tuesday = addDays(tuesday, 7);
 });
 
 afterAll(async () => {

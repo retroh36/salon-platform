@@ -26,6 +26,7 @@ import { loadPolicy } from "@/lib/policy-load";
 import { repeatOffenders } from "@/lib/policy-report";
 import { scanDay, type Viewer } from "./scan";
 import { eventKnowledge } from "./events";
+import { teamKnowledge } from "./team";
 
 type Supabase = SupabaseClient<Database>;
 
@@ -59,6 +60,10 @@ export type Knowledge = {
   // collect on one (the front of house).
   events: (month: string) => Promise<unknown>;
   eventBalance: ((name: string) => Promise<unknown>) | null;
+  // The published team schedule: who's working when (everyone), and what
+  // giving someone a day off would leave (owners and managers).
+  team: (date: string, part: string) => Promise<unknown>;
+  dayOff: ((date: string, firstName: string) => Promise<unknown>) | null;
 };
 
 export type PolicyPeriod = "this_month" | "last_month" | "last_30_days";
@@ -122,6 +127,7 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
   };
 
   const events = eventKnowledge(supabase, { businessId: me.businessId, timezone: tz, money: frontOfHouse, today: me.today }, (d) => sayDate(d, me.today));
+  const team = teamKnowledge(supabase, me.location, (d) => sayDate(d, me.today), { manager: me.role === "owner" || me.role === "manager" });
 
   return {
     async clients(firstName) {
@@ -439,6 +445,8 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
 
     events: (month) => events.inMonth(month),
     eventBalance: frontOfHouse ? (name) => events.balance(name) : null,
+    team: (date, part) => team.working(date, part),
+    dayOff: team.dayOff,
 
     fixes: frontOfHouse
       ? async (date) => {

@@ -2,7 +2,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { answer, assistantTools, type AssistantContext } from "@/lib/denise/assistant";
 import { ANALYSIS_MODEL, CHAT_MODEL, claudeClient, converse, explainFixes, isConnected, modelFor, type ClaudeClient } from "@/lib/denise/claude";
-import type { Knowledge } from "@/lib/denise/knowledge";
+import type { CoverageWeek } from "@/lib/coverage-load";
+import { sayDate, type Knowledge } from "@/lib/denise/knowledge";
+import { dayOffFacts, teamFacts } from "@/lib/denise/team";
 import { DailyLimitReached, metered } from "@/lib/denise/usage";
 import { fromLocal, parseTime, type BookedItem, type BookingContext } from "@/lib/scheduling";
 
@@ -229,6 +231,8 @@ function knowledge(overrides: Partial<Knowledge> = {}): Knowledge & Record<strin
     packages: vi.fn(async () => ({ unused_value_dollars: 640, clients: [{ first_name: "Ava", uses_left: ["3 Blowout"] }] })),
     rewards: vi.fn(async () => ({ points_outstanding: 41_250, vips: { total: 3, clients: [{ first_name: "Linda", tier: "VIP" }] } })),
     policy: vi.fn(async (period: string) => ({ period, late_cancellations: 2, incidents: [{ first_name: "Liam", what: "Late cancellation" }] })),
+    team: vi.fn(async (date: string) => ({ date, working: [] })),
+    dayOff: vi.fn(async (date: string) => ({ date })),
     ...overrides,
   } as never;
 }
@@ -282,6 +286,48 @@ describe("Ask Denise's knowledge", () => {
     // The system prompt says numbers come from tools, and clients are never contacted.
     expect(String(requests[0].system)).toMatch(/Every number you mention must come from what you looked up/);
     expect(String(requests[0].system)).toMatch(/never contact clients or write messages to them/);
+  });
+
+  it("answers who's working Thursday night and whether Nola can have Friday off from our coverage math", async () => {
+    const H = (h: number) => h * 60;
+    const cell = (staffId: string, from: number | null, to = 0, clients = 0) => ({
+      staffId, shifts: from == null ? [] : [{ start: H(from), end: H(to) }], draft: false, timeOff: [], clients, bookedMinutes: H(clients), lentChair: null,
+    });
+    const week: CoverageWeek = {
+      people: [
+        { id: "sam", firstName: "Sam", role: "front_desk", level: null, chair: null },
+        { id: "gil", firstName: "Gil", role: "stylist", level: "master", chair: "Chair 1" },
+        { id: "nola", firstName: "Nola", role: "stylist", level: "senior", chair: "Chair 2" },
+      ],
+      days: [
+        { date: "2026-11-05", weekStart: "2026-11-02", open: [{ start: H(9), end: H(20) }], cells: [cell("sam", 12, 20), cell("gil", 9, 17), cell("nola", 12, 20)], requests: [] },
+        { date: "2026-11-06", weekStart: "2026-11-02", open: [{ start: H(9), end: H(20) }], cells: [cell("sam", 9, 20), cell("gil", 9, 20), cell("nola", 9, 17, 3)], requests: [] },
+      ],
+    };
+    const k = knowledge({
+      team: vi.fn(async (date: string, part: string) => teamFacts(week, date, part as never, (d) => sayDate(d, "2026-11-01"), { flags: true })),
+      dayOff: vi.fn(async (date: string, name: string) => dayOffFacts(week, date, name, (d) => sayDate(d, "2026-11-01"))),
+    });
+    const { client, requests } = fakeClient([
+      toolUse(["t1", "who_is_working", { date: "2026-11-05", part: "evening" }], ["t2", "day_off_check", { date: "2026-11-06", first_name: "nola" }]),
+      text("Sam and Nola are on Thursday night. Nola has 3 clients Friday, and Gil would be the only stylist left."),
+    ]);
+    await answer(client, context({ knowledge: k }), [{ role: "user", text: "Who's working Thursday night, and can I give Nola Friday off?" }]);
+    const [working, dayOff] = (requests[1].messages as { content: { content: string }[] }[]).at(-1)!.content.map((r) => JSON.parse(r.content));
+    expect(working).toEqual({
+      date: "Thu, Nov 5", part_of_day: "evening", salon_open: "9am–8pm",
+      working: [{ first_name: "Sam", role: "Front desk", level: null, hours: "noon–8pm" }, { first_name: "Nola", role: "Stylist", level: "Senior", hours: "noon–8pm" }],
+      // Sam starts at noon: what Denise flags for a manager.
+      flags: ["Nobody on the front desk 9am–noon on Thu, Nov 5."],
+    });
+    expect(dayOff).toMatchObject({ first_name: "Nola", date: "Fri, Nov 6", clients_booked_with_them: 3, stylists_left: 1, masters_left: 1, also_off: [], new_gaps_in_cover: [] });
+    // Gil's 11 hours take Nola's 3 booked.
+    expect(dayOff.stylists_booked_after_pct).toBe(27);
+    // Only owners and managers check a day off.
+    const desk = assistantTools(context({ knowledge: knowledge({ dayOff: null }) }));
+    expect(desk.tools.map((t) => t.name)).toContain("who_is_working");
+    expect(desk.tools.map((t) => t.name)).not.toContain("day_off_check");
+    expect(await desk.run("day_off_check", { date: "2026-11-06", first_name: "Nola" })).toBe("Checking a day off is for owners and managers.");
   });
 
   it("refuses sales to those who can't see them, even if asked for by name", async () => {

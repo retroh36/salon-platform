@@ -85,6 +85,8 @@ describe("finding the page", () => {
     ["how do I decline a time off request", "Approve time off"],
     ["can I swap my shift with a coworker", "Swap a shift"],
     ["where do I approve a shift swap", "Approve a shift swap"],
+    ["can Denise draft next month's schedule", "Check cover and draft a month with Denise"],
+    ["are we short staffed at the front desk", "Check cover and draft a month with Denise"],
     ["how do I add blackout dates", "Set time-off rules"],
     ["how do I let someone use another stylist's chair", "Lend someone's chair for a day"],
   ])("%s → %s", (question, title) => {

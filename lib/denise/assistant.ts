@@ -19,6 +19,7 @@ import { findOpenings } from "@/lib/scheduling/openings";
 import { formatMinute, fromLocal, isLocalDate, parseTime, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { converse, modelFor, VOICE, type ClaudeClient, type ConverseHooks, type ToolRunner } from "./claude";
 import { POLICY_PERIODS, SALES_PERIODS, type Knowledge, type PolicyPeriod, type SalesPeriod } from "./knowledge";
+import { PARTS } from "./team";
 import type { StaffRole } from "@/lib/staff";
 import type { BookingSuggestion, HelpLink } from "./types";
 import type { PageContext } from "./page";
@@ -142,7 +143,31 @@ const TOOLS: Anthropic.Tool[] = [
 const noInput = { type: "object" as const, properties: {}, required: [], additionalProperties: false as const };
 
 // Read-only lookups of what Denise has learned, and her fixes.
-const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes" | "giftCards" | "packages" | "rewards" | "policy" | "events" | "eventBalance", Anthropic.Tool> = {
+const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes" | "giftCards" | "packages" | "rewards" | "policy" | "events" | "eventBalance" | "team" | "dayOff", Anthropic.Tool> = {
+  team: {
+    name: "who_is_working",
+    description:
+      "Who's working on a day from the published team schedule (stylists, assistants, the front desk and managers), or in part of it: morning (before noon), afternoon (noon to 5pm), evening (\"night\": from 5pm) or all_day. Each person's first name, role, level and hours, and when the salon is open. For owners and managers, also anything Denise would flag that day: gaps at the front desk or on the floor, no Master stylist, two people on one chair, a time-off request on a busy day.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: { date: { type: "string", description: "YYYY-MM-DD." }, part: { type: "string", enum: PARTS } },
+      required: ["date", "part"],
+      additionalProperties: false,
+    },
+  },
+  dayOff: {
+    name: "day_off_check",
+    description:
+      "What giving one person the day off would leave, from the published schedule: whether they're working, how many of their clients are booked, who else is off, the stylists and Master stylists left, how booked the stylists left would be, whether they've asked for it, and any new gaps in cover. Owners and managers. It changes nothing: time off is approved in Scheduling, Requests.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: { date: { type: "string", description: "YYYY-MM-DD." }, first_name: { type: "string" } },
+      required: ["date", "first_name"],
+      additionalProperties: false,
+    },
+  },
   events: {
     name: "events_in_month",
     description:
@@ -432,6 +457,8 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
         ...(k.policy ? [KNOWLEDGE_TOOLS.policy] : []),
         KNOWLEDGE_TOOLS.events,
         ...(k.eventBalance ? [KNOWLEDGE_TOOLS.eventBalance] : []),
+        KNOWLEDGE_TOOLS.team,
+        ...(k.dayOff ? [KNOWLEDGE_TOOLS.dayOff] : []),
       ]
     : [];
 
@@ -478,6 +505,11 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
       case "event_balance":
         if (!k.eventBalance) return "Event payments are for the front desk, managers and owners.";
         return JSON.stringify(await k.eventBalance(String(input.name ?? "")));
+      case "who_is_working":
+        return JSON.stringify(await k.team(String(input.date ?? ""), String(input.part ?? "")));
+      case "day_off_check":
+        if (!k.dayOff) return "Checking a day off is for owners and managers.";
+        return JSON.stringify(await k.dayOff(String(input.date ?? ""), String(input.first_name ?? "")));
       case "propose_fixes": {
         if (!k.fixes) return "Only the front desk, managers and owners can approve fixes.";
         const date = dayOf(input.date);
@@ -553,6 +585,10 @@ export function toolStatus(name: string, input: unknown, c: Pick<AssistantContex
       return "Checking the event's payments…";
     case "how_to":
       return "Looking it up in the help guide…";
+    case "who_is_working":
+      return "Checking the team schedule…";
+    case "day_off_check":
+      return typeof i.first_name === "string" ? `Checking what ${i.first_name}'s day off would leave…` : "Checking the schedule…";
     default:
       return "Looking that up…";
   }
