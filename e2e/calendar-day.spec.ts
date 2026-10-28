@@ -111,11 +111,22 @@ test.describe("front desk", () => {
     await expect(block).toHaveAttribute("data-visit", "here");
 
     // Canceled behind the calendar's back: Undo check-in can't be saved, so
-    // it's put back as it was, and booking details says why.
+    // it's put back as it was, and booking details says why. The calendar
+    // hears of the change within a second and reloads, so its reloads (RSC
+    // requests) are held until the undo has been tried.
+    let reload = () => {};
+    const reloads = new Promise<void>((r) => (reload = r));
+    await page.route("**/calendar**", async (route) => {
+      if (route.request().method() === "GET" && route.request().headers()["rsc"]) await reloads;
+      await route.continue();
+    });
     await admin.from("appointments").update({ status: "canceled", canceled_at: new Date().toISOString(), cancel_reason: "Test" }).eq("id", id);
     await moreAction(details(page), "Undo check-in");
     await expect(details(page).getByRole("alert")).toBeVisible();
     await expect(block).toHaveAttribute("data-visit", "here");
+    // Held reloads go on once it's over (or are dropped as the page closes).
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    reload();
   });
 
   test("booking details: who and where it's at, the visit, tabs, and one main button with the rest under ⋯", async ({ page }) => {

@@ -70,11 +70,15 @@ export function withoutDismissed(f: BriefFacts, dismissed: ReadonlySet<string>):
 
 const shortName = (c: { first_name: string; last_name: string }) => `${c.first_name}${c.last_name ? ` ${firstLetter(c.last_name)}.` : ""}`;
 
+type Scanned = { conflicts: ConflictView[]; openings: WaitlistOpening[] };
+
 export async function briefFacts(
   supabase: Supabase,
   where: { businessId: string; location: { id: string; timezone: string } },
   date: LocalDate,
-  scan: { conflicts: ConflictView[]; openings: WaitlistOpening[] },
+  // Denise's scan of the day, which may still be running: only the last
+  // step needs it, so the brief's own reads go at the same time.
+  scanned: Scanned | PromiseLike<Scanned>,
 ): Promise<BriefFacts> {
   const tz = where.location.timezone;
   const [{ data: items, error }, insights, events] = await Promise.all([
@@ -104,42 +108,26 @@ export async function briefFacts(
   // Regulars due back (or overdue) with nothing booked, most overdue first.
   const due = [...insights].filter(([, c]) => (c.due === "overdue" || c.due === "due_soon") && c.visits >= 2).sort((a, b) => b[1].overdueDays - a[1].overdueDays);
   const topIds = due.slice(0, DUE_LISTED).map(([id]) => id);
-  const { data: names, error: nameError } = topIds.length ? await supabase.from("clients").select("id, first_name, last_name").in("id", topIds) : { data: [], error: null };
+  const serviceIds = [...new Set(items.map((i) => i.service_id))];
+  const clientIds = [...new Set([...firstItem.values()].flatMap((i) => (i.appointment.client ? [i.appointment.client.id] : [])))];
+  // Their names, stock for today's services and today's clients' credit, all at once.
+  const [{ data: names, error: nameError }, lowStock, packages, { data: cards, error: cardError }, scan] = await Promise.all([
+    topIds.length ? supabase.from("clients").select("id, first_name, last_name").in("id", topIds) : Promise.resolve({ data: [], error: null }),
+    lowStockFor(supabase, where.location.id, serviceIds),
+    loadPackagesByClient(supabase, clientIds),
+    clientIds.length
+      ? supabase.from("gift_cards").select("client_id, balance_cents, expires_at").in("client_id", clientIds).eq("status", "active").gt("balance_cents", 0)
+      : Promise.resolve({ data: [], error: null }),
+    scanned,
+  ]);
   if (nameError) throw nameError;
+  if (cardError) throw cardError;
   const nameOf = new Map(names.map((n) => [n.id, shortName(n)]));
   const top = due.slice(0, DUE_LISTED).flatMap(([id, c]: [string, ClientInsight]) =>
     nameOf.has(id) ? [{ clientId: id, client: nameOf.get(id)!, overdueDays: c.overdueDays, usualWeeks: c.intervalDays ? Math.round(c.intervalDays / 7) : null }] : [],
   );
 
-  // Stock below its reorder point that today's services use.
-  const serviceIds = [...new Set(items.map((i) => i.service_id))];
-  let lowStock: BriefFacts["lowStock"] = [];
-  if (serviceIds.length) {
-    const { data: recipes, error: recipeError } = await supabase.from("service_products").select("product_id").in("service_id", serviceIds);
-    if (recipeError) throw recipeError;
-    const productIds = [...new Set(recipes.map((r) => r.product_id))];
-    if (productIds.length) {
-      const { data: levels, error: levelError } = await supabase
-        .from("stock_levels")
-        .select("product_id, on_hand, reorder_point, product:products(brand, line, name)")
-        .eq("location_id", where.location.id)
-        .in("product_id", productIds);
-      if (levelError) throw levelError;
-      lowStock = levels
-        .filter((l) => Number(l.on_hand) < Number(l.reorder_point))
-        .map((l) => ({ productId: l.product_id, name: [l.product.brand, l.product.line, l.product.name].filter(Boolean).join(" ") }));
-    }
-  }
-
   // Credit: package uses left and gift card balances, for today's clients.
-  const clientIds = [...new Set([...firstItem.values()].flatMap((i) => (i.appointment.client ? [i.appointment.client.id] : [])))];
-  const [packages, { data: cards, error: cardError }] = await Promise.all([
-    loadPackagesByClient(supabase, clientIds),
-    clientIds.length
-      ? supabase.from("gift_cards").select("client_id, balance_cents, expires_at").in("client_id", clientIds).eq("status", "active").gt("balance_cents", 0)
-      : Promise.resolve({ data: [], error: null }),
-  ]);
-  if (cardError) throw cardError;
   const now = new Date();
   const credits = [...firstItem.values()].flatMap((i) => {
     const c = i.appointment.client;
@@ -162,6 +150,24 @@ export async function briefFacts(
     credits,
     events,
   };
+}
+
+// Stock below its reorder point that these services use.
+async function lowStockFor(supabase: Supabase, locationId: string, serviceIds: string[]): Promise<BriefFacts["lowStock"]> {
+  if (!serviceIds.length) return [];
+  const { data: recipes, error: recipeError } = await supabase.from("service_products").select("product_id").in("service_id", serviceIds);
+  if (recipeError) throw recipeError;
+  const productIds = [...new Set(recipes.map((r) => r.product_id))];
+  if (!productIds.length) return [];
+  const { data: levels, error: levelError } = await supabase
+    .from("stock_levels")
+    .select("product_id, on_hand, reorder_point, product:products(brand, line, name)")
+    .eq("location_id", locationId)
+    .in("product_id", productIds);
+  if (levelError) throw levelError;
+  return levels
+    .filter((l) => Number(l.on_hand) < Number(l.reorder_point))
+    .map((l) => ({ productId: l.product_id, name: [l.product.brand, l.product.line, l.product.name].filter(Boolean).join(" ") }));
 }
 
 // "3 Blowouts left on a package, $40 on a gift card"

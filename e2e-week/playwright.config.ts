@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { requireLocal } from "../scripts/local-only.ts";
 
 // The simulated week (npm run test:week): its own server and build folder,
 // apart from the browser tests (3100) and npm run dev (3000), since it
@@ -10,6 +11,9 @@ try {
 }
 // Never the real Claude API: Denise runs on template wording.
 delete process.env.ANTHROPIC_API_KEY;
+
+// Never a hosted database (scripts/local-only.ts).
+requireLocal("The week");
 // The week signs in for itself, on the default seed (no Harbor & Vine), so
 // the browser tests' saved sign-ins are left alone (e2e/fresh-auth.ts).
 process.env.E2E_NO_SAVED_SIGN_INS = "1";

@@ -28,6 +28,7 @@ import { chromium, type Browser, type BrowserContext, type Locator, type Page } 
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../lib/database.types.ts";
 import { addDays, fromLocal, startOfWeek, todayIn, toLocal, weekdayOf, type LocalDate } from "../lib/scheduling/time.ts";
+import { requireLocal } from "./local-only.ts";
 
 try {
   process.loadEnvFile(".env.local");
@@ -47,6 +48,8 @@ const ASK = "Who’s cancelled late this month?";
 // What to keep off the shots (there are no cookie banners).
 const HIDE = `[class*="animate-toast-in"], [data-testid$="-toast"], a[href^="/dev/outbox"] { display: none !important; } * { caret-color: transparent !important; }`;
 
+// It resets and reloads the database: only ever the local one.
+requireLocal("npm run screenshots");
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SECRET_KEY;
 if (!url || !key) {

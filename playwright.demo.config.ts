@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { requireLocal } from "./scripts/local-only.ts";
 
 // npm run test:demo: the public demo's own checks (e2e-demo/). Locally it
 // runs a server with DEMO_MODE=true on port 3400 (build folder .next-demo)
@@ -11,6 +12,9 @@ try {
 } catch {
   // Rely on the environment instead.
 }
+// Its cleanup and the local server only ever use the local database
+// (scripts/local-only.ts); DEMO_URL only says which site to check.
+requireLocal("The demo's checks");
 delete process.env.ANTHROPIC_API_KEY;
 
 const PORT = 3400;

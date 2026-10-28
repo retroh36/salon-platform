@@ -62,29 +62,35 @@ export async function openingsOn(a: DeniseAsker, date: LocalDate): Promise<Waitl
 export async function deniseDay(a: DeniseAsker, date: LocalDate, options: { brief?: boolean; onStep?: (text: string) => void } = {}): Promise<DeniseState> {
   const connected = isConnected();
   // Reorders she's drafted on the Inventory page, for those who order.
-  const reorders = canReceiveOrders(a.role)
-    ? (await suggestReorders(a.supabase, { location: a.viewer.location, canManage: false })).map((r) => ({
-        supplierId: r.supplierId,
-        supplier: r.supplier,
-        headline: r.headline,
-        lines: r.lines.length,
-        totalCents: r.totalCents,
-        items: r.lines.slice(0, 3).map((l) => ({ product: l.product, reason: l.reason })),
-      }))
-    : [];
+  const drafts = canReceiveOrders(a.role) ? suggestReorders(a.supabase, { location: a.viewer.location, canManage: false }) : Promise.resolve([]);
+  const reordersOf = (list: Awaited<typeof drafts>) =>
+    list.map((r) => ({
+      supplierId: r.supplierId,
+      supplier: r.supplier,
+      headline: r.headline,
+      lines: r.lines.length,
+      totalCents: r.totalCents,
+      items: r.lines.slice(0, 3).map((l) => ({ product: l.product, reason: l.reason })),
+    }));
   // Past days can't be changed, so there's nothing to fix.
-  if (date < a.today) return { date, conflicts: [], notices: [], reorders, openings: [], brief: null, connected };
+  if (date < a.today) return { date, conflicts: [], notices: [], reorders: reordersOf(await drafts), openings: [], brief: null, connected };
   const client = claudeFor(a.businessId, "explain_fixes");
-  const [state, openings, dismissed] = await Promise.all([
-    scanDay(a.supabase, a.viewer, date, { explain: client ? (facts) => explainFixes(client, facts) : null, onStep: options.onStep }),
-    a.viewer.canBook ? openingsOn(a, date) : Promise.resolve([]),
+  // Everything at once: the reorders, the scan, the openings and the brief
+  // (which waits for the scan only at its last step).
+  const scanned = scanDay(a.supabase, a.viewer, date, { explain: client ? (facts) => explainFixes(client, facts) : null, onStep: options.onStep });
+  const opened = a.viewer.canBook ? openingsOn(a, date) : Promise.resolve([]);
+  const wantsBrief = options.brief && date === a.today && a.viewer.canBook;
+  const [list, state, openings, dismissed, facts] = await Promise.all([
+    drafts,
+    scanned,
+    opened,
     a.viewer.canBook ? dismissedOn(a.supabase, a.viewer.location.id, date) : Promise.resolve(new Set<string>()),
+    wantsBrief
+      ? briefFacts(a.supabase, { businessId: a.businessId, location: a.viewer.location }, date, Promise.all([scanned, opened]).then(([s, o]) => ({ conflicts: s.conflicts, openings: o })))
+      : Promise.resolve(null),
   ]);
   const notices = state.notices.filter((n) => !dismissed.has(n.id));
   // The morning brief: today, for the front of house.
-  let brief: BriefFacts | null = null;
-  if (options.brief && date === a.today && a.viewer.canBook) {
-    brief = withoutDismissed(await briefFacts(a.supabase, { businessId: a.businessId, location: a.viewer.location }, date, { conflicts: state.conflicts, openings }), dismissed);
-  }
-  return { ...state, notices, reorders, openings, brief, connected };
+  const brief: BriefFacts | null = facts ? withoutDismissed(facts, dismissed) : null;
+  return { ...state, notices, reorders: reordersOf(list), openings, brief, connected };
 }

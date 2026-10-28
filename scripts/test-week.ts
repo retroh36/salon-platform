@@ -9,6 +9,14 @@
 
 import { execFileSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
+import { requireLocal } from "./local-only.ts";
+
+try {
+  process.loadEnvFile(".env.local");
+} catch {
+  // The shell's settings, then.
+}
+requireLocal("npm run test:week");
 
 if (!process.argv.includes("--yes")) {
   if (!process.stdin.isTTY) {

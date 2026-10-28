@@ -217,7 +217,8 @@ export async function loadDashboard(supabase: Supabase, me: DashboardMe, now = n
   const seesMoney = can(me, "reports");
   const viewer = { location: { id: me.location.id, timezone: tz }, salon: me.location.business?.name ?? "the salon", canBook: frontOfHouse };
 
-  const [visits, before, team, ctx, disruptions, insights, salon, denise, services] = await Promise.all([
+  const ownBook = !isFrontOfHouse(me.role);
+  const [visits, before, team, ctx, disruptions, insights, salon, denise, services, weekSales, entries] = await Promise.all([
     loadVisits(supabase, me.location, today),
     loadVisits(supabase, me.location, lastWeek),
     loadTeam(supabase, me.location.id),
@@ -228,11 +229,14 @@ export async function loadDashboard(supabase: Supabase, me: DashboardMe, now = n
     // With the morning brief, from our own numbers (no Claude call).
     deniseDay({ supabase, role: me.role, businessId: me.business_id, viewer, today }, today, { brief: true }),
     supabase.from("services").select("id", { count: "exact", head: true }).is("archived_at", null),
+    seesMoney
+      ? Promise.all([salesBetween(supabase, { location: viewer.location }, weekStart, today), salesBetween(supabase, { location: viewer.location }, addDays(weekStart, -7), lastWeek)])
+      : Promise.resolve(null),
+    ownBook ? Promise.resolve([]) : loadWaitlist(supabase, me.location.id, today),
   ]);
   const stylistIds = team.map((s) => s.id);
   const names = new Map(team.map((s) => [s.id, s.first_name]));
   const book = bookOf(me);
-  const ownBook = !isFrontOfHouse(me.role);
   const mine = (v: DayVisit) => !ownBook || v.staffId === book;
   const scopeIds = ownBook ? [book] : stylistIds;
 
@@ -257,11 +261,8 @@ export async function loadDashboard(supabase: Supabase, me: DashboardMe, now = n
     today: date === today,
   }));
   let sales: DashboardData["week"]["sales"] = null;
-  if (seesMoney) {
-    const [thisWeek, lastWeekSales] = await Promise.all([
-      salesBetween(supabase, { location: viewer.location }, weekStart, today),
-      salesBetween(supabase, { location: viewer.location }, addDays(weekStart, -7), lastWeek),
-    ]);
+  if (weekSales) {
+    const [thisWeek, lastWeekSales] = weekSales;
     sales = { thisWeek: thisWeek.total_dollars, lastWeek: lastWeekSales.total_dollars, through: WEEKDAY_SHORT[days.findIndex((d) => d.today)] };
   }
 
@@ -332,7 +333,6 @@ export async function loadDashboard(supabase: Supabase, me: DashboardMe, now = n
 
   // Opportunities: overdue regulars, gaps worth filling (with waitlist
   // matches), and stock that upcoming services need.
-  const entries = await loadWaitlist(supabase, me.location.id, today);
   const gaps = [...gapsWorthFilling(ctx, stylistIds, today, nowMinute).sort((a, b) => a.start - b.start), ...gapsWorthFilling(ctx, stylistIds, tomorrow).sort((a, b) => a.start - b.start)]
     .slice(0, 3)
     .map((g) => {

@@ -1,6 +1,7 @@
 import path from "node:path";
 import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
+import { requireLocal } from "./scripts/local-only.ts";
 
 export default defineConfig(({ mode }) => ({
   resolve: {
@@ -10,7 +11,9 @@ export default defineConfig(({ mode }) => ({
     // Loads .env, .env.local, .env.test, .env.test.local into process.env:
     // only the Supabase settings tests need. Other secrets in .env.local
     // (e.g. Phorest credentials) stay out of the test process.
-    env: loadEnv(mode, process.cwd(), ["NEXT_PUBLIC_SUPABASE_", "SUPABASE_"]),
+    // Never a hosted database (scripts/local-only.ts: every setting in
+    // those files is checked, though only these reach the tests).
+    env: localEnv(mode, loadEnv(mode, process.cwd(), ["NEXT_PUBLIC_SUPABASE_", "SUPABASE_"])),
     projects: [
       { extends: true, test: { name: "unit", include: ["tests/unit/**/*.test.ts"] } },
       // Needs local Supabase running with the demo data loaded (npm run seed:demo).
@@ -37,3 +40,8 @@ export default defineConfig(({ mode }) => ({
     ],
   },
 }));
+
+function localEnv(mode: string, env: Record<string, string>): Record<string, string> {
+  requireLocal("The tests", loadEnv(mode, process.cwd(), ""));
+  return env;
+}

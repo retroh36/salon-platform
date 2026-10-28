@@ -64,29 +64,31 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
   // An assistant follows the stylist they assist (read-only: the stylist
   // taps their own times).
   const book = me.role === "assistant" ? me.assists_staff_id : me.id;
-  const { data: stylist } = book && book !== me.id ? await supabase.from("staff").select("first_name").eq("id", book).maybeSingle() : { data: null };
-  const { data, error } = await supabase
-    .from("appointment_items")
-    .select(
-      "id, appointment_id, starts_at, active_minutes, processing_minutes, finishing_minutes, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name), appointment:appointments!inner(status, client:clients(first_name, last_name))",
-    )
-    .eq("staff_id", book ?? me.id)
-    .eq("location_id", me.location.id)
-    .gte("starts_at", startOfLocalDay(today, tz).toISOString())
-    .lt("starts_at", startOfLocalDay(addDays(today, 1), tz).toISOString())
-    .not("appointment.status", "in", "(canceled)")
-    .order("starts_at");
+  // The stylist they assist, today's services and their notices, all at once.
+  const [{ data: stylist }, { data, error }, { data: notices }] = await Promise.all([
+    book && book !== me.id ? supabase.from("staff").select("first_name").eq("id", book).maybeSingle() : Promise.resolve({ data: null }),
+    supabase
+      .from("appointment_items")
+      .select(
+        "id, appointment_id, starts_at, active_minutes, processing_minutes, finishing_minutes, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name), appointment:appointments!inner(status, client:clients(first_name, last_name))",
+      )
+      .eq("staff_id", book ?? me.id)
+      .eq("location_id", me.location.id)
+      .gte("starts_at", startOfLocalDay(today, tz).toISOString())
+      .lt("starts_at", startOfLocalDay(addDays(today, 1), tz).toISOString())
+      .not("appointment.status", "in", "(canceled)")
+      .order("starts_at"),
+    // Notices for them in the app: unread, newest first.
+    supabase
+      .from("notifications")
+      .select("id, body, created_at")
+      .eq("staff_id", me.id)
+      .eq("channel", "app")
+      .is("read_at", null)
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
   if (error) throw error;
-
-  // Notices for them in the app: unread, newest first.
-  const { data: notices } = await supabase
-    .from("notifications")
-    .select("id, body, created_at")
-    .eq("staff_id", me.id)
-    .eq("channel", "app")
-    .is("read_at", null)
-    .order("created_at", { ascending: false })
-    .limit(20);
 
   const visits = data.map((i) => ({ ...i, minutes: i.active_minutes + i.processing_minutes + i.finishing_minutes }));
   const counted = visits.filter((i) => i.appointment.status !== "no_show").map((i) => ({ appointmentId: i.appointment_id, minutes: i.minutes }));

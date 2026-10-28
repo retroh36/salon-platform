@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { requireLocal } from "./scripts/local-only.ts";
 
 // Supabase URL and keys, for the tests' cleanup client.
 try {
@@ -8,6 +9,9 @@ try {
 }
 // Tests never call the real Claude API: Denise runs on template wording.
 delete process.env.ANTHROPIC_API_KEY;
+
+// Never a hosted database (scripts/local-only.ts).
+requireLocal("The browser tests");
 
 // Its own server, apart from `npm run dev` on 3000 (which may have the API
 // key), with its own build folder. A production build by default: the dev

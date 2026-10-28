@@ -7,6 +7,7 @@
 # never data.
 # Needs local Supabase running (npx supabase start).
 set -euo pipefail
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/require-local.ts "npm run backup:drill"
 
 CONTAINER="${SUPABASE_DB_CONTAINER:-supabase_db_salon-platform}"
 SCHEMAS="public private auth storage"
