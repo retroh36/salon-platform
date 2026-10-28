@@ -39,11 +39,11 @@ test.describe("owners and managers", () => {
     await sheet.getByLabel(/shift 1 starts/).fill("13:00");
     await sheet.getByLabel(/shift 1 ends/).fill("20:00");
     // A split shift that overlaps is refused before saving.
-    await sheet.getByRole("button", { name: "+ Add a split shift" }).click();
+    await sheet.getByRole("button", { name: "+ Add split shift" }).click();
     await sheet.getByLabel(/shift 2 starts/).fill("19:00");
     await expect(sheet.getByRole("alert")).toContainText("overlap");
     await sheet.getByRole("button", { name: "Remove shift 2" }).click();
-    await sheet.getByRole("button", { name: "Save to draft" }).click();
+    await sheet.getByRole("button", { name: "Save" }).click();
     await expect(sheet).toHaveCount(0);
     await expect(grid(page)).toContainText("Draft · 1 change");
     await expect(grid(page).locator(`[data-staff="${SEED.staff.gil}"][data-date="${wednesday}"]`)).toHaveAttribute("data-draft", "true");
@@ -70,25 +70,29 @@ test.describe("owners and managers", () => {
     expect(notice!.body).toContain("1pm–8pm (was 10am–7pm)");
   });
 
-  test("drag a shift later, then copy and clear the week as drafts", async ({ page }) => {
+  test("drag a shift to another day, nudge one with the keyboard, then copy and clear the week as drafts", async ({ page }) => {
     await page.goto(`/scheduling?week=${week}`);
     await waitForHydration(page, "[data-testid=team-schedule] button[data-shift]");
-    const bar = grid(page).locator(`[data-staff="${SEED.staff.gil}"][data-date="${wednesday}"] [data-shift]`).first();
-    const box = (await bar.boundingBox())!;
-    const track = (await grid(page).locator(`[data-staff="${SEED.staff.gil}"][data-date="${wednesday}"]`).boundingBox())!;
+    const draftOf = async (date: string) => (await admin.from("schedule_drafts").select("shifts").eq("staff_id", SEED.staff.gil).eq("on_date", date).maybeSingle()).data?.shifts;
+    // Gil's Wednesday onto his Tuesday off: the same hours, a day earlier.
+    const tuesday = addDays(week, 1);
+    const pill = grid(page).locator(`[data-staff="${SEED.staff.gil}"][data-date="${wednesday}"] [data-shift]`).first();
+    const box = (await pill.boundingBox())!;
+    const to = (await grid(page).locator(`[data-staff="${SEED.staff.gil}"][data-date="${tuesday}"]`).boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
-    // About an hour along the track.
-    await page.mouse.move(box.x + box.width / 2 + track.width / 14, box.y + box.height / 2, { steps: 8 });
+    await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
     await page.mouse.up();
-    await expect(grid(page)).toContainText("Draft · 1 change");
-    // Later by whole quarter hours, the same length.
-    await expect
-      .poll(async () => {
-        const shifts = (await admin.from("schedule_drafts").select("shifts").eq("staff_id", SEED.staff.gil).eq("on_date", wednesday).maybeSingle()).data?.shifts as { start: number; end: number }[] | undefined;
-        return shifts && shifts.length === 1 && shifts[0].start > 10 * 60 && shifts[0].start % 15 === 0 && shifts[0].end - shifts[0].start === 9 * 60;
-      })
-      .toBe(true);
+    await expect(grid(page)).toContainText("Draft · 2 changes");
+    await expect.poll(() => draftOf(tuesday)).toEqual([{ start: 600, end: 1140 }]);
+    await expect.poll(() => draftOf(wednesday)).toEqual([]);
+    await ui(page).getByRole("button", { name: "Discard changes" }).click();
+    await expect(grid(page)).toContainText("Follows everyone");
+
+    // The arrow keys move it by a quarter hour.
+    await grid(page).locator(`[data-staff="${SEED.staff.gil}"][data-date="${wednesday}"] [data-shift]`).first().focus();
+    await page.keyboard.press("ArrowRight");
+    await expect.poll(() => draftOf(wednesday)).toEqual([{ start: 615, end: 1155 }]);
 
     await ui(page).getByRole("button", { name: "Discard changes" }).click();
     await expect(grid(page)).toContainText("Follows everyone");

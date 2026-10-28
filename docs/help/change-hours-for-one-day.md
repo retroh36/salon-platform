@@ -9,14 +9,14 @@ Give a team member different hours on one date, such as a late shift, an extra d
 
 1. In the sidebar, tap **Scheduling**.
 2. Go to the week with the arrows.
-3. Tap the day in the person's row.
-4. Change the times, tap **+ Add a split shift** for a second part, or **Day off**.
-5. Tap **Save to draft**.
+3. Tap the shift, or the empty day, in the person's row. A small box opens beside it.
+4. Change the times, tap **+ Add split shift** for a second part, or **Day off**.
+5. Tap **Save**.
 6. Tap **Publish week**, then **Publish and tell**.
 
 ## Good to know
 
-- Nothing changes for the calendar or online booking until the week is published.
+- Nothing changes for the calendar or online booking until the week is published. Then every open calendar shows the new hours within a few seconds.
 - The change shows as **Changed hours** on the person's Schedule page.
 - To undo it, open the day again, tap **Back to published** or set their usual hours, and publish.
 - If clients are booked outside the new hours you'll be warned, with a link to move them.

@@ -36,49 +36,39 @@ import { DayEditor } from "./day-editor";
 import { PatternEditor } from "./pattern-editor";
 import { PublishSheet } from "./publish-sheet";
 
-// A shift's times, short enough for a bar: "9–5", "9:30–1".
+// A shift's times, short enough for a pill but always both ends: "9–5",
+// "9:30–1".
 const short = (m: number) => {
   const h = Math.floor(m / 60) % 12 || 12;
   return m % 60 ? `${h}:${String(m % 60).padStart(2, "0")}` : String(h);
 };
-const barText = (s: Shift) => `${short(s.start)}–${short(s.end)}`;
+const pillText = (s: Shift) => `${short(s.start)}–${short(s.end)}`;
 // A day's total, to the nearest hour: "54 hr".
 const hours = (m: number) => (m < 30 ? "0 hr" : formatDuration(Math.round(m / 60) * 60));
+// Approved time off in a day: "Time off" when it covers the day's hours,
+// else "Off 2–6".
+const offText = (t: Shift, day: Shift[]) => (day.length === 0 || day.every((d) => t.start <= d.start && t.end >= d.end) ? "Time off" : `Off ${pillText(t)}`);
 
-// The times on a bar; a narrow one shows when it starts.
-function BarText({ shift }: { shift: Shift }) {
-  return (
-    <>
-      <span aria-hidden className="hidden @[2.75rem]:inline">
-        {barText(shift)}
-      </span>
-      <span aria-hidden className="@[2.75rem]:hidden">
-        {short(shift.start)}
-      </span>
-    </>
-  );
-}
-
+// A shift being dragged to another day in its row.
 type Drag = {
   staffId: string;
   date: LocalDate;
   index: number;
-  mode: "move" | "start" | "end";
   x0: number;
-  width: number;
+  y0: number;
   moved: boolean;
-  // The preview: the day it'd land on and that day's shifts, and the
-  // source day's shifts once it's left.
+  // The day under the pointer, and both days' shifts if it's dropped there.
   target: LocalDate;
   preview: Shift[] | null;
   source: Shift[] | null;
 };
 
 // The team's week: a row per person (stylists, assistants, front desk,
-// then owners and managers with hours), a column per day, shifts as bars on
-// each day's track. Owners and managers click a day to edit it, drag a bar
-// to move it (to another day too) or its ends to resize it; every change
-// goes to the week's draft until they publish. Everyone else sees what's
+// then owners and managers with hours), a column per day, each day's shifts
+// as pills with their times, side by side (stacked when there's no room).
+// Owners and managers click a shift or an empty day to edit it in a
+// popover, or drag a shift onto another day in the row; every change goes
+// to the week's draft until they publish. Everyone else sees what's
 // published, read-only.
 export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today: LocalDate; editable: boolean }) {
   const router = useRouter();
@@ -88,7 +78,7 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
     setBase(grid);
     setCells(new Map(grid.cells.map((c) => [cellKey(c.staffId, c.date), c])));
   }
-  const [editing, setEditing] = useState<Cell | null>(null);
+  const [editing, setEditing] = useState<{ cell: Cell; anchor: HTMLElement } | null>(null);
   const [pattern, setPattern] = useState<GridPerson | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [notice, setNotice] = useState<{ tone: "error" | "success"; text: string; moves?: { label: string; href: string }[] } | null>(null);
@@ -98,7 +88,6 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
 
   const all = [...cells.values()];
   const range = trackRange(Object.values(grid.open).flat(), all.flatMap(shown));
-  const span = range.end - range.start;
   const changes = changesOf(all);
   const canEdit = (date: LocalDate) => editable && date >= today;
 
@@ -133,57 +122,45 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
     });
   }
 
-  // Dragging: the pointer's move along the track, in minutes, and the day
-  // under it.
-  function onPointerDown(e: React.PointerEvent, cell: Cell, index: number, mode: Drag["mode"]) {
+  // Dragging a shift onto another day in the row; a press without moving
+  // opens it.
+  function onPointerDown(e: React.PointerEvent, cell: Cell, index: number) {
     if (!canEdit(cell.date) || e.button !== 0) return;
     e.stopPropagation();
-    const track = (e.currentTarget as HTMLElement).closest("[data-cell]") as HTMLElement;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    const d: Drag = { staffId: cell.staffId, date: cell.date, index, mode, x0: e.clientX, width: track.getBoundingClientRect().width, moved: false, target: cell.date, preview: null, source: null };
+    const d: Drag = { staffId: cell.staffId, date: cell.date, index, x0: e.clientX, y0: e.clientY, moved: false, target: cell.date, preview: null, source: null };
     dragRef.current = d;
     setDrag(d);
   }
   function onPointerMove(e: React.PointerEvent) {
     const d = dragRef.current;
     if (!d) return;
-    const dx = e.clientX - d.x0;
-    if (!d.moved && Math.abs(dx) < 4) return;
-    const cell = cells.get(cellKey(d.staffId, d.date))!;
-    const shifts = shown(cell);
-    let target = d.date;
-    if (d.mode === "move") {
-      const over = document.elementsFromPoint(e.clientX, e.clientY).find((el) => (el as HTMLElement).dataset?.cell !== undefined) as HTMLElement | undefined;
-      if (over?.dataset.staff === d.staffId && over.dataset.date && canEdit(over.dataset.date)) target = over.dataset.date;
-    }
-    const delta = (dx / d.width) * span;
-    let preview: Shift[] | null;
-    let source: Shift[] | null = null;
-    if (target === d.date) {
-      preview = dragShift(shifts, d.index, d.mode, target === d.date ? delta : 0, range);
-    } else {
-      const moved = dragShift([shifts[d.index]], 0, "move", 0, range)![0];
-      preview = dropOnDay(shown(cells.get(cellKey(d.staffId, target))!), moved);
-      source = shifts.filter((_, i) => i !== d.index);
-    }
-    const next = { ...d, moved: true, target, preview, source };
+    if (!d.moved && Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 4) return;
+    const shifts = shown(cells.get(cellKey(d.staffId, d.date))!);
+    const over = document.elementsFromPoint(e.clientX, e.clientY).find((el) => (el as HTMLElement).dataset?.cell !== undefined) as HTMLElement | undefined;
+    const target = over?.dataset.staff === d.staffId && over.dataset.date && canEdit(over.dataset.date) ? over.dataset.date : d.date;
+    const next: Drag =
+      target === d.date
+        ? { ...d, moved: true, target, preview: null, source: null }
+        : { ...d, moved: true, target, preview: dropOnDay(shown(cells.get(cellKey(d.staffId, target))!), shifts[d.index]), source: shifts.filter((_, i) => i !== d.index) };
     dragRef.current = next;
     setDrag(next);
   }
-  function onPointerUp(cell: Cell) {
+  function onPointerUp(e: React.PointerEvent, cell: Cell) {
     const d = dragRef.current;
     dragRef.current = null;
     setDrag(null);
     if (!d) return;
     if (!d.moved) {
-      setEditing(cell);
+      setEditing({ cell, anchor: e.currentTarget as HTMLElement });
       return;
     }
+    if (d.target === d.date) return;
     if (!d.preview) {
       setNotice({ tone: "error", text: "That shift doesn't fit there." });
       return;
     }
-    save(d.target === d.date ? [{ staffId: d.staffId, date: d.date, shifts: d.preview }] : [
+    save([
       { staffId: d.staffId, date: d.date, shifts: d.source ?? [] },
       { staffId: d.staffId, date: d.target, shifts: d.preview },
     ]);
@@ -195,13 +172,10 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
     if (next) save([{ staffId: cell.staffId, date: cell.date, shifts: next }]);
   }
 
-  const shiftsIn = (cell: Cell): Shift[] => {
-    if (drag?.moved && drag.staffId === cell.staffId) {
-      if (drag.target === cell.date && drag.preview) return drag.preview;
-      if (drag.date === cell.date && drag.source) return drag.source;
-    }
-    return shown(cell);
-  };
+  // While a shift is dragged, the day under the pointer shows where it'd
+  // go; its own day keeps it (faded), so the pill being held stays put.
+  const shiftsIn = (cell: Cell): Shift[] => (drag?.moved && drag.staffId === cell.staffId && drag.target !== drag.date && drag.target === cell.date && drag.preview ? drag.preview : shown(cell));
+  const held = (cell: Cell, i: number) => Boolean(drag?.moved && drag.staffId === cell.staffId && drag.date === cell.date && drag.index === i && drag.target !== drag.date);
 
   const drafts = changes.length;
   const status = drafts ? (
@@ -295,7 +269,7 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
                 <div key={d} role="columnheader" className={`border-b border-l border-line px-3 py-2.5 ${d === today ? "bg-active-soft" : ""}`} data-day={d}>
                   <p className={`text-sm font-semibold ${d === today ? "text-active-ink" : "text-ink"}`}>{formatDay(d)}</p>
                   {closed ? (
-                    <p className="text-xs text-ink-muted">Salon closed</p>
+                    <p className="text-xs text-ink-muted">Closed</p>
                   ) : (
                     <p className="text-xs text-ink-muted tabular-nums" data-testid="day-totals">
                       <span className="block">{hours(totals.scheduled)} scheduled</span>
@@ -362,91 +336,80 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
                           data-staff={p.id}
                           data-date={cell.date}
                           data-draft={draft || undefined}
-                          className={`relative h-14 border-b border-l border-line ${closed ? "bg-off-hours" : ""} ${drag?.moved && drag.staffId === p.id && drag.target === cell.date ? "bg-active-soft/60" : ""}`}
+                          data-closed={closed || undefined}
+                          className={`relative min-w-0 border-b border-l border-line ${drag?.moved && drag.staffId === p.id && drag.target === cell.date ? "bg-active-soft/60" : ""}`}
                         >
                           {editableDay && (
                             <button
                               type="button"
                               className="absolute inset-0 rounded-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus hover:bg-sunken/60"
                               aria-label={`Edit ${p.firstName}'s hours on ${formatDay(cell.date)}: ${sayShifts(shown(cell))}`}
-                              onClick={() => setEditing(cell)}
+                              onClick={(e) => setEditing({ cell, anchor: e.currentTarget })}
                             />
                           )}
-                          {/* Approved time off: a hatched strip under the shifts, where it falls. */}
-                          {cell.timeOff.map((t, i) => {
-                            const start = Math.max(t.start, range.start);
-                            const end = Math.min(t.end, range.end);
-                            return end > start ? (
-                              <span
-                                key={`off-${i}`}
-                                aria-hidden
-                                title="Approved time off"
-                                data-testid="time-off"
-                                className="pointer-events-none absolute bottom-1 h-1.5 rounded-full bg-[repeating-linear-gradient(135deg,var(--color-ink-subtle)_0_2px,transparent_2px_5px)]"
-                                style={{ left: `${((start - range.start) / span) * 100}%`, width: `${((end - start) / span) * 100}%` }}
-                              />
-                            ) : null;
-                          })}
-                          {cell.timeOff.length > 0 && <span className="sr-only">Approved time off</span>}
-                          {grid.lentChairs[cellKey(cell.staffId, cell.date)] && (
-                            <span className="pointer-events-none absolute bottom-0.5 left-1.5 z-[2] text-[11px] leading-3 font-medium text-active-ink" data-testid="lent-chair">
-                              {grid.lentChairs[cellKey(cell.staffId, cell.date)]}
-                            </span>
-                          )}
-                          {shifts.length === 0 && !closed && !editableDay && <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-xs text-ink-subtle">Off</span>}
-                          {shifts.map((s, i) => {
-                            const label = `${p.firstName}, ${formatDay(cell.date)}, ${formatMinute(s.start)}–${formatMinute(s.end)}${draft ? ", draft" : ""}`;
-                            const style = { left: `${((s.start - range.start) / span) * 100}%`, width: `${((s.end - s.start) / span) * 100}%` };
-                            const barClass = `@container absolute top-2.5 flex h-8 items-center justify-center overflow-hidden rounded-md border px-0.5 text-xs font-medium tabular-nums whitespace-nowrap ${
-                              draft ? "border-dashed border-active bg-active-soft text-active-ink" : "border-navy-200 bg-navy-100 text-navy-900"
-                            }`;
-                            return editableDay ? (
-                              <button
-                                key={i}
-                                type="button"
-                                aria-label={label}
-                                title={label}
-                                data-shift
-                                className={`${barClass} z-[1] cursor-grab touch-none select-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus active:cursor-grabbing`}
-                                style={style}
-                                onPointerDown={(e) => onPointerDown(e, cell, i, "move")}
-                                onPointerMove={onPointerMove}
-                                onPointerUp={() => onPointerUp(cell)}
-                                onPointerCancel={() => {
-                                  dragRef.current = null;
-                                  setDrag(null);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Escape" && dragRef.current) {
+                          {/* The day's shifts as pills, left to right (wrapping
+                              when there's no room); the cell's own button
+                              shows through the gaps. */}
+                          <div className={`pointer-events-none relative flex min-h-14 flex-wrap content-center items-center gap-1 py-1.5 pl-1.5 ${left.length ? "pr-5" : "pr-1.5"}`}>
+                            {shifts.map((s, i) => {
+                              const label = `${p.firstName}, ${formatDay(cell.date)}, ${formatMinute(s.start)}–${formatMinute(s.end)}${draft ? ", draft" : ""}`;
+                              const pillClass = `inline-flex h-7 max-w-full min-w-0 items-center rounded-md border px-2 text-xs font-medium tabular-nums whitespace-nowrap ${
+                                draft ? "border-dashed border-active bg-active-soft text-active-ink" : "border-navy-200 bg-navy-100 text-navy-900"
+                              }`;
+                              const text = (
+                                <span aria-hidden className="truncate">
+                                  {pillText(s)}
+                                </span>
+                              );
+                              return editableDay ? (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  aria-label={label}
+                                  title={label}
+                                  data-shift
+                                    className={`${pillClass} ${held(cell, i) ? "opacity-40" : ""} pointer-events-auto cursor-grab touch-none select-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus active:cursor-grabbing`}
+                                  onPointerDown={(e) => onPointerDown(e, cell, i)}
+                                  onPointerMove={onPointerMove}
+                                  onPointerUp={(e) => onPointerUp(e, cell)}
+                                  onPointerCancel={() => {
                                     dragRef.current = null;
                                     setDrag(null);
-                                  } else onKeyDown(e, cell, i);
-                                }}
-                                onClick={(e) => {
-                                  // Keyboard Enter or Space (the pointer opens it on release).
-                                  if (e.detail === 0) setEditing(cell);
-                                }}
-                              >
-                                <span
-                                  aria-hidden
-                                  className="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize"
-                                  data-edge="start"
-                                  onPointerDown={(e) => onPointerDown(e, cell, i, "start")}
-                                />
-                                <BarText shift={s} />
-                                <span
-                                  aria-hidden
-                                  className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize"
-                                  data-edge="end"
-                                  onPointerDown={(e) => onPointerDown(e, cell, i, "end")}
-                                />
-                              </button>
-                            ) : (
-                              <span key={i} className={barClass} style={style} title={label} data-shift>
-                                <BarText shift={s} />
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Escape" && dragRef.current) {
+                                      dragRef.current = null;
+                                      setDrag(null);
+                                    } else onKeyDown(e, cell, i);
+                                  }}
+                                  onClick={(e) => {
+                                    // Keyboard Enter or Space (the pointer opens it on release).
+                                    if (e.detail === 0) setEditing({ cell, anchor: e.currentTarget });
+                                  }}
+                                >
+                                  {text}
+                                </button>
+                              ) : (
+                                <span key={i} className={pillClass} title={label} data-shift>
+                                  {text}
+                                </span>
+                              );
+                            })}
+                            {/* Approved time off: a small tag, never on a day the salon's closed. */}
+                            {!closed &&
+                              cell.timeOff.map((t, i) => (
+                                <span key={`off-${i}`} title="Approved time off" data-testid="time-off" className="inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 px-1 text-xs text-ink-muted">
+                                  <span aria-hidden className="size-3 shrink-0 rounded-sm bg-[repeating-linear-gradient(135deg,var(--color-ink-subtle)_0_2px,transparent_2px_4px)]" />
+                                  <span className="truncate">{offText(t, grid.open[cell.date])}</span>
+                                </span>
+                              ))}
+                            {grid.lentChairs[cellKey(cell.staffId, cell.date)] && (
+                              <span className="inline-flex h-7 max-w-full min-w-0 items-center px-1 text-[11px] font-medium text-active-ink" data-testid="lent-chair">
+                                <span className="truncate">{grid.lentChairs[cellKey(cell.staffId, cell.date)]}</span>
                               </span>
-                            );
-                          })}
+                            )}
+                            {shifts.length === 0 && cell.timeOff.length === 0 && !closed && !editableDay && <span className="px-1.5 text-xs text-ink-subtle">Off</span>}
+                          </div>
                           {left.length > 0 && (
                             <span
                               className="pointer-events-none absolute top-1 right-1 z-[2] text-warning"
@@ -471,20 +434,25 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
       </div>
       <p className="mt-2 text-xs text-ink-muted">
         {editable
-          ? "Dashed shifts are drafts: nobody sees them until you publish the week. Drag a shift to move it, or its ends to change its times."
+          ? "Dashed shifts are drafts: nobody sees them until you publish the week. Click a shift or a day to change it, or drag a shift onto another day."
           : "Shows the published schedule."}
-        {" "}Scheduled is shifts less approved time off (hatched); booked is time with clients.
+        {" "}Scheduled is shifts less approved time off; booked is time with clients.
       </p>
 
       {editing && (
         <DayEditor
-          key={cellKey(editing.staffId, editing.date)}
-          cell={cells.get(cellKey(editing.staffId, editing.date)) ?? editing}
-          person={grid.people.find((p) => p.id === editing.staffId)!}
-          open={grid.open[editing.date] ?? []}
+          key={cellKey(editing.cell.staffId, editing.cell.date)}
+          anchor={editing.anchor}
+          cell={cells.get(cellKey(editing.cell.staffId, editing.cell.date)) ?? editing.cell}
+          person={grid.people.find((p) => p.id === editing.cell.staffId)!}
+          open={grid.open[editing.cell.date] ?? []}
           pending={pending}
           onClose={() => setEditing(null)}
-          onSave={(shifts) => save([{ staffId: editing.staffId, date: editing.date, shifts }], () => setEditing(null))}
+          onSave={(shifts) => {
+            const { staffId, date } = editing.cell;
+            setEditing(null);
+            save([{ staffId, date, shifts }]);
+          }}
         />
       )}
       {pattern && <PatternEditor person={pattern} week={grid.week} onClose={() => setPattern(null)} />}
@@ -494,12 +462,16 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
           people={grid.people}
           pending={pending}
           onClose={() => setPublishing(false)}
-          onPublish={() =>
+          onPublish={(moveClients) =>
             start(async () => {
               const r = await publishWeek(grid.week);
               setPublishing(false);
               if (!r.ok) setNotice({ tone: "error", text: r.message });
-              else {
+              else if (moveClients && r.moves.length) {
+                // The rest stay listed here for when they come back.
+                setNotice({ tone: "success", text: r.message, moves: r.moves });
+                router.push(r.moves[0].href);
+              } else {
                 setNotice({ tone: "success", text: r.message, moves: r.moves });
                 router.refresh();
               }

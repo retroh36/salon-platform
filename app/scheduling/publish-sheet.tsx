@@ -9,8 +9,10 @@ import { sayShifts, type Change } from "@/lib/team-schedule";
 import type { GridPerson } from "@/lib/team-schedule-load";
 
 // What publishing the week changes, person by person, and the clients the
-// new hours leave outside them (moved afterwards with the Mark out panel).
-export function PublishSheet({ changes, people, pending, onClose, onPublish }: { changes: Change[]; people: GridPerson[]; pending: boolean; onClose: () => void; onPublish: () => void }) {
+// new hours leave outside them. With clients in the way it never just
+// publishes: the choice is to publish and move them now (the Mark out
+// panel opens on the first day) or to publish and move them later.
+export function PublishSheet({ changes, people, pending, onClose, onPublish }: { changes: Change[]; people: GridPerson[]; pending: boolean; onClose: () => void; onPublish: (moveClients: boolean) => void }) {
   const byPerson = people.map((p) => ({ person: p, changes: changes.filter((c) => c.staffId === p.id) })).filter((g) => g.changes.length);
   const affected = changes.reduce((n, c) => n + c.affected.length, 0);
   return (
@@ -41,16 +43,27 @@ export function PublishSheet({ changes, people, pending, onClose, onPublish }: {
         </ul>
         {affected > 0 && (
           <Alert tone="warning">
-            {affected} {affected === 1 ? "client is" : "clients are"} booked outside the new hours. Publishing doesn&rsquo;t move them: after publishing, use the links to move them with the Mark out panel.
+            {affected} {affected === 1 ? "client is" : "clients are"} booked outside the new hours. Publishing doesn&rsquo;t move anyone: move them now with the Mark out panel, or later from the links after publishing.
           </Alert>
         )}
         <div className="flex justify-end gap-2 border-t border-line pt-4">
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button disabled={pending} onClick={onPublish}>
-            Publish and tell {byPerson.length} {byPerson.length === 1 ? "person" : "people"}
-          </Button>
+          {affected > 0 ? (
+            <>
+              <Button variant="secondary" disabled={pending} onClick={() => onPublish(false)}>
+                Publish, move them later
+              </Button>
+              <Button disabled={pending} onClick={() => onPublish(true)}>
+                Publish and move {affected === 1 ? "the client" : `${affected} clients`}
+              </Button>
+            </>
+          ) : (
+            <Button disabled={pending} onClick={() => onPublish(false)}>
+              Publish and tell {byPerson.length} {byPerson.length === 1 ? "person" : "people"}
+            </Button>
+          )}
         </div>
       </div>
     </Sheet>

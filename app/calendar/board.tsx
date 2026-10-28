@@ -26,6 +26,7 @@ import { LEVEL_LABELS, STAFF_LEVELS } from "@/lib/schedule-forms";
 import { BLOCK_LABELS } from "@/lib/scheduling/blocks";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, toLocal } from "@/lib/scheduling/time";
+import { useCalendarChanges } from "@/components/live-calendar";
 import { calendarStamp, changeVisitStatus, type ClientOption, moveGroupVisit, saveCalendarZoom, moveVisitItem, moveVisitItemScoped, undoVisitCheckIn, undoVisitNoShow } from "./actions";
 import type { Scope } from "@/lib/scheduling/series";
 import { moveBlock } from "./block-actions";
@@ -339,8 +340,12 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const lastPointer = useRef({ x: 0, y: 0 });
 
   // Loads the day again when the calendar changes elsewhere (another desk,
-  // or a client booking online): checks every 20 seconds while the tab is
-  // in view, and when it comes back into view. Never mid-drag.
+  // a client booking online, a published week, approved time off): at once
+  // when Realtime says the location's calendar moved, when the tab comes
+  // back into view or gets focus, and every 20 seconds in case the
+  // connection dropped. Never mid-drag.
+  const checkStamp = useRef<() => void>(() => {});
+  useCalendarChanges(data.locationId, () => checkStamp.current());
   useEffect(() => {
     let stopped = false;
     const check = async () => {
@@ -349,8 +354,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
       const now = await calendarStamp().catch(() => null);
       if (!stopped && now && now !== data.stamp) router.refresh();
     };
+    checkStamp.current = check;
     const timer = window.setInterval(check, LIVE_CHECK_MS);
-    document.addEventListener("visibilitychange", check);
     // And once whenever new data arrives: a reload that started before a
     // save can land after the save's own, putting the old day back, and
     // this loads the saved one again at once rather than 20 seconds on.
@@ -358,7 +363,6 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     return () => {
       stopped = true;
       window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", check);
     };
   }, [data.stamp, router]);
   // A drag ends with a click on the block; this stops it opening the panel.

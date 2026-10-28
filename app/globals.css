@@ -175,18 +175,22 @@
   /* Motion: quick, so nothing feels slow */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-settle: cubic-bezier(0.34, 1.4, 0.64, 1);
-  --animate-panel-in: panel-in 200ms var(--ease-out) both;
-  --animate-fade-in: fade-in 150ms var(--ease-out) both;
-  --animate-settle: settle 250ms var(--ease-settle) both;
-  --animate-pop-in: pop-in 150ms var(--ease-out) both;
-  --animate-toast-in: toast-in 250ms var(--ease-out) both;
+  /* Entrances fill backwards, never forwards: an animation that keeps its
+     last transform makes the element hold one for good, and anything fixed
+     inside it (a sheet's backdrop, a popover) is then placed in that box
+     instead of the window. */
+  --animate-panel-in: panel-in 200ms var(--ease-out) backwards;
+  --animate-fade-in: fade-in 150ms var(--ease-out) backwards;
+  --animate-settle: settle 250ms var(--ease-settle) backwards;
+  --animate-pop-in: pop-in 150ms var(--ease-out) backwards;
+  --animate-toast-in: toast-in 250ms var(--ease-out) backwards;
   --animate-glow: glow 1.6s ease-in-out infinite;
   --animate-soft-bounce: soft-bounce 900ms var(--ease-out) 3;
   --animate-breathe: breathe 1.4s ease-in-out infinite alternate;
-  --animate-step-in: step-in 250ms var(--ease-out) both;
+  --animate-step-in: step-in 250ms var(--ease-out) backwards;
   --animate-skeleton: skeleton 1.2s ease-in-out infinite alternate;
-  --animate-grow-up: grow-up 400ms var(--ease-out) both;
-  --animate-ticket-in: ticket-in 900ms var(--ease-out) both;
+  --animate-grow-up: grow-up 400ms var(--ease-out) backwards;
+  --animate-ticket-in: ticket-in 900ms var(--ease-out) backwards;
 
   @keyframes panel-in {
     from {

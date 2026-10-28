@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { CloseIcon } from "./icons";
+import { portalRoot } from "./popover";
 
 // A modal panel over the page: centered on wide screens, from the bottom
 // on narrow ones. Escape or a tap outside closes it (and Escape goes no
-// further, so it never also leaves the page). Focus moves into it.
+// further, so it never also leaves the page). Focus moves into it. Drawn at
+// the top of the page's main area (`portalRoot`), so nothing inside the
+// page can hold it in a smaller box: it always covers the whole window.
 export function Sheet({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -14,7 +18,7 @@ export function Sheet({ title, onClose, children, wide = false }: { title: strin
     (first ?? panel.current)?.focus();
     return () => previous?.focus?.();
   }, []);
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[70] flex animate-fade-in items-end justify-center bg-navy-900/30 sm:items-center sm:p-6"
       onPointerDown={(e) => {
@@ -50,6 +54,7 @@ export function Sheet({ title, onClose, children, wide = false }: { title: strin
         </div>
         <div className="min-h-0 overflow-y-auto p-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    portalRoot(),
   );
 }

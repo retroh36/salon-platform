@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
+import { LiveRefresh } from "@/components/live-calendar";
 import { PageHeader } from "@/components/ui/page";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import { isLocalDate, startOfWeek, todayIn } from "@/lib/scheduling/time";
@@ -48,6 +49,8 @@ async function Scheduling({ searchParams }: Pick<PageProps<"/scheduling">, "sear
       <PageHeader title="Scheduling" description={editable ? "Plan the team's week, then publish it." : "The team's published schedule."} />
       <SchedulingTabs current="team" pending={pending} />
       {editable && <DeniseSchedule flags={flags} draft={draft} monthName={nextMonth(today).name} />}
+      {/* The front desk's published week follows a publish without a reload. */}
+      {!editable && <LiveRefresh locationId={me.location.id} />}
       <WeekGridView grid={grid} today={today} editable={editable} />
     </AppShell>
   );

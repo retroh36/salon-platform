@@ -483,6 +483,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       : null;
   const data: BoardData = {
     stamp,
+    locationId: me.location.id,
     focus: {
       staffId: typeof params.staff === "string" && isUuid(params.staff) ? params.staff : null,
       denise: params.denise === "1",

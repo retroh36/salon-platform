@@ -8,7 +8,7 @@ import { newShift, type Shift } from "@/lib/team-schedule";
 
 // A day's shifts as time fields: a start and end for each, a second for a
 // split shift (up to 4), and none for a day off.
-export function ShiftsField({ label, shifts, open, onChange }: { label: string; shifts: Shift[]; open: Shift[]; onChange: (shifts: Shift[]) => void }) {
+export function ShiftsField({ label, shifts, open, onChange, compact = false }: { label: string; shifts: Shift[]; open: Shift[]; onChange: (shifts: Shift[]) => void; compact?: boolean }) {
   const set = (i: number, edge: "start" | "end", value: string) => {
     const m = parseTime(value);
     if (m == null) return;
@@ -25,7 +25,7 @@ export function ShiftsField({ label, shifts, open, onChange }: { label: string; 
             type="time"
             step={300}
             aria-label={`${label}: shift ${i + 1} starts`}
-            className={`${fieldClass} w-32`}
+            className={`${fieldClass} ${compact ? "w-28" : "w-32"}`}
             value={minuteToTime(s.start)}
             onChange={(e) => set(i, "start", e.target.value)}
           />
@@ -34,7 +34,7 @@ export function ShiftsField({ label, shifts, open, onChange }: { label: string; 
             type="time"
             step={300}
             aria-label={`${label}: shift ${i + 1} ends`}
-            className={`${fieldClass} w-32`}
+            className={`${fieldClass} ${compact ? "w-28" : "w-32"}`}
             value={minuteToTime(s.end === 1440 ? 1439 : s.end)}
             onChange={(e) => set(i, "end", e.target.value)}
           />
@@ -46,7 +46,7 @@ export function ShiftsField({ label, shifts, open, onChange }: { label: string; 
       <div className="flex flex-wrap gap-1">
         {next && (
           <Button variant="quiet" size="sm" className="-ml-3" onClick={() => onChange([...shifts, next])}>
-            {shifts.length ? "+ Add a split shift" : "+ Add a shift"}
+            {shifts.length ? "+ Add split shift" : "+ Add a shift"}
           </Button>
         )}
         {shifts.length > 0 && (

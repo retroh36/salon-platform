@@ -212,6 +212,8 @@ export type BoardData = {
   initialView: ViewKey;
   // See loadCalendarStamp: the board reloads when it changes.
   stamp: string;
+  // The location whose calendar changes it listens for (useCalendarChanges).
+  locationId: string;
   // What a link asked to show (from the Dashboard): a stylist's column,
   // Denise's panel, a booking, or a question for Denise.
   // book: "Book" on a client's profile (`?book=`), a new booking for them.

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
+import { LiveRefresh } from "@/components/live-calendar";
 import { ServiceTimer } from "@/components/service-timer";
 import { StatusChip } from "@/components/ui/status-chip";
 import { EmptyState, PageHeader, Section } from "@/components/ui/page";
@@ -92,9 +93,12 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
 
   return (
     <AppShell section="my-day" me={me}>
+      {/* A published week, approved time off or a booking shows here without a reload. */}
+      <LiveRefresh locationId={me.location.id} />
       <PageHeader title="My day" description={`${stylist ? `${stylist.first_name}'s day, ` : ""}${formatLongDay(today, false)} · ${bookedSummary(counted)}`} />
       <div className="max-w-2xl">
-      <Notices notices={(notices ?? []).map((n) => ({ id: n.id, body: n.body, when: noticeTime(new Date(n.created_at), tz, today) }))} />
+      {/* Keyed by what's in it, so a new notice arriving live shows. */}
+      <Notices key={(notices ?? []).map((n) => n.id).join()} notices={(notices ?? []).map((n) => ({ id: n.id, body: n.body, when: noticeTime(new Date(n.created_at), tz, today) }))} />
       {me.role === "assistant" ? (
         <p className="mb-4 text-sm text-ink-muted" data-testid="assisting">
           {stylist ? `You're assisting ${stylist.first_name}: here's their day, as it's booked.` : "You're not assigned to a stylist yet. Ask a manager to choose one on your Team page."}
