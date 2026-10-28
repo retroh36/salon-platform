@@ -24,6 +24,7 @@ function why(ctx: BookingContext, problems: readonly BookingProblem[], stylist: 
     if (p.code === "staff_blocked") return `That's during ${stylist}'s ${BLOCK_WORDS[p.kind] ?? "blocked time"}.`;
     if (p.code === "staff_unavailable") return `${stylist} isn't working then.`;
     if (p.code === "resource_in_use" || p.code === "no_free_resource") return "No chair is free then.";
+    if (p.code === "room_needed") return "No room is free then.";
   }
   return "That time doesn't work.";
 }
@@ -38,7 +39,7 @@ export function bookingIdeas(
   names: ReadonlyMap<string, string>,
   notBefore?: Date,
 ): BookingIdeas | null {
-  const TIME = new Set(["staff_double_booked", "staff_blocked", "staff_unavailable", "resource_in_use", "no_free_resource"]);
+  const TIME = new Set(["staff_double_booked", "staff_blocked", "staff_unavailable", "resource_in_use", "no_free_resource", "room_needed"]);
   const line = problems.findIndex((p) => p.some((x) => TIME.has(x.code)));
   if (line < 0) return null;
   const { serviceId, staffId, startMinute } = lines[line];

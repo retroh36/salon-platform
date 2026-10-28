@@ -15,7 +15,8 @@
 //      Processing time is free time: another client can be booked into it,
 //      as long as that client's busy time fits in the gap, and
 //   6. the resource, if any, isn't used by another item at any point,
-//      processing included (the client is still in the chair).
+//      processing included (the client is still in the chair), and
+//   7. a service done in a room (facials, treatments) is in a room.
 
 import { isAvailable, type LocationSchedule, type StaffSchedule, type Unavailable } from "./availability.ts";
 import type { TimeBlockKind } from "./blocks.ts";
@@ -82,7 +83,7 @@ function overlaps(a: Span, b: Span): boolean {
   return a.start < b.end && b.start < a.end;
 }
 
-export type BookingService = ServiceTiming & { id: string; archived: boolean };
+export type BookingService = ServiceTiming & { id: string; archived: boolean; needsRoom?: boolean };
 export type BookingStaff = {
   id: string;
   isActive: boolean;
@@ -91,7 +92,7 @@ export type BookingStaff = {
   // The stylist's own length for a service, where it differs from the menu.
   timings?: ReadonlyMap<string, ServiceTiming>;
 };
-export type ResourceKind = "chair" | "room" | "station";
+export type ResourceKind = "chair" | "color_bar" | "shampoo" | "room" | "station";
 export type BookingResource = { id: string; isActive: boolean; kind?: ResourceKind; sortOrder?: number };
 
 // One day of a stylist's blocked time (lunch, a meeting…), as instants.
@@ -106,6 +107,14 @@ export type BookingContext = {
   booked: readonly BookedItem[];
   // Blocked time: the stylist's busy time can't overlap it.
   blocks?: readonly BlockedTime[];
+  // Whose chair is whose: each stylist's home chair, and chairs lent for a
+  // shift. Booking puts a client in their stylist's chair when it's free.
+  chairs?: ChairMap;
+};
+
+export type ChairMap = {
+  home: ReadonlyMap<string, string>;
+  lent: readonly { resourceId: string; staffId: string; start: Date; end: Date }[];
 };
 
 export type ItemRequest = {
@@ -136,6 +145,8 @@ export type BookingProblem =
   | { code: "resource_inactive" }
   | { code: "resource_in_use"; conflictWith?: string }
   | { code: "no_free_resource" }
+  // A service done in a room, and no room is free (or it isn't in one).
+  | { code: "room_needed" }
   | { code: "not_booked" }
   // The salon requires a valid patch test for this service.
   | { code: "patch_test"; state: Exclude<PatchState, "ok"> };
@@ -212,6 +223,7 @@ export function checkItem(
     const resourceConflict = others.find((o) => o.resourceId === item.resourceId && overlaps(resourceSpan(o), span));
     if (resourceConflict) problems.push({ code: "resource_in_use", conflictWith: resourceConflict.id });
   }
+  if (service.needsRoom && (item.resourceId == null || ctx.resources.get(item.resourceId)?.kind !== "room")) problems.push({ code: "room_needed" });
 
   return problems.length ? { valid: false, problems } : { valid: true, item };
 }
@@ -272,11 +284,49 @@ export function pickResource(
   const span = resourceSpan(item);
   const isFree = (id: string) => ctx.resources.get(id)?.isActive && !others.some((o) => o.resourceId === id && overlaps(resourceSpan(o), span));
 
+  const byOrder = (kind: ResourceKind) => [...ctx.resources.values()].filter((r) => r.kind === kind).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  // A service done in a room only ever goes in a room.
+  if (ctx.services.get(item.serviceId)?.needsRoom) {
+    if (preferred && ctx.resources.get(preferred)?.kind === "room" && isFree(preferred)) return preferred;
+    return byOrder("room").find((r) => isFree(r.id))?.id ?? null;
+  }
   if (preferred && isFree(preferred)) return preferred;
-  const chairs = [...ctx.resources.values()]
-    .filter((r) => r.kind === "chair")
-    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-  return chairs.find((r) => isFree(r.id))?.id ?? null;
+  // The stylist's own chair first, then chairs nobody else has then, then
+  // anyone's.
+  const own = chairOf(ctx, item.staffId, item.start);
+  if (own && isFree(own)) return own;
+  const chairs = byOrder("chair");
+  const theirs = (id: string) => chairHolder(ctx, id, item.start, item.staffId) !== null;
+  return (chairs.find((r) => !theirs(r.id) && isFree(r.id)) ?? chairs.find((r) => isFree(r.id)))?.id ?? null;
+}
+
+// The chair a stylist works from at a moment: one lent to them then, else
+// their home chair (unless it's lent to someone else then).
+export function chairOf(ctx: BookingContext, staffId: string, at: Date): string | null {
+  const map = ctx.chairs;
+  if (!map) return null;
+  const t = at.getTime();
+  const lent = map.lent.find((l) => l.staffId === staffId && l.start.getTime() <= t && t < l.end.getTime());
+  if (lent) return lent.resourceId;
+  const home = map.home.get(staffId) ?? null;
+  if (home && map.lent.some((l) => l.resourceId === home && l.start.getTime() <= t && t < l.end.getTime())) return null;
+  return home;
+}
+
+// Someone other than `except` whose chair it is at that moment: lent to
+// them, or their home chair while they're working.
+function chairHolder(ctx: BookingContext, resourceId: string, at: Date, except: string): string | null {
+  const map = ctx.chairs;
+  if (!map) return null;
+  const t = at.getTime();
+  const lent = map.lent.find((l) => l.resourceId === resourceId && l.start.getTime() <= t && t < l.end.getTime());
+  if (lent) return lent.staffId === except ? null : lent.staffId;
+  for (const [staffId, home] of map.home) {
+    if (home !== resourceId || staffId === except) continue;
+    const staff = ctx.staff.get(staffId);
+    if (staff && isAvailable(staff.schedule, ctx.location, at, 1).available) return staffId;
+  }
+  return null;
 }
 
 // Checks the items of one appointment together: each against the calendar
@@ -374,6 +424,8 @@ export function describeProblem(problem: BookingProblem): string {
       return "That chair or room is already in use then.";
     case "no_free_resource":
       return "Every chair is in use then.";
+    case "room_needed":
+      return "This service needs a room, and none is free then.";
     case "not_booked":
       return "That appointment is no longer on the calendar.";
     case "patch_test":

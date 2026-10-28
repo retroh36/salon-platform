@@ -329,14 +329,14 @@ isOneToOne: false
                   ]
                 },"businesses": {
                   Row: {
-                    "ai_daily_token_limit": number,"auto_lock_minutes": number,"cash_float_cents": number,"created_at": string,"discount_max_percent": number,"discount_roles": (Database["public"]['Enums']["staff_role"])[],"free_text_roles": (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months": number | null,"gift_card_presets_cents": (number)[],"google_review_url": string | null,"id": string,"logo_path": string | null,"name": string,"next_sale_number": number,"patch_test_enforcement": string,"patch_test_min_hours": number,"patch_test_valid_days": number,"pay_period": string,"pay_period_anchor": string,"plan": string,"promo_card_expiry_days": number,"receipt_footer": string | null,"receipt_show_stylists": boolean,"settings": NonNullable<Json>,"slug": string | null,"tax_rate_retail_bp": number,"tax_rate_services_bp": number,"updated_at": string,"yelp_url": string | null
+                    "ai_daily_token_limit": number,"auto_lock_minutes": number,"cash_float_cents": number,"created_at": string,"discount_max_percent": number,"discount_roles": (Database["public"]['Enums']["staff_role"])[],"free_text_roles": (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months": number | null,"gift_card_presets_cents": (number)[],"google_review_url": string | null,"id": string,"logo_path": string | null,"name": string,"next_sale_number": number,"patch_test_enforcement": string,"patch_test_min_hours": number,"patch_test_valid_days": number,"pay_period": string,"pay_period_anchor": string,"plan": string,"promo_card_expiry_days": number,"receipt_footer": string | null,"receipt_show_stylists": boolean,"settings": NonNullable<Json>,"slug": string | null,"tax_rate_retail_bp": number,"tax_rate_services_bp": number,"time_off_notice_days": number,"updated_at": string,"yelp_url": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "ai_daily_token_limit"?: number,"auto_lock_minutes"?: number,"cash_float_cents"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"free_text_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_presets_cents"?: (number)[],"google_review_url"?: string | null,"id"?: string,"logo_path"?: string | null,"name": string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"pay_period"?: string,"pay_period_anchor"?: string,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"updated_at"?: string,"yelp_url"?: string | null
+                    "ai_daily_token_limit"?: number,"auto_lock_minutes"?: number,"cash_float_cents"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"free_text_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_presets_cents"?: (number)[],"google_review_url"?: string | null,"id"?: string,"logo_path"?: string | null,"name": string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"pay_period"?: string,"pay_period_anchor"?: string,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"time_off_notice_days"?: number,"updated_at"?: string,"yelp_url"?: string | null
                   }
                   Update: {
-                    "ai_daily_token_limit"?: number,"auto_lock_minutes"?: number,"cash_float_cents"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"free_text_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_presets_cents"?: (number)[],"google_review_url"?: string | null,"id"?: string,"logo_path"?: string | null,"name"?: string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"pay_period"?: string,"pay_period_anchor"?: string,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"updated_at"?: string,"yelp_url"?: string | null
+                    "ai_daily_token_limit"?: number,"auto_lock_minutes"?: number,"cash_float_cents"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"free_text_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_presets_cents"?: (number)[],"google_review_url"?: string | null,"id"?: string,"logo_path"?: string | null,"name"?: string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"pay_period"?: string,"pay_period_anchor"?: string,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"time_off_notice_days"?: number,"updated_at"?: string,"yelp_url"?: string | null
                   }
                   Relationships: [
                     
@@ -2585,14 +2585,14 @@ isOneToOne: false
                   ]
                 },"resources": {
                   Row: {
-                    "business_id": string,"created_at": string,"id": string,"is_active": boolean,"kind": Database["public"]['Enums']["resource_kind"],"location_id": string,"name": string,"sort_order": number,"updated_at": string
+                    "area": string | null,"business_id": string,"created_at": string,"id": string,"is_active": boolean,"kind": Database["public"]['Enums']["resource_kind"],"location_id": string,"name": string,"sort_order": number,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"created_at"?: string,"id"?: string,"is_active"?: boolean,"kind": Database["public"]['Enums']["resource_kind"],"location_id": string,"name": string,"sort_order"?: number,"updated_at"?: string
+                    "area"?: string | null,"business_id": string,"created_at"?: string,"id"?: string,"is_active"?: boolean,"kind": Database["public"]['Enums']["resource_kind"],"location_id": string,"name": string,"sort_order"?: number,"updated_at"?: string
                   }
                   Update: {
-                    "business_id"?: string,"created_at"?: string,"id"?: string,"is_active"?: boolean,"kind"?: Database["public"]['Enums']["resource_kind"],"location_id"?: string,"name"?: string,"sort_order"?: number,"updated_at"?: string
+                    "area"?: string | null,"business_id"?: string,"created_at"?: string,"id"?: string,"is_active"?: boolean,"kind"?: Database["public"]['Enums']["resource_kind"],"location_id"?: string,"name"?: string,"sort_order"?: number,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -3155,14 +3155,14 @@ isOneToOne: false
                   ]
                 },"services": {
                   Row: {
-                    "active_minutes": number,"archived_at": string | null,"business_id": string,"category": string,"created_at": string,"deposit_amount": number,"deposit_kind": Database["public"]['Enums']["deposit_kind"],"description": string | null,"duration_minutes": number | null,"finishing_minutes": number,"id": string,"name": string,"online_booking": Database["public"]['Enums']["online_service_mode"],"price_cents": number,"processing_minutes": number,"requires_patch_test": boolean,"updated_at": string
+                    "active_minutes": number,"archived_at": string | null,"business_id": string,"category": string,"created_at": string,"deposit_amount": number,"deposit_kind": Database["public"]['Enums']["deposit_kind"],"description": string | null,"duration_minutes": number | null,"finishing_minutes": number,"id": string,"name": string,"needs_room": boolean,"online_booking": Database["public"]['Enums']["online_service_mode"],"price_cents": number,"processing_minutes": number,"requires_patch_test": boolean,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "active_minutes": number,"archived_at"?: string | null,"business_id": string,"category": string,"created_at"?: string,"deposit_amount"?: number,"deposit_kind"?: Database["public"]['Enums']["deposit_kind"],"description"?: string | null,"duration_minutes"?: never,"finishing_minutes"?: number,"id"?: string,"name": string,"online_booking"?: Database["public"]['Enums']["online_service_mode"],"price_cents": number,"processing_minutes"?: number,"requires_patch_test"?: boolean,"updated_at"?: string
+                    "active_minutes": number,"archived_at"?: string | null,"business_id": string,"category": string,"created_at"?: string,"deposit_amount"?: number,"deposit_kind"?: Database["public"]['Enums']["deposit_kind"],"description"?: string | null,"duration_minutes"?: never,"finishing_minutes"?: number,"id"?: string,"name": string,"needs_room"?: boolean,"online_booking"?: Database["public"]['Enums']["online_service_mode"],"price_cents": number,"processing_minutes"?: number,"requires_patch_test"?: boolean,"updated_at"?: string
                   }
                   Update: {
-                    "active_minutes"?: number,"archived_at"?: string | null,"business_id"?: string,"category"?: string,"created_at"?: string,"deposit_amount"?: number,"deposit_kind"?: Database["public"]['Enums']["deposit_kind"],"description"?: string | null,"duration_minutes"?: never,"finishing_minutes"?: number,"id"?: string,"name"?: string,"online_booking"?: Database["public"]['Enums']["online_service_mode"],"price_cents"?: number,"processing_minutes"?: number,"requires_patch_test"?: boolean,"updated_at"?: string
+                    "active_minutes"?: number,"archived_at"?: string | null,"business_id"?: string,"category"?: string,"created_at"?: string,"deposit_amount"?: number,"deposit_kind"?: Database["public"]['Enums']["deposit_kind"],"description"?: string | null,"duration_minutes"?: never,"finishing_minutes"?: number,"id"?: string,"name"?: string,"needs_room"?: boolean,"online_booking"?: Database["public"]['Enums']["online_service_mode"],"price_cents"?: number,"processing_minutes"?: number,"requires_patch_test"?: boolean,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -3221,14 +3221,14 @@ isOneToOne: false
                   ]
                 },"staff": {
                   Row: {
-                    "assists_staff_id": string | null,"business_id": string,"calendar_position": number | null,"calendar_zoom": string,"color": string | null,"created_at": string,"email": string | null,"event_roles": (string)[],"first_name": string,"goal_alert_seen_on": string | null,"goal_alerts": string,"hours_cycle_starts_on": string | null,"hours_cycle_weeks": number,"id": string,"is_active": boolean,"last_name": string,"level": Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone": string | null,"photo_path": string | null,"role": Database["public"]['Enums']["staff_role"],"updated_at": string,"user_id": string | null
+                    "assists_staff_id": string | null,"business_id": string,"calendar_position": number | null,"calendar_zoom": string,"color": string | null,"created_at": string,"email": string | null,"event_roles": (string)[],"first_name": string,"goal_alert_seen_on": string | null,"goal_alerts": string,"home_resource_id": string | null,"hours_cycle_starts_on": string | null,"hours_cycle_weeks": number,"id": string,"is_active": boolean,"last_name": string,"level": Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone": string | null,"photo_path": string | null,"role": Database["public"]['Enums']["staff_role"],"updated_at": string,"user_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "assists_staff_id"?: string | null,"business_id": string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"event_roles"?: (string)[],"first_name": string,"goal_alert_seen_on"?: string | null,"goal_alerts"?: string,"hours_cycle_starts_on"?: string | null,"hours_cycle_weeks"?: number,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone"?: string | null,"photo_path"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
+                    "assists_staff_id"?: string | null,"business_id": string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"event_roles"?: (string)[],"first_name": string,"goal_alert_seen_on"?: string | null,"goal_alerts"?: string,"home_resource_id"?: string | null,"hours_cycle_starts_on"?: string | null,"hours_cycle_weeks"?: number,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone"?: string | null,"photo_path"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
                   }
                   Update: {
-                    "assists_staff_id"?: string | null,"business_id"?: string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"event_roles"?: (string)[],"first_name"?: string,"goal_alert_seen_on"?: string | null,"goal_alerts"?: string,"hours_cycle_starts_on"?: string | null,"hours_cycle_weeks"?: number,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id"?: string,"phone"?: string | null,"photo_path"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
+                    "assists_staff_id"?: string | null,"business_id"?: string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"event_roles"?: (string)[],"first_name"?: string,"goal_alert_seen_on"?: string | null,"goal_alerts"?: string,"home_resource_id"?: string | null,"hours_cycle_starts_on"?: string | null,"hours_cycle_weeks"?: number,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id"?: string,"phone"?: string | null,"photo_path"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -3242,6 +3242,12 @@ isOneToOne: false
       columns: ["business_id"]
 isOneToOne: false
       referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "staff_home_resource_id_fkey"
+      columns: ["home_resource_id"]
+isOneToOne: false
+      referencedRelation: "resources"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "staff_location_id_business_id_fkey"
@@ -3499,14 +3505,14 @@ isOneToOne: false
                   ]
                 },"staff_time_off": {
                   Row: {
-                    "business_id": string,"created_at": string,"decided_at": string | null,"decided_by": string | null,"end_minute": number | null,"ends_on": string,"id": string,"note": string | null,"reason": Database["public"]['Enums']["time_off_reason"],"requested_by": string,"staff_id": string,"start_minute": number | null,"starts_on": string,"status": Database["public"]['Enums']["time_off_status"],"updated_at": string
+                    "business_id": string,"created_at": string,"decided_at": string | null,"decided_by": string | null,"decline_reason": string | null,"end_minute": number | null,"ends_on": string,"id": string,"in_blackout": boolean,"note": string | null,"reason": Database["public"]['Enums']["time_off_reason"],"requested_by": string,"short_notice": boolean,"staff_id": string,"start_minute": number | null,"starts_on": string,"status": Database["public"]['Enums']["time_off_status"],"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"end_minute"?: number | null,"ends_on": string,"id"?: string,"note"?: string | null,"reason": Database["public"]['Enums']["time_off_reason"],"requested_by": string,"staff_id": string,"start_minute"?: number | null,"starts_on": string,"status"?: Database["public"]['Enums']["time_off_status"],"updated_at"?: string
+                    "business_id": string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"decline_reason"?: string | null,"end_minute"?: number | null,"ends_on": string,"id"?: string,"in_blackout"?: boolean,"note"?: string | null,"reason": Database["public"]['Enums']["time_off_reason"],"requested_by": string,"short_notice"?: boolean,"staff_id": string,"start_minute"?: number | null,"starts_on": string,"status"?: Database["public"]['Enums']["time_off_status"],"updated_at"?: string
                   }
                   Update: {
-                    "business_id"?: string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"end_minute"?: number | null,"ends_on"?: string,"id"?: string,"note"?: string | null,"reason"?: Database["public"]['Enums']["time_off_reason"],"requested_by"?: string,"staff_id"?: string,"start_minute"?: number | null,"starts_on"?: string,"status"?: Database["public"]['Enums']["time_off_status"],"updated_at"?: string
+                    "business_id"?: string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"decline_reason"?: string | null,"end_minute"?: number | null,"ends_on"?: string,"id"?: string,"in_blackout"?: boolean,"note"?: string | null,"reason"?: Database["public"]['Enums']["time_off_reason"],"requested_by"?: string,"short_notice"?: boolean,"staff_id"?: string,"start_minute"?: number | null,"starts_on"?: string,"status"?: Database["public"]['Enums']["time_off_status"],"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -3543,6 +3549,44 @@ isOneToOne: false
                   Relationships: [
                     {
       foreignKeyName: "staff_working_hours_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"station_assignments": {
+                  Row: {
+                    "business_id": string,"created_at": string,"created_by": string | null,"end_minute": number,"id": string,"location_id": string,"note": string | null,"on_date": string,"resource_id": string,"staff_id": string,"start_minute": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"created_by"?: string | null,"end_minute": number,"id"?: string,"location_id": string,"note"?: string | null,"on_date": string,"resource_id": string,"staff_id": string,"start_minute": number
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"created_by"?: string | null,"end_minute"?: number,"id"?: string,"location_id"?: string,"note"?: string | null,"on_date"?: string,"resource_id"?: string,"staff_id"?: string,"start_minute"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "station_assignments_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "station_assignments_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "station_assignments_resource_id_location_id_fkey"
+      columns: ["resource_id","location_id"]
+isOneToOne: false
+      referencedRelation: "resources"
+      referencedColumns: ["id","location_id"]
+    },{
+      foreignKeyName: "station_assignments_staff_id_business_id_fkey"
       columns: ["staff_id","business_id"]
 isOneToOne: false
       referencedRelation: "staff"
@@ -3841,6 +3885,46 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"time_off_blackouts": {
+                  Row: {
+                    "business_id": string,"created_at": string,"created_by": string | null,"ends_on": string,"id": string,"label": string | null,"starts_on": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"created_by"?: string | null,"ends_on": string,"id"?: string,"label"?: string | null,"starts_on": string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"created_by"?: string | null,"ends_on"?: string,"id"?: string,"label"?: string | null,"starts_on"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "time_off_blackouts_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"time_off_events": {
+                  Row: {
+                    "business_id": string,"by_staff_id": string | null,"created_at": string,"ends_on": string,"id": string,"kind": string,"reason": string | null,"staff_id": string,"starts_on": string,"time_off_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"by_staff_id"?: string | null,"created_at"?: string,"ends_on": string,"id"?: string,"kind": string,"reason"?: string | null,"staff_id": string,"starts_on": string,"time_off_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"by_staff_id"?: string | null,"created_at"?: string,"ends_on"?: string,"id"?: string,"kind"?: string,"reason"?: string | null,"staff_id"?: string,"starts_on"?: string,"time_off_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "time_off_events_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"visit_photos": {
                   Row: {
                     "appointment_id": string,"business_id": string,"client_id": string,"created_at": string,"created_by": string | null,"id": string,"kind": string,"marketing_marked_at": string | null,"marketing_marked_by": string | null,"marketing_ok": boolean,"staff_id": string | null,"storage_path": string
@@ -4050,6 +4134,9 @@ isOneToOne: false
 "archive_promotion":
 { Args: { "p_promotion_id": string }; Returns: undefined
                            },
+"assign_station":
+{ Args: { "p_end"?: number,"p_note"?: string,"p_on_date": string,"p_resource_id": string,"p_staff_id": string,"p_start"?: number }; Returns: string
+                           },
 "attach_online_promotion":
 { Args: { "p_appointment_id": string,"p_promotion_id": string }; Returns: undefined
                            },
@@ -4135,6 +4222,9 @@ isOneToOne: false
                            },
 "create_payment_link":
 { Args: { "p_amount_cents": number,"p_channel": string,"p_draft_id": string,"p_hours": number,"p_snapshot": Json,"p_to": string,"p_token_hash": string }; Returns: string
+                           },
+"decide_time_off":
+{ Args: { "p_decision": Database["public"]['Enums']["time_off_status"],"p_reason"?: string,"p_time_off_id": string }; Returns: undefined
                            },
 "delete_calendar_view":
 { Args: { "p_view_id": string }; Returns: undefined
@@ -4309,6 +4399,9 @@ isOneToOne: false
 "report_running_late":
 { Args: { "p_item_id": string,"p_minutes": number }; Returns: string
                            },
+"request_time_off":
+{ Args: { "p_end_minute"?: number,"p_ends_on": string,"p_note"?: string,"p_reason": Database["public"]['Enums']["time_off_reason"],"p_start_minute"?: number,"p_starts_on": string }; Returns: string
+                           },
 "resume_membership":
 { Args: { "p_membership_id": string }; Returns: undefined
                            },
@@ -4479,6 +4572,9 @@ isOneToOne: false
 "set_goal_alerts":
 { Args: { "p_frequency": string }; Returns: undefined
                            },
+"set_home_station":
+{ Args: { "p_resource_id"?: string,"p_staff_id": string }; Returns: undefined
+                           },
 "set_location_hours":
 { Args: { "p_business_id": string,"p_hours": Json,"p_location_id": string }; Returns: undefined
                            },
@@ -4552,6 +4648,9 @@ isOneToOne: false
               "email": string,"invited_at": string,"last_sign_in_at": string,"staff_id": string
             }[]
                            },
+"unassign_station":
+{ Args: { "p_assignment_id": string }; Returns: undefined
+                           },
 "undo_ai_action":
 { Args: { "p_action_id": string,"p_expected_version": number }; Returns: undefined
                            },
@@ -4590,7 +4689,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","client_package_status": "active"|"canceled"|"refunded","deposit_kind": "none"|"fixed"|"percent","disruption_kind": "overrun"|"client_late"|"call_out","event_party_role": "bride"|"bridesmaid"|"maid_of_honor"|"mother"|"flower_girl"|"groom"|"guest","event_status": "inquiry"|"proposal_sent"|"booked"|"trial_done"|"completed"|"lost","fee_kind": "none"|"fixed"|"percent"|"deposit","form_requirement": "none"|"first_visit"|"services","gift_card_kind": "purchased"|"promotional","gift_card_status": "active"|"voided","membership_status": "active"|"past_due"|"paused"|"canceled","notification_status": "pending"|"sent"|"canceled","online_service_mode": "bookable"|"consultation"|"off","patch_test_result": "no_reaction"|"reaction","payment_method": "cash"|"card"|"gift_card"|"package"|"membership","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station","sale_item_kind": "service"|"product"|"gift_card"|"gift_card_reload"|"package"|"membership","sale_status": "completed"|"partly_refunded"|"refunded"|"voided","staff_level": "artisan"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist"|"assistant","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal"|"event","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
+            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","client_package_status": "active"|"canceled"|"refunded","deposit_kind": "none"|"fixed"|"percent","disruption_kind": "overrun"|"client_late"|"call_out","event_party_role": "bride"|"bridesmaid"|"maid_of_honor"|"mother"|"flower_girl"|"groom"|"guest","event_status": "inquiry"|"proposal_sent"|"booked"|"trial_done"|"completed"|"lost","fee_kind": "none"|"fixed"|"percent"|"deposit","form_requirement": "none"|"first_visit"|"services","gift_card_kind": "purchased"|"promotional","gift_card_status": "active"|"voided","membership_status": "active"|"past_due"|"paused"|"canceled","notification_status": "pending"|"sent"|"canceled","online_service_mode": "bookable"|"consultation"|"off","patch_test_result": "no_reaction"|"reaction","payment_method": "cash"|"card"|"gift_card"|"package"|"membership","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station"|"color_bar"|"shampoo","sale_item_kind": "service"|"product"|"gift_card"|"gift_card_reload"|"package"|"membership","sale_status": "completed"|"partly_refunded"|"refunded"|"voided","staff_level": "artisan"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist"|"assistant","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal"|"event","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -4710,7 +4809,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"client_package_status": ["active", "canceled", "refunded"],"deposit_kind": ["none", "fixed", "percent"],"disruption_kind": ["overrun", "client_late", "call_out"],"event_party_role": ["bride", "bridesmaid", "maid_of_honor", "mother", "flower_girl", "groom", "guest"],"event_status": ["inquiry", "proposal_sent", "booked", "trial_done", "completed", "lost"],"fee_kind": ["none", "fixed", "percent", "deposit"],"form_requirement": ["none", "first_visit", "services"],"gift_card_kind": ["purchased", "promotional"],"gift_card_status": ["active", "voided"],"membership_status": ["active", "past_due", "paused", "canceled"],"notification_status": ["pending", "sent", "canceled"],"online_service_mode": ["bookable", "consultation", "off"],"patch_test_result": ["no_reaction", "reaction"],"payment_method": ["cash", "card", "gift_card", "package", "membership"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station"],"sale_item_kind": ["service", "product", "gift_card", "gift_card_reload", "package", "membership"],"sale_status": ["completed", "partly_refunded", "refunded", "voided"],"staff_level": ["artisan", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist", "assistant"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal", "event"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
+            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"client_package_status": ["active", "canceled", "refunded"],"deposit_kind": ["none", "fixed", "percent"],"disruption_kind": ["overrun", "client_late", "call_out"],"event_party_role": ["bride", "bridesmaid", "maid_of_honor", "mother", "flower_girl", "groom", "guest"],"event_status": ["inquiry", "proposal_sent", "booked", "trial_done", "completed", "lost"],"fee_kind": ["none", "fixed", "percent", "deposit"],"form_requirement": ["none", "first_visit", "services"],"gift_card_kind": ["purchased", "promotional"],"gift_card_status": ["active", "voided"],"membership_status": ["active", "past_due", "paused", "canceled"],"notification_status": ["pending", "sent", "canceled"],"online_service_mode": ["bookable", "consultation", "off"],"patch_test_result": ["no_reaction", "reaction"],"payment_method": ["cash", "card", "gift_card", "package", "membership"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station", "color_bar", "shampoo"],"sale_item_kind": ["service", "product", "gift_card", "gift_card_reload", "package", "membership"],"sale_status": ["completed", "partly_refunded", "refunded", "voided"],"staff_level": ["artisan", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist", "assistant"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal", "event"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
           }
         }
 } as const

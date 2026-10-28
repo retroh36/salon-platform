@@ -78,6 +78,9 @@ describe("finding the page", () => {
     ["copy last week's shifts", "Plan the team's week"],
     ["how do I give someone every other Saturday off", "Set someone's repeating schedule pattern"],
     ["when am I working this week", "See my schedule"],
+    ["how do I add a shampoo bowl", "Set up chairs and stations"],
+    ["give Gil a home chair", "Set up chairs and stations"],
+    ["how do I let someone use another stylist's chair", "Lend someone's chair for a day"],
   ])("%s → %s", (question, title) => {
     expect(searchHelp(pages, question)[0]?.title).toBe(title);
   });

@@ -544,6 +544,23 @@ from (values
   (8, 'Barber Station', 'station'), (9, 'Treatment Room', 'room')
 ) as r (n, name, kind);
 
+-- Each stylist's home chair (Nola's is the barber station); Chair 6 is
+-- spare. Smoothing treatments are done in the treatment room.
+update public.staff s set home_resource_id = h.resource_id::uuid
+from (values
+  ('d0000000-0000-4000-8000-000000000004', 'f0000000-0000-4000-8000-000000000001'),
+  ('d0000000-0000-4000-8000-000000000005', 'f0000000-0000-4000-8000-000000000002'),
+  ('d0000000-0000-4000-8000-000000000006', 'f0000000-0000-4000-8000-000000000003'),
+  ('d0000000-0000-4000-8000-000000000008', 'f0000000-0000-4000-8000-000000000004'),
+  ('d0000000-0000-4000-8000-000000000009', 'f0000000-0000-4000-8000-000000000005'),
+  ('d0000000-0000-4000-8000-000000000010', 'f0000000-0000-4000-8000-000000000007'),
+  ('d0000000-0000-4000-8000-000000000007', 'f0000000-0000-4000-8000-000000000008')
+) as h (staff_id, resource_id)
+where s.id = h.staff_id::uuid;
+update public.resources set area = 'Back room' where id = 'f0000000-0000-4000-8000-000000000009';
+update public.services set needs_room = true
+where business_id = 'b0000000-0000-4000-8000-000000000001' and name in ('Keratin Smoothing', 'Brazilian Blowout');
+
 -- ---------------------------------------------------------------------------
 -- Inventory: three suppliers, back-bar color (by weight or volume, so
 -- partly used tubes count) and retail (by unit). Stock was last counted

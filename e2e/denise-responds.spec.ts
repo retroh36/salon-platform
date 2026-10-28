@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
-import { admin, openAllDay, restoreLearnedDurations, SEED, setAsideLearnedDurations } from "../tests/db/helpers";
+import { admin, makeRoom, openAllDay, restoreLearnedDurations, SEED, setAsideLearnedDurations } from "../tests/db/helpers";
 import { AUTH, expect, knownBridgetBalayage, moreAction, putBackSales, setBridgetBalayage, test, ui, waitForHydration } from "./fixtures";
 
 // Bridget's Balayage as these tests expect it, whatever the seed gave her.
@@ -164,10 +164,13 @@ test.describe("at 9pm", () => {
   test("a client reported late long after their time: Denise says there's no time left, and what to do", async ({ page }) => {
     const zone = zoneAt(21);
     const today = todayIn(zone);
+    const start = fromLocal(today, 15 * 60 + 15, zone)!;
+    // Bridget's own demo client then is set aside, so the visit fits.
+    const putBack = await makeRoom(BRIDGET, start, new Date(start.getTime() + 2 * 3600_000));
     await admin.from("locations").update({ timezone: zone }).eq("id", L);
-    const camila = await newClient("Camila");
-    const id = await seed(camila, BRIDGET, fromLocal(today, 15 * 60 + 15, zone)!);
+    let id: string | undefined;
     try {
+      id = await seed(await newClient("Camila"), BRIDGET, start);
       await page.goto("/calendar");
       await waitForHydration(page, "section[data-staff-id]");
       await reportLate(page, "Camila", 45);
@@ -176,8 +179,11 @@ test.describe("at 9pm", () => {
       await expect(panel).toContainText("you could mark it a no-show, or rebook them");
     } finally {
       await admin.from("locations").update({ timezone: TZ }).eq("id", L);
-      await admin.from("schedule_disruptions").delete().eq("appointment_id", id);
-      await admin.from("appointments").delete().eq("id", id);
+      if (id) {
+        await admin.from("schedule_disruptions").delete().eq("appointment_id", id);
+        await admin.from("appointments").delete().eq("id", id);
+      }
+      await putBack();
     }
   });
 });

@@ -24,6 +24,7 @@ const EMPTY: ServiceFormFields = {
   price: "",
   level_prices: { artisan: "", senior: "", master: "" },
   requires_patch_test: false,
+  needs_room: false,
   staff: {},
 };
 
@@ -43,7 +44,7 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
         ? supabase
             .from("services")
             .select(
-              "id, name, category, description, active_minutes, processing_minutes, finishing_minutes, price_cents, requires_patch_test, archived_at, staff_services(staff_id, price_cents), service_level_prices(level, price_cents)",
+              "id, name, category, description, active_minutes, processing_minutes, finishing_minutes, price_cents, requires_patch_test, needs_room, archived_at, staff_services(staff_id, price_cents), service_level_prices(level, price_cents)",
             )
             .eq("id", serviceId)
             .maybeSingle()
@@ -81,6 +82,7 @@ export async function ServiceEditor({ serviceId, error }: { serviceId?: string; 
           master: centsToInput(service.service_level_prices.find((p) => p.level === "master")?.price_cents),
         },
         requires_patch_test: service.requires_patch_test,
+        needs_room: service.needs_room,
         staff: Object.fromEntries(service.staff_services.map((ss) => [ss.staff_id, centsToInput(ss.price_cents)])),
       }
     : EMPTY;

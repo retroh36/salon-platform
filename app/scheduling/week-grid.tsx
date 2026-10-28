@@ -327,6 +327,7 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
                         </Link>
                         <p className="truncate text-xs text-ink-muted tabular-nums">
                           {hours(total)}
+                          {p.chair && <span data-testid="home-chair"> · {p.chair}</span>}
                         </p>
                       </div>
                       {editable && (
@@ -387,6 +388,11 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
                             ) : null;
                           })}
                           {cell.timeOff.length > 0 && <span className="sr-only">Approved time off</span>}
+                          {grid.lentChairs[cellKey(cell.staffId, cell.date)] && (
+                            <span className="pointer-events-none absolute bottom-0.5 left-1.5 z-[2] text-[11px] leading-3 font-medium text-active-ink" data-testid="lent-chair">
+                              {grid.lentChairs[cellKey(cell.staffId, cell.date)]}
+                            </span>
+                          )}
                           {shifts.length === 0 && !closed && !editableDay && <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-xs text-ink-subtle">Off</span>}
                           {shifts.map((s, i) => {
                             const label = `${p.firstName}, ${formatDay(cell.date)}, ${formatMinute(s.start)}–${formatMinute(s.end)}${draft ? ", draft" : ""}`;

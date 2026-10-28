@@ -1067,8 +1067,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                               <FitText variants={nameVariants(c.name, c.firstName, squeezed)} className="text-sm font-semibold" />
                             </span>
                             {/* One line, the full hours on hover. */}
-                            <div title={c.hoursLabel} data-testid="column-hours" className="truncate text-xs leading-4 whitespace-nowrap text-ink-muted">
+                            <div title={c.chair ? `${c.hoursLabel} · ${c.chair}` : c.hoursLabel} data-testid="column-hours" className="truncate text-xs leading-4 whitespace-nowrap text-ink-muted">
                               {c.working ? c.hoursShort : c.offReason}
+                              {c.working && c.chair && <span data-testid="column-chair"> · {c.chair}</span>}
                             </div>
                           </div>
                         </div>

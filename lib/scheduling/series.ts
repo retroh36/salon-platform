@@ -69,7 +69,7 @@ export function checkVisitOn(ctx: BookingContext, lines: readonly VisitLine[], d
     const mine: BookingProblem[] = [];
     if (line.resource === "any") {
       resourceId = pickResource(calendar, { ...timingFor(ctx, line.staffId, service.id)!, serviceId: service.id, staffId: line.staffId, start }, null, accepted);
-      if (!resourceId) mine.push({ code: "no_free_resource" });
+      if (!resourceId && !service.needsRoom) mine.push({ code: "no_free_resource" });
     }
     const check = checkItem(calendar, { serviceId: line.serviceId, staffId: line.staffId, resourceId, start }, accepted);
     if (check.valid) accepted.push(check.item);

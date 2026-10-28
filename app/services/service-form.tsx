@@ -95,6 +95,13 @@ export function ServiceForm({
               <span className="block text-ink-muted">Warn (or block, in Forms settings) when the client has no valid patch test before this service.</span>
             </span>
           </label>
+          <label className="flex items-start gap-3 text-sm sm:col-span-2">
+            <input type="checkbox" name="needs_room" defaultChecked={fields.needs_room} className={`${checkboxClass} mt-0.5`} />
+            <span>
+              <span className="font-medium text-ink">Needs a room</span>
+              <span className="block text-ink-muted">For facials and treatments: booking it reserves a free room (Settings → Stations), and it can&rsquo;t be booked when none is free.</span>
+            </span>
+          </label>
         </section>
 
         <section className={`p-4 ${cardClass}`} aria-labelledby="level-prices-heading">

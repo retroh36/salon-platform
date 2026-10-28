@@ -1455,3 +1455,11 @@ insert into public.schedule_drafts (business_id, location_id, staff_id, on_date,
 select 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000008',
        w.monday + 12, '[{"start": 540, "end": 900}]'::jsonb, 'd0000000-0000-4000-8000-000000000002'
 from (select (now() at time zone 'America/Chicago')::date - (extract(isodow from (now() at time zone 'America/Chicago')::date)::int - 1) as monday) w;
+
+-- Sandra doesn't work Saturdays, so on the coming one Shae is using her
+-- chair (Chair 4) for her shift.
+insert into public.station_assignments (business_id, location_id, resource_id, staff_id, on_date, start_minute, end_minute, created_by)
+select 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', 'f0000000-0000-4000-8000-000000000004',
+       'd0000000-0000-4000-8000-000000000009', t.today + ((6 - extract(isodow from t.today)::int + 7) % 7), 8 * 60, 16 * 60,
+       'd0000000-0000-4000-8000-000000000002'
+from (select (now() at time zone 'America/Chicago')::date as today) t;

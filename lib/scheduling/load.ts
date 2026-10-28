@@ -195,8 +195,8 @@ export async function loadBookingContext(
   const business = await supabase.from("locations").select("business_id").eq("id", location.id).single();
   if (business.error) throw business.error;
   const [staff, services, resources] = await Promise.all([
-    supabase.from("staff").select("id, is_active").eq("location_id", location.id),
-    supabase.from("services").select("id, active_minutes, processing_minutes, finishing_minutes, archived_at").eq("business_id", business.data.business_id),
+    supabase.from("staff").select("id, is_active, home_resource_id").eq("location_id", location.id),
+    supabase.from("services").select("id, active_minutes, processing_minutes, finishing_minutes, archived_at, needs_room").eq("business_id", business.data.business_id),
     supabase.from("resources").select("id, is_active, kind, sort_order").eq("location_id", location.id),
   ]);
   if (staff.error) throw staff.error;
@@ -204,13 +204,14 @@ export async function loadBookingContext(
   if (resources.error) throw resources.error;
 
   const staffIds = staff.data.map((s) => s.id);
-  const [locationSchedule, schedules, booked, offers, blocks, timings] = await Promise.all([
+  const [locationSchedule, schedules, booked, offers, blocks, timings, lent] = await Promise.all([
     loadLocationSchedule(supabase, location),
     loadStaffSchedules(supabase, staffIds, from, to),
     loadBookedItems(supabase, location, from, to),
     loadOffers(supabase, staffIds),
     loadBlockOccurrences(supabase, location.id, from, to),
     loadStaffTimings(supabase, staffIds),
+    loadLentChairs(supabase, location, from, to),
   ]);
 
   return {
@@ -224,6 +225,7 @@ export async function loadBookingContext(
           processingMinutes: s.processing_minutes,
           finishingMinutes: s.finishing_minutes,
           archived: s.archived_at !== null,
+          needsRoom: s.needs_room,
         },
       ]),
     ),
@@ -242,7 +244,28 @@ export async function loadBookingContext(
     resources: new Map(resources.data.map((r) => [r.id, { id: r.id, isActive: r.is_active, kind: r.kind, sortOrder: r.sort_order }])),
     booked,
     blocks: blockedTimes(blocks, location.timezone),
+    chairs: {
+      home: new Map(staff.data.filter((s) => s.is_active && s.home_resource_id).map((s) => [s.id, s.home_resource_id!])),
+      lent,
+    },
   };
+}
+
+// Chairs and stations lent to someone for a shift, as instants.
+export async function loadLentChairs(supabase: Supabase, location: { id: string; timezone: string }, from: LocalDate, to: LocalDate) {
+  const { data, error } = await supabase
+    .from("station_assignments")
+    .select("resource_id, staff_id, on_date, start_minute, end_minute")
+    .eq("location_id", location.id)
+    .gte("on_date", from)
+    .lte("on_date", to);
+  if (error) throw error;
+  return data.map((a) => ({
+    resourceId: a.resource_id,
+    staffId: a.staff_id,
+    start: fromLocal(a.on_date, a.start_minute, location.timezone)!,
+    end: (a.end_minute === MINUTES_PER_DAY ? fromLocal(addDays(a.on_date, 1), 0, location.timezone) : fromLocal(a.on_date, a.end_minute, location.timezone))!,
+  }));
 }
 
 // A short string that changes whenever the location's calendar does: its

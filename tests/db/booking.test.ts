@@ -89,10 +89,10 @@ describe("booking", () => {
       starts_at: "2031-06-03T15:00:00+00:00",
       ends_at: "2031-06-03T17:30:00+00:00",
     });
-    // Bridget's color price (15% over the menu's $130) and the first free chairs.
+    // Bridget's color price (15% over the menu's $130), each in their own chair.
     expect(a.appointment_items.map((i) => [i.staff_id, i.resource_id, i.price_cents])).toEqual([
       [BRIDGET, CHAIR(1), 15000],
-      [SHAE, CHAIR(1), 4500], // Shae's Artisan price for a blowout
+      [SHAE, CHAIR(5), 4500], // Shae's Artisan price for a blowout
     ]);
   });
 

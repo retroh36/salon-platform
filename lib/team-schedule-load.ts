@@ -20,6 +20,8 @@ export type GridPerson = {
   cycleWeeks: number;
   // Their repeating pattern: a week's shifts for each week of the cycle.
   pattern: { startsOn: LocalDate | null; weeks: WeeklyHours[] };
+  // Their home chair's name.
+  chair: string | null;
 };
 
 export type WeekGrid = {
@@ -32,6 +34,8 @@ export type WeekGrid = {
   // When the salon is open each day.
   open: Record<LocalDate, Shift[]>;
   lastPublished: { at: string; by: string } | null;
+  // A chair lent to someone on a day, by cellKey: its name.
+  lentChairs: Record<string, string>;
 };
 
 // A week of the team schedule at a location: everyone active, what's
@@ -46,14 +50,14 @@ export async function loadWeekGrid(supabase: Supabase, location: { id: string; t
 
   const { data: staff, error } = await supabase
     .from("staff")
-    .select("id, first_name, last_name, role, level, color, photo_path, is_active, calendar_position, hours_cycle_weeks, hours_cycle_starts_on")
+    .select("id, first_name, last_name, role, level, color, photo_path, is_active, calendar_position, hours_cycle_weeks, hours_cycle_starts_on, home_resource_id")
     .eq("location_id", location.id)
     .eq("is_active", true);
   if (error) throw error;
   const team = sortForCalendar(staff);
   const ids = team.map((s) => s.id);
 
-  const [locationSchedule, schedules, draftRows, items, publish] = await Promise.all([
+  const [locationSchedule, schedules, draftRows, items, publish, resources, lent] = await Promise.all([
     loadLocationSchedule(supabase, location),
     loadStaffSchedules(supabase, ids, from, to),
     drafts
@@ -74,7 +78,12 @@ export async function loadWeekGrid(supabase: Supabase, location: { id: string; t
       .eq("week_start", week)
       .order("published_at", { ascending: false })
       .limit(1),
+    supabase.from("resources").select("id, name").eq("location_id", location.id),
+    supabase.from("station_assignments").select("resource_id, staff_id, on_date").eq("location_id", location.id).gte("on_date", week).lte("on_date", to),
   ]);
+  if (resources.error) throw resources.error;
+  if (lent.error) throw lent.error;
+  const resourceName = new Map(resources.data.map((r) => [r.id, r.name]));
   if (draftRows.error) throw draftRows.error;
   if (items.error) throw items.error;
   if (publish.error) throw publish.error;
@@ -121,10 +130,12 @@ export async function loadWeekGrid(supabase: Supabase, location: { id: string; t
       photoUrl: staffPhotoUrl(s.photo_path),
       cycleWeeks: s.hours_cycle_weeks,
       pattern: { startsOn: s.hours_cycle_starts_on, weeks: schedules.get(s.id)!.cycle?.weeks ?? [schedules.get(s.id)!.weekly] },
+      chair: s.home_resource_id ? (resourceName.get(s.home_resource_id) ?? null) : null,
     })),
     cells: ids.flatMap((id) => dates.map((d) => cellFor(id, d))),
     lastWeek: ids.flatMap((id) => lastDates.map((d) => cellFor(id, d))),
     open: Object.fromEntries(dates.map((d) => [d, dayView({ weekly: {}, overrides: {}, timeOff: [] }, locationSchedule, d).open])),
     lastPublished: publish.data[0] ? { at: publish.data[0].published_at, by: publish.data[0].publisher?.first_name ?? "" } : null,
+    lentChairs: Object.fromEntries(lent.data.map((l) => [cellKey(l.staff_id, l.on_date), resourceName.get(l.resource_id) ?? ""])),
   };
 }

@@ -366,6 +366,44 @@ describe("items already booked", () => {
   });
 });
 
+describe("rooms and home chairs", () => {
+  const FACIAL: BookingService = { ...service("facial", 60), needsRoom: true };
+  const withFacial = (over: Partial<BookingContext> = {}) =>
+    context({ services: new Map([CUT, MENS_CUT, BANG_TRIM, COLOR, GLOSS, MASK, PERM, FACIAL].map((s) => [s.id, s])), ...over });
+  const facialPriya: BookingStaff = { ...priya, serviceIds: new Set([...priya.serviceIds, "facial"]) };
+  const draft = (time: string, svc = CUT, staffId = "ethan"): BookedItem => ({ ...booked("new", svc, staffId, time), id: undefined });
+
+  it("puts a room service in a free room, and refuses it when none is free", () => {
+    const ctx = withFacial({ staff: new Map([facialPriya, ethan].map((s) => [s.id, s])) });
+    expect(pickResource(ctx, draft("10:00", FACIAL, "priya"))).toBe("room");
+    expect(pickResource(ctx, draft("10:00", FACIAL, "priya"), "chair-1")).toBe("room");
+    expect(codes(ctx, request("facial", "priya", "10:00", "room"))).toEqual([]);
+    expect(codes(ctx, request("facial", "priya", "10:00", "chair-1"))).toEqual(["room_needed"]);
+    expect(codes(ctx, request("facial", "priya", "10:00"))).toEqual(["room_needed"]);
+
+    const full = withFacial({ staff: ctx.staff, booked: [booked("f", FACIAL, "ethan", "09:30", "room")] });
+    expect(pickResource(full, draft("10:00", FACIAL, "priya"))).toBeNull();
+    expect(codes(full, request("facial", "priya", "10:00", "room"))).toEqual(["resource_in_use"]);
+    expect(describeProblem({ code: "room_needed" })).toBe("This service needs a room, and none is free then.");
+  });
+
+  it("puts a client in their stylist's own chair, and keeps others' chairs for them", () => {
+    const chairs = { home: new Map([["ethan", "chair-2"], ["priya", "chair-1"]]), lent: [] };
+    expect(pickResource(context({ chairs }), draft("10:00"))).toBe("chair-2");
+    // Priya's chair is taken while she works; it's used for someone else only when nothing else is free.
+    const busy = context({ chairs, booked: [booked("a", CUT, "priya", "10:00", "chair-2")] });
+    expect(pickResource(busy, draft("10:00"))).toBe("chair-1");
+  });
+
+  it("follows a chair lent for a shift", () => {
+    const lent = [{ resourceId: "chair-1", staffId: "ethan", start: at("09:00"), end: at("17:00") }];
+    const ctx = context({ chairs: { home: new Map([["priya", "chair-1"]]), lent } });
+    expect(pickResource(ctx, draft("10:00"))).toBe("chair-1");
+    // Priya's home chair is lent out, so hers isn't held for her.
+    expect(pickResource(ctx, draft("10:00", CUT, "priya"))).toBe("chair-2");
+  });
+});
+
 describe("picking a chair", () => {
   const draft = (time: string, svc = CUT, staffId = "ethan"): BookedItem => ({ ...booked("new", svc, staffId, time), id: undefined });
 

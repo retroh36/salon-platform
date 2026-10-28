@@ -160,7 +160,8 @@ function planVisit(calendar: BookingContext, input: BookingInput, existing: Exis
       const t = timing ?? timingFor(calendar, item.staffId, item.serviceId)!;
       const draft: BookedItem = { ...t, id: item.id, serviceId: item.serviceId, staffId: item.staffId, start: item.start };
       resourceId = pickResource(calendar, draft, item.resource.prefer ?? null, accepted);
-      if (!resourceId) problems[n].push({ code: "no_free_resource" });
+      // A room service without a free room is reported by checkItem.
+      if (!resourceId && !service?.needsRoom) problems[n].push({ code: "no_free_resource" });
     }
     resources[n] = resourceId;
 

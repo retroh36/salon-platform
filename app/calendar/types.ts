@@ -36,6 +36,8 @@ export type ColumnData = {
   hoursLabel: string;
   // The same on one line: "9–1, 2–6".
   hoursShort: string;
+  // The chair they work from today ("Chair 4"), when they have one.
+  chair: string | null;
   offHours: Interval[];
   timeOff: (Interval & { label: string })[];
 };

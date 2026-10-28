@@ -123,10 +123,10 @@ test.describe("front desk", () => {
     // Owner, manager and front desk don't take clients.
     await expect(column(page, "Olivia Bennett")).toHaveCount(0);
     await expect(column(page, "Sam Rivera")).toHaveCount(0);
-    // Bridget's split shift, on one line, with the full hours on hover.
+    // Bridget's split shift and her chair, on one line, with the full hours on hover.
     const hours = ui(page).locator("[data-column-header]").filter({ hasText: "Bridget" }).getByTestId("column-hours");
-    await expect(hours).toHaveText("9–1, 2–6");
-    await expect(hours).toHaveAttribute("title", "9am–1pm, 2pm–6pm");
+    await expect(hours).toHaveText("9–1, 2–6 · Chair 1");
+    await expect(hours).toHaveAttribute("title", "9am–1pm, 2pm–6pm · Chair 1");
     await expect(ui(page).getByText("Open 9am–7pm")).toBeVisible();
   });
 

@@ -2,12 +2,13 @@ import Link from "next/link";
 
 const TABS = [
   { value: "team", href: "/scheduling", label: "Team schedule" },
+  { value: "floor", href: "/scheduling/floor", label: "Floor today" },
 ] as const;
 
 // Scheduling's pages, as links.
 export function SchedulingTabs({ current }: { current: (typeof TABS)[number]["value"] }) {
   return (
-    <nav aria-label="Scheduling pages" className="mb-6 flex w-full max-w-md gap-1 rounded-lg bg-sunken p-1">
+    <nav aria-label="Scheduling pages" className="mb-6 flex w-full max-w-xl gap-1 rounded-lg bg-sunken p-1">
       {TABS.map((t) => (
         <Link
           key={t.value}

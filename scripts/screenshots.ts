@@ -404,6 +404,15 @@ async function capture(browser: Browser) {
     await page.getByTestId("team-schedule").locator("[data-draft]").first().waitFor();
   });
 
+  // Floor today on the coming Saturday: Shae on Sandra's chair while
+  // Sandra's off, and the treatment room's bookings.
+  await shot("36-floor-today", owner, async (page) => {
+    let saturday = today;
+    while (weekdayOf(saturday) !== 6) saturday = addDays(saturday, 1);
+    await page.goto(`/scheduling/floor?date=${saturday}`);
+    await page.getByTestId("floor").waitFor();
+  });
+
   // Marking a stylist out: the stylist with the most clients on the next
   // day with visits, Denise's plan for every client all day, then leaving
   // early at 1pm, with the moves dashed on the calendar (nothing is saved).

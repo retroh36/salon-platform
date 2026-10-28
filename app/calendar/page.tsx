@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { canBook, type AppointmentStatus } from "@/lib/appointments";
 import { getCurrentStaff } from "@/lib/auth";
+import { chairFor } from "@/lib/stations";
 import { bookedSummary, compactHours, FAMILIES, gridRange, isZoom, offHours, serviceFamily } from "@/lib/calendar";
 import { fitCookie, offReason, viewCookie, viewKey, type CalendarView, type ViewKey } from "@/lib/calendar-views";
 import { formatAmount, productName } from "@/lib/inventory";
@@ -60,9 +61,9 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   // signed in, then what needs the day's visits and team, then what needs
   // the visits put together. (One query after another, each a trip to the
   // database, made the calendar slow to load and to reload.)
-  const [staffResult, itemsResult, servicesResult, resourcesResult, location, viewsResult, products, timeBlocks, { data: business }, { data: bookRow }] = await Promise.all([
+  const [staffResult, itemsResult, servicesResult, resourcesResult, location, viewsResult, products, timeBlocks, { data: business }, { data: bookRow }, lentResult] = await Promise.all([
     // Everyone in the business, for "booked by" names; columns are this location's.
-    supabase.from("staff").select("id, first_name, last_name, role, level, color, is_active, location_id, calendar_position"),
+    supabase.from("staff").select("id, first_name, last_name, role, level, color, is_active, location_id, calendar_position, home_resource_id"),
     supabase
       .from("appointment_items")
       .select(
@@ -84,7 +85,10 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     // Who may write their own messages to clients (owners always).
     supabase.from("businesses").select("free_text_roles").eq("id", me.business_id).single(),
     bookId ? supabase.from("clients").select("id, first_name, last_name, phone, allergies").eq("id", bookId).maybeSingle() : Promise.resolve({ data: null }),
+    // Chairs lent for a shift today, for the column headers.
+    supabase.from("station_assignments").select("resource_id, staff_id, on_date").eq("location_id", me.location.id).eq("on_date", date),
   ]);
+  if (lentResult.error) throw lentResult.error;
   if (staffResult.error) throw staffResult.error;
   if (viewsResult.error) throw viewsResult.error;
   if (itemsResult.error) throw itemsResult.error;
@@ -416,6 +420,10 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
   const eventHolds = timeBlocks.filter((b) => b.kind === "event").flatMap((b) => occurrences(b, date, date));
   const range = gridRange(open, weekHours, [...blocks, ...eventHolds]);
 
+  // Each stylist's chair today: one lent to them, else their home chair.
+  const resourceName = new Map(resourcesResult.data.map((r) => [r.id, r.name]));
+  const homes = new Map(team.filter((s) => s.home_resource_id).map((s) => [s.id, s.home_resource_id!]));
+  const lent = lentResult.data.map((l) => ({ resourceId: l.resource_id, staffId: l.staff_id, date: l.on_date }));
   const reasonOf = (t: { reason?: string; note?: string | null }) => [REASON_LABELS[t.reason as TimeOffReason] ?? "Time off", t.note].filter(Boolean).join(" · ");
   const columns: ColumnData[] = columnStaff.map((s) => {
     const day = dayView(schedules.get(s.id)!, location, date);
@@ -437,6 +445,7 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       offReason: working ? null : offReason({ timeOff: allDay ? reasonOf(allDay) : null, salonOpen: open.length > 0, hasHours: day.hours.length > 0 }),
       hoursLabel: approved.some((t) => t.startMinute == null) ? "Time off" : day.hours.length ? formatIntervals(day.hours) : "Not working",
       hoursShort: approved.some((t) => t.startMinute == null) ? "Time off" : day.hours.length ? compactHours(day.hours) : "Not working",
+      chair: resourceName.get(chairFor(s.id, date, homes, lent)?.resourceId ?? "") ?? null,
       offHours: offHours(range, intersectIntervals(day.hours, day.open)),
       timeOff: approved
         .map((t) => ({
