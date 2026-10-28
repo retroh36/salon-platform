@@ -261,7 +261,7 @@ describe("failed charges", () => {
     expect((await runPolicyCharges(admin, { feeId: fee.id })).failed).toBe(1);
     expect(await feeOf(a)).toMatchObject({ status: "failed", failure_reason: "The card was declined" });
     const { data: notices } = await admin.from("notifications").select("staff_id, body").eq("appointment_id", a).eq("template", "policy_fee_failed");
-    expect(new Set(notices!.map((n) => n.staff_id))).toEqual(new Set([SEED.staff.owner, SEED.staff.manager, SEED.staff.frontDesk]));
+    expect(new Set(notices!.map((n) => n.staff_id))).toEqual(new Set([SEED.staff.owner, SEED.staff.manager, SEED.staff.frontDesk, SEED.staff.jordan]));
     expect(notices![0].body).toContain("didn't go through");
 
     // Stylists can't retry; the front desk can, once there's a good card.

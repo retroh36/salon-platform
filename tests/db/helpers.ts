@@ -38,8 +38,9 @@ export const SEED = {
     shae: "d0000000-0000-4000-8000-000000000009",
     lois: "d0000000-0000-4000-8000-000000000010",
     ari: "d0000000-0000-4000-8000-000000000011",
+    jordan: "d0000000-0000-4000-8000-000000000012",
   },
-  staffCount: 11,
+  staffCount: 12,
   // The second, larger demo salon (supabase/seed-large.sql): 35 stylists.
   large: {
     business: "b1000000-0000-4000-8000-000000000001",

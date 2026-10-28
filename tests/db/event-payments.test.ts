@@ -141,7 +141,7 @@ describe("scheduled payments", () => {
     expect(result).toMatchObject({ charged: 0, failed: 1 });
     expect((await paymentsOf("second"))[0]).toMatchObject({ status: "failed", failure_reason: "The card was declined" });
     const { data: flagged } = await admin.from("notifications").select("staff_id").eq("template", "event_payment_failed");
-    expect(new Set(flagged!.map((n) => n.staff_id))).toEqual(new Set([SEED.staff.owner, SEED.staff.manager, SEED.staff.frontDesk]));
+    expect(new Set(flagged!.map((n) => n.staff_id))).toEqual(new Set([SEED.staff.owner, SEED.staff.manager, SEED.staff.frontDesk, SEED.staff.jordan]));
     // Not charged twice by another run.
     expect((await chargeDuePayments(admin, { businessId: SEED.business, paymentId: second.id })).failed).toBe(0);
   });

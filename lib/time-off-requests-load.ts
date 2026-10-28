@@ -135,14 +135,19 @@ export async function loadRequestsInbox(supabase: Supabase, location: { id: stri
   };
 }
 
-// How many requests are waiting at a location (for the tab's count).
+// How many requests are waiting at a location (for the tab's count): time
+// off, and shift swaps both people have agreed to.
 export async function countPendingRequests(supabase: Supabase, location: { id: string }, today: LocalDate): Promise<number> {
-  const { count, error } = await supabase
-    .from("staff_time_off")
-    .select("id, staff:staff!staff_time_off_staff_id_business_id_fkey!inner(location_id)", { count: "exact", head: true })
-    .eq("status", "requested")
-    .gte("ends_on", today)
-    .eq("staff.location_id", location.id);
-  if (error) throw error;
-  return count ?? 0;
+  const [timeOff, swaps] = await Promise.all([
+    supabase
+      .from("staff_time_off")
+      .select("id, staff:staff!staff_time_off_staff_id_business_id_fkey!inner(location_id)", { count: "exact", head: true })
+      .eq("status", "requested")
+      .gte("ends_on", today)
+      .eq("staff.location_id", location.id),
+    supabase.from("shift_swaps").select("id", { count: "exact", head: true }).eq("location_id", location.id).eq("status", "accepted").gte("give_date", today),
+  ]);
+  if (timeOff.error) throw timeOff.error;
+  if (swaps.error) throw swaps.error;
+  return (timeOff.count ?? 0) + (swaps.count ?? 0);
 }

@@ -1489,3 +1489,20 @@ select 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-00000000
        'd0000000-0000-4000-8000-000000000009', t.today + ((6 - extract(isodow from t.today)::int + 7) % 7), 8 * 60, 16 * 60,
        'd0000000-0000-4000-8000-000000000002'
 from (select (now() at time zone 'America/Chicago')::date as today) t;
+
+-- Shift swaps: Sam has asked Jordan to take a Tuesday (waiting on Jordan),
+-- and Jordan's Thursday going to Sam is agreed, waiting for a manager.
+insert into public.shift_swaps (business_id, location_id, from_staff_id, to_staff_id, give_date, give_shifts, note, status, answered_at, created_at)
+select 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', s.from_id, s.to_id, s.day,
+       private.live_hours(s.from_id, s.day), s.note, s.status::public.shift_swap_status,
+       case when s.status = 'accepted' then now() - interval '3 hours' end, now() - interval '1 day'
+from (select (now() at time zone 'America/Chicago')::date - (extract(isodow from (now() at time zone 'America/Chicago')::date)::int - 1) as monday) w,
+     lateral (values
+       ('d0000000-0000-4000-8000-000000000003'::uuid, 'd0000000-0000-4000-8000-000000000012'::uuid, w.monday + 15, 'Dentist in the morning', 'asked'),
+       ('d0000000-0000-4000-8000-000000000012'::uuid, 'd0000000-0000-4000-8000-000000000003'::uuid, w.monday + 17, 'Graduation', 'accepted')
+     ) as s (from_id, to_id, day, note, status);
+
+insert into public.shift_swap_events (business_id, swap_id, kind, by_staff_id, reason, created_at)
+select business_id, id, 'asked', from_staff_id, note, created_at from public.shift_swaps
+union all
+select business_id, id, 'accepted', to_staff_id, null, answered_at from public.shift_swaps where status = 'accepted';

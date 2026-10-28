@@ -39,7 +39,8 @@ with seed_users (id, email) as (
     ('a0000000-0000-4000-8000-000000000008'::uuid, 'sandra@mapleandash.test'),
     ('a0000000-0000-4000-8000-000000000009'::uuid, 'shae@mapleandash.test'),
     ('a0000000-0000-4000-8000-000000000010'::uuid, 'lois@mapleandash.test'),
-    ('a0000000-0000-4000-8000-000000000011'::uuid, 'ari@mapleandash.test')
+    ('a0000000-0000-4000-8000-000000000011'::uuid, 'ari@mapleandash.test'),
+    ('a0000000-0000-4000-8000-000000000012'::uuid, 'jordan@mapleandash.test')
 ),
 inserted_users as (
   insert into auth.users (
@@ -111,7 +112,10 @@ insert into public.staff (
    'a0000000-0000-4000-8000-000000000010', 'Lois', 'Park', 'lois@mapleandash.test', '(555) 010-0110', 'stylist', '#be185d', true),
   -- Bridget's assistant: sees her day and clients, no prices or pay.
   ('d0000000-0000-4000-8000-000000000011', 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001',
-   'a0000000-0000-4000-8000-000000000011', 'Ari', 'Delgado', 'ari@mapleandash.test', '(555) 010-0111', 'assistant', null, true);
+   'a0000000-0000-4000-8000-000000000011', 'Ari', 'Delgado', 'ari@mapleandash.test', '(555) 010-0111', 'assistant', null, true),
+  -- A second front desk, on the days Sam isn't (someone to swap shifts with).
+  ('d0000000-0000-4000-8000-000000000012', 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001',
+   'a0000000-0000-4000-8000-000000000012', 'Jordan', 'Pike', 'jordan@mapleandash.test', '(555) 010-0112', 'front_desk', null, true);
 
 update public.staff set assists_staff_id = 'd0000000-0000-4000-8000-000000000004'
 where id = 'd0000000-0000-4000-8000-000000000011';
@@ -444,6 +448,10 @@ from (values
   ('d0000000-0000-4000-8000-000000000003', 3, '09:00', '17:00'),
   ('d0000000-0000-4000-8000-000000000003', 5, '12:00', '20:00'),
   ('d0000000-0000-4000-8000-000000000003', 6, '08:00', '17:00'),
+  -- Jordan (front desk)
+  ('d0000000-0000-4000-8000-000000000012', 4, '09:00', '17:00'),
+  ('d0000000-0000-4000-8000-000000000012', 5, '09:00', '17:00'),
+  ('d0000000-0000-4000-8000-000000000012', 6, '12:00', '20:00'),
   -- Bridget: split shifts with a lunch break, short Saturday
   ('d0000000-0000-4000-8000-000000000004', 2, '09:00', '13:00'),
   ('d0000000-0000-4000-8000-000000000004', 2, '14:00', '18:00'),
@@ -502,6 +510,7 @@ where s.business_id = 'b0000000-0000-4000-8000-000000000001' and s.role = 'styli
 insert into public.staff_compensation (staff_id, business_id, hourly_rate_cents) values
   ('d0000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 2600),
   ('d0000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000001', 1800),
+  ('d0000000-0000-4000-8000-000000000012', 'b0000000-0000-4000-8000-000000000001', 1800),
   ('d0000000-0000-4000-8000-000000000011', 'b0000000-0000-4000-8000-000000000001', 1600);
 
 -- Commission plans (Settings → Commission): Gil is on marginal tiers that

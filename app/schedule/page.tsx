@@ -17,6 +17,7 @@ import { loadLocationSchedule, loadStaffSchedules } from "@/lib/scheduling/load"
 import { addDays, datesBetween, isLocalDate, minuteToTime, startOfWeek, todayIn, WEEKDAYS } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { fullName, roleLabel, sortStaff } from "@/lib/staff";
+import { canSwap } from "@/lib/shift-swaps";
 import { patternLabel } from "@/lib/team-schedule";
 import { Notices } from "../my-day/notices";
 import { deleteTimeOff, saveWeeklyHours } from "./actions";
@@ -124,6 +125,11 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
             {seesEveryone && (
               <Link href={`/scheduling${week !== startOfWeek(today) ? `?week=${week}` : ""}`} className={buttonClass("secondary", "md")}>
                 Team schedule
+              </Link>
+            )}
+            {isSelf && canSwap(me.role) && (
+              <Link href="/shift-swaps" className={buttonClass("secondary", "md")}>
+                Swap a shift
               </Link>
             )}
             {manager && (

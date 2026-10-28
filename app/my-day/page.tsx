@@ -19,6 +19,7 @@ import { periodContaining, previousPeriod, ratesText } from "@/lib/payroll";
 import { loadPayroll, loadPaySettings } from "@/lib/payroll-load";
 import Link from "next/link";
 import { buttonClass } from "@/components/ui/button";
+import { canSwap } from "@/lib/shift-swaps";
 import { TipDetails } from "@/components/tip-details";
 import { GoalAlertCard, GoalCard } from "@/components/goals";
 import { AlertFrequencyPicker, GoalForm, RemoveGoal } from "@/components/goal-controls";
@@ -165,9 +166,16 @@ async function MyWeekSection({ supabase, me }: { supabase: Awaited<ReturnType<ty
       className="mt-10"
       data-testid="my-week"
       actions={
-        <Link href="/time-off" className={buttonClass("quiet", "sm")}>
-          Ask for time off
-        </Link>
+        <span className="flex gap-1">
+          {canSwap(me.role) && (
+            <Link href="/shift-swaps" className={buttonClass("quiet", "sm")}>
+              Swap a shift
+            </Link>
+          )}
+          <Link href="/time-off" className={buttonClass("quiet", "sm")}>
+            Ask for time off
+          </Link>
+        </span>
       }
     >
       <ol className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">

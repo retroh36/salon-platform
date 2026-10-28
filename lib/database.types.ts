@@ -3205,6 +3205,76 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"shift_swap_events": {
+                  Row: {
+                    "business_id": string,"by_staff_id": string | null,"created_at": string,"id": string,"kind": string,"reason": string | null,"swap_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"by_staff_id"?: string | null,"created_at"?: string,"id"?: string,"kind": string,"reason"?: string | null,"swap_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"by_staff_id"?: string | null,"created_at"?: string,"id"?: string,"kind"?: string,"reason"?: string | null,"swap_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "shift_swap_events_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "shift_swap_events_swap_id_fkey"
+      columns: ["swap_id"]
+isOneToOne: false
+      referencedRelation: "shift_swaps"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"shift_swaps": {
+                  Row: {
+                    "answered_at": string | null,"business_id": string,"created_at": string,"decided_at": string | null,"decided_by": string | null,"decline_reason": string | null,"from_staff_id": string,"give_date": string,"give_shifts": NonNullable<Json>,"id": string,"location_id": string,"note": string | null,"status": Database["public"]['Enums']["shift_swap_status"],"take_date": string | null,"take_shifts": Json | null,"to_staff_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "answered_at"?: string | null,"business_id": string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"decline_reason"?: string | null,"from_staff_id": string,"give_date": string,"give_shifts": NonNullable<Json>,"id"?: string,"location_id": string,"note"?: string | null,"status"?: Database["public"]['Enums']["shift_swap_status"],"take_date"?: string | null,"take_shifts"?: Json | null,"to_staff_id": string
+                  }
+                  Update: {
+                    "answered_at"?: string | null,"business_id"?: string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"decline_reason"?: string | null,"from_staff_id"?: string,"give_date"?: string,"give_shifts"?: NonNullable<Json>,"id"?: string,"location_id"?: string,"note"?: string | null,"status"?: Database["public"]['Enums']["shift_swap_status"],"take_date"?: string | null,"take_shifts"?: Json | null,"to_staff_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "shift_swaps_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "shift_swaps_decided_by_business_id_fkey"
+      columns: ["decided_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "shift_swaps_from_staff_id_business_id_fkey"
+      columns: ["from_staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "shift_swaps_location_id_business_id_fkey"
+      columns: ["location_id","business_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "shift_swaps_to_staff_id_business_id_fkey"
+      columns: ["to_staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"sms_suppressions": {
                   Row: {
                     "keyword": string,"phone_digits": string,"stopped_at": string
@@ -4113,6 +4183,9 @@ isOneToOne: false
               "daily_limit": number,"used": number
             }[]
                            },
+"answer_shift_swap":
+{ Args: { "p_accept": boolean,"p_swap_id": string }; Returns: undefined
+                           },
 "apply_ai_action":
 { Args: { "p_action_id": string,"p_client_id"?: string,"p_expected_version": number }; Returns: undefined
                            },
@@ -4159,6 +4232,9 @@ isOneToOne: false
                            },
 "cancel_payment_link":
 { Args: { "p_link_id": string }; Returns: undefined
+                           },
+"cancel_shift_swap":
+{ Args: { "p_swap_id": string }; Returns: undefined
                            },
 "cancel_stocktake":
 { Args: { "p_stocktake_id": string }; Returns: undefined
@@ -4222,6 +4298,9 @@ isOneToOne: false
                            },
 "create_payment_link":
 { Args: { "p_amount_cents": number,"p_channel": string,"p_draft_id": string,"p_hours": number,"p_snapshot": Json,"p_to": string,"p_token_hash": string }; Returns: string
+                           },
+"decide_shift_swap":
+{ Args: { "p_approve": boolean,"p_reason"?: string,"p_swap_id": string }; Returns: undefined
                            },
 "decide_time_off":
 { Args: { "p_decision": Database["public"]['Enums']["time_off_status"],"p_reason"?: string,"p_time_off_id": string }; Returns: undefined
@@ -4398,6 +4477,9 @@ isOneToOne: false
                            },
 "report_running_late":
 { Args: { "p_item_id": string,"p_minutes": number }; Returns: string
+                           },
+"request_shift_swap":
+{ Args: { "p_give_date": string,"p_note"?: string,"p_take_date"?: string,"p_to_staff_id": string }; Returns: string
                            },
 "request_time_off":
 { Args: { "p_end_minute"?: number,"p_ends_on": string,"p_note"?: string,"p_reason": Database["public"]['Enums']["time_off_reason"],"p_start_minute"?: number,"p_starts_on": string }; Returns: string
@@ -4689,7 +4771,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","client_package_status": "active"|"canceled"|"refunded","deposit_kind": "none"|"fixed"|"percent","disruption_kind": "overrun"|"client_late"|"call_out","event_party_role": "bride"|"bridesmaid"|"maid_of_honor"|"mother"|"flower_girl"|"groom"|"guest","event_status": "inquiry"|"proposal_sent"|"booked"|"trial_done"|"completed"|"lost","fee_kind": "none"|"fixed"|"percent"|"deposit","form_requirement": "none"|"first_visit"|"services","gift_card_kind": "purchased"|"promotional","gift_card_status": "active"|"voided","membership_status": "active"|"past_due"|"paused"|"canceled","notification_status": "pending"|"sent"|"canceled","online_service_mode": "bookable"|"consultation"|"off","patch_test_result": "no_reaction"|"reaction","payment_method": "cash"|"card"|"gift_card"|"package"|"membership","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station"|"color_bar"|"shampoo","sale_item_kind": "service"|"product"|"gift_card"|"gift_card_reload"|"package"|"membership","sale_status": "completed"|"partly_refunded"|"refunded"|"voided","staff_level": "artisan"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist"|"assistant","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal"|"event","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
+            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","client_package_status": "active"|"canceled"|"refunded","deposit_kind": "none"|"fixed"|"percent","disruption_kind": "overrun"|"client_late"|"call_out","event_party_role": "bride"|"bridesmaid"|"maid_of_honor"|"mother"|"flower_girl"|"groom"|"guest","event_status": "inquiry"|"proposal_sent"|"booked"|"trial_done"|"completed"|"lost","fee_kind": "none"|"fixed"|"percent"|"deposit","form_requirement": "none"|"first_visit"|"services","gift_card_kind": "purchased"|"promotional","gift_card_status": "active"|"voided","membership_status": "active"|"past_due"|"paused"|"canceled","notification_status": "pending"|"sent"|"canceled","online_service_mode": "bookable"|"consultation"|"off","patch_test_result": "no_reaction"|"reaction","payment_method": "cash"|"card"|"gift_card"|"package"|"membership","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station"|"color_bar"|"shampoo","sale_item_kind": "service"|"product"|"gift_card"|"gift_card_reload"|"package"|"membership","sale_status": "completed"|"partly_refunded"|"refunded"|"voided","shift_swap_status": "asked"|"accepted"|"approved"|"declined"|"canceled","staff_level": "artisan"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist"|"assistant","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal"|"event","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -4809,7 +4891,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"client_package_status": ["active", "canceled", "refunded"],"deposit_kind": ["none", "fixed", "percent"],"disruption_kind": ["overrun", "client_late", "call_out"],"event_party_role": ["bride", "bridesmaid", "maid_of_honor", "mother", "flower_girl", "groom", "guest"],"event_status": ["inquiry", "proposal_sent", "booked", "trial_done", "completed", "lost"],"fee_kind": ["none", "fixed", "percent", "deposit"],"form_requirement": ["none", "first_visit", "services"],"gift_card_kind": ["purchased", "promotional"],"gift_card_status": ["active", "voided"],"membership_status": ["active", "past_due", "paused", "canceled"],"notification_status": ["pending", "sent", "canceled"],"online_service_mode": ["bookable", "consultation", "off"],"patch_test_result": ["no_reaction", "reaction"],"payment_method": ["cash", "card", "gift_card", "package", "membership"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station", "color_bar", "shampoo"],"sale_item_kind": ["service", "product", "gift_card", "gift_card_reload", "package", "membership"],"sale_status": ["completed", "partly_refunded", "refunded", "voided"],"staff_level": ["artisan", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist", "assistant"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal", "event"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
+            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"client_package_status": ["active", "canceled", "refunded"],"deposit_kind": ["none", "fixed", "percent"],"disruption_kind": ["overrun", "client_late", "call_out"],"event_party_role": ["bride", "bridesmaid", "maid_of_honor", "mother", "flower_girl", "groom", "guest"],"event_status": ["inquiry", "proposal_sent", "booked", "trial_done", "completed", "lost"],"fee_kind": ["none", "fixed", "percent", "deposit"],"form_requirement": ["none", "first_visit", "services"],"gift_card_kind": ["purchased", "promotional"],"gift_card_status": ["active", "voided"],"membership_status": ["active", "past_due", "paused", "canceled"],"notification_status": ["pending", "sent", "canceled"],"online_service_mode": ["bookable", "consultation", "off"],"patch_test_result": ["no_reaction", "reaction"],"payment_method": ["cash", "card", "gift_card", "package", "membership"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station", "color_bar", "shampoo"],"sale_item_kind": ["service", "product", "gift_card", "gift_card_reload", "package", "membership"],"sale_status": ["completed", "partly_refunded", "refunded", "voided"],"shift_swap_status": ["asked", "accepted", "approved", "declined", "canceled"],"staff_level": ["artisan", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist", "assistant"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal", "event"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
           }
         }
 } as const

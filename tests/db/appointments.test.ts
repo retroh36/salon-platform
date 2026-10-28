@@ -138,19 +138,18 @@ describe("seed data", () => {
   });
 
   it("has a month of appointments with a realistic mix of statuses", async () => {
-    const { data } = await admin.from("appointments").select("status, starts_at").eq("business_id", B);
-    const dates = data!.map((a) => toLocal(new Date(a.starts_at), TZ).date).sort();
+    // Counted in the database: a select returns at most 1000 rows.
+    const visits = () => admin.from("appointments").select("id", { count: "exact", head: true }).eq("business_id", B);
+    const edge = async (ascending: boolean) =>
+      (await admin.from("appointments").select("starts_at").eq("business_id", B).order("starts_at", { ascending }).limit(1).single()).data!.starts_at;
+    const [first, last] = [toLocal(new Date(await edge(true)), TZ).date, toLocal(new Date(await edge(false)), TZ).date];
     // About a month, around the reset date.
-    expect(datesBetween(dates[0], dates.at(-1)!).length).toBeGreaterThanOrEqual(28);
-    expect(data!.length).toBeGreaterThan(600);
+    expect(datesBetween(first, last).length).toBeGreaterThanOrEqual(28);
+    expect((await visits()).count).toBeGreaterThan(600);
 
-    const statuses = new Set(data!.map((a) => a.status));
-    for (const s of ["completed", "canceled", "no_show", "booked", "confirmed"] as const) expect(statuses).toContain(s);
-    // Nothing upcoming is completed; nothing past is still booked.
-    const now = Date.now();
-    for (const a of data!) {
-      if (new Date(a.starts_at).getTime() > now) expect(["booked", "confirmed", "canceled"]).toContain(a.status);
-    }
+    for (const s of ["completed", "canceled", "no_show", "booked", "confirmed"] as const) expect((await visits().eq("status", s)).count).toBeGreaterThan(0);
+    // Everything upcoming is booked, confirmed or canceled.
+    expect((await visits().gt("starts_at", new Date().toISOString()).not("status", "in", "(booked,confirmed,canceled)")).count).toBe(0);
   });
 
   // Clients come back on their own cycles, so the salon isn't full.

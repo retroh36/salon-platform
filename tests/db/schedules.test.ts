@@ -333,7 +333,7 @@ describe("commission", () => {
     expect(await ids(gil)).toEqual([GIL]);
     // The front desk sees only their own hourly rate.
     expect(await ids(frontDesk)).toEqual([SEED.staff.frontDesk]);
-    expect(await ids(manager)).toHaveLength(10); // the stylists, the manager, the front desk and the assistant
+    expect(await ids(manager)).toHaveLength(11); // the stylists, the manager, the two on the front desk and the assistant
   });
 
   it("only owners and managers change it", async () => {
