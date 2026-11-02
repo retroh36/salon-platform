@@ -48,12 +48,17 @@ export function DenisePanel({
   onNoShow,
   onBookWaitlist,
   run,
+  stuck = false,
+  onRetry,
   children,
 }: {
   data: BoardData;
   state: DeniseState | null;
   // Scanning, applying, or answering.
   working: boolean;
+  // Her look at the day failed or is taking too long (no state yet).
+  stuck?: boolean;
+  onRetry?: () => void;
   // A question or report she's working on: what she's doing, her answer
   // so far.
   run: DeniseRun;
@@ -85,6 +90,7 @@ export function DenisePanel({
 
   let says: string;
   if (run.working) says = "Let me look into that…";
+  else if (!state && stuck) says = "I couldn't look over the day just now. The calendar works as normal.";
   else if (!state) says = "Give me a second, I'm looking over the day…";
   else if (conflicts.length) says = conflicts.length === 1 ? "I spotted something." : `I spotted ${conflicts.length} things.`;
   else if (notices.length) says = "Nothing's clashing, but keep an eye on this:";
@@ -100,6 +106,12 @@ export function DenisePanel({
           {says}
         </p>
       </div>
+
+      {!state && stuck && onRetry && (
+        <Button size="sm" className="self-start" onClick={onRetry}>
+          Try again
+        </Button>
+      )}
 
       {outcome && (
         <div role="status" className={`flex animate-fade-in items-start gap-3 rounded-lg p-3 ${outcome.error ? "bg-danger-soft text-danger" : "bg-denise-50 text-ink"}`}>

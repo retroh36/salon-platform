@@ -9,6 +9,8 @@ import { addDays, todayIn } from "@/lib/scheduling/time";
 import { DeniseUsage, SalonSettings } from "./salon-settings";
 import { SettingsNav } from "./settings-nav";
 import { can } from "@/lib/permissions";
+import { isConnected } from "@/lib/denise/claude";
+import { healthStatus } from "@/lib/denise/health";
 
 export const metadata: Metadata = { title: "Your salon" };
 
@@ -28,12 +30,14 @@ async function Settings() {
   // Usage is counted by the salon's day (private.business_today).
   const today = todayIn(me.location.timezone);
   const since = addDays(today, -6);
-  const [{ data: usage, error }, { data: limits, error: limitError }] = await Promise.all([
-    supabase.from("ai_usage").select("day, feature, requests, input_tokens, output_tokens").eq("business_id", me.business_id).gte("day", since),
+  const [{ data: usage, error }, { data: limits, error: limitError }, { data: health, error: healthError }] = await Promise.all([
+    supabase.from("ai_usage").select("day, feature, requests, failed_requests, input_tokens, output_tokens").eq("business_id", me.business_id).gte("day", since),
     supabase.from("businesses").select("ai_daily_token_limit").eq("id", me.business_id).single(),
+    supabase.from("ai_health").select("last_ok_at, last_failed_at, last_failure").eq("business_id", me.business_id).maybeSingle(),
   ]);
   if (error) throw error;
   if (limitError) throw limitError;
+  if (healthError) throw healthError;
   const tokens = (rows: typeof usage) => rows.reduce((sum, r) => sum + Number(r.input_tokens) + Number(r.output_tokens), 0);
 
   return (
@@ -43,13 +47,15 @@ async function Settings() {
       <Card title="Your salon" titleId="salon-heading">
         <SalonSettings name={business?.name ?? ""} logoUrl={salonLogoUrl(business?.logo_path)} />
       </Card>
-      <Card title="Denise" titleId="denise-heading" description="What Denise's thinking (the Claude API) uses. At the daily limit she switches to plain wording until tomorrow.">
+      <Card title="Denise" titleId="denise-heading" description="Whether Denise's thinking is working, and what it uses. At the daily limit she switches to plain wording until tomorrow.">
         <DeniseUsage
           today={tokens(usage.filter((r) => r.day === today))}
           week={tokens(usage)}
-          requests={usage.reduce((sum, r) => sum + r.requests, 0)}
+          answered={usage.reduce((sum, r) => sum + r.requests, 0)}
+          failed={usage.reduce((sum, r) => sum + r.failed_requests, 0)}
           limit={limits.ai_daily_token_limit}
-          connected={Boolean(process.env.ANTHROPIC_API_KEY)}
+          status={healthStatus(isConnected(), health && { lastOkAt: health.last_ok_at, lastFailedAt: health.last_failed_at, lastFailure: health.last_failure })}
+          timeZone={me.location.timezone}
           canChange={can(me, "billing")}
         />
       </Card>

@@ -5,6 +5,12 @@ import { getCurrentStaff } from "@/lib/auth";
 import { DEMO_OFF, isDemo } from "@/lib/demo";
 import { LOGO_BUCKET, LOGO_TYPES, MAX_LOGO_BYTES } from "@/lib/branding";
 import { can } from "@/lib/permissions";
+import { everyTool } from "@/lib/denise/assistant";
+import { CHAT_MODEL } from "@/lib/denise/claude";
+import { claudeFor } from "@/lib/denise/day-state";
+import { failureRef, logDeniseError } from "@/lib/denise/errors";
+import { healthStatus, type HealthStatus } from "@/lib/denise/health";
+import { DailyLimitReached } from "@/lib/denise/usage";
 
 export type SettingsResult = { ok: true; message: string } | { ok: false; message: string };
 const OWNERS_ONLY = "Only owners and managers can change the salon's name and logo.";
@@ -76,4 +82,26 @@ export async function saveDeniseLimit(limit: number): Promise<SettingsResult> {
   if (error) throw error;
   revalidatePath("/settings");
   return { ok: true, message: "Saved Denise's daily limit." };
+}
+
+// Asks Denise's AI service one small question, with the same tools Ask
+// Denise sends, so Settings says "Working" only when a real call works (the
+// meter records the outcome either way; lib/denise/health.ts words it).
+export async function checkDenise(): Promise<HealthStatus> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!can(me, "settings")) return { kind: "unknown" };
+  const client = claudeFor(me.business_id, "connection_check");
+  if (!client) return { kind: "off" };
+  try {
+    await client.messages.create(
+      { model: CHAT_MODEL, max_tokens: 16, tools: everyTool(), tool_choice: { type: "none" }, output_config: { effort: "low" }, messages: [{ role: "user", content: "Reply with the word OK." }] },
+      { timeout: 20_000, maxRetries: 0 },
+    );
+  } catch (error) {
+    if (error instanceof DailyLimitReached) return { kind: "failing", at: new Date().toISOString(), why: "Denise has used today's limit, so she's using plain wording until tomorrow." };
+    logDeniseError(error, { where: "connection_check", businessId: me.business_id, model: CHAT_MODEL, ref: failureRef() });
+  }
+  const { data, error } = await supabase.from("ai_health").select("last_ok_at, last_failed_at, last_failure").eq("business_id", me.business_id).maybeSingle();
+  if (error) throw error;
+  return healthStatus(true, data && { lastOkAt: data.last_ok_at, lastFailedAt: data.last_failed_at, lastFailure: data.last_failure });
 }

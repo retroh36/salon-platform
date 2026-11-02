@@ -53,11 +53,18 @@ export type AssistantContext = {
   page?: PageContext | null;
 };
 
+// The API refuses a request with more than 20 strict tools (a 400, which
+// broke Ask Denise for owners once the list grew to 22). Strict is for
+// tools whose inputs we act on (dates, ids, periods, a booking); tools
+// with nothing to fill in, or only how many to list (our code defaults
+// it), aren't strict. tests/unit/denise-claude.test.ts checks the most
+// anyone gets stays within it.
+export const MAX_STRICT_TOOLS = 20;
+
 const THIS_CLIENT_TOOL: Anthropic.Tool = {
   name: "this_client",
   description:
     "The client on the page staff are looking at: their next booked visits (date, time, services, stylists), how often they come, when they're next due, their usual stylist, day, time and services, how often they're late, cancel or don't show, and churn risk (spend for owners, managers and front desk).",
-  strict: true,
   input_schema: { type: "object", properties: {}, required: [], additionalProperties: false },
 };
 
@@ -98,7 +105,6 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "list_stylists",
     description: "The stylists at this salon with their id, first name and level.",
-    strict: true,
     input_schema: { type: "object", properties: {}, required: [], additionalProperties: false },
   },
   {
@@ -207,20 +213,17 @@ const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "s
   giftCards: {
     name: "gift_card_balances",
     description: "What the salon owes in gift cards: purchased balances still on cards (services owed), promotional credit out (no cash value) and balances on expired cards. Owners only.",
-    strict: true,
     input_schema: { type: "object", properties: {}, required: [], additionalProperties: false },
   },
   packages: {
     name: "unused_packages",
     description: "Unused package uses: what they're worth in total, how many uses are left, and the clients who have them (first names, most value first). Owners only.",
-    strict: true,
     input_schema: { type: "object", properties: { limit: { ...nullable("integer"), description: "How many clients to list (1-20, default 5)." } }, required: ["limit"], additionalProperties: false },
   },
   rewards: {
     name: "rewards_summary",
     description:
       "The salon's rewards program: points outstanding (and their estimated value), clients by tier, the last 90 days' points earned and redeemed with the redemption rate, and the VIPs (the top tier's clients, first names, most spent first). For \"How many points are outstanding?\" and \"Who are our VIPs?\". Owners and managers.",
-    strict: true,
     input_schema: { type: "object", properties: { limit: { ...nullable("integer"), description: "How many VIPs to list (1-20, default 5)." } }, required: ["limit"], additionalProperties: false },
   },
   clients: {
@@ -233,7 +236,6 @@ const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "s
   overdue: {
     name: "overdue_clients",
     description: "Regulars who are due back or overdue and have nothing booked, most overdue first, with the total. Ask for 3 to 5 unless staff want the whole list.",
-    strict: true,
     input_schema: { type: "object", properties: { limit: { ...nullable("integer"), description: "How many to list (1-20, default 10)." } }, required: ["limit"], additionalProperties: false },
   },
   durations: {
@@ -251,7 +253,6 @@ const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "s
   salon: {
     name: "salon_patterns",
     description: "The salon's patterns: busiest and quietest hours, which days and services run over (and who runs over most), no-shows by day and time of day, and rebooking rates by stylist.",
-    strict: true,
     input_schema: noInput,
   },
   schedule: {
@@ -312,6 +313,12 @@ function pageLine(c: AssistantContext): string {
   if (!c.page) return "";
   if (!c.page.client) return `They're asking from ${c.page.label}.\n\n`;
   return `They're asking from ${c.page.label}, about ${c.page.client.firstName}: "this client", "they", "them", "she", "her", "he" or "him" without another name mean ${c.page.client.firstName}. Look them up with this_client.\n\n`;
+}
+
+// Every tool anyone can be given, as sent to the API (Settings' connection
+// check sends them, so a request the API would refuse shows there too).
+export function everyTool(): Anthropic.Tool[] {
+  return [...TOOLS, HOW_TO_TOOL, THIS_CLIENT_TOOL, ...Object.values(KNOWLEDGE_TOOLS)];
 }
 
 // A tool runner for one question; suggestions it makes are collected.

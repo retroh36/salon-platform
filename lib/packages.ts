@@ -90,6 +90,30 @@ export function packageFor(packages: readonly ClientPackage[], serviceId: string
   return fits[0] ?? null;
 }
 
+const LEVEL_NAMES: Record<StaffLevel, string> = { artisan: "Artisan", senior: "Senior", master: "Master" };
+
+// Why Package can't be used at checkout, shown under the payment buttons
+// (null when it can): the button used to grey out with no reason. A
+// package already used on a line counts as used (checkout ticks it when it
+// opens).
+export function packageNote(
+  lines: readonly { serviceId: string; name: string; staffLevel: StaffLevel | null; packageItemId: string | null }[],
+  packages: readonly ClientPackage[],
+  client: { firstName: string } | null,
+  now = new Date(),
+): string | null {
+  if (lines.some((l) => !l.packageItemId && packageFor(packages, l.serviceId, l.staffLevel, now))) return null;
+  if (!client) return "Packages need a client on the sale.";
+  const usable = packages.filter((p) => isUsable(p, now) && p.items.some((i) => i.used < i.total));
+  if (!usable.length) return `${client.firstName} has no package with uses left.`;
+  const used = lines.find((l) => l.packageItemId);
+  if (used) return `${client.firstName}'s package is already paying for ${used.name}.`;
+  const left = usable.flatMap((p) => p.items.filter((i) => i.used < i.total).map((i) => usesLeft(i)));
+  const levelOnly = usable.find((p) => p.levels && lines.some((l) => p.items.some((i) => i.serviceId === l.serviceId && i.used < i.total)));
+  if (levelOnly) return `${client.firstName}'s package is only for ${levelOnly.levels!.map((l) => LEVEL_NAMES[l]).join(" or ")} stylists.`;
+  return `${client.firstName}'s package (${left.join(", ")}) doesn't cover anything on this sale.`;
+}
+
 // "3 Blowouts left"
 export function usesLeft(item: Pick<ClientPackageItem, "total" | "used" | "serviceName">): string {
   const n = item.total - item.used;

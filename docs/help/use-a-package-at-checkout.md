@@ -23,4 +23,4 @@ Pay for a service with one use of the client's package.
 
 ## If it doesn't work
 
-- **Package** is greyed out: no service on the ticket is covered by the client's packages (wrong service, stylist level, expired, or none left).
+- **Package** is greyed out: the line under the payment buttons says why (no client on the sale, no uses left, the package is already paying for a service on the ticket, it's only for some stylist levels, or it doesn't cover anything on the sale).

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { packageFor, packageTags, proRatedRefund, usesLeft, withPackages, type ClientPackage } from "@/lib/packages";
+import { packageFor, packageNote, packageTags, proRatedRefund, usesLeft, withPackages, type ClientPackage } from "@/lib/packages";
 
 const NOW = new Date("2026-10-23T12:00:00Z");
 const pkg = (over: Partial<ClientPackage> = {}): ClientPackage => ({
@@ -44,5 +44,24 @@ describe("package wording and refunds", () => {
     expect(packageTags([pkg()], NOW)).toEqual([{ label: "Package: 3 Blowouts left", tone: "good" }]);
     expect(withPackages(null, [pkg()])).toEqual({ summary: "Has a package with uses left.", line: "Has a package with uses left", tags: [{ label: "Package: 3 Blowouts left", tone: "good" }] });
     expect(withPackages({ summary: "Comes every 4 weeks.", tags: [] }, [])).toEqual({ summary: "Comes every 4 weeks.", tags: [] });
+  });
+});
+
+// Package at checkout used to grey out with no reason, so testers took it
+// for broken. It says why now.
+describe("why Package can't be used at checkout", () => {
+  const line = (over: Partial<{ serviceId: string; name: string; staffLevel: "artisan" | "senior" | "master" | null; packageItemId: string | null }> = {}) => ({ serviceId: "blowout", name: "Blowout", staffLevel: "artisan" as const, packageItemId: null, ...over });
+  const michael = { firstName: "Michael" };
+
+  it("says nothing when it can be used", () => {
+    expect(packageNote([line()], [pkg()], michael, NOW)).toBeNull();
+  });
+
+  it("says why when it can't", () => {
+    expect(packageNote([line()], [], null, NOW)).toBe("Packages need a client on the sale.");
+    expect(packageNote([line()], [], michael, NOW)).toBe("Michael has no package with uses left.");
+    expect(packageNote([line({ packageItemId: "i1" })], [pkg()], michael, NOW)).toBe("Michael's package is already paying for Blowout.");
+    expect(packageNote([line({ serviceId: "cut", name: "Men's Cut" })], [pkg()], michael, NOW)).toBe("Michael's package (3 Blowouts left) doesn't cover anything on this sale.");
+    expect(packageNote([line()], [pkg({ levels: ["senior", "master"] })], michael, NOW)).toBe("Michael's package is only for Senior or Master stylists.");
   });
 });

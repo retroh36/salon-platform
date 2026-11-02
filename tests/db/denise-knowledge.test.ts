@@ -144,6 +144,31 @@ describe("usage and the brief cache", () => {
     await admin.from("ai_usage").delete().eq("feature", "test_feature");
   });
 
+  it("keeps each call's outcome: a failure is counted with why, and the latest outcome says whether she's working", async () => {
+    const { data: before } = await admin.from("ai_health").select("*").eq("business_id", B).maybeSingle();
+    try {
+      const failure = { p_business_id: B, p_model: "claude-haiku-5-5", p_feature: "test_feature", p_reason: "request_refused" };
+      expect((await owner.rpc("record_ai_failure", failure)).error?.code).toBe("42501");
+      expect((await anon.rpc("record_ai_failure", failure)).error?.code).toBe("42501");
+      expect((await admin.rpc("record_ai_failure", failure)).error).toBeNull();
+      const { data: usage } = await owner.from("ai_usage").select("requests, failed_requests").eq("business_id", B).eq("feature", "test_feature").single();
+      expect(usage).toEqual({ requests: 0, failed_requests: 1 });
+      const { data: failed } = await owner.from("ai_health").select("last_failure, last_failed_at").eq("business_id", B).single();
+      expect(failed!.last_failure).toBe("request_refused");
+      // A call that works afterwards stamps last_ok_at after it.
+      await admin.rpc("record_ai_usage", { p_business_id: B, p_model: "claude-haiku-5-5", p_feature: "test_feature", p_input: 10, p_output: 1, p_cache_read: 0 });
+      const { data: ok } = await owner.from("ai_health").select("last_ok_at, last_failed_at").eq("business_id", B).single();
+      expect(Date.parse(ok!.last_ok_at!)).toBeGreaterThanOrEqual(Date.parse(ok!.last_failed_at!));
+      // Owners and managers only, like the usage; nobody writes it directly.
+      expect((await frontDesk.from("ai_health").select("business_id")).data).toEqual([]);
+      expect((await owner.from("ai_health").update({ last_failure: null }).eq("business_id", B).select()).data).toEqual([]);
+    } finally {
+      await admin.from("ai_usage").delete().eq("feature", "test_feature");
+      if (before) await admin.from("ai_health").upsert(before);
+      else await admin.from("ai_health").delete().eq("business_id", B);
+    }
+  });
+
   it("keeps the cached brief away from staff", async () => {
     await admin.from("denise_briefs").upsert({ location_id: L, day: today, facts_hash: "a".repeat(64), text: "Test brief", model: "claude-sonnet-5-5" });
     expect((await owner.from("denise_briefs").select("text")).data).toEqual([]);

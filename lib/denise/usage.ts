@@ -1,13 +1,16 @@
 // What Denise's Claude calls cost: each call's tokens are logged per salon
 // (ai_usage), and once a salon reaches its daily limit
 // (businesses.ai_daily_token_limit) calls stop until tomorrow, so Denise
-// uses template wording instead. Server-only (the service role).
+// uses template wording instead. A call that fails is counted too, with
+// why (./health.ts), so Settings says whether she's really working.
+// Server-only (the service role).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import type Anthropic from "@anthropic-ai/sdk";
 import { demoTokenLimit, isDemo } from "@/lib/demo";
 import type { ClaudeClient, ClaudeStream } from "./claude";
+import { failureReason } from "./errors";
 
 type Admin = SupabaseClient<Database>;
 
@@ -45,6 +48,13 @@ export function metered(client: ClaudeClient, admin: Admin, businessId: string, 
     });
     if (error) throw error;
   };
+  // Never in the way of the failure itself, which the caller handles.
+  const recordFailure = async (model: string, failure: unknown) => {
+    const reason = failureReason(failure);
+    if (!reason) return;
+    const { error } = await admin.rpc("record_ai_failure", { p_business_id: businessId, p_model: model, p_feature: feature, p_reason: reason });
+    if (error) console.error("[denise] couldn't record a failed call:", error.message);
+  };
   // Called on client.messages, never detached: the SDK's methods need
   // their `this` (a detached stream() fails with "reading '_client'").
   const messages = client.messages;
@@ -52,7 +62,13 @@ export function metered(client: ClaudeClient, admin: Admin, businessId: string, 
     messages: {
       create: async (params, options) => {
         await checkLimit();
-        const response = await client.messages.create(params, options);
+        let response: Anthropic.Message;
+        try {
+          response = await client.messages.create(params, options);
+        } catch (failure) {
+          await recordFailure(String(params.model), failure);
+          throw failure;
+        }
         await record(String(params.model), response);
         return response;
       },
@@ -65,9 +81,16 @@ export function metered(client: ClaudeClient, admin: Admin, businessId: string, 
               async *[Symbol.asyncIterator]() {
                 await checkLimit();
                 const s = messages.stream!(params, options);
-                for await (const event of s) yield event;
-                final = s.finalMessage();
-                await record(String(params.model), await final);
+                let message: Anthropic.Message;
+                try {
+                  for await (const event of s) yield event;
+                  final = s.finalMessage();
+                  message = await final;
+                } catch (failure) {
+                  await recordFailure(String(params.model), failure);
+                  throw failure;
+                }
+                await record(String(params.model), message);
               },
               finalMessage: () => final ?? Promise.reject(new Error("Read the stream first.")),
             };

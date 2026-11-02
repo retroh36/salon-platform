@@ -4,10 +4,14 @@
 
 // The booking site's buttons (the salon's pages): Maestra's shapes (8px
 // corners, never pills), the salon's color for the one main action. 48px
-// tall and 16px text, for a phone.
+// tall and 16px text, for a phone. A disabled main button is grey, never
+// the salon's color faded (a faded tan read as "can't tap" on an enabled
+// one); one that's working keeps its color with a spinner (`busy`).
 const buttonBase =
   "inline-flex min-h-12 items-center justify-center gap-2 rounded-lg px-5 text-base font-semibold transition-[filter,opacity,background-color,transform] duration-(--motion-fast) active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed";
-export const primaryButton = `${buttonBase} w-full bg-(--accent) text-white hover:brightness-110 disabled:opacity-40`;
+export const primaryButton = `${buttonBase} w-full bg-(--accent) text-white hover:brightness-110 disabled:bg-line disabled:text-ink-subtle disabled:hover:brightness-100 aria-busy:cursor-progress`;
+// The spinner inside a main button that's working.
+export const buttonSpinner = "size-4 animate-spin rounded-full border-2 border-white/40 border-t-white";
 // Outlined, beside the main action.
 export const secondaryButton = `${buttonBase} border border-line-strong bg-surface text-ink hover:bg-sunken disabled:opacity-55`;
 // The confirming step of something that can't be taken back.
@@ -20,7 +24,7 @@ export const accentLink = "font-medium text-(--accent) underline underline-offse
 export const choiceClass =
   "group flex min-h-16 w-full items-center gap-4 rounded-lg border bg-surface px-4 py-3 text-left transition-[border-color,background-color,box-shadow] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 export const inputClass =
-  "min-h-12 w-full rounded-lg border border-line-strong bg-surface px-3.5 text-base text-ink placeholder:text-ink-subtle focus-visible:border-focus focus-visible:ring-3 focus-visible:ring-focus/25 focus:outline-none";
+  "min-h-12 w-full rounded-lg border border-line-strong bg-surface px-3.5 text-base text-ink placeholder:text-ink-subtle focus-visible:border-focus focus-visible:ring-3 focus-visible:ring-focus/25 focus:outline-none aria-invalid:border-danger";
 // A section on a client page: a title over a thin rule, no box.
 export const sectionTitle = "border-b border-line pb-2 text-base font-semibold text-ink";
 // One of a few choices (a tip, what they're planning): the salon's color

@@ -55,7 +55,8 @@ test("owners set up online booking: link, embed, rules, look and services", asyn
     await expect(site.getByRole("button", { name: /^Blowout\s*\d/ })).toHaveCount(0);
     await expect(site.getByRole("button", { name: /^Men's Cut\s*\d/ })).toContainText("$10 deposit");
     await site.getByRole("button", { name: /^Men's Cut\s*\d/ }).click();
-    expect(await site.getByRole("button", { name: "Continue" }).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(29, 78, 95)");
+    // Enabled now, in the salon's color (grey while it was disabled).
+    await expect(site.getByRole("button", { name: "Continue" })).toHaveCSS("background-color", "rgb(29, 78, 95)");
   } finally {
     await admin.from("online_booking_settings").update(before!).eq("business_id", B);
     for (const s of services!) await admin.from("services").update({ online_booking: s.online_booking, deposit_kind: s.deposit_kind, deposit_amount: s.deposit_amount }).eq("id", s.id);

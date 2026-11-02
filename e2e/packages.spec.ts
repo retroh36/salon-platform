@@ -85,11 +85,15 @@ test.describe.serial("a package from start to finish", () => {
     co = await onCheckout(page);
     await expect(co.lines.first()).toContainText("paid with package");
     await expect(co.remaining).toHaveText("Paid in full");
+    // Package under Payment is greyed out, and says why.
+    await expect(co.payment.getByRole("button", { name: "Package", exact: true })).toBeDisabled();
+    await expect(co.payment.getByTestId("package-why")).toHaveText(`${PREFIX}Ava's package is already paying for Blowout.`);
     // Taken back off the line before the sale: it's paid like any service…
     await co.lines.first().click();
     await co.ticket.getByRole("button", { name: "Don't use the package for this" }).click();
     await expect(co.lines.first()).not.toContainText("paid with package");
     await expect(co.remaining).not.toHaveText("Paid in full");
+    await expect(co.payment.getByTestId("package-why")).toBeHidden();
     // …and put back with Package under Payment.
     await co.payment.getByRole("button", { name: "Package", exact: true }).click();
     await co.dialog.getByRole("button", { name: /^Blowout/ }).click();

@@ -1,6 +1,6 @@
 // Denise's Claude features with a fake API client: no real API calls.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { answer, assistantTools, type AssistantContext } from "@/lib/denise/assistant";
+import { answer, assistantTools, MAX_STRICT_TOOLS, type AssistantContext } from "@/lib/denise/assistant";
 import { ANALYSIS_MODEL, CHAT_MODEL, claudeClient, converse, explainFixes, isConnected, modelFor, type ClaudeClient } from "@/lib/denise/claude";
 import type { CoverageWeek } from "@/lib/coverage-load";
 import { sayDate, type Knowledge } from "@/lib/denise/knowledge";
@@ -263,6 +263,15 @@ describe("Ask Denise's knowledge", () => {
     expect(stylist).not.toContain("late_cancellations");
     // Without knowledge, just the booking tools.
     expect(names()).toEqual(["list_services", "list_stylists", "find_openings", "propose_booking"]);
+  });
+
+  it("never marks more tools strict than the API takes, whoever asks and from wherever", () => {
+    // An owner on a client's page, with the help guide: every tool there is.
+    const most = assistantTools(context({ knowledge: knowledge(), help: [], page: { label: "a client's profile", client: { id: "c1", firstName: "Mia" } } })).tools;
+    expect(most.map((t) => t.name)).toContain("this_client");
+    expect(most.filter((t) => t.strict).length).toBeLessThanOrEqual(MAX_STRICT_TOOLS);
+    // Tools with nothing to fill in gain nothing from strict.
+    for (const t of most) if (Object.keys(t.input_schema.properties ?? {}).length === 0) expect(t.strict, t.name).toBeFalsy();
   });
 
   it("passes tool inputs to our functions and their facts back to Claude", async () => {

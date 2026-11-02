@@ -6,6 +6,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { DailyLimitReached } from "./usage";
+import type { FailureReason } from "./health";
 
 // limit: the salon's daily allowance is used up. busy: the API is rate
 // limiting, overloaded, down or unreachable for now (worth trying again).
@@ -16,6 +17,8 @@ export type FailureKind = "limit" | "busy" | "setup" | "bug";
 export function failureKind(error: unknown): FailureKind {
   if (error instanceof DailyLimitReached) return "limit";
   if (error instanceof Anthropic.APIConnectionError) return "busy"; // includes timeouts
+  // Stopped by us (the person left): not the key's or the request's fault.
+  if (error instanceof Anthropic.APIUserAbortError) return "busy";
   if (error instanceof Anthropic.APIError) {
     const type = apiErrorType(error);
     if (type === "billing_error") return "setup";
@@ -37,6 +40,24 @@ export const FAILURE_TEXT: Record<FailureKind, string> = {
   setup: "I can't think straight right now: something in how I'm connected needs fixing on our side. I've logged it for the team. The calendar works as normal in the meantime.",
   bug: "Something went wrong on my end, and I've logged it so it can be fixed. Anything you changed is saved; try again in a moment.",
 };
+
+// Why a call to her AI service failed, or null when it didn't fail on its
+// side: we stopped it ourselves (the person left mid-answer).
+export function failureReason(error: unknown): FailureReason | null {
+  if (error instanceof Anthropic.APIUserAbortError) return null;
+  if (error instanceof Anthropic.APIConnectionError) return "unreachable"; // includes timeouts
+  if (!(error instanceof Anthropic.APIError)) return "unknown";
+  const body = error.error as { error?: { type?: unknown }; type?: unknown } | undefined;
+  const type = body?.error?.type ?? body?.type;
+  if (error.status === 401 || type === "authentication_error") return "key_invalid";
+  if (type === "billing_error" || error.status === 402) return "no_credit";
+  if (error.status === 403 || type === "permission_error") return "key_not_allowed";
+  if (error.status === 404 || type === "not_found_error") return "model_missing";
+  if (error.status === 429 || error.status === 529 || type === "rate_limit_error" || type === "overloaded_error") return "busy";
+  if ((error.status ?? 0) >= 500) return "down";
+  if ((error.status ?? 0) >= 400) return "request_refused";
+  return "unknown";
+}
 
 // A short code staff can quote, matching the log line.
 export function failureRef(): string {

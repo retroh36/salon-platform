@@ -58,6 +58,9 @@ const PINCH_STEP = 1.3;
 const WHEEL_STEP = 60;
 // How long "Undo" stays on the toast after a check-in or a no-show.
 const UNDO_MS = 10_000;
+// How long Denise's panel waits for her look at the day before saying it
+// didn't come (with Try again).
+export const SCAN_PATIENCE_MS = 15_000;
 // A status change shown before the day reloads is held at most this long
 // after it's saved (the day normally shows it well before).
 const HOLD_MS = 15_000;
@@ -419,18 +422,33 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     }
   }, []);
 
-  // Denise looks again whenever the calendar changes.
+  // Denise looks again whenever the calendar changes. A look that fails,
+  // comes back empty or takes over SCAN_PATIENCE_MS says so in her panel,
+  // with Try again (`stuck`, for this calendar), rather than "looking over
+  // the day" for good; a late answer still shows when it comes.
   const scans = useRef(0);
+  const [scanTry, setScanTry] = useState(0);
+  const [stuck, setStuck] = useState<BoardData | null>(null);
   useEffect(() => {
     const id = ++scans.current;
-    // Offline, she looks again when the calendar next changes.
+    const slow = setTimeout(() => {
+      if (id === scans.current) setStuck(data);
+    }, SCAN_PATIENCE_MS);
     scanDenise(data.date).then(
       (state) => {
-        if (state && id === scans.current) showDenise(state, data);
+        clearTimeout(slow);
+        if (id !== scans.current) return;
+        if (!state) return setStuck(data);
+        setStuck(null);
+        showDenise(state, data);
       },
-      () => {},
+      () => {
+        clearTimeout(slow);
+        if (id === scans.current) setStuck(data);
+      },
     );
-  }, [data, showDenise]);
+    return () => clearTimeout(slow);
+  }, [data, showDenise, scanTry]);
 
   // Escape closes the panel (unless a menu or picker inside it is open).
   useEffect(() => {
@@ -1373,7 +1391,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               <DenisePanel
                 data={data}
                 state={deniseState && { ...deniseState, conflicts, notices }}
-                working={deciding || deniseRun.working || (scanning && !deniseState)}
+                working={deciding || deniseRun.working || (scanning && !deniseState && stuck !== data)}
+                stuck={!deniseState && stuck === data}
+                onRetry={() => (setStuck(null), setScanTry((n) => n + 1))}
                 run={deniseRun}
                 outcome={outcome}
                 preview={preview}

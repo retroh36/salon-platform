@@ -18,7 +18,7 @@ Take payment for a client's visit on the checkout screen.
 ## Good to know
 
 - The ticket saves as you go: tap **Back** and nothing is lost.
-- Card payments are taken on the salon's own card terminal; here you only record them (last 4 digits or approval code).
+- Card payments are taken on the salon's own card machine; here you only record them (last 4 digits or approval code). Nothing is charged from this screen.
 - To pay part by card and part by cash, see Split a payment. To let the client pay on their phone, see Send a payment link.
 
 ## If it doesn't work

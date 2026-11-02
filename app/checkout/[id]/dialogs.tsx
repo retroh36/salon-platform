@@ -512,7 +512,7 @@ function CardPay({ totals, onAddPayment, onClose }: Props) {
         onClose();
       }}
     >
-      <p className="text-ink-muted">Take the card on the terminal, then record it here.</p>
+      <p className="text-ink-muted">Take the card on your card machine, then record it here. Maestra doesn&rsquo;t charge cards from this screen yet, so nothing is charged when you tap Record.</p>
       <AmountField value={amount} onChange={setAmount} />
       <label className={labelClass}>
         Last 4 digits or approval code (optional)
@@ -622,6 +622,7 @@ function GiftCardPay({ data, totals, onAddPayment, onClose }: Props) {
           </Button>
         </form>
       )}
+      {!card && <p className="text-13 text-ink-muted">The code is on the card, or in the email it came in. Gift cards in the sidebar lists the salon&rsquo;s cards.</p>}
       {card && (
         <>
           <p className="text-base" data-testid="gift-card-balance">

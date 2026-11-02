@@ -141,8 +141,12 @@ test.describe("owners' settings", () => {
       await page.goto("/settings");
       const usage = ui(page).getByTestId("denise-usage");
       await expect(usage).toContainText(/Today\s*[\d,]+ of 1,500,000 tokens/);
-      // The test server has no API key.
-      await expect(usage).toContainText("No: plain wording only");
+      await expect(usage).toContainText(/Last 7 days\s*[\d,]+ tokens, [\d,]+ answered/);
+      // The test server has no key: never "Working" without a call that worked.
+      const status = ui(page).getByTestId("denise-status");
+      await expect(status).toContainText("Not set up");
+      await expect(status).toContainText("uses plain wording");
+      await expect(status).not.toContainText("Working");
       await waitForHydration(page, "form[aria-label=\"Denise's daily limit\"] button");
       const form = ui(page).getByRole("form", { name: "Denise's daily limit" });
       await form.getByLabel("Daily limit (tokens)").fill("250000");

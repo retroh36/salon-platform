@@ -1,11 +1,13 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { SalonMark } from "@/components/ui/salon-mark";
 import { fieldClass, labelClass } from "@/components/ui/field";
-import { Alert } from "@/components/ui/page";
+import { Alert, Badge } from "@/components/ui/page";
+import { needsCheck, type HealthStatus } from "@/lib/denise/health";
 import {
+  checkDenise,
   removeSalonLogo,
   saveDeniseLimit,
   saveSalonName,
@@ -111,29 +113,46 @@ export function SalonSettings({
   );
 }
 
-// Denise's Claude usage and the salon's daily limit (owners).
-// Changing the limit is billing (owners); managers see the usage.
+// Whether Denise's thinking is working (a real call's outcome, checked
+// again here when nothing's been tried for an hour), her usage and the
+// salon's daily limit. Changing the limit is billing (owners); managers
+// see the rest.
 export function DeniseUsage({
   today,
   week,
-  requests,
+  answered,
+  failed,
   limit,
-  connected,
+  status: initial,
+  timeZone,
   canChange,
 }: {
   today: number;
   week: number;
-  requests: number;
+  answered: number;
+  failed: number;
   limit: number;
-  connected: boolean;
+  status: HealthStatus;
+  timeZone: string;
   canChange: boolean;
 }) {
   const [value, setValue] = useState(String(limit));
   const [result, setResult] = useState<SettingsResult | null>(null);
   const [pending, startTransition] = useTransition();
+  const [status, setStatus] = useState(initial);
+  const [checking, startCheck] = useTransition();
+  const check = useCallback(() => startCheck(async () => setStatus(await checkDenise())), []);
+  // Checked once on opening when nothing's been tried for an hour.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (opened.current) return;
+    opened.current = true;
+    if (needsCheck(initial, Date.now())) check();
+  }, [initial, check]);
   const n = (x: number) => x.toLocaleString("en-US");
   return (
     <div className="flex flex-col gap-4">
+      <DeniseStatus status={status} checking={checking} timeZone={timeZone} onCheck={check} />
       <dl className="flex flex-wrap gap-8 text-sm" data-testid="denise-usage">
         <div>
           <dt className="text-ink-muted">Today</dt>
@@ -144,13 +163,7 @@ export function DeniseUsage({
         <div>
           <dt className="text-ink-muted">Last 7 days</dt>
           <dd className="font-semibold tabular-nums">
-            {n(week)} tokens, {n(requests)} requests
-          </dd>
-        </div>
-        <div>
-          <dt className="text-ink-muted">Connected</dt>
-          <dd className="font-semibold">
-            {connected ? "Yes" : "No: plain wording only"}
+            {n(week)} tokens, {n(answered)} answered{failed > 0 ? `, ${n(failed)} failed` : ""}
           </dd>
         </div>
       </dl>
@@ -194,6 +207,43 @@ export function DeniseUsage({
           </Button>
         </form>
       )}
+    </div>
+  );
+}
+
+const atTime = (at: string, timeZone: string) =>
+  new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(at));
+
+// "Working · last answered Mon, Nov 2, 2:14 PM", or why not, with Check now.
+function DeniseStatus({ status, checking, timeZone, onCheck }: { status: HealthStatus; checking: boolean; timeZone: string; onCheck: () => void }) {
+  return (
+    <div className="flex flex-col gap-2" data-testid="denise-status">
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <span className="text-ink-muted">Status</span>
+        {checking ? (
+          <Badge tone="neutral">Checking…</Badge>
+        ) : status.kind === "working" ? (
+          <Badge tone="success">Working</Badge>
+        ) : status.kind === "failing" ? (
+          <Badge tone="danger">Not working</Badge>
+        ) : status.kind === "off" ? (
+          <Badge tone="neutral">Not set up</Badge>
+        ) : (
+          <Badge tone="neutral">Not checked yet</Badge>
+        )}
+        {!checking && status.kind === "working" && <span className="text-ink-muted">Last answered {atTime(status.at, timeZone)}</span>}
+        {status.kind !== "off" && (
+          <Button size="sm" variant="quiet" disabled={checking} onClick={onCheck}>
+            Check now
+          </Button>
+        )}
+      </div>
+      {!checking && status.kind === "failing" && (
+        <Alert>
+          {status.why} <span className="text-ink-muted">({atTime(status.at, timeZone)})</span>
+        </Alert>
+      )}
+      {status.kind === "off" && <p className="text-sm text-ink-muted">Denise isn&rsquo;t connected to her AI service, so she uses plain wording and can&rsquo;t answer questions.</p>}
     </div>
   );
 }

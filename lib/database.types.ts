@@ -67,16 +67,36 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
-                },"ai_usage": {
+                },"ai_health": {
                   Row: {
-                    "business_id": string,"cache_read_tokens": number,"day": string,"feature": string,"input_tokens": number,"model": string,"output_tokens": number,"requests": number
+                    "business_id": string,"last_failed_at": string | null,"last_failure": string | null,"last_ok_at": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"cache_read_tokens"?: number,"day": string,"feature": string,"input_tokens"?: number,"model": string,"output_tokens"?: number,"requests"?: number
+                    "business_id": string,"last_failed_at"?: string | null,"last_failure"?: string | null,"last_ok_at"?: string | null
                   }
                   Update: {
-                    "business_id"?: string,"cache_read_tokens"?: number,"day"?: string,"feature"?: string,"input_tokens"?: number,"model"?: string,"output_tokens"?: number,"requests"?: number
+                    "business_id"?: string,"last_failed_at"?: string | null,"last_failure"?: string | null,"last_ok_at"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ai_health_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: true
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"ai_usage": {
+                  Row: {
+                    "business_id": string,"cache_read_tokens": number,"day": string,"failed_requests": number,"feature": string,"input_tokens": number,"model": string,"output_tokens": number,"requests": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"cache_read_tokens"?: number,"day": string,"failed_requests"?: number,"feature": string,"input_tokens"?: number,"model": string,"output_tokens"?: number,"requests"?: number
+                  }
+                  Update: {
+                    "business_id"?: string,"cache_read_tokens"?: number,"day"?: string,"failed_requests"?: number,"feature"?: string,"input_tokens"?: number,"model"?: string,"output_tokens"?: number,"requests"?: number
                   }
                   Relationships: [
                     {
@@ -4406,6 +4426,9 @@ isOneToOne: false
                            },
 "recent_offer_clients":
 { Args: { "p_business_id": string,"p_client_ids": (string)[] }; Returns: string[]
+                           },
+"record_ai_failure":
+{ Args: { "p_business_id": string,"p_feature": string,"p_model": string,"p_reason": string }; Returns: undefined
                            },
 "record_ai_proposals":
 { Args: { "p_feature": string,"p_location_id": string,"p_options": Json,"p_subject": string }; Returns: (string)[]

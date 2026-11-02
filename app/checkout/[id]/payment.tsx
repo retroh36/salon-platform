@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/page";
 import { parseDollars, tipFor, TIP_PERCENTS } from "@/lib/checkout";
 import type { CheckoutScreenData } from "@/lib/checkout-screen";
 import { creditFor } from "@/lib/memberships-load";
-import { packageFor } from "@/lib/packages";
+import { packageFor, packageNote } from "@/lib/packages";
 import { DEPOSIT_REFERENCE } from "@/lib/policy";
 import { formatPrice } from "@/lib/services";
 import { formatMinute } from "@/lib/scheduling/time";
@@ -48,7 +48,11 @@ export function PaymentPanel({
 }) {
   // Stylists with services on the ticket, for tips.
   const stylists = data.staff.filter((s) => servicesFor(ticket, s.id, rates) > 0 || (ticket.tips[s.id] ?? 0) > 0);
-  const packageUsable = ticket.lines.some((l) => l.kind === "service" && !l.packageItemId && packageFor(data.packages, l.serviceId, data.staff.find((s) => s.id === l.staffId)?.level ?? null));
+  const levelOf = (staffId: string) => data.staff.find((s) => s.id === staffId)?.level ?? null;
+  const packageUsable = ticket.lines.some((l) => l.kind === "service" && !l.packageItemId && packageFor(data.packages, l.serviceId, levelOf(l.staffId)));
+  // Why Package is greyed out, said under the buttons.
+  const services = ticket.lines.flatMap((l) => (l.kind === "service" ? [{ serviceId: l.serviceId, name: l.name, staffLevel: levelOf(l.staffId), packageItemId: l.packageItemId }] : []));
+  const packageWhy = ticket.lines.length > 0 ? packageNote(services, data.packages, data.client) : null;
   const membershipUsable = ticket.lines.some((l) => l.kind === "service" && !l.packageItemId && !l.membershipCreditId && l.quantity === 1 && creditFor(data.memberships, l.serviceId));
   const blocking = message ?? problems[0] ?? null;
   return (
@@ -92,6 +96,11 @@ export function PaymentPanel({
             <PayButton label="Package" disabled={!packageUsable} onClick={() => onDialog({ kind: "package" })} />
             {data.memberships.length > 0 && <PayButton label="Membership" disabled={!membershipUsable} onClick={() => onDialog({ kind: "membership" })} />}
           </div>
+          {packageWhy && (
+            <p className="text-13 text-ink-muted" data-testid="package-why">
+              {packageWhy}
+            </p>
+          )}
           {data.client && ticket.payments.length === 0 && totals.dueCents > 0 && (
             <Button variant="quiet" className="self-start" onClick={() => onDialog({ kind: "payment-link" })}>
               Text a payment link instead
@@ -126,7 +135,7 @@ export function PaymentPanel({
             </ul>
           )}
           <div aria-live="polite" data-testid="remaining" className="flex flex-col gap-1 text-base font-semibold text-ink tabular-nums">
-            {totals.dueCents === 0 ? (
+            {ticket.lines.length === 0 ? null : totals.dueCents === 0 ? (
               <Badge tone="success" className="self-start">
                 Paid in full
               </Badge>

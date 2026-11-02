@@ -214,6 +214,26 @@ test("a returning client confirms with a code and is matched to their profile (a
   expect(visits).toEqual([{ id: expect.any(String), online_source: "google" }]);
 });
 
+// A tester typed a number and Send code did nothing: a number the browser
+// fills in without a typing event left the button disabled (a faded tan,
+// like a disabled Continue). The field is read when the form is sent now,
+// and an empty one says what's missing.
+test("Send code takes a number the browser filled in, and says when there isn't one", async ({ page }) => {
+  await open(page);
+  await chooseServices(page, ["Men's Cut"]);
+  await chooseStylist(page, "No preference");
+  await chooseFirstTime(page);
+  const send = flow(page).getByRole("button", { name: "Send code" });
+  await expect(send).toBeEnabled();
+  await send.click();
+  await expect(flow(page).getByText("Enter your mobile number.")).toBeVisible();
+  await expect(flow(page).getByLabel("Mobile number")).toHaveAttribute("aria-invalid", "true");
+  // Filled in without an input event, as some browsers' autofill does.
+  await flow(page).getByLabel("Mobile number").evaluate((el, v) => ((el as HTMLInputElement).value = v), newPhone());
+  await send.click();
+  await expect(flow(page).getByLabel("Code")).toBeVisible();
+});
+
 test("two people can't book the same time: the second is told and picks again", async ({ browser }) => {
   const visitor = async (b: Browser) => {
     const context = await b.newContext({ ...phone, storageState: { cookies: [], origins: [] } });

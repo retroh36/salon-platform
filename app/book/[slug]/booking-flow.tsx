@@ -14,7 +14,7 @@ import { formatMinute, type LocalDate } from "@/lib/scheduling/time";
 import { formatPrice, formatPriceRange } from "@/lib/services";
 import { formatDuration } from "@/lib/duration";
 import { book, confirmCode, findTimes, requestCode, reviewPromotion, reviewTerms, type DayTimes, type PromotionResult, type TermsResult } from "./actions";
-import { accentLink, choiceClass, inputClass, primaryButton, secondaryButton, sectionTitle, smallButton } from "./styles";
+import { accentLink, buttonSpinner, choiceClass, inputClass, primaryButton, secondaryButton, sectionTitle, smallButton } from "./styles";
 import { DateStrip, TimeGrid, longDate } from "./times";
 
 // A booking attempt's key (isAttemptKey on the server).
@@ -612,19 +612,26 @@ function DetailsStep({
   honeypot: React.RefObject<HTMLInputElement | null>;
 }) {
   const [channel, setChannel] = useState<"sms" | "email">("sms");
+  // What was sent to, for "Send a new code" (the field itself is read when
+  // the form is sent, so a number the browser filled in counts even when no
+  // typing event came).
   const [value, setValue] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  const send = () =>
+  const send = (to = value) => {
+    if (pending) return;
+    if (!to.trim()) return setError(channel === "sms" ? "Enter your mobile number." : "Enter your email address.");
+    setValue(to);
     start(async () => {
-      const result = await requestCode(site.business.slug, channel, value, honeypot.current?.value ?? "");
+      const result = await requestCode(site.business.slug, channel, to, honeypot.current?.value ?? "");
       if (!result.ok) return setError(result.message);
       setError(null);
       setCode("");
       setIdentity({ phase: "code", verificationId: result.verificationId, sentTo: result.sentTo, demoCode: result.demoCode });
     });
+  };
 
   const check = (verificationId: string) =>
     start(async () => {
@@ -653,9 +660,10 @@ function DetailsStep({
       {identity.phase === "enter" && (
         <form
           className="flex flex-col gap-4"
+          noValidate
           onSubmit={(e) => {
             e.preventDefault();
-            send();
+            send(String(new FormData(e.currentTarget).get("contact") ?? ""));
           }}
         >
           <p className="text-ink-muted">We&rsquo;ll send you a code to confirm it&rsquo;s you. Booked with us before? We&rsquo;ll find your details.</p>
@@ -676,9 +684,13 @@ function DetailsStep({
           <label className="flex flex-col gap-1.5 text-sm font-medium text-ink">
             {channel === "sms" ? "Mobile number" : "Email"}
             <input
+              key={channel}
+              name="contact"
               className={inputClass}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
+              defaultValue={value}
+              onChange={() => error && setError(null)}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "contact-error" : undefined}
               type={channel === "sms" ? "tel" : "email"}
               inputMode={channel === "sms" ? "tel" : "email"}
               autoComplete={channel === "sms" ? "tel" : "email"}
@@ -686,9 +698,14 @@ function DetailsStep({
               required
             />
           </label>
-          {error && <Alert>{error}</Alert>}
-          <button type="submit" className={primaryButton} disabled={pending || !value.trim()}>
-            {pending ? "Sending…" : "Send code"}
+          {error && (
+            <div id="contact-error">
+              <Alert>{error}</Alert>
+            </div>
+          )}
+          <button type="submit" className={primaryButton} aria-busy={pending || undefined}>
+            {pending && <span aria-hidden className={buttonSpinner} />}
+            {pending ? "Sending your code…" : "Send code"}
           </button>
           {!site.settings.allowNewClients && (
             <p className="text-sm text-ink-muted">New clients: please call {site.location.phone ?? "the salon"} to book your first visit.</p>
@@ -725,7 +742,7 @@ function DetailsStep({
             {pending ? "Checking…" : "Confirm"}
           </button>
           <div className="flex justify-between text-sm">
-            <button type="button" className={`min-h-11 ${accentLink}`} onClick={send} disabled={pending}>
+            <button type="button" className={`min-h-11 ${accentLink}`} onClick={() => send()} disabled={pending}>
               Send a new code
             </button>
             <button type="button" className={`min-h-11 ${accentLink}`} onClick={() => (setIdentity({ phase: "enter" }), setError(null))}>
