@@ -201,6 +201,51 @@ test.describe("front desk", () => {
     await expect(panel.getByTestId("denise-message")).toContainText("Bridget's running 20 min late.");
   });
 
+  // Testers looked for "Gil is running late" on Gil, not in a client's
+  // booking: it's on the stylist's column, and nothing moves until Apply.
+  test("a stylist running late, from their column: what it pushes into, previewed, applied and undone", async ({ page }) => {
+    const grace = await overrunMorning();
+    await openDay(page);
+    await ui(page).getByRole("button", { name: "More for Bridget Callahan" }).click();
+    await page.getByRole("menu", { name: "Bridget's day" }).getByRole("menuitem", { name: "Bridget is running late…" }).click();
+    const late = page.getByRole("region", { name: "Bridget is running late" });
+    await expect(late.getByTestId("late-denise")).toHaveText(`${PREFIX}Mia's Women's Cut & Style is booked until 11am. How far over is it running?`);
+    await late.getByText("20 min", { exact: true }).click();
+    await late.getByRole("button", { name: "Show what it pushes into" }).click();
+
+    // Her fix, previewed; nothing has moved yet.
+    const panel = denisePanel(page);
+    await expect(panel.getByTestId("denise-message")).toContainText("Bridget's running 20 min late.");
+    await expect(ui(page).locator("[data-fix-ghost]")).toContainText("→ 11:20am");
+    expect(await startOf(grace)).toEqual({ start: at(11).getTime(), staffId: BRIDGET });
+
+    await panel.getByRole("button", { name: "Apply fix" }).click();
+    await expect(panel.getByRole("status")).toContainText(`${PREFIX}Grace has been moved`);
+    expect(await startOf(grace)).toEqual({ start: at(11, 20).getTime(), staffId: BRIDGET });
+    await panel.getByRole("button", { name: "Undo" }).click();
+    await expect(panel.getByRole("status")).toContainText(`Undone — ${PREFIX}Grace is back at 11:00.`);
+    expect(await startOf(grace)).toEqual({ start: at(11).getTime(), staffId: BRIDGET });
+  });
+
+  test("a stylist running late with nobody in the chair yet: Mark out's coming in late, planned before anything moves", async ({ page }) => {
+    const grace = await seedCut(await newClient("Grace"), BRIDGET, at(11));
+    // Said to Denise: read by our code (this server has no AI key), with a
+    // link to Running late… for her.
+    await openDay(page);
+    await askOnCalendar(page, "Bridget is running 20 minutes late");
+    const conversation = page.getByRole("region", { name: "Conversation with Denise" });
+    await expect(conversation).toContainText("Nothing moves, and no client is messaged, until you apply a fix.");
+    await conversation.getByRole("link", { name: "Bridget is running 20 min late" }).click();
+    const late = page.getByRole("region", { name: "Bridget is running late" });
+    await expect(late.getByTestId("late-denise")).toHaveText(`Bridget isn't with a client yet. Next is ${PREFIX}Grace at 11am. How late will Bridget be?`);
+    await expect(late.getByRole("radio", { name: "20 min" })).toBeChecked();
+    await late.getByRole("button", { name: "Plan for 11:30am" }).click();
+    const out = page.getByRole("region", { name: "Mark Bridget out" });
+    await expect(out.getByRole("radio", { name: "Coming in late…" })).toBeChecked();
+    await expect(out.getByTestId("out-denise")).toContainText("1 client needs a new spot");
+    expect(await startOf(grace)).toEqual({ start: at(11).getTime(), staffId: BRIDGET });
+  });
+
   test("dismisses a fix", async ({ page }) => {
     await overrunMorning();
     await openDay(page);

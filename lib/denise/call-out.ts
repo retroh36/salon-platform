@@ -1,6 +1,7 @@
 // "Nola called out", "Gil has to leave at 1": a stylist out, read by our
 // code (no Claude), so Denise can open "Mark … out" on the calendar for
-// them. Pure.
+// them. "Gil is running 20 minutes late" the same way, for "Running
+// late…". Pure.
 
 export type CallOutRead = { staffId: string; firstName: string; from: number | null };
 
@@ -34,4 +35,25 @@ export function readCallOut(text: string, stylists: readonly { id: string; first
     return from === null ? null : { staffId: named[0].id, firstName: named[0].firstName, from };
   }
   return OUT.test(line) ? { staffId: named[0].id, firstName: named[0].firstName, from: null } : null;
+}
+
+export type RunningLateRead = { staffId: string; firstName: string; minutes: number | null };
+
+const RUNNING_LATE = /\b(running|is|'s|are)\b.*\b(late|behind)\b|\b(late|behind) by\b/i;
+const MINUTES = /\b(\d{1,3})\s*(m|mins?|minutes?)\b|\b(?:late|behind) by (\d{1,3})\b/i;
+
+// A stylist running late, said as a statement ("Is Gil running late?" is
+// a question for Ask Denise), with how late when it's said.
+export function readRunningLate(text: string, stylists: readonly { id: string; firstName: string }[]): RunningLateRead | null {
+  const line = text.slice(0, 300).trim();
+  if (line.endsWith("?") || /^(is|are|was|how|why|when|will|who)\b/i.test(line)) return null;
+  if (!RUNNING_LATE.test(line) || /\bcoming in late\b/i.test(line)) return null;
+  // "Gil's client is running late", "Gil's 11 o'clock…": a client, for the
+  // booking's own Running late.
+  if (/\bclients?\b|'s\s+\d/i.test(line)) return null;
+  const named = stylists.filter((s) => new RegExp(`\\b${s.firstName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(line));
+  if (named.length !== 1) return null;
+  const m = MINUTES.exec(line);
+  const said = m ? Number(m[1] ?? m[3]) : /\bhalf an hour\b/i.test(line) ? 30 : /\ban hour\b/i.test(line) ? 60 : null;
+  return { staffId: named[0].id, firstName: named[0].firstName, minutes: said !== null && said > 0 ? said : null };
 }

@@ -32,7 +32,9 @@ import type { Scope } from "@/lib/scheduling/series";
 import { moveBlock } from "./block-actions";
 import { BlockPanel, repeatLabel } from "./block-panel";
 import { AppointmentPanel } from "./appointment-panel";
+import { LatePanel } from "./late-panel";
 import { OutPanel, type OutPreview } from "./out-panel";
+import { lateTarget } from "@/lib/running-late";
 import type { OutWhen } from "@/lib/rescue";
 import { approveDeniseFix, bookFromWaitlist, dismissDeniseItem, rejectDeniseFix, scanDenise, undoDeniseFix } from "./denise-actions";
 import { appendDenise, askDenise, focusDenise, hydrateDenise, startDenise, takeAdjust, useDenise } from "@/components/denise-chat/store";
@@ -93,8 +95,11 @@ type Selection =
   | { kind: "detail"; appointmentId: string }
   | { kind: "walk-ins" }
   | { kind: "group"; start: BookingStart }
-  // "Mark … out" on a stylist's column (./out-panel.tsx).
-  | { kind: "out"; staffId: string; leaves: number | null };
+  // "Mark … out" on a stylist's column (./out-panel.tsx): `leaves` or
+  // `arrives` starts it on leaving early or coming in late at that time.
+  | { kind: "out"; staffId: string; leaves: number | null; arrives?: number }
+  // "Running late…" on a stylist's column (./late-panel.tsx).
+  | { kind: "late"; staffId: string; minutes: number | null };
 
 type Tab = "denise" | "details";
 
@@ -176,7 +181,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
         ? { kind: "book", start: data.focus.book.start, client: data.focus.book.client }
         : data.focus.out
           ? { kind: "out", staffId: data.focus.out.staffId, leaves: data.focus.out.leaves }
-          : { kind: "none" },
+          : data.focus.late
+            ? { kind: "late", staffId: data.focus.late.staffId, minutes: data.focus.late.minutes }
+            : { kind: "none" },
   );
   // While "Mark … out" is open: their time out and where clients would go.
   const [outPreview, setOutPreview] = useState<OutPreview | null>(null);
@@ -206,7 +213,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const [tab, setTab] = useState<Tab>(linked || data.focus.book ? "details" : "denise");
   // The panel is closed until something opens it: a booking, a new
   // booking, Denise spotting something, or a question for her.
-  const [panelOpen, setPanelOpen] = useState(Boolean(linked || data.focus.book || data.focus.out || data.focus.denise || data.focus.ask));
+  const [panelOpen, setPanelOpen] = useState(Boolean(linked || data.focus.book || data.focus.out || data.focus.late || data.focus.denise || data.focus.ask));
   // What Denise has that hasn't been looked at in her panel yet.
   const [unseen, setUnseen] = useState<ReadonlySet<string>>(new Set());
 
@@ -546,6 +553,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   }
   const firstNameOf = (staffId: string) => data.columns.find((c) => c.staffId === staffId)?.firstName ?? "the stylist";
   const openOut = (staffId: string) => select({ kind: "out", staffId, leaves: null });
+  const openLate = (staffId: string) => select({ kind: "late", staffId, minutes: null });
   const markOut = (staffId: string, when: OutWhen) =>
     trigger({ action: "report_out", date: data.date, staffId, when }, `Looking at ${firstNameOf(staffId)}'s clients…`);
   const reportLate = (itemId: string, minutes: number) => trigger({ action: "report_late", date: data.date, itemId, minutes }, "Checking what that pushes into…");
@@ -557,8 +565,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   useEffect(() => {
     if (followed.current) return;
     followed.current = true;
-    const { staffId, denise: openDenise, appointmentId, ask: question, book, out } = data.focus;
-    if (!staffId && !openDenise && !appointmentId && !question && !book && !out) return;
+    const { staffId, denise: openDenise, appointmentId, ask: question, book, out, late } = data.focus;
+    if (!staffId && !openDenise && !appointmentId && !question && !book && !out && !late) return;
     if (staffId) columnRefs.current.get(staffId)?.scrollIntoView({ inline: "center", block: "nearest" });
     if (staffId) setTimeout(() => setFocusedStaff(null), 2500);
     if (question) queueMicrotask(() => ask(question));
@@ -1104,7 +1112,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         )}
                         {!squeezed && c.working && data.date >= data.today && (me.canBook || me.staffId === c.staffId) && (
                           <div className="absolute right-1 bottom-1">
-                            <OutMenu column={c} self={me.staffId === c.staffId} onMarkOut={openOut} />
+                            <OutMenu column={c} self={me.staffId === c.staffId} onMarkOut={openOut} onRunningLate={data.date >= data.today ? openLate : null} />
                           </div>
                         )}
                       </div>
@@ -1339,7 +1347,27 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             panelOpen ? "visible translate-x-0" : "invisible translate-x-full"
           }`}
         >
-          {selection.kind === "out" ? (
+          {selection.kind === "late" ? (
+            <LatePanel
+              key={`${selection.staffId}:${data.date}`}
+              firstName={firstNameOf(selection.staffId)}
+              self={me.staffId === selection.staffId}
+              target={lateTarget(
+                data.blocks.filter((b) => b.status !== "canceled"),
+                selection.staffId,
+                data.date === data.today ? nowMinute : null,
+              )}
+              nowMinute={data.date === data.today ? nowMinute : null}
+              minutes={selection.minutes}
+              onClose={() => leave(closeDetails)}
+              onReport={(itemId, minutes) => {
+                // Denise looks at what it pushes into, in her tab.
+                setSelection({ kind: "none" });
+                reportLate(itemId, minutes);
+              }}
+              onComingInLate={(arrives) => setSelection({ kind: "out", staffId: selection.staffId, leaves: null, arrives })}
+            />
+          ) : selection.kind === "out" ? (
             <OutPanel
               key={`${selection.staffId}:${data.date}`}
               staffId={selection.staffId}
@@ -1350,6 +1378,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               canPlan={me.canBook}
               hours={workingHours(data.columns.find((c) => c.staffId === selection.staffId), range)}
               leaves={selection.leaves}
+              arrives={selection.arrives ?? null}
               onPreview={setOutPreview}
               onClose={() => leave(closeDetails)}
               onApplied={() => router.refresh()}
@@ -1800,11 +1829,14 @@ function workingHours(column: ColumnData | undefined, range: { start: number; en
   return start < end ? { start, end } : range;
 }
 
-// The stylist's column menu: "Mark … out…", which opens the panel to
-// choose when and plan where their clients go.
+// The stylist's column menu: "… is running late…" (today and later) and
+// "Mark … out…", each opening the side panel to say how late or when, and
+// plan where their clients go.
 const MENU_MARGIN = 8;
+const MENU_ITEM =
+  "flex w-full items-center rounded-md px-3 py-2 text-left text-sm whitespace-nowrap text-ink transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:bg-sunken focus-visible:outline-none";
 
-function OutMenu({ column, self, onMarkOut }: { column: ColumnData; self: boolean; onMarkOut: (staffId: string) => void }) {
+function OutMenu({ column, self, onMarkOut, onRunningLate }: { column: ColumnData; self: boolean; onMarkOut: (staffId: string) => void; onRunningLate: ((staffId: string) => void) | null }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -1880,11 +1912,25 @@ function OutMenu({ column, self, onMarkOut }: { column: ColumnData; self: boolea
             className="fixed z-[60] flex min-w-44 origin-top-right animate-pop-in flex-col rounded-lg border border-line bg-surface p-1.5 shadow-lift"
             style={{ top: place.top, right: place.right }}
           >
+            {onRunningLate && (
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={-1}
+                className={MENU_ITEM}
+                onClick={() => {
+                  setOpen(false);
+                  onRunningLate(column.staffId);
+                }}
+              >
+                {self ? "I'm running late…" : `${column.firstName} is running late…`}
+              </button>
+            )}
             <button
               type="button"
               role="menuitem"
               tabIndex={-1}
-              className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm whitespace-nowrap text-ink transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:bg-sunken focus-visible:outline-none"
+              className={MENU_ITEM}
               onClick={() => {
                 setOpen(false);
                 onMarkOut(column.staffId);

@@ -17,7 +17,9 @@ import { bookingDeps, bookingMenu, cleanRequest } from "@/lib/denise/booking-loa
 import { readBookingRequest } from "@/lib/denise/booking-request";
 import { pageContext } from "@/lib/denise/page";
 import { clientPolicyNote } from "@/app/calendar/actions";
-import { readCallOut } from "@/lib/denise/call-out";
+import { readCallOut, readRunningLate } from "@/lib/denise/call-out";
+import { formatDuration } from "@/lib/duration";
+import { lateChoice } from "@/lib/running-late";
 import { isConnected } from "@/lib/denise/claude";
 import { assistantContext } from "@/lib/denise/context";
 import { claudeFor, deniseDay } from "@/lib/denise/day-state";
@@ -126,6 +128,22 @@ async function callOutIn(s: DeniseSession, text: string, date: string) {
   };
 }
 
+// "Gil is running 20 minutes late": Running late… on the calendar for them
+// (the front of house, or a stylist about themselves), read by our code.
+async function lateIn(s: DeniseSession, text: string, date: string) {
+  const { data: team } = await s.supabase.from("staff").select("id, first_name, staff_services(service_id)").eq("location_id", s.viewer.location.id).eq("is_active", true);
+  const read = readRunningLate(text, (team ?? []).filter((t) => t.staff_services.length > 0).map((t) => ({ id: t.id, firstName: t.first_name })));
+  if (!read) return null;
+  if (!canBook(s.me.role) && read.staffId !== s.me.id) return { t: "done" as const, reply: { text: `The front desk can tell me ${read.firstName} is running late, from the ⋯ on ${read.firstName}'s column on the calendar.`, kind: "nothing" as const } };
+  const self = read.staffId === s.me.id;
+  const how = read.minutes ? ` ${formatDuration(lateChoice(read.minutes))}` : "";
+  return {
+    t: "done" as const,
+    reply: { text: `Got it. Tell me how late${self ? "" : ` ${read.firstName} is`} and I'll show what it pushes into. Nothing moves, and no client is messaged, until you apply a fix.`, kind: "fixes" as const },
+    links: [{ path: `/calendar?date=${date}&late=${read.staffId}${read.minutes ? `&minutes=${lateChoice(read.minutes)}` : ""}`, label: self ? `I'm running${how} late` : `${read.firstName} is running${how} late` }],
+  };
+}
+
 // The booking request on screen, as the browser sent it back.
 function cleanState(raw: unknown): BookingState | null {
   if (!raw || typeof raw !== "object") return null;
@@ -219,7 +237,10 @@ async function run(s: DeniseSession, body: DeniseRequest, send: Send) {
       // "Nola called out", "Gil has to leave at 1": marking them out,
       // read by our code (no Claude needed).
       const last = [...(Array.isArray(body.history) ? body.history : [])].reverse().find((m) => m.role === "user");
-      const out = last ? await callOutIn(s, String(last.text), isLocalDate(body.date) && body.date > s.today ? body.date : s.today) : null;
+      const day = isLocalDate(body.date) && body.date > s.today ? body.date : s.today;
+      const late = last ? await lateIn(s, String(last.text), day) : null;
+      if (late) return send(late);
+      const out = last ? await callOutIn(s, String(last.text), day) : null;
       if (out) return send(out);
       const page = await pageContext(s.supabase, body.page);
       // A booking request, or a follow-up to one: booking cards, worked out

@@ -1,3 +1,4 @@
+import { lateChoice } from "@/lib/running-late";
 import { allowedChannels, consentOf, noTextsFlag } from "@/lib/messaging/consent";
 import type { Metadata } from "next";
 import { isUuid } from "@/lib/ids";
@@ -500,6 +501,10 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
       out:
         typeof params.out === "string" && isUuid(params.out) && date >= today && (canBook(me.role) || params.out === me.id)
           ? { staffId: params.out, leaves: typeof params.leaves === "string" ? parseTime(params.leaves) : null }
+          : null,
+      late:
+        typeof params.late === "string" && isUuid(params.late) && date >= today && (canBook(me.role) || params.late === me.id)
+          ? { staffId: params.late, minutes: typeof params.minutes === "string" && /^\d{1,3}$/.test(params.minutes) ? lateChoice(Number(params.minutes)) : null }
           : null,
     },
     date,

@@ -53,6 +53,7 @@ export function OutPanel({
   canPlan,
   hours,
   leaves,
+  arrives = null,
   onClose,
   onPreview,
   onMarkOutOnly,
@@ -70,6 +71,8 @@ export function OutPanel({
   hours: { start: number; end: number };
   // "Gil has to leave at 1" (from Denise): leaving early at that minute.
   leaves: number | null;
+  // From "Running late…": coming in late at this time.
+  arrives?: number | null;
   onClose: () => void;
   onPreview: (preview: OutPreview | null) => void;
   // Mark them out without moving anyone: Denise does it, and her fixes
@@ -92,9 +95,9 @@ export function OutPanel({
       ? { kind: "all" }
       : {
           kind,
-          minute: nearest(kind === "early" ? (leaves ?? (nowMinute !== null && nowMinute > hours.start ? Math.ceil(nowMinute / STEP) * STEP : 13 * 60)) : hours.start + 120),
+          minute: nearest(kind === "early" ? (leaves ?? (nowMinute !== null && nowMinute > hours.start ? Math.ceil(nowMinute / STEP) * STEP : 13 * 60)) : (arrives ?? hours.start + 120)),
         };
-  const [when, setWhen] = useState<OutWhen>(() => (leaves !== null ? startFor("early") : { kind: "all" }));
+  const [when, setWhen] = useState<OutWhen>(() => (leaves !== null ? startFor("early") : arrives !== null ? startFor("late") : { kind: "all" }));
 
   // Plans loaded for each time out (the all-day one first, so a new choice
   // shows at once from the visits it touches, until its own plan arrives).

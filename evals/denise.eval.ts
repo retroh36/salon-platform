@@ -435,9 +435,13 @@ const CASES: Case[] = [
     as: "owner",
     tools: ["rewards_summary"],
     facts: async () => {
-      const { data } = await admin.from("reward_points").select("client_id, delta").eq("business_id", B);
+      // Every row, a page at a time (a query returns 1,000 at most).
       const by = new Map<string, number>();
-      for (const r of data!) by.set(r.client_id, (by.get(r.client_id) ?? 0) + r.delta);
+      for (let from = 0; ; from += 1000) {
+        const { data } = await admin.from("reward_points").select("client_id, delta").eq("business_id", B).order("id").range(from, from + 999);
+        for (const r of data!) by.set(r.client_id, (by.get(r.client_id) ?? 0) + r.delta);
+        if (data!.length < 1000) break;
+      }
       return { points: [...by.values()].reduce((n, v) => n + Math.max(v, 0), 0).toLocaleString("en-US") };
     },
     check: (a, f) => (has(a, f.points) ? null : `should say ${f.points} points`),

@@ -225,5 +225,7 @@ export type BoardData = {
     book: { client: ClientOption; start: BookingStart } | null;
     // ?out=<staff>[&leaves=13:00]: the "Mark … out" panel (from Denise or Team).
     out: { staffId: string; leaves: number | null } | null;
+    // "Gil is running 20 minutes late" from Denise: Running late… for them.
+    late: { staffId: string; minutes: number | null } | null;
   };
 };
