@@ -17,6 +17,7 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { formatMinute } from "@/lib/scheduling/time";
 import { BookingCardView, FormLink } from "./booking-card";
 import { appendDenise, askDenise, useDenise, type DeniseRun } from "./store";
+import { setUnsaved } from "@/lib/unsaved-work";
 
 // The input's id, so the keyboard shortcut and "Ask Denise" can put the
 // cursor in it.
@@ -99,6 +100,11 @@ export function DeniseChat({
 
 function AskForm({ onAsk, disabled, focus, canBook, placeholder }: { onAsk: (question: string) => void; disabled: boolean; focus: number; canBook: boolean; placeholder?: string }) {
   const [question, setQuestion] = useState("");
+  // Typed and not yet sent: a stalled page won't reload over it.
+  useEffect(() => {
+    setUnsaved("denise-box", question.trim() !== "");
+    return () => setUnsaved("denise-box", false);
+  }, [question]);
   const input = useRef<HTMLInputElement>(null);
   const [opening, start] = useTransition();
   const [error, setError] = useState<string | null>(null);

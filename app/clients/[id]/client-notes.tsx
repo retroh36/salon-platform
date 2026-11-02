@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { fieldClass } from "@/components/ui/field";
 import { MAX_CLIENT_NOTES } from "@/lib/client-profile";
 import { saveClientNotes } from "../actions";
+import { setUnsaved, trackSave } from "@/lib/unsaved-work";
 
 // The client's notes, right under the header: clicking the box (or Enter
 // on it) opens it for editing; it saves as you type and when you leave it,
@@ -24,10 +25,11 @@ export function ClientNotes({ clientId, initial, edited, editable }: { clientId:
       clearTimeout(timer.current);
       if (value.trim() === saved.current.trim()) return;
       setState({ kind: "saving" });
-      void saveClientNotes(clientId, value).then(
+      void trackSave(saveClientNotes(clientId, value)).then(
         (r) => {
           if (!r.ok) return setState({ kind: "error", message: r.message });
           saved.current = value;
+          if (latest.current === value) setUnsaved(`notes:${clientId}`, false);
           setEditedText(r.edited);
           if (latest.current === value) setState({ kind: "saved" });
         },
@@ -61,6 +63,7 @@ export function ClientNotes({ clientId, initial, edited, editable }: { clientId:
               const value = e.target.value;
               setNotes(value);
               latest.current = value;
+              setUnsaved(`notes:${clientId}`, value.trim() !== saved.current.trim());
               setState({ kind: "idle" });
               clearTimeout(timer.current);
               timer.current = setTimeout(() => save(value), NOTES_SAVE_DELAY);

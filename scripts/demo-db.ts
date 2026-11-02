@@ -227,6 +227,10 @@ if (command === "migrate") {
     const schema = schemaProblem();
     console.log(schema ?? "The database has exactly this code's migrations.");
     ok &&= !schema;
+    // Both salons, with staff and visits today (read only).
+    const fresh = freshProblems();
+    if (fresh.length) console.log(fresh.join("\n"));
+    ok &&= !fresh.length;
   }
   const { data: salons, error: salonError } = await admin.from("businesses").select("id, name");
   if (salonError) fail(`Couldn't read the salons: ${salonError.message}`);

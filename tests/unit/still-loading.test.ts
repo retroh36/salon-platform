@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RELOAD_LOAD_MS, SLOW_LOAD_MS, watchLoading } from "@/components/still-loading";
+import { hasUnsavedWork, resetUnsavedWork, setUnsaved, trackSave } from "@/lib/unsaved-work";
 
 const memory = () => {
   const m = new Map<string, string>();
@@ -45,6 +46,32 @@ describe("a page that stalls while loading", () => {
     watchLoading("/clients", storage, stalled);
     vi.advanceTimersByTime(RELOAD_LOAD_MS);
     expect(stalled.reload).toHaveBeenCalledOnce();
+  });
+
+  it("never reloads by itself over unsaved work: Reload is offered instead", () => {
+    resetUnsavedWork();
+    setUnsaved("checkout:1", true);
+    const on = { slow: vi.fn(), reload: vi.fn(), unsaved: hasUnsavedWork };
+    watchLoading("/checkout/1", memory(), on);
+    vi.advanceTimersByTime(RELOAD_LOAD_MS);
+    expect(on.slow).toHaveBeenCalledOnce();
+    expect(on.reload).not.toHaveBeenCalled();
+    resetUnsavedWork();
+  });
+
+  it("counts a change as unsaved until it's saved, and a save on its way too", async () => {
+    resetUnsavedWork();
+    expect(hasUnsavedWork()).toBe(false);
+    setUnsaved("notes:a", true);
+    expect(hasUnsavedWork()).toBe(true);
+    setUnsaved("notes:a", false);
+    let finish!: () => void;
+    const save = trackSave(new Promise<void>((r) => (finish = r)));
+    expect(hasUnsavedWork()).toBe(true);
+    finish();
+    await save;
+    await Promise.resolve();
+    expect(hasUnsavedWork()).toBe(false);
   });
 
   it("never reloads without storage to remember it by (no loop)", () => {

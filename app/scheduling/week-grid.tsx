@@ -35,6 +35,7 @@ import { discardWeek, publishWeek, saveDays } from "./actions";
 import { DayEditor } from "./day-editor";
 import { PatternEditor } from "./pattern-editor";
 import { PublishSheet } from "./publish-sheet";
+import { trackSave } from "@/lib/unsaved-work";
 
 // A shift's times, short enough for a pill but always both ends: "9–5",
 // "9:30–1".
@@ -102,7 +103,7 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
     setCells(next);
     setNotice(null);
     start(async () => {
-      const r = await saveDays(edits);
+      const r = await trackSave(saveDays(edits));
       if (!r.ok) {
         setCells(before);
         setNotice({ tone: "error", text: r.message });

@@ -30,6 +30,7 @@ import { ProductPicker } from "./products";
 import { LinkWaiting } from "./payment-link";
 import { Success } from "./success";
 import { ClientHeader, TicketList } from "./ticket-view";
+import { setUnsaved, trackSave } from "@/lib/unsaved-work";
 
 const SAVE_DELAY_MS = 500;
 
@@ -77,8 +78,12 @@ export function CheckoutScreen({ data, denise }: { data: CheckoutScreenData; den
   const flush = useCallback(async () => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
-    return saveTicket(data.draft.id, latest.current).then(
-      () => true,
+    const sent = latest.current;
+    return trackSave(saveTicket(data.draft.id, sent)).then(
+      () => {
+        if (latest.current === sent) setUnsaved(`checkout:${data.draft.id}`, false);
+        return true;
+      },
       () => false,
     );
   }, [data.draft.id]);
@@ -91,11 +96,18 @@ export function CheckoutScreen({ data, denise }: { data: CheckoutScreenData; den
         latest.current = value;
         return value;
       });
+      setUnsaved(`checkout:${data.draft.id}`, true);
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => {
         timer.current = null;
         // Offline, it's saved on the next change, on leaving, or by Complete sale.
-        saveTicket(data.draft.id, latest.current).catch(() => {});
+        const sent = latest.current;
+        trackSave(saveTicket(data.draft.id, sent)).then(
+          () => {
+            if (latest.current === sent) setUnsaved(`checkout:${data.draft.id}`, false);
+          },
+          () => {},
+        );
       }, SAVE_DELAY_MS);
     },
     [data.draft.id],

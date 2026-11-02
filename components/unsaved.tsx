@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 import { Sheet } from "./ui/sheet";
+import { setUnsaved } from "@/lib/unsaved-work";
 
 // Half-filled forms in a side panel (a new booking, a group, blocked time,
 // a walk-in): leaving one asks first, so nothing typed is lost by a stray
@@ -15,10 +16,15 @@ const UnsavedContext = createContext<(dirty: boolean) => void>(() => {});
 
 export function useUnsavedChanges(dirty: boolean) {
   const set = useContext(UnsavedContext);
+  const key = `form:${useId()}`;
   useEffect(() => {
     set(dirty);
-    return () => set(false);
-  }, [dirty, set]);
+    setUnsaved(key, dirty);
+    return () => {
+      set(false);
+      setUnsaved(key, false);
+    };
+  }, [dirty, set, key]);
 }
 
 export function useLeaveGuard() {
