@@ -144,7 +144,7 @@ test("a busy checkout: search and quick-add, edit and remove with undo, an added
 
   // Nothing can be completed until it's paid.
   await expect(co.payment.getByRole("button", { name: /^Complete sale/ })).toBeDisabled();
-  await expect(co.payment.getByTestId("checkout-blocked")).toHaveText(/still to pay\.$/);
+  await expect(co.payment.getByTestId("checkout-blocked")).toHaveText("Choose how they're paying.");
   // The busy ticket, every line in view (the editor closed, the toast gone).
   await co.ticket.getByRole("button", { name: /^Blowout: .*Edit$/ }).click();
   await co.ticket.getByRole("button", { name: /^Blowout: .*Edit$/ }).click();

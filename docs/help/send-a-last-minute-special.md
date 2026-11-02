@@ -17,6 +17,7 @@ Denise lists openings coming up with regulars who'd fit them, and a message to s
 - Denise suggests regulars who are due back with nothing booked, usually see that stylist (or have services the stylist does), and said yes to offers.
 - The message is written by Maestra from a set template, never by Denise. If your role can write its own messages, you can change the words.
 - Offers go out between 9am and 8pm, at most one offer or reminder a week per client, and each special once per client. Every message ends with how to stop offers.
+- The message has a short booking link (like `…/b/K7QM3XRP`). It opens your booking site with the stylist and the client's usual services already chosen, and keeps working after the special ends.
 - A last-minute special needs to be running (see "Set up a promotion or last-minute special").
 - Texts and email wait in the outbox until they're connected.
 

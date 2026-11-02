@@ -304,7 +304,30 @@ test.describe("front desk", () => {
     }
   });
 
-  test("groups clients who haven't arrived into one card, to mark a no-show or dismiss for good", async ({ page }) => {
+  test("New booking today starts at the next quarter hour, and a time already gone says so but is allowed", async ({ page }) => {
+    const nowMinute = toLocal(new Date(), TZ).minute;
+    test.skip(nowMinute < 30 || nowMinute > 23 * 60, "Needs room before and after now");
+    // Bridget, working all day today whatever day it is.
+    const reopen = await openAllDay([SEED.staff.bridget]);
+    try {
+      await openDay(page, today);
+      await ui(page).getByRole("button", { name: "New booking" }).click();
+      const starts = ui(page).getByRole("group", { name: "Service 1" }).getByLabel("Starts");
+      const minute = (value: string) => Number(value.slice(0, 2)) * 60 + Number(value.slice(3, 5));
+      const first = minute(await starts.inputValue());
+      expect(first).toBeGreaterThanOrEqual(Math.ceil(nowMinute / 15) * 15);
+      expect(first).toBeLessThanOrEqual(Math.ceil(nowMinute / 15) * 15 + 15);
+      await expect(page.getByTestId("past-time-note")).toHaveCount(0);
+      // Recording a visit that already happened: a note, nothing blocked.
+      await starts.fill("00:15");
+      await expect(page.getByTestId("past-time-note")).toContainText("That time has already passed.");
+      await expect(ui(page).getByRole("button", { name: "Create booking" })).toBeEnabled();
+    } finally {
+      await reopen();
+    }
+  });
+
+  test("groups clients who haven't arrived into one card, visits that are over into another, to mark a no-show or dismiss for good", async ({ page }) => {
     const nowMinute = toLocal(new Date(), TZ).minute;
     test.skip(nowMinute < 60 || nowMinute > 23 * 60, "Needs room for visits due in the last hour");
     // Ben's name is long: it wraps, never cut off.
@@ -317,20 +340,29 @@ test.describe("front desk", () => {
     const [anaBen, cyStylist, deeStylist] = team.map((t) => t.id);
     const reopen = await openAllDay([anaBen, cyStylist, deeStylist]);
     try {
-      // Due 15 and 50 minutes ago, one after the other (not a clash), and
-      // 30 minutes ago with another stylist; 5 minutes ago is still in the
+      // Due 50 and 15 minutes ago, one after the other (not a clash; Ana's
+      // 30 minutes are over, so hers is to settle, not to chase), and 25
+      // minutes ago with another stylist; 5 minutes ago is still in the
       // grace period.
-      await book(ana, "Men's Cut", new Date(Date.now() - 15 * 60_000), anaBen);
-      await book(ben, "Men's Cut", new Date(Date.now() - 50 * 60_000), anaBen);
-      const cyVisit = await book(cy, "Men's Cut", new Date(Date.now() - 30 * 60_000), cyStylist);
+      await book(ana, "Men's Cut", new Date(Date.now() - 50 * 60_000), anaBen);
+      await book(ben, "Men's Cut", new Date(Date.now() - 15 * 60_000), anaBen);
+      const cyVisit = await book(cy, "Men's Cut", new Date(Date.now() - 25 * 60_000), cyStylist);
       await book(dee, "Men's Cut", new Date(Date.now() - 5 * 60_000), deeStylist);
       await openDay(page, today);
       await page.getByTestId("denise-launcher").click();
       const card = page.getByTestId("denise-late");
-      await expect(card).toContainText(/not arrived yet/);
+      await expect(card).toContainText("2 not arrived yet");
       await expect(card).toContainText("Give them a call");
       const line = (name: string) => card.getByRole("listitem").filter({ hasText: `${PREFIX}${name}` });
-      await expect(line("Ana")).toContainText(/Due \d/);
+      await expect(line("Ben")).toContainText(/Due \d/);
+      // Ana's booked time is over: no call to make, just to settle.
+      const never = page.getByTestId("denise-never-in");
+      const settle = (name: string) => never.getByRole("listitem").filter({ hasText: `${PREFIX}${name}` });
+      await expect(never).toContainText("Never checked in");
+      await expect(never).toContainText("Their booked time is over.");
+      await expect(never).not.toContainText("Give them a call");
+      await expect(settle("Ana")).toContainText(/Booked \d/);
+      await expect(line("Ana")).toHaveCount(0);
       await expect(line("Ben").getByRole("button", { name: "Open" })).toBeVisible();
       // Each row: the full name on its own line, the due time under it, the
       // actions below that, and dismiss in the top right corner.
@@ -364,14 +396,14 @@ test.describe("front desk", () => {
       await expect(page.getByTestId("no-show-toast")).toContainText("is marked a no-show.");
       await expect.poll(() => status(cyVisit)).toBe("no_show");
 
-      await line("Ana").getByRole("button", { name: `Dismiss ${PREFIX}Ana Test` }).click();
-      await expect(line("Ana")).toHaveCount(0);
+      await settle("Ana").getByRole("button", { name: `Dismiss ${PREFIX}Ana Test` }).click();
+      await expect(settle("Ana")).toHaveCount(0);
       await expect.poll(async () => (await admin.from("denise_dismissals").select("id").eq("location_id", L).eq("day", today).like("item_key", "late:%")).data!.length).toBeGreaterThan(0);
       await page.reload();
       await waitForHydration(page, "section[data-staff-id]");
       await page.getByTestId("denise-launcher").click();
       await expect(page.getByTestId("denise-late").getByRole("listitem").filter({ hasText: `${PREFIX}Ben` })).toBeVisible();
-      await expect(page.getByTestId("denise-late").getByRole("listitem").filter({ hasText: `${PREFIX}Ana` })).toHaveCount(0);
+      await expect(page.getByTestId("denise-never-in")).toHaveCount(0);
 
       await line("Ben").getByRole("button", { name: "Open" }).click();
       await expect(details(page).getByTestId("client-name")).toHaveText(`${PREFIX}${BEN} Test`);

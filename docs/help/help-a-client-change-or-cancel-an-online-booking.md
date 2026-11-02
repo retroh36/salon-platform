@@ -18,4 +18,4 @@ Clients who booked online can move or cancel their own visit from the page they 
 - Texts and email aren't connected yet, so the confirmation with this link doesn't reach clients for now. They can still call, and you can change the booking on the calendar.
 - A moved booking keeps its services; the page also has **Book another visit**.
 - Online bookings show a globe in booking details' **History** tab.
-- A cancellation or a new booking by a client never comes from Denise: she never messages clients.
+- A cancellation or a new booking by a client never comes from Denise, who never messages clients.

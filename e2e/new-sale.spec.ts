@@ -51,6 +51,10 @@ test("New sale on Sales: a walk-in guest, credited to whoever is signed in", asy
 
   await co.addProduct(`${PREFIX}-WS`);
   await expect(co.lines).toHaveCount(1);
+  // The line and its group name Sam, though Sam isn't a stylist.
+  await expect(co.lines.first()).toContainText("sold by Sam");
+  await expect(co.ticket).not.toContainText("undefined");
+  await expect(co.ticket).not.toContainText("Not credited to a stylist");
   await co.cash();
   await co.complete();
 

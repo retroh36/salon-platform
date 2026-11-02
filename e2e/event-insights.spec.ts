@@ -16,10 +16,16 @@ test("Denise's brief flags the events coming up, each one linking to its event",
   await page.goto("/dashboard");
   const events = ui(page).getByTestId("brief-events");
   await expect(events.getByRole("heading", { name: /Events coming up/ })).toBeVisible();
-  const rossi = events.getByRole("link").filter({ hasText: "A payment didn't go through. Try the card again, or send a card link." });
-  await expect(rossi).toContainText(/Rossi wedding (today|tomorrow|in \d days)/);
-  await expect(events).toContainText("The trial isn't booked yet.");
-  await expect(events).toContainText("Nola has time off then. Choose someone else.");
+  // One row per event, its issues under its name once.
+  const rossiName = /^Rossi wedding (today|tomorrow|in \d days)$/;
+  const rossi = events.getByRole("link", { name: rossiName });
+  await expect(rossi).toHaveCount(1);
+  await expect(events.getByRole("listitem").filter({ has: page.getByRole("link", { name: rossiName }) }).first()).toContainText("A payment didn't go through. Try the card again, or send a card link.");
+  const okaforName = /^Okafor wedding in \d+ days$/;
+  await expect(events.getByRole("link", { name: okaforName })).toHaveCount(1);
+  const okaforRow = events.getByRole("listitem").filter({ has: page.getByRole("link", { name: okaforName }) }).first();
+  await expect(okaforRow).toContainText("The trial isn't booked yet.");
+  await expect(okaforRow).toContainText("Nola has time off then. Choose someone else.");
 
   await waitForHydration(page, "[data-testid=brief-events] button");
   const trial = events.getByRole("button", { name: /^Dismiss Okafor wedding in \d+ days: The trial isn't booked yet\.$/ });

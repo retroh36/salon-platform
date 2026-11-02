@@ -7,7 +7,7 @@ open: /inventory | Open Inventory
 
 Denise checks stock against the next two weeks of bookings and suggests an order for each supplier before anything runs out.
 
-1. In the sidebar, tap **Inventory** (or tap **Review on Inventory** on her reorder card in Denise's panel on the calendar).
+1. In the sidebar, tap **Inventory** (or tap **Review on Inventory** on the reorder card in Denise's panel on the calendar).
 2. Read Denise's suggestions at the top. Tap **What's in it** to see each product, how many and why.
 3. Tap **Draft this order** to turn a suggestion into a draft, or **Dismiss** to skip it.
 4. Tap **Open order** to check the draft. Change products, quantities or costs and tap **Save draft**.

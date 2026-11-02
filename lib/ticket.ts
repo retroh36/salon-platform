@@ -287,7 +287,8 @@ export function ticketProblems(ticket: Ticket, rates: Rates, hasClient: boolean)
     if (p.method === "cash" && p.tenderedCents < p.amountCents) problems.push("The cash handed over is less than the amount.");
   }
   const t = totalsOf(ticket, rates);
-  if (t.dueCents > 0) problems.push(`${dollars(t.dueCents)} still to pay.`);
+  // Nothing paid yet: the total and the button already say how much.
+  if (t.dueCents > 0) problems.push(ticket.payments.length === 0 && t.coveredCents === 0 ? "Choose how they're paying." : `${dollars(t.dueCents)} still to pay.`);
   if (t.dueCents < 0) problems.push(`The payments are ${dollars(-t.dueCents)} more than the total.`);
   return problems;
 }

@@ -247,7 +247,7 @@ export function BookingFlow({
             <li
               key={s}
               aria-current={s === step ? "step" : undefined}
-              className={`h-1.5 rounded-full transition-[width,background-color] duration-(--motion-base) ${i === index ? "w-6 bg-(--accent)" : i < index ? "w-3 bg-(--accent-line)" : "w-3 bg-line-strong"}`}
+              className={`h-1.5 rounded-full transition-[width,background-color] duration-(--motion-base) ${i === index ? "w-6 bg-(--accent)" : i < index ? "w-3 bg-(--accent)" : "w-3 bg-ink-subtle"}`}
             >
               <span className="sr-only">{STEP_TITLES[s]}</span>
             </li>

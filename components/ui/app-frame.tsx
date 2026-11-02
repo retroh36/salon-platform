@@ -82,7 +82,8 @@ function shown(item: NavItem, user: User): boolean {
 }
 
 // A sidebar link: light gray on the navy; the current page in white on the
-// bright blue's tint, with an accent bar on its left edge.
+// bright blue's tint, with an accent bar just inside its left edge (part of
+// the item, never off at the window's edge).
 function NavLink({ item, current }: { item: NavItem; current: boolean }) {
   const { href, label, Icon } = item;
   return (
@@ -93,7 +94,7 @@ function NavLink({ item, current }: { item: NavItem; current: boolean }) {
         current ? "bg-sidebar-active text-white" : "text-sidebar-text hover:bg-sidebar-hover hover:text-white"
       }`}
     >
-      {current && <span aria-hidden data-testid="nav-accent" className="absolute top-1.5 bottom-1.5 -left-3 w-[3px] rounded-r-full bg-sidebar-accent" />}
+      {current && <span aria-hidden data-testid="nav-accent" className="absolute top-2.5 bottom-2.5 left-1 w-[3px] rounded-full bg-sidebar-accent" />}
       <Icon className="size-5 shrink-0" />
       <span className="truncate">{label}</span>
     </Link>

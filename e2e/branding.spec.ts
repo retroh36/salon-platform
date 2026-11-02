@@ -53,10 +53,13 @@ test.describe("owner", () => {
     await expect(sidebar.getByTestId("salon-initial")).toHaveText("W");
 
     const logo = page.getByRole("form", { name: "Salon logo" });
-    await logo.getByLabel("Logo").setInputFiles("public/brand/maestra/maestra-mark.png");
+    // One button opens the file chooser; choosing a file uploads it.
+    const chooser = page.waitForEvent("filechooser");
     await logo.getByRole("button", { name: "Upload logo" }).click();
+    await (await chooser).setFiles("public/brand/maestra/maestra-mark.png");
     await expect(page.getByRole("status")).toHaveText("Saved the salon's logo.");
     await expect(sidebar.getByTestId("salon-logo")).toBeVisible();
+    await expect(logo.getByRole("button", { name: "Change logo" })).toBeVisible();
     const src = await sidebar.getByTestId("salon-logo").getAttribute("src");
     expect((await page.request.get(src!)).status()).toBe(200);
 
@@ -70,7 +73,6 @@ test.describe("owner", () => {
     await waitForHydration(page, "form[aria-label='Salon logo']");
     const logo = page.getByRole("form", { name: "Salon logo" });
     await logo.getByLabel("Logo").setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hello") });
-    await logo.getByRole("button", { name: "Upload logo" }).click();
     await expect(page.locator("main").getByRole("alert")).toHaveText("Use a PNG, JPEG or WebP image.");
   });
 });

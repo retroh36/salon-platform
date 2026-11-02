@@ -9,9 +9,8 @@ Your salon's name and logo show on the salon card at the top of the sidebar (und
 
 1. Go to **Settings** (the **Your salon** tab opens).
 2. To rename, change **Salon name** and tap **Save name**.
-3. To add a logo, tap the **Logo** file picker and choose an image.
-4. Tap **Upload logo**.
-5. To go back to no logo, tap **Remove logo**.
+3. To add a logo, tap **Upload logo** (or **Change logo** when there's one) and choose an image. It uploads as soon as you choose it.
+4. To go back to no logo, tap **Remove logo**.
 
 ## Good to know
 

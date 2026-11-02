@@ -11,7 +11,7 @@ import { PlusIcon } from "@/components/ui/icons";
 import { MAX_NOTES, priceFor, visitSummary } from "@/lib/appointments";
 import { parseClientSearch } from "@/lib/clients";
 import { formatLongDay } from "@/lib/schedule-format";
-import { formatMinute, minuteToTime, parseTime } from "@/lib/scheduling/time";
+import { formatMinute, minuteToTime, parseTime, toLocal } from "@/lib/scheduling/time";
 import { formatPrice, sortCategories } from "@/lib/services";
 import { formatDuration } from "@/lib/duration";
 import { DeniseFace } from "@/components/denise";
@@ -94,6 +94,9 @@ export function BookingPanel({
   );
   // The visit's day: an edit can move it to another one.
   const [date, setDate] = useState(draft?.date ?? data.date);
+  // When the form opened: a new booking for a time already gone is allowed
+  // (recording a visit after the fact), with a note saying so.
+  const [openedAt] = useState(() => toLocal(new Date(), data.timeZone));
   const [message, setMessage] = useState<string | null>(null);
   const [lineErrors, setLineErrors] = useState<string[][]>([]);
   const [ideas, setIdeas] = useState<BookingIdeas | null>(null);
@@ -560,6 +563,12 @@ export function BookingPanel({
               </label>
             ))}
           </fieldset>
+        )}
+
+        {!appointment && (date < openedAt.date || (date === openedAt.date && lines.some((l) => l.startMinute !== null && l.startMinute < openedAt.minute))) && (
+          <p role="note" className="text-13 text-ink-muted" data-testid="past-time-note">
+            That time has already passed. That&apos;s fine for recording a visit that happened; otherwise choose a later time.
+          </p>
         )}
 
         <div className="flex gap-2">

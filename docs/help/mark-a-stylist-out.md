@@ -8,7 +8,7 @@ open: /calendar | Open calendar
 When a stylist can't work all or part of the day (sick, an emergency, an appointment of their own), mark them out and Denise plans a new spot for each of their clients.
 
 1. Go to **Calendar** and open the day.
-2. At the top right of the stylist's column, tap **⋯** (More for their name), then **Mark … out…** (for example **Mark Sandra out…**). A panel opens beside the calendar. You can also open the stylist on **Team** and tap **Mark … out…**, or tell Denise ("Nola called out", "Gil has to leave at 1") and tap the button under her answer.
+2. At the top right of the stylist's column, tap **⋯** (More for their name), then **Mark … out…** (for example **Mark Sandra out…**). A panel opens beside the calendar. You can also open the stylist on **Team** and tap **Mark … out…**, or tell Denise ("Nola called out", "Gil has to leave at 1") and tap the button under the answer.
 3. Choose when they're out: **All day**, **Leaving early…** (then the time they leave) or **Coming in late…** (then the time they come in). Denise's plan changes straight away.
 4. Read the plan: a row for each client with their time and service, and where they go, marked **Move** (another stylist, or a little later that day) or **Reschedule** (another day), with a line saying why. Where they'd move today shows dashed on the calendar.
 5. To change a client, tap **Change** on their row and choose another stylist, another time, a reschedule, or **Leave it and call the client**. A row marked **Clashes** needs another choice.
@@ -18,7 +18,7 @@ When a stylist can't work all or part of the day (sick, an emergency, an appoint
 ## Good to know
 
 - Marking someone out adds approved time off for them, so nothing else is booked with them then.
-- **Mark out only, I'll handle clients** marks them out without moving anyone. Denise's tab then shows her fixes, one client at a time (see Approve Denise's fixes).
+- **Mark out only, I'll handle clients** marks them out without moving anyone. Denise's tab then shows the fixes, one client at a time (see Approve Denise's fixes).
 - If nobody is booked with them then, the button is **Mark … out**, and the panel says no clients were affected.
 - Denise's plan tries the same time with a stylist at the same level first, then another stylist or a little later that day, then another day. Each option is checked with the booking rules: who does the service, each stylist's own length for it, processing time and chairs. A stylist at another level charges their own price, shown on the option ("Master · $20 more").
 - Clients set to **Only books with their preferred stylist** (on their details) are only offered their stylist's next openings. Clients who usually see them start on a new day with them.

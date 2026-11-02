@@ -8,6 +8,7 @@ import { siteUrl } from "@/lib/branding";
 import { channelFor, consentOf } from "@/lib/messaging/consent";
 import { CONSENT_COLUMNS } from "@/lib/messaging/send";
 import { can } from "@/lib/permissions";
+import { saveBookingLink } from "@/lib/booking-links";
 import { specialDraft } from "@/lib/promotion-ideas-load";
 import { parsePromotionInput, type PromotionInput } from "@/lib/promotions";
 import { isFrontOfHouse } from "@/lib/staff";
@@ -57,6 +58,7 @@ export async function sendSpecial(input: { promotionId: string; clientId: string
   if (!to) return { ok: false, message: "They haven't said yes to offers by text or email." };
   const written = input.body?.trim();
   const custom = Boolean(written && written !== draft.body);
+  await saveBookingLink(supabase, me.id, draft.bookingLink);
   const token = randomBytes(24).toString("base64url");
   const body = withOptOut(custom ? written! : draft.body, to.channel, `${siteUrl()}/unsubscribe/${token}`);
   const { error } = await supabase.rpc("send_promotion_message", {

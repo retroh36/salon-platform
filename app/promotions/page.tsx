@@ -1,3 +1,4 @@
+import { formatDuration } from "@/lib/duration";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -106,7 +107,7 @@ async function Promotions() {
               <li key={`${i.gap.staffId}:${i.gap.date}:${i.gap.start}`} className="px-4 py-3" data-testid="opening-idea">
                 <p className="text-sm font-semibold text-ink">
                   {i.staffName} is free {i.when}
-                  <span className="font-normal text-ink-muted"> · {Math.floor((i.gap.end - i.gap.start) / 60)}h{(i.gap.end - i.gap.start) % 60 ? ` ${(i.gap.end - i.gap.start) % 60}m` : ""} open</span>
+                  <span className="font-normal text-ink-muted"> · {formatDuration(i.gap.end - i.gap.start)} open</span>
                 </p>
                 <ul className="mt-1 flex flex-col">
                   {i.clients.map((c) => (

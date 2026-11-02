@@ -69,7 +69,7 @@ describe("the ticket", () => {
   it("says what's missing before it can be completed", () => {
     expect(ticketProblems(EMPTY_TICKET, RATES, true)).toEqual(["Add something to the ticket."]);
     const noReason = ticket([service("cut", "bridget", 9000, { basePriceCents: 10000 }), product("spray", null, 2000)]);
-    expect(ticketProblems(noReason, RATES, true)).toEqual(["Say why cut's price changed.", "$112 still to pay."]);
+    expect(ticketProblems(noReason, RATES, true)).toEqual(["Say why cut's price changed.", "Choose how they're paying."]);
     const over = ticket([product("spray", null, 2000)], { payments: [{ key: "1", method: "cash", amountCents: 2500, tenderedCents: 2500 }] });
     expect(ticketProblems(over, RATES, true)).toEqual(["The payments are $3 more than the total."]);
     const paid = ticket([product("spray", null, 2000)], { payments: [{ key: "1", method: "cash", amountCents: 2200, tenderedCents: 4000 }] });

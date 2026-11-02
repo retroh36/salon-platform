@@ -121,7 +121,52 @@ export async function explainFixes(client: ClaudeClient, facts: FixFacts[]): Pro
   });
 }
 
-const GENDERED = /\b(he|she|him|his|her|hers|himself|herself)\b/i;
+export const GENDERED = /\b(he|she|him|his|her|hers|himself|herself)\b/i;
+
+const REWORD_SYSTEM = `Rewrite the message below so it never assumes anyone's gender: replace he, she, him, his, her, hers, himself and herself with the person's first name or with they, them, their, theirs or themself, fixing the verbs to match. The message is Denise's own, the app's assistant: anything about Denise becomes I, me or my ("tap my face", not "tap her face"). Keep every fact, name, number, time and date exactly as it is, and the same plain-text style. Reply with only the rewritten message.`;
+
+// An answer that used a gendered pronoun anyway, reworded once (every fact
+// kept). If that fails or still uses one, our own they/them swap, so a
+// guessed pronoun never reaches the screen.
+export async function withoutPronouns(client: ClaudeClient, text: string): Promise<string> {
+  try {
+    const response = await client.messages.create(
+      { model: CHAT_MODEL, max_tokens: 2000, system: REWORD_SYSTEM, output_config: { effort: "low" }, messages: [{ role: "user", content: text }] },
+      REQUEST,
+    );
+    const reworded = textOf(response.content).trim();
+    if (reworded && !GENDERED.test(reworded)) return reworded;
+  } catch (error) {
+    logDeniseError(error, { where: "reword", model: CHAT_MODEL });
+  }
+  return theyThem(text);
+}
+
+const SWAPS: Record<string, string> = { he: "they", she: "they", him: "them", his: "their", hers: "theirs", himself: "themself", herself: "themself" };
+const AGREE: [RegExp, string][] = [
+  [/\b(they) (is|'s)\b/gi, "$1 are"],
+  [/\b(they) was\b/gi, "$1 were"],
+  [/\b(they) has\b/gi, "$1 have"],
+  [/\b(they) does\b/gi, "$1 do"],
+  [/\b(they) isn't\b/gi, "$1 aren't"],
+  [/\b(they) wasn't\b/gi, "$1 weren't"],
+  [/\b(they) hasn't\b/gi, "$1 haven't"],
+  [/\b(they) doesn't\b/gi, "$1 don't"],
+];
+
+// The plain swap. "her" is "their" before what's theirs ("her color"),
+// else "them" ("call her", "for her and Mia").
+const NOT_OWNED = new Set(
+  "and or but so if to at in on for with from about by of into over after before during until when that than as off out up down back a an the some any know again today tomorrow tonight now soon first next later yet too instead is was will can".split(" "),
+);
+export function theyThem(text: string): string {
+  const swapped = text.replace(/\b(he|she|him|his|hers|himself|herself|her)\b(?=(\s+([A-Za-z']+))?)/gi, (word: string, _a, _b, next: string | undefined) => {
+    const lower = word.toLowerCase();
+    const plain = lower === "her" ? (next && !NOT_OWNED.has(next.toLowerCase()) ? "their" : "them") : SWAPS[lower];
+    return word[0] === word[0].toUpperCase() ? plain[0].toUpperCase() + plain.slice(1) : plain;
+  });
+  return AGREE.reduce((t, [pattern, to]) => t.replace(pattern, to), swapped);
+}
 
 export type ToolRunner = {
   tools: Anthropic.Tool[];

@@ -79,6 +79,7 @@ export async function briefFacts(
   // Denise's scan of the day, which may still be running: only the last
   // step needs it, so the brief's own reads go at the same time.
   scanned: Scanned | PromiseLike<Scanned>,
+  now: Date = new Date(),
 ): Promise<BriefFacts> {
   const tz = where.location.timezone;
   const [{ data: items, error }, insights, events] = await Promise.all([
@@ -95,10 +96,12 @@ export async function briefFacts(
   ]);
   if (error) throw error;
 
-  // Likely no-shows: clients on today's book who often don't come.
+  // Likely no-shows: clients still to come today who often don't (a reminder
+  // call can help); once a visit has started or they're here, it's gone.
   const firstItem = new Map<string, (typeof items)[number]>();
   for (const i of items) if (!firstItem.has(i.appointment.id)) firstItem.set(i.appointment.id, i);
   const likelyNoShows = [...firstItem.values()].flatMap((i) => {
+    if (i.appointment.status === "checked_in" || new Date(i.starts_at) <= now) return [];
     const c = i.appointment.client;
     const known = c ? insights.get(c.id) : undefined;
     if (!c || !known || known.noShowRate === null || known.noShowRate < NO_SHOW_RATE || known.visits < NO_SHOW_VISITS) return [];
@@ -128,7 +131,6 @@ export async function briefFacts(
   );
 
   // Credit: package uses left and gift card balances, for today's clients.
-  const now = new Date();
   const credits = [...firstItem.values()].flatMap((i) => {
     const c = i.appointment.client;
     if (!c) return [];

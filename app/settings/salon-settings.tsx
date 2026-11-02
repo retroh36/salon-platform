@@ -79,23 +79,23 @@ export function SalonSettings({
       >
         <SalonMark name={value || name} logoUrl={logoUrl} size="lg" />
         <div className="flex flex-col gap-2">
-          <label className={labelClass}>
-            Logo
-            <input
-              ref={file}
-              type="file"
-              name="logo"
-              accept="image/png,image/jpeg,image/webp"
-              className="text-sm"
-            />
-          </label>
-          <p className="text-13 text-ink-muted">
-            PNG, JPEG or WebP, up to 2 MB. A square image works best. Without a
-            logo, the salon&apos;s initial shows.
-          </p>
+          {/* One control: the button opens the file chooser, and choosing a
+              file uploads it. */}
+          <input
+            ref={file}
+            type="file"
+            name="logo"
+            aria-label="Logo"
+            accept="image/png,image/jpeg,image/webp"
+            tabIndex={-1}
+            className="sr-only"
+            onChange={(e) => {
+              if (e.currentTarget.files?.length) e.currentTarget.form?.requestSubmit();
+            }}
+          />
           <div className="flex gap-2">
-            <Button type="submit" disabled={pending}>
-              Upload logo
+            <Button disabled={pending} onClick={() => file.current?.click()}>
+              {pending ? "Uploading…" : logoUrl ? "Change logo" : "Upload logo"}
             </Button>
             {logoUrl && (
               <Button
@@ -107,6 +107,10 @@ export function SalonSettings({
               </Button>
             )}
           </div>
+          <p className="text-13 text-ink-muted">
+            PNG, JPEG or WebP, up to 2 MB. A square image works best. Without a
+            logo, the salon&apos;s initial shows.
+          </p>
         </div>
       </form>
     </div>

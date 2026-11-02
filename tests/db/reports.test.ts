@@ -5,8 +5,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { briefFacts } from "@/lib/denise/brief";
 import { knowledgeFor, type Asker } from "@/lib/denise/knowledge";
 import { loadCloseout, loadGiftCardLiability, loadUnusedPackages } from "@/lib/reports-load";
-import { todayIn } from "@/lib/scheduling/time";
-import { admin, DEFAULT_PERMISSIONS, makeRoom, SEED, signIn, type Client } from "./helpers";
+import { fromLocal, todayIn } from "@/lib/scheduling/time";
+import { admin, busyDay, DEFAULT_PERMISSIONS, makeRoom, SEED, signIn, type Client } from "./helpers";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -90,6 +90,15 @@ describe("closing out the day", () => {
 });
 
 describe("the morning brief", () => {
+  it("suggests reminder calls only for visits still to come: none once the day's done", async () => {
+    const { date } = await busyDay(TZ);
+    const at = (minute: number) => briefFacts(frontDesk, { businessId: B, location: { id: L, timezone: TZ } }, date, { conflicts: [], openings: [] }, fromLocal(date, minute, TZ)!);
+    const morning = await at(6 * 60);
+    expect(morning.likelyNoShows.length).toBeGreaterThan(0);
+    const evening = await at(23 * 60);
+    expect(evening.likelyNoShows).toEqual([]);
+  });
+
   it("names today's clients with package uses or gift card money", async () => {
     // A client of our own with a package, booked today.
     let putBack = async () => {};

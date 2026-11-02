@@ -1,6 +1,6 @@
 ---
 title: Handle a client who hasn't arrived
-keywords: not arrived, late client, client not here, no show, missing client, didn't turn up, where is my client, not checked in, Denise notice
+keywords: not arrived, never checked in, late client, client not here, no show, missing client, didn't turn up, where is my client, not checked in, Denise notice
 who: owner, manager, front_desk
 open: /calendar | Open calendar
 ---
@@ -17,5 +17,7 @@ When a client is 15 minutes past their start time and not checked in, Denise lis
 ## Good to know
 
 - On the calendar, a client who's due shows a clock with how late they are ("+5m"), then "Not arrived" from 15 minutes.
+- Once a visit's booked time is over (at the end of the day, say), Denise moves it to **Never checked in** instead: there's no one to call, so mark a no-show, or tap **Open** to check them in and out if they came.
+- On the Dashboard, **Might not show** lists only clients still to come, so a reminder call can help.
 - A dismissed row stays gone for the rest of the day, for everyone at the salon.
 - Stylists can see the card but only the front desk, managers and owners can mark a no-show or dismiss.

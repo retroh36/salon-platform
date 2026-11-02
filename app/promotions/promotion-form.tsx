@@ -83,7 +83,7 @@ export function PromotionForm({ id, initial, options }: { id: string | null; ini
             { value: "last_minute", label: "Last-minute special" },
           ]}
         />
-        <p className="text-13 text-ink-muted">{KIND_HELP[p.kind]}</p>
+        <p className="text-sm text-ink-muted">{KIND_HELP[p.kind]}</p>
       </div>
 
       {p.kind === "code" && (
@@ -219,7 +219,7 @@ export function PromotionForm({ id, initial, options }: { id: string | null; ini
 function CheckGroup({ label, items, selected, onToggle }: { label: string; items: { value: string; label: string }[]; selected: readonly string[]; onToggle: (v: string) => void }) {
   return (
     <fieldset>
-      <legend className="mb-2 text-13 font-medium text-ink-muted">{label}</legend>
+      <legend className="mb-2 text-13 font-medium text-ink">{label}</legend>
       <div className="flex flex-wrap gap-x-4 gap-y-2">
         {items.map((i) => (
           <label key={i.value} className="flex items-center gap-2 text-sm">
@@ -237,7 +237,7 @@ function CheckGroup({ label, items, selected, onToggle }: { label: string; items
 function Exclusions({ value, categories, onChange }: { value: PromotionInput["exclusions"]; categories: string[]; onChange: (v: PromotionInput["exclusions"]) => void }) {
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="mb-2 text-13 font-medium text-ink-muted">Never (for example, never Master stylists&rsquo; color)</legend>
+      <legend className="mb-2 text-13 font-medium text-ink">Never (for example, never Master stylists&rsquo; color)</legend>
       {value.map((e, i) => (
         <div key={i} className="flex flex-wrap items-center gap-2" data-testid="exclusion">
           <select aria-label="Never this level" value={e.level ?? ""} onChange={(x) => onChange(value.map((v, j) => (j === i ? { ...v, level: (x.target.value || null) as Level | null } : v)))} className={`${selectClass} w-40`}>

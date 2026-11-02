@@ -17,7 +17,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { checkAppointment, describeProblem, durationMinutes, pickResource, stretchTiming, timingFor, type BookingContext, type ServiceTiming } from "@/lib/scheduling/booking";
 import { findOpenings } from "@/lib/scheduling/openings";
 import { formatMinute, fromLocal, isLocalDate, parseTime, toLocal, type LocalDate } from "@/lib/scheduling/time";
-import { converse, modelFor, VOICE, type ClaudeClient, type ConverseHooks, type ToolRunner } from "./claude";
+import { converse, GENDERED, modelFor, VOICE, withoutPronouns, type ClaudeClient, type ConverseHooks, type ToolRunner } from "./claude";
 import { POLICY_PERIODS, SALES_PERIODS, type Knowledge, type PolicyPeriod, type SalesPeriod } from "./knowledge";
 import { PARTS } from "./team";
 import type { StaffRole } from "@/lib/staff";
@@ -290,7 +290,7 @@ You help the staff at ${c.salon}. You're talking to ${c.askerName ? `${c.askerNa
 
 Facts: look everything up; never guess a time is free. Every number you mention must come from what you looked up, as given: don't calculate, estimate or invent figures. Say briefly what an answer is based on (e.g. "from 14 timed visits"). Times are either tapped in by stylists or estimated from check-in to checkout (based_on, estimated_percent): when a figure comes from check-in to checkout, say so ("based on check-in to checkout times"), as it's rougher. If you can't find something out, say you don't know. Only mention a stylist getting faster or slower when the figures you looked up include a trend.
 
-Voice: you speak for yourself. Never mention tools or their names, "the tool", "the system" or "the data": say "I'd suggest booking 180 minutes", "I checked", "I can only see your own times". If something isn't yours to see, say where it is: contact details are on the client's profile, and sales are for owners and managers.
+Voice: you speak for yourself. Never mention tools or their names, "the tool", "the system" or "the data": say "I'd suggest booking 3 hr", "I checked", "I can only see your own times". Say lengths the way your facts give them ("3 hr 7 min"), never as minutes alone past an hour. If something isn't yours to see, say where it is: contact details are on the client's profile, and sales are for owners and managers.
 
 Availability: free times are checked with each stylist's usual time for the service when it's known (length_basis says which length was used). Say which you used, e.g. "I checked with Bridget's usual 3 hours" or "with the booked length".
 
@@ -300,7 +300,7 @@ Style: keep it scannable. Two to four sentences unless they ask for more. For li
 
 ${
     c.help
-      ? `How to use Maestra: for any question about how to do something in the app, look it up in the help guide and answer only from the page you get back; never describe screens, buttons or steps from memory. Give its steps as a short numbered list (1. 2. 3.), one line each, in the page's words, then at most one "Good to know" line if it matters. If the person asking can't do it themselves (can_do false), don't list the steps: say who can (who_can) and suggest asking them. If the guide doesn't cover it (found false), say it isn't in the help guide yet and suggest asking a manager; don't guess. When the page has a button, it appears under your answer, so you can say "tap Open new sale below".
+      ? `How to use Maestra: for any question about how to do something in the app, look it up in the help guide and answer only from the page you get back; never describe screens, buttons or steps from memory. Give its steps as a short numbered list (1. 2. 3.), one line each, in the page's words, then at most one "Good to know" line if it matters. If the person asking can't do it themselves (can_do false), don't list the steps: say who can (who_can) and suggest asking them. If the guide doesn't cover it (found false), say it isn't in the help guide yet and suggest asking a manager; don't guess. When the page has a button, it appears under your answer, so you can say "tap Open new sale below". The guide talks about you as Denise; when you pass it on, speak as yourself: "my panel", "tap my face in the corner", "I'll suggest", never "Denise's panel" or "her". On-screen names stay as they are ("the Denise's brief card").
 
 `
       : ""
@@ -386,7 +386,7 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
             date,
             start: formatMinute(o.startMinute),
             start_24h: `${String(Math.floor(o.startMinute / 60)).padStart(2, "0")}:${String(o.startMinute % 60).padStart(2, "0")}`,
-            length_minutes: o.minutes,
+            length: formatDuration(o.minutes),
             length_basis: basis(o.staffId),
           })),
         );
@@ -440,7 +440,7 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
           endMinute: minute + (timing ? durationMinutes(timing) : service.minutes),
           clientHint: hint,
         });
-        return JSON.stringify({ suggested: summary, length_minutes: timing ? durationMinutes(timing) : service.minutes, needs_approval: true });
+        return JSON.stringify({ suggested: summary, length: formatDuration(timing ? durationMinutes(timing) : service.minutes), needs_approval: true });
       }
       default:
         return `Unknown tool ${name}.`;
@@ -542,7 +542,13 @@ export async function answer(
 ): Promise<{ text: string; suggestions: BookingSuggestion[]; links: HelpLink[] }> {
   const runner = assistantTools(c);
   const question = [...history].reverse().find((m) => m.role === "user")?.text ?? "";
-  const text = await converse(client, systemPrompt(c), history, runner, modelFor(question), hooks);
+  let text = await converse(client, systemPrompt(c), history, runner, modelFor(question), hooks);
+  // Never a guessed pronoun on screen: what streamed is taken back and the
+  // reworded answer shown instead.
+  if (GENDERED.test(text)) {
+    hooks.onDiscard?.();
+    text = await withoutPronouns(client, text);
+  }
   return { text, suggestions: runner.suggestions, links: runner.links };
 }
 

@@ -8,6 +8,7 @@ import type { Database } from "@/lib/database.types";
 import { NOT_ARRIVED_MINUTES } from "@/lib/calendar";
 import { blockNotifications, notificationsFor } from "@/lib/notifications";
 import { recordProposals, type ProposalOption } from "@/lib/scheduling/ai-actions";
+import { durationMinutes } from "@/lib/scheduling/booking";
 import { loadDisruptions } from "@/lib/scheduling/disruptions";
 import { loadBookingContext } from "@/lib/scheduling/load";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -244,9 +245,11 @@ function lateNotices(day: Day, lookup: Lookup, date: LocalDate, conflicts: Confl
   const reported = new Set(day.disruptions.flatMap((d) => (d.kind === "client_late" ? [d.appointmentId] : [])));
   const inConflict = new Set(conflicts.flatMap((c) => [...c.causeItemIds, ...c.displaced]).map((id) => lookup.items.get(id)?.appointmentId));
   const firstItems = new Map<string, (typeof day.ctx.booked)[number]>();
+  const ends = new Map<string, number>();
   for (const b of day.ctx.booked) {
     const first = firstItems.get(b.appointmentId!);
     if (!first || b.start < first.start) firstItems.set(b.appointmentId!, b);
+    ends.set(b.appointmentId!, Math.max(ends.get(b.appointmentId!) ?? 0, b.start.getTime() + durationMinutes(b) * MINUTE));
   }
   const notices: DeniseNotice[] = [];
   for (const [appointmentId, item] of firstItems) {
@@ -255,13 +258,17 @@ function lateNotices(day: Day, lookup: Lookup, date: LocalDate, conflicts: Confl
     if ((status !== "booked" && status !== "confirmed") || late < NOT_ARRIVED_MINUTES) continue;
     if (reported.has(appointmentId) || inConflict.has(appointmentId)) continue;
     const name = lookup.visits.get(appointmentId)?.client?.fullName ?? "A walk-in";
+    const over = (ends.get(appointmentId) ?? 0) <= day.now.getTime();
     notices.push({
       id: `late:${appointmentId}`,
       appointmentId,
       itemId: item.id!,
       clientName: name,
       startMinute: toLocal(item.start, lookup.timeZone).minute,
-      text: `${name} was due at ${clock(toLocal(item.start, lookup.timeZone).minute)} and hasn't arrived. Give them a call, or mark a no-show.`,
+      text: over
+        ? `${name} was booked at ${clock(toLocal(item.start, lookup.timeZone).minute)} and was never checked in. Mark a no-show, or open it to check them in and out if they came.`
+        : `${name} was due at ${clock(toLocal(item.start, lookup.timeZone).minute)} and hasn't arrived. Give them a call, or mark a no-show.`,
+      over,
     });
   }
   return notices;

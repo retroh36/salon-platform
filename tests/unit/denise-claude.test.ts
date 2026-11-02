@@ -1,7 +1,7 @@
 // Denise's Claude features with a fake API client: no real API calls.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { answer, assistantTools, MAX_STRICT_TOOLS, type AssistantContext } from "@/lib/denise/assistant";
-import { ANALYSIS_MODEL, CHAT_MODEL, claudeClient, converse, explainFixes, isConnected, modelFor, type ClaudeClient } from "@/lib/denise/claude";
+import { ANALYSIS_MODEL, CHAT_MODEL, claudeClient, converse, explainFixes, isConnected, modelFor, theyThem, type ClaudeClient } from "@/lib/denise/claude";
 import type { CoverageWeek } from "@/lib/coverage-load";
 import { sayDate, type Knowledge } from "@/lib/denise/knowledge";
 import { dayOffFacts, teamFacts } from "@/lib/denise/team";
@@ -170,13 +170,13 @@ describe("Ask Denise", () => {
     const found = JSON.parse(await runner.run("find_openings", { service_id: "cut", date: DAY, staff_id: null, after: "11:30", before: "12:00", limit: 10 }));
     const priya = found.filter((o: { stylist: string }) => o.stylist === "Priya");
     expect(priya.map((o: { start: string }) => o.start)).toEqual(["11:30am"]);
-    expect(priya[0]).toMatchObject({ length_minutes: 80, length_basis: "Priya's usual time (typically 1 hr 18 min over 12 visits, based on check-in to checkout times)" });
+    expect(priya[0]).toMatchObject({ length: "1 hr 20 min", length_basis: "Priya's usual time (typically 1 hr 18 min over 12 visits, based on check-in to checkout times)" });
     // Ethan has no usual time yet: the booked length.
-    expect(found.find((o: { stylist: string }) => o.stylist === "Ethan")).toMatchObject({ length_minutes: 60, length_basis: expect.stringContaining("booked length") });
+    expect(found.find((o: { stylist: string }) => o.stylist === "Ethan")).toMatchObject({ length: "1 hr", length_basis: expect.stringContaining("booked length") });
 
     expect(await runner.run("propose_booking", { service_id: "cut", staff_id: "priya", date: DAY, start: "12:00", client_first_name: null })).toMatch(/already has a client/);
     const ok = JSON.parse(await runner.run("propose_booking", { service_id: "cut", staff_id: "priya", date: DAY, start: "11:30", client_first_name: null }));
-    expect(ok.length_minutes).toBe(80);
+    expect(ok.length).toBe("1 hr 20 min");
     expect(c.propose).toHaveBeenCalledWith(expect.objectContaining({ timing: { activeMinutes: 80, processingMinutes: 0, finishingMinutes: 0 }, reason: expect.stringContaining("Priya's usual time") }));
   });
 
@@ -185,6 +185,30 @@ describe("Ask Denise", () => {
     const runner = assistantTools(c);
     await runner.run("propose_booking", { service_id: "cut", staff_id: "ethan", date: DAY, start: "10:00", client_first_name: null });
     expect(runner.suggestions[0]).toMatchObject({ actionId: null, staffName: "Ethan" });
+  });
+
+  it("never shows a guessed pronoun: the answer is reworded, or swapped for they and them", async () => {
+    const discards: number[] = [];
+    const reworded = fakeClient([text("Gil has her 2pm open. Call her first."), text("Gil has Mia's 2pm open. Call Mia first.")]);
+    const reply = await answer(reworded.client, context(), [{ role: "user", text: "Anything open?" }], { onDiscard: () => discards.push(1) });
+    expect(reply.text).toBe("Gil has Mia's 2pm open. Call Mia first.");
+    expect(discards).toHaveLength(1);
+    // The rewording keeps the facts: it's asked with the answer as it was.
+    expect((reworded.requests[1].messages as { content: string }[])[0].content).toBe("Gil has her 2pm open. Call her first.");
+
+    // The rewording still guesses (or fails): our own swap.
+    const stubborn = fakeClient([text("She is due back. Book her with Gil."), text("She is due back.")]);
+    expect((await answer(stubborn.client, context(), [{ role: "user", text: "Mia?" }])).text).toBe("They are due back. Book them with Gil.");
+    // Nothing to fix: no second call.
+    const fine = fakeClient([text("Mia is due back.")]);
+    expect((await answer(fine.client, context(), [{ role: "user", text: "Mia?" }])).text).toBe("Mia is due back.");
+    expect(fine.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("swaps pronouns for they and them, keeping the sense", () => {
+    expect(theyThem("He has his color at 2, and she was late for her cut. Ask him and her.")).toBe("They have their color at 2, and they were late for their cut. Ask them and them.");
+    expect(theyThem("Her usual is a balayage. She doesn't rebook, so call her today.")).toBe("Their usual is a balayage. They don't rebook, so call them today.");
+    expect(theyThem("Sheila and Hector are here.")).toBe("Sheila and Hector are here.");
   });
 
   it("returns tool errors to Claude, handles refusals, and stops after a few steps", async () => {
@@ -221,7 +245,7 @@ function knowledge(overrides: Partial<Knowledge> = {}): Knowledge & Record<strin
   return {
     clients: vi.fn(async (name: string) => ({ matches: [{ match: 1, first_name: name, visits: 6, usual_gap_days: 42, due_status: "overdue", days_overdue: 9 }] })),
     overdue: vi.fn(async () => ({ total_due_or_overdue: 12, clients: [{ first_name: "Liam", days_overdue: 21 }] })),
-    durations: vi.fn(async () => ({ rows: [{ stylist: "Shae", service: "Men's Cut", typical_minutes: 24, visits_counted: 31, trusted: true }] })),
+    durations: vi.fn(async () => ({ rows: [{ stylist: "Shae", service: "Men's Cut", typical_length: "24 min", visits_counted: 31, trusted: true }] })),
     salon: vi.fn(async () => ({ running_over_by_day: [{ day: "Thursday", ran_over_percent: 38 }] })),
     schedule: vi.fn(async (date: string) => ({ date, visits: [] })),
     stock: vi.fn(async () => ({ products: [] })),

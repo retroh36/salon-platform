@@ -17,6 +17,29 @@ const STARTED = new Date().toISOString();
 const phone = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true };
 test.use({ ...phone, storageState: { cookies: [], origins: [] } });
 
+// Records any "null", "undefined" or "NaN" a client could see, from the
+// first byte on (a value missing for a moment while the page loads).
+async function watchForBlanks(page: Page) {
+  await page.addInitScript(() => {
+    const seen: string[] = [];
+    (window as unknown as { blanksSeen: string[] }).blanksSeen = seen;
+    const check = (n: Node) => {
+      const el = n.nodeType === Node.TEXT_NODE ? n.parentElement : (n as Element);
+      if (!el?.closest || el.closest("script, style, template, noscript")) return;
+      const text = n.nodeType === Node.TEXT_NODE ? n.textContent : (el as HTMLElement).innerText;
+      const hit = text?.replace(/\s+/g, " ").match(/.{0,60}\b(null|undefined|NaN)\b.{0,30}/);
+      if (hit) seen.push(hit[0]);
+    };
+    new MutationObserver((changes) =>
+      changes.forEach((c) => {
+        c.addedNodes.forEach(check);
+        if (c.type === "characterData") check(c.target);
+      }),
+    ).observe(document, { subtree: true, childList: true, characterData: true });
+  });
+}
+const blanksSeen = (page: Page) => page.evaluate(() => (window as unknown as { blanksSeen: string[] }).blanksSeen);
+
 // Tests come from one address, faster than any client would.
 test.beforeEach(async () => {
   await admin.from("rate_limits").delete().neq("key", "");
@@ -109,6 +132,7 @@ async function bookIt(page: Page) {
 }
 
 test("a new client books two services back to back on a phone", async ({ page }) => {
+  await watchForBlanks(page);
   await open(page);
   // The salon's brand leads; Maestra is small at the foot.
   await expect(page.getByRole("banner")).toContainText("Maple & Ash Hair Studio");
@@ -192,6 +216,8 @@ test("a new client books two services back to back on a phone", async ({ page })
   await visitTab(calendar.getByRole("tabpanel", { name: "Booking details" }), "History");
   await expect(calendar.getByRole("tabpanel", { name: "Booking details" }).getByTestId("online-badge")).toBeVisible();
   await desk.close();
+  // Nothing on the client's screens ever read "null" or "undefined".
+  expect(await blanksSeen(page)).toEqual([]);
 });
 
 test("a returning client confirms with a code and is matched to their profile (and where they came from is kept)", async ({ page }) => {

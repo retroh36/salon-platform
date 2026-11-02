@@ -949,7 +949,16 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               <button
                 type="button"
                 className={buttonClass("primary", "lg")}
-                onClick={() => select({ kind: "book", start: { staffId: (columns.find((c) => c.working) ?? columns[0] ?? data.columns[0]).staffId, startMinute: range.start } })}
+                // Today, from the next quarter hour rather than a time already gone.
+                onClick={() =>
+                  select({
+                    kind: "book",
+                    start: {
+                      staffId: (columns.find((c) => c.working) ?? columns[0] ?? data.columns[0]).staffId,
+                      startMinute: nowMinute === null ? range.start : Math.min(Math.max(Math.ceil(nowMinute / 15) * 15, range.start), range.end - 15),
+                    },
+                  })
+                }
               >
                 <PlusIcon className="size-5" />
                 New booking

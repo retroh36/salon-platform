@@ -1,3 +1,4 @@
+import { StillLoading } from "@/components/still-loading";
 import { AppFrame, type Section } from "@/components/ui/app-frame";
 import { canBook } from "@/lib/appointments";
 import { salonLogoUrl } from "@/lib/branding";
@@ -71,7 +72,7 @@ export function NotLinked() {
 }
 
 // Shown while a page first loads: Maestra's logo, breathing gently (still,
-// with reduced motion).
+// with reduced motion), and Reload if it stalls (StillLoading).
 export function LoadingShell() {
   return (
     <div className="flex min-h-screen flex-1 items-center justify-center bg-canvas text-sm text-ink-muted" aria-busy>
@@ -79,6 +80,7 @@ export function LoadingShell() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/maestra/maestra-logo.png" alt="" data-testid="loading-logo" className="h-10 w-auto animate-breathe" />
         Loading Maestra…
+        <StillLoading />
       </span>
     </div>
   );

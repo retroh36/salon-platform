@@ -110,9 +110,9 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
               <tr>
                 <th className={thClass}>Staff</th>
                 <th className={`${thClass} text-right`}>Service sales</th>
-                <th className={`${thClass} text-right`}>Commission</th>
+                <th className={`${thClass} text-right`}>Service commission</th>
                 <th className={`${thClass} text-right`}>Retail sales</th>
-                <th className={`${thClass} text-right`}>Commission</th>
+                <th className={`${thClass} text-right`}>Retail commission</th>
                 <th className={`${thClass} text-right`}>Tips</th>
                 <th className={`${thClass} text-right`}>Hours</th>
                 <th className={`${thClass} text-right`}>Total pay</th>
@@ -141,7 +141,7 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
                   </td>
                   <td className={`${tdClass} ${numClass}`}>{payMoney(l.tipCents)}</td>
                   <td className={`${tdClass} ${numClass}`}>
-                    {l.minutes === null ? "—" : formatHours(l.minutes)}
+                    {l.minutes === null ? "—" : `${formatHours(l.minutes)} hr`}
                     {l.rates.hourly.length > 0 && <span className="block text-xs text-ink-subtle">at {ratesText(l.rates.hourly, (c) => `${formatPrice(c)}/h`)}</span>}
                   </td>
                   <td className={`${tdClass} ${numClass} font-semibold text-ink`} data-testid="pay-total">
@@ -156,7 +156,7 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
                 <td className={`${tdClass} ${numClass}`}>{payMoney(sum((l) => l.retailCents))}</td>
                 <td className={`${tdClass} ${numClass}`}>{payMoney(sum((l) => l.retailCommissionCents))}</td>
                 <td className={`${tdClass} ${numClass}`}>{payMoney(sum((l) => l.tipCents))}</td>
-                <td className={`${tdClass} ${numClass}`}>{formatHours(sum((l) => l.minutes ?? 0))}</td>
+                <td className={`${tdClass} ${numClass}`}>{formatHours(sum((l) => l.minutes ?? 0))} hr</td>
                 <td className={`${tdClass} ${numClass}`} data-testid="pay-everyone">
                   {formatPrice(sum((l) => l.totalCents))}
                 </td>

@@ -16,6 +16,6 @@ See how long each stylist really takes for each service, and book them for their
 ## Good to know
 
 - The change is only for that stylist and that service. New bookings take the new length; visits already booked keep theirs.
-- Denise learns from the Start service and Finish service taps stylists make on My day. Without taps, she uses check-in to checkout, marked "From check-in to checkout".
-- She suggests a change once she's seen enough visits (5 with taps, 10 from check-in to checkout) and it's 10 minutes or more off (15 from check-in to checkout).
-- "Learning" means she hasn't seen enough visits yet.
+- Denise learns from the Start service and Finish service taps stylists make on My day. Without taps, Denise uses check-in to checkout, marked "From check-in to checkout".
+- Denise suggests a change once there are enough visits (5 with taps, 10 from check-in to checkout) and it's 10 minutes or more off (15 from check-in to checkout).
+- "Learning" means Denise hasn't seen enough visits yet.

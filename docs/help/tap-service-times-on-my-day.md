@@ -16,7 +16,7 @@ On your phone, tap when each service starts, goes into processing, comes back to
 
 ## Good to know
 
-- Tapping is optional. When you do, Denise learns how long you really take; otherwise she goes by check-in and checkout.
+- Tapping is optional. When you do, Denise learns how long you really take; otherwise Denise goes by check-in and checkout.
 - What Denise learns helps book your usual length for each service and spot visits that might run over.
 - The front desk still checks clients out.
 - Your pay for the period is further down the page (see See my earnings).

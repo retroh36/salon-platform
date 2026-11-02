@@ -103,6 +103,8 @@ const howToCase = (question: string, as: Role, page: string | null, check: (a: s
   help: { page, canDo },
   facts: async () => ({}),
   check: (a) => {
+    // She relays the guide as herself: "my panel", never "her" or "Denise's panel".
+    if (/\b(she|her|herself)\b|\bDenise's (panel|face|chat|answer|card|message box|tab|bubble)\b/i.test(a)) return "should speak as herself, not about Denise in the third person";
     if (page === null) return /\b(guide|not sure|don't know)\b/i.test(a) && !steps(a) ? check(a) : "should say it isn't in the help guide, without steps";
     if (!canDo) return !steps(a) ? check(a) : "shouldn't give steps to someone who can't do it";
     return steps(a) ? check(a) : "should answer with numbered steps";

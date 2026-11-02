@@ -28,7 +28,7 @@ async function Outbox({ searchParams }: Pick<PageProps<"/dev/outbox">, "searchPa
   const to = (await searchParams).to;
   let query = createAdminClient()
     .from("outbox_messages")
-    .select("id, channel, to_address, subject, body, html, created_at")
+    .select("id, channel, to_address, subject, body, html, created_at, business:businesses(locations(timezone))")
     .order("created_at", { ascending: false })
     .limit(50);
   if (typeof to === "string" && to) query = query.eq("to_address", to);
@@ -51,7 +51,7 @@ async function Outbox({ searchParams }: Pick<PageProps<"/dev/outbox">, "searchPa
                 <span>
                   <span className="font-semibold text-ink">{m.channel === "sms" ? "Text" : "Email"}</span> to <span data-testid="outbox-to">{m.to_address}</span>
                 </span>
-                <time dateTime={m.created_at}>{new Date(m.created_at).toLocaleString("en-US")}</time>
+                <time dateTime={m.created_at}>{sentAt(m.created_at, m.business?.locations[0]?.timezone)}</time>
               </p>
               {m.subject && <p className="mt-1 font-semibold text-ink">{m.subject}</p>}
               <p className="mt-1 whitespace-pre-line text-ink" data-testid="outbox-body">
@@ -75,4 +75,10 @@ async function Outbox({ searchParams }: Pick<PageProps<"/dev/outbox">, "searchPa
       )}
     </main>
   );
+}
+
+// When it was sent, in the salon's own time with its zone ("Nov 2, 3:41 PM
+// CST"), like every other screen; UTC, labelled, for a message with no salon.
+function sentAt(iso: string, timeZone = "UTC"): string {
+  return new Date(iso).toLocaleString("en-US", { timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
 }

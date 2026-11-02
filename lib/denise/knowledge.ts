@@ -8,6 +8,7 @@
 //   - sales figures for owners and managers.
 // Every number is calculated here; Claude only reads them.
 
+import { formatDuration } from "@/lib/duration";
 import { loadRewardsOverview } from "@/lib/rewards-load";
 import { can } from "@/lib/permissions";
 import { isFrontOfHouse } from "@/lib/staff";
@@ -218,20 +219,21 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
         .map((d) => ({
           stylist: staff.get(d.staffId) ?? "a stylist",
           service: services.get(d.serviceId) ?? "a service",
-          typical_minutes: d.medianMinutes,
+          // Lengths come worded ("3 hr 7 min"), so she never says "187 minutes".
+          typical_length: formatDuration(d.medianMinutes),
           // Tapped times, or a rougher estimate from check-in to checkout.
           based_on: d.basis === "check_in_out" ? "check-in to checkout times (an estimate)" : "tapped start and finish times",
-          middle_half_minutes: `${d.p25Minutes}–${d.p75Minutes}`,
+          middle_half: `${formatDuration(d.p25Minutes)} to ${formatDuration(d.p75Minutes)}`,
           visits_counted: d.visits,
           outliers_set_aside: d.outliers,
           trusted: d.trusted,
           consistency: d.consistency,
           // Only real trends (significant, from enough recent visits).
-          ...(d.trend !== "steady" ? { trend: d.trend === "faster" ? "getting faster" : "getting slower", trend_minutes: d.trendMinutes } : {}),
-          menu_minutes: d.menuMinutes,
-          usually_booked_minutes: d.bookedMinutes,
+          ...(d.trend !== "steady" ? { trend: d.trend === "faster" ? "getting faster" : "getting slower", trend_by: formatDuration(Math.abs(d.trendMinutes)) } : {}),
+          menu_length: formatDuration(d.menuMinutes),
+          usually_booked_for: d.bookedMinutes === null ? null : formatDuration(d.bookedMinutes),
           ran_over_percent: pct(d.overrunRate),
-          suggested_booking_minutes: d.suggestedMinutes,
+          suggested_booking_length: d.suggestedMinutes === null ? null : formatDuration(d.suggestedMinutes),
         }));
       return { scope: ownTimesOnly ? "your own services" : "all stylists", rows, note: rows.length ? undefined : "No timed visits for that yet." };
     },
@@ -243,19 +245,19 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
       const mine = (id: string | null) => (!ownTimesOnly || id === own ? (id ? (staff.get(id) ?? null) : null) : "(another stylist)");
       return {
         weeks_of_history: s.weeks,
-        busiest_hours: s.busiest.map((h) => ({ day: WEEKDAY[h.weekday], hour: hourText(h.hour), booked_minutes_per_week: h.bookedMinutesPerWeek })),
-        quietest_hours: s.quietest.map((h) => ({ day: WEEKDAY[h.weekday], hour: hourText(h.hour), booked_minutes_per_week: h.bookedMinutesPerWeek })),
+        busiest_hours: s.busiest.map((h) => ({ day: WEEKDAY[h.weekday], hour: hourText(h.hour), booked_per_week: formatDuration(h.bookedMinutesPerWeek) })),
+        quietest_hours: s.quietest.map((h) => ({ day: WEEKDAY[h.weekday], hour: hourText(h.hour), booked_per_week: formatDuration(h.bookedMinutesPerWeek) })),
         running_over_by_day: s.weekdays.map((w) => ({
           day: WEEKDAY[w.weekday],
           timed_visits: w.visits,
           ran_over_percent: pct(w.overrunRate),
-          average_minutes_over: w.averageOverMinutes,
+          average_over_by: formatDuration(w.averageOverMinutes),
           stylist_running_over_most: mine(w.worstStaffId),
           stylist_ran_over_percent: !ownTimesOnly || w.worstStaffId === own ? pct(w.worstStaffRate) : null,
           services_running_over_most: w.worstServiceIds.map((id) => services.get(id) ?? "a service"),
           estimated_percent: pct(w.estimatedShare ?? 0),
         })),
-        services_running_over: s.serviceOverruns.slice(0, 6).map((o) => ({ service: services.get(o.serviceId) ?? "a service", timed_visits: o.visits, ran_over_percent: pct(o.overrunRate), typical_minutes_over: o.typicalOverMinutes, estimated_percent: pct(o.estimatedShare ?? 0) })),
+        services_running_over: s.serviceOverruns.slice(0, 6).map((o) => ({ service: services.get(o.serviceId) ?? "a service", timed_visits: o.visits, ran_over_percent: pct(o.overrunRate), typical_over_by: o.typicalOverMinutes === null ? null : formatDuration(o.typicalOverMinutes), estimated_percent: pct(o.estimatedShare ?? 0) })),
         no_shows_by_day: s.noShowsByWeekday.map((n) => ({ day: WEEKDAY[n.key], visits: n.visits, no_show_percent: pct(n.rate) })),
         no_shows_by_time_of_day: s.noShowsByTimeOfDay.map((n) => ({ time_of_day: n.key, visits: n.visits, no_show_percent: pct(n.rate) })),
         rebooking_by_stylist: s.rebooking.filter((r) => !ownTimesOnly || r.staffId === own).map((r) => ({ stylist: staff.get(r.staffId) ?? "a stylist", visits: r.visits, rebooked_before_leaving_percent: pct(r.rebookedRate) })),
@@ -294,8 +296,8 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
             client: i.appointment.client?.first_name ?? "walk-in",
             service: services.get(i.service_id) ?? "a service",
             status: i.appointment.status,
-            booked_minutes: minutes,
-            stylist_usually_takes_minutes: usual?.trusted ? usual.medianMinutes : null,
+            booked_for: formatDuration(minutes),
+            stylist_usually_takes: usual?.trusted ? formatDuration(usual.medianMinutes) : null,
             ...(usual?.trusted && usual.basis === "check_in_out" ? { usual_time_based_on: "check-in to checkout times (an estimate)" } : {}),
           };
         }),

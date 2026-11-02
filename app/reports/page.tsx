@@ -111,7 +111,8 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
     return s.size ? `/reports?${s}` : "/reports";
   };
 
-  const between = `${formatLongDay(range.from, false)} to ${formatLongDay(range.to, false)}`;
+  // One day says it once ("this month" on the 1st).
+  const between = range.from === range.to ? formatLongDay(range.from, false) : `${formatLongDay(range.from, false)} to ${formatLongDay(range.to, false)}`;
   const th = thClass;
   const thNum = `${thClass} text-right`;
   const td = tdClass;
@@ -126,7 +127,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
           <>
             What you owe in gift cards and packages, gift card activity, memberships, rewards, bridal and events, where online bookings came from, rebooking, and closing out the day.
             <span className="mt-1 block text-13 text-ink-subtle" data-testid="report-period">
-              Showing {formatLongDay(range.from, false)} to {formatLongDay(range.to, false)}
+              Showing {between}
             </span>
           </>
         }
@@ -156,7 +157,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
         </Stats>
         {liability.expired.cents > 0 && (
           <p className="mt-3 text-13 text-ink-muted">
-            {formatPrice(liability.expired.cents)} sits on {liability.expired.count} expired cards. What happens to unused balances depends on your state&apos;s law.
+            {formatPrice(liability.expired.cents)} sits on {liability.expired.count} expired {liability.expired.count === 1 ? "card" : "cards"}. What happens to unused balances depends on your state&apos;s law.
           </p>
         )}
         {packages.clients.length > 0 && (

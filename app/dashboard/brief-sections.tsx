@@ -10,8 +10,22 @@ import { briefItemKey, creditText, type BriefFacts } from "@/lib/denise/brief";
 // Shown per section before "See all".
 const TOP = 3;
 
-// `label` names the row for its dismiss button when titles repeat.
-type Row = { key: string; href: string; title: string; detail: string; label?: string };
+// `label` names the row for its dismiss button when titles repeat. A row
+// with `parts` (an event with several things to sort out) shows its title
+// once, then each part with its own dismiss.
+type Part = { key: string; detail: string; label: string };
+type Row = { key: string; href: string; title: string; detail: string; label?: string; parts?: Part[] };
+
+// One row per event, in the order its first issue came.
+function byEvent(risks: BriefFacts["events"]): Row[] {
+  const rows = new Map<string, Row & { parts: Part[] }>();
+  for (const e of risks) {
+    const row = rows.get(e.eventId) ?? { key: `event:${e.eventId}`, href: `/events/${e.eventId}`, title: e.title, detail: "", parts: [] };
+    row.parts.push({ key: briefItemKey.event(e), detail: e.detail, label: `${e.title}: ${e.detail}` });
+    rows.set(e.eventId, row);
+  }
+  return [...rows.values()];
+}
 
 // Denise's morning brief in sections: what might go wrong today and who to
 // look out for, each item linking to the visit, client or product, and
@@ -69,15 +83,19 @@ export function BriefSections({ brief, today }: { brief: BriefFacts; today: stri
     {
       id: "events",
       title: "Events coming up",
-      rows: brief.events.map((e) => ({ key: briefItemKey.event(e), href: `/events/${e.eventId}`, title: e.title, detail: e.detail, label: `${e.title}: ${e.detail}` })),
-      total: brief.events.length,
+      rows: byEvent(brief.events),
+      total: byEvent(brief.events).length,
       seeAll: "/events",
       empty: "Every event coming up is in order.",
     },
   ];
 
   const shown = sections.map((s) => {
-    const rows = s.rows.filter((r) => !dismissed.has(r.key));
+    const rows = s.rows.flatMap((r) => {
+      if (!r.parts) return dismissed.has(r.key) ? [] : [r];
+      const parts = r.parts.filter((p) => !dismissed.has(p.key));
+      return parts.length ? [{ ...r, parts }] : [];
+    });
     return { ...s, rows, total: s.total - (s.rows.length - rows.length) };
   });
   const busy = shown.filter((s) => s.rows.length > 0 || s.total > 0);
@@ -142,23 +160,33 @@ function BriefSection({
       </h3>
       {shown.length > 0 && (
         <ul className="divide-y divide-denise-100">
-          {shown.map((r) => (
+          {shown.map((r) =>
+            r.parts ? (
+              <li key={r.key} className="animate-fade-in py-2.5 text-sm">
+                <Link href={r.href} className="font-medium text-ink underline-offset-2 hover:underline">
+                  {r.title}
+                </Link>
+                <ul className="mt-1 flex flex-col gap-1">
+                  {r.parts.map((p) => (
+                    <li key={p.key} className="flex items-start gap-2">
+                      <Link href={r.href} className="min-w-0 flex-1 text-13 text-ink-muted hover:text-ink">
+                        {p.detail}
+                      </Link>
+                      <DismissButton label={p.label} onClick={() => onDismiss(p.key)} />
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ) : (
             <li key={r.key} className="group flex animate-fade-in items-start gap-2 py-2.5">
               <Link href={r.href} className="min-w-0 flex-1 text-sm">
                 <span className="block font-medium text-ink underline-offset-2 group-hover:underline">{r.title}</span>
                 <span className="block text-13 text-ink-muted">{r.detail}</span>
               </Link>
-              <button
-                type="button"
-                aria-label={`Dismiss ${r.label ?? r.title}`}
-                title="Dismiss"
-                onClick={() => onDismiss(r.key)}
-                className="-mr-1.5 flex size-7 shrink-0 items-center justify-center rounded-md text-ink-subtle transition-colors duration-(--motion-fast) hover:bg-denise-100 hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
-              >
-                <CloseIcon className="size-4" />
-              </button>
+              <DismissButton label={r.label ?? r.title} onClick={() => onDismiss(r.key)} />
             </li>
-          ))}
+            ),
+          )}
         </ul>
       )}
       {more > 0 &&
@@ -177,5 +205,19 @@ function BriefSection({
         </button>
       )}
     </section>
+  );
+}
+
+function DismissButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={`Dismiss ${label}`}
+      title="Dismiss"
+      onClick={onClick}
+      className="-mr-1.5 flex size-7 shrink-0 items-center justify-center rounded-md text-ink-subtle transition-colors duration-(--motion-fast) hover:bg-denise-100 hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+    >
+      <CloseIcon className="size-4" />
+    </button>
   );
 }

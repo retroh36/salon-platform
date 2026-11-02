@@ -18,5 +18,5 @@ Put a client on the waitlist for when time opens up.
 ## Good to know
 
 - Everyone waiting is listed under **Waiting** with their services, stylists, dates and times. Tap **Remove** to take someone off.
-- When a cancellation, no-show or Denise's fix frees time, she suggests who fits it in her panel (see Book a client from the waitlist).
+- When a cancellation, no-show or Denise's fix frees time, Denise's panel suggests who fits it (see Book a client from the waitlist).
 - Stylists can see the waitlist but can't change it.

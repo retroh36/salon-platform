@@ -347,6 +347,38 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"booking_links": {
+                  Row: {
+                    "business_id": string,"code": string,"created_at": string,"created_by": string | null,"service_ids": (string)[],"source": string,"staff_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"code": string,"created_at"?: string,"created_by"?: string | null,"service_ids"?: (string)[],"source": string,"staff_id"?: string | null
+                  }
+                  Update: {
+                    "business_id"?: string,"code"?: string,"created_at"?: string,"created_by"?: string | null,"service_ids"?: (string)[],"source"?: string,"staff_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "booking_links_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "booking_links_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "booking_links_staff_id_fkey"
+      columns: ["staff_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"businesses": {
                   Row: {
                     "ai_daily_token_limit": number,"auto_lock_minutes": number,"cash_float_cents": number,"created_at": string,"discount_max_percent": number,"discount_roles": (Database["public"]['Enums']["staff_role"])[],"free_text_roles": (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months": number | null,"gift_card_presets_cents": (number)[],"google_review_url": string | null,"id": string,"logo_path": string | null,"name": string,"next_sale_number": number,"patch_test_enforcement": string,"patch_test_min_hours": number,"patch_test_valid_days": number,"pay_period": string,"pay_period_anchor": string,"plan": string,"promo_card_expiry_days": number,"receipt_footer": string | null,"receipt_show_stylists": boolean,"settings": NonNullable<Json>,"slug": string | null,"tax_rate_retail_bp": number,"tax_rate_services_bp": number,"time_off_notice_days": number,"updated_at": string,"yelp_url": string | null

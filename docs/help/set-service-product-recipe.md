@@ -18,4 +18,4 @@ Set the back-bar products a service usually uses, so stock is taken off at check
 
 - Only back-bar products can be in a recipe.
 - When the stylist records a formula with products for the visit, that's used instead of the recipe.
-- Denise also uses recipes to work out what upcoming visits will need when she suggests reorders.
+- Denise also uses recipes to work out what upcoming visits will need when suggesting reorders.

@@ -48,7 +48,9 @@ export type ConflictView = {
 };
 
 // A client due who hasn't checked in yet ("late:<appointment>").
-export type DeniseNotice = { id: string; appointmentId: string; itemId: string; clientName: string; startMinute: number; text: string };
+// `over`: the visit's whole booked time has passed (after closing, say), so
+// it's to settle (a no-show, or checked in and out if they came), not to chase.
+export type DeniseNotice = { id: string; appointmentId: string; itemId: string; clientName: string; startMinute: number; text: string; over: boolean };
 
 // A reorder Denise has drafted on the Inventory page.
 export type ReorderNotice = {

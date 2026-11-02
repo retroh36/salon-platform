@@ -17,4 +17,4 @@ Set the stock level that counts as low, and how many to order at a time.
 
 - A product below its reorder point shows **Low stock** on Inventory, and on the Dashboard when today's visits need it.
 - Tap the low stock alert on Inventory to see only those products.
-- Denise uses these numbers, and upcoming bookings, when she drafts reorders. See "Review Denise's reorder drafts".
+- Denise uses these numbers, and upcoming bookings, when drafting reorders. See "Review Denise's reorder drafts".

@@ -289,7 +289,9 @@ export function TicketList({
   onRemovePromotion: (id: string) => void;
   onChange: (f: (t: Ticket) => Ticket) => void;
 }) {
-  const names = new Map(data.staff.map((s) => [s.id, s]));
+  // Products can be credited to whoever is signed in (the front desk, a
+  // manager), who isn't among the stylists.
+  const names = new Map([...data.creditStaff, ...data.staff].map((s) => [s.id, s]));
   // What promotions take off each line, for the whole ticket.
   const rates = withPromotions(ticket, given);
   const groups = stylistGroups(ticket, rates);
@@ -390,7 +392,7 @@ export function TicketList({
 }
 
 function detailOf(line: TicketLine, data: CheckoutScreenData, rates: Rates): string[] {
-  const staff = (id: string | null) => data.staff.find((s) => s.id === id)?.firstName;
+  const staff = (id: string | null) => (data.staff.find((s) => s.id === id) ?? data.creditStaff.find((s) => s.id === id))?.firstName;
   const out: string[] = [];
   if (line.kind === "service") {
     out.push(`by ${staff(line.staffId) ?? "a stylist"}`);

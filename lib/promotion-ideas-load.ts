@@ -5,7 +5,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import { siteUrl } from "@/lib/branding";
+import { shortLink, type BookingLink } from "@/lib/booking-links";
 import { gapsWorthFilling } from "@/lib/dashboard";
 import type { ClientInsight } from "@/lib/insights/clients";
 import { loadAllClientInsights, loadClientInsights } from "@/lib/insights/read";
@@ -80,7 +80,7 @@ export async function specialDraft(
   me: Me,
   o: { promotionId: string; clientId: string; staffId: string; date: LocalDate; start: number },
   now = new Date(),
-): Promise<{ body: string; subject: string; promotion: PromoRule } | null> {
+): Promise<{ body: string; subject: string; promotion: PromoRule; bookingLink: BookingLink } | null> {
   const tz = me.location.timezone;
   const today = todayIn(tz, now);
   const promotion = (await loadPromotions(supabase, me.business_id, today)).find((r) => r.id === o.promotionId);
@@ -93,10 +93,12 @@ export async function specialDraft(
   ]);
   if (!business || !client || !stylist) return null;
   const habits: ClientInsight | undefined = insight.get(o.clientId)?.habits;
-  const services = habits?.usualServiceIds.length ? `&services=${habits.usualServiceIds.join(",")}` : "";
-  const link = `${siteUrl()}/book/${business.slug}?src=special&staff=${o.staffId}${services}`;
+  // A short link (/b/<code>), saved when the message is sent.
+  const bookingLink: BookingLink = { businessId: me.business_id, staffId: o.staffId, serviceIds: (habits?.usualServiceIds ?? []).slice(0, 4), source: "special" };
+  const link = shortLink(bookingLink);
   return {
     promotion,
+    bookingLink,
     subject: `An opening at ${business.name}`,
     body: specialMessage({
       firstName: client.first_name,

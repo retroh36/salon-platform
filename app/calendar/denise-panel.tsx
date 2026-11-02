@@ -142,58 +142,66 @@ export function DenisePanel({
       ))}
 
       {/* Clients who haven't arrived 15 minutes after they were due: one
-          card, a line each, to call them or mark a no-show. */}
-      {notices.length > 0 && (
-        <section aria-label="Not arrived" data-testid="denise-late" className="flex animate-fade-in flex-col gap-2 rounded-lg border border-denise-200 bg-surface p-3">
-          <p className="flex items-center gap-2 font-semibold text-denise-900">
-            <ClockIcon className="size-4 shrink-0 text-denise-700" />
-            {notices.length === 1 ? "Not arrived yet" : `${notices.length} not arrived yet`}
-          </p>
-          <ul className="flex flex-col gap-1.5">
-            {notices.map((n) => (
-              // The full name on its own line (never cut off), when they were
-              // due under it, then small actions; dismiss in the corner.
-              <li key={n.id} className="relative flex animate-fade-in flex-col gap-2 border-t border-line pt-2.5 first:border-t-0 first:pt-0">
-                <span className={data.me.canBook ? "pr-8" : ""}>
-                  <span data-testid="late-name" className="block font-medium break-words text-ink">
-                    {n.clientName}
-                  </span>
-                  <span className="block text-xs text-ink-muted">Due {formatMinute(n.startMinute)}</span>
-                </span>
-                <span className="flex flex-wrap gap-1.5">
-                  <Button size="xs" onClick={() => onOpen(n.appointmentId)}>
-                    Open
-                  </Button>
-                  {data.me.canBook &&
-                    (confirmingNoShow === n.id ? (
-                      // Asked first: a no-show frees their time (Undo follows on the toast).
-                      <>
-                        <Button size="xs" variant="danger" onClick={() => onNoShow(n)}>
-                          Yes, no-show
-                        </Button>
-                        <Button size="xs" variant="ghost" onClick={() => setConfirmingNoShow(null)}>
-                          Not yet
-                        </Button>
-                      </>
-                    ) : (
-                      <Button size="xs" variant="ghost" onClick={() => setConfirmingNoShow(n.id)}>
-                        Mark no-show
+          card, a line each, to call them or mark a no-show. Visits whose
+          booked time is over (after closing, say) are their own card: to
+          settle, not to chase. */}
+      {(["due", "over"] as const).map((kind) => {
+        const these = notices.filter((n) => n.over === (kind === "over"));
+        if (!these.length) return null;
+        return (
+            <section key={kind} aria-label={kind === "over" ? "Never checked in" : "Not arrived"} data-testid={kind === "over" ? "denise-never-in" : "denise-late"} className="flex animate-fade-in flex-col gap-2 rounded-lg border border-denise-200 bg-surface p-3">
+              <p className="flex items-center gap-2 font-semibold text-denise-900">
+                <ClockIcon className="size-4 shrink-0 text-denise-700" />
+                {kind === "over" ? (these.length === 1 ? "Never checked in" : `${these.length} never checked in`) : these.length === 1 ? "Not arrived yet" : `${these.length} not arrived yet`}
+              </p>
+              <ul className="flex flex-col gap-1.5">
+                {these.map((n) => (
+                  // The full name on its own line (never cut off), when they were
+                  // due under it, then small actions; dismiss in the corner.
+                  <li key={n.id} className="relative flex animate-fade-in flex-col gap-2 border-t border-line pt-2.5 first:border-t-0 first:pt-0">
+                    <span className={data.me.canBook ? "pr-8" : ""}>
+                      <span data-testid="late-name" className="block font-medium break-words text-ink">
+                        {n.clientName}
+                      </span>
+                      <span className="block text-xs text-ink-muted">{kind === "over" ? "Booked" : "Due"} {formatMinute(n.startMinute)}</span>
+                    </span>
+                    <span className="flex flex-wrap gap-1.5">
+                      <Button size="xs" onClick={() => onOpen(n.appointmentId)}>
+                        Open
                       </Button>
-                    ))}
-                </span>
-                {data.me.canBook && (
-                  <IconButton label={`Dismiss ${n.clientName}`} size="xs" variant="ghost" className="absolute top-1.5 -right-1.5" onClick={() => onDismissNotice(n.id)}>
-                    <CloseIcon className="size-3.5" />
-                  </IconButton>
-                )}
-              </li>
-            ))}
-          </ul>
-          <p className="text-xs text-ink-muted">
-            Give them a call (their number&apos;s in the booking), or mark a no-show. If they&apos;re on the way, open the booking and tell me how late; I&apos;ll rearrange things.
-          </p>
-        </section>
-      )}
+                      {data.me.canBook &&
+                        (confirmingNoShow === n.id ? (
+                          // Asked first: a no-show frees their time (Undo follows on the toast).
+                          <>
+                            <Button size="xs" variant="danger" onClick={() => onNoShow(n)}>
+                              Yes, no-show
+                            </Button>
+                            <Button size="xs" variant="ghost" onClick={() => setConfirmingNoShow(null)}>
+                              Not yet
+                            </Button>
+                          </>
+                        ) : (
+                          <Button size="xs" variant="ghost" onClick={() => setConfirmingNoShow(n.id)}>
+                            Mark no-show
+                          </Button>
+                        ))}
+                    </span>
+                    {data.me.canBook && (
+                      <IconButton label={`Dismiss ${n.clientName}`} size="xs" variant="ghost" className="absolute top-1.5 -right-1.5" onClick={() => onDismissNotice(n.id)}>
+                        <CloseIcon className="size-3.5" />
+                      </IconButton>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-ink-muted">
+                {kind === "over"
+                  ? "Their booked time is over. Mark a no-show, or if they came, open the booking to check them in and out."
+                  : "Give them a call (their number's in the booking), or mark a no-show. If they're on the way, open the booking and tell me how late; I'll rearrange things."}
+              </p>
+            </section>
+        );
+      })}
 
       {openings.length > 0 && (
         <section aria-label="Waitlist" className="flex flex-col gap-2">

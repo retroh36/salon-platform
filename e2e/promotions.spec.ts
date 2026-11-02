@@ -122,6 +122,39 @@ test.describe("front desk", () => {
   });
 });
 
+test.describe("short booking links", () => {
+  test.use({ storageState: AUTH.frontDesk });
+  const code = "TESTQNK2";
+
+  test.afterAll(async () => {
+    await admin.from("booking_links").delete().eq("code", code);
+  });
+
+  test("a special's message links short, and the link opens the booking site with the stylist chosen", async ({ page }) => {
+    await page.goto("/promotions");
+    const ideas = ui(page).getByTestId("opening-ideas");
+    await waitForHydration(page, "[data-testid=opening-ideas]");
+    // When the next 48 hours have an opening with someone due back.
+    const message = ideas.getByRole("button", { name: "Message", exact: true });
+    if (await message.count()) {
+      await message.first().click();
+      const body = await ideas.getByLabel("Message", { exact: true }).inputValue();
+      expect(body).toMatch(/\/b\/[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8}\b/);
+      expect(body).not.toMatch(/staff=|services=|[0-9a-f]{8}-[0-9a-f]{4}-/);
+    }
+    // A saved link (as sending saves it) goes on with its choices.
+    const { data: cut } = await admin.from("services").select("id").eq("business_id", SEED.business).eq("name", "Men's Cut").single();
+    const saved = await admin.from("booking_links").insert({ code, business_id: SEED.business, staff_id: SEED.staff.gil, service_ids: [cut!.id], source: "special", created_by: SEED.staff.frontDesk });
+    expect(saved.error).toBeNull();
+    await page.goto(`/b/${code.toLowerCase()}`);
+    await expect(page).toHaveURL(new RegExp(`/book/maple-and-ash\\?src=special&staff=${SEED.staff.gil}&services=${cut!.id}$`));
+    await expect(page.getByTestId("booking-flow")).toBeVisible();
+    // An unknown code says so.
+    const missing = await page.request.get("/b/ZZZZZZZZ", { maxRedirects: 0 });
+    expect(missing.status()).toBe(404);
+  });
+});
+
 test.describe("booking site", () => {
   const phone = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true };
   test.use({ ...phone, storageState: { cookies: [], origins: [] } });

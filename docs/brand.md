@@ -301,5 +301,7 @@ Maestra's AI assistant, and the reason for the tagline's second half.
   notes.
 - **Her look:** periwinkle, and her art in `public/brand/denise/` (`wave`:
   nothing to do, `think`: working, `point`: presenting a fix, `face`: the
-  small icon). On the calendar her face sits at the end of the legend bar,
+  small icon, a crop of `wave` showing her whole page head, folded corner
+  and glasses, so it reads as the same character at 20px; always drawn
+  through `DeniseFace`, the login screen included). On the calendar her face sits at the end of the legend bar,
   never over appointments.

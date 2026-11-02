@@ -9,7 +9,7 @@ Set up a wedding or other event on one screen: the details, the party, the timel
 
 1. Go to **Events** and tap **New event**.
 2. In **Describe it to Denise**, type one line, like "June 14 wedding, ready by 2pm, bride plus 5 bridesmaids hair and makeup, at the Grand Hotel", and tap **Draft it**.
-3. Check what she filled in: the **Date**, **Ready by**, **Where** and everyone in the **Party** with their package. Change anything.
+3. Check what Denise filled in: the **Date**, **Ready by**, **Where** and everyone in the **Party** with their package. Change anything.
 4. Tap **+ Bridesmaid**, **+ Mother of the bride** and the other buttons to add someone, or **×** to remove them.
 5. Give it a **Name** and find the client under **Find a client** (or tap **New client**).
 6. Check the **Total** and the deposit on the side, and the **Timeline** under the party. Change the number of hair or makeup artists, and who's on each, if you need to.

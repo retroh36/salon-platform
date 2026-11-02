@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { DeniseFace } from "@/components/denise";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { fieldClass } from "@/components/ui/field";
-import { CalendarIcon, CloseIcon } from "@/components/ui/icons";
+import { CalendarIcon, CloseIcon, SendIcon } from "@/components/ui/icons";
 import { Badge } from "@/components/ui/page";
 import { parseDollars, tipFor, TIP_PERCENTS } from "@/lib/checkout";
 import type { CheckoutScreenData } from "@/lib/checkout-screen";
@@ -102,7 +102,8 @@ export function PaymentPanel({
             </p>
           )}
           {data.client && ticket.payments.length === 0 && totals.dueCents > 0 && (
-            <Button variant="quiet" className="self-start" onClick={() => onDialog({ kind: "payment-link" })}>
+            <Button variant="secondary" className="w-full" onClick={() => onDialog({ kind: "payment-link" })}>
+              <SendIcon className="size-4" />
               Text a payment link instead
             </Button>
           )}
@@ -140,7 +141,8 @@ export function PaymentPanel({
                 Paid in full
               </Badge>
             ) : totals.dueCents > 0 ? (
-              `${formatPrice(totals.dueCents)} remaining to pay`
+              // Only once something's paid: before that it's the total.
+              (ticket.payments.length > 0 || totals.coveredCents > 0) && `${formatPrice(totals.dueCents)} remaining to pay`
             ) : (
               `${formatPrice(-totals.dueCents)} more than the total`
             )}

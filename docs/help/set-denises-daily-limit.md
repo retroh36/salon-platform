@@ -16,8 +16,8 @@ See whether Denise's thinking is working and how much it's used, and cap it per 
 ## Good to know
 
 - At the limit, Denise switches to plain wording until midnight at the salon. Everything still works: fixes, the morning brief and the calendar.
-- Set it to 0 to keep her to plain wording all the time.
-- **Status** comes from her latest real answer. **Working** means it went through (with when). **Not working** says why in plain words, such as "the key is invalid". **Not set up** means her thinking isn't set up for this salon, whatever the limit, so she uses plain wording.
+- Set it to 0 to keep Denise to plain wording all the time.
+- **Status** comes from Denise's latest real answer. **Working** means it went through (with when). **Not working** says why in plain words, such as "the key is invalid". **Not set up** means Denise's thinking isn't set up for this salon, whatever the limit, so plain wording is used.
 - Settings checks again by itself when nothing has been tried for an hour. Tap **Check now** to try straight away; a check uses a few thousand tokens.
 - Usage is counted by the salon's day: the limit starts again at midnight at the salon.
 - Limits go up to 50,000,000 tokens a day.
