@@ -1096,10 +1096,15 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                             <span title={squeezed ? `${c.name} · ${c.booked}` : c.name} className="block">
                               <FitText variants={nameVariants(c.name, c.firstName, squeezed)} className="text-sm font-semibold" />
                             </span>
-                            {/* One line, the full hours on hover. */}
-                            <div title={c.chair ? `${c.hoursLabel} · ${c.chair}` : c.hoursLabel} data-testid="column-hours" className="truncate text-xs leading-4 whitespace-nowrap text-ink-muted">
-                              {c.working ? c.hoursShort : c.offReason}
-                              {c.working && c.chair && <span data-testid="column-chair"> · {c.chair}</span>}
+                            {/* One line, the full hours on hover: the chair goes
+                                first when the column is narrow, never cut off. */}
+                            <div
+                              title={c.chair ? `${c.hoursLabel} · ${c.chair}` : c.hoursLabel}
+                              data-testid="column-hours"
+                              data-chair={(c.working && c.chair) || undefined}
+                              className="text-xs leading-4 text-ink-muted"
+                            >
+                              <FitText variants={c.working ? (c.chair ? [`${c.hoursShort} · ${c.chair}`, c.hoursShort] : [c.hoursShort]) : [c.offReason ?? ""]} />
                             </div>
                           </div>
                         </div>
@@ -2324,8 +2329,10 @@ function AppointmentBlock({
   // never initials, and the time is always the whole range (shortened).
   const [first, ...rest] = block.clientName.split(" ");
   const ranges = timeRangeVariants(block.start, block.end);
+  // When even the shortest range won't fit beside it, the time goes (it's in
+  // the tooltip and booking details) and the first name keeps the room.
   const names = timeOnName
-    ? ranges.map((r) => `${first} · ${r}`)
+    ? [...ranges.map((r) => `${first} · ${r}`), first]
     : [block.clientName, ...(rest.length ? [`${first} ${firstLetter(rest.at(-1)!)}.`, first] : [])];
   // The visit's other services, when stylists share it.
   const others = block.parts.filter((p) => p.start !== block.start || p.service !== block.service);

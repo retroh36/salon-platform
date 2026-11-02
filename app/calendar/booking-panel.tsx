@@ -354,14 +354,15 @@ export function BookingPanel({
                   </optgroup>
                 ))}
               </LabeledSelect>
+              {/* The stylist has the whole row, so a full name is never cut off. */}
+              <LabeledSelect label="Stylist" value={l.staffId} onChange={(v) => update(l.key, { staffId: v })}>
+                {columns.map((c) => (
+                  <option key={c.staffId} value={c.staffId}>
+                    {c.name}
+                  </option>
+                ))}
+              </LabeledSelect>
               <div className="grid grid-cols-2 gap-3">
-                <LabeledSelect label="Stylist" value={l.staffId} onChange={(v) => update(l.key, { staffId: v })}>
-                  {columns.map((c) => (
-                    <option key={c.staffId} value={c.staffId}>
-                      {c.name}
-                    </option>
-                  ))}
-                </LabeledSelect>
                 <label className={labelClass}>
                   Starts
                   <input
@@ -373,16 +374,16 @@ export function BookingPanel({
                     className={fieldClass}
                   />
                 </label>
+                <LabeledSelect label="Chair" value={l.resource} onChange={(v) => update(l.key, { resource: v })}>
+                  <option value="any">Any free chair</option>
+                  <option value="none">No chair</option>
+                  {menu.resources.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </LabeledSelect>
               </div>
-              <LabeledSelect label="Chair" value={l.resource} onChange={(v) => update(l.key, { resource: v })}>
-                <option value="any">Any free chair</option>
-                <option value="none">No chair</option>
-                {menu.resources.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </LabeledSelect>
               <div className="flex min-h-8 items-center justify-between gap-2 text-13 text-ink-muted">
                 <span data-testid="line-summary" className="tabular-nums">
                   {info && l.startMinute != null

@@ -121,7 +121,7 @@ test("someone leaving is deactivated: their history stays, they can't get in, an
   await ui(raePage).getByLabel("Email").fill(EMAIL);
   await ui(raePage).getByLabel("Password").fill("a-new-password-1");
   await raePage.getByRole("button", { name: "Sign in" }).click();
-  await expect(raePage.getByText(/not linked to a salon/i)).toBeVisible();
+  await expect(raePage.getByRole("heading", { name: /not linked to a salon/i })).toBeVisible();
 
   await page.reload();
   await ui(page).getByRole("region", { name: "Leaving" }).getByRole("button", { name: `Reactivate ${TAG}Rae` }).click();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DeniseFace, DenisePose } from "@/components/denise";
 import { IconButton } from "@/components/ui/button";
 import { CloseIcon } from "@/components/ui/icons";
@@ -30,8 +30,12 @@ export type BubbleMe = { staffId: string; firstName: string; canBook: boolean; t
 // side panel): her face in the bottom right corner, and her chat in a panel
 // that sits beside the page rather than over it, so the page's own buttons
 // (Complete sale, Save) stay in reach. At iPad width and up it's a column on
-// the right; on a phone it fills the screen, with a close button. `launcher`
-// "header": the page shows its own button (the checkout's, in its top bar).
+// the right; on a phone it fills the screen, with a close button. The face
+// never covers the page: pages leave room under their last row (AppFrame's
+// `pb-24`), and while a button, link or field is under it, it tucks into a
+// small tab at the window's edge (`useTucked`). "Ask Denise" in the sidebar
+// opens her too. `launcher` "header": the page shows its own button (the
+// checkout's, in its top bar).
 export function DeniseBubble({ me, launcher = "corner" }: { me: BubbleMe; launcher?: "corner" | "header" }) {
   const { open, staffId } = useDenise();
   useEffect(() => hydrateDenise(me.staffId), [me.staffId]);
@@ -92,19 +96,87 @@ export function DeniseBubble({ me, launcher = "corner" }: { me: BubbleMe; launch
   );
 }
 
-// Her face in the corner while the panel is closed.
+// Her face in the corner while the panel is closed, tucked into a tab at
+// the window's edge while something the page needs is under it.
 function DeniseLauncherButton() {
+  const ref = useRef<HTMLButtonElement>(null);
+  const tucked = useTucked(ref);
   return (
     <button
+      ref={ref}
       type="button"
       onClick={focusDenise}
       aria-label="Open Denise"
       aria-keyshortcuts={DENISE_SHORTCUT}
       title={`Denise (${SHORTCUT_TEXT})`}
       data-testid="denise-bubble-launcher"
-      className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 flex size-14 animate-pop-in items-center justify-center rounded-full bg-surface shadow-lift ring-1 ring-denise-200 transition-transform duration-(--motion-fast) hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:scale-95"
+      data-tucked={tucked || undefined}
+      className={`fixed bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 flex animate-pop-in items-center justify-center bg-surface shadow-lift ring-1 ring-denise-200 transition-[right,width,height,border-radius,transform] duration-(--motion-base) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:scale-95 ${
+        tucked ? "right-0 h-12 w-7 rounded-l-full pl-1" : "right-4 size-14 rounded-full hover:-translate-y-0.5"
+      }`}
     >
-      <DeniseFace size={46} />
+      <DeniseFace size={tucked ? 22 : 46} />
+    </button>
+  );
+}
+
+// The full bubble's spot (16px in from the corner, 56px across).
+const SPOT = 56;
+const INSET = 16;
+const INTERACTIVE = "a[href], button, input, select, textarea, summary, [role=button], [role=link], [role=checkbox], [role=switch], [role=tab]";
+
+// Whether something the person can use (a button, link or field) is in the
+// bubble's spot just now, checked as the page scrolls, resizes or changes.
+function useTucked(ref: React.RefObject<HTMLElement | null>): boolean {
+  const [tucked, setTucked] = useState(false);
+  useEffect(() => {
+    let frame = 0;
+    const check = () => {
+      frame = 0;
+      const right = innerWidth - INSET;
+      const bottom = innerHeight - Math.max(INSET, 0);
+      const points: [number, number][] = [];
+      for (const dx of [4, SPOT / 2, SPOT - 4]) for (const dy of [4, SPOT / 2, SPOT - 4]) points.push([right - SPOT + dx, bottom - SPOT + dy]);
+      const covered = points.some(([x, y]) =>
+        document.elementsFromPoint(x, y).some((el) => !ref.current?.contains(el) && !el.closest("[data-denise-panel]") && el.closest(INTERACTIVE) !== null),
+      );
+      setTucked(covered);
+    };
+    const soon = () => {
+      if (!frame) frame = requestAnimationFrame(check);
+    };
+    check();
+    document.addEventListener("scroll", soon, { capture: true, passive: true });
+    addEventListener("resize", soon);
+    const changes = new MutationObserver(soon);
+    changes.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("scroll", soon, { capture: true });
+      removeEventListener("resize", soon);
+      changes.disconnect();
+    };
+  }, [ref]);
+  return tucked;
+}
+
+// "Ask Denise" in the sidebar, above who's signed in: a second way in.
+export function DeniseSidebarButton() {
+  const { open } = useDenise();
+  return (
+    <button
+      type="button"
+      onClick={() => (open ? setDeniseOpen(false) : focusDenise())}
+      aria-keyshortcuts={DENISE_SHORTCUT}
+      aria-expanded={open}
+      title={`Denise (${SHORTCUT_TEXT})`}
+      data-testid="denise-sidebar-launcher"
+      className="flex h-10 w-full items-center gap-2.5 rounded-md px-2 text-left text-sm font-medium text-sidebar-text transition-colors duration-(--motion-fast) hover:bg-sidebar-hover hover:text-white focus-visible:outline-2 focus-visible:outline-sidebar-focus aria-expanded:bg-sidebar-hover aria-expanded:text-white"
+    >
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-surface">
+        <DeniseFace size={24} />
+      </span>
+      Ask Denise
     </button>
   );
 }

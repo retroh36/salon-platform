@@ -79,6 +79,11 @@ export function DeniseChat({
                   ))}
                   {m.suggestions?.map((sg, j) => <SuggestionCard key={sg.actionId ?? j} suggestion={sg} today={today} canBook={canBook} />)}
                   {m.booking && <BookingCardView card={m.booking} index={i} outcome={m.outcome} today={today} onBooked={onBooked} />}
+                  {m.retry && i === chat.length - 1 && !run.working && (
+                    <Button size="sm" className="self-start" onClick={() => ask(m.retry!)} data-testid="denise-try-again">
+                      Try again
+                    </Button>
+                  )}
                 </div>
               </div>
             ),
@@ -205,8 +210,9 @@ function SuggestionCard({ suggestion, today, canBook }: { suggestion: BookingSug
   );
 }
 
-// While she works: "Denise is thinking…" (after 20 seconds, "Still working
-// on it…"), what she's doing now, and her answer as it streams in.
+// While she works: "Denise is thinking…" (after 8 seconds, "Still
+// thinking…"; at 25 seconds with no answer she stops, store.ts), what she's
+// doing now, and her answer as it streams in.
 function Thinking({ run }: { run: DeniseRun }) {
   return (
     <div className="flex max-w-[92%] animate-fade-in gap-2" data-testid="denise-thinking" aria-live="polite">
@@ -216,7 +222,7 @@ function Thinking({ run }: { run: DeniseRun }) {
           <DeniseText text={run.text} className="rounded-lg rounded-tl-sm bg-denise-50 px-3 py-2 text-ink" />
         ) : (
           <p className="flex items-center gap-1.5 rounded-lg rounded-tl-sm bg-denise-50 px-3 py-2 font-medium text-denise-900">
-            {run.slow ? "Still working on it" : "Denise is thinking"}
+            {run.slow ? "Still thinking" : "Denise is thinking"}
             <span aria-hidden className="inline-flex gap-0.5">
               {[0, 1, 2].map((i) => (
                 <span key={i} className="size-1 animate-breathe rounded-full bg-denise-500" style={{ animationDelay: `${i * 200}ms` }} />
@@ -227,7 +233,7 @@ function Thinking({ run }: { run: DeniseRun }) {
         )}
         {run.status && (
           <p className="text-xs text-ink-muted" data-testid="denise-status">
-            {run.slow && run.text ? "Still working on it… " : ""}
+            {run.slow && run.text ? "Still thinking… " : ""}
             {run.status}
           </p>
         )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { selectClass } from "@/components/ui/field";
 import { SearchIcon } from "@/components/ui/icons";
 import { Badge } from "@/components/ui/page";
@@ -62,7 +62,7 @@ export function ProductPicker({ data, onAdd }: { data: CheckoutScreenData; onAdd
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-60 flex-1">
+        <div className="relative min-w-80 flex-1">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-ink-muted" />
           <label htmlFor="product-search" className="sr-only">
             Add a product: name, brand, SKU or scan
@@ -122,11 +122,44 @@ export function ProductPicker({ data, onAdd }: { data: CheckoutScreenData; onAdd
       {/* Quick add, in one row (so the ticket keeps the room): what the
           stylist usually recommends, then the best sellers. */}
       {(others.length > 0 || recommended.length > 0) && (
-        <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-1">
+        <FadeScroll>
           {recommended.length > 0 && <QuickTiles label={`${recommender} recommends`} products={recommended} onAdd={add} testId="recommended" />}
           {others.length > 0 && <QuickTiles label="Best sellers" products={others} onAdd={add} testId="best-sellers" />}
-        </div>
+        </FadeScroll>
       )}
+    </div>
+  );
+}
+
+// A row that scrolls sideways, faded at whichever edge has more, so tiles
+// past the edge read as "more this way" rather than cut off (scrollbars stay
+// out of sight until hovered).
+function FadeScroll({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState({ left: false, right: false });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setMore({ left: el.scrollLeft > 1, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1 });
+    measure();
+    el.addEventListener("scroll", measure, { passive: true });
+    const seen = new ResizeObserver(measure);
+    seen.observe(el);
+    return () => {
+      el.removeEventListener("scroll", measure);
+      seen.disconnect();
+    };
+  }, []);
+  const fade = `linear-gradient(to right, ${more.left ? "transparent, black 3rem" : "black"}, ${more.right ? "black calc(100% - 3rem), transparent" : "black"})`;
+  return (
+    <div
+      ref={ref}
+      data-more-left={more.left || undefined}
+      data-more-right={more.right || undefined}
+      style={{ maskImage: fade, WebkitMaskImage: fade }}
+      className="-mx-1 flex gap-4 overflow-x-auto overscroll-x-contain px-1 pb-1"
+    >
+      {children}
     </div>
   );
 }

@@ -170,7 +170,7 @@ export function GroupPanel({ data, start, onClose, onSaved }: { data: BoardData;
                 ))}
               </select>
             </label>
-            <label className={labelClass}>
+            <label className={`${labelClass} col-span-2`}>
               Stylist
               <select value={g.staffId} onChange={(e) => update(g.key, { staffId: e.target.value })} className={selectClass}>
                 {data.columns

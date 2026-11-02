@@ -108,6 +108,8 @@ export type ChatMessage = {
   links?: HelpLink[];
   booking?: BookingCard;
   outcome?: { text: string; appointmentId?: string; date?: string };
+  // The question to ask again, when she stopped because it took too long.
+  retry?: string;
 };
 
 // Denise's streaming endpoint (app/api/denise/route.ts): what's asked of

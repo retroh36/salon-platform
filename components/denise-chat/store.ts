@@ -20,11 +20,12 @@ export type DeniseRun = {
   status: string | null;
   // Her answer so far, as it streams in.
   text: string;
-  // Over 20 seconds: "Still working on it…".
+  // Over 8 seconds: "Still thinking…".
   slow: boolean;
 };
 
-export type Done = Extract<DeniseEvent, { t: "done" }>;
+// `stopped`: she took too long and the request was stopped (STOP_MS).
+export type Done = Extract<DeniseEvent, { t: "done" }> & { stopped?: boolean };
 
 // "Open in the booking form" from a booking card: picked up by the calendar.
 export type Adjust = { date: string; lines: { serviceId: string; staffId: string; startMinute: number; minutes?: number }[]; client: { id: string; name: string; phone: string | null; allergies: string | null } | null };
@@ -41,10 +42,16 @@ type State = {
 };
 
 const IDLE: DeniseRun = { working: false, status: null, text: "", slow: false };
-export const SLOW_MS = 20_000;
-// Past this, she gives up and says something went wrong (a request that
-// hangs would otherwise leave her "still working" for good).
+export const SLOW_MS = 8_000;
+// Past this with no answer started, she stops and says so, with Try again:
+// a question never hangs. Once her words are coming in, she's given until
+// GIVE_UP_MS to finish.
+export const STOP_MS = 25_000;
 export const GIVE_UP_MS = 150_000;
+export const TOO_SLOW_TEXT = "That's taking me too long, so I stopped. Nothing was changed. Try again, or ask it a shorter way.";
+// For a report (running late, out, a cancellation): what was reported is
+// already saved, and the calendar looks over the day again by itself.
+const TOO_SLOW_REPORT = "That's taking me too long, so I stopped looking. What you told me is saved, and I'll look over the day again in a moment.";
 // The most messages kept.
 const KEEP = 40;
 const PREFIX = "maestra:denise:";
@@ -117,9 +124,19 @@ export function takeAdjust(): Adjust | null {
 export async function startDenise(request: DeniseRequest, firstStatus: string): Promise<Done> {
   set({ run: { working: true, status: firstStatus, text: "", slow: false } });
   const run = (patch: Partial<DeniseRun> | ((r: DeniseRun) => Partial<DeniseRun>)) => set({ run: { ...state.run, ...(typeof patch === "function" ? patch(state.run) : patch) } });
-  const timer = setTimeout(() => run({ slow: true }), SLOW_MS);
+  const stop = new AbortController();
+  let stopped = false;
+  const timers = [
+    setTimeout(() => run({ slow: true }), SLOW_MS),
+    setTimeout(() => {
+      if (state.run.text) return;
+      stopped = true;
+      stop.abort();
+    }, STOP_MS),
+    setTimeout(() => stop.abort(), GIVE_UP_MS),
+  ];
   try {
-    const response = await fetch("/api/denise", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request), signal: AbortSignal.timeout(GIVE_UP_MS) });
+    const response = await fetch("/api/denise", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request), signal: stop.signal });
     if (!response.ok || !response.body) return { t: "done", reply: ERROR_REPLY };
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -143,9 +160,9 @@ export async function startDenise(request: DeniseRequest, firstStatus: string): 
     }
     return done ?? { t: "done", reply: ERROR_REPLY };
   } catch {
-    return { t: "done", reply: ERROR_REPLY };
+    return stopped ? { t: "done", reply: { text: request.action === "ask" ? TOO_SLOW_TEXT : TOO_SLOW_REPORT, kind: "error" }, stopped: true } : { t: "done", reply: ERROR_REPLY };
   } finally {
-    clearTimeout(timer);
+    for (const t of timers) clearTimeout(t);
     set({ run: IDLE });
   }
 }
@@ -161,6 +178,6 @@ export async function askDenise(question: string, where: { date: string; page: P
   // Only what the conversation needs goes back: the words.
   const words = history.slice(-12).map((m) => ({ role: m.role, text: m.text }));
   const done = await startDenise({ action: "ask", date: where.date, history: words, page: where.page, booking: card ? stateOf(card) : null }, "Reading your question…");
-  appendDenise({ role: "denise", text: done.reply.text, suggestions: done.suggestions, links: done.links, booking: done.booking });
+  appendDenise({ role: "denise", text: done.reply.text, suggestions: done.suggestions, links: done.links, booking: done.booking, retry: done.stopped ? question : undefined });
   return done;
 }

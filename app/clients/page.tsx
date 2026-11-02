@@ -75,7 +75,7 @@ async function Clients({ searchParams }: Pick<PageProps<"/clients">, "searchPara
                 </th>
                 {header("last_visit", "Last visit")}
                 {header("next_visit", "Next visit")}
-                {header("stylist", "Usual stylist", "hidden lg:table-cell")}
+                {header("stylist", "Usual stylist", "hidden xl:table-cell")}
                 {spend && header("spend", "Spend", "text-right")}
               </tr>
             </thead>
@@ -93,10 +93,18 @@ async function Clients({ searchParams }: Pick<PageProps<"/clients">, "searchPara
                   </td>
                   <td className={`${tdClass} hidden whitespace-nowrap text-ink-muted tabular-nums md:table-cell`}>{client.phone}</td>
                   <td className={`${tdClass} whitespace-nowrap text-ink-muted tabular-nums`}>{client.last_visit_at ? day(client.last_visit_at, tz) : "—"}</td>
-                  <td className={`${tdClass} whitespace-nowrap tabular-nums ${client.next_visit_at ? "text-ink" : "text-ink-muted"}`}>
-                    {client.next_visit_at ? `${day(client.next_visit_at, tz, false)} · ${formatMinute(toLocal(new Date(client.next_visit_at), tz).minute)}` : "—"}
+                  {/* Wraps between the day and the time when it's narrow, so Spend stays on screen. */}
+                  <td className={`${tdClass} tabular-nums ${client.next_visit_at ? "text-ink" : "text-ink-muted"}`}>
+                    {client.next_visit_at ? (
+                      <>
+                        <span className="whitespace-nowrap">{day(client.next_visit_at, tz, false)}</span> ·{" "}
+                        <span className="whitespace-nowrap">{formatMinute(toLocal(new Date(client.next_visit_at), tz).minute)}</span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
                   </td>
-                  <td className={`${tdClass} hidden max-w-48 truncate text-ink-muted lg:table-cell`}>{client.usual_staff_name ?? "—"}</td>
+                  <td className={`${tdClass} hidden max-w-48 truncate text-ink-muted xl:table-cell`}>{client.usual_staff_name ?? "—"}</td>
                   {spend && <td className={`${tdClass} ${numClass}`}>{client.spend_cents ? formatPrice(client.spend_cents) : "—"}</td>}
                 </tr>
               ))}

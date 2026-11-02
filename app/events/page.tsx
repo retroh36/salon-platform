@@ -75,8 +75,10 @@ async function Events() {
         <EmptyState action={<Link href="/events/new" className={buttonClass("secondary")}>New event</Link>}>No events yet. Start one and describe it to Denise.</EmptyState>
       ) : (
         <>
-          <div className="-mx-4 overflow-x-auto overscroll-x-contain px-4 pb-2">
-            <ol className="grid min-w-[66rem] grid-cols-6 gap-4" aria-label="Pipeline">
+          {/* Six columns side by side when they fit, else rows of three (two
+              on a phone), so no stage is ever off the edge. */}
+          <div className="@container pb-2">
+            <ol className="grid grid-cols-2 gap-x-4 gap-y-6 @2xl:grid-cols-3 @[66rem]:grid-cols-6" aria-label="Pipeline">
               {PIPELINE.map((col) => {
                 const list = events.filter((e) => column(e) === col.key);
                 return (

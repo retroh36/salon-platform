@@ -25,6 +25,7 @@ import { assistantContext } from "@/lib/denise/context";
 import { claudeFor, deniseDay } from "@/lib/denise/day-state";
 import { DEMO_DENISE_PER_10_MIN, DEMO_LIMIT_TEXT, DEMO_SLOW_DOWN, isDemo } from "@/lib/demo";
 import { FAILURE_TEXT, failureRef, logDeniseError } from "@/lib/denise/errors";
+import { stepTimer, type StepTimer } from "@/lib/denise/timing";
 import { askerOf, deniseSession, type DeniseSession } from "@/lib/denise/session";
 import { replyToCallOut, replyToCancel, replyToLate } from "@/lib/denise/triggers";
 import type { DeniseEvent, DeniseRequest } from "@/lib/denise/types";
@@ -67,14 +68,19 @@ export async function POST(request: Request) {
         controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
       };
       let businessId: string | undefined;
+      // Each step's time, logged once she's done (./lib/denise/timing.ts).
+      const timer = stepTimer(typeof body?.action === "string" ? body.action : "unknown");
+      let outcome = "answered";
       try {
         const s = await deniseSession();
+        timer.mark("session");
         businessId = s?.me.business_id;
         if (!s) send(reply("Sign in again.", "error"));
         else if (!body || !isLocalDate(body.date)) send(reply("I didn't catch that. Try again.", "error"));
         else if (isDemo() && !(await withinDemoLimit())) send(reply(DEMO_SLOW_DOWN, "nothing"));
-        else await run(s, body, send);
+        else await run(s, body, send, timer);
       } catch (error) {
+        outcome = error instanceof Gone ? "gone" : "failed";
         if (!(error instanceof Gone)) {
           // Logged with the error's details and what she was doing, never the
           // question or client data.
@@ -88,6 +94,7 @@ export async function POST(request: Request) {
         }
       } finally {
         request.signal.removeEventListener("abort", leave);
+        timer.log(gone && outcome === "answered" ? "gone" : outcome);
       }
       if (!gone) controller.close();
     },
@@ -190,7 +197,7 @@ async function bookingIn(s: DeniseSession, line: string, current: BookingState |
   });
 }
 
-async function run(s: DeniseSession, body: DeniseRequest, send: Send) {
+async function run(s: DeniseSession, body: DeniseRequest, send: Send, timer: StepTimer) {
   const status = (text: string) => send({ t: "status", text });
   const where = { supabase: s.supabase, location: s.viewer.location, today: s.today };
   const look = () => deniseDay(askerOf(s), body.date, { onStep: status });
@@ -243,10 +250,12 @@ async function run(s: DeniseSession, body: DeniseRequest, send: Send) {
       const out = last ? await callOutIn(s, String(last.text), day) : null;
       if (out) return send(out);
       const page = await pageContext(s.supabase, body.page);
+      timer.mark("checks");
       // A booking request, or a follow-up to one: booking cards, worked out
       // by our code (Denise only reads the line).
       if (last && canBook(s.me.role)) {
         const booked = await bookingIn(s, String(last.text), cleanState(body.booking), page?.client?.id ?? null, status);
+        timer.mark("booking");
         if (booked) return send({ t: "done", reply: { text: booked.text, kind: "fixes" }, booking: booked.card });
       }
       const client = claudeFor(s.me.business_id, "ask_denise");
@@ -259,16 +268,25 @@ async function run(s: DeniseSession, body: DeniseRequest, send: Send) {
         new Date(),
         page,
       );
+      timer.mark("context");
       // Text only, starting with the staff member's question.
       const turns = (Array.isArray(body.history) ? body.history : [])
         .slice(-12)
         .map((m) => ({ role: m.role === "user" ? ("user" as const) : ("assistant" as const), text: String(m.text).slice(0, 1000) }));
       while (turns.length && turns[0].role !== "user") turns.shift();
       if (!turns.length) return send(reply("What would you like to know?", "nothing"));
+      let writing = false;
       const result = await answer(client, context, turns, {
-        onText: (text) => send({ t: "text", text }),
+        onText: (text) => {
+          if (!writing) timer.mark("first_words");
+          writing = true;
+          send({ t: "text", text });
+        },
         onDiscard: () => send({ t: "discard" }),
-        onTool: (name, input) => status(toolStatus(name, input, context)),
+        onTool: (name, input) => {
+          timer.mark(`tool:${name}`);
+          status(toolStatus(name, input, context));
+        },
       });
       return send({ t: "done", reply: { text: result.text, kind: "fixes" }, suggestions: result.suggestions, links: result.links });
     }

@@ -257,7 +257,7 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
       )}
 
       <div className="overflow-x-auto overscroll-x-contain rounded-xl border border-line bg-surface">
-        <div role="grid" aria-label={`Team schedule, week of ${formatDay(grid.week, true)}`} className="grid min-w-[60rem] grid-cols-[15rem_repeat(7,minmax(7rem,1fr))]">
+        <div role="grid" aria-label={`Team schedule, week of ${formatDay(grid.week, true)}`} className="grid min-w-[50rem] grid-cols-[minmax(12.5rem,15rem)_repeat(7,minmax(5.25rem,1fr))]">
           <div role="row" className="contents">
             <div role="columnheader" className="sticky left-0 z-10 border-b border-line bg-surface px-4 py-3 text-13 font-medium text-ink-muted">
               Team
@@ -267,13 +267,27 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
               const closed = grid.open[d].length === 0;
               return (
                 <div key={d} role="columnheader" className={`border-b border-l border-line px-3 py-2.5 ${d === today ? "bg-active-soft" : ""}`} data-day={d}>
-                  <p className={`text-sm font-semibold ${d === today ? "text-active-ink" : "text-ink"}`}>{formatDay(d)}</p>
+                  {/* Narrow columns wrap between words, never inside "Nov 3" or "54 hr". */}
+                  <p className={`text-sm font-semibold ${d === today ? "text-active-ink" : "text-ink"}`}>
+                    {formatDay(d)
+                      .split(", ")
+                      .map((part, i) => (
+                        <span key={i} className="whitespace-nowrap">
+                          {i > 0 ? ", " : ""}
+                          {part}
+                        </span>
+                      ))}
+                  </p>
                   {closed ? (
                     <p className="text-xs text-ink-muted">Closed</p>
                   ) : (
                     <p className="text-xs text-ink-muted tabular-nums" data-testid="day-totals">
-                      <span className="block">{hours(totals.scheduled)} scheduled</span>
-                      <span className="block">{hours(totals.booked)} booked</span>
+                      <span className="block">
+                        <span className="whitespace-nowrap">{hours(totals.scheduled)}</span> scheduled
+                      </span>
+                      <span className="block">
+                        <span className="whitespace-nowrap">{hours(totals.booked)}</span> booked
+                      </span>
                     </p>
                   )}
                 </div>

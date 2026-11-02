@@ -7,7 +7,7 @@ open: /calendar | Open calendar
 
 Type what a client asks for in Denise's chat, on any page, and book one of the best times in one tap.
 
-1. Open Denise: tap her face in the bottom right corner (on the calendar, her tab; at checkout, her button at the top), or press **⌘K** or **Ctrl+K**.
+1. Tap the Denise button in the bottom right corner or **Ask Denise** at the bottom of the sidebar (on the calendar, the **Denise** tab; at checkout, the Denise button at the top), or press **⌘K** or **Ctrl+K**.
 2. Type the request the way the client says it, for example "John Williams wants a cut with Gil on a Thursday morning", "earliest balayage with any Senior next week" or "Zoey, same as last time", and send it.
 3. If she asks **Which one is it?**, tap the right client. If they aren't on file, check their name and **Mobile** and tap **Add client**.
 4. Read the client's alerts on the card: allergies, **Card on file** or **No card on file**, and **Repeat no-show**.

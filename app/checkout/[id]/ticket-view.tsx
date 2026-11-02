@@ -43,69 +43,79 @@ export function ClientHeader({ data, walkIn, onWalkIn }: { data: CheckoutScreenD
   const usesLeftTotal = data.packages.reduce((n, p) => n + p.items.reduce((m, i) => m + (i.total - i.used), 0), 0);
   const giftCents = data.giftCards.reduce((n, g) => n + g.balanceCents, 0);
   if (!data.client) return <ChooseClient draftId={data.draft.id} walkIn={walkIn} onWalkIn={onWalkIn} />;
+  const packageItems = data.packages.flatMap((p) => p.items.filter((i) => i.used < i.total));
   return (
+    // The name has its own line and is never cut off; the buttons sit beside
+    // it when there's room and drop under it when there isn't (Denise docked
+    // beside the checkout); badges are whole pills on a line of their own.
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <Avatar name={data.client.name} size="lg" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xl font-semibold tracking-[-0.01em] text-ink" data-testid="checkout-client">
-            {data.client.name}
-          </p>
-          <div className="mt-1 flex flex-wrap gap-1.5">
-            {usesLeftTotal > 0 && (
-              <span data-testid="badge-package" className="max-w-full">
-                <Badge wrap tone="info">Package: {data.packages.flatMap((p) => p.items.filter((i) => i.used < i.total).map(usesLeft)).join(", ")}</Badge>
-              </span>
-            )}
-            {data.memberships.map((m) => (
-              <span key={m.id} data-testid="badge-membership" className="max-w-full">
-                <Badge wrap tone={m.status === "past_due" ? "warning" : m.status === "paused" ? "neutral" : "info"}>
-                  {m.name}
-                  {m.status === "past_due"
-                    ? ": payment failed, no member benefits"
-                    : m.status === "paused"
-                      ? ": paused"
-                      : m.credits.length
-                        ? ` · ${m.credits.map((c) => `${c.serviceName}: ${c.allowance - c.used} left`).join(", ")}`
-                        : ""}
-                </Badge>
-              </span>
-            ))}
-            {data.rewards && (
-              <span data-testid="badge-points" className="max-w-full">
-                <Badge tone="info">
-                  <span className="tabular-nums">{points(data.rewards.client.balance)}</span>
-                  {tierName(data) ? ` · ${tierName(data)}` : ""}
-                </Badge>
-              </span>
-            )}
-            {giftCents > 0 && (
-              <span data-testid="badge-gift-card" className="max-w-full">
-                <Badge tone="info">
-                  Gift card: <span className="tabular-nums">{formatPrice(giftCents)}</span>
-                </Badge>
-              </span>
-            )}
-          </div>
+        <p className="min-w-40 flex-1 text-xl font-semibold tracking-[-0.01em] break-words text-ink" data-testid="checkout-client">
+          {data.client.name}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {!data.draft.appointmentId && (
+            <Button variant="quiet" onClick={() => setSaleClient(data.draft.id, null).then(() => router.refresh())}>
+              Remove client
+            </Button>
+          )}
+          {data.insight && (
+            <button
+              type="button"
+              aria-expanded={open}
+              onClick={() => setOpen(!open)}
+              className="touch-target inline-flex h-9 items-center gap-2 rounded-md border border-denise-200 bg-denise-50 px-3 text-sm font-medium whitespace-nowrap text-denise-900 transition-colors duration-(--motion-fast) hover:border-denise-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            >
+              <DeniseFace size={20} />
+              What Denise knows
+              <ChevronDownIcon className={`size-4 ${open ? "rotate-180" : ""}`} />
+            </button>
+          )}
         </div>
-        {!data.draft.appointmentId && (
-          <Button variant="quiet" onClick={() => setSaleClient(data.draft.id, null).then(() => router.refresh())}>
-            Remove client
-          </Button>
-        )}
-        {data.insight && (
-          <button
-            type="button"
-            aria-expanded={open}
-            onClick={() => setOpen(!open)}
-            className="touch-target inline-flex h-9 items-center gap-2 rounded-md border border-denise-200 bg-denise-50 px-3 text-sm font-medium text-denise-900 transition-colors duration-(--motion-fast) hover:border-denise-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-          >
-            <DeniseFace size={20} />
-            What Denise knows
-            <ChevronDownIcon className={`size-4 ${open ? "rotate-180" : ""}`} />
-          </button>
-        )}
       </div>
+      {(usesLeftTotal > 0 || data.memberships.length > 0 || data.rewards || giftCents > 0) && (
+        <div className="flex flex-wrap gap-1.5">
+          {usesLeftTotal > 0 && (
+            <span data-testid="badge-package" className="contents">
+              {packageItems.map((i) => (
+                <Badge key={i.id} tone="info" className="max-w-full">
+                  <span className="truncate">Package: {usesLeft(i)}</span>
+                </Badge>
+              ))}
+            </span>
+          )}
+          {data.memberships.map((m) => (
+            <span key={m.id} data-testid="badge-membership" className="max-w-full">
+              <Badge wrap tone={m.status === "past_due" ? "warning" : m.status === "paused" ? "neutral" : "info"}>
+                {m.name}
+                {m.status === "past_due"
+                  ? ": payment failed, no member benefits"
+                  : m.status === "paused"
+                    ? ": paused"
+                    : m.credits.length
+                      ? ` · ${m.credits.map((c) => `${c.serviceName}: ${c.allowance - c.used} left`).join(", ")}`
+                      : ""}
+              </Badge>
+            </span>
+          ))}
+          {data.rewards && (
+            <span data-testid="badge-points">
+              <Badge tone="info">
+                <span className="tabular-nums">{points(data.rewards.client.balance)}</span>
+                {tierName(data) ? ` · ${tierName(data)}` : ""}
+              </Badge>
+            </span>
+          )}
+          {giftCents > 0 && (
+            <span data-testid="badge-gift-card">
+              <Badge tone="info">
+                Gift card: <span className="tabular-nums">{formatPrice(giftCents)}</span>
+              </Badge>
+            </span>
+          )}
+        </div>
+      )}
       {data.rewardsLine && (
         <p className="flex items-center gap-2 text-sm text-denise-900" data-testid="rewards-line">
           <DeniseFace size={20} />

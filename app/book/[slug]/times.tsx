@@ -30,8 +30,12 @@ export function DateStrip({
   useEffect(() => {
     strip.current?.querySelector<HTMLElement>("[aria-checked=true]")?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [selected]);
+  // Whole days only: five across on a phone, seven wider, so the edge never
+  // shows a sliver of the next one (it snaps a day at a time, and doesn't
+  // run under the page's margin).
   return (
-    <div ref={strip} role="radiogroup" aria-label="Date" className="-mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+    <div className="@container">
+    <div ref={strip} role="radiogroup" aria-label="Date" className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
       {days.map((d) => {
         const on = d.date === selected;
         const empty = d.times.length === 0;
@@ -43,7 +47,7 @@ export function DateStrip({
             aria-checked={on}
             aria-label={`${longDate(d.date)}${empty ? ", no times" : `, ${d.times.length} ${d.times.length === 1 ? "time" : "times"}`}`}
             onClick={() => onSelect(d.date)}
-            className={`flex min-h-18 w-15 shrink-0 snap-start flex-col items-center justify-center rounded-lg border text-center transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+            className={`flex min-h-18 w-[calc((100cqw-2rem)/5)] shrink-0 snap-start flex-col @md:w-[calc((100cqw-3rem)/7)] items-center justify-center rounded-lg border text-center transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-focus ${
  on ? "border-(--accent) bg-(--accent) text-white" : empty ? "border-line bg-sunken text-ink-subtle" : "border-line bg-surface text-ink hover:border-(--accent-line)"
  }`}
           >
@@ -58,11 +62,12 @@ export function DateStrip({
           type="button"
           onClick={onMore}
           disabled={loading}
-          className="flex min-h-18 w-24 shrink-0 items-center justify-center rounded-lg border border-line-strong bg-surface px-2 text-sm font-medium text-ink transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:outline-2 focus-visible:outline-focus disabled:opacity-55"
+          className="flex min-h-18 w-24 shrink-0 snap-start items-center justify-center rounded-lg border border-line-strong bg-surface px-2 text-sm font-medium text-ink transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:outline-2 focus-visible:outline-focus disabled:opacity-55"
         >
           {loading ? "Loading…" : "Later dates"}
         </button>
       )}
+    </div>
     </div>
   );
 }

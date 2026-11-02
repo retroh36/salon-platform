@@ -265,7 +265,7 @@ export function CheckoutScreen({ data, denise }: { data: CheckoutScreenData; den
 
       <div className="flex min-h-0 flex-1">
       <div className="@container flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto @3xl:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] @3xl:overflow-hidden">
+      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto @3xl:grid-cols-[minmax(0,1fr)_20rem] @3xl:overflow-hidden @5xl:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)]">
         <main
           className={`flex min-h-0 flex-col @3xl:overflow-hidden ${linkOut ? "opacity-60" : ""}`}
           aria-label="Ticket"

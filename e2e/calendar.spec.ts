@@ -182,9 +182,10 @@ test.describe("front desk", () => {
     expect(trimBox.x).toBeGreaterThanOrEqual(colorBox.x + colorBox.width - 1);
     expect(trimBox.y).toBeCloseTo(colorBox.y + heights[0], 0);
     // A short block: the first name and the whole time range on one line
-    // (never initials, never just the start), ending in an ellipsis if the
-    // lane is too narrow.
-    await expect(trim).toHaveText(new RegExp(`^${PREFIX}Ben · 10:45(am)?–11(am)?$`));
+    // (never initials, never just the start); when the lane is too narrow
+    // for both, the time goes and the name keeps the room, ending in an
+    // ellipsis only if even that doesn't fit.
+    await expect(trim).toHaveText(new RegExp(`^${PREFIX}Ben( · 10:45(am)?–11(am)?)?$`));
     expect(await trim.locator(".truncate").first().evaluate((t) => getComputedStyle(t).textOverflow)).toBe("ellipsis");
 
     // The second stylist on Ava's visit: each block is that stylist's part,

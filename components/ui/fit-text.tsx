@@ -18,7 +18,7 @@ export function FitText({ variants, lines = 1, className = "" }: { variants: str
       // Measure each variant in place, longest first.
       for (let i = 0; i < variants.length; i++) {
         el.textContent = variants[i];
-        if (el.scrollWidth <= el.clientWidth + 0.5 && el.scrollHeight <= el.clientHeight + 0.5) {
+        if (fits(el, lines)) {
           setIndex(i);
           return;
         }
@@ -28,7 +28,14 @@ export function FitText({ variants, lines = 1, className = "" }: { variants: str
     fit();
     const observer = new ResizeObserver(fit);
     observer.observe(el);
-    return () => observer.disconnect();
+    // Measured again once the web font is in: before it, a line can fit in
+    // the fallback font and then not in Geist.
+    let live = true;
+    document.fonts?.ready.then(() => live && fit());
+    return () => {
+      live = false;
+      observer.disconnect();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` stands for `variants`
   }, [key, lines]);
 
@@ -37,4 +44,15 @@ export function FitText({ variants, lines = 1, className = "" }: { variants: str
       {variants[Math.min(index, variants.length - 1)]}
     </span>
   );
+}
+
+// Whether the text fits its box. scrollWidth is rounded to whole pixels, so a
+// line a fraction of a pixel too long passes it and still shows "…": one
+// line is measured exactly.
+function fits(el: HTMLElement, lines: 1 | 2): boolean {
+  if (el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight + 0.5) return false;
+  if (lines === 2) return true;
+  const text = document.createRange();
+  text.selectNodeContents(el);
+  return text.getBoundingClientRect().width <= el.getBoundingClientRect().width + 0.01;
 }

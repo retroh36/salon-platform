@@ -7,7 +7,7 @@ open: /calendar | Open calendar
 
 When something clashes (a visit running over, a late client, a stylist out, a double-booking), Denise suggests fixes. You decide.
 
-1. Open Denise's panel: tap her face under the calendar (the badge shows how many things she has), or the **Denise** tab in the side panel.
+1. Open the **Denise** tab in the calendar's side panel, or tap the Denise button in the calendar's corner (its badge shows how many things are waiting).
 2. Read her card: what's wrong and **Why it works** for her best fix. The calendar shows the visits involved glowing, with dashed outlines where they'd move.
 3. Tap **Apply fix** to make the change, or **Dismiss** to say no.
 4. To see others, tap **Other options**, then **Use this instead** on the one you want.

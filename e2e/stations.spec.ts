@@ -67,7 +67,7 @@ test.describe("owners and managers", () => {
 
     await page.goto(`/calendar?date=${saturday}`);
     await waitForHydration(page, "section[data-staff-id]");
-    await expect(ui(page).locator("[data-column-header]").filter({ hasText: "Gil" }).getByTestId("column-chair")).toHaveText(" · Chair 4");
+    await expect(ui(page).locator("[data-column-header]").filter({ hasText: "Gil" }).getByTestId("column-hours")).toHaveAttribute("data-chair", "Chair 4");
 
     await page.goto(`/scheduling/floor?date=${saturday}`);
     await waitForHydration(page, "[data-testid=floor] a");

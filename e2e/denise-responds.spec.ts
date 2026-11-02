@@ -337,13 +337,13 @@ test.describe("while she works", () => {
     await expect(panel.getByTestId("denise-thinking")).toHaveCount(0);
   });
 
-  test("questions: one at a time, and she says she's still working after 20 seconds", async ({ page }) => {
+  test("questions: one at a time, \"Still thinking\" after 8 seconds, and never hanging: at 25 she stops, with Try again", async ({ page }) => {
     await page.clock.install();
     await openDay(page);
-    let release!: () => void;
-    const held = new Promise<void>((r) => (release = r));
+    // The first answer never comes; the second is let through.
+    let calls = 0;
     await page.route("**/api/denise", async (route) => {
-      await held;
+      if (++calls === 1) return; // held until she stops it
       await route.continue();
     });
     await page.getByTestId("denise-launcher").click();
@@ -353,12 +353,18 @@ test.describe("while she works", () => {
     await expect(panel).toContainText("Who's free for a color at 3?");
     await expect(panel.getByTestId("denise-thinking")).toContainText("Denise is thinking");
     await expect(panel.getByRole("button", { name: "Send" })).toBeDisabled();
-    await page.clock.fastForward(21_000);
-    await expect(panel.getByTestId("denise-thinking")).toContainText("Still working on it");
-    release();
+    await page.clock.fastForward(8_500);
+    await expect(panel.getByTestId("denise-thinking")).toContainText("Still thinking");
+    await page.clock.fastForward(17_000);
+    await expect(panel.getByTestId("denise-thinking")).toHaveCount(0);
+    await expect(panel).toContainText("That's taking me too long, so I stopped.");
+    await expect(panel.getByRole("button", { name: "Send" })).toBeEnabled();
+    // Try again asks the same question again.
+    await panel.getByTestId("denise-try-again").click();
     // No API key in tests: she says so, but she says something.
     await expect(panel).toContainText("I'm not connected yet");
-    await expect(panel.getByRole("button", { name: "Send" })).toBeEnabled();
+    await expect(panel.getByTestId("denise-try-again")).toHaveCount(0);
+    expect(calls).toBe(2);
   });
 
   test("a how-to answer comes with a button that opens the right screen", async ({ page }) => {

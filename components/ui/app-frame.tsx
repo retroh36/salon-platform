@@ -7,7 +7,7 @@ import { SalonMark } from "@/components/ui/salon-mark";
 import { SalonSwitcher, type SwitcherLocation } from "@/components/salon-switcher";
 import { firstSettingsPage } from "@/app/settings/settings-nav";
 import { AutoLock } from "@/components/auto-lock";
-import { DeniseBubble, type BubbleMe } from "@/components/denise-chat/bubble";
+import { DeniseBubble, DeniseSidebarButton, type BubbleMe } from "@/components/denise-chat/bubble";
 import { NewSaleLink } from "@/components/new-sale-link";
 import { canTakePayments } from "@/lib/sales";
 import { can, type Permission } from "@/lib/permissions";
@@ -183,6 +183,11 @@ export function AppFrame({
         {/* The footer: who's signed in and sign out (or Switch user on the
             shared iPad), never under anything else. */}
         <div className="flex shrink-0 flex-col gap-3 border-t border-sidebar-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]" data-testid="sidebar-footer">
+          {denise && (
+            <div className="-mx-2">
+              <DeniseSidebarButton />
+            </div>
+          )}
           <div className="flex min-w-0 items-center gap-3">
             <Avatar name={user.name} size="sm" halo={false} />
             <div className="min-w-0 flex-1">
@@ -273,7 +278,9 @@ export function AppFrame({
             </Link>
           ))}
         </nav>
-        <main className="flex min-h-0 flex-1 flex-col text-sm lg:overflow-y-auto">{children}</main>
+        {/* Room under the last row for Denise's face, so it never covers the
+            page's own buttons once scrolled to the end. */}
+        <main className={`flex min-h-0 flex-1 flex-col text-sm lg:overflow-y-auto ${denise ? "pb-24" : ""}`}>{children}</main>
       </div>
       {denise && <DeniseBubble me={denise} />}
       {sharedDevice && <AutoLock minutes={sharedDevice.autoLockMinutes} />}
