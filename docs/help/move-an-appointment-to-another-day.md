@@ -12,12 +12,13 @@ Move a visit to a different day (and time), with all its services together.
 3. Choose the **Date** and the time it **Starts**. Every service moves together, with the same stylists.
 4. For a repeating visit, choose **This visit only**, **This and following visits** or **All visits in the series**.
 5. Tap **Move**. The calendar goes to the new day with the visit open.
+6. At the top, **Let … know about the new time?** shows the message. Tap **Send** or **Don't send**.
 
 ## Good to know
 
 - Or tap **Edit booking** and change its **Date** there (you can change services and times at the same time).
 - A group visit moves the whole group, everyone by the same amount, or no one.
-- The move is checked against the booking rules on the new day. The client and the stylists get a notice of the new day and time (recorded for now; texts aren't connected yet).
+- The move is checked against the booking rules on the new day. The stylists get a notice. Then the calendar asks **Let … know about the new time?** and shows the message: tap **Send** to send it, or **Don't send**. Nothing goes to the client unless you tap **Send** (messages wait in the outbox until texts are connected).
 - Only visits that haven't started can move to another day. A checked-in visit stays where it is.
 
 ## If it doesn't work

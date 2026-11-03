@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { formatDay, formatLongDay } from "@/lib/schedule-format";
+import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn, toLocal } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { AUTH, expect, moreAction, test, ui, waitForHydration } from "./fixtures";
@@ -7,7 +7,8 @@ import { AUTH, expect, moreAction, test, ui, waitForHydration } from "./fixtures
 // Moving a visit to another day: from "⋯" (every service together, with
 // Denise's nearest times when it doesn't fit), from Edit booking's date,
 // a repeating visit (this and following), and a group (everyone). Each
-// move records notices to the client and stylists.
+// move tells the stylists, and asks before telling the client: only Send
+// messages them.
 
 const B = SEED.business;
 const L = SEED.location;
@@ -28,14 +29,16 @@ test.afterAll(async () => {
   await clear();
   await admin.from("appointment_groups").delete().like("label", `${PREFIX}%`);
   const { data: mine } = await admin.from("clients").select("id").like("first_name", `${PREFIX}%`);
+  await admin.from("client_messages").delete().in("client_id", (mine ?? []).map((c) => c.id));
+  await admin.from("outbox_messages").delete().like("body", `%${PREFIX}%`);
   await admin.from("appointment_series").delete().in("client_id", (mine ?? []).map((c) => c.id));
   await admin.from("clients").delete().like("first_name", `${PREFIX}%`);
 });
 
 test.use({ storageState: AUTH.frontDesk, viewport: { width: 1920, height: 1500 } });
 
-async function newClient(firstName: string) {
-  const { data } = await admin.from("clients").insert({ business_id: B, first_name: `${PREFIX}${firstName}`, last_name: "Test", phone: "(312) 555-0188" }).select("id").single();
+async function newClient(firstName: string, extra: Record<string, unknown> = {}) {
+  const { data } = await admin.from("clients").insert({ business_id: B, first_name: `${PREFIX}${firstName}`, last_name: "Test", phone: "(312) 555-0188", ...extra }).select("id").single();
   return data!.id;
 }
 
@@ -83,7 +86,7 @@ async function open(page: Page, date: string, stylist: string, name: RegExp) {
   await column(page, stylist).getByRole("button", { name }).first().click();
 }
 
-test("moves a visit to another day from ⋯, every service together, and tells the client and stylist", async ({ page }) => {
+test("moves a visit to another day from ⋯, every service together, tells the stylists and asks before telling the client", async ({ page }) => {
   const ava = await newClient("Ava");
   const id = await seedVisit(ava, [
     { service: "Women's Cut & Style", staff: BRIDGET, start: at(DAY, 10) },
@@ -104,11 +107,60 @@ test("moves a visit to another day from ⋯, every service together, and tells t
     { staff: BRIDGET, date: NEXT, minute: 14 * 60 },
     { staff: SHAE, date: NEXT, minute: 15 * 60 },
   ]);
-  const { data: notices } = await admin.from("notifications").select("template, body, client_id, staff_id").eq("appointment_id", id).order("template");
-  expect(notices!.map((n) => n.template)).toEqual(["staff_visit_moved", "visit_moved"]);
-  const client = notices!.find((n) => n.template === "visit_moved")!;
-  expect(client.client_id).toBe(ava);
-  expect(client.body).toBe(`Hi ${PREFIX}Ava, it's Maple & Ash Hair Studio. Your appointment has moved from ${formatDay(DAY)} at 10am to ${formatDay(NEXT)} at 2pm, still with Bridget. Reply or call us if that doesn't work. See you soon!`);
+  const { data: notices } = await admin.from("notifications").select("template, client_id, staff_id").eq("appointment_id", id);
+  expect(notices).toEqual([{ template: "staff_visit_moved", client_id: null, staff_id: BRIDGET }]);
+
+  // The client only hears from Send.
+  const prompt = ui(page).getByTestId("move-prompt");
+  await expect(prompt).toContainText(`Let ${PREFIX}Ava know about the new time?`);
+  await expect(prompt.getByTestId("move-preview")).toContainText(`We've moved your visit to ${formatLongDay(NEXT, false)} at 2pm with Bridget.`);
+  expect((await admin.from("client_messages").select("id").eq("client_id", ava)).data).toEqual([]);
+  await prompt.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(prompt).toBeHidden();
+  await expect(ui(page).getByRole("status").filter({ hasText: `Sent to ${PREFIX}Ava.` })).toBeVisible();
+  const { data: sent } = await admin.from("client_messages").select("template, sent_by").eq("client_id", ava);
+  expect(sent).toEqual([{ template: "visit_moved", sent_by: FRONT_DESK }]);
+});
+
+test("Don't send tells nobody; a client who takes no messages says to call; don't ask again today", async ({ page }) => {
+  const eli = await newClient("Eli");
+  const fay = await newClient("Fay", { appointment_sms_ok: false });
+  const eliVisit = await seedVisit(eli, [{ service: "Women's Cut & Style", staff: BRIDGET, start: at(DAY, 9) }]);
+  await seedVisit(fay, [{ service: "Women's Cut & Style", staff: BRIDGET, start: at(DAY, 11) }]);
+  const moveTo = async (name: string, starts: string) => {
+    await open(page, DAY, "Bridget Callahan", new RegExp(`${PREFIX}${name} Test`));
+    await moreAction(panel(page), "Move to another day");
+    const form = panel(page).getByRole("form", { name: "Move to another day" });
+    await form.getByLabel("Date").fill(NEXT);
+    await form.getByLabel("Starts").fill(starts);
+    await form.getByRole("button", { name: "Move" }).click();
+    await expect(ui(page).getByTestId("calendar-date")).toContainText(formatLongDay(NEXT));
+  };
+
+  await moveTo("Eli", "09:00");
+  const prompt = ui(page).getByTestId("move-prompt");
+  await prompt.getByRole("button", { name: /Don.t send/ }).click();
+  await expect(prompt).toBeHidden();
+
+  await moveTo("Fay", "11:00");
+  await expect(prompt.getByText("No messages: call")).toBeVisible();
+  await expect(prompt).toContainText("(312) 555-0188");
+  await expect(prompt.getByRole("button", { name: "Send", exact: true })).toHaveCount(0);
+  await prompt.getByLabel(/Don.t ask again today/).check();
+  await prompt.getByRole("button", { name: "Done" }).click();
+
+  // Asked not to: the next move doesn't ask, and says who wasn't told.
+  await page.goto(`/calendar?date=${NEXT}&open=${eliVisit}`);
+  await moreAction(panel(page), "Move to another day");
+  const form = panel(page).getByRole("form", { name: "Move to another day" });
+  await form.getByLabel("Date").fill(LATER);
+  await form.getByLabel("Starts").fill("09:00");
+  await form.getByRole("button", { name: "Move" }).click();
+  await expect(ui(page).getByRole("status").filter({ hasText: `${PREFIX}Eli hasn't been told about the change.` })).toBeVisible();
+  await expect(prompt).toHaveCount(0);
+
+  expect((await admin.from("client_messages").select("id").in("client_id", [eli, fay])).data).toEqual([]);
+  expect((await admin.from("notifications").select("id").in("client_id", [eli, fay])).data).toEqual([]);
 });
 
 test("when it doesn't fit, says why and offers the nearest times that day", async ({ page }) => {

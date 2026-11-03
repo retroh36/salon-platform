@@ -23,7 +23,7 @@ import { MAX_VISITS, planSeries, seriesDates, type Scope, type SeriesEnd } from 
 import { bookSeries, changeSeries, changeSeriesStatus, moveSeriesItem, type VisitResult } from "@/lib/scheduling/series-book";
 import { bookGroup, changeGroupStatus, moveGroupItem } from "@/lib/scheduling/group-book";
 import { moveVisitTo } from "@/lib/scheduling/move-day";
-import { recordMoveNotices, snapshotVisits } from "@/lib/move-notices";
+import { withMoveNotices, type Moved } from "@/lib/move-notices";
 import { MAX_GUESTS } from "@/lib/scheduling/groups";
 import { formatDay } from "@/lib/schedule-format";
 import { addDays, daysBetween, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, toLocal, todayIn, type LocalDate } from "@/lib/scheduling/time";
@@ -95,7 +95,7 @@ export type VisitInput = {
 };
 
 export type SaveVisitResult =
-  | { ok: true; appointmentId: string }
+  | { ok: true; appointmentId: string; moved?: Moved | null }
   // ideas: Denise's nearest times that work, when the rules refused a time.
   | { ok: false; message: string; lineErrors?: string[][]; ideas?: BookingIdeas | null };
 
@@ -154,7 +154,7 @@ export async function saveVisit(input: VisitInput): Promise<SaveVisitResult> {
     }
   }
 
-  const result = await withNotices(supabase, me.location, input.appointmentId ?? null, () =>
+  const { result, moved } = await withMoveNotices(supabase, me.location, input.appointmentId ?? null, () =>
     saveBooking(supabase, me.location, {
       appointmentId: input.appointmentId,
       clientId: input.clientId,
@@ -172,7 +172,7 @@ export async function saveVisit(input: VisitInput): Promise<SaveVisitResult> {
     };
   }
   refresh();
-  return { ok: true, appointmentId: result.appointmentId };
+  return { ok: true, appointmentId: result.appointmentId, moved };
 }
 
 // What the editor saw, as instants (nothing to compare if it's unreadable).
@@ -196,32 +196,11 @@ async function ideasFor(supabase: Awaited<ReturnType<typeof getCurrentStaff>>["s
   }
 }
 
-export type MoveResult = { ok: true } | { ok: false; message: string };
+export type MoveResult = { ok: true; moved?: Moved | null } | { ok: false; message: string };
 
 type Supabase = Awaited<ReturnType<typeof getCurrentStaff>>["supabase"];
 
-// The visits a change to this one can move: it, and the rest of its series
-// or group still to come.
-async function relatedVisits(supabase: Supabase, appointmentId: string): Promise<string[]> {
-  const { data: a } = await supabase.from("appointments").select("id, series_id, group_id").eq("id", appointmentId).maybeSingle();
-  if (!a) return [];
-  if (!a.series_id && !a.group_id) return [a.id];
-  const column = a.series_id ? "series_id" : "group_id";
-  const { data } = await supabase.from("appointments").select("id").eq(column, (a.series_id ?? a.group_id)!).in("status", ["booked", "confirmed"]);
-  return [...new Set([a.id, ...(data ?? []).map((r) => r.id)])];
-}
-
 const visitOfItem = async (supabase: Supabase, itemId: string) => (await supabase.from("appointment_items").select("appointment_id").eq("id", itemId).maybeSingle()).data?.appointment_id ?? null;
-
-// Makes a change, then records a notice to the client and each stylist for
-// every visit whose day, time or stylist it changed (like Denise's fixes).
-async function withNotices<T>(supabase: Supabase, location: { timezone: string }, appointmentId: string | null, change: () => Promise<T>): Promise<T> {
-  if (!appointmentId) return change();
-  const before = await snapshotVisits(supabase, await relatedVisits(supabase, appointmentId), location.timezone);
-  const result = await change();
-  await recordMoveNotices(supabase, location, before);
-  return result;
-}
 
 export async function moveVisitItem(input: { itemId: string; staffId: string; date: LocalDate; startMinute: number }): Promise<MoveResult> {
   const { supabase, staff: me } = await getCurrentStaff();
@@ -230,16 +209,18 @@ export async function moveVisitItem(input: { itemId: string; staffId: string; da
   const start = Number.isInteger(input.startMinute) ? fromLocal(input.date, input.startMinute, me.location.timezone) : null;
   if (!start) return { ok: false, message: "That time doesn't exist." };
 
-  const result = await withNotices(supabase, me.location, await visitOfItem(supabase, input.itemId), () => moveItem(supabase, me.location, { itemId: input.itemId, staffId: input.staffId, start }));
+  const { result, moved } = await withMoveNotices(supabase, me.location, await visitOfItem(supabase, input.itemId), () =>
+    moveItem(supabase, me.location, { itemId: input.itemId, staffId: input.staffId, start }),
+  );
   if (!result.ok) {
     if (result.error === "invalid") return { ok: false, message: [...new Set(result.problems.flat().map(describeProblem))].join(" ") };
     return { ok: false, message: saveErrorMessage(result) };
   }
   refresh();
-  return { ok: true };
+  return { ok: true, moved };
 }
 
-export type MoveDayResult = { ok: true; message: string } | { ok: false; message: string; ideas?: BookingIdeas | null };
+export type MoveDayResult = { ok: true; message: string; moved?: Moved | null } | { ok: false; message: string; ideas?: BookingIdeas | null };
 
 // Moves a visit to another day and/or start time, every service together
 // (a repeating visit: this one, this and following, or all; a group: the
@@ -255,7 +236,7 @@ export async function moveVisitToDay(input: { appointmentId: string; date: Local
   const today = todayIn(me.location.timezone);
   if (input.date < today) return { ok: false, message: "Choose today or a later day." };
 
-  const moved = await withNotices(supabase, me.location, input.appointmentId, () => moveVisitTo(supabase, me.location, input, scope));
+  const { result: moved, moved: clients } = await withMoveNotices(supabase, me.location, input.appointmentId, () => moveVisitTo(supabase, me.location, input, scope));
   refresh();
   const when = `${formatDay(input.date)} at ${formatMinute(input.startMinute)}`;
   switch (moved.kind) {
@@ -266,7 +247,7 @@ export async function moveVisitToDay(input: { appointmentId: string; date: Local
           moved.error === "not_movable" ? "Only visits still to come can move to another day. A checked-in visit stays where it is." : moved.error === "invalid_time" ? "That time doesn't exist that day." : "That appointment no longer exists.",
       };
     case "group":
-      if (moved.result.ok) return { ok: true, message: `Moved the whole group (${moved.result.moved} guest${moved.result.moved === 1 ? "" : "s"}) to ${when}.` };
+      if (moved.result.ok) return { ok: true, message: `Moved the whole group (${moved.result.moved} guest${moved.result.moved === 1 ? "" : "s"}) to ${when}.`, moved: clients };
       if (moved.result.error === "invalid") {
         const problem = moved.result.problems?.flat()[0];
         return { ok: false, message: `The whole group doesn't fit then${problem ? `: ${describeProblem(problem)}` : "."} Nothing was moved.` };
@@ -274,11 +255,11 @@ export async function moveVisitToDay(input: { appointmentId: string; date: Local
       return { ok: false, message: moved.result.error === "taken" ? "Someone changed the calendar at the same moment. Nothing was moved; try again." : "That visit is no longer in a group." };
     case "series": {
       const summary = scopeSummary(moved.results, "move");
-      return summary.ok ? { ok: true, message: summary.message ?? `Moved to ${when}.` } : { ok: false, message: summary.message };
+      return summary.ok ? { ok: true, message: summary.message ?? `Moved to ${when}.`, moved: clients } : { ok: false, message: summary.message };
     }
     case "single": {
       const r = moved.result;
-      if (r.ok) return { ok: true, message: `Moved to ${when}.` };
+      if (r.ok) return { ok: true, message: `Moved to ${when}.`, moved: clients };
       if (r.error !== "invalid") return { ok: false, message: saveErrorMessage(r) };
       // Why, and Denise's nearest times that work that day.
       const { data: items } = await supabase.from("appointment_items").select("service_id, staff_id, starts_at").eq("appointment_id", input.appointmentId).order("starts_at");
@@ -573,11 +554,12 @@ export async function saveVisitScoped(input: VisitInput, scope: Scope): Promise<
   const { data: was } = await supabase.from("appointments").select("starts_at").eq("id", input.appointmentId).maybeSingle();
   const days = was ? daysBetween(toLocal(new Date(was.starts_at), me.location.timezone).date, input.date) : 0;
   const appointmentId = input.appointmentId;
-  const results = await withNotices(supabase, me.location, appointmentId, () =>
+  const { result: results, moved } = await withMoveNotices(supabase, me.location, appointmentId, () =>
     changeSeries(supabase, me.location, appointmentId, scope, { clientId: input.clientId!, notes: input.notes.trim() || null, lines: toLines(input.lines) }, days),
   );
   refresh();
-  return scopeSummary(results, "change");
+  const summary = scopeSummary(results, "change");
+  return summary.ok ? { ...summary, moved } : summary;
 }
 
 // Drag-moves a series visit's service: this visit, this and following, or all.
@@ -588,10 +570,12 @@ export async function moveVisitItemScoped(input: { itemId: string; staffId: stri
   if (!isUuid(input.itemId) || !isUuid(input.staffId) || !isLocalDate(input.date)) return { ok: false, message: "That move isn't possible." };
   const start = fromLocal(input.date, input.startMinute, me.location.timezone);
   if (!start) return { ok: false, message: "That time doesn't exist." };
-  const results = await withNotices(supabase, me.location, await visitOfItem(supabase, input.itemId), () => moveSeriesItem(supabase, me.location, { itemId: input.itemId, staffId: input.staffId, start }, scope));
+  const { result: results, moved } = await withMoveNotices(supabase, me.location, await visitOfItem(supabase, input.itemId), () =>
+    moveSeriesItem(supabase, me.location, { itemId: input.itemId, staffId: input.staffId, start }, scope),
+  );
   refresh();
   const summary = scopeSummary(results, "move");
-  return summary.ok ? { ok: true, message: summary.message } : { ok: false, message: summary.message };
+  return summary.ok ? { ok: true, message: summary.message, moved } : { ok: false, message: summary.message };
 }
 
 // Cancels or marks a series visit: this one, this and following, or all.
@@ -686,9 +670,11 @@ export async function moveGroupVisit(input: { itemId: string; staffId: string; d
   if (!isUuid(input.itemId) || !isUuid(input.staffId) || !isLocalDate(input.date)) return { ok: false, message: "That move isn't possible." };
   const start = fromLocal(input.date, input.startMinute, me.location.timezone);
   if (!start) return { ok: false, message: "That time doesn't exist." };
-  const result = await withNotices(supabase, me.location, await visitOfItem(supabase, input.itemId), () => moveGroupItem(supabase, me.location, { itemId: input.itemId, staffId: input.staffId, start }));
+  const { result, moved } = await withMoveNotices(supabase, me.location, await visitOfItem(supabase, input.itemId), () =>
+    moveGroupItem(supabase, me.location, { itemId: input.itemId, staffId: input.staffId, start }),
+  );
   refresh();
-  if (result.ok) return { ok: true, message: `Moved the whole group (${result.moved} guest${result.moved === 1 ? "" : "s"}).` };
+  if (result.ok) return { ok: true, message: `Moved the whole group (${result.moved} guest${result.moved === 1 ? "" : "s"}).`, moved };
   if (result.error === "invalid") {
     const problem = result.problems?.flat()[0];
     return { ok: false, message: `the whole group doesn't fit there${problem ? ` (${describeProblem(problem).replace(/\.$/, "").toLowerCase()})` : ""}. Nothing was moved.` };

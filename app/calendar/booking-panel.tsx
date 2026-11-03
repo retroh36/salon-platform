@@ -1,5 +1,6 @@
 "use client";
 
+import type { Moved } from "@/lib/move-notices";
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { DurationBasis } from "@/lib/insights/durations";
 import { visitsText } from "@/lib/insights/describe";
@@ -61,7 +62,7 @@ export function BookingPanel({
   appointment?: AppointmentDetail;
   onClose: () => void;
   // date: the day it's on now (an edit can move it to another day).
-  onSaved: (appointmentId: string, message?: string, date?: string) => void;
+  onSaved: (appointmentId: string, message?: string, date?: string, moved?: Moved | null) => void;
   // Switch to blocking this time (lunch, a meeting…) instead.
   onBlockInstead?: () => void;
   // Switch to booking several people as a group.
@@ -203,7 +204,7 @@ export function BookingPanel({
         return;
       }
       const result = await reach(appointment?.series && scope !== "this" ? saveVisitScoped(input, scope) : saveVisit(input));
-      if (result.ok) onSaved(result.appointmentId, (result as { message?: string }).message ?? (date !== data.date ? `Moved to ${formatLongDay(date, false)}.` : undefined), date);
+      if (result.ok) onSaved(result.appointmentId, (result as { message?: string }).message ?? (date !== data.date ? `Moved to ${formatLongDay(date, false)}.` : undefined), date, result.moved);
       else {
         setMessage(result.message);
         setLineErrors(("lineErrors" in result && result.lineErrors) || []);

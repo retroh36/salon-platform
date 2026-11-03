@@ -52,6 +52,8 @@ import type { AppointmentDetail, BlockData, BoardData, ColumnData, TimeBlockData
 import { firstLetter } from "@/lib/initial";
 import { useKeepOnScreen } from "@/components/ui/keep-on-screen";
 import { SideScrollEdges } from "@/components/ui/side-scroll";
+import type { Moved } from "@/lib/move-notices";
+import { MovePrompt } from "./move-prompt";
 
 // How tall time is drawn (px per minute), from the zoom; blocks read it.
 const ScaleContext = createContext(ZOOM_PX_PER_MINUTE.comfortable);
@@ -242,6 +244,12 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const [savedOrder, setSavedOrder] = useOptimistic<string[] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
+  // Clients a staff move changed, until staff choose whether to tell them.
+  const [movePrompt, setMovePrompt] = useState<Moved | null>(null);
+  const closeMovePrompt = useCallback((message: string | null) => {
+    setMovePrompt(null);
+    if (message) setDoneMessage(message);
+  }, []);
   // Just checked in or marked a no-show: a toast with Undo, for UNDO_MS.
   const [undoable, setUndoable] = useState<{ kind: "check_in" | "no_show"; appointmentId: string; name: string; at: number } | null>(null);
   useEffect(() => {
@@ -825,7 +833,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
       const input = { itemId: move.itemId, staffId: move.staffId, date: data.date, startMinute: move.start };
       const result = scope === "this" ? await moveVisitItem(input) : scope === "group" ? await moveGroupVisit(input) : await moveVisitItemScoped(input, scope);
       if (!result.ok) setNotice(`Couldn't move ${b.clientName}'s ${b.service}: ${result.message}`);
-      else if ((result as { message?: string }).message) setDoneMessage((result as { message?: string }).message!);
+      else {
+        if ((result as { message?: string }).message) setDoneMessage((result as { message?: string }).message!);
+        if (result.moved) setMovePrompt(result.moved);
+      }
     });
   }
 
@@ -1035,6 +1046,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             </button>
           </div>
         )}
+
+        {movePrompt && <MovePrompt moved={movePrompt} staffId={me.staffId} today={data.today} onDone={closeMovePrompt} />}
 
         {notice && (
           <div role="alert" className="flex animate-fade-in items-start justify-between gap-4 rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">
@@ -1501,9 +1514,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                 onStatusNow={setStatusNow}
                 onCheckedIn={(appointmentId) => offerUndo("check_in", appointmentId)}
                 onNoShow={(appointmentId) => offerUndo("no_show", appointmentId)}
-                onMoved={(date, appointmentId, message) => {
+                onMoved={(date, appointmentId, message, moved) => {
                   if (date !== data.date) openOn(date, appointmentId);
                   setDoneMessage(message);
+                  if (moved) setMovePrompt(moved);
                 }}
                 team={data.columns.map((c) => ({ id: c.staffId, name: c.name }))}
                 products={data.menu.products}
@@ -1566,10 +1580,11 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                 data={data}
                 appointment={detailOf(selection.appointmentId)}
                 onClose={() => select({ kind: "detail", appointmentId: selection.appointmentId })}
-                onSaved={(id, message, date) => {
+                onSaved={(id, message, date, moved) => {
                   if (date && date !== data.date) openOn(date, id);
                   else show({ kind: "detail", appointmentId: selection.appointmentId });
                   if (message) setDoneMessage(message);
+                  if (moved) setMovePrompt(moved);
                 }}
               />
             ) : (

@@ -82,7 +82,8 @@ export type DeniseState = {
 // After approving, rejecting or undoing.
 // `moved`: the visits an applied fix moved, and when, for staff to send
 // each client their message (applying sends nothing).
-export type Moved = { appointmentIds: string[]; at: string };
+export type { Moved } from "@/lib/move-notices";
+import type { Moved } from "@/lib/move-notices";
 
 export type FixResult = { ok: true; message: string; state: DeniseState; moved?: Moved } | { ok: false; message: string; state?: DeniseState };
 

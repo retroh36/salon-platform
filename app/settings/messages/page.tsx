@@ -7,6 +7,7 @@ import { getCurrentStaff } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { SettingsNav } from "../settings-nav";
 import { FreeTextRoles } from "./free-text-roles";
+import { MoveMessageDefault } from "./move-default";
 
 export const metadata: Metadata = { title: "Messages" };
 
@@ -25,7 +26,7 @@ async function MessagesSettings() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
   if (!can(me, "settings")) redirect("/dashboard");
-  const { data: b, error } = await supabase.from("businesses").select("free_text_roles").eq("id", me.business_id).single();
+  const { data: b, error } = await supabase.from("businesses").select("free_text_roles, move_message_default").eq("id", me.business_id).single();
   if (error) throw error;
   return (
     <AppShell section="settings" me={me}>
@@ -37,6 +38,13 @@ async function MessagesSettings() {
         description="Everyone who can message a client can use the quick picks. Choose who can also write their own. Owners always can. Denise never writes to clients."
       >
         <FreeTextRoles roles={b.free_text_roles} canChange={me.role === "owner"} />
+      </Card>
+      <Card
+        title="When a visit is moved"
+        titleId="move-message-heading"
+        description="When someone drags or edits a visit's time, stylist or date, the calendar asks whether to let the client know, with the message. Choose which answer comes first. Nothing goes to a client until someone taps Send."
+      >
+        <MoveMessageDefault value={b.move_message_default === "skip" ? "skip" : "send"} />
       </Card>
     </AppShell>
   );

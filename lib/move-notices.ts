@@ -1,10 +1,12 @@
 // Notices when staff move visits (editing them, dragging them, or moving
 // them to another day), like Denise's fixes: a snapshot of each visit's
-// first service before the change, then, once it's saved, a notice to the
-// client and each stylist involved for every visit whose day, time or
-// stylist changed (lib/notifications.ts, fixed templates). Recorded through
-// record_visit_notices until texts are connected. A notice that can't be
-// recorded never undoes the move; it's logged.
+// first service before the change, then, once it's saved, a notice to each
+// stylist involved for every visit whose day, time or stylist changed
+// (lib/notifications.ts, fixed templates), recorded through
+// record_visit_notices_for_user. Never to the client: the visits with a
+// client that moved are handed back, and the calendar asks staff whether to
+// tell them (app/calendar/move-prompt.tsx); only Send there messages them.
+// A notice that can't be recorded never undoes the move; it's logged.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
@@ -37,45 +39,67 @@ async function load(supabase: Supabase, ids: readonly string[], timeZone: string
   return out;
 }
 
-export const snapshotVisits = load;
-
-// After the change: a notice for each visit that moved.
-export async function recordMoveNotices(supabase: Supabase, location: { timezone: string }, before: Snapshot): Promise<number> {
+// After the change: a notice to the stylists for each visit that moved.
+// Returns the visits with a client whose day, time or stylist changed.
+async function recordMoveNotices(supabase: Supabase, location: { timezone: string }, before: Snapshot): Promise<string[]> {
+  const moved: string[] = [];
   try {
     const after = await load(supabase, [...before.keys()], location.timezone);
-    const { data: salon } = await supabase.from("businesses").select("name").limit(1).maybeSingle();
     const today = todayIn(location.timezone);
     const { data: auth } = await supabase.auth.getUser();
     const user = auth.user;
-    if (!user) return 0;
+    if (!user) return moved;
     const server = createAdminClient();
-    let recorded = 0;
     for (const [appointmentId, was] of before) {
       const now = after.get(appointmentId);
       if (!was.first || !now?.first) continue;
       const notices = moveNotices({
         appointmentId,
         client: now.client,
-        salon: salon?.name ?? "the salon",
         service: now.first.service,
         today,
         from: was.first,
         to: now.first,
       });
       if (!notices.length) continue;
+      if (now.client) moved.push(appointmentId);
       // Recorded by the server, as the person who moved it, so nobody can
       // send notice text of their own in.
       const { error } = await server.rpc("record_visit_notices_for_user", {
         p_user_id: user.id,
         p_appointment_id: appointmentId,
-        p_notices: notices.map((n) => ({ template: n.template, body: n.body, client_id: "clientId" in n ? n.clientId : null, staff_id: "staffId" in n ? n.staffId : null })),
+        p_notices: notices.map((n) => ({ template: n.template, body: n.body, client_id: null, staff_id: n.staffId })),
       });
       if (error) throw error;
-      recorded += notices.length;
     }
-    return recorded;
   } catch (error) {
     console.error("Couldn't record move notices:", error instanceof Error ? error.message : error);
-    return 0;
   }
+  return moved;
+}
+
+// The visits a change to this one can move: it, and the rest of its series
+// or group still to come.
+async function relatedVisits(supabase: Supabase, appointmentId: string): Promise<string[]> {
+  const { data: a } = await supabase.from("appointments").select("id, series_id, group_id").eq("id", appointmentId).maybeSingle();
+  if (!a) return [];
+  if (!a.series_id && !a.group_id) return [a.id];
+  const column = a.series_id ? "series_id" : "group_id";
+  const { data } = await supabase.from("appointments").select("id").eq(column, (a.series_id ?? a.group_id)!).in("status", ["booked", "confirmed"]);
+  return [...new Set([a.id, ...(data ?? []).map((r) => r.id)])];
+}
+
+// The clients' visits a staff change moved, for the calendar to ask about
+// (`at`: when, so a message sent since shows as sent).
+export type Moved = { appointmentIds: string[]; at: string };
+
+// Makes a change staff asked for, then tells the stylists about every visit
+// whose day, time or stylist it changed, and hands back the clients' ones.
+export async function withMoveNotices<T>(supabase: Supabase, location: { timezone: string }, appointmentId: string | null, change: () => Promise<T>): Promise<{ result: T; moved: Moved | null }> {
+  if (!appointmentId) return { result: await change(), moved: null };
+  const at = new Date().toISOString();
+  const before = await load(supabase, await relatedVisits(supabase, appointmentId), location.timezone);
+  const result = await change();
+  const ids = await recordMoveNotices(supabase, location, before);
+  return { result, moved: ids.length ? { appointmentIds: ids, at } : null };
 }

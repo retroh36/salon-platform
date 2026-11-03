@@ -1,5 +1,6 @@
 "use client";
 
+import type { Moved } from "@/lib/move-notices";
 import { MessageClientForm } from "./message-client";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
@@ -74,7 +75,7 @@ export function AppointmentPanel({
   // Just marked a no-show from here: the calendar offers Undo too.
   onNoShow: (appointmentId: string) => void;
   // Moved to another day (or time): the calendar follows it there.
-  onMoved: (date: LocalDate, appointmentId: string, message: string) => void;
+  onMoved: (date: LocalDate, appointmentId: string, message: string, moved?: Moved | null) => void;
   // Who can be named as doing a patch test.
   team: { id: string; name: string }[];
 }) {
@@ -403,9 +404,9 @@ export function AppointmentPanel({
               appointment={appointment}
               date={date}
               today={today}
-              onMoved={(to, text) => {
+              onMoved={(to, text, moved) => {
                 setMoving(false);
-                onMoved(to, appointment.id, text);
+                onMoved(to, appointment.id, text, moved);
               }}
               onCancel={() => setMoving(false)}
             />
@@ -819,7 +820,7 @@ function MoveForm({
   appointment: AppointmentDetail;
   date: LocalDate;
   today: LocalDate;
-  onMoved: (date: LocalDate, message: string) => void;
+  onMoved: (date: LocalDate, message: string, moved?: Moved | null) => void;
   onCancel: () => void;
 }) {
   const first = [...appointment.items].sort((a, b) => a.start - b.start)[0];
@@ -841,7 +842,7 @@ function MoveForm({
         setIdeas(null);
         start(async () => {
           const r = await moveVisitToDay({ appointmentId: appointment.id, date: to, startMinute }, scope);
-          if (r.ok) return onMoved(to, r.message);
+          if (r.ok) return onMoved(to, r.message, r.moved);
           setMessage(r.message);
           // Only times with the same stylist fit this form.
           const same = r.ideas ? { ...r.ideas, options: r.ideas.options.filter((o) => o.staffId === first.staffId) } : null;

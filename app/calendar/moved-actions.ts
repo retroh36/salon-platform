@@ -1,9 +1,11 @@
 "use server";
 
-// The message for each client one of Denise's fixes moved: applying a fix
-// sends nothing, so staff see "Your visit has moved" filled in from the
-// visit as it is now, change it if their role may write its own, and send
-// it through the consent rules (./moved-messages.tsx). Front of house only.
+// The message for each client a change moved, one of Denise's fixes or
+// staff's own (a drag, Edit booking, Move to another day): the change sends
+// nothing, so staff see "Your visit has moved" filled in from the visit as
+// it is now, change it if their role may write its own, and send it through
+// the consent rules (./moved-messages.tsx, ./move-prompt.tsx). Front of
+// house only.
 
 import { canBook } from "@/lib/appointments";
 import { getCurrentStaff } from "@/lib/auth";
@@ -14,6 +16,8 @@ import { CONSENT_COLUMNS, previewTemplate, sendStaffMessage } from "@/lib/messag
 export type MovedMessage = {
   appointmentId: string;
   clientName: string;
+  firstName: string;
+  phone: string | null;
   // The channel they allow for messages about visits (null: call them).
   channel: Channel | null;
   subject: string;
@@ -22,7 +26,9 @@ export type MovedMessage = {
   sent: boolean;
 };
 
-export type MovedMessages = { messages: MovedMessage[]; freeText: boolean };
+// askDefault: the answer the salon's "Let … know?" leans to (Settings →
+// Messages); it only orders the buttons.
+export type MovedMessages = { messages: MovedMessage[]; freeText: boolean; askDefault: "send" | "skip" };
 
 async function desk() {
   const { supabase, staff: me } = await getCurrentStaff();
@@ -32,11 +38,11 @@ async function desk() {
 export async function movedMessages(appointmentIds: string[], since: string): Promise<MovedMessages> {
   const s = await desk();
   const ids = Array.isArray(appointmentIds) ? appointmentIds.filter(isUuid).slice(0, 20) : [];
-  if (!s || !ids.length || Number.isNaN(Date.parse(since))) return { messages: [], freeText: false };
+  if (!s || !ids.length || Number.isNaN(Date.parse(since))) return { messages: [], freeText: false, askDefault: "send" };
   const [{ data: visits }, { data: sent }, { data: business }] = await Promise.all([
     s.supabase.from("appointments").select(`id, client:clients(first_name, last_name, ${CONSENT_COLUMNS})`).in("id", ids),
     s.supabase.from("client_messages").select("appointment_id").in("appointment_id", ids).gte("created_at", since),
-    s.supabase.from("businesses").select("free_text_roles").eq("id", s.me.business_id).maybeSingle(),
+    s.supabase.from("businesses").select("free_text_roles, move_message_default").eq("id", s.me.business_id).maybeSingle(),
   ]);
   const done = new Set((sent ?? []).map((m) => m.appointment_id));
   const messages: MovedMessage[] = [];
@@ -46,9 +52,21 @@ export async function movedMessages(appointmentIds: string[], since: string): Pr
     const channel = channelFor(consentOf(visit.client), "appointment")?.channel ?? null;
     const rendered = await previewTemplate(s.supabase, { appointmentId: id, template: "visit_moved", channel: channel ?? "sms" });
     if (!rendered) continue;
-    messages.push({ appointmentId: id, clientName: `${visit.client.first_name} ${visit.client.last_name ?? ""}`.trim(), channel, ...rendered, sent: done.has(id) });
+    messages.push({
+      appointmentId: id,
+      clientName: `${visit.client.first_name} ${visit.client.last_name ?? ""}`.trim(),
+      firstName: visit.client.first_name,
+      phone: visit.client.phone,
+      channel,
+      ...rendered,
+      sent: done.has(id),
+    });
   }
-  return { messages, freeText: s.me.role === "owner" || Boolean(business?.free_text_roles.includes(s.me.role)) };
+  return {
+    messages,
+    freeText: s.me.role === "owner" || Boolean(business?.free_text_roles.includes(s.me.role)),
+    askDefault: business?.move_message_default === "skip" ? "skip" : "send",
+  };
 }
 
 // Sends one client their message: the template as it is, or what the staff

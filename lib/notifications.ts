@@ -65,7 +65,6 @@ export function blockNotifications(
 export type VisitMove = {
   appointmentId: string;
   client: { id: string; firstName: string; fullName: string } | null;
-  salon: string;
   service: string;
   // The salon's today, to say "today" rather than the date.
   today: LocalDate;
@@ -73,7 +72,7 @@ export type VisitMove = {
   to: { date: LocalDate; minute: number; staffId: string; staffFirstName: string };
 };
 
-export type MoveNotice = { template: "visit_moved"; body: string; clientId: string } | { template: "staff_visit_moved"; body: string; staffId: string };
+export type MoveNotice = { template: "staff_visit_moved"; body: string; staffId: string };
 
 const dayText = (date: LocalDate, today: LocalDate) => (date === today ? "today" : `on ${formatDay(date)}`);
 // "on Tue, Oct 27 at 2pm" (or "today at 2pm"), and without the "on" after
@@ -81,24 +80,15 @@ const dayText = (date: LocalDate, today: LocalDate) => (date === today ? "today"
 const at = (p: { date: LocalDate; minute: number }, today: LocalDate) => `${dayText(p.date, today)} at ${formatMinute(p.minute)}`;
 const bare = (p: { date: LocalDate; minute: number }, today: LocalDate) => `${p.date === today ? "today" : formatDay(p.date)} at ${formatMinute(p.minute)}`;
 
-// The client and each stylist involved, in fixed templates. Nothing when
-// the day, time and stylist are all the same (a new chair, say).
+// Each stylist involved, in fixed templates. Nothing when the day, time and
+// stylist are all the same (a new chair, say). Never the client: staff
+// choose to tell them, with the message they see (app/calendar/move-prompt.tsx).
 export function moveNotices(m: VisitMove): MoveNotice[] {
   const sameDay = m.from.date === m.to.date;
   const sameTime = sameDay && m.from.minute === m.to.minute;
   const sameStylist = m.from.staffId === m.to.staffId;
   if (sameTime && sameStylist) return [];
   const out: MoveNotice[] = [];
-  if (m.client) {
-    const hi = `Hi ${m.client.firstName}, it's ${m.salon}.`;
-    const when = sameTime
-      ? `${dayText(m.to.date, m.today)} at ${formatMinute(m.to.minute)} is still on`
-      : sameDay
-        ? `${dayText(m.to.date, m.today)} has moved from ${formatMinute(m.from.minute)} to ${formatMinute(m.to.minute)}`
-        : `has moved from ${bare(m.from, m.today)} to ${bare(m.to, m.today)}`;
-    const who = sameStylist ? `, still with ${m.to.staffFirstName}` : ` and will be with ${m.to.staffFirstName}`;
-    out.push({ template: "visit_moved", body: `${hi} Your appointment ${when}${who}. Reply or call us if that doesn't work. See you soon!`, clientId: m.client.id });
-  }
   const name = m.client?.fullName ?? "A walk-in";
   for (const staffId of new Set([m.from.staffId, m.to.staffId])) {
     const body = sameStylist
