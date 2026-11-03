@@ -51,6 +51,7 @@ import { saveCalendarView, setCalendarOrder } from "./view-actions";
 import type { AppointmentDetail, BlockData, BoardData, ColumnData, TimeBlockData } from "./types";
 import { firstLetter } from "@/lib/initial";
 import { useKeepOnScreen } from "@/components/ui/keep-on-screen";
+import { SideScrollEdges } from "@/components/ui/side-scroll";
 
 // How tall time is drawn (px per minute), from the zoom; blocks read it.
 const ScaleContext = createContext(ZOOM_PX_PER_MINUTE.comfortable);
@@ -499,7 +500,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     const result = await run();
     setDeciding(false);
     if (result.state) showDenise(result.state, data);
-    setOutcome({ message: result.message, error: !result.ok, undoActionId: result.ok ? undoActionId : null });
+    setOutcome({ message: result.message, error: !result.ok, undoActionId: result.ok ? undoActionId : null, moved: result.ok ? result.moved : undefined });
   }
   const approve = (o: FixView) => decide(() => approveDeniseFix(o.actionId!, data.date), o.actionId);
   const reject = (o: FixView) => decide(() => rejectDeniseFix(o.actionId!, data.date), null);
@@ -1044,6 +1045,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           </div>
         )}
 
+        {/* With less room (Denise's panel or booking details open), the
+            stylists scroll sideways under the time column, and the side with
+            more stylists says so. */}
+        <div className="relative flex min-h-0 flex-col lg:flex-1">
         <ViewTransition key={data.date} enter={DAY_SLIDE} exit={DAY_SLIDE} default="none">
           <div
             ref={gridRef}
@@ -1290,6 +1295,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             </ScaleContext>
           </div>
         </ViewTransition>
+          {!squeezed && <SideScrollEdges target={gridRef} label="More stylists" leftInset="4rem" />}
+        </div>
 
         {/* The key, with Denise's face at the end of the row while her panel
             is closed (so she never sits on top of the calendar). */}

@@ -9,14 +9,16 @@ import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/field";
 import { CheckCircleIcon, ChevronDownIcon, ClockIcon, CloseIcon, UndoIcon } from "@/components/ui/icons";
 import { noFixAdvice } from "@/lib/denise/respond";
-import type { ConflictView, DeniseNotice, DeniseState, FixView, OpeningMatch, WaitlistOpening } from "@/lib/denise/types";
+import type { ConflictView, DeniseNotice, DeniseState, FixView, Moved, OpeningMatch, WaitlistOpening } from "@/lib/denise/types";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
+import { MovedMessages } from "./moved-messages";
 import { useNow } from "./now-line";
 import type { BoardData } from "./types";
 
 // What Denise said after the last approve, reject or undo.
-export type Outcome = { message: string; error: boolean; undoActionId: string | null };
+// `moved`: the clients an applied fix moved, whose messages wait to be sent.
+export type Outcome = { message: string; error: boolean; undoActionId: string | null; moved?: Moved };
 
 // Which fix the calendar previews: a conflict's option.
 export type Preview = { subject: string; index: number };
@@ -125,6 +127,7 @@ export function DenisePanel({
           )}
         </div>
       )}
+      {outcome?.moved && <MovedMessages moved={outcome.moved} />}
 
       {conflicts.map((c, i) => (
         <ConflictCard

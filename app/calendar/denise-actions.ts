@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { approveFix, rejectFix, undoFix } from "@/lib/denise/fixes";
 import { deniseDay } from "@/lib/denise/day-state";
 import { askerOf, deniseSession, type DeniseSession } from "@/lib/denise/session";
-import type { DeniseState, FixResult } from "@/lib/denise/types";
+import type { DeniseState, FixResult, Moved } from "@/lib/denise/types";
 import { isUuid } from "@/lib/ids";
 import { isLocalDate } from "@/lib/scheduling/time";
 import { bookWaitlistEntry } from "@/lib/waitlist-book";
@@ -41,14 +41,14 @@ export async function scanDenise(date: string): Promise<DeniseState | null> {
   return look(s, date);
 }
 
-async function decide(actionId: string, date: string, run: (s: Session) => Promise<{ ok: true; message: string } | { ok: false; message: string }>): Promise<FixResult> {
+async function decide(actionId: string, date: string, run: (s: Session) => Promise<{ ok: true; message: string; moved?: Moved } | { ok: false; message: string }>): Promise<FixResult> {
   const s = await session();
   if (!s) return { ok: false, message: NOT_SIGNED_IN };
   if (!isUuid(actionId) || !isLocalDate(date)) return { ok: false, message: "I can't find that suggestion any more." };
   const result = await run(s);
   refresh();
   const state = await look(s, date);
-  return result.ok ? { ok: true, message: result.message, state } : { ok: false, message: result.message, state };
+  return result.ok ? { ok: true, message: result.message, state, moved: result.moved } : { ok: false, message: result.message, state };
 }
 
 export async function approveDeniseFix(actionId: string, date: string, clientId: string | null = null): Promise<FixResult> {

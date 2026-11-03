@@ -65,6 +65,13 @@ describe("staff messages", () => {
     expect(templateProblem("running_late", { minutes: 2 })).toBe("Say how many minutes behind (5 to 120).");
     expect(templateProblem("ready_early", { time: "1:30pm" })).toBeNull();
   });
+
+  it("say where a visit moved to, after one of Denise's fixes", () => {
+    expect(renderStaffMessage("visit_moved", facts, "sms")).toEqual({
+      subject: "Your visit at Maple & Ash has moved",
+      body: "Hi Ava, Maple & Ash here. We've moved your visit to today at 2:00pm with Gil. Call us at (555) 010-0100 if that doesn't work. Reply STOP to stop texts.",
+    });
+  });
 });
 
 describe("what staff write themselves", () => {

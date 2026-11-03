@@ -11,6 +11,9 @@ export const STAFF_TEMPLATES = {
   need_to_move: { label: "We need to move your visit", needs: [] },
   reminder: { label: "Reminder", needs: [] },
   ready_early: { label: "We can take you early", needs: ["time"] },
+  // After a visit is moved (one of Denise's fixes, applied by staff):
+  // where and when it is now.
+  visit_moved: { label: "Your visit has moved", needs: [] },
 } as const;
 
 export type StaffTemplate = keyof typeof STAFF_TEMPLATES;
@@ -38,6 +41,7 @@ export function renderStaffMessage(template: StaffTemplate, f: TemplateFacts, ch
     need_to_move: `Hi ${f.firstName}, ${f.salon} here. We need to move your visit ${f.when}. Please call us${call}${f.manageLink ? ` or choose a new time:${link}` : "."}`,
     reminder: `Hi ${f.firstName}, a reminder of your visit at ${f.salon} ${f.when}${f.stylist ? ` with ${f.stylist}` : ""}.${f.manageLink ? ` Change or cancel:${link}` : ""}`,
     ready_early: `Hi ${f.firstName}, ${f.salon} here. We can take you early, at ${f.time ?? "an earlier time"}, for your visit ${f.when}. Call us${call} if that works.`,
+    visit_moved: `Hi ${f.firstName}, ${f.salon} here. We've moved your visit to ${f.when}${f.stylist ? ` with ${f.stylist}` : ""}. Call us${call} if that doesn't work.`,
   }[template];
   const subject = {
     running_late: `${f.salon} is running a little behind`,
@@ -45,6 +49,7 @@ export function renderStaffMessage(template: StaffTemplate, f: TemplateFacts, ch
     need_to_move: `${f.salon} needs to move your visit`,
     reminder: `Your visit at ${f.salon}`,
     ready_early: `${f.salon} can take you early`,
+    visit_moved: `Your visit at ${f.salon} has moved`,
   }[template];
   return { subject, body: channel === "sms" ? withStopLine(text) : text };
 }

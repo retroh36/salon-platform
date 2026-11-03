@@ -13,18 +13,17 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { DeniseFace } from "@/components/denise";
 import { Button, IconButton } from "@/components/ui/button";
-import { fieldClass } from "@/components/ui/field";
 import { ChevronDownIcon, CloseIcon } from "@/components/ui/icons";
 import { useKeepOnScreen } from "@/components/ui/keep-on-screen";
 import { Listbox } from "@/components/ui/listbox";
 import { Alert, Badge, nameLinkClass, textLinkClass } from "@/components/ui/page";
 import { Segmented } from "@/components/ui/segmented";
 import { useUnsavedChanges } from "@/components/unsaved";
-import { smsCounterText } from "@/lib/messaging/templates";
 import { reach } from "@/lib/reach";
 import { clashingRows, movesOf, type OutWhen, type RescueChoice, type RescueRow } from "@/lib/rescue";
 import { formatMinute, fromLocal, toLocal } from "@/lib/scheduling/time";
-import { applyRescue, loadOutPanel, markOut, sendRescueMessage, undoRescue, type OutPanelData, type RescueMessage } from "./out-actions";
+import { ClientMessageRow } from "./client-message-row";
+import { applyRescue, loadOutPanel, markOut, sendRescueMessage, undoRescue, type OutPanelData } from "./out-actions";
 
 type Kind = OutWhen["kind"];
 const STEP = 15;
@@ -486,8 +485,6 @@ function ChangeMenu({ row, choice, onChoose }: { row: RescueRow; choice: number;
   );
 }
 
-type Message = RescueMessage & { clientName: string };
-
 // After applying: Undo, and each client's message to check and send.
 function Applied({
   staffId,
@@ -543,54 +540,16 @@ function Applied({
       ) : (
         <ul className="-mr-2 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-2">
           {data.messages.map((m) => (
-            <MessageRow key={m.appointmentId} staffId={staffId} message={m} freeText={data.freeText} onSent={onSent} />
+            <ClientMessageRow
+              key={m.appointmentId}
+              message={m}
+              freeText={data.freeText}
+              send={(edited) => sendRescueMessage({ appointmentId: m.appointmentId, staffId, template: m.template, channel: m.channel!, edited, subject: m.subject })}
+              onSent={onSent}
+            />
           ))}
         </ul>
       )}
     </div>
-  );
-}
-
-function MessageRow({ staffId, message: m, freeText, onSent }: { staffId: string; message: Message; freeText: boolean; onSent: () => void }) {
-  const [body, setBody] = useState(m.body);
-  const [result, setResult] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-  const edited = body.trim() !== m.body.trim();
-  const counter = m.channel === "sms" ? smsCounterText(body) : null;
-
-  function send() {
-    if (!m.channel) return;
-    start(async () => {
-      const r = await reach(sendRescueMessage({ appointmentId: m.appointmentId, staffId, template: m.template, channel: m.channel!, edited: edited ? body : null, subject: m.subject }));
-      setResult(r.ok ? null : r.message);
-      if (r.ok) onSent();
-    });
-  }
-
-  return (
-    <li className="rounded-lg border border-line bg-surface p-3" data-testid="out-message">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="font-medium text-ink">{m.clientName}</p>
-        {m.sent ? <Badge tone="success">Sent</Badge> : m.channel ? <Badge>{m.channel === "sms" ? "Text" : "Email"}</Badge> : <Badge tone="warning">No messages: call</Badge>}
-      </div>
-      {m.sent || !m.channel ? (
-        <p className="text-sm whitespace-pre-line text-ink-muted">{m.body}</p>
-      ) : (
-        <>
-          <label className="sr-only" htmlFor={`msg-${m.appointmentId}`}>
-            Message to {m.clientName}
-          </label>
-          <textarea id={`msg-${m.appointmentId}`} value={body} onChange={(e) => setBody(e.target.value)} readOnly={!freeText} rows={4} className={`${fieldClass} h-auto py-2`} />
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <Button size="sm" onClick={send} disabled={pending || !body.trim()}>
-              {pending ? "Sending…" : "Send"}
-            </Button>
-            {counter && <span className={`text-xs ${counter.warn ? "text-warning" : "text-ink-subtle"}`}>{counter.text}</span>}
-            {!freeText && <span className="text-xs text-ink-subtle">Your role sends the template as it is.</span>}
-          </div>
-        </>
-      )}
-      {result && <Alert className="mt-2">{result}</Alert>}
-    </li>
   );
 }

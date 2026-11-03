@@ -1,15 +1,9 @@
 // Lists of records as real tables (docs/brand.md, "Tables"): a quiet header
 // row, aligned columns, money and counts right-aligned in tabular figures,
 // a thin rule between rows. `TableCard` is the one box around it (scrolling
-// sideways on a narrow screen rather than squeezing the columns).
+// sideways on a narrow screen rather than squeezing the columns, ./table-card.tsx).
 
-export function TableCard({ className = "", children, ...rest }: { className?: string; children: React.ReactNode } & React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div className={`mb-6 overflow-x-auto overscroll-x-contain rounded-lg border border-line bg-surface ${className}`} {...rest}>
-      {children}
-    </div>
-  );
-}
+export { TableCard } from "./table-card";
 
 export const tableClass = "w-full border-collapse text-left text-sm";
 export const theadClass = "bg-sunken/70 text-xs font-medium text-ink-muted";

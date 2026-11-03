@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button, buttonClass } from "@/components/ui/button";
 import { ChevronLeftIcon, ChevronRightIcon, RepeatIcon, WarningIcon } from "@/components/ui/icons";
 import { Alert, Badge, nameLinkClass, textLinkClass } from "@/components/ui/page";
+import { SideScrollEdges } from "@/components/ui/side-scroll";
 import { formatDuration } from "@/lib/duration";
 import { formatDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, type LocalDate } from "@/lib/scheduling/time";
@@ -85,6 +86,7 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
   const [notice, setNotice] = useState<{ tone: "error" | "success"; text: string; moves?: { label: string; href: string }[] } | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
+  const weekRef = useRef<HTMLDivElement>(null);
   const [pending, start] = useTransition();
 
   const all = [...cells.values()];
@@ -257,8 +259,12 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
         </div>
       )}
 
-      <div className="overflow-x-auto overscroll-x-contain rounded-xl border border-line bg-surface">
-        <div role="grid" aria-label={`Team schedule, week of ${formatDay(grid.week, true)}`} className="grid min-w-[50rem] grid-cols-[minmax(12.5rem,15rem)_repeat(7,minmax(5.25rem,1fr))]">
+      {/* Days keep a readable width; with less room (Denise's panel open)
+          the week scrolls sideways under the team column, and the side
+          with more days says so. */}
+      <div className="relative">
+      <div ref={weekRef} className="overflow-x-auto overscroll-x-contain rounded-xl border border-line bg-surface">
+        <div role="grid" aria-label={`Team schedule, week of ${formatDay(grid.week, true)}`} className="grid grid-cols-[13rem_repeat(7,minmax(5.75rem,1fr))]">
           <div role="row" className="contents">
             <div role="columnheader" className="sticky left-0 z-10 border-b border-line bg-surface px-4 py-3 text-13 font-medium text-ink-muted">
               Team
@@ -446,6 +452,8 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
             </div>
           ))}
         </div>
+      </div>
+      <SideScrollEdges target={weekRef} label="More days" leftInset="13rem" />
       </div>
       <p className="mt-2 text-xs text-ink-muted">
         {editable

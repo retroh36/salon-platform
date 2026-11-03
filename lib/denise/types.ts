@@ -80,7 +80,11 @@ export type DeniseState = {
 };
 
 // After approving, rejecting or undoing.
-export type FixResult = { ok: true; message: string; state: DeniseState } | { ok: false; message: string; state?: DeniseState };
+// `moved`: the visits an applied fix moved, and when, for staff to send
+// each client their message (applying sends nothing).
+export type Moved = { appointmentIds: string[]; at: string };
+
+export type FixResult = { ok: true; message: string; state: DeniseState; moved?: Moved } | { ok: false; message: string; state?: DeniseState };
 
 // A booking Denise suggests from "Ask Denise", for staff to approve.
 export type BookingSuggestion = {

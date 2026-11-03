@@ -86,9 +86,15 @@ test("the checkout's client header keeps the name whole and the badges as pills,
   // The search box shows its whole placeholder.
   const search = ticket.getByLabel("Add a product: name, brand, SKU or scan");
   expect(await search.evaluate((el: HTMLInputElement) => el.scrollWidth <= el.clientWidth)).toBe(true);
-  // Quick-add tiles past the edge fade rather than stop dead.
+  // Quick-add tiles past the edge fade rather than stop dead, and only on
+  // the side with more: the first tile is whole and unfaded.
   const strip = ticket.getByTestId("best-sellers").locator("xpath=..");
-  if (await strip.evaluate((el) => el.scrollWidth > el.clientWidth)) await expect(strip).toHaveAttribute("data-more-right", "true");
+  if (await strip.evaluate((el) => el.scrollWidth > el.clientWidth)) {
+    await expect(strip).toHaveAttribute("data-more-right", "true");
+    await expect(ticket.getByRole("button", { name: "More products to the right" })).toBeVisible();
+  }
+  await expect(strip).not.toHaveAttribute("data-more-left");
+  await expectInside(strip.getByRole("button").first(), strip);
 });
 
 test("the calendar's column headers and the booking form fit beside the side panel", async ({ page }) => {
@@ -103,6 +109,35 @@ test("the calendar's column headers and the booking form fit beside the side pan
   const service = (await form.getByRole("combobox").nth(0).boundingBox())!;
   const stylist = (await form.getByRole("combobox").nth(1).boundingBox())!;
   expect(Math.abs(stylist.width - service.width)).toBeLessThan(1);
+});
+
+// Testers found columns squeezed or cut off with Denise open: they keep a
+// readable width and scroll sideways, with an arrow on the side with more.
+async function expectScrollsWithArrows(page: Page, scroller: Locator, label: string) {
+  await expect(scroller).toHaveJSProperty("scrollLeft", 0);
+  expect(await scroller.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  await expect(page.getByRole("button", { name: `${label} to the left` })).toHaveCount(0);
+  await page.getByRole("button", { name: `${label} to the right` }).click();
+  await expect.poll(() => scroller.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  await expect(page.getByRole("button", { name: `${label} to the left` })).toBeVisible();
+}
+
+test("with Denise open, the calendar's stylists keep their width and scroll with an arrow", async ({ page }) => {
+  await page.goto(`/calendar?date=${(await busyDay("America/Chicago")).date}`);
+  await waitForHydration(page, "section[data-staff-id]");
+  await page.getByTestId("denise-launcher").click();
+  await expect(page.getByTestId("denise-says")).toBeVisible();
+  for (const column of await ui(page).locator("section[data-staff-id]").all()) expect((await column.boundingBox())!.width).toBeGreaterThanOrEqual(151);
+  await expectScrollsWithArrows(page, ui(page).getByTestId("calendar-grid"), "More stylists");
+});
+
+test("with Denise open, Scheduling's days keep their width and scroll with an arrow", async ({ page }) => {
+  await page.goto("/scheduling");
+  const grid = ui(page).getByRole("grid", { name: /^Team schedule/ });
+  await waitForHydration(page, "[data-testid=denise-bubble-launcher]");
+  await openDenise(page);
+  for (const day of await grid.locator("[role=columnheader][data-day]").all()) expect((await day.boundingBox())!.width).toBeGreaterThanOrEqual(91);
+  await expectScrollsWithArrows(page, grid.locator(".."), "More days");
 });
 
 test("Scheduling shows the whole week, Sunday included", async ({ page }) => {

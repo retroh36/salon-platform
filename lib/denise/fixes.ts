@@ -9,10 +9,11 @@ import { describeProblem } from "@/lib/scheduling/booking";
 import { toLocal } from "@/lib/scheduling/time";
 import { adjustFor, loadDay, type Viewer } from "./scan";
 import { clock, type Lookup } from "./wording";
+import type { Moved } from "./types";
 
 type Supabase = SupabaseClient<Database>;
 
-export type FixOutcome = { ok: true; date: string; message: string } | { ok: false; message: string };
+export type FixOutcome = { ok: true; date: string; message: string; moved?: Moved } | { ok: false; message: string };
 
 async function loadProposal(supabase: Supabase, actionId: string): Promise<Proposal | null> {
   const { data, error } = await supabase.from("ai_actions").select("proposal").eq("id", actionId).maybeSingle();
@@ -25,16 +26,19 @@ function dateOf(proposal: Proposal, timeZone: string): string | null {
   return first ? toLocal(first, timeZone).date : null;
 }
 
+// The visits a proposal moves (to another time or stylist).
+function movedVisits(proposal: Proposal): string[] {
+  const ids = new Set<string>();
+  for (const c of proposal.changes) {
+    if (c.from.start.getTime() === c.to.start.getTime() && c.from.staffId === c.to.staffId) continue;
+    ids.add(c.appointmentId);
+  }
+  return [...ids];
+}
+
 // First names of the clients a proposal moves.
 function movedNames(proposal: Proposal, lookup: Lookup): string[] {
-  const names = new Set<string>();
-  for (const c of proposal.changes) {
-    const from = c.from;
-    const to = c.to;
-    if (from.start.getTime() === to.start.getTime() && from.staffId === to.staffId) continue;
-    names.add(lookup.visits.get(c.appointmentId)?.client?.firstName ?? "The walk-in");
-  }
-  return [...names];
+  return [...new Set(movedVisits(proposal).map((id) => lookup.visits.get(id)?.client?.firstName ?? "The walk-in"))];
 }
 
 function joinNames(names: string[]): string {
@@ -71,11 +75,11 @@ export async function approveFix(supabase: Supabase, viewer: Viewer, actionId: s
 
   if (proposal.book) return { ok: true, date, message: "Done — it's booked." };
   const names = movedNames(proposal, lookup);
-  const notified = proposal.notifications?.length ? " and notified" : "";
-  const message = names.length
-    ? `Done — ${joinNames(names)} ${names.length > 1 ? "have" : "has"} been moved${notified}.`
-    : "Done — I've swapped the chair, so no one needs to move.";
-  return { ok: true, date, message };
+  if (!names.length) return { ok: true, date, message: "Done — I've swapped the chair, so no one needs to move." };
+  // Applying sends nothing: each client's message waits for staff to check
+  // and send it, so this never says anyone was told.
+  const message = `Moved ${joinNames(names)}. ${names.length > 1 ? "Messages" : "Message"} ready to send.`;
+  return { ok: true, date, message, moved: { appointmentIds: movedVisits(proposal), at: new Date().toISOString() } };
 }
 
 export async function undoFix(supabase: Supabase, viewer: Viewer, actionId: string, now?: Date): Promise<FixOutcome> {

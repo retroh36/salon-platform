@@ -136,7 +136,8 @@ function useTucked(ref: React.RefObject<HTMLElement | null>): boolean {
       const right = innerWidth - INSET;
       const bottom = innerHeight - Math.max(INSET, 0);
       const points: [number, number][] = [];
-      for (const dx of [4, SPOT / 2, SPOT - 4]) for (const dy of [4, SPOT / 2, SPOT - 4]) points.push([right - SPOT + dx, bottom - SPOT + dy]);
+      // 2px in from each edge: a button just under the edge counts.
+      for (const dx of [2, SPOT / 2, SPOT - 2]) for (const dy of [2, SPOT / 2, SPOT - 2]) points.push([right - SPOT + dx, bottom - SPOT + dy]);
       const covered = points.some(([x, y]) =>
         document.elementsFromPoint(x, y).some((el) => !ref.current?.contains(el) && !el.closest("[data-denise-panel]") && el.closest(INTERACTIVE) !== null),
       );

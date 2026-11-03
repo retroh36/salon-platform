@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import { approveDeniseFix, bookFromWaitlist, rejectDeniseFix, undoDeniseFix } from "@/app/calendar/denise-actions";
+import { MovedMessages } from "@/app/calendar/moved-messages";
 import { DeniseFace, DenisePose } from "@/components/denise";
 import { Button, buttonClass } from "@/components/ui/button";
 import { CheckCircleIcon, UndoIcon } from "@/components/ui/icons";
 import { Alert } from "@/components/ui/page";
-import type { DeniseState, FixResult } from "@/lib/denise/types";
+import type { DeniseState, FixResult, Moved } from "@/lib/denise/types";
 import { noFixAdvice } from "@/lib/denise/respond";
 import type { ConflictKind } from "@/lib/scheduling/resolve";
 import { formatMinute } from "@/lib/scheduling/time";
@@ -32,7 +33,7 @@ const REVIEW = "/calendar?denise=1";
 export function DeniseCard({ initial, today, canBook, seesMoney }: { initial: DeniseState; today: string; canBook: boolean; seesMoney: boolean }) {
   const [state, setState] = useState(initial);
   const [working, setWorking] = useState(false);
-  const [outcome, setOutcome] = useState<{ message: string; error: boolean; undo: string | null } | null>(null);
+  const [outcome, setOutcome] = useState<{ message: string; error: boolean; undo: string | null; moved?: Moved } | null>(null);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
 
   async function run(action: () => Promise<FixResult>, undo: string | null) {
@@ -42,7 +43,7 @@ export function DeniseCard({ initial, today, canBook, seesMoney }: { initial: De
     setWorking(false);
     // Her panel's actions don't redo the brief; keep the one shown.
     if (result.state) setState((was) => ({ ...result.state!, brief: was.brief }));
-    setOutcome({ message: result.message, error: !result.ok, undo: result.ok ? undo : null });
+    setOutcome({ message: result.message, error: !result.ok, undo: result.ok ? undo : null, moved: result.ok ? result.moved : undefined });
   }
 
   const conflicts = state.conflicts.filter((c) => !dismissed.has(c.subject));
@@ -93,6 +94,11 @@ export function DeniseCard({ initial, today, canBook, seesMoney }: { initial: De
               )}
             </div>
           ))}
+        {outcome?.moved && (
+          <div className="pb-3">
+            <MovedMessages moved={outcome.moved} />
+          </div>
+        )}
 
         {count > 0 && (
           <ul aria-label="Denise's open items" className="divide-y divide-denise-100">

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { selectClass } from "@/components/ui/field";
 import { SearchIcon } from "@/components/ui/icons";
 import { Badge } from "@/components/ui/page";
 import type { CheckoutScreenData } from "@/lib/checkout-screen";
 import { formatPrice } from "@/lib/services";
+import { SideScroll } from "@/components/ui/side-scroll";
 
 type Product = CheckoutScreenData["products"][number];
 
@@ -122,44 +123,11 @@ export function ProductPicker({ data, onAdd }: { data: CheckoutScreenData; onAdd
       {/* Quick add, in one row (so the ticket keeps the room): what the
           stylist usually recommends, then the best sellers. */}
       {(others.length > 0 || recommended.length > 0) && (
-        <FadeScroll>
+        <SideScroll label="More products" className="gap-4 px-1 pb-1">
           {recommended.length > 0 && <QuickTiles label={`${recommender} recommends`} products={recommended} onAdd={add} testId="recommended" />}
           {others.length > 0 && <QuickTiles label="Best sellers" products={others} onAdd={add} testId="best-sellers" />}
-        </FadeScroll>
+        </SideScroll>
       )}
-    </div>
-  );
-}
-
-// A row that scrolls sideways, faded at whichever edge has more, so tiles
-// past the edge read as "more this way" rather than cut off (scrollbars stay
-// out of sight until hovered).
-function FadeScroll({ children }: { children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [more, setMore] = useState({ left: false, right: false });
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const measure = () => setMore({ left: el.scrollLeft > 1, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1 });
-    measure();
-    el.addEventListener("scroll", measure, { passive: true });
-    const seen = new ResizeObserver(measure);
-    seen.observe(el);
-    return () => {
-      el.removeEventListener("scroll", measure);
-      seen.disconnect();
-    };
-  }, []);
-  const fade = `linear-gradient(to right, ${more.left ? "transparent, black 3rem" : "black"}, ${more.right ? "black calc(100% - 3rem), transparent" : "black"})`;
-  return (
-    <div
-      ref={ref}
-      data-more-left={more.left || undefined}
-      data-more-right={more.right || undefined}
-      style={{ maskImage: fade, WebkitMaskImage: fade }}
-      className="-mx-1 flex gap-4 overflow-x-auto overscroll-x-contain px-1 pb-1"
-    >
-      {children}
     </div>
   );
 }

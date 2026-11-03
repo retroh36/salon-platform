@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RELOAD_LOAD_MS, SLOW_LOAD_MS, watchLoading } from "@/components/still-loading";
+import { loadFactsText, RELOAD_LOAD_MS, SLOW_LOAD_MS, watchLoading } from "@/components/still-loading";
 import { hasUnsavedWork, resetUnsavedWork, setUnsaved, trackSave } from "@/lib/unsaved-work";
 
 const memory = () => {
@@ -80,5 +80,11 @@ describe("a page that stalls while loading", () => {
     vi.advanceTimersByTime(RELOAD_LOAD_MS);
     expect(on.slow).toHaveBeenCalledOnce();
     expect(on.reload).not.toHaveBeenCalled();
+  });
+
+  it("says what a stalled load was waiting on, with no data in it", () => {
+    expect(loadFactsText({ nav: "reload", soft: false, docDone: false, docBytes: 18_200, dataBack: false, online: true, visible: true, waitedMs: 10_004 })).toBe(
+      "nav=reload soft=no doc=streaming bytes=18200 data=none online=yes visible=yes waited=10004",
+    );
   });
 });

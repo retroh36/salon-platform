@@ -168,7 +168,13 @@ describe("Denise's fixes", () => {
     expect(again.conflicts[0].options[0].actionId).toBe(top.actionId);
 
     const approved = await approveFix(frontDesk, desk, top.actionId!, { now: NOW });
-    expect(approved).toEqual({ ok: true, date: DAY, message: `Done — ${clients[1].first_name} has been moved and notified.` });
+    // Applying sends nothing: the client's message waits for staff.
+    expect(approved).toEqual({
+      ok: true,
+      date: DAY,
+      message: `Moved ${clients[1].first_name}. Message ready to send.`,
+      moved: { appointmentIds: [next.appointment_id], at: expect.any(String) },
+    });
     expect(await startOf(next.id)).toEqual({ start: at(11, 20), staffId: BRIDGET });
 
     const { data: sent } = await admin.from("notifications").select("client_id, staff_id, template, body, status, appointment_id").eq("ai_action_id", top.actionId!);

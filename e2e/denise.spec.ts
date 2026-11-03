@@ -178,7 +178,18 @@ test.describe("front desk", () => {
     await expect(ui(page).locator("[data-denise-highlight]")).toHaveCount(2);
 
     await panel.getByRole("button", { name: "Apply fix" }).click();
-    await expect(panel.getByRole("status")).toContainText(`Done — ${PREFIX}Grace has been moved and notified.`);
+    // Moved, and her message waits to be checked and sent: nothing reaches
+    // her until it is.
+    await expect(panel.getByRole("status")).toContainText(`Moved ${PREFIX}Grace. Message ready to send.`);
+    const message = panel.getByTestId("moved-messages").getByTestId("client-message");
+    await expect(message).toContainText(`${PREFIX}Grace Lewis`);
+    await expect(message.getByRole("textbox", { name: `Message to ${PREFIX}Grace Lewis` })).toHaveValue(/We've moved your visit to .+ at 11:20am with Bridget\./);
+    const { data: graceItem } = await admin.from("appointment_items").select("appointment_id").eq("id", grace).single();
+    const outbox = () => admin.from("client_messages").select("template, channel").eq("appointment_id", graceItem!.appointment_id);
+    expect((await outbox()).data).toEqual([]);
+    await message.getByRole("button", { name: "Send" }).click();
+    await expect(message.getByText("Sent", { exact: true })).toBeVisible();
+    expect((await outbox()).data).toEqual([{ template: "visit_moved", channel: "sms" }]);
     expect(await startOf(grace)).toEqual({ start: at(11, 20).getTime(), staffId: BRIDGET });
     await expect(block(page, "Grace")).toHaveAccessibleName(/^11:20am–12:20pm/);
     await expect(panel.getByTestId("denise-message")).toHaveCount(0);
@@ -187,7 +198,7 @@ test.describe("front desk", () => {
     await expect(ui(page).locator("[data-denise-highlight]")).toHaveCount(0);
     await expect(ui(page).locator("[data-fix-ghost]")).toHaveCount(0);
 
-    // Logged and notified.
+    // Logged, with the notices recorded.
     const { data: logged } = await admin.from("ai_actions").select("id, status, decided_by").like("subject", `${DAY}:%`).eq("status", "approved").single();
     expect(logged!.decided_by).toBe(FRONT_DESK);
     const { count } = await admin.from("notifications").select("id", { count: "exact", head: true }).eq("ai_action_id", logged!.id);
@@ -220,7 +231,7 @@ test.describe("front desk", () => {
     expect(await startOf(grace)).toEqual({ start: at(11).getTime(), staffId: BRIDGET });
 
     await panel.getByRole("button", { name: "Apply fix" }).click();
-    await expect(panel.getByRole("status")).toContainText(`${PREFIX}Grace has been moved`);
+    await expect(panel.getByRole("status")).toContainText(`Moved ${PREFIX}Grace. Message ready to send.`);
     expect(await startOf(grace)).toEqual({ start: at(11, 20).getTime(), staffId: BRIDGET });
     await panel.getByRole("button", { name: "Undo" }).click();
     await expect(panel.getByRole("status")).toContainText(`Undone — ${PREFIX}Grace is back at 11:00.`);
@@ -278,7 +289,7 @@ test.describe("front desk", () => {
       `Bridget is out for the rest of the day. I found a fix that only moves one client: ${PREFIX}Grace Lewis → Shae at 10:00. Want me to apply it?`,
     );
     await panel.getByRole("button", { name: "Apply fix" }).click();
-    await expect(panel.getByRole("status")).toContainText("has been moved and notified");
+    await expect(panel.getByRole("status")).toContainText(`Moved ${PREFIX}Grace. Message ready to send.`);
     expect(await startOf(grace)).toEqual({ start: at(10).getTime(), staffId: SHAE });
     // Bridget's column shows the time off.
     await expect(ui(page).getByRole("region", { name: "Bridget Callahan" }).locator("[data-time-off]")).toContainText("Out for the rest of the day");
@@ -302,7 +313,7 @@ test.describe("front desk", () => {
     await other.hover();
     await expect(ui(page).getByRole("region", { name: "Shae Morgan" }).locator("[data-fix-ghost]")).toBeVisible();
     await other.getByRole("button", { name: "Use this instead" }).click();
-    await expect(panel.getByRole("status")).toContainText("has been moved and notified");
+    await expect(panel.getByRole("status")).toContainText(`Moved ${PREFIX}Grace. Message ready to send.`);
     expect(await startOf(grace)).toEqual({ start: at(11).getTime(), staffId: SHAE });
   });
 

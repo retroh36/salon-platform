@@ -136,7 +136,7 @@ test("plans every client as the time out changes, applies it all, messages them 
   expect(out!.ends_at).toBeNull();
 
   // A message for each: Ava's new stylist, Ben's call to move.
-  const messages = panel.getByTestId("out-message");
+  const messages = panel.getByTestId("client-message");
   const avaMessage = messages.filter({ hasText: `${PREFIX}Ava Test` });
   await expect(avaMessage.getByRole("textbox")).toHaveValue(/Bridget is out, so Sandra will look after you .* instead\./);
   await expect(messages.filter({ hasText: `${PREFIX}Ben Test` }).getByRole("textbox")).toHaveValue(/We need to move your visit/);
