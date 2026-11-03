@@ -35,10 +35,11 @@ export function staffPhotoUrl(path: string | null | undefined): string | null {
 }
 
 // Photos that ship with the app (the demo salons' covers, portraits and
-// work, in public/demo/, credited in public/demo/CREDITS.md) are stored as
-// their path from the site's root; any other path is a file in Storage
-// under the business id.
-const BUNDLED = /^\/demo\/[a-z0-9-]+(\/[a-z0-9-]+)*\.(jpg|png|webp)$/;
+// work, in public/demo/, credited in public/demo/CREDITS.md, and their
+// invented logos, drawn as SVGs in public/demo/logos/) are stored as their
+// path from the site's root; any other path is a file in Storage under the
+// business id. Salons upload only PNG, JPEG or WebP.
+const BUNDLED = /^\/demo\/(?:[a-z0-9-]+(\/[a-z0-9-]+)*\.(jpg|png|webp)|logos\/[a-z0-9-]+\.svg)$/;
 
 export function isBundledPhoto(path: string): boolean {
   return BUNDLED.test(path);

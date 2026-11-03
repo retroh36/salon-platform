@@ -6,7 +6,7 @@ Every photo is from Unsplash under the [Unsplash License](https://unsplash.com/l
 
 Portraits are cropped to one 4:5 head-and-shoulders frame with their brightness evened out, so they read as one salon's team. Other photos are cropped from the original at Unsplash's image service.
 
-Product thumbnails in the app are drawn shapes (`components/product-thumb.tsx`), not photos.
+The salons' logos (`logos/maple-and-ash.svg`, `logos/harbor-and-vine.svg`) are monograms drawn for the demo in each salon's color, invented and not based on any real salon's brand. Product thumbnails in the app are drawn shapes (`components/product-thumb.tsx`), not photos.
 
 | File | Shows | Photographer | Unsplash photo | License |
 | --- | --- | --- | --- | --- |

@@ -73,6 +73,22 @@ describe("the booking page", () => {
     }
   });
 
+  it("takes a drawn logo that ships with the app, as SVG only under /demo/logos/", async () => {
+    // migration …_demo_logos.sql
+    const seeded = "/demo/logos/maple-and-ash.svg";
+    try {
+      expect((await owner.from("businesses").update({ logo_path: `${B}/logo-test.png` }).eq("id", B).select("id")).data).toHaveLength(1);
+      for (const path of ["/demo/logos/../x.svg", "/demo/logos/a.png", "/demo/team/bridget.svg", "/demo/covers/x.svg"]) {
+        expect((await owner.from("businesses").update({ logo_path: path }).eq("id", B)).error?.code, path).toBe("23514");
+      }
+    } finally {
+      await admin.from("businesses").update({ logo_path: seeded }).eq("id", B);
+    }
+    const [maple, harbor] = await Promise.all([loadSite(admin, "maple-and-ash"), loadSite(admin, "harbor-and-vine")]);
+    if (maple.status !== "open" || harbor.status !== "open") throw new Error("Both booking sites should be open.");
+    expect([maple.site.business.logoUrl, harbor.site.business.logoUrl]).toEqual([seeded, "/demo/logos/harbor-and-vine.svg"]);
+  });
+
   it("seeds the demo's photos for both salons", async () => {
     const [maple, harbor] = await Promise.all([loadSite(admin, "maple-and-ash"), loadSite(admin, "harbor-and-vine")]);
     if (maple.status !== "open" || harbor.status !== "open") throw new Error("Both booking sites should be open.");

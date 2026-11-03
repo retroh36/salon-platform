@@ -31,6 +31,8 @@ const money = (cents: number) => (cents / 100).toFixed(2);
 
 export function seoFor(info: SeoInfo, baseUrl: string) {
   const url = `${baseUrl}/book/${info.slug}`;
+  // A logo that ships with the app is a path from the site's root.
+  const logo = info.logoUrl?.startsWith("/") ? `${baseUrl}${info.logoUrl}` : info.logoUrl;
   const place = [info.address.city, info.address.region].filter(Boolean).join(", ");
   const title = place ? `Book online at ${info.name} · ${place}` : `Book online at ${info.name}`;
   const categories = [...new Set(info.services.map((s) => s.category))].slice(0, 3).map((c) => c.toLowerCase());
@@ -47,7 +49,7 @@ export function seoFor(info: SeoInfo, baseUrl: string) {
     "@type": "HairSalon",
     name: info.name,
     url,
-    ...(info.logoUrl ? { image: info.logoUrl, logo: info.logoUrl } : {}),
+    ...(logo ? { image: logo, logo } : {}),
     ...(info.phone ? { telephone: info.phone } : {}),
     ...(info.address.line1 || info.address.city
       ? {

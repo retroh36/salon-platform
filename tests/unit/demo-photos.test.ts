@@ -15,9 +15,18 @@ describe("photos that ship with the app", () => {
   });
 
   it("are only files under /demo/, never another page or site", () => {
-    for (const path of ["/demo/../api/x.jpg", "/settings", "//evil.test/a.jpg", "/demo/team/gil.svg", "/demo/team/Gil.jpg"]) {
+    for (const path of ["/demo/../api/x.jpg", "/settings", "//evil.test/a.jpg", "/demo/team/gil.svg", "/demo/team/Gil.jpg", "/demo/logos/../x.svg", "/demo/logos/a/b.svg"]) {
       expect(isBundledPhoto(path)).toBe(false);
       expect(staffPhotoUrl(path)).toBeNull();
+    }
+  });
+
+  it("include the salons' drawn logos, as SVG only under /demo/logos/", () => {
+    for (const f of readdirSync("public/demo/logos")) {
+      expect(f).toMatch(/\.svg$/);
+      expect(salonLogoUrl(`/demo/logos/${f}`)).toBe(`/demo/logos/${f}`);
+      // A drawing only: no script, links or anything loaded from elsewhere.
+      expect(readFileSync(`public/demo/logos/${f}`, "utf8")).not.toMatch(/<script|href|url\(|on[a-z]+=/i);
     }
   });
 

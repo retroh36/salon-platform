@@ -3,11 +3,14 @@ import { AUTH, expect, test, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
 const NAME = "Maple & Ash Hair Studio";
+// The seeded logo, a drawing that ships with the app; put back after.
+const SEEDED_LOGO = "/demo/logos/maple-and-ash.svg";
 
-async function restore() {
+// Starts from the salon's initial (no logo), removing any uploaded one.
+async function clearLogo(logo: string | null = null) {
   const { data } = await admin.from("businesses").select("logo_path").eq("id", B).single();
-  if (data?.logo_path) await admin.storage.from("salon-logos").remove([data.logo_path]);
-  await admin.from("businesses").update({ name: NAME, logo_path: null }).eq("id", B);
+  if (data?.logo_path && !data.logo_path.startsWith("/")) await admin.storage.from("salon-logos").remove([data.logo_path]);
+  await admin.from("businesses").update({ name: NAME, logo_path: logo }).eq("id", B);
 }
 
 test.describe("signed out", () => {
@@ -20,8 +23,8 @@ test.describe("signed out", () => {
 
 test.describe("owner", () => {
   test.use({ storageState: AUTH.owner });
-  test.beforeEach(restore);
-  test.afterAll(restore);
+  test.beforeEach(() => clearLogo());
+  test.afterAll(() => clearLogo(SEEDED_LOGO));
 
   test("the salon's brand sits on top of Maestra's, and owners set it in Settings", async ({ page }) => {
     await page.goto("/dashboard");

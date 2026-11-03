@@ -114,12 +114,27 @@ test.describe("front desk", () => {
     // it's put back as it was, and booking details says why. The calendar
     // hears of the change within a second and reloads, so its reloads (RSC
     // requests) are held until the undo has been tried.
+    // Reloads already past the hold (the check-in's own, and the one the
+    // realtime change brings) finish first, so none can be drawn after the
+    // cancel.
     let reload = () => {};
     const reloads = new Promise<void>((r) => (reload = r));
+    const isReload = (r: { method(): string; url(): string; headers(): Record<string, string> }) => r.method() === "GET" && /\/calendar/.test(r.url()) && Boolean(r.headers()["rsc"]);
+    // Each reload seen starting, until it's done; those held stay in it.
+    const inFlight = new Set<object>();
+    const holding = new Set<object>();
+    page.on("request", (r) => void (isReload(r) && inFlight.add(r)));
+    page.on("requestfinished", (r) => void inFlight.delete(r));
+    page.on("requestfailed", (r) => void inFlight.delete(r));
     await page.route("**/calendar**", async (route) => {
-      if (route.request().method() === "GET" && route.request().headers()["rsc"]) await reloads;
+      if (isReload(route.request())) {
+        holding.add(route.request());
+        await reloads;
+      }
       await route.continue();
     });
+    await page.waitForTimeout(1500);
+    await expect.poll(() => [...inFlight].filter((r) => !holding.has(r)).length).toBe(0);
     await admin.from("appointments").update({ status: "canceled", canceled_at: new Date().toISOString(), cancel_reason: "Test" }).eq("id", id);
     await moreAction(details(page), "Undo check-in");
     await expect(details(page).getByRole("alert")).toBeVisible();
@@ -351,9 +366,12 @@ test.describe("front desk", () => {
       await openDay(page, today);
       await page.getByTestId("denise-launcher").click();
       const card = page.getByTestId("denise-late");
-      await expect(card).toContainText("2 not arrived yet");
+      // Ben and Cy, and any demo client not here yet at this hour (the
+      // seed plants one around opening), so the count isn't fixed.
+      await expect(card).toContainText(/\d+ not arrived yet/);
       await expect(card).toContainText("Give them a call");
       const line = (name: string) => card.getByRole("listitem").filter({ hasText: `${PREFIX}${name}` });
+      await expect(line("Cy")).toHaveCount(1);
       await expect(line("Ben")).toContainText(/Due \d/);
       // Ana's booked time is over: no call to make, just to settle.
       const never = page.getByTestId("denise-never-in");

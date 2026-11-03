@@ -856,9 +856,12 @@ select 'b0000000-0000-4000-8000-000000000001', true, 60, 120, true, 24,
        '#6b3f2a', 'Book your next visit with our team. We can''t wait to see you.';
 
 -- The demo's photos ship with the app (public/demo/, credited in
--- public/demo/CREDITS.md), stored as paths from the site's root: the cover,
+-- public/demo/CREDITS.md), stored as paths from the site's root: the salon's
+-- invented logo (public/demo/logos/), the cover,
 -- a photo for each menu category, and the stylists' portraits and work
 -- (none for Nola and Shae, so both cases show).
+update public.businesses set logo_path = '/demo/logos/maple-and-ash.svg'
+where id = 'b0000000-0000-4000-8000-000000000001';
 update public.online_booking_settings set cover_path = '/demo/covers/maple-and-ash.jpg'
 where business_id = 'b0000000-0000-4000-8000-000000000001';
 

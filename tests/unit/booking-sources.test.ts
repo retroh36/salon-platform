@@ -97,6 +97,11 @@ describe("how the booking site shows up in Google", () => {
     });
   });
 
+  it("gives a logo that ships with the app as a full address", () => {
+    const { jsonLd } = seoFor({ ...info, logoUrl: "/demo/logos/maple-and-ash.svg" }, "https://app.test");
+    expect(jsonLd).toMatchObject({ logo: "https://app.test/demo/logos/maple-and-ash.svg", image: "https://app.test/demo/logos/maple-and-ash.svg" });
+  });
+
   it("can't be broken out of its script tag", () => {
     expect(jsonLdText({ name: "</script><script>alert(1)</script>" })).toBe('{"name":"\\u003c/script>\\u003cscript>alert(1)\\u003c/script>"}');
   });
