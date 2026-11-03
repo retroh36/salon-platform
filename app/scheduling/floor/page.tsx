@@ -32,7 +32,7 @@ async function FloorDay({ searchParams }: Pick<PageProps<"/scheduling/floor">, "
   const editable = canManage(me.role);
   const [floor, pending] = await Promise.all([loadFloor(supabase, me.location, date), editable ? countPendingRequests(supabase, me.location, today) : null]);
   return (
-    <AppShell section={editable ? "scheduling" : "team"} me={me} wide>
+    <AppShell section={editable ? "scheduling" : "team"} me={me} wide denise="overlay">
       <PageHeader title="Scheduling" description="Who's at each chair and station, and when." />
       <SchedulingTabs current="floor" pending={pending} />
       <FloorView floor={floor} today={today} editable={editable && date >= today} />

@@ -263,7 +263,7 @@ export function OutPanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col" aria-label={`Mark ${firstName} out`} role="region">
       <div className="flex items-start gap-3">
-        <DeniseFace size={36} className="shrink-0" />
+        <DeniseFace className="mt-0.5" />
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-semibold text-ink">{title}</h2>
           <p className="text-sm text-ink-muted" data-testid="out-denise">

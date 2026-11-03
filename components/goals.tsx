@@ -80,7 +80,7 @@ export function GoalCard({ pacing, children }: { pacing: Pacing; children?: Reac
 export function GoalAlertCard({ alert, today }: { alert: GoalAlert; today: string }) {
   return (
     <section aria-label="Denise on your goals" className="mb-6 flex gap-3 rounded-lg border border-denise-200 bg-denise-50 p-4 text-sm text-denise-900" data-testid="goal-alert">
-      <DeniseFace size={28} className="shrink-0" />
+      <DeniseFace />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         {alert.celebrations.map((c) => (
           <p key={`${c.goalId}-${c.milestone}`} className="font-semibold" data-testid="goal-celebration">

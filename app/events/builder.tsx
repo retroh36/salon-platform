@@ -153,7 +153,7 @@ export function EventBuilder({ eventId, initial, packages, settings, taxBp, team
           >
             <label className={`${labelClass} flex-1 text-denise-900`}>
               <span className="flex items-center gap-2">
-                <DeniseFace size={22} /> Describe it to Denise
+                <DeniseFace size={20} /> Describe it to Denise
               </span>
               <input
                 value={line}

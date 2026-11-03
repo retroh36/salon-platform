@@ -110,8 +110,20 @@ export function SideScroll({ label, children, className = "" }: { label: string;
 // The fades and arrows over a scroller of your own; its parent is
 // `relative` and the same size as the scroller. Each arrow rides down its
 // edge with the page (sticky, near the middle of the screen), so a table
-// or a week taller than the screen still shows it.
-export function SideScrollEdges({ target, label, leftInset = "0px" }: { target: RefObject<HTMLElement | null>; label: string; leftInset?: string }) {
+// or a week taller than the screen still shows it. `rightInset`: something
+// floats over the scroller's right side (Denise's card on the calendar), so
+// the right fade and arrow sit just left of it.
+export function SideScrollEdges({
+  target,
+  label,
+  leftInset = "0px",
+  rightInset = "0px",
+}: {
+  target: RefObject<HTMLElement | null>;
+  label: string;
+  leftInset?: string;
+  rightInset?: string;
+}) {
   const more = useSideMore(target);
   const inset = useRef<HTMLDivElement>(null);
   const by = useScrollBy(
@@ -130,7 +142,7 @@ export function SideScrollEdges({ target, label, leftInset = "0px" }: { target: 
         </div>
       )}
       {more.right && (
-        <div data-more-right className={`${edge} right-px bg-linear-to-l from-surface to-transparent`}>
+        <div data-more-right className={`${edge} bg-linear-to-l from-surface to-transparent`} style={{ right: `calc(${rightInset} + 1px)` }}>
           <Arrow side="right" label={label} onClick={() => by(1)} className={arrow} />
         </div>
       )}

@@ -22,7 +22,7 @@ export function AskBar({ example, today }: { example: string; today: string }) {
         setQuestion("");
       }}
     >
-      <DeniseFace size={26} />
+      <DeniseFace />
       <label className="sr-only" htmlFor="dashboard-ask">
         Ask Denise
       </label>

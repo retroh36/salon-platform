@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { DenisePose } from "@/components/denise";
+import { DeniseAvatar } from "@/components/denise";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/page";
 import type { CoverageFlag } from "@/lib/coverage";
@@ -42,7 +42,7 @@ export function DeniseSchedule({ flags, draft, monthName }: { flags: CoverageFla
   return (
     <section aria-labelledby="denise-schedule-heading" data-testid="denise-schedule" className="mb-6 flex flex-col gap-4 rounded-lg border border-denise-200 bg-denise-50 p-4">
       <div className="flex items-center gap-3">
-        <DenisePose pose={flags.length || draft ? "point" : "wave"} className="w-12 shrink-0" />
+        <DeniseAvatar pose={flags.length || draft ? "point" : "wave"} />
         <div className="min-w-0 flex-1">
           <h2 id="denise-schedule-heading" className="text-base font-semibold text-denise-900">
             {flags.length ? `I spotted ${flags.length === 1 ? "one thing" : `${flags.length} things`} this week` : "This week looks covered"}

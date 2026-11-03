@@ -283,7 +283,7 @@ function Rebook({ data, ticket, onChange }: { data: CheckoutScreenData; ticket: 
   return (
     <section aria-label="Rebook" className="flex flex-col gap-3 rounded-lg border border-denise-200 bg-denise-50 px-4 py-3" data-testid="rebook">
       <div className="flex gap-2.5">
-        <DeniseFace size={28} className="mt-0.5" />
+        <DeniseFace className="mt-0.5" />
         <p className="text-sm text-denise-900">
           {s.why} <strong className="font-semibold">Book {s.when}?</strong>
         </p>

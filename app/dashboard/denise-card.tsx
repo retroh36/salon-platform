@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { approveDeniseFix, bookFromWaitlist, rejectDeniseFix, undoDeniseFix } from "@/app/calendar/denise-actions";
 import { MovedMessages } from "@/app/calendar/moved-messages";
-import { DeniseFace, DenisePose } from "@/components/denise";
+import { DeniseAvatar, DeniseFace } from "@/components/denise";
 import { Button, buttonClass } from "@/components/ui/button";
 import { CheckCircleIcon, UndoIcon } from "@/components/ui/icons";
 import { Alert } from "@/components/ui/page";
@@ -54,7 +54,7 @@ export function DeniseCard({ initial, today, canBook, seesMoney }: { initial: De
   return (
     <section aria-labelledby="denise-brief-heading" data-testid="dashboard-denise" className="mb-8 flex animate-fade-in flex-col gap-6 rounded-lg border border-denise-200 bg-denise-50 p-4 sm:p-6">
       <div className="flex items-center gap-4">
-        <DenisePose pose={count ? "point" : "wave"} className="w-14 shrink-0 sm:w-16" />
+        <DeniseAvatar pose={count ? "point" : "wave"} />
         <div className="min-w-0 flex-1">
           <h2 id="denise-brief-heading" className="text-xl font-semibold text-denise-900">
             Denise&rsquo;s brief

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { DeniseFace, DenisePose, type Pose } from "@/components/denise";
+import { DeniseAvatar, DeniseFace, DenisePose, type Pose } from "@/components/denise";
 import { formatDuration } from "@/lib/duration";
 import type { DeniseRun } from "@/components/denise-chat/store";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
@@ -99,15 +99,27 @@ export function DenisePanel({
   else if (openings.length) says = "Some time opened up, and your waitlist could use it:";
   else if (state.reorders.length) says = state.reorders.length === 1 ? "The calendar's clear. One thing about stock:" : "The calendar's clear. A few things about stock:";
   else says = isToday ? "All clear today." : "All clear for this day.";
+  const allClear = pose === "wave" && Boolean(state) && !notices.length && !openings.length && !state?.reorders.length && !outcome;
 
   return (
     <div className="flex min-h-full flex-col gap-4 py-2 text-sm">
-      <div className="flex items-end gap-3">
-        <DenisePose pose={pose} className="w-20" />
-        <p data-testid="denise-says" aria-live="polite" className="relative mb-3 rounded-lg rounded-bl-sm bg-denise-50 px-3 py-2 font-medium text-denise-900">
-          {says}
-        </p>
-      </div>
+      {/* All clear is an empty state, with her waving; otherwise she's her
+          small avatar beside what she says. */}
+      {allClear ? (
+        <div className="flex flex-col items-center gap-2 py-4 text-center">
+          <DenisePose className="w-20" />
+          <p data-testid="denise-says" aria-live="polite" className="font-medium text-denise-900">
+            {says}
+          </p>
+        </div>
+      ) : (
+        <div className="flex items-start gap-2.5">
+          <DeniseAvatar pose={pose} className="mt-1" />
+          <p data-testid="denise-says" aria-live="polite" className="rounded-lg rounded-tl-sm bg-denise-50 px-3 py-2 font-medium text-denise-900">
+            {says}
+          </p>
+        </div>
+      )}
 
       {!state && stuck && onRetry && (
         <Button size="sm" className="self-start" onClick={onRetry}>
@@ -311,7 +323,7 @@ function ConflictCard({
   return (
     <section aria-label={conflict.headline} data-conflict={conflict.kind} className="flex animate-fade-in flex-col gap-3 rounded-lg border border-denise-200 bg-surface p-4">
       <div className="flex items-start gap-2.5">
-        <DeniseFace size={28} />
+        <DeniseFace />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <p className="text-ink" data-testid="denise-message">
             <strong className="font-semibold text-denise-900">{conflict.headline}</strong> {top ? top.intro : noFixAdvice(conflict.kind)}

@@ -22,7 +22,9 @@ type Me = {
 // otherwise content sits in a centered column (`wide`: a little wider, for
 // the Dashboard), with room at the foot so her bubble never sits on the
 // last thing on the page. `denise={false}`: the page has her already (the
-// calendar's side panel).
+// calendar's side panel); `denise="overlay"`: she opens as a compact card
+// over the corner, so a page that shows the whole team keeps its width
+// (Scheduling).
 export async function AppShell({
   section,
   me,
@@ -35,7 +37,7 @@ export async function AppShell({
   me: Me;
   bleed?: boolean;
   wide?: boolean;
-  denise?: boolean;
+  denise?: boolean | "overlay";
   children: React.ReactNode;
 }) {
   // On the shared iPad: Switch user, and lock when idle.
@@ -52,6 +54,7 @@ export async function AppShell({
       locationId={me.location.id}
       locations={locations ?? []}
       user={{ name: me.first_name, role: me.role, permissions: me.permissions }}
+      deniseOverlay={denise === "overlay"}
       denise={denise ? { staffId: me.id, firstName: me.first_name, canBook: canBook(me.role), today: todayIn(me.location.timezone) } : null}
     >
       {bleed ? children : <div className={`mx-auto w-full animate-fade-in px-4 pt-8 pb-24 sm:px-8 ${wide ? "max-w-6xl" : "max-w-5xl"}`}>{children}</div>}

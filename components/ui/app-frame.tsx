@@ -116,6 +116,7 @@ export function AppFrame({
   user,
   sharedDevice = null,
   denise = null,
+  deniseOverlay = false,
   children,
 }: {
   section: Section;
@@ -131,6 +132,8 @@ export function AppFrame({
   sharedDevice?: { autoLockMinutes: number } | null;
   // Denise's bubble, for who's signed in (none: the page has her already).
   denise?: BubbleMe | null;
+  // She opens as a compact card over the corner rather than beside the page.
+  deniseOverlay?: boolean;
   children: React.ReactNode;
 }) {
   const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => shown(n, user)) })).filter((g) => g.items.length > 0);
@@ -283,7 +286,7 @@ export function AppFrame({
             page's own buttons once scrolled to the end. */}
         <main className={`flex min-h-0 flex-1 flex-col text-sm lg:overflow-y-auto ${denise ? "pb-24" : ""}`}>{children}</main>
       </div>
-      {denise && <DeniseBubble me={denise} />}
+      {denise && <DeniseBubble me={denise} overlay={deniseOverlay} />}
       {sharedDevice && <AutoLock minutes={sharedDevice.autoLockMinutes} />}
     </div>
   );

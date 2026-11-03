@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
-import { DeniseFace, DenisePose } from "@/components/denise";
+import { DeniseAvatar, DeniseFace, DenisePose } from "@/components/denise";
 import { DeniseText } from "@/components/denise-text";
 import { ProductThumb } from "@/components/product-thumb";
 import { Avatar } from "@/components/ui/avatar";
@@ -435,29 +435,42 @@ async function Design() {
         </div>
       </Section>
 
-      <Section title="Denise" description="Periwinkle means Denise is speaking; nothing else uses it.">
+      <Section
+        title="Denise"
+        description="Periwinkle means Denise is speaking; nothing else uses it. While she works she's one small avatar (24px where she speaks, 20px inside a control); her full illustration is only for signing in, the welcome and empty states."
+      >
         <div className="grid gap-6 md:grid-cols-2">
-          <div className="flex items-end gap-3">
-            <DenisePose pose="wave" className="w-20" />
-            <p className="mb-3 rounded-lg rounded-bl-sm bg-denise-50 px-3 py-2 font-medium text-denise-900">All clear today.</p>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4 text-xs text-ink-muted">
+              {(["wave", "think", "point"] as const).map((pose) => (
+                <span key={pose} className="flex items-center gap-2">
+                  <DeniseAvatar pose={pose} />
+                  {pose === "wave" ? "Nothing to act on" : pose === "think" ? "Working" : "Something to act on"}
+                </span>
+              ))}
+            </div>
+            <div className="flex flex-col items-center gap-2 rounded-lg border border-line py-4 text-center">
+              <DenisePose className="w-20" />
+              <p className="font-medium text-denise-900">All clear today.</p>
+            </div>
           </div>
           <div className="flex flex-col gap-3">
             <p className="max-w-[85%] self-end rounded-lg rounded-br-sm bg-navy-900 px-3 py-2 text-white">Who&apos;s due back with nothing booked?</p>
             <div className="flex max-w-[92%] gap-2">
-              <DeniseFace size={24} className="mt-1" />
+              <DeniseFace className="mt-1" />
               <DeniseText text={DENISE_ANSWER} className="rounded-lg rounded-tl-sm bg-denise-50 px-3 py-2 text-ink" />
             </div>
           </div>
           <section className="flex flex-col gap-3 rounded-lg border border-denise-200 bg-surface p-4 md:col-span-2">
             <div className="flex items-start gap-2.5">
-              <DeniseFace size={28} />
+              <DeniseFace />
               <p className="text-ink">
                 <strong className="font-semibold text-denise-900">Gil&apos;s color is running 25 minutes over.</strong> I can move Stella to 12:35 with Gil, or to 12:10 with Hannah.
               </p>
             </div>
             <p className="text-ink-muted">
               <span className="font-semibold text-denise-700">Why it works: </span>
-              Stella keeps her stylist and no one else moves.
+              Stella keeps the same stylist and no one else moves.
             </p>
             <div className="flex gap-2">
               <Button variant="primary">Apply fix</Button>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { DeniseFace, DenisePose } from "@/components/denise";
+import { DeniseFace } from "@/components/denise";
 import { IconButton } from "@/components/ui/button";
 import { CloseIcon } from "@/components/ui/icons";
 import { DeniseChat } from "./chat";
@@ -35,8 +35,10 @@ export type BubbleMe = { staffId: string; firstName: string; canBook: boolean; t
 // `pb-24`), and while a button, link or field is under it, it tucks into a
 // small tab at the window's edge (`useTucked`). "Ask Denise" in the sidebar
 // opens her too. `launcher` "header": the page shows its own button (the
-// checkout's, in its top bar).
-export function DeniseBubble({ me, launcher = "corner" }: { me: BubbleMe; launcher?: "corner" | "header" }) {
+// checkout's, in its top bar). `overlay`: on a page whose point is the whole
+// team at once (Scheduling), she's a compact card over the corner from md
+// up instead, so the page keeps its full width.
+export function DeniseBubble({ me, launcher = "corner", overlay = false }: { me: BubbleMe; launcher?: "corner" | "header"; overlay?: boolean }) {
   const { open, staffId } = useDenise();
   useEffect(() => hydrateDenise(me.staffId), [me.staffId]);
   useDeniseShortcut(focusDenise);
@@ -63,13 +65,18 @@ export function DeniseBubble({ me, launcher = "corner" }: { me: BubbleMe; launch
           aria-label="Denise"
           data-denise-panel
           data-testid="denise-bubble"
-          className={`fixed inset-0 z-50 flex animate-fade-in flex-col border-line bg-surface md:z-auto md:w-[22rem] md:shrink-0 md:border-l ${
-            // The checkout's row is already the screen's height.
-            launcher === "header" ? "md:static" : "md:sticky md:top-0 md:h-[calc(100dvh-var(--demo-bar))] md:self-start lg:h-auto lg:self-stretch"
+          data-overlay={overlay || undefined}
+          className={`fixed inset-0 z-50 flex animate-fade-in flex-col border-line bg-surface md:w-[22rem] ${
+            overlay
+              ? "md:inset-auto md:right-4 md:bottom-4 md:h-[min(28rem,calc(100dvh-2rem-var(--demo-bar)))] md:overflow-hidden md:rounded-xl md:border md:shadow-panel"
+              : `md:z-auto md:shrink-0 md:border-l ${
+                  // The checkout's row is already the screen's height.
+                  launcher === "header" ? "md:static" : "md:sticky md:top-0 md:h-[calc(100dvh-var(--demo-bar))] md:self-start lg:h-auto lg:self-stretch"
+                }`
           }`}
         >
           <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2.5">
-            <DenisePose pose="wave" className="w-9" />
+            <DeniseFace />
             <h2 className="flex-1 text-base font-semibold text-ink">Denise</h2>
             <IconButton label="Close Denise" onClick={() => setDeniseOpen(false)}>
               <CloseIcon />
@@ -115,7 +122,7 @@ function DeniseLauncherButton() {
         tucked ? "right-0 h-12 w-7 rounded-l-full pl-1" : "right-4 size-14 rounded-full hover:-translate-y-0.5"
       }`}
     >
-      <DeniseFace size={tucked ? 22 : 46} />
+      <DeniseFace size={tucked ? 20 : 46} />
     </button>
   );
 }

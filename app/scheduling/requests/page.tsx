@@ -31,7 +31,7 @@ async function Requests() {
   const today = todayIn(me.location.timezone);
   const [inbox, swaps] = await Promise.all([loadRequestsInbox(supabase, me.location, today), loadSwapsToApprove(supabase, me.location, today)]);
   return (
-    <AppShell section="scheduling" me={me} wide>
+    <AppShell section="scheduling" me={me} wide denise="overlay">
       <PageHeader title="Scheduling" description="Time off and shift swaps the team has asked for." />
       <SchedulingTabs current="requests" pending={inbox.pending.length + swaps.length} />
       <RequestsView inbox={inbox} today={today} timezone={me.location.timezone} />

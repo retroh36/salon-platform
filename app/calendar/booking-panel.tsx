@@ -326,7 +326,7 @@ export function BookingPanel({
 
         {policyText && (
           <div role="note" className="flex items-start gap-2 rounded-lg bg-denise-50 px-3 py-2.5 text-sm text-denise-900" data-testid="denise-policy">
-            <DeniseFace size={22} />
+            <DeniseFace />
             <p className="flex-1">{policyText}</p>
           </div>
         )}
@@ -527,7 +527,7 @@ export function BookingPanel({
                     <div className="mt-2 flex flex-col gap-1.5">
                       <p className="text-ink-muted">{v.problems.join(" ")}</p>
                       <p className="flex items-center gap-1.5 text-xs font-semibold text-denise-700">
-                        <DeniseFace size={18} />
+                        <DeniseFace size={20} />
                         {v.alternatives.length ? "Denise suggests:" : "Denise couldn't find another time nearby."}
                       </p>
                       {v.alternatives.map((a, i) => (
@@ -780,7 +780,7 @@ function UsualLength({
   }
   return (
     <div role="note" className="flex items-start gap-2 rounded-lg bg-denise-50 px-3 py-2.5 text-sm text-denise-900" data-testid="usual-length">
-      <DeniseFace size={22} />
+      <DeniseFace />
       <p className="flex-1">
         This is shorter than {stylist} usually takes: {formatDuration(learned.medianMinutes)} for this ({visitsText(learned)}).{" "}
         <button type="button" className="font-medium text-denise-700 underline underline-offset-2 hover:text-denise-900" onClick={() => onUse(suggested)}>

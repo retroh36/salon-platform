@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { DenisePose } from "@/components/denise";
+import { DeniseAvatar } from "@/components/denise";
 import { Button, buttonClass } from "@/components/ui/button";
 import {
   CheckCircleIcon,
@@ -60,7 +60,7 @@ export function DeniseReorders({ canManage }: { canManage: boolean }) {
       ? suggestions.length === 1
         ? "One order would keep you stocked:"
         : `${suggestions.length} orders would keep you stocked:`
-      : "Stock looks good for the next two weeks!";
+      : "Stock looks good for the next two weeks.";
 
   return (
     <section
@@ -68,7 +68,7 @@ export function DeniseReorders({ canManage }: { canManage: boolean }) {
       className="mb-6 animate-fade-in rounded-lg border border-denise-200 bg-denise-50"
     >
       <div className="flex items-center gap-3 px-4 py-3">
-        <DenisePose pose={pose} className="w-10" />
+        <DeniseAvatar pose={pose} />
         <p
           data-testid="denise-reorder-says"
           aria-live="polite"

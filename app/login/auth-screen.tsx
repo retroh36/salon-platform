@@ -1,4 +1,4 @@
-import { DeniseFace } from "@/components/denise";
+import { DenisePose } from "@/components/denise";
 import { TAGLINE } from "@/lib/branding";
 import { serif } from "@/app/serif";
 
@@ -16,10 +16,14 @@ export function AuthScreen({ title, subtitle, children, footer }: { title: strin
         <img src="/brand/maestra/maestra-logo-white.png" alt="Maestra" className="-ml-3 h-16 w-auto self-start" />
         <div className="relative z-10 animate-fade-in">
           <p className="font-serif text-display-lg font-semibold tracking-[-0.01em]">Your salon&rsquo;s brain.</p>
-          <p className="mt-5 flex items-center gap-3 font-serif text-display-lg font-semibold text-denise-200">
-            <DeniseFace size={44} />
+          <div className="mt-5 flex items-center gap-4 font-serif text-display-lg font-semibold text-denise-200">
+            {/* Her full illustration, on a light tile: her outline is the
+                panel's navy. */}
+            <span className="flex size-24 shrink-0 items-center justify-center rounded-2xl bg-denise-50">
+              <DenisePose className="w-18" />
+            </span>
             Meet Denise.
-          </p>
+          </div>
           <p className="mt-6 max-w-sm text-base leading-relaxed text-navy-100/80">
             The calendar, clients, stock and the back office in one place, with Denise spotting problems and lining up fixes for your team.
           </p>

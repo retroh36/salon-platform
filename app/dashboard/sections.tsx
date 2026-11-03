@@ -2,7 +2,7 @@ import { isFrontOfHouse } from "@/lib/staff";
 import { formatDuration } from "@/lib/duration";
 import Link from "next/link";
 import { ClientInsightCard } from "@/components/client-insight";
-import { DeniseFace, DenisePose } from "@/components/denise";
+import { DeniseAvatar, DeniseFace, DenisePose } from "@/components/denise";
 import { buttonClass } from "@/components/ui/button";
 import { ChevronRightIcon } from "@/components/ui/icons";
 import type { DashboardData, MyDay, Opportunities } from "@/lib/dashboard-load";
@@ -234,7 +234,7 @@ export function MyDaySections({ me }: { me: MyDay }) {
   return (
     <>
       <section aria-labelledby="my-notes-heading" data-testid="my-denise-notes" className="mb-8 flex animate-fade-in items-start gap-4 rounded-lg border border-denise-200 bg-denise-50 p-4 sm:p-6">
-        <DenisePose pose={me.notes.length ? "point" : "wave"} className="w-12 shrink-0 sm:w-14" />
+        <DeniseAvatar pose={me.notes.length ? "point" : "wave"} />
         <div className="min-w-0 flex-1">
           <h2 id="my-notes-heading" className="text-base font-semibold text-denise-900">
             Denise&rsquo;s notes for you
@@ -340,7 +340,7 @@ function Stat({ label, value, note }: { label: string; value: string; note?: str
 export function Welcome({ owner }: { owner: boolean }) {
   return (
     <section aria-labelledby="welcome-heading" data-testid="dashboard-welcome" className="mb-8 flex animate-fade-in items-start gap-4 rounded-lg border border-denise-200 bg-denise-50 p-4 sm:p-6">
-      <DenisePose pose="wave" className="w-14 shrink-0 sm:w-16" />
+      <DenisePose className="w-14 shrink-0 sm:w-16" />
       <div>
         <h2 id="welcome-heading" className="text-xl font-semibold text-denise-900">
           Welcome to Maestra

@@ -312,9 +312,24 @@ Maestra's AI assistant, and the reason for the tagline's second half.
   the salon's approved templates and come from the salon. She sees first
   names and scheduling facts, never phone numbers, emails, allergies or
   notes.
-- **Her look:** periwinkle, and her art in `public/brand/denise/` (`wave`:
-  nothing to do, `think`: working, `point`: presenting a fix, `face`: the
-  small icon, a crop of `wave` showing her whole page head, folded corner
-  and glasses, so it reads as the same character at 20px; always drawn
-  through `DeniseFace`, the login screen included). On the calendar her face sits at the end of the legend bar,
-  never over appointments.
+- **Her look:** periwinkle, and her art in `public/brand/denise/` (`face`:
+  a crop of `wave` showing her whole page head, folded corner and glasses,
+  so it reads as the same character at 20px; `wave`, `think`, `point`: the
+  full illustrations).
+- **One small avatar while she works:** wherever she speaks (her messages,
+  cards, notes, her brief, Scheduling's card, reorders) she's her face at
+  24px (`DeniseAvatar`, `DeniseFace`), 20px inside a control or a line of
+  small text, and 36 or 46px only on the buttons that open her. What she's
+  doing shows in the words beside her, with a soft breathing ring while
+  she works; never a bigger drawing.
+- **Full illustrations only for her moments:** signing in (waving, on a
+  light tile, since her outline is the panel's navy), the welcome for a new
+  salon, and empty states (`EmptyState`, and her calendar tab when the day
+  is all clear) (`DenisePose`, waving). `think` and `point` are kept for
+  onboarding and marketing, not shown in the app.
+- **Out of the way of the team:** on the Calendar (her tab, from `lg` up)
+  and Scheduling she opens as a compact card over the bottom right corner,
+  below the stylists' header row, so the whole team stays in view; on other
+  pages she docks beside the page, and on a phone she fills the screen. On
+  the calendar her face sits at the end of the legend bar, never over
+  appointments.

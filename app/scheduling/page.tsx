@@ -45,7 +45,7 @@ async function Scheduling({ searchParams }: Pick<PageProps<"/scheduling">, "sear
   const flags = coverage ? coverage.days.filter((d) => d.date >= today).flatMap((d) => coverageFlags(coverage.people, d)) : [];
 
   return (
-    <AppShell section={editable ? "scheduling" : "team"} me={me} wide>
+    <AppShell section={editable ? "scheduling" : "team"} me={me} wide denise="overlay">
       <PageHeader title="Scheduling" description={editable ? "Plan the team's week, then publish it." : "The team's published schedule."} />
       <SchedulingTabs current="team" pending={pending} />
       {editable && <DeniseSchedule flags={flags} draft={draft} monthName={nextMonth(today).name} />}

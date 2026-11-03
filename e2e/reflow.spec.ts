@@ -122,22 +122,53 @@ async function expectScrollsWithArrows(page: Page, scroller: Locator, label: str
   await expect(page.getByRole("button", { name: `${label} to the left` })).toBeVisible();
 }
 
-test("with Denise open, the calendar's stylists keep their width and scroll with an arrow", async ({ page }) => {
-  await page.goto(`/calendar?date=${(await busyDay("America/Chicago")).date}`);
+test("with Denise open, the calendar keeps its width: she's a compact card under the stylists' headers", async ({ browser }) => {
+  // Harbor & Vine: more stylists than fit, whatever the day.
+  const page = await browser.newPage({ storageState: AUTH.largeFrontDesk, viewport: { width: 1180, height: 820 } });
+  await page.goto("/calendar");
   await waitForHydration(page, "section[data-staff-id]");
+  const grid = ui(page).getByTestId("calendar-grid");
+  const before = (await grid.boundingBox())!.width;
   await page.getByTestId("denise-launcher").click();
   await expect(page.getByTestId("denise-says")).toBeVisible();
+  const card = page.locator("aside[aria-label='Assistant and booking details']");
+  await expect(card).toHaveAttribute("data-compact", "true");
+  // Wait for it to slide in, then: the grid hasn't made room, columns keep
+  // their width and still scroll with an arrow, and the card starts below
+  // the header row, so every stylist's name and day stays in view.
+  await expect.poll(async () => {
+    const b = (await card.boundingBox())!;
+    return b.x + b.width;
+  }).toBeLessThanOrEqual(1180 - 15);
+  expect(Math.abs((await grid.boundingBox())!.width - before)).toBeLessThan(1);
   for (const column of await ui(page).locator("section[data-staff-id]").all()) expect((await column.boundingBox())!.width).toBeGreaterThanOrEqual(151);
-  await expectScrollsWithArrows(page, ui(page).getByTestId("calendar-grid"), "More stylists");
+  const header = (await ui(page).locator("[data-grid-header]").boundingBox())!;
+  const box = (await card.boundingBox())!;
+  expect(box.y).toBeGreaterThanOrEqual(header.y + header.height - 1);
+  expect(box.width).toBeLessThanOrEqual(384 + 1);
+  // The arrow for more stylists sits just left of the card, never under it.
+  const arrow = (await page.getByRole("button", { name: "More stylists to the right" }).boundingBox())!;
+  expect(arrow.x + arrow.width).toBeLessThanOrEqual(box.x);
+  await expectScrollsWithArrows(page, grid, "More stylists");
+  // Booking details is the full-height panel again, which the page makes room for.
+  await card.getByRole("tab", { name: "Booking details" }).click();
+  await expect(card).not.toHaveAttribute("data-compact", "true");
+  await page.close();
 });
 
-test("with Denise open, Scheduling's days keep their width and scroll with an arrow", async ({ page }) => {
+test("with Denise open, Scheduling keeps its full width: she's a compact card over the corner", async ({ page }) => {
   await page.goto("/scheduling");
   const grid = ui(page).getByRole("grid", { name: /^Team schedule/ });
   await waitForHydration(page, "[data-testid=denise-bubble-launcher]");
+  const before = (await grid.boundingBox())!.width;
   await openDenise(page);
+  const card = page.getByRole("complementary", { name: "Denise" });
+  await expect(card).toHaveAttribute("data-overlay", "true");
+  expect(Math.abs((await grid.boundingBox())!.width - before)).toBeLessThan(1);
   for (const day of await grid.locator("[role=columnheader][data-day]").all()) expect((await day.boundingBox())!.width).toBeGreaterThanOrEqual(91);
-  await expectScrollsWithArrows(page, grid.locator(".."), "More days");
+  const box = (await card.boundingBox())!;
+  expect(box.width).toBeLessThanOrEqual(352 + 1);
+  expect(box.height).toBeLessThanOrEqual(448 + 1);
 });
 
 test("Scheduling shows the whole week, Sunday included", async ({ page }) => {

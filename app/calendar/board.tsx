@@ -597,6 +597,11 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // column's blocks so nothing overlaps.
   // The same for "Mark … out": where each client would move that day.
   const outShown = panelOpen && selection.kind === "out" && outPreview?.staffId === selection.staffId ? outPreview : null;
+  // Denise's tab is a compact card over the corner from lg up, so the whole
+  // team stays in view while she's open; booking details, Running late and
+  // Mark out keep the full-height panel the page makes room for. The card
+  // stays below the stylists' header row (which ends about 19rem down).
+  const compact = tab === "denise" && selection.kind !== "late" && selection.kind !== "out";
   const ghostMoves = [
     ...(previewOption?.moves ?? []).map((m) => ({ itemId: m.itemId, staffId: m.to.staffId, minute: m.to.minute, move: m as FixMove | undefined })),
     ...(outShown?.moves ?? []).map((m) => ({ ...m, move: undefined })),
@@ -930,7 +935,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
       {/* With the panel open on a wide screen, the page makes room for it, so
           the toolbar wraps instead of hiding under it. */}
       <div
-        className={`flex min-w-0 flex-1 flex-col gap-4 px-4 pt-6 pb-4 transition-[padding] duration-(--motion-slow) sm:px-6 lg:min-h-0 ${panelOpen ? "lg:pr-[25.5rem]" : ""}`}
+        className={`flex min-w-0 flex-1 flex-col gap-4 px-4 pt-6 pb-4 transition-[padding] duration-(--motion-slow) sm:px-6 lg:min-h-0 ${panelOpen && !compact ? "lg:pr-[25.5rem]" : ""}`}
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -1061,7 +1066,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
         {/* With less room (Denise's panel or booking details open), the
             stylists scroll sideways under the time column, and the side with
             more stylists says so. */}
-        <div className="relative flex min-h-0 flex-col lg:flex-1">
+        {/* With Denise's compact card open (lg up), its footprint over the
+            grid's right side (--denise-card) moves the right arrow clear of it. */}
+        <div className={`relative flex min-h-0 flex-col lg:flex-1 ${panelOpen && compact ? "lg:[--denise-card:24rem]" : ""}`}>
         <ViewTransition key={data.date} enter={DAY_SLIDE} exit={DAY_SLIDE} default="none">
           <div
             ref={gridRef}
@@ -1308,7 +1315,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             </ScaleContext>
           </div>
         </ViewTransition>
-          {!squeezed && <SideScrollEdges target={gridRef} label="More stylists" leftInset="4rem" />}
+          {!squeezed && <SideScrollEdges target={gridRef} label="More stylists" leftInset="4rem" rightInset="var(--denise-card, 0px)" />}
         </div>
 
         {/* The key, with Denise's face at the end of the row while her panel
@@ -1372,13 +1379,17 @@ export function CalendarBoard({ data }: { data: BoardData }) {
       )}
 
       {/* Denise and booking details: a panel that slides over the calendar
-          when something opens it. */}
+          when something opens it (on Denise's tab from lg up, a compact card
+          in the corner instead: see `compact`). */}
       <guard.Provider value={guard.set}>
         <aside
           aria-label="Assistant and booking details"
+          data-compact={compact || undefined}
           className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col gap-4 border-l border-line bg-surface p-4 shadow-panel transition-[transform,visibility] duration-(--motion-slow) ease-out sm:w-96 ${
+            compact ? "lg:top-auto lg:right-4 lg:bottom-4 lg:h-[min(32rem,calc(100dvh-19rem-var(--demo-bar)))] lg:rounded-xl lg:border" : ""
+          } ${
             // Closed, it's hidden once it has slid away, so keyboard focus skips it.
-            panelOpen ? "visible translate-x-0" : "invisible translate-x-full"
+            panelOpen ? "visible translate-x-0" : `invisible ${compact ? "translate-x-[calc(100%+1rem)]" : "translate-x-full"}`
           }`}
         >
           {selection.kind === "late" ? (
@@ -1819,7 +1830,7 @@ function DeniseLauncher({ hidden, count, bounce, onOpen }: { hidden: boolean; co
       data-testid="denise-launcher"
       className="relative ml-auto flex size-11 shrink-0 animate-pop-in items-center justify-center rounded-full bg-surface ring-1 ring-denise-200 transition-transform duration-(--motion-fast) hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:scale-95"
     >
-      <DeniseFace size={38} />
+      <DeniseFace size={36} />
       {count > 0 && (
         <span
           data-testid="denise-launcher-badge"
