@@ -65,7 +65,6 @@ async function BookingSettings() {
               cancellation_policy: s?.cancellation_policy ?? "",
               consultation_service_id: s?.consultation_service_id ?? "",
               accent_color: s?.accent_color ?? DEFAULT_ACCENT,
-              welcome: s?.welcome ?? "",
             }}
             services={sorted.map((x) => ({ id: x.id, name: x.name }))}
           />

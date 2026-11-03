@@ -51,6 +51,7 @@ describe("how the booking site shows up in Google", () => {
     name: "Maple & Ash Hair Studio",
     slug: "maple-and-ash",
     logoUrl: "https://cdn.test/logo.png",
+    coverUrl: null,
     welcome: null,
     address: { line1: "1428 N Milwaukee Ave", line2: null, city: "Chicago", region: "IL", postalCode: "60622", country: "US" },
     phone: "(312) 555-0100",

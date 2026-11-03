@@ -5,7 +5,7 @@ who: owner, manager, front_desk
 open: /events | Open events
 ---
 
-Clients can send an event inquiry from the booking site ("Planning a wedding or event?"). It comes in as an Inquiry for you to plan.
+Clients can send an event inquiry from the booking site ("Weddings and events"). It comes in as an Inquiry for you to plan.
 
 1. Go to **Events**. New inquiries are under **Inquiry**.
 2. Tap the inquiry to see what they asked for, their notes and their inspiration photos.

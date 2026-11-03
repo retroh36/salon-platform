@@ -5,6 +5,9 @@ import { APPOINTMENT_TEXTS_CONSENT, MARKETING_CONSENT } from "@/lib/messaging/co
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
+import { ChevronDownIcon } from "@/components/ui/icons";
+import { LevelBadge } from "@/components/ui/level";
+import { fromPrice, stepLabel } from "@/lib/online-booking/intro";
 import { Alert, Badge } from "@/components/ui/page";
 import type { BookingSite, SiteService, SiteStylist } from "@/lib/online-booking/site";
 import { describeDeposit } from "@/lib/online-booking/settings";
@@ -91,6 +94,7 @@ export function BookingFlow({
   // while they tap Book again, so a dropped connection never books twice.
   const attempt = useRef("");
   const heading = useRef<HTMLHeadingElement>(null);
+  const root = useRef<HTMLDivElement>(null);
 
   const services = useMemo(() => new Map(site.services.map((s) => [s.id, s])), [site.services]);
   const selected = serviceIds.map((id) => services.get(id)!);
@@ -121,14 +125,16 @@ export function BookingFlow({
 
   // Move focus to the new step's title, for keyboards and screen readers,
   // and bring it into view.
-  const first = useRef(true);
+  // Only when the step changes (not on the first render, even when an effect
+  // runs twice in development).
+  const shown = useRef(step);
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
+    if (shown.current === step) return;
+    shown.current = step;
     heading.current?.focus({ preventScroll: true });
-    window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    // The top of the steps (below the salon's intro on a phone).
+    const top = root.current ? root.current.getBoundingClientRect().top + window.scrollY - 16 : 0;
+    window.scrollTo({ top: Math.max(0, top), behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }, [step]);
 
   // The policy is worked out for this exact visit when it's reviewed.
@@ -224,15 +230,8 @@ export function BookingFlow({
     (step === "details" && identity.phase === "done" && (identity.known || (site.settings.allowNewClients && detailsComplete(details, identity.channel))));
 
   return (
-    <div className="flex flex-1 flex-col" data-testid="booking-flow">
-      {step === "services" && (
-        <div className="mb-6">
-          <p className="text-2xl leading-tight font-semibold tracking-[-0.015em] text-ink">Book online</p>
-          {site.settings.welcome && <p className="mt-1.5 text-ink-muted">{site.settings.welcome}</p>}
-        </div>
-      )}
-
-      <nav aria-label="Booking steps" className="mb-4 flex items-center gap-3">
+    <div ref={root} className="flex flex-1 flex-col" data-testid="booking-flow">
+      <nav aria-label="Booking steps" className="mb-3 flex min-h-11 items-center gap-3">
         {index > 0 && (
           <button
             type="button"
@@ -242,17 +241,9 @@ export function BookingFlow({
             <span aria-hidden>←</span> Back
           </button>
         )}
-        <ol className="ml-auto flex items-center gap-1.5" aria-label={`Step ${index + 1} of ${STEPS.length}`}>
-          {STEPS.map((s, i) => (
-            <li
-              key={s}
-              aria-current={s === step ? "step" : undefined}
-              className={`h-1.5 rounded-full transition-[width,background-color] duration-(--motion-base) ${i === index ? "w-6 bg-(--accent)" : i < index ? "w-3 bg-(--accent)" : "w-3 bg-ink-subtle"}`}
-            >
-              <span className="sr-only">{STEP_TITLES[s]}</span>
-            </li>
-          ))}
-        </ol>
+        <p className="ml-auto text-13 font-medium text-ink-muted" aria-current="step" data-testid="step-label">
+          {stepLabel(index)}
+        </p>
       </nav>
 
       <section
@@ -261,9 +252,9 @@ export function BookingFlow({
         className="flex flex-1 animate-step-in flex-col"
         style={{ "--step-from": `${direction * 16}px` } as React.CSSProperties}
       >
-        <h1 id="step-title" ref={heading} tabIndex={-1} className="mb-4 text-xl font-semibold tracking-[-0.01em] text-ink focus:outline-none">
+        <h2 id="step-title" ref={heading} tabIndex={-1} className="mb-4 text-xl font-semibold tracking-[-0.01em] text-ink focus:outline-none">
           {STEP_TITLES[step]}
-        </h1>
+        </h2>
 
         {notice && (
           <Alert className="mb-4">{notice}</Alert>
@@ -391,14 +382,18 @@ function ServicesStep({
   onConsultation: () => void;
 }) {
   const categories = [...new Set(site.services.map((s) => s.category))];
-  const range = (s: SiteService) => formatPriceRange(site.stylists.filter((st) => s.id in st.prices).map((st) => st.prices[s.id]));
+  const price = (s: SiteService) => fromPrice(site.stylists.filter((st) => s.id in st.prices).map((st) => st.prices[s.id]));
   return (
-    <div className="flex flex-col gap-7">
+    <div className="flex flex-col gap-8">
       {categories.map((category) => (
         <section key={category} aria-labelledby={`cat-${category}`}>
-          <h2 id={`cat-${category}`} className="mb-2 text-13 font-medium text-ink-muted">
+          {site.categoryPhotos[category] && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={site.categoryPhotos[category]} alt="" loading="lazy" data-testid="category-photo" className="mb-3 aspect-[5/2] w-full rounded-lg bg-sunken object-cover" />
+          )}
+          <h3 id={`cat-${category}`} className="mb-2 text-base font-semibold text-ink">
             {category}
-          </h2>
+          </h3>
           <ul className="flex flex-col gap-2">
             {site.services
               .filter((s) => s.category === category)
@@ -409,6 +404,7 @@ function ServicesStep({
                   return (
                     <li key={s.id} className="rounded-lg border border-line bg-surface px-4 py-3">
                       <p className="font-medium text-ink">{s.name}</p>
+                      {s.description && <p className="mt-0.5 text-sm text-ink-muted">{s.description}</p>}
                       <p className="mt-0.5 text-sm text-ink-muted">We&rsquo;ll start with a consultation to plan this together.</p>
                       {site.settings.consultationServiceId ? (
                         <button type="button" onClick={onConsultation} className={`${smallButton} mt-3`}>
@@ -422,26 +418,27 @@ function ServicesStep({
                 }
                 return (
                   <li key={s.id}>
-                    <button type="button" aria-pressed={on} onClick={() => onToggle(s.id)} className={`${choiceClass} ${on ? chosen : notChosen}`}>
+                    <button type="button" aria-pressed={on} onClick={() => onToggle(s.id)} className={`${choiceClass} items-start! ${on ? chosen : notChosen}`}>
                       <span
                         aria-hidden
-                        className={`flex size-5 shrink-0 items-center justify-center rounded-md border-[1.5px] text-xs text-white transition-colors duration-(--motion-fast) ${on ? "border-(--accent) bg-(--accent)" : "border-line-strong bg-surface"}`}
+                        className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border-[1.5px] text-xs text-white transition-colors duration-(--motion-fast) ${on ? "border-(--accent) bg-(--accent)" : "border-line-strong bg-surface"}`}
                       >
                         {on && "✓"}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block font-medium text-ink">{s.name}</span>
-                        <span className="block text-sm text-ink-muted">
+                        <span className="mt-0.5 block text-13 text-ink-muted">
                           {formatDuration(s.minutes)}
                           {deposit && ` · ${deposit}`}
                         </span>
+                        {s.description && <span className="mt-1 block text-sm leading-snug text-ink-muted">{s.description}</span>}
                         {s.requiresPatchTest && (
                           <Badge tone={blocked.includes(s.id) ? "danger" : "neutral"} className="mt-1.5">
                             Needs a patch test on file
                           </Badge>
                         )}
                       </span>
-                      <span className="shrink-0 text-sm font-medium text-ink tabular-nums">{range(s)}</span>
+                      <span className="shrink-0 self-start pt-0.5 text-sm font-medium text-ink tabular-nums">{price(s)}</span>
                     </button>
                   </li>
                 );
@@ -484,22 +481,79 @@ function StylistStep({
         </button>
       </li>
       {able.map((s) => (
-        <li key={s.id}>
-          <button type="button" aria-pressed={current === s.id} onClick={() => onChoose(s.id)} className={`${choiceClass} ${current === s.id ? chosen : notChosen}`}>
-            <Avatar name={s.displayName} color={s.color} level={s.level} photoUrl={s.photoUrl} size="lg" />
-            <span className="min-w-0 flex-1 pl-1">
-              <span className="block font-medium text-ink">{s.displayName}</span>
-              {s.level && <span className="block text-sm text-ink-muted">{LEVEL_LABELS[s.level]} stylist</span>}
-            </span>
-            <span className="shrink-0 text-sm font-medium text-ink tabular-nums">{formatPrice(serviceIds.reduce((sum, id) => sum + s.prices[id], 0))}</span>
-          </button>
-        </li>
+        <StylistCard key={s.id} stylist={s} on={current === s.id} price={formatPrice(serviceIds.reduce((sum, id) => sum + s.prices[id], 0))} onChoose={() => onChoose(s.id)} />
       ))}
       {able.length === 0 && (
         <li className="text-sm text-ink-muted">No one stylist does all of these, so we&rsquo;ll match each service with someone who does.</li>
       )}
       {site.stylists.length > 0 && <li className="sr-only">Prices are for everything you chose.</li>}
     </ul>
+  );
+}
+
+// A stylist to choose: their portrait (or initials), full name, level and
+// specialty, and what it costs with them. "About" opens their bio and up to
+// three photos of their work, without choosing them.
+function StylistCard({ stylist: s, on, price, onChoose }: { stylist: SiteStylist; on: boolean; price: string; onChoose: () => void }) {
+  const [open, setOpen] = useState(false);
+  const more = Boolean(s.bio || s.portfolio.length);
+  return (
+    <li className={`rounded-lg border bg-surface transition-[border-color,box-shadow] duration-(--motion-fast) ${on ? chosen : notChosen}`} data-testid="stylist-card">
+      <button
+        type="button"
+        aria-pressed={on}
+        onClick={onChoose}
+        className="flex w-full items-center gap-4 rounded-lg px-3 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+      >
+        {s.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={s.photoUrl} alt="" loading="lazy" data-testid="stylist-portrait" className="h-20 w-16 shrink-0 rounded-md bg-sunken object-cover" />
+        ) : (
+          <span className="flex h-20 w-16 shrink-0 items-center justify-center">
+            <Avatar name={s.displayName} color={s.color} level={s.level} size="lg" />
+          </span>
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="block font-medium text-ink">{s.displayName}</span>
+          {s.level && (
+            <span className="mt-0.5 flex items-center gap-1.5 text-13 text-ink-muted">
+              {s.photoUrl && <LevelBadge level={s.level} className="size-3.5" />}
+              {LEVEL_LABELS[s.level]} stylist
+            </span>
+          )}
+          {s.specialty && <span className="mt-1 block text-sm leading-snug text-ink">{s.specialty}</span>}
+        </span>
+        <span className="shrink-0 self-start pt-0.5 text-sm font-medium text-ink tabular-nums">{price}</span>
+      </button>
+      {more && (
+        <div className="-mt-1 px-3 pb-2">
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen((o) => !o)}
+            className="-mx-1 inline-flex min-h-9 items-center gap-1 rounded-md px-1 text-13 font-medium text-(--accent) focus-visible:outline-2 focus-visible:outline-focus"
+          >
+            {open ? "Less" : `About ${s.firstName}`}
+            <ChevronDownIcon className={`size-4 ${open ? "rotate-180" : ""}`} />
+          </button>
+          {open && (
+            <div className="mt-1 flex flex-col gap-3" data-testid="stylist-about">
+              {s.bio && <p className="text-sm leading-relaxed text-ink-muted">{s.bio}</p>}
+              {s.portfolio.length > 0 && (
+                <ul className="grid grid-cols-3 gap-2" aria-label={`${s.firstName}'s work`}>
+                  {s.portfolio.map((url, i) => (
+                    <li key={url}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`${s.firstName}'s work, photo ${i + 1}`} loading="lazy" className="aspect-square w-full rounded-md bg-sunken object-cover" />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </li>
   );
 }
 

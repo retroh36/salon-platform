@@ -83,7 +83,7 @@ test("Denise drafts an event from one line; the desk checks it and saves an Inqu
 test("an inquiry from the booking site opens in the builder with the party started", async ({ browser }) => {
   const site = await browser.newPage({ viewport: { width: 390, height: 900 } });
   await site.goto("/book/maple-and-ash");
-  await site.getByRole("link", { name: "Planning a wedding or event?" }).click();
+  await site.getByRole("link", { name: "Weddings and events" }).click();
   await waitForHydration(site, "input[type=date]");
   await site.getByLabel("Date").fill(DAY);
   await site.getByLabel("Ready by").fill("11:00");

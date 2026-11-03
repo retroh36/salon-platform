@@ -135,20 +135,20 @@ test("a new client books two services back to back on a phone", async ({ page })
   await watchForBlanks(page);
   await open(page);
   // The salon's brand leads; Maestra is small at the foot.
-  await expect(page.getByRole("banner")).toContainText("Maple & Ash Hair Studio");
+  await expect(page.getByTestId("salon-intro").getByRole("heading", { level: 1 })).toHaveText("Maple & Ash Hair Studio");
   await expect(page.getByTestId("powered-by")).toHaveText("Powered by Maestra");
   await expect(page.getByText("Bang Trim")).toHaveCount(0); // not online
-  // Level-based price ranges.
-  await expect(flow(page).getByRole("button", { name: /^Women's Cut & Style/ })).toContainText("$70–$100");
+  // From the lowest level's price.
+  await expect(flow(page).getByRole("button", { name: /^Women's Cut & Style/ })).toContainText("From $70");
 
   await chooseServices(page, ["Women's Cut & Style", "Blowout"]);
   await expect(flow(page).getByRole("heading", { name: "Choose your stylist" })).toBeFocused();
   // Each stylist with their level and price for both.
-  const shae = flow(page).getByRole("button", { name: /Shae M\./ });
+  const shae = flow(page).getByRole("button", { name: /Shae Morgan/ });
   await expect(shae).toContainText("Artisan stylist");
   await expect(shae).toContainText("$115"); // $70 + $45
-  await expect(flow(page).getByRole("button", { name: /Bridget C\./ })).toContainText("Master stylist");
-  await chooseStylist(page, /Shae M\./);
+  await expect(flow(page).getByRole("button", { name: /Bridget Callahan/ })).toContainText("Master stylist");
+  await chooseStylist(page, /Shae Morgan/);
 
   // Big tap targets.
   expect((await cont(page).boundingBox())!.height).toBeGreaterThanOrEqual(48);
@@ -271,7 +271,7 @@ test("two people can't book the same time: the second is told and picks again", 
   for (const [i, p] of [first, second].entries()) {
     await open(p);
     await chooseServices(p, ["Men's Cut"]);
-    await chooseStylist(p, /Nola B\./);
+    await chooseStylist(p, /Nola Brennan/);
     picked.push(await chooseFirstTime(p));
     await verify(p, numbers[i]);
     await flow(p).getByLabel("First name").fill(`Ob${RUN}Race${i}`);
@@ -304,7 +304,7 @@ test("two people can't book the same time: the second is told and picks again", 
 test("the connection drops as they book: it says so, and tapping Book again shows the booking, made once", async ({ page, pageErrors }) => {
   await open(page);
   await chooseServices(page, ["Blowout"]);
-  await chooseStylist(page, /Shae M\./);
+  await chooseStylist(page, /Shae Morgan/);
   // The first time she has (the soonest day may have only one or two left).
   await chooseFirstTime(page);
   await verify(page, newPhone());
@@ -340,7 +340,7 @@ test("the connection drops as they book: it says so, and tapping Book again show
 test("a client reschedules, then cancels, with their private link", async ({ page }) => {
   await open(page);
   await chooseServices(page, ["Kids' Cut (12 & under)"]);
-  await chooseStylist(page, /Nola B\./);
+  await chooseStylist(page, /Nola Brennan/);
   // Far enough ahead to change online (the salon's cutoff is 24 hours).
   await chooseFirstTime(page, 0, 3);
   const number = newPhone();

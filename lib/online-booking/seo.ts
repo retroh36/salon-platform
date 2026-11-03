@@ -6,7 +6,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import { loadSite } from "./site";
+import { loadSite, type BookingSite } from "./site";
 
 type Admin = SupabaseClient<Database>;
 
@@ -14,6 +14,8 @@ export type SeoInfo = {
   name: string;
   slug: string;
   logoUrl: string | null;
+  // The booking page's cover photo, for link previews.
+  coverUrl: string | null;
   welcome: string | null;
   address: { line1: string | null; line2: string | null; city: string | null; region: string | null; postalCode: string | null; country: string | null };
   phone: string | null;
@@ -95,22 +97,22 @@ export const jsonLdText = (data: unknown) => JSON.stringify(data).replace(/</g, 
 
 export async function loadSeo(admin: Admin, slug: string): Promise<SeoInfo | null> {
   const found = await loadSite(admin, slug);
-  if (found.status !== "open") return null;
-  const { site } = found;
-  const [{ data: loc, error }, { data: hours, error: hoursError }] = await Promise.all([
-    admin.from("locations").select("address_line1, address_line2, city, region, postal_code, country").eq("id", site.location.id).single(),
-    admin.from("location_hours").select("weekday, start_minute, end_minute").eq("location_id", site.location.id),
-  ]);
+  return found.status === "open" ? seoInfo(admin, found.site) : null;
+}
+
+// The same for a site already loaded.
+export async function seoInfo(admin: Admin, site: BookingSite): Promise<SeoInfo> {
+  const { data: loc, error } = await admin.from("locations").select("address_line1, address_line2, city, region, postal_code, country").eq("id", site.location.id).single();
   if (error) throw error;
-  if (hoursError) throw hoursError;
   return {
     name: site.business.name,
     slug: site.business.slug,
     logoUrl: site.business.logoUrl,
+    coverUrl: site.business.coverUrl,
     welcome: site.settings.welcome,
     address: { line1: loc.address_line1, line2: loc.address_line2, city: loc.city, region: loc.region, postalCode: loc.postal_code, country: loc.country },
     phone: site.location.phone,
-    hours: hours.map((h) => ({ weekday: h.weekday, start: h.start_minute, end: h.end_minute })),
+    hours: site.location.hours,
     services: site.services.map((s) => ({
       name: s.name,
       category: s.category,

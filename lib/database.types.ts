@@ -2079,14 +2079,14 @@ isOneToOne: false
                   ]
                 },"online_booking_settings": {
                   Row: {
-                    "accent_color": string | null,"allow_new_clients": boolean,"business_id": string,"cancel_cutoff_hours": number,"cancellation_policy": string,"consultation_service_id": string | null,"enabled": boolean,"notice_minutes": number,"updated_at": string,"welcome": string | null,"window_days": number
+                    "accent_color": string | null,"allow_new_clients": boolean,"business_id": string,"cancel_cutoff_hours": number,"cancellation_policy": string,"consultation_service_id": string | null,"cover_path": string | null,"enabled": boolean,"notice_minutes": number,"updated_at": string,"welcome": string | null,"window_days": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "accent_color"?: string | null,"allow_new_clients"?: boolean,"business_id": string,"cancel_cutoff_hours"?: number,"cancellation_policy"?: string,"consultation_service_id"?: string | null,"enabled"?: boolean,"notice_minutes"?: number,"updated_at"?: string,"welcome"?: string | null,"window_days"?: number
+                    "accent_color"?: string | null,"allow_new_clients"?: boolean,"business_id": string,"cancel_cutoff_hours"?: number,"cancellation_policy"?: string,"consultation_service_id"?: string | null,"cover_path"?: string | null,"enabled"?: boolean,"notice_minutes"?: number,"updated_at"?: string,"welcome"?: string | null,"window_days"?: number
                   }
                   Update: {
-                    "accent_color"?: string | null,"allow_new_clients"?: boolean,"business_id"?: string,"cancel_cutoff_hours"?: number,"cancellation_policy"?: string,"consultation_service_id"?: string | null,"enabled"?: boolean,"notice_minutes"?: number,"updated_at"?: string,"welcome"?: string | null,"window_days"?: number
+                    "accent_color"?: string | null,"allow_new_clients"?: boolean,"business_id"?: string,"cancel_cutoff_hours"?: number,"cancellation_policy"?: string,"consultation_service_id"?: string | null,"cover_path"?: string | null,"enabled"?: boolean,"notice_minutes"?: number,"updated_at"?: string,"welcome"?: string | null,"window_days"?: number
                   }
                   Relationships: [
                     {
@@ -3147,6 +3147,26 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"service_category_photos": {
+                  Row: {
+                    "business_id": string,"category": string,"photo_path": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"category": string,"photo_path": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"category"?: string,"photo_path"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "service_category_photos_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"service_level_prices": {
                   Row: {
                     "business_id": string,"level": Database["public"]['Enums']["staff_level"],"price_cents": number,"service_id": string
@@ -3343,14 +3363,14 @@ isOneToOne: false
                   ]
                 },"staff": {
                   Row: {
-                    "assists_staff_id": string | null,"business_id": string,"calendar_position": number | null,"calendar_zoom": string,"color": string | null,"created_at": string,"email": string | null,"event_roles": (string)[],"first_name": string,"goal_alert_seen_on": string | null,"goal_alerts": string,"home_resource_id": string | null,"hours_cycle_starts_on": string | null,"hours_cycle_weeks": number,"id": string,"is_active": boolean,"last_name": string,"level": Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone": string | null,"photo_path": string | null,"role": Database["public"]['Enums']["staff_role"],"updated_at": string,"user_id": string | null
+                    "assists_staff_id": string | null,"bio": string | null,"business_id": string,"calendar_position": number | null,"calendar_zoom": string,"color": string | null,"created_at": string,"email": string | null,"event_roles": (string)[],"first_name": string,"goal_alert_seen_on": string | null,"goal_alerts": string,"home_resource_id": string | null,"hours_cycle_starts_on": string | null,"hours_cycle_weeks": number,"id": string,"is_active": boolean,"last_name": string,"level": Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone": string | null,"photo_path": string | null,"portfolio_paths": (string)[],"role": Database["public"]['Enums']["staff_role"],"specialty": string | null,"updated_at": string,"user_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "assists_staff_id"?: string | null,"business_id": string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"event_roles"?: (string)[],"first_name": string,"goal_alert_seen_on"?: string | null,"goal_alerts"?: string,"home_resource_id"?: string | null,"hours_cycle_starts_on"?: string | null,"hours_cycle_weeks"?: number,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone"?: string | null,"photo_path"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
+                    "assists_staff_id"?: string | null,"bio"?: string | null,"business_id": string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"event_roles"?: (string)[],"first_name": string,"goal_alert_seen_on"?: string | null,"goal_alerts"?: string,"home_resource_id"?: string | null,"hours_cycle_starts_on"?: string | null,"hours_cycle_weeks"?: number,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone"?: string | null,"photo_path"?: string | null,"portfolio_paths"?: (string)[],"role"?: Database["public"]['Enums']["staff_role"],"specialty"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
                   Update: {
-                    "assists_staff_id"?: string | null,"business_id"?: string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"event_roles"?: (string)[],"first_name"?: string,"goal_alert_seen_on"?: string | null,"goal_alerts"?: string,"home_resource_id"?: string | null,"hours_cycle_starts_on"?: string | null,"hours_cycle_weeks"?: number,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id"?: string,"phone"?: string | null,"photo_path"?: string | null,"role"?: Database["public"]['Enums']["staff_role"],"updated_at"?: string,"user_id"?: string | null
+                    "assists_staff_id"?: string | null,"bio"?: string | null,"business_id"?: string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"event_roles"?: (string)[],"first_name"?: string,"goal_alert_seen_on"?: string | null,"goal_alerts"?: string,"home_resource_id"?: string | null,"hours_cycle_starts_on"?: string | null,"hours_cycle_weeks"?: number,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id"?: string,"phone"?: string | null,"photo_path"?: string | null,"portfolio_paths"?: (string)[],"role"?: Database["public"]['Enums']["staff_role"],"specialty"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
                   Relationships: [
                     {

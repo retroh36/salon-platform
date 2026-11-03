@@ -130,6 +130,17 @@ test("books again without a code, starting from their last visit", async ({ page
   // Straight past the services (and the stylist, when it was one).
   await expect(flow.getByRole("heading", { name: /Pick a date and time|Choose your stylist/ })).toBeVisible();
   await expect(flow.getByRole("button", { name: "Send code" })).toHaveCount(0);
+
+  // The booking site offers it at the top too, before the salon's intro
+  // ends, one tap from the time step.
+  await page.goto(`/book/${SLUG}`);
+  const top = page.getByTestId("book-again");
+  await expect(top).toContainText(`Welcome back, ${client.first_name}`);
+  await expect(top).toContainText("Blowout with Bridget");
+  await expect(top).toBeInViewport();
+  await top.getByRole("link", { name: "Book again" }).click();
+  await expect(page.getByTestId("step-label")).toHaveText("Time · Step 3 of 5");
+  await expect(flow.getByRole("heading", { name: "Pick a date and time" })).toBeVisible();
 });
 
 test("asks for a new code after too many sign-in tries", async ({ page }) => {

@@ -72,7 +72,6 @@ type RulesFields = {
   cancellation_policy: string;
   consultation_service_id: string;
   accent_color: string;
-  welcome: string;
 };
 
 const PRESETS = ["#17273b", "#6b3f2a", "#2f4a3a", "#5b2a4a", "#1d4e5f", "#3f3f46"];
@@ -152,11 +151,6 @@ export function BookingRulesForm({ initial, services }: { initial: RulesFields; 
 
       <fieldset className="flex flex-col gap-4">
         <legend className="mb-2 text-base font-semibold text-ink">Look</legend>
-        <label className={labelClass}>
-          Welcome line
-          <input name="welcome" defaultValue={initial.welcome} maxLength={280} className={fieldClass} />
-          {error("welcome")}
-        </label>
         <div className={labelClass}>
           <span id="accent-label">Your color</span>
           <div className="flex flex-wrap items-center gap-2" role="group" aria-labelledby="accent-label">

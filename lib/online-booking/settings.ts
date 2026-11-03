@@ -58,7 +58,6 @@ export type BookingSettingsInput = {
   cancellation_policy: string;
   consultation_service_id: string | null;
   accent_color: string | null;
-  welcome: string | null;
 };
 
 export type BookingSettingsErrors = Partial<Record<keyof BookingSettingsInput, string>>;
@@ -74,7 +73,8 @@ function wholeNumber(value: string, min: number, max: number): number | null {
 
 // Fields: enabled (checkbox), slug, window_days, notice_hours,
 // allow_new_clients (checkbox), cancel_cutoff_hours, cancellation_policy,
-// consultation_service_id ("" = none), accent_color ("" = default), welcome.
+// consultation_service_id ("" = none), accent_color ("" = default). The
+// welcome line is the booking page's description (Settings → Booking page).
 export function parseBookingSettings(
   form: FormLike,
 ): { ok: true; value: BookingSettingsInput } | { ok: false; errors: BookingSettingsErrors } {
@@ -94,8 +94,6 @@ export function parseBookingSettings(
 
   const policy = text(form, "cancellation_policy");
   if (policy.length > 2000) errors.cancellation_policy = "Keep it under 2,000 characters.";
-  const welcome = text(form, "welcome");
-  if (welcome.length > 280) errors.welcome = "Keep it under 280 characters.";
 
   const accent = text(form, "accent_color").toLowerCase();
   if (accent && !accentReadable(accent)) errors.accent_color = "Choose a darker color: white text on it must be easy to read.";
@@ -113,7 +111,6 @@ export function parseBookingSettings(
       cancellation_policy: policy,
       consultation_service_id: text(form, "consultation_service_id") || null,
       accent_color: accent || null,
-      welcome: welcome || null,
     },
   };
 }

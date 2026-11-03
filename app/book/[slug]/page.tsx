@@ -3,16 +3,16 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { siteUrl } from "@/lib/branding";
-import { jsonLdText, loadSeo, seoFor } from "@/lib/online-booking/seo";
+import { jsonLdText, loadSeo, seoFor, seoInfo } from "@/lib/online-booking/seo";
 import { loadSite } from "@/lib/online-booking/site";
 import { bookingSource } from "@/lib/online-booking/sources";
 import { todayIn } from "@/lib/scheduling/time";
 import { createAdminClient } from "@/lib/supabase/admin";
-import Link from "next/link";
 import { currentAccount } from "@/lib/online-booking/account";
+import { loadRebook } from "@/lib/online-booking/account-data";
 import { BookingFlow } from "./booking-flow";
-import { accentLink } from "./styles";
 import { BookingFrame } from "./frame";
+import { SalonIntro, SalonTop } from "./intro";
 
 // The title, description and links Google and link previews use, from the
 // salon's own details; a closed or missing site isn't indexed.
@@ -25,8 +25,15 @@ export async function generateMetadata({ params }: PageProps<"/book/[slug]">): P
     title: { absolute: seo.title },
     description: seo.description,
     alternates: { canonical: seo.url },
-    openGraph: { type: "website", url: seo.url, title: seo.title, description: seo.description, siteName: info.name, ...(info.logoUrl ? { images: [{ url: info.logoUrl }] } : {}) },
-    twitter: { card: "summary", title: seo.title, description: seo.description },
+    openGraph: {
+      type: "website",
+      url: seo.url,
+      title: seo.title,
+      description: seo.description,
+      siteName: info.name,
+      ...(info.coverUrl || info.logoUrl ? { images: [{ url: (info.coverUrl ?? info.logoUrl)! }] } : {}),
+    },
+    twitter: { card: info.coverUrl ? "summary_large_image" : "summary", title: seo.title, description: seo.description },
     robots: { index: true, follow: true },
   };
 }
@@ -61,34 +68,49 @@ async function Booking({ params, searchParams }: { params: Promise<{ slug: strin
   const { site } = found;
   const admin = createAdminClient();
   const [info, account, events] = await Promise.all([
-    loadSeo(admin, slug),
+    seoInfo(admin, site),
     currentAccount(admin, site.business.id),
     admin.from("event_settings").select("inquiries_enabled").eq("business_id", site.business.id).maybeSingle(),
   ]);
   // "Book this again" from their account: ?services=a,b&staff=x.
   const services = typeof query.services === "string" ? query.services.split(",").filter((id) => /^[0-9a-f-]{36}$/.test(id)) : [];
   const staff = typeof query.staff === "string" && /^[0-9a-f-]{36}$/.test(query.staff) ? query.staff : null;
+  // A signed-in client's last visit, at the top, when it can still be booked online.
+  const last = account && !services.length ? await loadRebook(admin, account) : null;
+  const rebook =
+    last && last.serviceIds.every((id) => site.services.some((s) => s.id === id && s.mode === "bookable"))
+      ? { href: `/book/${slug}?${new URLSearchParams({ services: last.serviceIds.join(","), ...(last.staffId ? { staff: last.staffId } : {}) })}#book`, label: last.label, firstName: account!.firstName }
+      : null;
+  const today = todayIn(site.location.timezone);
   return (
-    <BookingFrame name={site.business.name} logoUrl={site.business.logoUrl} accent={site.settings.accent}>
-      {info && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdText(seoFor(info, siteUrl()).jsonLd) }} />}
-      <p className="-mt-2 mb-4 flex flex-wrap justify-end gap-x-4 gap-y-1 text-sm">
-        {events.data?.inquiries_enabled && (
-          <Link href={`/book/${slug}/event`} className={accentLink}>
-            Planning a wedding or event?
-          </Link>
-        )}
-        <Link href={`/book/${slug}/account`} className={accentLink}>
-          {account ? `${account.firstName}'s account` : "My account"}
-        </Link>
-      </p>
-      <BookingFlow
-        site={site}
-        today={todayIn(site.location.timezone)}
-        source={source}
-        referral={referral}
-        signedIn={account ? { firstName: account.firstName } : null}
-        start={services.length ? { serviceIds: services, staffId: staff } : null}
-      />
+    <BookingFrame name={site.business.name} logoUrl={site.business.logoUrl} accent={site.settings.accent} intro={{
+        top: (
+          <SalonTop
+            coverUrl={site.business.coverUrl}
+            account={{ href: `/book/${slug}/account`, label: account ? `${account.firstName}'s account` : "My account" }}
+            eventsLink={events.data?.inquiries_enabled ? `/book/${slug}/event` : null}
+          />
+        ),
+      }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdText(seoFor(info, siteUrl()).jsonLd) }} />
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,34rem)] lg:gap-14">
+        <SalonIntro
+          site={site}
+          weekday={new Date(`${today}T12:00:00Z`).getUTCDay() || 7}
+          rebook={rebook}
+        />
+        <section id="book" aria-label="Book a visit" className="flex scroll-mt-4 flex-col lg:pt-10">
+          <BookingFlow
+            key={`${services.join(",")}:${staff}`}
+            site={site}
+            today={today}
+            source={source}
+            referral={referral}
+            signedIn={account ? { firstName: account.firstName } : null}
+            start={services.length ? { serviceIds: services, staffId: staff } : null}
+          />
+        </section>
+      </div>
     </BookingFrame>
   );
 }

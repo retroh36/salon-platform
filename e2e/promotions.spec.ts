@@ -171,7 +171,7 @@ test.describe("booking site", () => {
     await flow(page).getByRole("button", { name: /^Women's Cut & Style\s*\d/ }).click();
     await cont(page).click();
     // An Artisan stylist: the special covers their cuts.
-    await flow(page).getByRole("button", { name: /Shae M\./ }).click();
+    await flow(page).getByRole("button", { name: /Shae Morgan/ }).click();
     await cont(page).click();
     await expect(flow(page).getByTestId("specials-note")).toBeVisible();
     const dates = flow(page).getByRole("radiogroup", { name: "Date" });

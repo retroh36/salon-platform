@@ -178,6 +178,41 @@ from (values
   ('Treatments', 'Perm',                  45, 30, 30, 14000, null)
 ) as s (category, name, active, processing, finishing, price, description);
 
+-- A short description for every service, for the booking site.
+update public.services sv set description = d.description
+from (values
+  ('Men''s Cut', 'Cut, clipper or scissor work and a style to finish.'),
+  ('Skin Fade', 'A seamless fade down to the skin, with a lined-up finish.'),
+  ('Beard Trim', 'Shape, line and tidy, with a hot towel.'),
+  ('Kids'' Cut (12 & under)', 'A relaxed cut for younger clients, with a quick style.'),
+  ('All-Over Color', 'One color from roots to ends, with a gloss and blow-dry.'),
+  ('Gloss / Toner', 'Adds shine and refreshes tone between color visits.'),
+  ('Gray Blending', 'Softens gray with dimension rather than solid coverage.'),
+  ('Men''s Gray Blending', 'A quick, natural-looking blend for gray.'),
+  ('Double Process (Bleach & Tone)', 'Lightened all over, then toned to your shade.'),
+  ('Face-Frame Highlights', 'Brightness around the face, for a lift between visits.'),
+  ('Partial Highlights', 'Highlights through the top and sides.'),
+  ('Full Highlights', 'Highlights throughout, with toner and blow-dry.'),
+  ('Babylights', 'Very fine highlights for a soft, natural glow.'),
+  ('Lowlights', 'Deeper tones woven in to add depth.'),
+  ('Highlight & Lowlight Combo', 'Light and depth together for full dimension.'),
+  ('Mini Balayage', 'Hand-painted brightness through the top and front.'),
+  ('Foilayage', 'Painted color in foils, for a brighter balayage.'),
+  ('Blowout', 'Shampoo and a smooth, full blow-dry.'),
+  ('Blowout (Long/Thick Hair)', 'Shampoo and blow-dry, with extra time for long or thick hair.'),
+  ('Silk Press', 'Shampoo, treatment and a smooth press for natural hair.'),
+  ('Curls / Beach Waves', 'Shampoo, blow-dry and soft, lasting curls or waves.'),
+  ('Updo', 'An updo for an event. Bring photos of looks you love.'),
+  ('Bridal Trial', 'Try your wedding look ahead of the day.'),
+  ('Hydrating Mask Add-On', 'A moisture mask added to any visit.'),
+  ('Deep Conditioning', 'Restores softness and shine to dry hair.'),
+  ('Bond Repair Treatment', 'Strengthens hair after color or heat.'),
+  ('Scalp Treatment', 'Exfoliating scalp care with a relaxing massage.'),
+  ('Brazilian Blowout', 'Smooths frizz and cuts drying time for up to 12 weeks.'),
+  ('Perm', 'Lasting curl or body.')
+) as d (name, description)
+where sv.business_id = 'b0000000-0000-4000-8000-000000000001' and sv.name = d.name and sv.description is null;
+
 -- No longer on the menu, to show how archived services look.
 update public.services set archived_at = now()
 where business_id = 'b0000000-0000-4000-8000-000000000001' and name = 'Perm';
@@ -427,6 +462,28 @@ from (values
   ('d0000000-0000-4000-8000-000000000010', 'senior')   -- Lois
 ) as l (id, level)
 where s.id = l.id::uuid;
+
+-- What the booking site says about each stylist (Settings → Booking page):
+-- a one-line specialty and a short bio, in their own words. Portraits and
+-- portfolio photos come with the demo imagery.
+update public.staff s set specialty = p.specialty, bio = p.bio
+from (values
+  ('d0000000-0000-4000-8000-000000000004', 'Lived-in color and balayage',
+   'I''ve been coloring hair for fifteen years, and I love soft, low-maintenance color that grows out beautifully. Bring photos: we''ll plan it together.'),
+  ('d0000000-0000-4000-8000-000000000005', 'Precision cuts and short hair',
+   'Clean lines, sharp bobs and cuts that fall into place at home. I''ll show you how to style it in five minutes.'),
+  ('d0000000-0000-4000-8000-000000000006', 'Blowouts, waves and finishing',
+   'Smooth blowouts and easy waves for every day or a big night. I''ll leave you with tips for making it last.'),
+  ('d0000000-0000-4000-8000-000000000007', 'Fades, beards and classic barbering',
+   'Skin fades, tapers and beard work, done with care and a hot towel finish.'),
+  ('d0000000-0000-4000-8000-000000000008', 'Color corrections and bold color',
+   'From fixing box dye to vivid fashion shades, I take color on step by step, with your hair''s health first.'),
+  ('d0000000-0000-4000-8000-000000000009', 'Everyday cuts and easy styling',
+   'Fresh, wearable cuts for all ages. I''m happy to talk through what works with your routine.'),
+  ('d0000000-0000-4000-8000-000000000010', 'Highlights, smoothing and bridal',
+   'Bright highlights, frizz-free smoothing and wedding-day hair. I love helping clients feel their best on the big day.')
+) as p (id, specialty, bio)
+where s.id = p.id::uuid;
 
 -- Weekly hours. Two rows on the same day make a split shift.
 insert into public.staff_working_hours (business_id, staff_id, weekday, start_minute, end_minute)

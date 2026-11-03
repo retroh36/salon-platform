@@ -90,7 +90,7 @@ test("a stylist's photo, added on the schedule page, shows on the booking site",
     await waitForHydration(site, "[data-testid=booking-flow] button[aria-pressed]");
     await site.getByRole("button", { name: /^Blowout\s*\d/ }).click();
     await site.getByRole("button", { name: "Continue" }).click();
-    await expect(site.getByRole("button", { name: /Shae M\./ }).locator("img")).toHaveAttribute("src", /\/storage\/v1\/object\/public\/staff-photos\//);
+    await expect(site.getByRole("button", { name: /Shae Morgan/ }).locator("img")).toHaveAttribute("src", /\/storage\/v1\/object\/public\/staff-photos\//);
     await visitor.close();
   } finally {
     const { data } = await admin.from("staff").select("photo_path").eq("id", SEED.staff.shae).single();

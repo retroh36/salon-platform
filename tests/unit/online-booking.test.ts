@@ -21,7 +21,6 @@ const valid = {
   cancellation_policy: "Please give us 24 hours.",
   consultation_service_id: "",
   accent_color: "#6B3F2A",
-  welcome: "Hello",
 };
 
 describe("contact details", () => {
@@ -71,7 +70,6 @@ describe("booking site settings", () => {
         cancellation_policy: "Please give us 24 hours.",
         consultation_service_id: null,
         accent_color: "#6b3f2a",
-        welcome: "Hello",
       },
     });
     // Unchecked boxes aren't sent at all.

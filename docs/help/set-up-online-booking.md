@@ -1,6 +1,6 @@
 ---
 title: Set up online booking
-keywords: online booking, turn on online booking, book online, booking site, booking page, web booking, self booking, booking window, notice, lead time, new clients online, cancellation policy, cancel cutoff, booking color, welcome message, consultation, booking address
+keywords: online booking, turn on online booking, book online, booking site, booking page, web booking, self booking, booking window, notice, lead time, new clients online, cancellation policy, cancel cutoff, booking color, consultation, booking address
 who: owner, manager
 open: /settings/booking | Open Online booking settings
 ---
@@ -14,7 +14,7 @@ Turn on your salon's own booking site and set its rules: how far ahead, how much
 5. Set **Cancel or change online until (hours before)** and write your **Cancellation policy**.
 6. Tick or untick **New clients can book online**.
 7. Under **"Request a consultation" books**, choose the service a consultation books, or **Nothing (clients call instead)**.
-8. Under **Look**, add a **Welcome line** and pick **Your color**.
+8. Under **Look**, pick **Your color**.
 9. Tap **Save rules and look**. The top of the page then says **Online booking is on.**
 
 ## Good to know
@@ -24,6 +24,7 @@ Turn on your salon's own booking site and set its rules: how far ahead, how much
 - Online bookings appear on the calendar right away, marked as booked online.
 - Without **New clients can book online**, only clients already on file can book; new ones are asked to call.
 - To choose which services can be booked online, see Choose which services clients can book online.
+- The cover photo, description, stylist profiles and service descriptions are on **Booking page**: see Set up your booking page.
 
 ## If it doesn't work
 

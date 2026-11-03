@@ -8,11 +8,15 @@ export function BookingFrame({
   name,
   logoUrl,
   accent,
+  intro,
   children,
 }: {
   name: string;
   logoUrl: string | null;
   accent: string;
+  // The booking page's own top (its cover and intro, ./intro.tsx), in place
+  // of the bar with the logo and name; the page is wider then.
+  intro?: { top: React.ReactNode };
   children: React.ReactNode;
 }) {
   return (
@@ -26,20 +30,24 @@ export function BookingFrame({
         } as React.CSSProperties
       }
     >
-      <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-4 py-3">
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="" data-testid="salon-logo" className="size-11 shrink-0 rounded-[14px_4px_14px_4px] bg-surface object-contain" />
-          ) : (
-            <span aria-hidden data-testid="salon-initial" className="inline-flex size-11 shrink-0 items-center justify-center rounded-[14px_4px_14px_4px] bg-(--accent) text-xl text-white">
-              {salonInitial(name)}
-            </span>
-          )}
-          <p className="min-w-0 truncate text-base font-semibold tracking-tight text-ink">{name}</p>
-        </div>
-      </header>
-      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col px-4 pt-6 pb-4">{children}</main>
+      {intro ? (
+        intro.top
+      ) : (
+        <header className="border-b border-line bg-surface">
+          <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-4 py-3">
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt="" data-testid="salon-logo" className="size-11 shrink-0 rounded-[14px_4px_14px_4px] bg-surface object-contain" />
+            ) : (
+              <span aria-hidden data-testid="salon-initial" className="inline-flex size-11 shrink-0 items-center justify-center rounded-[14px_4px_14px_4px] bg-(--accent) text-xl text-white">
+                {salonInitial(name)}
+              </span>
+            )}
+            <p className="min-w-0 truncate text-base font-semibold tracking-tight text-ink">{name}</p>
+          </div>
+        </header>
+      )}
+      <main className={`mx-auto flex w-full flex-1 flex-col px-4 pb-4 ${intro ? "max-w-5xl md:px-8" : "max-w-xl pt-6"}`}>{children}</main>
       <footer className="pb-6 text-center text-xs text-ink-subtle">
         <a href="#top" className="sr-only">
           Back to top

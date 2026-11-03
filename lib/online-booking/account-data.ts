@@ -138,6 +138,27 @@ export async function loadAccountRewards(admin: Admin, account: Account): Promis
 }
 
 
+// Just their last finished visit, to offer "Book again" at the top of the
+// booking site (only services still on the menu online, worked out there).
+export async function loadRebook(admin: Admin, account: Account): Promise<AccountData["rebook"]> {
+  const { data, error } = await admin
+    .from("appointments")
+    .select("appointment_items(service_id, staff_id, starts_at, service:services(name), staff:staff(first_name))")
+    .eq("client_id", account.clientId)
+    .eq("business_id", account.businessId)
+    .eq("status", "completed")
+    .order("starts_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.appointment_items.length) return null;
+  const items = [...data.appointment_items]
+    .sort((x, y) => x.starts_at.localeCompare(y.starts_at))
+    .map((i) => ({ serviceId: i.service_id, service: i.service.name, staffId: i.staff_id, stylist: i.staff.first_name, priceCents: 0 }));
+  const stylists = [...new Set(items.map((i) => i.staffId))];
+  return { serviceIds: items.map((i) => i.serviceId), staffId: stylists.length === 1 ? stylists[0] : null, label: rebookLabel({ items }) };
+}
+
 // "Women's Cut & Style with Bridget"
 export function rebookLabel(visit: Pick<AccountVisit, "items">): string {
   const services = visit.items.map((i) => i.service);

@@ -5,11 +5,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { salonLogoUrl, staffPhotoUrl } from "@/lib/branding";
+import type { OpeningHours } from "./intro";
 import type { StaffLevel } from "@/lib/schedule-forms";
 import { formatPhone } from "./contact";
 import { DEFAULT_ACCENT, type DepositKind } from "./settings";
 import { levelPricesFrom, sortCategories, stylistPrice } from "@/lib/services";
-import { firstLetter } from "@/lib/initial";
 
 type Admin = SupabaseClient<Database>;
 
@@ -29,18 +29,23 @@ export type SiteService = {
 export type SiteStylist = {
   id: string;
   firstName: string;
-  // "Bridget C."
+  // "Bridget Callahan"
   displayName: string;
   level: StaffLevel | null;
   color: string | null;
   photoUrl: string | null;
+  // "Lived-in color and balayage", a short bio and up to 3 portfolio
+  // photos (Settings → Booking page).
+  specialty: string | null;
+  bio: string | null;
+  portfolio: string[];
   // Their price for each service they offer online, in cents.
   prices: Record<string, number>;
 };
 
 export type BookingSite = {
-  business: { id: string; name: string; slug: string; logoUrl: string | null };
-  location: { id: string; name: string; timezone: string; address: string | null; phone: string | null };
+  business: { id: string; name: string; slug: string; logoUrl: string | null; coverUrl: string | null };
+  location: { id: string; name: string; timezone: string; address: string | null; phone: string | null; hours: OpeningHours[] };
   settings: {
     windowDays: number;
     noticeMinutes: number;
@@ -54,6 +59,8 @@ export type BookingSite = {
   // The salon's patch test rules (see lib/scheduling/patch-tests.ts).
   patchTest: { validDays: number; minHours: number };
   services: SiteService[];
+  // A photo for each category that has one.
+  categoryPhotos: Record<string, string>;
   stylists: SiteStylist[];
 };
 
@@ -79,7 +86,7 @@ export async function loadSite(admin: Admin, slug: string): Promise<SiteLookup> 
   const logoUrl = salonLogoUrl(business.logo_path);
   if (!loc || !settings?.enabled) return { status: "closed", name: business.name, logoUrl, phone: loc?.phone ?? null };
 
-  const [{ data: services, error: serviceError }, { data: staff, error: staffError }] = await Promise.all([
+  const [{ data: services, error: serviceError }, { data: staff, error: staffError }, { data: hours, error: hoursError }, { data: photos, error: photoError }] = await Promise.all([
     admin
       .from("services")
       .select("id, name, category, description, duration_minutes, price_cents, online_booking, requires_patch_test, deposit_kind, deposit_amount, service_level_prices(level, price_cents)")
@@ -88,24 +95,31 @@ export async function loadSite(admin: Admin, slug: string): Promise<SiteLookup> 
       .neq("online_booking", "off"),
     admin
       .from("staff")
-      .select("id, first_name, last_name, level, color, photo_path, staff_services(service_id, price_cents)")
+      .select("id, first_name, last_name, level, color, photo_path, specialty, bio, portfolio_paths, staff_services(service_id, price_cents)")
       .eq("location_id", loc.id)
       .eq("role", "stylist")
       .eq("is_active", true)
       .order("first_name"),
+    admin.from("location_hours").select("weekday, start_minute, end_minute").eq("location_id", loc.id),
+    admin.from("service_category_photos").select("category, photo_path").eq("business_id", business.id),
   ]);
   if (serviceError) throw serviceError;
   if (staffError) throw staffError;
+  if (hoursError) throw hoursError;
+  if (photoError) throw photoError;
 
   const byId = new Map(services.map((s) => [s.id, { price_cents: s.price_cents, levelPrices: levelPricesFrom(s.service_level_prices) }]));
   const stylists: SiteStylist[] = staff
     .map((s) => ({
       id: s.id,
       firstName: s.first_name,
-      displayName: s.last_name ? `${s.first_name} ${firstLetter(s.last_name)}.` : s.first_name,
+      displayName: [s.first_name, s.last_name].filter(Boolean).join(" "),
       level: s.level,
       color: s.color,
       photoUrl: staffPhotoUrl(s.photo_path),
+      specialty: s.specialty?.trim() || null,
+      bio: s.bio?.trim() || null,
+      portfolio: s.portfolio_paths.map((p) => staffPhotoUrl(p)!),
       prices: Object.fromEntries(
         s.staff_services
           .filter((ss) => byId.has(ss.service_id))
@@ -138,8 +152,15 @@ export async function loadSite(admin: Admin, slug: string): Promise<SiteLookup> 
   return {
     status: "open",
     site: {
-      business: { id: business.id, name: business.name, slug: business.slug!, logoUrl },
-      location: { id: loc.id, name: loc.name, timezone: loc.timezone, address, phone: digits.length === 10 ? formatPhone(digits) : loc.phone },
+      business: { id: business.id, name: business.name, slug: business.slug!, logoUrl, coverUrl: salonLogoUrl(settings.cover_path) },
+      location: {
+        id: loc.id,
+        name: loc.name,
+        timezone: loc.timezone,
+        address,
+        phone: digits.length === 10 ? formatPhone(digits) : loc.phone,
+        hours: hours.map((h) => ({ weekday: h.weekday, start: h.start_minute, end: h.end_minute })),
+      },
       settings: {
         windowDays: settings.window_days,
         noticeMinutes: settings.notice_minutes,
@@ -152,6 +173,7 @@ export async function loadSite(admin: Admin, slug: string): Promise<SiteLookup> 
       },
       patchTest: { validDays: business.patch_test_valid_days, minHours: business.patch_test_min_hours },
       services: siteServices,
+      categoryPhotos: Object.fromEntries(photos.filter((p) => siteServices.some((x) => x.category === p.category)).map((p) => [p.category, salonLogoUrl(p.photo_path)!])),
       stylists,
     },
   };
