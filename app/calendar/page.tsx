@@ -28,6 +28,7 @@ import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, parseTi
 import { visitWarnings } from "@/lib/client-checks";
 import { fullName, sortForCalendar } from "@/lib/staff";
 import { CalendarBoard } from "./board";
+import { CalendarSkeleton } from "./skeleton";
 import { loadVisitPolicies } from "@/lib/policy-visits";
 import type { AppointmentDetail, BlockData, BoardData, ColumnData } from "./types";
 import { can } from "@/lib/permissions";
@@ -43,7 +44,21 @@ export default function CalendarPage({ searchParams }: PageProps<"/calendar">) {
   );
 }
 
+// The shell shows as soon as we know who's signed in; the day's shape (the
+// toolbar, the stylists' columns, the hours) stands in while it loads.
 async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchParams">) {
+  const { staff: me } = await getCurrentStaff();
+  if (!me) return <NotLinked />;
+  return (
+    <AppShell section="calendar" me={me} bleed denise={false}>
+      <Suspense fallback={<CalendarSkeleton />}>
+        <CalendarDay searchParams={searchParams} />
+      </Suspense>
+    </AppShell>
+  );
+}
+
+async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searchParams">) {
   const [params, { supabase, staff: me }, jar] = await Promise.all([searchParams, getCurrentStaff(), cookies()]);
   if (!me) return <NotLinked />;
 
@@ -562,14 +577,10 @@ async function Calendar({ searchParams }: Pick<PageProps<"/calendar">, "searchPa
     initialView,
   };
 
-  return (
-    <AppShell section="calendar" me={me} bleed denise={false}>
-      {columns.length === 0 ? (
-        <EmptyState className="py-16">No one at this location takes appointments yet.</EmptyState>
-      ) : (
-        <CalendarBoard data={data} />
-      )}
-    </AppShell>
+  return columns.length === 0 ? (
+    <EmptyState className="py-16">No one at this location takes appointments yet.</EmptyState>
+  ) : (
+    <CalendarBoard data={data} />
   );
 }
 

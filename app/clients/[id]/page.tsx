@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { ProfileSkeleton } from "./skeleton";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Avatar } from "@/components/ui/avatar";
 import { BackLink } from "@/components/ui/back-link";
@@ -68,10 +69,24 @@ export default function ClientPage({ params }: PageProps<"/clients/[id]">) {
 // The past visits shown in the Visits tab.
 const PAST_VISITS = 100;
 
+// The shell shows as soon as we know who's signed in; the profile's shape
+// stands in while the client's records load.
 async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "params">) {
-  const [{ id }, { supabase, staff: me }, jar] = await Promise.all([params, getCurrentStaff(), cookies()]);
+  const [{ id }, { staff: me }] = await Promise.all([params, getCurrentStaff()]);
   if (!me) return <NotLinked />;
   if (!isUuid(id)) notFound();
+  return (
+    <AppShell section="clients" me={me} wide>
+      <Suspense fallback={<ProfileSkeleton />}>
+        <ClientRecords id={id} />
+      </Suspense>
+    </AppShell>
+  );
+}
+
+async function ClientRecords({ id }: { id: string }) {
+  const [{ supabase, staff: me }, jar] = await Promise.all([getCurrentStaff(), cookies()]);
+  if (!me) return <NotLinked />;
 
   const tz = me.location.timezone;
   const today = todayIn(tz);
@@ -321,7 +336,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
   ];
 
   return (
-    <AppShell section="clients" me={me} wide>
+    <>
       <BackLink href="/clients">Clients</BackLink>
 
       {client.allergies && (
@@ -473,7 +488,7 @@ async function ClientProfile({ params }: Pick<PageProps<"/clients/[id]">, "param
           </aside>
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }
 

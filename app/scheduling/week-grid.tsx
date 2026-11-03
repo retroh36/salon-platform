@@ -425,7 +425,7 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
                                 </span>
                               ))}
                             {grid.lentChairs[cellKey(cell.staffId, cell.date)] && (
-                              <span className="inline-flex h-7 max-w-full min-w-0 items-center px-1 text-[11px] font-medium text-active-ink" data-testid="lent-chair">
+                              <span className="inline-flex h-7 max-w-full min-w-0 items-center px-1 text-2xs font-medium text-active-ink" data-testid="lent-chair">
                                 <span className="truncate">{grid.lentChairs[cellKey(cell.staffId, cell.date)]}</span>
                               </span>
                             )}

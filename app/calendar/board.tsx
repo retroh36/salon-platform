@@ -1161,7 +1161,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         key={m}
                         {...(hour ? { "data-hour-label": m } : { "data-quarter-label": m })}
                         aria-hidden={nowHides(m) || undefined}
-                        className={`absolute right-2 transition-opacity duration-(--motion-fast) ${hour ? "text-xs font-semibold text-ink" : "text-[11px] text-ink-subtle"} ${m === range.start ? "translate-y-1" : "-translate-y-1/2"} ${nowHides(m) ? "opacity-0" : ""}`}
+                        className={`absolute right-2 transition-opacity duration-(--motion-fast) ${hour ? "text-xs font-semibold text-ink" : "text-2xs text-ink-subtle"} ${m === range.start ? "translate-y-1" : "-translate-y-1/2"} ${nowHides(m) ? "opacity-0" : ""}`}
                         style={{ top: y(m) }}
                       >
                         {hour ? formatMinute(m) : `:${String(m % 60).padStart(2, "0")}`}
@@ -2005,7 +2005,7 @@ function FixGhost({ block, y }: { block: Placed & { lane: number; lanes: number 
         )}
         <FitText
           variants={[`→ ${formatMinute(block.start)}–${formatMinute(block.end)}`, `→ ${formatMinute(block.start)}`]}
-          className="text-[13px] leading-[17px] text-denise-700"
+          className="text-13 leading-[17px] text-denise-700"
         />
       </div>
     </li>
@@ -2259,7 +2259,7 @@ function DragGhost({ block, start, stylist, y }: { block: BlockData; start: numb
       style={{ top: y(start), height: length * PX_PER_MINUTE }}
     >
       <div className="truncate font-semibold">{block.clientName}</div>
-      <div className="truncate text-[13px] font-medium">
+      <div className="truncate text-13 font-medium">
         {formatMinute(start)}–{formatMinute(start + length)} · {stylist}
       </div>
     </div>
@@ -2481,12 +2481,12 @@ function AppointmentBlock({
         )}
         {show.service && (
           <span aria-hidden className={`relative block ${narrow ? "px-1.5" : "px-2"}`}>
-            <FitText variants={services} lines={show.serviceLines} className="text-[13px] leading-[17px] text-(--visit-ink-muted)" />
+            <FitText variants={services} lines={show.serviceLines} className="text-13 leading-[17px] text-(--visit-ink-muted)" />
           </span>
         )}
         {show.time && (
           <span aria-hidden className={`relative block ${narrow ? "px-1.5" : "px-2"}`}>
-            <FitText variants={ranges} className="text-[13px] leading-[17px] text-(--visit-ink-muted)" />
+            <FitText variants={ranges} className="text-13 leading-[17px] text-(--visit-ink-muted)" />
           </span>
         )}
       </div>

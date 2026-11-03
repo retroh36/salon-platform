@@ -64,14 +64,14 @@ export function SalonIntro({
             <span
               aria-hidden
               data-testid="salon-initial"
-              className="inline-flex size-18 shrink-0 items-center justify-center rounded-[18px_6px_18px_6px] border-4 border-canvas bg-(--accent) text-3xl text-white md:size-22"
+              className="inline-flex size-18 shrink-0 items-center justify-center rounded-[18px_6px_18px_6px] border-4 border-canvas bg-(--accent) font-serif text-display-lg text-white md:size-22"
             >
               {salonInitial(business.name)}
             </span>
           )}
         </div>
 
-        <h1 className="mt-4 text-[1.75rem] leading-tight font-semibold tracking-[-0.02em] text-balance text-ink md:text-[2rem]">{business.name}</h1>
+        <h1 className="mt-4 font-serif text-display font-semibold tracking-[-0.01em] text-balance text-ink md:text-display-lg">{business.name}</h1>
 
         {rebook && (
           <div className="mt-5 rounded-lg border border-(--accent-line) bg-(--accent-soft) p-4" data-testid="book-again">

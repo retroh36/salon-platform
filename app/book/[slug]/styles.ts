@@ -34,8 +34,8 @@ export function chipClass(on: boolean) {
     on ? "border-(--accent) bg-(--accent) text-white" : "border-line-strong bg-surface text-ink hover:bg-sunken"
   }`;
 }
-// A page's title on a client page (24px), and the line under it.
-export const pageTitle = "text-2xl font-semibold tracking-[-0.015em] text-ink";
+// A page's title on a client page (24px, in the serif), and the line under it.
+export const pageTitle = "font-serif text-2xl font-semibold tracking-[-0.01em] text-balance text-ink";
 export const pageLead = "mt-1.5 text-ink-muted";
 // Outlined in red: the first step of something that can't be taken back.
 export const dangerOutlineButton = `${buttonBase} border border-line-strong bg-surface text-danger hover:bg-danger-soft disabled:opacity-55`;

@@ -15,6 +15,10 @@ import { StatusChip } from "@/components/ui/status-chip";
 import { actionsClass, numClass, TableCard, tableClass, tdClass, theadClass, thClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
 import { TabSamples } from "./samples";
+import { serif } from "@/app/serif";
+import { CalendarSkeleton } from "@/app/calendar/skeleton";
+import { ProfileSkeleton } from "@/app/clients/[id]/skeleton";
+import { SiteSkeleton, TimesSkeleton } from "@/app/book/[slug]/skeleton";
 
 export const metadata: Metadata = { title: "Style guide" };
 
@@ -36,6 +40,14 @@ const TYPE: [string, string, string][] = [
   ["text-sm", "14px regular", "Body text, table cells, buttons"],
   ["text-13 font-medium", "13px medium", "Labels, notes"],
   ["text-xs", "12px regular", "Meta, tags, hints"],
+  ["text-2xs font-medium", "11px medium", "Dense grid labels only (calendar, week grid)"],
+];
+
+// Client pages and signing in only: the salon's name and big headlines.
+const SERIF: [string, string, string][] = [
+  ["font-serif text-display-lg font-semibold tracking-[-0.01em]", "32px serif", "Salon name (desktop), sign-in headline"],
+  ["font-serif text-display font-semibold tracking-[-0.01em]", "28px serif", "Salon name (phone)"],
+  ["font-serif text-2xl font-semibold tracking-[-0.01em]", "24px serif", "Page and step titles"],
 ];
 
 const COLORS: [string, string[]][] = [
@@ -91,7 +103,7 @@ async function Design() {
         }
       />
 
-      <Section title="Type" description="Geist throughout. Hierarchy from weight and color, not size.">
+      <Section title="Type" description="Geist for the staff app. Source Serif only on client pages and sign-in, for the salon's name and big headlines. Hierarchy from weight and color, not size.">
         <Card flush>
           <ul className="divide-y divide-line">
             {TYPE.map(([cls, size, use]) => (
@@ -111,6 +123,17 @@ async function Design() {
               <span className="text-13 text-ink-muted">Geist Mono</span>
               <span className="text-13 text-ink-subtle">Codes only</span>
             </li>
+          </ul>
+        </Card>
+        <Card flush className={serif.variable}>
+          <ul className="divide-y divide-line">
+            {SERIF.map(([cls, size, use]) => (
+              <li key={size} className="grid items-baseline gap-2 px-4 py-3 sm:grid-cols-[1fr_10rem_14rem]">
+                <span className={`${cls} text-ink`}>Maple &amp; Ash Hair Studio</span>
+                <span className="text-13 text-ink-muted">{size}</span>
+                <span className="text-13 text-ink-subtle">{use}</span>
+              </li>
+            ))}
           </ul>
         </Card>
       </Section>
@@ -382,6 +405,22 @@ async function Design() {
               <Skeleton className="h-16" style={{ animationDelay: "80ms" }} />
             </div>
           </div>
+        </div>
+      </Section>
+
+      <Section title="Page skeletons" description="The page's own shape while its data loads, under the sidebar that's already there.">
+        <div className="flex flex-col gap-6" aria-hidden>
+          {[
+            ["Calendar", <CalendarSkeleton key="c" />],
+            ["Client profile", <div key="p" className="p-6"><ProfileSkeleton /></div>],
+            ["Booking site", <SiteSkeleton key="s" />],
+            ["Booking site, finding times", <div key="t" className="max-w-xl p-6"><TimesSkeleton /></div>],
+          ].map(([label, shape]) => (
+            <div key={label as string} className="flex flex-col gap-2">
+              <p className="text-13 font-medium text-ink-muted">{label}</p>
+              <div className="max-h-[30rem] overflow-hidden rounded-lg border border-line bg-canvas">{shape}</div>
+            </div>
+          ))}
         </div>
       </Section>
 

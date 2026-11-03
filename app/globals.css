@@ -6,6 +6,13 @@
    pair there.
    --------------------------------------------------------------------------- */
 
+/* Source Serif's variable is set only on the pages that load it (a client
+   page's frame, signing in), not on :root, so font-serif refers to it where
+   it's used (inline) rather than through a :root variable. */
+@theme inline {
+  --font-serif: var(--font-source-serif), ui-serif, Georgia, serif;
+}
+
 @theme {
   /* Surfaces: a warm off-white page, white cards */
   --color-canvas: #faf8f5;
@@ -151,14 +158,23 @@
   --color-danger-dot: #e5484d;
   --color-now: #c8323a;
 
-  /* Type: Geist for everything (docs/brand.md), Geist Mono only where
-     digits must line up as code (receipt numbers, gift card codes). The
-     scale is 12, 13, 14, 16, 20 and 24px: text-xs, text-13, text-sm,
-     text-base, text-xl and text-2xl. */
+  /* Type (docs/brand.md, "Typography"): Geist for the staff app, Geist
+     Mono only where digits must line up as code (receipt numbers, gift card
+     codes), and Source Serif (app/serif.ts) only on client pages and
+     signing in, for the salon's name and big headlines. The scale is 11
+     (dense grid labels only), 12, 13, 14, 16, 20 and 24px, and 28/32px for
+     a display headline: text-2xs, text-xs, text-13, text-sm, text-base,
+     text-xl, text-2xl, text-display and text-display-lg. */
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
   --text-13: 0.8125rem;
   --text-13--line-height: 1.25rem;
+  --text-display: 1.75rem;
+  --text-display--line-height: 1.15;
+  --text-display-lg: 2rem;
+  --text-display-lg--line-height: 1.15;
 
   /* Radius: 8px for buttons, fields and cards; 6px for small tags */
   --radius-sm: 4px;

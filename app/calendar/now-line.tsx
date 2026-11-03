@@ -46,7 +46,7 @@ export function NowLine({
       className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-now"
       style={{ top: (local.minute - startMinute) * pxPerMinute }}
     >
-      <span className="absolute -top-2.5 -left-[3.75rem] w-14 rounded-full bg-now py-0.5 text-center text-[11px] leading-4 font-semibold text-white">
+      <span className="absolute -top-2.5 -left-[3.75rem] w-14 rounded-full bg-now py-0.5 text-center text-2xs font-semibold text-white">
         {formatMinute(local.minute)}
       </span>
       <span className="absolute -top-[5px] -left-1 size-2 rounded-full bg-now" />

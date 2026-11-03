@@ -13,6 +13,8 @@ import { loadRebook } from "@/lib/online-booking/account-data";
 import { BookingFlow } from "./booking-flow";
 import { BookingFrame } from "./frame";
 import { SalonIntro, SalonTop } from "./intro";
+import { SiteSkeleton } from "./skeleton";
+import { pageTitle } from "./styles";
 
 // The title, description and links Google and link previews use, from the
 // salon's own details; a closed or missing site isn't indexed.
@@ -40,7 +42,7 @@ export async function generateMetadata({ params }: PageProps<"/book/[slug]">): P
 
 export default function BookPage({ params, searchParams }: PageProps<"/book/[slug]">) {
   return (
-    <Suspense fallback={<div className="min-h-dvh bg-canvas" aria-busy="true" />}>
+    <Suspense fallback={<SiteSkeleton />}>
       <Booking params={params} searchParams={searchParams} />
     </Suspense>
   );
@@ -58,7 +60,7 @@ async function Booking({ params, searchParams }: { params: Promise<{ slug: strin
   if (found.status === "closed") {
     return (
       <BookingFrame name={found.name} logoUrl={found.logoUrl} accent="#17273b">
-        <h1 className="text-2xl font-semibold tracking-[-0.015em]">Online booking is closed</h1>
+        <h1 className={pageTitle}>Online booking is closed</h1>
         <p className="mt-1.5 text-ink-muted">
           {found.phone ? `Please call us on ${found.phone} to book.` : "Please call the salon to book."}
         </p>

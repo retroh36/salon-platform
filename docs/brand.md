@@ -222,9 +222,15 @@ or one-off hex values.
 
 ## Typography
 
-- **Geist** (the `geist` package, through `next/font`) for everything:
-  titles, body, labels, buttons, numbers, the booking site and the login
-  screen. No serif anywhere in the product.
+- **Geist** (the `geist` package, through `next/font`) for the staff app:
+  titles, body, labels, buttons, numbers, every screen staff work in. The
+  staff app stays Geist.
+- **Source Serif** (Next's built-in Google Fonts loading, `app/serif.ts`,
+  as `font-serif`) only on client-facing pages (the booking site and its
+  manage, account, event, pay, card and unsubscribe pages) and on signing
+  in, and there only for the salon's name and big headlines (page and step
+  titles, the sign-in headline). Body text, labels, buttons and prices on
+  those pages stay Geist.
 - **Geist Mono** only where characters must line up as code (gift card
   codes, a formula's amounts). Money and counts use Geist with tabular
   figures (`tabular-nums`), so columns line up.
@@ -233,6 +239,11 @@ or one-off hex values.
   with slight negative letter-spacing (`PageHeader`); section and card
   titles 16px semibold; body 14px (the app's default); labels 13px medium;
   meta and tags 12px. Hierarchy comes from weight and color, not size.
+  Two additions, each for one place only: 11px (`text-2xs`) for labels in
+  dense grids (the calendar's quarter hours and time pill, the week grid,
+  the sidebar's group headings, small status chips), and 28/32px
+  (`text-display`, `text-display-lg`) for the salon's name on its booking
+  site and the sign-in headline, in the serif. No other sizes.
 - Small labels are sentence case, never spaced-out capitals.
 - The wordmark is part of the logo: never set "Maestra" in a font to stand
   in for it.

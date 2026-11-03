@@ -1,12 +1,13 @@
 import { DeniseFace } from "@/components/denise";
 import { TAGLINE } from "@/lib/branding";
+import { serif } from "@/app/serif";
 
 // Maestra's own screen (the product brand, not a salon's): the logo and
 // tagline beside a plain form (signing in, a forgotten password, choosing a
 // password). On narrow screens the panel folds to the logo above the form.
 export function AuthScreen({ title, subtitle, children, footer }: { title: string; subtitle: string; children: React.ReactNode; footer?: React.ReactNode }) {
   return (
-    <main className="flex flex-1 bg-canvas">
+    <main className={`${serif.variable} flex flex-1 bg-canvas`}>
       <section
         aria-label="Maestra"
         className="relative hidden w-[44%] max-w-2xl shrink-0 flex-col justify-between overflow-hidden bg-navy-900 px-14 py-12 text-white lg:flex"
@@ -14,8 +15,8 @@ export function AuthScreen({ title, subtitle, children, footer }: { title: strin
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/maestra/maestra-logo-white.png" alt="Maestra" className="-ml-3 h-16 w-auto self-start" />
         <div className="relative z-10 animate-fade-in">
-          <p className="text-2xl leading-tight font-semibold tracking-[-0.015em]">Your salon&rsquo;s brain.</p>
-          <p className="mt-5 flex items-center gap-3 text-2xl font-semibold text-denise-200">
+          <p className="font-serif text-display-lg font-semibold tracking-[-0.01em]">Your salon&rsquo;s brain.</p>
+          <p className="mt-5 flex items-center gap-3 font-serif text-display-lg font-semibold text-denise-200">
             <DeniseFace size={44} />
             Meet Denise.
           </p>
@@ -35,7 +36,7 @@ export function AuthScreen({ title, subtitle, children, footer }: { title: strin
             <img src="/brand/maestra/maestra-logo.png" alt="Maestra" className="-ml-2 h-12 w-auto" />
             <p className="mt-3 text-sm text-ink-muted">{TAGLINE}</p>
           </div>
-          <h1 className="text-2xl font-semibold tracking-[-0.015em] text-ink">{title}</h1>
+          <h1 className="font-serif text-2xl font-semibold tracking-[-0.01em] text-ink">{title}</h1>
           <p className="mt-1 mb-8 text-ink-muted">{subtitle}</p>
           {children}
           {footer}

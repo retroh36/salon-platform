@@ -17,6 +17,7 @@ import { formatMinute, type LocalDate } from "@/lib/scheduling/time";
 import { formatPrice, formatPriceRange } from "@/lib/services";
 import { formatDuration } from "@/lib/duration";
 import { book, confirmCode, findTimes, requestCode, reviewPromotion, reviewTerms, type DayTimes, type PromotionResult, type TermsResult } from "./actions";
+import { LinesSkeleton, TimesSkeleton } from "./skeleton";
 import { accentLink, buttonSpinner, choiceClass, inputClass, primaryButton, secondaryButton, sectionTitle, smallButton } from "./styles";
 import { DateStrip, TimeGrid, longDate } from "./times";
 
@@ -252,7 +253,7 @@ export function BookingFlow({
         className="flex flex-1 animate-step-in flex-col"
         style={{ "--step-from": `${direction * 16}px` } as React.CSSProperties}
       >
-        <h2 id="step-title" ref={heading} tabIndex={-1} className="mb-4 text-xl font-semibold tracking-[-0.01em] text-ink focus:outline-none">
+        <h2 id="step-title" ref={heading} tabIndex={-1} className="mb-4 font-serif text-2xl font-semibold tracking-[-0.01em] text-ink focus:outline-none">
           {STEP_TITLES[step]}
         </h2>
 
@@ -608,7 +609,7 @@ function TimeStep({
   const name = (id: string) => stylists.find((s) => s.id === id)?.firstName ?? "";
 
   if (error) return <Alert>{error}</Alert>;
-  if (!days) return <p className="text-ink-muted" aria-busy="true">Finding times…</p>;
+  if (!days) return <TimesSkeleton />;
 
   return (
     <div className="flex flex-col gap-5" aria-busy={loading}>
@@ -931,9 +932,7 @@ function ConfirmStep({
       <PromoCode promo={promo} onCode={onCode} />
 
       {terms === null ? (
-        <p className="text-sm text-ink-muted" aria-busy="true">
-          Getting the cancellation policy…
-        </p>
+        <LinesSkeleton label="Getting the cancellation policy…" />
       ) : !terms.ok ? (
         <Alert>{terms.message}</Alert>
       ) : (

@@ -1,4 +1,5 @@
 import { salonInitial } from "@/lib/branding";
+import { serif } from "@/app/serif";
 
 // The booking site's frame: the salon's own brand first (its logo or
 // initial, name and color), with "Powered by Maestra" small at the foot.
@@ -21,7 +22,7 @@ export function BookingFrame({
 }) {
   return (
     <div
-      className="flex min-h-dvh flex-col bg-canvas text-ink"
+      className={`${serif.variable} flex min-h-dvh flex-col bg-canvas text-ink`}
       style={
         {
           "--accent": accent,
@@ -39,11 +40,11 @@ export function BookingFrame({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logoUrl} alt="" data-testid="salon-logo" className="size-11 shrink-0 rounded-[14px_4px_14px_4px] bg-surface object-contain" />
             ) : (
-              <span aria-hidden data-testid="salon-initial" className="inline-flex size-11 shrink-0 items-center justify-center rounded-[14px_4px_14px_4px] bg-(--accent) text-xl text-white">
+              <span aria-hidden data-testid="salon-initial" className="inline-flex size-11 shrink-0 items-center justify-center rounded-[14px_4px_14px_4px] bg-(--accent) font-serif text-xl text-white">
                 {salonInitial(name)}
               </span>
             )}
-            <p className="min-w-0 truncate text-base font-semibold tracking-tight text-ink">{name}</p>
+            <p className="min-w-0 truncate font-serif text-xl font-semibold text-ink">{name}</p>
           </div>
         </header>
       )}

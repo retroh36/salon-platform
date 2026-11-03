@@ -26,7 +26,7 @@ const DOTS: Record<AppointmentStatus, string> = {
 
 // The status as a small tag: a dot and the label (the Badge look).
 export function StatusChip({ status, size = "md", className = "" }: { status: AppointmentStatus; size?: "sm" | "md"; className?: string }) {
-  const sizes = { sm: "h-4 gap-1 px-1 text-[11px] leading-4", md: "h-5 gap-1.5 px-1.5 text-xs leading-5" };
+  const sizes = { sm: "h-4 gap-1 px-1 text-2xs", md: "h-5 gap-1.5 px-1.5 text-xs leading-5" };
   return (
     <span data-status={status} className={`inline-flex shrink-0 items-center rounded-sm font-medium whitespace-nowrap ${sizes[size]} ${STYLES[status]} ${className}`}>
       <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${DOTS[status]}`} />

@@ -167,7 +167,7 @@ export function AppFrame({
         <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 pb-3">
           {groups.map((g) => (
             <div key={g.label} role="group" aria-labelledby={`nav-${g.label}`} className="flex flex-col gap-0.5">
-              <h2 id={`nav-${g.label}`} className="px-3 pb-1 text-[11px] font-medium tracking-wider text-sidebar-muted uppercase">
+              <h2 id={`nav-${g.label}`} className="px-3 pb-1 text-2xs font-medium tracking-wider text-sidebar-muted uppercase">
                 {g.label}
               </h2>
               {g.items.map((item) => (
