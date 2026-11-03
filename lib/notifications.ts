@@ -19,17 +19,6 @@ export type VisitChange = {
   to: { minute: number; staffId: string; staffFirstName: string };
 };
 
-function clientMessage(c: VisitChange, undo: boolean): string {
-  const hi = `Hi ${c.client!.firstName}, it's ${c.salon}.`;
-  if (undo) {
-    return `${hi} Sorry for the mix-up: your appointment today is back at ${formatMinute(c.from.minute)} with ${c.from.staffFirstName}. See you then!`;
-  }
-  const sameStylist = c.from.staffId === c.to.staffId;
-  const when = c.from.minute === c.to.minute ? `is still at ${formatMinute(c.to.minute)}` : `has moved from ${formatMinute(c.from.minute)} to ${formatMinute(c.to.minute)}`;
-  const who = sameStylist ? `, still with ${c.to.staffFirstName}` : ` and will be with ${c.to.staffFirstName}`;
-  return `${hi} Your appointment today ${when}${who}. Reply or call us if that doesn't work. See you soon!`;
-}
-
 function staffMessage(c: VisitChange, staffId: string, undo: boolean): string {
   const name = c.client?.fullName ?? "A walk-in";
   const [from, to] = undo ? [c.to, c.from] : [c.from, c.to];
@@ -38,18 +27,17 @@ function staffMessage(c: VisitChange, staffId: string, undo: boolean): string {
   return `${name}'s ${c.service} at ${formatMinute(from.minute)} has moved to ${to.staffFirstName} at ${formatMinute(to.minute)}.`;
 }
 
-// What to send when a change is applied, and what to send instead if it's
-// undone after these went out: the client, and each stylist involved.
+// What to tell each stylist involved when one of Denise's fixes is applied,
+// and what to tell them instead if it's undone after these went out. Never
+// the client: a client hears about a fix only from the message staff check
+// and send after Apply (app/calendar/moved-messages.tsx), and the database
+// refuses a fix's notice to a client (private.check_proposal_notices).
 export function notificationsFor(changes: readonly VisitChange[]): { notifications: NotificationDraft[]; undo: NotificationDraft[] } {
   const notifications: NotificationDraft[] = [];
   const undo: NotificationDraft[] = [];
   for (const c of changes) {
     // A new chair at the same time with the same stylist needs no notice.
     if (c.from.minute === c.to.minute && c.from.staffId === c.to.staffId) continue;
-    if (c.client) {
-      notifications.push({ template: "time_change", body: clientMessage(c, false), appointmentId: c.appointmentId, clientId: c.client.id });
-      undo.push({ template: "time_change_undone", body: clientMessage(c, true), appointmentId: c.appointmentId, clientId: c.client.id });
-    }
     for (const staffId of new Set([c.from.staffId, c.to.staffId])) {
       notifications.push({ template: "staff_schedule_change", body: staffMessage(c, staffId, false), appointmentId: c.appointmentId, staffId });
       undo.push({ template: "staff_schedule_change_undone", body: staffMessage(c, staffId, true), appointmentId: c.appointmentId, staffId });

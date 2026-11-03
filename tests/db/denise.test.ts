@@ -177,18 +177,11 @@ describe("Denise's fixes", () => {
     });
     expect(await startOf(next.id)).toEqual({ start: at(11, 20), staffId: BRIDGET });
 
+    // The stylist is told; the client isn't, until staff send their message.
     const { data: sent } = await admin.from("notifications").select("client_id, staff_id, template, body, status, appointment_id").eq("ai_action_id", top.actionId!);
-    expect(sent).toHaveLength(2);
-    expect(sent).toContainEqual(
-      expect.objectContaining({
-        client_id: clients[1].id,
-        template: "time_change",
-        status: "pending",
-        appointment_id: next.appointment_id,
-        body: `Hi ${clients[1].first_name}, it's Maple & Ash Hair Studio. Your appointment today has moved from 11am to 11:20am, still with Bridget. Reply or call us if that doesn't work. See you soon!`,
-      }),
-    );
-    expect(sent).toContainEqual(expect.objectContaining({ staff_id: BRIDGET, template: "staff_schedule_change", body: `${name(1)}'s Women's Cut & Style has moved from 11am to 11:20am.` }));
+    expect(sent).toEqual([
+      expect.objectContaining({ client_id: null, staff_id: BRIDGET, template: "staff_schedule_change", status: "pending", body: `${name(1)}'s Women's Cut & Style has moved from 11am to 11:20am.` }),
+    ]);
 
     // All clear now.
     expect((await scanDay(frontDesk, desk, DAY, { now: NOW })).conflicts).toEqual([]);
@@ -197,31 +190,67 @@ describe("Denise's fixes", () => {
     expect(await undoFix(frontDesk, desk, top.actionId!, NOW)).toEqual({ ok: true, date: DAY, message: `Undone — ${clients[1].first_name} is back at 11:00.` });
     expect(await startOf(next.id)).toEqual({ start: at(11), staffId: BRIDGET });
     const { data: canceled } = await admin.from("notifications").select("status").eq("ai_action_id", top.actionId!);
-    expect(canceled!.map((n) => n.status)).toEqual(["canceled", "canceled"]);
+    expect(canceled!.map((n) => n.status)).toEqual(["canceled"]);
     const after = await scanDay(frontDesk, desk, DAY, { now: NOW });
     expect(after.conflicts).toHaveLength(1);
     expect(after.conflicts[0].options[0].actionId).not.toBe(top.actionId);
   });
 
-  it("tells clients it's back when a notice already went out", async () => {
-    const { current } = await overrunMorning();
+  // A client message goes out only when staff send it: applying or undoing
+  // a fix never records one a sender could send by itself, not even from a
+  // proposal stored before this rule with a client notice in it.
+  it("never records a message to a client: only staff sending one reaches the outbox", async () => {
+    const started = new Date().toISOString();
+    const { current, next } = await overrunMorning();
     await reportRunningLate(frontDesk, current.id, 20);
     const [top] = (await scanDay(frontDesk, desk, DAY, { now: NOW })).conflicts[0].options;
-    await approveFix(frontDesk, desk, top.actionId!, { now: NOW });
-    // Pretend the client's text was sent.
-    await admin.from("notifications").update({ status: "sent" }).eq("ai_action_id", top.actionId!).eq("template", "time_change");
+    // As proposals stored before carried one: a text to the client.
+    const { data: stored } = await admin.from("ai_actions").select("proposal").eq("id", top.actionId!).single();
+    const proposal = stored!.proposal as { notifications?: unknown[]; undo_notifications?: unknown[] };
+    const old = (template: string) => ({ appointment_id: next.appointment_id, client_id: clients[1].id, staff_id: null, template, body: `Hi ${clients[1].first_name}, it's Maple & Ash.` });
+    await admin
+      .from("ai_actions")
+      .update({ proposal: { ...proposal, notifications: [...(proposal.notifications ?? []), old("time_change")], undo_notifications: [...(proposal.undo_notifications ?? []), old("time_change_undone")] } as never })
+      .eq("id", top.actionId!);
 
+    const clientNotices = async () => (await admin.from("notifications").select("id").eq("client_id", clients[1].id).gte("created_at", started)).data;
+    const outbox = async () => (await admin.from("outbox_messages").select("body").gte("created_at", started)).data!.filter((m) => m.body.includes(clients[1].first_name));
+
+    expect((await approveFix(frontDesk, desk, top.actionId!, { now: NOW })).ok).toBe(true);
+    expect(await clientNotices()).toEqual([]);
+    expect(await outbox()).toEqual([]);
+    // Even pretending the stylist's notice went out, undo tells the client nothing.
+    await admin.from("notifications").update({ status: "sent" }).eq("ai_action_id", top.actionId!);
     expect((await undoFix(frontDesk, desk, top.actionId!, NOW)).ok).toBe(true);
-    const { data } = await admin.from("notifications").select("template, status, body, client_id").eq("ai_action_id", top.actionId!).order("created_at");
-    expect(data!.map((n) => [n.template, n.status])).toEqual(
-      expect.arrayContaining([
-        ["time_change", "sent"],
-        ["staff_schedule_change", "canceled"],
-        ["time_change_undone", "pending"],
-      ]),
-    );
-    expect(data).toHaveLength(3);
-    expect(data!.find((n) => n.template === "time_change_undone")!.body).toContain("back at 11am with Bridget");
+    expect(await clientNotices()).toEqual([]);
+    expect(await outbox()).toEqual([]);
+
+    // Nothing pending to any client from any fix, anywhere.
+    const { count } = await admin.from("notifications").select("id", { count: "exact", head: true }).not("ai_action_id", "is", null).not("client_id", "is", null).eq("status", "pending");
+    expect(count).toBe(0);
+
+    // A new proposal carrying a client notice is refused.
+    const refused = await admin.rpc("record_ai_proposals_as_system", {
+      p_location_id: L,
+      p_feature: "conflict_resolver",
+      p_subject: `client-notice-test:${next.appointment_id}`,
+      p_options: [{ summary: "x", reason: "", proposal: { changes: [], notifications: [old("time_change")] } }] as never,
+    });
+    expect(refused.error?.message).toBe("A fix never records a message to a client");
+
+    // Staff sending it is what reaches the client, logged with who sent it.
+    const sentByStaff = await frontDesk.rpc("send_client_message", {
+      p_appointment_id: next.appointment_id,
+      p_purpose: "appointment",
+      p_template: "visit_moved",
+      p_channel: "sms",
+      p_subject: "",
+      p_body: `Hi ${clients[1].first_name}, we've moved your visit. Reply STOP to stop texts.`,
+    });
+    expect(sentByStaff.error).toBeNull();
+    expect(await outbox()).toHaveLength(1);
+    const { data: logged } = await admin.from("client_messages").select("template, sent_by").eq("appointment_id", next.appointment_id);
+    expect(logged).toEqual([{ template: "visit_moved", sent_by: FRONT_DESK }]);
   });
 
   it("moves a late client's visit and marks the report resolved, until undone", async () => {
@@ -313,7 +342,8 @@ describe("who can see reports and notifications", () => {
     const { data: notesByStylist } = await gil.from("notifications").select("id").eq("ai_action_id", top.actionId!);
     expect(notesByStylist).toEqual([]);
     const { data: notesByDesk } = await frontDesk.from("notifications").select("id").eq("ai_action_id", top.actionId!);
-    expect(notesByDesk).toHaveLength(2);
+    // Bridget's notice only: a fix never records one to the client.
+    expect(notesByDesk).toHaveLength(1);
 
     const { data: theirReports } = await otherOwner.from("schedule_disruptions").select("id").eq("on_date", DAY);
     expect(theirReports).toEqual([]);

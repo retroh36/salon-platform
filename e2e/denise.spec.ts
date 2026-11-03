@@ -201,8 +201,9 @@ test.describe("front desk", () => {
     // Logged, with the notices recorded.
     const { data: logged } = await admin.from("ai_actions").select("id, status, decided_by").like("subject", `${DAY}:%`).eq("status", "approved").single();
     expect(logged!.decided_by).toBe(FRONT_DESK);
-    const { count } = await admin.from("notifications").select("id", { count: "exact", head: true }).eq("ai_action_id", logged!.id);
-    expect(count).toBe(2);
+    // Bridget's notice only: the client hears from the message sent above.
+    const { data: notices } = await admin.from("notifications").select("client_id, staff_id").eq("ai_action_id", logged!.id);
+    expect(notices).toEqual([{ client_id: null, staff_id: BRIDGET }]);
 
     // Undo, right there.
     await panel.getByRole("button", { name: "Undo" }).click();
