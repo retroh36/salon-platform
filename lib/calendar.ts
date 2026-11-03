@@ -123,6 +123,14 @@ export function bookedSummary(items: readonly { appointmentId: string; minutes: 
 // or marking a no-show.
 export const NOT_ARRIVED_MINUTES = 15;
 
+// How late a client is who hasn't checked in: whole minutes past their
+// start, only once they're past it (never 0, so no badge at their time),
+// and only for visits still waiting for them.
+export function minutesLate(start: number, nowMinute: number | null, status: string): number | null {
+  if (nowMinute === null || (status !== "booked" && status !== "confirmed")) return null;
+  return nowMinute > start ? nowMinute - start : null;
+}
+
 // A block's time, always the whole range, shortened to fit, longest first:
 // "10:45am–12:10pm", "10:45–12:10pm", "10:45–12:10".
 export function timeRangeVariants(start: number, end: number): string[] {

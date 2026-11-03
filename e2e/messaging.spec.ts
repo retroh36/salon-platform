@@ -48,7 +48,7 @@ test.afterAll(async () => {
   await admin.from("businesses").update({ free_text_roles: ["manager", "front_desk", "stylist"] }).eq("id", B);
 });
 
-const panel = (page: Page) => page.getByRole("tabpanel", { name: "Booking details" });
+const panel = (page: Page) => page.getByRole("complementary", { name: "Booking details" });
 
 async function openVisit(page: Page) {
   await page.goto(`/calendar?date=${DAY}&open=${visitId}`);

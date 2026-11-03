@@ -40,7 +40,7 @@ test("adds before and after photos to a visit, records consent, and shows them o
   await expect(ui(page).getByTestId("calendar-date")).toContainText(formatLongDay(DAY));
   await waitForHydration(page, "section[data-staff-id]");
   await ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Pia Test`) }).click();
-  const panel = page.getByRole("tabpanel", { name: "Booking details" });
+  const panel = page.getByRole("complementary", { name: "Booking details" });
   await visitTab(panel, "Photos");
   const add = panel.getByRole("region", { name: "Add photos" });
   await expect(add.getByRole("button", { name: "Take photo" })).toBeVisible();

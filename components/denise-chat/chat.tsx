@@ -28,6 +28,8 @@ export const DENISE_INPUT_ID = "denise-follow-up";
 // works, and the box to ask her something. The same conversation on every
 // page (./store.ts). `date` is the day on screen (today off the calendar);
 // `appointmentId` the visit open on the calendar, so she knows whose it is.
+// `box={false}` leaves out her message box, for a card that pins it under
+// its scrolling area (`DeniseAskBox`), so it's always in view.
 export function DeniseChat({
   canBook,
   today,
@@ -36,6 +38,7 @@ export function DeniseChat({
   onBooked,
   intro,
   placeholder,
+  box = true,
 }: {
   canBook: boolean;
   today: string;
@@ -46,6 +49,7 @@ export function DeniseChat({
   intro?: React.ReactNode;
   // An example in her message box ("Find a haircut with Gil after 1 PM").
   placeholder?: string;
+  box?: boolean;
 }) {
   const { chat, run, focus } = useDenise();
   const path = usePathname();
@@ -93,12 +97,44 @@ export function DeniseChat({
         </section>
       )}
       <div ref={end} />
-      <AskForm onAsk={ask} disabled={run.working} focus={focus} canBook={canBook} placeholder={placeholder} />
+      {box && <AskForm onAsk={ask} disabled={run.working} focus={focus} canBook={canBook} placeholder={placeholder} />}
     </div>
   );
 }
 
-function AskForm({ onAsk, disabled, focus, canBook, placeholder }: { onAsk: (question: string) => void; disabled: boolean; focus: number; canBook: boolean; placeholder?: string }) {
+// Her message box on its own, pinned at the bottom of a card.
+export function DeniseAskBox({ canBook, date, appointmentId = null, placeholder }: { canBook: boolean; date: string; appointmentId?: string | null; placeholder?: string }) {
+  const { run, focus } = useDenise();
+  const path = usePathname();
+  return (
+    <div className="shrink-0 border-t border-line px-4 pt-3" data-testid="denise-ask-box">
+      <AskForm
+        pinned
+        onAsk={(question) => askDenise(question, { date, page: { path, appointmentId } })}
+        disabled={run.working}
+        focus={focus}
+        canBook={canBook}
+        placeholder={placeholder}
+      />
+    </div>
+  );
+}
+
+function AskForm({
+  onAsk,
+  disabled,
+  focus,
+  canBook,
+  placeholder,
+  pinned = false,
+}: {
+  onAsk: (question: string) => void;
+  disabled: boolean;
+  focus: number;
+  canBook: boolean;
+  placeholder?: string;
+  pinned?: boolean;
+}) {
   const [question, setQuestion] = useState("");
   // Typed and not yet sent: a stalled page won't reload over it.
   useEffect(() => {
@@ -122,7 +158,7 @@ function AskForm({ onAsk, disabled, focus, canBook, placeholder }: { onAsk: (que
     return () => cancelAnimationFrame(frame);
   }, [focus]);
   return (
-    <div className="sticky bottom-0 mt-auto flex flex-col gap-1.5 bg-surface pt-1 pb-3">
+    <div className={`flex flex-col gap-1.5 bg-surface pb-3 ${pinned ? "" : "sticky bottom-0 mt-auto pt-1"}`}>
       <form
         aria-label="Message Denise"
         className="flex items-center gap-2 rounded-lg border border-line bg-surface p-1.5 pl-2 focus-within:border-denise-500 focus-within:ring-2 focus-within:ring-denise-200"

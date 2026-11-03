@@ -125,7 +125,7 @@ test.describe("links into the calendar", () => {
 
   test("open Denise's panel or a booking, then tidy the address", async ({ page }) => {
     await page.goto("/calendar?denise=1");
-    await expect(page.getByRole("tabpanel", { name: /Denise/ })).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "Denise" })).toBeVisible();
     await expect(page).toHaveURL(/\/calendar$/);
 
     const today = todayIn("America/Chicago");
@@ -139,7 +139,7 @@ test.describe("links into the calendar", () => {
       .limit(1)
       .single();
     await page.goto(`/calendar?open=${visit!.id}`);
-    await expect(page.getByRole("tabpanel", { name: "Booking details" })).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "Booking details" })).toBeVisible();
   });
 });
 

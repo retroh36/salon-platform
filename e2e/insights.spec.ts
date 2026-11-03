@@ -55,7 +55,7 @@ test.describe("the front desk", () => {
     await expect(ui(page).getByTestId("calendar-date")).toContainText(formatLongDay(DAY));
     await waitForHydration(page, "section[data-staff-id]");
     await clickSlot(page, "Bridget Callahan", 9);
-    const form = page.getByRole("tabpanel", { name: "Booking details" }).getByRole("form", { name: "New booking" });
+    const form = page.getByRole("complementary", { name: "Booking details" }).getByRole("form", { name: "New booking" });
     await form.getByLabel("Find a client").fill(`${PREFIX}bal`);
     await form.getByRole("list", { name: "Matching clients" }).getByRole("button", { name: new RegExp(`${PREFIX}Bal`) }).click();
     const line = form.getByRole("group", { name: "Service 1" });
@@ -69,7 +69,7 @@ test.describe("the front desk", () => {
     await expect(line.getByTestId("usual-length")).toHaveText("Booked at Bridget’s usual length.");
 
     await form.getByRole("button", { name: "Create booking" }).click();
-    await expect(page.getByRole("tabpanel", { name: "Booking details" }).getByTestId("client-name")).toHaveText(`${PREFIX}Bal Test`);
+    await expect(page.getByRole("complementary", { name: "Booking details" }).getByTestId("client-name")).toHaveText(`${PREFIX}Bal Test`);
     const { data: item } = await admin.from("appointment_items").select("active_minutes, processing_minutes, finishing_minutes").eq("location_id", L).gte("starts_at", at(0).toISOString()).lt("starts_at", at(23).toISOString()).single();
     expect(item!.active_minutes + item!.processing_minutes + item!.finishing_minutes).toBe(suggested);
   });
@@ -80,13 +80,13 @@ test.describe("the front desk", () => {
     await waitForHydration(page, "[data-testid=denise-launcher]");
     await page.getByTestId("denise-launcher").click();
     // The brief is on the Dashboard; her panel is for what to act on now.
-    await expect(page.getByRole("tabpanel", { name: /Denise/ })).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "Denise" })).toBeVisible();
     await expect(page.getByText(/Today.s brief/)).toHaveCount(0);
 
     // Booking details for a visit with a client: her card about them.
     const block = ui(page).locator("[data-block]").filter({ hasNotText: /Walk-in|guest/ }).first();
     await block.click({ position: { x: 10, y: 5 } });
-    const card = page.getByRole("tabpanel", { name: "Booking details" }).getByTestId("client-insight");
+    const card = page.getByRole("complementary", { name: "Booking details" }).getByTestId("client-insight");
     await expect(card).toBeVisible();
     // One quiet line, opening to her full sentence.
     await expect(card).toContainText(/^(Every|One visit so far|New client|Has a package)/);

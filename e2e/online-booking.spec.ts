@@ -213,8 +213,8 @@ test("a new client books two services back to back on a phone", async ({ page })
   await expect(booked.getByTestId("online-badge")).toHaveCount(0);
   await booked.click();
   // How it was booked is in its history.
-  await visitTab(calendar.getByRole("tabpanel", { name: "Booking details" }), "History");
-  await expect(calendar.getByRole("tabpanel", { name: "Booking details" }).getByTestId("online-badge")).toBeVisible();
+  await visitTab(calendar.getByRole("complementary", { name: "Booking details" }), "History");
+  await expect(calendar.getByRole("complementary", { name: "Booking details" }).getByTestId("online-badge")).toBeVisible();
   await desk.close();
   // Nothing on the client's screens ever read "null" or "undefined".
   expect(await blanksSeen(page)).toEqual([]);

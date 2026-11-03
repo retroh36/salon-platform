@@ -7,7 +7,7 @@ open: /calendar | Open calendar
 
 When a client is 15 minutes past their start time and not checked in, Denise lists them under **Not arrived yet**.
 
-1. Open the **Denise** tab in the calendar's side panel (or tap the Denise button in the calendar's corner).
+1. Tap Denise's face under the calendar (or her small bar in the corner if she's minimized) to open her card.
 2. Find the **Not arrived yet** card. Each row shows the client's name and when they were due.
 3. Give them a call. Tap **Open** to see their booking, where you can tap the phone icon next to their name.
 4. If they're on the way: in booking details, tap **⋯**, then **Running late**, and say how late.

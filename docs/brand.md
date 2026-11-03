@@ -327,13 +327,18 @@ Maestra's AI assistant, and the reason for the tagline's second half.
   salon, and empty states (`EmptyState`, and her calendar tab when the day
   is all clear) (`DenisePose`, waving). `think` and `point` are kept for
   onboarding and marketing, not shown in the app.
-- **Out of the way of the team:** on the Calendar (her tab, from `lg` up)
-  and Scheduling she opens as a compact card over the bottom right corner,
+- **Out of the way of the team:** on the Calendar (from `lg` up) and
+  Scheduling she opens as a compact card over the bottom right corner,
   380px wide and only as tall as what's in it (an empty chat is a short
   card; it grows to a set height, then scrolls), below the stylists' header
   row, so the whole team stays in view. It minimizes to a small bar
   ("Denise · 8") without losing the conversation, and each page remembers
   whether it was open, minimized or closed. On other pages she docks beside
-  the page, and on a phone she fills the screen. On
+  the page, and on a phone she fills the screen. Her card is only her (no
+  tabs): her header stays at the top and her message box at the bottom,
+  with what she has and the conversation scrolling between. On the
+  Calendar, booking details is its own panel, open only while a visit or a
+  booking form is; she steps aside to her bar while it's open, and opened
+  on purpose sits just left of it, never on top. On
   the calendar her face sits at the end of the legend bar, never over
   appointments.

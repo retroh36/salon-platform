@@ -49,7 +49,7 @@ async function openDay(page: Page, date = DAY) {
   await waitForHydration(page, "section[data-staff-id]");
 }
 
-const details = (page: Page) => page.getByRole("tabpanel", { name: "Booking details" });
+const details = (page: Page) => page.getByRole("complementary", { name: "Booking details" });
 const status = async (id: string) => (await admin.from("appointments").select("status").eq("id", id).single()).data!.status;
 
 test.afterAll(async () => {
@@ -168,7 +168,9 @@ test.describe("front desk", () => {
     await expect(panel.getByTestId("primary-action")).toHaveText("Check in");
     const footer = panel.locator("footer");
     const [foot, box] = await Promise.all([footer.boundingBox(), panel.boundingBox()]);
-    expect(Math.abs(foot!.y + foot!.height - (box!.y + box!.height))).toBeLessThan(2);
+    // At the panel's inner edge (inside its padding).
+    const pad = await panel.evaluate((el) => parseFloat(getComputedStyle(el).paddingBottom));
+    expect(Math.abs(foot!.y + foot!.height - (box!.y + box!.height - pad))).toBeLessThan(2);
     await panel.getByRole("button", { name: "More actions" }).click();
     await expect(panel.getByRole("menu", { name: "More actions" }).getByRole("menuitem")).toHaveText(["Running late", "Message client", "Edit booking", "Move to another day", "Mark no-show", "Cancel booking"]);
     await page.keyboard.press("Escape");

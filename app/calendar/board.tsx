@@ -14,14 +14,13 @@ import { LEVEL_BG, LevelBadge } from "@/components/ui/level";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { FitText } from "@/components/ui/fit-text";
-import { CalendarIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, GripIcon, MoreIcon, PlusIcon, SlidersIcon } from "@/components/ui/icons";
+import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, GripIcon, MoreIcon, PlusIcon, SlidersIcon } from "@/components/ui/icons";
 import { Listbox } from "@/components/ui/listbox";
 import { Segmented } from "@/components/ui/segmented";
-import { Tabs } from "@/components/ui/tabs";
 import { isEditable, STATUS_LABELS, type AppointmentStatus } from "@/lib/appointments";
 import { reach } from "@/lib/reach";
 import type { DeniseRequest, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
-import { FAMILIES, FAMILY_LABELS, laneBox, layoutColumn, NOT_ARRIVED_MINUTES, quarterMarks, summaryVariants, timeRangeVariants, ZOOM_LABELS, ZOOM_PX_PER_MINUTE, ZOOMS, type CalendarZoom, type ServiceFamily } from "@/lib/calendar";
+import { FAMILIES, FAMILY_LABELS, laneBox, layoutColumn, minutesLate, NOT_ARRIVED_MINUTES, quarterMarks, summaryVariants, timeRangeVariants, ZOOM_LABELS, ZOOM_PX_PER_MINUTE, ZOOMS, type CalendarZoom, type ServiceFamily } from "@/lib/calendar";
 import { LEVEL_LABELS, STAFF_LEVELS } from "@/lib/schedule-forms";
 import { BLOCK_LABELS } from "@/lib/scheduling/blocks";
 import { formatLongDay } from "@/lib/schedule-format";
@@ -40,7 +39,7 @@ import { approveDeniseFix, bookFromWaitlist, dismissDeniseItem, rejectDeniseFix,
 import { appendDenise, askDenise, focusDenise, hydrateDenise, startDenise, takeAdjust, useDenise } from "@/components/denise-chat/store";
 import { useDeniseShortcut } from "@/components/denise-chat/bubble";
 import { MinimizedBar, MinimizeButton } from "@/components/denise-chat/card";
-import { DeniseChat } from "@/components/denise-chat/chat";
+import { DeniseAskBox, DeniseChat } from "@/components/denise-chat/chat";
 import { DenisePanel, type Outcome, type Preview } from "./denise-panel";
 import { BookingPanel, type BookingDraft, type BookingStart } from "./booking-panel";
 import { NewSaleLink } from "@/components/new-sale-link";
@@ -105,7 +104,6 @@ type Selection =
   // "Running late…" on a stylist's column (./late-panel.tsx).
   | { kind: "late"; staffId: string; minutes: number | null };
 
-type Tab = "denise" | "details";
 
 type Move = { itemId: string; staffId: string; start: number };
 
@@ -214,28 +212,51 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     setOutcome(null);
     setPreview(null);
   }
-  const [tab, setTab] = useState<Tab>(linked || data.focus.book ? "details" : "denise");
-  // The panel is closed until something opens it: a booking, a new
-  // booking, Denise spotting something, or a question for her.
-  // A link asking for something opens the panel on it; otherwise Denise's
-  // card is as last left on the calendar (open, minimized or closed).
-  const asked = Boolean(linked || data.focus.book || data.focus.out || data.focus.late || data.focus.denise || data.focus.ask);
-  const [panelOpen, setPanelOpen] = useState(asked || me.card === "open" || me.card === "min");
-  // Denise's tab is a compact card over the corner from lg up, so the whole
-  // team stays in view while she's open; booking details, Running late and
-  // Mark out keep the full-height panel the page makes room for. The card
-  // stays below the stylists' header row (which ends about 19rem down), is
-  // only as tall as what's in it, and can be minimized to a small bar
-  // (`cardMin`), keeping the conversation.
-  const compact = tab === "denise" && selection.kind !== "late" && selection.kind !== "out";
-  const [minimized, setMinimized] = useState(!asked && me.card === "min");
-  if (minimized && (!compact || !panelOpen)) setMinimized(false);
-  const cardMin = panelOpen && compact && minimized;
-  // Remembered as it changes (a cookie per person, like the view).
+  // Two separate things on the right. The side panel (booking details, a
+  // booking form, walk-ins, Running late, Mark out) is open exactly while
+  // something is chosen, and the page makes room for it. Denise is her own
+  // card: from lg up over the calendar's bottom right corner, below the
+  // stylists' header row (which ends about 19rem down), only as tall as
+  // what's in it, minimized to a small bar or closed; below lg a panel that
+  // slides over. The two never overlap: the side panel opening minimizes
+  // her (`autoMin`, and she comes back when it closes), and opened on
+  // purpose while it's open, she sits just left of it.
+  const sideOpen = selection.kind !== "none";
+  // A link asking for her opens her; otherwise she's as last left on the
+  // calendar (open, minimized or closed).
+  const askedDenise = Boolean(data.focus.denise || data.focus.ask);
+  const [deniseOpen, setDeniseCard] = useState(askedDenise || me.card === "open" || me.card === "min");
+  const [minimized, setMinimized] = useState(!askedDenise && (me.card === "min" || (sideOpen && me.card === "open")));
+  const [autoMin, setAutoMin] = useState(!askedDenise && sideOpen && me.card === "open");
+  const [sideWas, setSideWas] = useState(sideOpen);
+  if (sideWas !== sideOpen) {
+    setSideWas(sideOpen);
+    if (sideOpen && deniseOpen && !minimized) {
+      setMinimized(true);
+      setAutoMin(true);
+    } else if (!sideOpen && autoMin) {
+      setMinimized(false);
+      setAutoMin(false);
+    }
+  }
+  const deniseShown = deniseOpen && !minimized;
+  // Opened on purpose (her face, the bar, a question, something she spotted).
+  const openDenise = () => {
+    setDeniseCard(true);
+    setMinimized(false);
+    setAutoMin(false);
+  };
+  const closeDenise = () => {
+    setDeniseCard(false);
+    setMinimized(false);
+    setAutoMin(false);
+  };
+  // Remembered as it changes (a cookie per person, like the view); a card
+  // minimized only to make room is remembered as open.
   useEffect(() => {
-    const value = !panelOpen ? "closed" : compact ? (minimized ? "min" : "open") : null;
-    if (value) document.cookie = `${deniseCardCookie(me.staffId)}=${value}; path=/; max-age=${COOKIE_AGE}; samesite=lax`;
-  }, [panelOpen, compact, minimized, me.staffId]);
+    const value = !deniseOpen ? "closed" : minimized && !autoMin ? "min" : "open";
+    document.cookie = `${deniseCardCookie(me.staffId)}=${value}; path=/; max-age=${COOKIE_AGE}; samesite=lax`;
+  }, [deniseOpen, minimized, autoMin, me.staffId]);
   // What Denise has that hasn't been looked at in her panel yet.
   const [unseen, setUnseen] = useState<ReadonlySet<string>>(new Set());
 
@@ -421,11 +442,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // first; `show` is for what a form does itself (after saving, say).
   const guard = useLeaveGuard();
   const { leave } = guard;
-  const show = (next: Selection) => {
-    setSelection(next);
-    setTab("details");
-    setPanelOpen(true);
-  };
+  const show = (next: Selection) => setSelection(next);
   const select = (next: Selection) => leave(() => show(next));
 
   // Shows Denise's latest view. A conflict or reorder she hasn't shown
@@ -438,7 +455,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // details): Denise's badge calls rather than taking the panel over.
   const busyWith = useRef<Selection["kind"]>("none");
   useEffect(() => {
-    busyWith.current = panelOpen ? selection.kind : "none";
+    busyWith.current = selection.kind;
   });
   const showDenise = useCallback((state: DeniseState, forData: BoardData) => {
     setDenise({ state, for: forData });
@@ -452,8 +469,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     // aren't urgent enough to take over the panel.
     const urgent = (k: string) => k.startsWith("conflict:") && !k.includes(":likely:");
     if (fresh.some((k) => urgent(k) || (!first && (k.startsWith("reorder:") || k.startsWith("opening:")))) && busyWith.current === "none") {
-      setTab("denise");
-      setPanelOpen(true);
+      setDeniseCard(true);
+      setMinimized(false);
+      setAutoMin(false);
     }
   }, []);
 
@@ -485,20 +503,19 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     return () => clearTimeout(slow);
   }, [data, showDenise, scanTry]);
 
-  // Escape closes the panel (unless a menu or picker inside it is open).
+  // Escape closes the side panel (unless a menu or picker inside it is
+  // open), or, with none open, Denise's card.
   useEffect(() => {
-    if (!panelOpen) return;
+    if (!sideOpen && !deniseShown) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       if ((e.target as HTMLElement | null)?.closest?.("[role=dialog], [role=listbox]")) return;
-      leave(
-        () => setPanelOpen(false),
-        () => setSelection({ kind: "none" }),
-      );
+      if (sideOpen) leave(() => setSelection({ kind: "none" }));
+      else closeDenise();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [panelOpen, leave]);
+  }, [sideOpen, deniseShown, leave]);
 
   // ⌘K / Ctrl+K (or her bubble's shortcut from another page) opens her tab
   // with the cursor in her message box.
@@ -506,13 +523,11 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const [focusSeen, setFocusSeen] = useState(deniseFocus);
   if (focusSeen !== deniseFocus) {
     setFocusSeen(deniseFocus);
-    setTab("denise");
-    setPanelOpen(true);
-    setMinimized(false);
+    openDenise();
   }
 
-  // Looking at Denise's panel clears what was new.
-  if (panelOpen && !cardMin && tab === "denise" && unseen.size) setUnseen(new Set());
+  // Looking at Denise's card clears what was new.
+  if (deniseShown && unseen.size) setUnseen(new Set());
 
   const deniseState = denise && denise.state.date === data.date ? denise.state : null;
   const conflicts = (deniseState?.conflicts ?? []).filter((c) => !dismissed.has(c.subject));
@@ -535,11 +550,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const undo = (actionId: string) => decide(() => undoDeniseFix(actionId, data.date), null);
 
   // The visit open in booking details, so Denise knows whose it is.
-  const openVisit = panelOpen && selection.kind === "detail" ? selection.appointmentId : null;
+  const openVisit = selection.kind === "detail" ? selection.appointmentId : null;
   async function ask(question: string) {
     if (deniseRun.working) return;
-    setTab("denise");
-    setPanelOpen(true);
+    openDenise();
     await askDenise(question, { date: data.date, page: { path: "/calendar", appointmentId: openVisit } });
   }
 
@@ -565,10 +579,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // someone is in the middle of a booking, when her badge calls instead.
   async function trigger(request: DeniseRequest, firstStatus: string) {
     const midTask = selection.kind === "book" || selection.kind === "edit" || selection.kind === "new-block" || selection.kind === "group";
-    if (!midTask) {
-      setTab("denise");
-      setPanelOpen(true);
-    }
+    if (!midTask) openDenise();
     setOutcome(null);
     const done = await startDenise(request, firstStatus);
     if (done.state) {
@@ -609,14 +620,14 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // it: the one hovered there, or her first suggestion. Blocks it's about
   // glow; where they'd go shows dashed. Nothing is left on the calendar once
   // the panel closes, she moves on, or the fix is applied or dismissed.
-  const showingFixes = panelOpen && !cardMin && tab === "denise" && !deciding;
+  const showingFixes = deniseShown && !deciding;
   const previewConflict = showingFixes ? (preview && conflicts.find((c) => c.subject === preview.subject)) || conflicts[0] || null : null;
   const previewOption = previewConflict?.options[preview && previewConflict.subject === preview.subject ? preview.index : 0] ?? null;
   const highlighted = new Set(previewConflict?.itemIds ?? []);
   // Copies of the moved blocks at their new places, laid out with the
   // column's blocks so nothing overlaps.
   // The same for "Mark … out": where each client would move that day.
-  const outShown = panelOpen && selection.kind === "out" && outPreview?.staffId === selection.staffId ? outPreview : null;
+  const outShown = selection.kind === "out" && outPreview?.staffId === selection.staffId ? outPreview : null;
   const ghostMoves = [
     ...(previewOption?.moves ?? []).map((m) => ({ itemId: m.itemId, staffId: m.to.staffId, minute: m.to.minute, move: m as FixMove | undefined })),
     ...(outShown?.moves ?? []).map((m) => ({ ...m, move: undefined })),
@@ -865,7 +876,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // blocking their own time).
   function onSlotClick(e: React.MouseEvent<HTMLElement>, column: ColumnData) {
     if ((e.target as HTMLElement).closest("[data-block], [data-time-block]")) return;
-    if (panelOpen && !cardMin) return leave(() => setPanelOpen(false), closeDetails);
+    if (sideOpen) return leave(closeDetails);
     const top = e.currentTarget.getBoundingClientRect().top;
     const minute = range.start + Math.floor((e.clientY - top) / PX_PER_MINUTE / SLOT_STEP) * SLOT_STEP;
     const start = { staffId: column.staffId, startMinute: Math.min(minute, range.end - SLOT_STEP) };
@@ -950,7 +961,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
       {/* With the panel open on a wide screen, the page makes room for it, so
           the toolbar wraps instead of hiding under it. */}
       <div
-        className={`flex min-w-0 flex-1 flex-col gap-4 px-4 pt-6 pb-4 transition-[padding] duration-(--motion-slow) sm:px-6 lg:min-h-0 ${panelOpen && !compact ? "lg:pr-[25.5rem]" : ""}`}
+        className={`flex min-w-0 flex-1 flex-col gap-4 px-4 pt-6 pb-4 transition-[padding] duration-(--motion-slow) sm:px-6 lg:min-h-0 ${sideOpen ? "lg:pr-[25.5rem]" : ""}`}
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -1083,7 +1094,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             more stylists says so. */}
         {/* With Denise's compact card open (lg up), its footprint over the
             grid's right side (--denise-card) moves the right arrow clear of it. */}
-        <div className={`relative flex min-h-0 flex-col lg:flex-1 ${panelOpen && compact && !cardMin ? "lg:[--denise-card:23.75rem]" : ""}`}>
+        <div className={`relative flex min-h-0 flex-col lg:flex-1 ${deniseShown ? "lg:[--denise-card:23.75rem]" : ""}`}>
         <ViewTransition key={data.date} enter={DAY_SLIDE} exit={DAY_SLIDE} default="none">
           <div
             ref={gridRef}
@@ -1288,7 +1299,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                               key={b.itemId}
                               block={b}
                               y={y}
-                              lateBy={nowMinute !== null && (b.status === "booked" || b.status === "confirmed") && b.start <= nowMinute ? nowMinute - b.start : null}
+                              lateBy={minutesLate(b.start, nowMinute, b.status)}
                               draggable={canMove(b)}
                               dragging={drag?.moved === true && drag.itemId === b.itemId}
                               selected={b.appointmentId === selectedAppointment}
@@ -1337,15 +1348,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             is closed (so she never sits on top of the calendar). */}
         <div className="flex items-center gap-4">
           <CalendarKey families={FAMILIES.filter((f) => f !== "other" && data.menu.services.some((s) => s.family === f && !s.archived))} />
-          <DeniseLauncher
-            hidden={panelOpen}
-            count={attention}
-            bounce={unseen.size > 0}
-            onOpen={() => {
-              setTab("denise");
-              setPanelOpen(true);
-            }}
-          />
+          {/* Minimized, she's a bar in the corner from lg up; below lg, and
+              from lg while the side panel's footer is there, her face here. */}
+          <DeniseLauncher hidden={deniseShown || (minimized && !sideOpen)} className={minimized && sideOpen ? "lg:hidden" : ""} count={attention} bounce={unseen.size > 0} onOpen={openDenise} />
         </div>
       </div>
 
@@ -1393,19 +1398,16 @@ export function CalendarBoard({ data }: { data: BoardData }) {
         </div>
       )}
 
-      {cardMin && <MinimizedBar count={attention} onOpen={() => setMinimized(false)} onClose={() => setPanelOpen(false)} />}
-      {/* Denise and booking details: a panel that slides over the calendar
-          when something opens it (on Denise's tab from lg up, a compact card
-          in the corner instead: see `compact`). */}
+      {deniseOpen && minimized && <MinimizedBar count={attention} onOpen={openDenise} onClose={closeDenise} className={sideOpen ? "hidden lg:right-[25rem] lg:flex" : ""} />}
       <guard.Provider value={guard.set}>
+        {/* The side panel: booking details, a booking form, walk-ins,
+            Running late or Mark out, open while something is chosen. */}
         <aside
-          aria-label="Assistant and booking details"
-          data-compact={compact || undefined}
+          aria-label="Booking details"
+          data-testid="side-panel"
           className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col gap-4 border-l border-line bg-surface p-4 shadow-panel transition-[transform,visibility] duration-(--motion-slow) ease-out sm:w-96 ${
-            compact ? "lg:top-auto lg:right-4 lg:bottom-4 lg:h-auto lg:max-h-[min(32rem,calc(100dvh-19rem-var(--demo-bar)))] lg:w-[23.75rem] lg:rounded-xl lg:border" : ""
-          } ${
             // Closed, it's hidden once it has slid away, so keyboard focus skips it.
-            panelOpen && !cardMin ? "visible translate-x-0" : `invisible ${compact ? "translate-x-[calc(100%+1rem)]" : "translate-x-full"}`
+            sideOpen ? "visible translate-x-0" : "invisible translate-x-full"
           }`}
         >
           {selection.kind === "late" ? (
@@ -1422,7 +1424,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               minutes={selection.minutes}
               onClose={() => leave(closeDetails)}
               onReport={(itemId, minutes) => {
-                // Denise looks at what it pushes into, in her tab.
+                // Denise looks at what it pushes into, in her card.
                 setSelection({ kind: "none" });
                 reportLate(itemId, minutes);
               }}
@@ -1445,7 +1447,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               onApplied={() => router.refresh()}
               onMarkOutOnly={(when) => {
                 // Denise marks them out and offers her fixes, one client at a
-                // time, in her tab.
+                // time, in her card.
                 leave(() => {
                   setSelection({ kind: "none" });
                   markOut(selection.staffId, when);
@@ -1453,183 +1455,183 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               }}
             />
           ) : (
-          <Tabs
-            label="Assistant"
-            value={tab}
-            onChange={setTab}
-            panelKey={`${tab}-${selection.kind}-${"appointmentId" in selection ? selection.appointmentId : ""}`}
-            tabs={[
-              { value: "denise", label: "Denise", icon: <DeniseFace size={20} />, badge: <DeniseBadge count={attention} /> },
-              { value: "details", label: "Booking details", icon: <CalendarIcon className="size-4" /> },
-            ]}
-            trailing={
-              // The panel's one close button (a visit being viewed is let go
-              // too), with Minimize beside it on Denise's card.
-              <>
-                {compact && (
-                  <span className="hidden lg:contents">
-                    <MinimizeButton onMinimize={() => setMinimized(true)} />
-                  </span>
-                )}
-                <IconButton
-                  label="Close panel"
-                  onClick={() =>
-                    leave(() => {
-                      setPanelOpen(false);
-                      if (selection.kind === "detail") closeDetails();
-                    }, closeDetails)
-                  }
-                >
+            <>
+              <div className="flex items-center gap-2">
+                {selection.kind === "detail" ? <h2 className="flex-1 text-13 font-medium text-ink-muted">Booking details</h2> : <span className="flex-1" />}
+                <IconButton label="Close panel" onClick={() => leave(closeDetails)}>
                   <CloseIcon />
                 </IconButton>
-              </>
-            }
-          >
-            {tab === "denise" ? (
-              <DenisePanel
-                data={data}
-                state={deniseState && { ...deniseState, conflicts, notices }}
-                working={deciding || deniseRun.working || (scanning && !deniseState && stuck !== data)}
-                stuck={!deniseState && stuck === data}
-                onRetry={() => (setStuck(null), setScanTry((n) => n + 1))}
-                run={deniseRun}
-                outcome={outcome}
-                preview={preview}
-                onApprove={approve}
-                onReject={reject}
-                onUndo={undo}
-                onDismiss={(subject) => setDismissed((all) => new Set(all).add(subject))}
-                onPreview={setPreview}
-                onOpen={(appointmentId) => select({ kind: "detail", appointmentId })}
-                onDismissNotice={(id) => {
-                  setDismissed((all) => new Set(all).add(id));
-                  startTransition(() => dismissDeniseItem(id, data.date).then(() => {}));
-                }}
-                onNoShow={(n) => {
-                  setDismissed((all) => new Set(all).add(n.id));
-                  offerUndo("no_show", n.appointmentId, n.clientName.split(" ")[0]);
-                  setStatusNow(n.appointmentId, "no_show", () => changeVisitStatus(n.appointmentId, "no_show"), (message) => {
-                    setOutcome({ message, error: true, undoActionId: null });
-                    setDismissed((all) => {
-                      const next = new Set(all);
-                      next.delete(n.id);
-                      return next;
-                    });
-                  });
-                }}
-                onBookWaitlist={(o, m) => decide(() => bookFromWaitlist(m.entryId, o.staffId, data.date, m.startMinute), null)}
-              >
-                <DeniseChat
-                  canBook={me.canBook}
-                  today={data.today}
+              </div>
+              <div key={`${selection.kind}-${"appointmentId" in selection ? selection.appointmentId : ""}`} className="-mt-2 min-h-0 flex-1 animate-panel-in overflow-y-auto">
+              {selection.kind === "detail" && data.appointments[selection.appointmentId] ? (
+                <AppointmentPanel
                   date={data.date}
-                  appointmentId={openVisit}
-                  placeholder={me.canBook ? askExample(data) : undefined}
-                  onBooked={(appointmentId, date) => {
-                    router.refresh();
+                  today={data.today}
+                  timeZone={data.timeZone}
+                  appointment={detailOf(selection.appointmentId)}
+                  me={me}
+                  onEdit={() => select({ kind: "edit", appointmentId: selection.appointmentId })}
+                  onClose={closeDetails}
+                  onReportLate={reportLate}
+                  onCanceled={onCanceled}
+                  // A full load: /checkout/new is a route handler that opens the checkout.
+                  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+                  onCheckout={() => window.location.assign(`/checkout/new?appointment=${selection.appointmentId}&from=${encodeURIComponent(window.location.pathname + window.location.search)}`)}
+                  onOpenVisit={(appointmentId) => select({ kind: "detail", appointmentId })}
+                  onStatusNow={setStatusNow}
+                  onCheckedIn={(appointmentId) => offerUndo("check_in", appointmentId)}
+                  onNoShow={(appointmentId) => offerUndo("no_show", appointmentId)}
+                  onMoved={(date, appointmentId, message, moved) => {
                     if (date !== data.date) openOn(date, appointmentId);
+                    setDoneMessage(message);
+                    if (moved) setMovePrompt(moved);
+                  }}
+                  team={data.columns.map((c) => ({ id: c.staffId, name: c.name }))}
+                  products={data.menu.products}
+                />
+              ) : selection.kind === "walk-ins" ? (
+                <WalkInPanel
+                  data={data}
+                  onClose={cancel}
+                  onBooked={(id, message) => {
+                    setDoneMessage(message);
+                    if (data.date === data.today) show({ kind: "detail", appointmentId: id });
+                    else closeDetails();
                   }}
                 />
-              </DenisePanel>
-            ) : selection.kind === "detail" && data.appointments[selection.appointmentId] ? (
-              <AppointmentPanel
-                date={data.date}
-                today={data.today}
-                timeZone={data.timeZone}
-                appointment={detailOf(selection.appointmentId)}
-                me={me}
-                onEdit={() => select({ kind: "edit", appointmentId: selection.appointmentId })}
-                onClose={closeDetails}
-                onReportLate={reportLate}
-                onCanceled={onCanceled}
-                // A full load: /checkout/new is a route handler that opens the checkout.
-                // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-                onCheckout={() => window.location.assign(`/checkout/new?appointment=${selection.appointmentId}&from=${encodeURIComponent(window.location.pathname + window.location.search)}`)}
-                onOpenVisit={(appointmentId) => select({ kind: "detail", appointmentId })}
-                onStatusNow={setStatusNow}
-                onCheckedIn={(appointmentId) => offerUndo("check_in", appointmentId)}
-                onNoShow={(appointmentId) => offerUndo("no_show", appointmentId)}
-                onMoved={(date, appointmentId, message, moved) => {
-                  if (date !== data.date) openOn(date, appointmentId);
-                  setDoneMessage(message);
-                  if (moved) setMovePrompt(moved);
-                }}
-                team={data.columns.map((c) => ({ id: c.staffId, name: c.name }))}
-                products={data.menu.products}
-              />
-            ) : selection.kind === "walk-ins" ? (
-              <WalkInPanel
-                data={data}
-                onClose={cancel}
-                onBooked={(id, message) => {
-                  setDoneMessage(message);
-                  if (data.date === data.today) show({ kind: "detail", appointmentId: id });
-                  else closeDetails();
-                }}
-              />
-            ) : selection.kind === "book" ? (
-              <BookingPanel
-                key={selection.draft ? JSON.stringify(selection.draft) : "new"}
-                data={data}
-                start={selection.start}
-                client={selection.client}
-                draft={selection.draft}
-                onClose={cancel}
-                onSaved={(id, message, date) => {
-                  if (date && date !== data.date) openOn(date, id);
-                  else show({ kind: "detail", appointmentId: id });
-                  if (message) setDoneMessage(message);
-                }}
-                onBlockInstead={blockStaff.includes(selection.start.staffId) ? () => show({ kind: "new-block", start: selection.start }) : undefined}
-                onGroupInstead={() => show({ kind: "group", start: selection.start })}
-              />
-            ) : selection.kind === "group" ? (
-              <GroupPanel
-                data={data}
-                start={selection.start}
-                onClose={cancel}
-                onSaved={(id, message) => {
-                  show({ kind: "detail", appointmentId: id });
-                  setDoneMessage(message);
-                }}
-              />
-            ) : selection.kind === "new-block" || (selection.kind === "block" && data.timeBlocks.some((b) => b.blockId === selection.blockId)) ? (
-              <BlockPanel
-                key={selection.kind === "block" ? selection.blockId : "new"}
-                date={data.date}
-                columns={data.columns}
-                staffChoices={blockStaff}
-                block={selection.kind === "block" ? data.timeBlocks.find((b) => b.blockId === selection.blockId) : undefined}
-                start={selection.kind === "new-block" ? selection.start : undefined}
-                onClose={cancel}
-                onDone={(message) => {
-                  closeDetails();
-                  setPanelOpen(false);
-                  setNotice(null);
-                  setBlockMoves({});
-                  setDoneMessage(message);
-                }}
-              />
-            ) : selection.kind === "edit" && data.appointments[selection.appointmentId] ? (
-              <BookingPanel
-                data={data}
-                appointment={detailOf(selection.appointmentId)}
-                onClose={() => select({ kind: "detail", appointmentId: selection.appointmentId })}
-                onSaved={(id, message, date, moved) => {
-                  if (date && date !== data.date) openOn(date, id);
-                  else show({ kind: "detail", appointmentId: selection.appointmentId });
-                  if (message) setDoneMessage(message);
-                  if (moved) setMovePrompt(moved);
-                }}
-              />
-            ) : (
-              <div className="flex flex-col gap-3 py-6 text-sm text-ink-muted">
-                <p>Choose an appointment to see its details{me.canBook ? ", or click an empty time to book it." : "."}</p>
-                {me.canBook && <p>Drag an appointment to move it.</p>}
+              ) : selection.kind === "book" ? (
+                <BookingPanel
+                  key={selection.draft ? JSON.stringify(selection.draft) : "new"}
+                  data={data}
+                  start={selection.start}
+                  client={selection.client}
+                  draft={selection.draft}
+                  onClose={cancel}
+                  onSaved={(id, message, date) => {
+                    if (date && date !== data.date) openOn(date, id);
+                    else show({ kind: "detail", appointmentId: id });
+                    if (message) setDoneMessage(message);
+                  }}
+                  onBlockInstead={blockStaff.includes(selection.start.staffId) ? () => show({ kind: "new-block", start: selection.start }) : undefined}
+                  onGroupInstead={() => show({ kind: "group", start: selection.start })}
+                />
+              ) : selection.kind === "group" ? (
+                <GroupPanel
+                  data={data}
+                  start={selection.start}
+                  onClose={cancel}
+                  onSaved={(id, message) => {
+                    show({ kind: "detail", appointmentId: id });
+                    setDoneMessage(message);
+                  }}
+                />
+              ) : selection.kind === "new-block" || (selection.kind === "block" && data.timeBlocks.some((b) => b.blockId === selection.blockId)) ? (
+                <BlockPanel
+                  key={selection.kind === "block" ? selection.blockId : "new"}
+                  date={data.date}
+                  columns={data.columns}
+                  staffChoices={blockStaff}
+                  block={selection.kind === "block" ? data.timeBlocks.find((b) => b.blockId === selection.blockId) : undefined}
+                  start={selection.kind === "new-block" ? selection.start : undefined}
+                  onClose={cancel}
+                  onDone={(message) => {
+                    closeDetails();
+                    setNotice(null);
+                    setBlockMoves({});
+                    setDoneMessage(message);
+                  }}
+                />
+              ) : selection.kind === "edit" && data.appointments[selection.appointmentId] ? (
+                <BookingPanel
+                  data={data}
+                  appointment={detailOf(selection.appointmentId)}
+                  onClose={() => select({ kind: "detail", appointmentId: selection.appointmentId })}
+                  onSaved={(id, message, date, moved) => {
+                    if (date && date !== data.date) openOn(date, id);
+                    else show({ kind: "detail", appointmentId: selection.appointmentId });
+                    if (message) setDoneMessage(message);
+                    if (moved) setMovePrompt(moved);
+                  }}
+                />
+                ) : null}
               </div>
-            )}
-          </Tabs>
+            </>
           )}
+        </aside>
+
+        {/* Denise's card: her header at the top, her message box at the
+            bottom, and what she has and the conversation scrolling between. */}
+        <aside
+          aria-label="Denise"
+          data-testid="denise-card"
+          className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col border-l border-line bg-surface shadow-panel transition-[transform,visibility] duration-(--motion-slow) ease-out sm:w-96 lg:top-auto lg:bottom-4 lg:h-auto lg:max-h-[min(32rem,calc(100dvh-19rem-var(--demo-bar)))] lg:w-[23.75rem] lg:overflow-hidden lg:rounded-xl lg:border ${
+            sideOpen ? "lg:right-[25rem]" : "lg:right-4"
+          } ${deniseShown ? "visible translate-x-0" : "invisible translate-x-[calc(100%+1rem)]"}`}
+        >
+          <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2.5">
+            <DeniseFace />
+            <h2 className="flex-1 text-base font-semibold text-ink">Denise</h2>
+            <span className="hidden lg:contents">
+              <MinimizeButton
+                onMinimize={() => {
+                  setMinimized(true);
+                  setAutoMin(false);
+                }}
+              />
+            </span>
+            <IconButton label="Close Denise" onClick={closeDenise}>
+              <CloseIcon />
+            </IconButton>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 lg:flex-initial">
+            <DenisePanel
+              data={data}
+              state={deniseState && { ...deniseState, conflicts, notices }}
+              working={deciding || deniseRun.working || (scanning && !deniseState && stuck !== data)}
+              stuck={!deniseState && stuck === data}
+              onRetry={() => (setStuck(null), setScanTry((n) => n + 1))}
+              run={deniseRun}
+              outcome={outcome}
+              preview={preview}
+              onApprove={approve}
+              onReject={reject}
+              onUndo={undo}
+              onDismiss={(subject) => setDismissed((all) => new Set(all).add(subject))}
+              onPreview={setPreview}
+              onOpen={(appointmentId) => select({ kind: "detail", appointmentId })}
+              onDismissNotice={(id) => {
+                setDismissed((all) => new Set(all).add(id));
+                startTransition(() => dismissDeniseItem(id, data.date).then(() => {}));
+              }}
+              onNoShow={(n) => {
+                setDismissed((all) => new Set(all).add(n.id));
+                offerUndo("no_show", n.appointmentId, n.clientName.split(" ")[0]);
+                setStatusNow(n.appointmentId, "no_show", () => changeVisitStatus(n.appointmentId, "no_show"), (message) => {
+                  setOutcome({ message, error: true, undoActionId: null });
+                  setDismissed((all) => {
+                    const next = new Set(all);
+                    next.delete(n.id);
+                    return next;
+                  });
+                });
+              }}
+              onBookWaitlist={(o, m) => decide(() => bookFromWaitlist(m.entryId, o.staffId, data.date, m.startMinute), null)}
+            >
+              <DeniseChat
+                box={false}
+                canBook={me.canBook}
+                today={data.today}
+                date={data.date}
+                appointmentId={openVisit}
+                placeholder={me.canBook ? askExample(data) : undefined}
+                onBooked={(appointmentId, date) => {
+                  router.refresh();
+                  if (date !== data.date) openOn(date, appointmentId);
+                }}
+              />
+            </DenisePanel>
+          </div>
+          <DeniseAskBox canBook={me.canBook} date={data.date} appointmentId={openVisit} placeholder={me.canBook ? askExample(data) : undefined} />
         </aside>
       </guard.Provider>
 
@@ -1790,18 +1792,6 @@ function askExample({ columns, menu }: BoardData): string {
   return who ? `Find a haircut with ${who.firstName} after 1 PM` : "Who's free for a haircut after 1 PM?";
 }
 
-// How many things Denise wants looked at, on her tab and button.
-function DeniseBadge({ count }: { count: number }) {
-  if (!count) return null;
-  return (
-    <span data-testid="denise-badge" className="inline-flex h-5 min-w-5 animate-pop-in items-center justify-center rounded-full bg-denise-600 px-1.5 text-xs font-semibold text-white">
-      <span className="sr-only">, </span>
-      {count}
-      <span className="sr-only"> to look at</span>
-    </span>
-  );
-}
-
 // "This visit, the whole group, this and following, or all?" for a change
 // to a repeating or group visit.
 function ScopeDialog({
@@ -1844,7 +1834,7 @@ function ScopeDialog({
 
 // Denise's face in the corner while her panel is closed. Her badge counts
 // what she wants looked at, and bounces gently when something is new.
-function DeniseLauncher({ hidden, count, bounce, onOpen }: { hidden: boolean; count: number; bounce: boolean; onOpen: () => void }) {
+function DeniseLauncher({ hidden, className = "", count, bounce, onOpen }: { hidden: boolean; className?: string; count: number; bounce: boolean; onOpen: () => void }) {
   if (hidden) return null;
   return (
     <button
@@ -1852,7 +1842,7 @@ function DeniseLauncher({ hidden, count, bounce, onOpen }: { hidden: boolean; co
       onClick={onOpen}
       aria-label={count ? `Open Denise (${count} to look at)` : "Open Denise"}
       data-testid="denise-launcher"
-      className="relative ml-auto flex size-11 shrink-0 animate-pop-in items-center justify-center rounded-full bg-surface ring-1 ring-denise-200 transition-transform duration-(--motion-fast) hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:scale-95"
+      className={`relative ml-auto flex size-11 shrink-0 animate-pop-in items-center justify-center rounded-full bg-surface ring-1 ring-denise-200 transition-transform duration-(--motion-fast) hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus active:scale-95 ${className}`}
     >
       <DeniseFace size={36} />
       {count > 0 && (
@@ -2373,7 +2363,7 @@ function AppointmentBlock({
   const late = lateBy !== null;
   // Past the grace period: "Not arrived", not a growing count.
   const notArrived = late && lateBy >= NOT_ARRIVED_MINUTES;
-  const lateText = notArrived ? "not arrived" : lateBy ? `${formatDuration(lateBy)} late` : "due now";
+  const lateText = notArrived ? "not arrived" : late ? `${formatDuration(lateBy)} late` : "";
 
   // Only lines that fit whole: name, service, then time.
   let room = height - 6;
@@ -2504,11 +2494,11 @@ function AppointmentBlock({
               // clock (it's all in the tooltip).
               <span
                 data-attention={notArrived ? "not-arrived" : "late"}
-                title={notArrived ? `Not arrived: due ${formatMinute(block.start)}` : lateBy ? `Running ${formatDuration(lateBy)} late` : "Due now, not here yet"}
+                title={notArrived ? `Not arrived: due ${formatMinute(block.start)}` : `Running ${formatDuration(lateBy!)} late`}
                 className="hidden shrink-0 items-center gap-0.5 text-xs leading-4 font-semibold whitespace-nowrap text-block-attention @min-[6.5rem]:flex"
               >
                 <ClockIcon className="size-3.5" />
-                {(notArrived || lateBy) && <span className={notArrived ? "hidden @min-[11rem]:inline" : "hidden @min-[8.5rem]:inline"}>{notArrived ? "Not arrived" : `+${lateBy}m`}</span>}
+                <span className={notArrived ? "hidden @min-[11rem]:inline" : "hidden @min-[8.5rem]:inline"}>{notArrived ? "Not arrived" : `+${lateBy}m`}</span>
               </span>
             )}
             {/* Checked out: a check, which goes before the name does. */}

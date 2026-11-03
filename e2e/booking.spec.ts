@@ -108,7 +108,7 @@ async function drag(page: Page, block: Locator, toStylist: string, minutes: numb
 }
 
 // The side panel's Booking details tab.
-const panel = (page: Page) => page.getByRole("tabpanel", { name: "Booking details" });
+const panel = (page: Page) => page.getByRole("complementary", { name: "Booking details" });
 
 // Big enough to click any stylist at any time of day without scrolling.
 test.use({ viewport: { width: 1920, height: 1500 } });
@@ -265,7 +265,7 @@ test.describe("front desk", () => {
     await form.getByRole("button", { name: "Cancel booking" }).click();
 
     // Denise says what the cancellation freed.
-    await expect(page.getByRole("tabpanel", { name: /Denise/ })).toContainText("That frees 10am–11am with Bridget.");
+    await expect(page.getByRole("complementary", { name: "Denise" })).toContainText("That frees 10am–11am with Bridget.");
     await expect(block).toHaveCount(0);
     // Saved behind the screen.
     await expect.poll(() => appointment(id)).toMatchObject({ status: "canceled", cancel_reason: "Client is sick: Will call to rebook" });

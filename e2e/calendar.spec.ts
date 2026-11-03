@@ -204,7 +204,7 @@ test.describe("front desk", () => {
     await waitForHydration(page, "[data-block]");
     // (Its middle is under Ben's trim.)
     await color.click({ position: { x: 10, y: 5 } });
-    const panel = page.getByRole("tabpanel", { name: "Booking details" });
+    const panel = page.getByRole("complementary", { name: "Booking details" });
     await expect(panel.getByTestId("client-name")).toHaveText(`${PREFIX}Ava Test`);
     await expect(panel).toContainText("All-Over Color");
     await expect(color).toHaveAttribute("aria-pressed", "true");
@@ -443,36 +443,60 @@ test.describe("design", () => {
   });
 
   for (const width of [1100, 1920]) {
-    test(`keeps the panel closed until something opens it (${width}px)`, async ({ page }) => {
+    test(`keeps Denise and booking details apart, each closed until opened (${width}px)`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await openDay(page, QUIET_TUESDAY);
-      const aside = page.getByRole("complementary", { name: "Assistant and booking details" });
-      await expect(aside).toBeHidden();
-      // The calendar uses the full width.
+      const denise = page.getByTestId("denise-card");
+      const details = page.getByTestId("side-panel");
+      const bar = page.getByTestId("denise-minimized");
+      await expect(denise).toBeHidden();
+      await expect(details).toBeHidden();
+      // With nothing chosen, the calendar uses the full width.
       const grid = await ui(page).getByTestId("calendar-grid").boundingBox();
       expect(grid!.x + grid!.width).toBeGreaterThan(width - 40);
 
-      // Denise's face opens her panel; the X and Escape close it.
+      // Denise's face opens her card, with no tabs; her X and Escape close it.
       await waitForHydration(page, "[data-block]");
       await page.getByTestId("denise-launcher").click();
-      await expect(aside).toBeVisible();
-      await expect(aside.getByRole("tab", { name: /Denise/ })).toHaveAttribute("aria-selected", "true");
+      await expect(denise).toBeVisible();
+      await expect(denise.getByRole("tab")).toHaveCount(0);
+      await expect(details).toBeHidden();
       await expect(page.getByTestId("denise-launcher")).toHaveCount(0);
-      await aside.getByRole("button", { name: "Close panel" }).click();
-      await expect(aside).toBeHidden();
+      await denise.getByRole("button", { name: "Close Denise" }).click();
+      await expect(denise).toBeHidden();
       await page.getByTestId("denise-launcher").click();
-      await expect(aside).toBeVisible();
+      await expect(denise).toBeVisible();
       await page.keyboard.press("Escape");
-      await expect(aside).toBeHidden();
+      await expect(denise).toBeHidden();
 
-      // An appointment opens its details; empty calendar space closes them
-      // without starting a booking.
+      // An appointment opens booking details on its own; with Denise open,
+      // she steps aside to her small bar, and comes back when it closes.
+      await page.getByTestId("denise-launcher").click();
+      await expect(denise).toBeVisible();
       await column(page, "Bridget Callahan").getByRole("button", { name: /Ava Test/ }).click({ position: { x: 10, y: 5 } });
-      await expect(aside.getByRole("tabpanel", { name: "Booking details" })).toContainText("All-Over Color");
+      await expect(page.getByRole("complementary", { name: "Booking details" })).toContainText("All-Over Color");
+      await expect(denise).toBeHidden();
+      await expect(bar).toBeVisible();
+      await details.getByRole("button", { name: "Close panel" }).click();
+      await expect(details).toBeHidden();
+      await expect(denise).toBeVisible();
+
+      // Opened on purpose while booking details are open, she sits beside
+      // them, never on top.
+      await column(page, "Bridget Callahan").getByRole("button", { name: /Ava Test/ }).click({ position: { x: 10, y: 5 } });
+      await expect(bar).toBeVisible();
+      await bar.getByRole("button", { name: /^Open Denise/ }).click();
+      await expect(denise).toBeVisible();
+      await expect(details).toBeVisible();
+      const [d, p] = [(await denise.boundingBox())!, (await details.boundingBox())!];
+      expect(d.x + d.width).toBeLessThanOrEqual(p.x);
+
+      // Empty calendar space closes booking details without starting a booking.
+      await denise.getByRole("button", { name: "Close Denise" }).click();
       const box = (await column(page, "Nola Brennan").boundingBox())!;
       await column(page, "Nola Brennan").click({ position: { x: 20, y: box.height - 20 } });
-      await expect(aside).toBeHidden();
-      await expect(aside.getByRole("form", { name: "New booking" })).toHaveCount(0);
+      await expect(details).toBeHidden();
+      await expect(page.getByRole("form", { name: "New booking" })).toHaveCount(0);
     });
   }
 });

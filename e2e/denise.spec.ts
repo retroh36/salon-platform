@@ -89,8 +89,7 @@ async function openDenise(page: Page) {
 }
 
 const block = (page: Page, client: string) => ui(page).getByRole("button", { name: new RegExp(`${PREFIX}${client} Lewis`) });
-const deniseTab = (page: Page) => page.getByRole("tab", { name: /Denise/ });
-const denisePanel = (page: Page) => page.getByRole("tabpanel", { name: /Denise/ });
+const denisePanel = (page: Page) => page.getByRole("complementary", { name: "Denise" });
 
 async function startOf(itemId: string) {
   const { data } = await admin.from("appointment_items").select("starts_at, staff_id").eq("id", itemId).single();
@@ -104,9 +103,10 @@ test.describe("front desk", () => {
 
   test("waves when the day is clear, and mentions stock that needs ordering", async ({ page }) => {
     await openDay(page);
-    // Nothing on the calendar, so her panel stays closed; she has reorders
-    // waiting, so her badge shows them.
-    await expect(page.getByRole("complementary", { name: "Assistant and booking details" })).toBeHidden();
+    // Nothing on the calendar, so her card stays closed (and no booking
+    // panel); she has reorders waiting, so her badge shows them.
+    await expect(page.getByTestId("denise-card")).toBeHidden();
+    await expect(page.getByTestId("side-panel")).toBeHidden();
     const badge = page.getByTestId("denise-launcher-badge");
     await expect(badge).toHaveText(/^\d+$/);
     const waiting = Number(await badge.innerText());
@@ -139,7 +139,7 @@ test.describe("front desk", () => {
 
     // Report that Bridget's 10:00 is running 20 minutes over.
     await block(page, "Mia").click();
-    const details = page.getByRole("tabpanel", { name: "Booking details" });
+    const details = page.getByRole("complementary", { name: "Booking details" });
     await moreAction(details, "Running late");
     const form = details.getByRole("form", { name: "Running late" });
     await expect(form.getByRole("group", { name: "How far over is this running?" })).toBeVisible();
@@ -148,15 +148,10 @@ test.describe("front desk", () => {
     // Off her panel, so hovering an option doesn't preview it instead.
     await page.mouse.move(5, 5);
 
-    // Denise's panel slides in with her fix, pointing.
-    await expect(deniseTab(page)).toHaveAttribute("aria-selected", "true");
+    // Denise's card opens with her fix, pointing, beside booking details.
     const panel = denisePanel(page);
-    // The fix, and whatever else is waiting in her panel (reorders, other
-    // tests' openings and not-arrived clients), once it has all shown.
-    await expect(async () => {
-      const others = (await panel.getByTestId("denise-reorder").count()) + (await panel.getByTestId("denise-opening").count()) + (await panel.getByTestId("late-name").count());
-      expect(await page.getByTestId("denise-badge").textContent()).toBe(`, ${1 + others} to look at`);
-    }).toPass();
+    await expect(panel).toBeVisible();
+    await expect(details).toBeVisible();
     await expect(panel.locator("[data-pose]")).toHaveAttribute("data-pose", "point");
     await expect(panel.getByTestId("denise-message")).toHaveText(
       `Bridget's running 20 min late. I found a fix that only moves one client: ${PREFIX}Grace Lewis 11:00 → 11:20. Want me to apply it?`,
@@ -167,12 +162,15 @@ test.describe("front desk", () => {
     // new place shows dashed.
     await expect(ui(page).locator("[data-denise-highlight]")).toHaveCount(2);
     await expect(ui(page).locator("[data-fix-ghost]")).toContainText("→ 11:20am");
-    // Only while she's showing it: closing her panel clears the calendar,
-    // and her badge is all that's left.
-    await page.getByRole("button", { name: "Close panel" }).click();
+    // Only while she's showing it: closing her card clears the calendar,
+    // and her badge is all that's left, counting the fix and whatever else
+    // is waiting (reorders, other tests' openings and not-arrived clients).
+    const others = (await panel.getByTestId("denise-reorder").count()) + (await panel.getByTestId("denise-opening").count()) + (await panel.getByTestId("late-name").count());
+    await panel.getByRole("button", { name: "Close Denise" }).click();
     await expect(ui(page).locator("[data-denise-highlight]")).toHaveCount(0);
     await expect(ui(page).locator("[data-fix-ghost]")).toHaveCount(0);
     await expect(page.getByTestId("denise-launcher")).toBeVisible();
+    await expect(page.getByTestId("denise-launcher-badge")).toHaveText(String(1 + others));
     await openDenise(page);
     await expect(ui(page).locator("[data-denise-highlight]")).toHaveCount(2);
 
@@ -261,7 +259,7 @@ test.describe("front desk", () => {
     await overrunMorning();
     await openDay(page);
     await block(page, "Mia").click();
-    await moreAction(page.getByRole("tabpanel", { name: "Booking details" }), "Running late");
+    await moreAction(page.getByRole("complementary", { name: "Booking details" }), "Running late");
     await page.getByText("30 min").click();
     await page.getByRole("button", { name: "Tell Denise" }).click();
 
@@ -301,7 +299,7 @@ test.describe("front desk", () => {
     const grace = await seedCut(await newClient("Grace"), BRIDGET, at(11));
     await openDay(page);
     await block(page, "Mia").click();
-    await moreAction(page.getByRole("tabpanel", { name: "Booking details" }), "Running late");
+    await moreAction(page.getByRole("complementary", { name: "Booking details" }), "Running late");
     await page.getByText("20 min").click();
     await page.getByRole("button", { name: "Tell Denise" }).click();
 
@@ -333,7 +331,7 @@ test.describe("stylist", () => {
     await overrunMorning();
     await openDay(page);
     await block(page, "Mia").click();
-    await moreAction(page.getByRole("tabpanel", { name: "Booking details" }), "Running late");
+    await moreAction(page.getByRole("complementary", { name: "Booking details" }), "Running late");
     await page.getByText("15 min").click();
     await page.getByRole("button", { name: "Tell Denise" }).click();
 
@@ -352,8 +350,9 @@ test.describe("reduced motion", () => {
     const badge = page.getByTestId("denise-launcher-badge");
     await expect(badge).toHaveAttribute("data-bounce", "true");
     expect(parseFloat(await badge.evaluate((el) => getComputedStyle(el).animationDuration))).toBeLessThan(0.001);
-    const aside = page.locator("aside[aria-label='Assistant and booking details']");
-    expect(parseFloat(await aside.evaluate((el) => getComputedStyle(el).transitionDuration))).toBeLessThan(0.001);
+    for (const aside of [page.getByTestId("denise-card"), page.getByTestId("side-panel")]) {
+      expect(parseFloat(await aside.evaluate((el) => getComputedStyle(el).transitionDuration))).toBeLessThan(0.001);
+    }
     await openDenise(page);
     const image = denisePanel(page).locator("[data-pose] img").first();
     await expect(image).toBeVisible();

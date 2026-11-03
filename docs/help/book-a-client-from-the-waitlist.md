@@ -7,7 +7,7 @@ open: /calendar | Open calendar
 
 When time opens up, Denise suggests waitlist clients who fit it. You choose who to book.
 
-1. After a cancellation, no-show or fix frees some time, open Denise's panel (tap Denise's face under the calendar, or the **Denise** tab).
+1. After a cancellation, no-show or fix frees some time, open Denise's card (tap her face under the calendar, or her small bar in the corner if she's minimized).
 2. Find the waitlist card. It shows the opening and the clients who fit, best first: those who asked for that stylist, then whoever has waited longest.
 3. Call or message the client to check they can come.
 4. Tap **Book** next to their name. The visit is booked and the client comes off the waitlist.

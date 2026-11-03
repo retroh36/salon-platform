@@ -17,7 +17,7 @@ async function startBooking(page: Page) {
   await waitForHydration(page, "section[data-staff-id]");
   const { box, y } = await slotAt(page, ui(page).getByRole("region", { name: "Bridget Callahan", exact: true }), 11 * 60);
   await page.mouse.click(box.x + box.width - 15, y);
-  const form = page.getByRole("tabpanel", { name: "Booking details" });
+  const form = page.getByRole("complementary", { name: "Booking details" });
   await expect(form.getByLabel("Service")).toBeVisible();
   return form;
 }

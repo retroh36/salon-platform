@@ -117,7 +117,7 @@ test("moves and cancels this and following visits", async ({ page }) => {
   // Cancel the third and fourth.
   await openDay(page, DATES[2]);
   await column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Ivy Test`) }).click();
-  const panel = page.getByRole("tabpanel", { name: "Booking details" });
+  const panel = page.getByRole("complementary", { name: "Booking details" });
   await moreAction(panel, "Cancel booking");
   const cancel = panel.getByRole("form", { name: "Cancel booking" });
   await cancel.getByLabel("Reason").selectOption("Client rescheduled");

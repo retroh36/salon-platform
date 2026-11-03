@@ -107,7 +107,7 @@ test("the key is one small button under the calendar, with Denise at the end of 
   await page.mouse.click(5, 5);
   await expect(key).toBeHidden();
   await launcher.click();
-  await expect(page.locator("aside[aria-label]").first()).toBeVisible();
+  await expect(page.getByTestId("denise-card")).toBeVisible();
   await expect(launcher).toBeHidden();
 });
 

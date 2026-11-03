@@ -96,7 +96,7 @@ test("when a visit is canceled, Denise suggests who on the waitlist fits, and st
 
   await openDay(page);
   await ui(page).getByRole("region", { name: "Nola Brennan", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Gone Test`) }).click();
-  const panel = page.getByRole("tabpanel", { name: "Booking details" });
+  const panel = page.getByRole("complementary", { name: "Booking details" });
   await moreAction(panel, "Cancel booking");
   const cancel = panel.getByRole("form", { name: "Cancel booking" });
   await cancel.getByLabel("Reason").selectOption("Client canceled");

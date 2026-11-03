@@ -18,7 +18,7 @@ When a stylist can't work all or part of the day (sick, an emergency, an appoint
 ## Good to know
 
 - Marking someone out adds approved time off for them, so nothing else is booked with them then.
-- **Mark out only, I'll handle clients** marks them out without moving anyone. Denise's tab then shows the fixes, one client at a time, each with the client's message to send once it's applied (see Approve Denise's fixes).
+- **Mark out only, I'll handle clients** marks them out without moving anyone. Denise's card then shows the fixes, one client at a time, each with the client's message to send once it's applied (see Approve Denise's fixes).
 - If nobody is booked with them then, the button is **Mark … out**, and the panel says no clients were affected.
 - Denise's plan tries the same time with a stylist at the same level first, then another stylist or a little later that day, then another day. Each option is checked with the booking rules: who does the service, each stylist's own length for it, processing time and chairs. A stylist at another level charges their own price, shown on the option ("Master · $20 more").
 - Clients set to **Only books with their preferred stylist** (on their details) are only offered their stylist's next openings. Clients who usually see them start on a new day with them.

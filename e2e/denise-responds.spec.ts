@@ -84,8 +84,8 @@ async function openDay(page: Page, date = DAY) {
   await waitForHydration(page, "section[data-staff-id]");
 }
 
-const denisePanel = (page: Page) => page.getByRole("tabpanel", { name: /Denise/ });
-const details = (page: Page) => page.getByRole("tabpanel", { name: "Booking details" });
+const denisePanel = (page: Page) => page.getByRole("complementary", { name: "Denise" });
+const details = (page: Page) => page.getByRole("complementary", { name: "Booking details" });
 const block = (page: Page, client: string) => ui(page).getByRole("button", { name: new RegExp(`${PREFIX}${client} Lewis`) });
 
 // "Mark … out…" on their column, all day: with clients, "Mark out only"

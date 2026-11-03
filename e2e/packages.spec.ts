@@ -68,7 +68,7 @@ test.describe.serial("a package from start to finish", () => {
     await expect(ui(page).getByTestId("calendar-date")).toContainText(formatLongDay(DAY));
     await waitForHydration(page, "section[data-staff-id]");
     await ui(page).getByRole("button", { name: "New booking" }).click();
-    const booking = page.getByRole("tabpanel", { name: "Booking details" }).getByRole("form", { name: "New booking" });
+    const booking = page.getByRole("complementary", { name: "Booking details" }).getByRole("form", { name: "New booking" });
     await booking.getByLabel("Find a client").fill(`${PREFIX}ava`);
     await booking.getByRole("list", { name: "Matching clients" }).getByRole("button").first().click();
     const line = booking.getByRole("group", { name: "Service 1" });
@@ -79,7 +79,7 @@ test.describe.serial("a package from start to finish", () => {
     await booking.getByRole("button", { name: "Create booking" }).click();
 
     // Checked in and out: the package pays for it.
-    const details = page.getByRole("tabpanel", { name: "Booking details" });
+    const details = page.getByRole("complementary", { name: "Booking details" });
     await checkIn(details);
     await checkOut(details);
     co = await onCheckout(page);

@@ -131,8 +131,8 @@ test("with Denise open, the calendar keeps its width: she's a compact card under
   const before = (await grid.boundingBox())!.width;
   await page.getByTestId("denise-launcher").click();
   await expect(page.getByTestId("denise-says")).toBeVisible();
-  const card = page.locator("aside[aria-label='Assistant and booking details']");
-  await expect(card).toHaveAttribute("data-compact", "true");
+  const card = page.getByTestId("denise-card");
+  await expect(card.getByRole("tab")).toHaveCount(0);
   // Wait for it to slide in, then: the grid hasn't made room, columns keep
   // their width and still scroll with an arrow, and the card starts below
   // the header row, so every stylist's name and day stays in view.
@@ -150,6 +150,19 @@ test("with Denise open, the calendar keeps its width: she's a compact card under
   expect(arrow.x + arrow.width).toBeLessThanOrEqual(box.x);
   await expectScrollsWithArrows(page, grid, "More stylists");
   expect(Math.abs(box.width - 380)).toBeLessThan(1);
+  // Her header at the top and her message box at the bottom, whatever
+  // scrolls between them.
+  const ask = page.getByTestId("denise-ask-box");
+  const pinned = async () => {
+    const [c, a, h] = [(await card.boundingBox())!, (await ask.boundingBox())!, (await card.getByRole("heading", { name: "Denise" }).boundingBox())!];
+    expect(Math.abs(a.y + a.height - (c.y + c.height))).toBeLessThan(2);
+    expect(h.y - c.y).toBeLessThan(24);
+  };
+  await pinned();
+  await card.locator(".overflow-y-auto").first().evaluate((el) => el.scrollTo(0, 0));
+  await pinned();
+  await card.locator(".overflow-y-auto").first().evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await pinned();
 
   // Minimized: a small bar with how many things are waiting, kept on a
   // reload; opened again, the card is back.
@@ -163,9 +176,18 @@ test("with Denise open, the calendar keeps its width: she's a compact card under
   await bar.getByRole("button", { name: /^Open Denise/ }).click();
   await expect(card).toHaveCSS("visibility", "visible");
 
-  // Booking details is the full-height panel again, which the page makes room for.
-  await card.getByRole("tab", { name: "Booking details" }).click();
-  await expect(card).not.toHaveAttribute("data-compact", "true");
+  // A visit opens booking details on its own, a full-height panel the page
+  // makes room for; Denise steps aside to her bar, and comes back after.
+  await ui(page).locator("[data-block]").first().click();
+  const details = page.getByTestId("side-panel");
+  await expect(details).toBeVisible();
+  await expect(card).toHaveCSS("visibility", "hidden");
+  await expect(bar).toBeVisible();
+  const barBox = (await bar.boundingBox())!;
+  expect(barBox.x + barBox.width).toBeLessThanOrEqual((await details.boundingBox())!.x);
+  await expect.poll(async () => (await grid.boundingBox())!.width).toBeLessThan(before - 300);
+  await details.getByRole("button", { name: "Close panel" }).click();
+  await expect(card).toHaveCSS("visibility", "visible");
   await page.close();
 });
 

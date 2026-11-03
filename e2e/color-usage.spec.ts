@@ -68,7 +68,7 @@ async function openVisit(page: Page) {
   await page.goto("/calendar");
   await waitForHydration(page, "section[data-staff-id]");
   await ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Rose Test`) }).click();
-  return page.getByRole("tabpanel", { name: "Booking details" });
+  return page.getByRole("complementary", { name: "Booking details" });
 }
 
 test.describe("formulas and stock", () => {

@@ -47,7 +47,7 @@ async function addCard(clientId: string, ref = "test_visa_4242", label = "Visa â
 async function openVisit(page: import("@playwright/test").Page, v: { id: string; date: string }) {
   await page.goto(`/calendar?date=${v.date}&open=${v.id}`);
   await waitForHydration(page, "section[data-staff-id]");
-  const panel = page.getByRole("tabpanel", { name: "Booking details" });
+  const panel = page.getByRole("complementary", { name: "Booking details" });
   await expect(panel).toBeVisible();
   return panel;
 }
@@ -211,7 +211,7 @@ test("Denise flags a repeat offender when the desk books them", async ({ page })
   await page.goto(`/calendar?date=${(await busyDay()).date}`);
   await waitForHydration(page, "section[data-staff-id]");
   await ui(page).getByRole("button", { name: "New booking" }).click();
-  const form = page.getByRole("tabpanel", { name: "Booking details" }).getByRole("form", { name: "New booking" });
+  const form = page.getByRole("complementary", { name: "Booking details" }).getByRole("form", { name: "New booking" });
   await form.getByLabel("Find a client").fill(`${PREFIX}remy`);
   await form.getByRole("list", { name: "Matching clients" }).getByRole("button", { name: new RegExp(`${PREFIX}Remy Test`) }).click();
   await expect(form.getByTestId("denise-policy")).toHaveText(/^Heads up: \w+Remy has 2 late cancellations or no-shows since \w+, so the salon asks for a 50% deposit\./, { timeout: 15_000 });

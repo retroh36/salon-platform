@@ -101,7 +101,7 @@ test.describe("front desk", () => {
     await expect(ui(page).getByTestId("calendar-date")).toContainText(formatLongDay(DAY));
     await waitForHydration(page, "section[data-staff-id]");
     await ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Mia Test`) }).click();
-    await expect(page.getByRole("tabpanel", { name: "Booking details" }).getByTestId("membership-info")).toHaveText("Blowout Club member · Blowout: 2 left · 10% off retail");
+    await expect(page.getByRole("complementary", { name: "Booking details" }).getByTestId("membership-info")).toHaveText("Blowout Club member · Blowout: 2 left · 10% off retail");
 
     co = await openCheckout(page, { appointmentId: a!.id });
     await expect(co.ticket.getByTestId("badge-membership")).toHaveText("Blowout Club · Blowout: 2 left");

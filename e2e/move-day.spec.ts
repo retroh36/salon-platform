@@ -76,7 +76,7 @@ async function where(id: string) {
   return data!.map((i) => ({ staff: i.staff_id, ...toLocal(new Date(i.starts_at), TZ) }));
 }
 
-const panel = (page: Page) => page.getByRole("tabpanel", { name: "Booking details" });
+const panel = (page: Page) => page.getByRole("complementary", { name: "Booking details" });
 const column = (page: Page, name: string) => ui(page).getByRole("region", { name, exact: true });
 
 async function open(page: Page, date: string, stylist: string, name: RegExp) {

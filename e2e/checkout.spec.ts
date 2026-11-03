@@ -71,7 +71,7 @@ async function fromCalendar(page: Page, first: string) {
   await expect(ui(page).getByTestId("calendar-date")).toContainText(formatLongDay(DAY));
   await waitForHydration(page, "section[data-staff-id]");
   await ui(page).getByRole("button", { name: new RegExp(`${PREFIX}${first} Test`) }).click();
-  await checkOut(page.getByRole("tabpanel", { name: "Booking details" }));
+  await checkOut(page.getByRole("complementary", { name: "Booking details" }));
   return onCheckout(page);
 }
 

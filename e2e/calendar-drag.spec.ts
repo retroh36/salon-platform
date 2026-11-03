@@ -53,7 +53,7 @@ async function openDay(page: Page) {
 
 const grid = (page: Page) => ui(page).getByTestId("calendar-grid");
 const block = (page: Page) => ui(page).locator("[data-block]").filter({ hasText: `${PREFIX}Ava` });
-const details = (page: Page) => page.getByRole("tabpanel", { name: "Booking details" });
+const details = (page: Page) => page.getByRole("complementary", { name: "Booking details" });
 const savedStart = async () => toLocal(new Date((await admin.from("appointment_items").select("starts_at").eq("id", itemId).single()).data!.starts_at), TZ).minute;
 // Until the block stops moving (opening the panel narrows the calendar, and
 // its toolbar can wrap onto a second line).

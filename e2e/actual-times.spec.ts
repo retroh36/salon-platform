@@ -68,7 +68,7 @@ test.describe("the front desk", () => {
     await page.goto(`/calendar?date=${todayIn("America/Chicago")}`);
     await waitForHydration(page, "section[data-staff-id]");
     await ui(page).getByRole("region", { name: "Bridget Callahan", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Tap`) }).click({ position: { x: 10, y: 5 } });
-    const details = page.getByRole("tabpanel", { name: "Booking details" });
+    const details = page.getByRole("complementary", { name: "Booking details" });
     // Check in, then Check out: nothing in between.
     if ((await details.getByTestId("primary-action").textContent()) === "Check in") await checkIn(details);
     await expect(details.getByTestId("primary-action")).toHaveText("Check out");

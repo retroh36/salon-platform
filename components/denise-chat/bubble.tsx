@@ -6,7 +6,7 @@ import { DeniseFace } from "@/components/denise";
 import { IconButton } from "@/components/ui/button";
 import { CloseIcon } from "@/components/ui/icons";
 import { MinimizedBar, MinimizeButton, rememberCard, rememberedCard } from "./card";
-import { DeniseChat } from "./chat";
+import { DeniseAskBox, DeniseChat } from "./chat";
 import { focusDenise, hydrateDenise, setDeniseMin, setDeniseOpen, useDenise } from "./store";
 
 // The shortcut that opens Denise from anywhere, with the cursor in her
@@ -106,12 +106,14 @@ export function DeniseBubble({ me, launcher = "corner", overlay = false }: { me:
               <CloseIcon />
             </IconButton>
           </div>
-          <div className={`min-h-0 overflow-y-auto px-4 pt-3 text-sm ${overlay ? "flex-1 md:flex-initial" : "flex-1"}`}>
+          {/* The header stays at the top and her message box at the bottom;
+              the conversation scrolls between them. */}
+          <div className={`min-h-0 overflow-y-auto px-4 pt-3 pb-3 text-sm ${overlay ? "flex-1 md:flex-initial" : "flex-1"}`}>
             <DeniseChat
+              box={false}
               canBook={me.canBook}
               today={me.today}
               date={me.today}
-              placeholder={me.canBook ? "Find a haircut after 1 PM" : undefined}
               intro={
                 <p className="rounded-lg rounded-bl-sm bg-denise-50 px-3 py-2 text-denise-900">
                   {me.canBook
@@ -121,6 +123,7 @@ export function DeniseBubble({ me, launcher = "corner", overlay = false }: { me:
               }
             />
           </div>
+          <DeniseAskBox canBook={me.canBook} date={me.today} placeholder={me.canBook ? "Find a haircut after 1 PM" : undefined} />
         </aside>
       )}
     </>
