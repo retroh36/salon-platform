@@ -5,6 +5,7 @@ import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { buttonClass } from "@/components/ui/button";
 import { PlusIcon } from "@/components/ui/icons";
 import { Badge, EmptyState, nameLinkClass, PageHeader } from "@/components/ui/page";
+import { ProductThumb } from "@/components/product-thumb";
 import { numClass, TableCard, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
 import { canManageInventory, canReceiveOrders, describeStock, filterInventory, formatAmount, isLow, productName, readFilter, stockValueCents, TYPE_LABELS } from "@/lib/inventory";
@@ -138,13 +139,18 @@ async function Inventory({ searchParams }: Pick<PageProps<"/inventory">, "search
                 return (
                   <tr key={p.id} className={trClass} data-low={lowStock || undefined}>
                     <td className={tdClass}>
-                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <Link href={`/inventory/${p.id}`} className={nameLinkClass}>
-                          {productName(p)}
-                        </Link>
-                        {lowStock && <Badge tone="warning">Low stock</Badge>}
+                      <span className="flex items-center gap-3">
+                        <ProductThumb name={productName(p)} unit={p.unit} size="sm" />
+                        <span className="min-w-0">
+                          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <Link href={`/inventory/${p.id}`} className={nameLinkClass}>
+                              {productName(p)}
+                            </Link>
+                            {lowStock && <Badge tone="warning">Low stock</Badge>}
+                          </span>
+                          {(p.sku || p.supplier?.name) && <span className="block text-13 text-ink-muted">{[p.sku, p.supplier?.name].filter(Boolean).join(" · ")}</span>}
+                        </span>
                       </span>
-                      {(p.sku || p.supplier?.name) && <span className="block text-13 text-ink-muted">{[p.sku, p.supplier?.name].filter(Boolean).join(" · ")}</span>}
                     </td>
                     <td className={`${tdClass} hidden whitespace-nowrap text-ink-muted sm:table-cell`}>{TYPE_LABELS[p.type]}</td>
                     <td className={`${tdClass} ${numClass}`}>

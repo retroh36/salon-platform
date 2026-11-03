@@ -389,7 +389,7 @@ function ServicesStep({
         <section key={category} aria-labelledby={`cat-${category}`}>
           {site.categoryPhotos[category] && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={site.categoryPhotos[category]} alt="" loading="lazy" data-testid="category-photo" className="mb-3 aspect-[5/2] w-full rounded-lg bg-sunken object-cover" />
+            <img src={site.categoryPhotos[category]} alt="" loading="lazy" data-testid="category-photo" className="mb-3 aspect-[5/2] w-full rounded-lg bg-sunken object-cover md:aspect-[4/1]" />
           )}
           <h3 id={`cat-${category}`} className="mb-2 text-base font-semibold text-ink">
             {category}

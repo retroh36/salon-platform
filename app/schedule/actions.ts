@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { canManage, getCurrentStaff } from "@/lib/auth";
-import { LOGO_TYPES, MAX_LOGO_BYTES } from "@/lib/branding";
+import { LOGO_TYPES, MAX_LOGO_BYTES, removeStored } from "@/lib/branding";
 import { isUuid } from "@/lib/ids";
 import {
   parseCompensationForm,
@@ -166,7 +166,7 @@ export async function uploadStaffPhoto(staffId: string, formData: FormData): Pro
   const { data, error: updateError } = await supabase.from("staff").update({ photo_path: path }).eq("id", staffId).select("id");
   if (updateError) throw updateError;
   if (!data.length) return { ok: false, message: "Only owners and managers can change photos." };
-  if (before?.photo_path) await supabase.storage.from(PHOTO_BUCKET).remove([before.photo_path]);
+  await removeStored(supabase, PHOTO_BUCKET, [before?.photo_path]);
   revalidatePath("/schedule");
   return { ok: true, message: "Saved the photo." };
 }
@@ -177,7 +177,7 @@ export async function removeStaffPhoto(staffId: string): Promise<PhotoResult> {
   const { data: before } = await supabase.from("staff").select("photo_path").eq("id", staffId).single();
   const { error } = await supabase.from("staff").update({ photo_path: null }).eq("id", staffId);
   if (error) throw error;
-  if (before?.photo_path) await supabase.storage.from(PHOTO_BUCKET).remove([before.photo_path]);
+  await removeStored(supabase, PHOTO_BUCKET, [before?.photo_path]);
   revalidatePath("/schedule");
   return { ok: true, message: "Removed the photo." };
 }

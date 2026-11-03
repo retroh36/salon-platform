@@ -308,3 +308,21 @@ select 'b1000000-0000-4000-8000-000000000001', 'c1000000-0000-4000-8000-00000000
        (select array_agg(('d1000000-0000-4000-8000-0000000000' || t.n)::uuid order by t.n) from team t where t.dept = any (v.depts)),
        'd1000000-0000-4000-8000-000000000001'
 from (values ('Color team', array['color']), ('Nails & skin', array['nails', 'skin'])) as v (name, depts);
+
+-- Its booking site, /book/harbor-and-vine, with the demo's cover and a photo
+-- for each menu category (public/demo/, credited in public/demo/CREDITS.md).
+-- Its stylists have no portraits, so the site shows their initials.
+update public.businesses set slug = 'harbor-and-vine' where id = 'b1000000-0000-4000-8000-000000000001';
+
+insert into public.online_booking_settings (business_id, enabled, cancellation_policy, accent_color, welcome, cover_path)
+values ('b1000000-0000-4000-8000-000000000001', true,
+        'You can cancel or reschedule online, with the link in your confirmation, or by phone.',
+        '#2f5d62', 'Hair, color, nails and skin under one roof, open seven days.', '/demo/covers/harbor-and-vine.jpg');
+
+insert into public.service_category_photos (business_id, category, photo_path)
+select 'b1000000-0000-4000-8000-000000000001', c.category, '/demo/categories/' || c.file || '.jpg'
+from (values
+  ('Cuts', 'cuts'), ('Blowouts & Styling', 'blowouts-and-styling'), ('Treatments', 'treatments'),
+  ('Color', 'color'), ('Highlights', 'highlights'), ('Balayage', 'balayage'),
+  ('Nails', 'nails'), ('Skin', 'skin'), ('Brows & Lashes', 'brows-and-lashes')
+) as c (category, file);

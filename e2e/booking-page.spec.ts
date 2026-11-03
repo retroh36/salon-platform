@@ -45,7 +45,7 @@ test("owners set up the booking page, and clients see it", async ({ page, browse
 
     // A photo for Blowouts & Styling, and the Blowout's description.
     const category = ui(page).locator("li").filter({ has: page.getByRole("heading", { name: "Blowouts & Styling" }) });
-    await category.getByLabel("Upload Photo for Blowouts & Styling").setInputFiles({ name: "blowouts.png", mimeType: "image/png", buffer: PNG });
+    await category.getByLabel(/^(Upload|Replace) Photo for Blowouts & Styling$/).setInputFiles({ name: "blowouts.png", mimeType: "image/png", buffer: PNG });
     await expect(category.getByRole("status")).toHaveText("Saved the photo for Blowouts & Styling.");
     const descriptions = ui(page).getByRole("region", { name: "Service descriptions" });
     await descriptions.getByLabel("Blowout", { exact: true }).fill("A smooth, full blow-dry that lasts.");

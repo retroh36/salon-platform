@@ -13,13 +13,13 @@ const CATEGORY = "Treatments";
 let owner: Client;
 let frontDesk: Client;
 let stranger: Client;
-let before: { specialty: string | null; bio: string | null; portfolio_paths: string[] };
+let before: { specialty: string | null; bio: string | null; portfolio_paths: string[]; photo_path: string | null };
 let coverBefore: string | null;
 let photoBefore: Record<string, unknown> | null;
 
 beforeAll(async () => {
   [owner, frontDesk, stranger] = await Promise.all([signIn("owner@mapleandash.test"), signIn("frontdesk@mapleandash.test"), signIn("owner@harborvine.test")]);
-  before = (await admin.from("staff").select("specialty, bio, portfolio_paths").eq("id", BRIDGET).single()).data!;
+  before = (await admin.from("staff").select("specialty, bio, portfolio_paths, photo_path").eq("id", BRIDGET).single()).data!;
   coverBefore = (await admin.from("online_booking_settings").select("cover_path").eq("business_id", B).single()).data!.cover_path;
   photoBefore = (await admin.from("service_category_photos").select("*").eq("business_id", B).eq("category", CATEGORY).maybeSingle()).data;
 });
@@ -62,5 +62,23 @@ describe("the booking page", () => {
     expect(bridget.portfolio).toHaveLength(3);
     expect(site.categoryPhotos[CATEGORY]).toMatch(/\/category-test\.jpg$/);
     expect(site.location.hours.length).toBeGreaterThan(0);
+  });
+
+  it("takes a portrait that ships with the app, and nothing else outside the salon's folder", async () => {
+    // migration …_demo_photos.sql
+    expect((await owner.from("staff").update({ photo_path: "/demo/team/bridget.jpg" }).eq("id", BRIDGET).select("id")).data).toHaveLength(1);
+    expect((await owner.from("staff").update({ photo_path: `${B}/staff-test.jpg` }).eq("id", BRIDGET).select("id")).data).toHaveLength(1);
+    for (const path of ["/demo/../x.jpg", "/settings", "https://evil.test/a.jpg", "/demo/team/bridget.svg"]) {
+      expect((await owner.from("staff").update({ photo_path: path }).eq("id", BRIDGET)).error?.code, path).toBe("23514");
+    }
+  });
+
+  it("seeds the demo's photos for both salons", async () => {
+    const [maple, harbor] = await Promise.all([loadSite(admin, "maple-and-ash"), loadSite(admin, "harbor-and-vine")]);
+    if (maple.status !== "open" || harbor.status !== "open") throw new Error("Both booking sites should be open.");
+    expect(harbor.site.business.coverUrl).toBe("/demo/covers/harbor-and-vine.jpg");
+    expect(harbor.site.categoryPhotos.Nails).toBe("/demo/categories/nails.jpg");
+    const { data: team } = await admin.from("staff").select("first_name, photo_path").eq("business_id", B).eq("role", "stylist");
+    expect(team!.filter((s) => s.first_name !== "Bridget").every((s) => s.photo_path?.startsWith("/demo/team/"))).toBe(true);
   });
 });

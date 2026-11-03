@@ -465,7 +465,7 @@ where s.id = l.id::uuid;
 
 -- What the booking site says about each stylist (Settings → Booking page):
 -- a one-line specialty and a short bio, in their own words. Portraits and
--- portfolio photos come with the demo imagery.
+-- photos of their work are set with the booking site below.
 update public.staff s set specialty = p.specialty, bio = p.bio
 from (values
   ('d0000000-0000-4000-8000-000000000004', 'Lived-in color and balayage',
@@ -854,6 +854,36 @@ select 'b0000000-0000-4000-8000-000000000001', true, 60, 120, true, 24,
        'Plans change, we understand. You can cancel or reschedule online, with the link in your confirmation, or by phone.',
        (select id from public.services where business_id = 'b0000000-0000-4000-8000-000000000001' and name = 'Color Consultation'),
        '#6b3f2a', 'Book your next visit with our team. We can''t wait to see you.';
+
+-- The demo's photos ship with the app (public/demo/, credited in
+-- public/demo/CREDITS.md), stored as paths from the site's root: the cover,
+-- a photo for each menu category, and the stylists' portraits and work
+-- (none for Nola and Shae, so both cases show).
+update public.online_booking_settings set cover_path = '/demo/covers/maple-and-ash.jpg'
+where business_id = 'b0000000-0000-4000-8000-000000000001';
+
+insert into public.service_category_photos (business_id, category, photo_path)
+select 'b0000000-0000-4000-8000-000000000001', c.category, c.path
+from (values
+  ('Cuts', '/demo/categories/cuts.jpg'),
+  ('Blowouts & Styling', '/demo/categories/blowouts-and-styling.jpg'),
+  ('Color', '/demo/categories/color.jpg'),
+  ('Highlights', '/demo/categories/highlights.jpg'),
+  ('Balayage', '/demo/categories/balayage.jpg'),
+  ('Treatments', '/demo/categories/treatments.jpg')
+) as c (category, path);
+
+update public.staff s set photo_path = '/demo/team/' || p.name || '.jpg', portfolio_paths = p.work
+from (values
+  ('d0000000-0000-4000-8000-000000000004', 'bridget', array['/demo/work/bridget-1.jpg', '/demo/work/bridget-2.jpg']),
+  ('d0000000-0000-4000-8000-000000000005', 'gil', array['/demo/work/gil-1.jpg']),
+  ('d0000000-0000-4000-8000-000000000006', 'hannah', array['/demo/work/hannah-1.jpg']),
+  ('d0000000-0000-4000-8000-000000000007', 'nola', array[]::text[]),
+  ('d0000000-0000-4000-8000-000000000008', 'sandra', array['/demo/work/sandra-1.jpg', '/demo/work/sandra-2.jpg', '/demo/work/sandra-3.jpg']),
+  ('d0000000-0000-4000-8000-000000000009', 'shae', array[]::text[]),
+  ('d0000000-0000-4000-8000-000000000010', 'lois', array['/demo/work/lois-1.jpg'])
+) as p (id, name, work)
+where s.id = p.id::uuid;
 
 update public.services set online_booking = 'consultation'
 where business_id = 'b0000000-0000-4000-8000-000000000001' and name in ('Color Correction', 'Vivid / Fashion Color');

@@ -119,7 +119,7 @@ export async function loadSite(admin: Admin, slug: string): Promise<SiteLookup> 
       photoUrl: staffPhotoUrl(s.photo_path),
       specialty: s.specialty?.trim() || null,
       bio: s.bio?.trim() || null,
-      portfolio: s.portfolio_paths.map((p) => staffPhotoUrl(p)!),
+      portfolio: s.portfolio_paths.map(staffPhotoUrl).filter((u): u is string => Boolean(u)),
       prices: Object.fromEntries(
         s.staff_services
           .filter((ss) => byId.has(ss.service_id))

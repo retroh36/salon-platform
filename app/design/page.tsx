@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { DeniseFace, DenisePose } from "@/components/denise";
 import { DeniseText } from "@/components/denise-text";
+import { ProductThumb } from "@/components/product-thumb";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, IconButton } from "@/components/ui/button";
 import { Skeleton, toastActionClass } from "@/components/ui/feedback";
@@ -308,6 +309,23 @@ async function Design() {
             </tbody>
           </table>
         </TableCard>
+      </Section>
+
+      <Section title="Product thumbnails" description="Drawn containers, chosen from the product's name; never a photo or a brand.">
+        <div className="flex flex-wrap items-end gap-4">
+          {[
+            ["Shampoo 300 ml", "Bottle"],
+            ["Bonding Oil 30 ml", "Dropper"],
+            ["Surf Spray 125 ml", "Spray"],
+            ["Hydrating Mask 200 ml", "Jar"],
+            ["Color 7N", "Tube"],
+          ].map(([name, label]) => (
+            <span key={label} className="flex flex-col items-center gap-1 text-xs text-ink-muted">
+              <ProductThumb name={name} unit={label === "Tube" ? "g" : "unit"} size="lg" />
+              {label}
+            </span>
+          ))}
+        </div>
       </Section>
 
       <Section title="Cards and sections" description="One layer: groups are a title over the items; only the items are cards.">

@@ -23,13 +23,33 @@ export const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 
 export function salonLogoUrl(path: string | null | undefined): string | null {
   if (!path) return null;
+  if (path.startsWith("/")) return isBundledPhoto(path) ? path : null;
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${LOGO_BUCKET}/${path}`;
 }
 
 // Stylist photos (for the booking site): the public `staff-photos` bucket.
 export function staffPhotoUrl(path: string | null | undefined): string | null {
   if (!path) return null;
+  if (path.startsWith("/")) return isBundledPhoto(path) ? path : null;
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/staff-photos/${path}`;
+}
+
+// Photos that ship with the app (the demo salons' covers, portraits and
+// work, in public/demo/, credited in public/demo/CREDITS.md) are stored as
+// their path from the site's root; any other path is a file in Storage
+// under the business id.
+const BUNDLED = /^\/demo\/[a-z0-9-]+(\/[a-z0-9-]+)*\.(jpg|png|webp)$/;
+
+export function isBundledPhoto(path: string): boolean {
+  return BUNDLED.test(path);
+}
+
+// Removes these files from Storage once nothing points at them: never a
+// photo that ships with the app.
+type WithStorage = { storage: { from(bucket: string): { remove(paths: string[]): PromiseLike<unknown> } } };
+export async function removeStored(client: WithStorage, bucket: string, paths: (string | null | undefined)[]): Promise<void> {
+  const files = paths.filter((p): p is string => Boolean(p) && !p!.startsWith("/"));
+  if (files.length) await client.storage.from(bucket).remove(files);
 }
 
 // The fallback mark: the salon name's first letter.

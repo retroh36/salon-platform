@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentStaff } from "@/lib/auth";
 import { DEMO_OFF, isDemo } from "@/lib/demo";
-import { LOGO_BUCKET, LOGO_TYPES, MAX_LOGO_BYTES } from "@/lib/branding";
+import { LOGO_BUCKET, LOGO_TYPES, MAX_LOGO_BYTES, removeStored } from "@/lib/branding";
 import { can } from "@/lib/permissions";
 import { everyTool } from "@/lib/denise/assistant";
 import { CHAT_MODEL } from "@/lib/denise/claude";
@@ -54,7 +54,7 @@ export async function uploadSalonLogo(formData: FormData): Promise<SettingsResul
   const { data: before } = await s.supabase.from("businesses").select("logo_path").eq("id", s.me.business_id).single();
   const { error: updateError } = await s.supabase.from("businesses").update({ logo_path: path }).eq("id", s.me.business_id);
   if (updateError) throw updateError;
-  if (before?.logo_path) await s.supabase.storage.from(LOGO_BUCKET).remove([before.logo_path]);
+  await removeStored(s.supabase, LOGO_BUCKET, [before?.logo_path]);
   refresh();
   return { ok: true, message: "Saved the salon's logo." };
 }
@@ -65,7 +65,7 @@ export async function removeSalonLogo(): Promise<SettingsResult> {
   const { data: before } = await s.supabase.from("businesses").select("logo_path").eq("id", s.me.business_id).single();
   const { error } = await s.supabase.from("businesses").update({ logo_path: null }).eq("id", s.me.business_id);
   if (error) throw error;
-  if (before?.logo_path) await s.supabase.storage.from(LOGO_BUCKET).remove([before.logo_path]);
+  await removeStored(s.supabase, LOGO_BUCKET, [before?.logo_path]);
   refresh();
   return { ok: true, message: "Removed the logo. The salon's initial shows instead." };
 }

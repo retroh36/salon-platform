@@ -7,29 +7,9 @@ import { Badge } from "@/components/ui/page";
 import type { CheckoutScreenData } from "@/lib/checkout-screen";
 import { formatPrice } from "@/lib/services";
 import { SideScroll } from "@/components/ui/side-scroll";
+import { ProductThumb } from "@/components/product-thumb";
 
 type Product = CheckoutScreenData["products"][number];
-
-// A stand-in for a product photo: the brand's initials on a soft tile
-// tinted from its name.
-function ProductThumb({ product, size = "md" }: { product: Product; size?: "md" | "lg" }) {
-  const initials = product.brand
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-  const hue = [...product.brand].reduce((n, c) => n + c.charCodeAt(0), 0) % 360;
-  return (
-    <span
-      aria-hidden
-      className={`flex shrink-0 items-center justify-center rounded-md font-semibold text-ink ${size === "lg" ? "size-14 text-base" : "size-11 text-sm"}`}
-      style={{ background: `hsl(${hue} 45% 90%)` }}
-    >
-      {initials || "•"}
-    </span>
-  );
-}
 
 function stockText(p: Product) {
   return p.onHand <= 0 ? "Out of stock" : `${p.onHand} left`;
@@ -95,7 +75,7 @@ export function ProductPicker({ data, onAdd }: { data: CheckoutScreenData; onAdd
                     onClick={() => add(p)}
                     className="flex min-h-14 w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:bg-sunken focus-visible:outline-none"
                   >
-                    <ProductThumb product={p} />
+                    <ProductThumb name={p.name} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-ink">{p.name}</span>
                       <span className="block text-13 text-ink-muted">{p.onHand <= 0 ? <Badge tone="warning">{stockText(p)}</Badge> : stockText(p)}</span>
@@ -145,7 +125,7 @@ function QuickTiles({ label, products, onAdd, testId }: { label: string; product
               aria-label={`Add ${p.name}, ${formatPrice(p.priceCents)}`}
               className="flex w-44 items-center gap-2.5 rounded-lg border border-line bg-surface p-2 text-left transition-[transform,border-color,box-shadow] duration-(--motion-fast) hover:border-line-strong active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-focus"
             >
-              <ProductThumb product={p} />
+              <ProductThumb name={p.name} />
               <span className="min-w-0">
                 <span className="line-clamp-2 text-sm leading-tight font-medium text-ink">{p.name}</span>
                 <span className="block text-xs text-ink-muted tabular-nums">

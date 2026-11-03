@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentStaff } from "@/lib/auth";
-import { LOGO_BUCKET, MAX_LOGO_BYTES } from "@/lib/branding";
+import { LOGO_BUCKET, MAX_LOGO_BYTES, removeStored } from "@/lib/branding";
 import { isUuid } from "@/lib/ids";
 import { can } from "@/lib/permissions";
 import { sniffImage } from "@/lib/photos";
@@ -66,7 +66,7 @@ export async function uploadCover(formData: FormData): Promise<PageResult> {
   const { data: before } = await s.supabase.from("online_booking_settings").select("cover_path").eq("business_id", s.me.business_id).maybeSingle();
   const { error } = await s.supabase.from("online_booking_settings").upsert({ business_id: s.me.business_id, cover_path: path });
   if (error) throw error;
-  if (before?.cover_path) await s.supabase.storage.from(LOGO_BUCKET).remove([before.cover_path]);
+  await removeStored(s.supabase, LOGO_BUCKET, [before?.cover_path]);
   return done("Saved the cover photo.");
 }
 
@@ -76,7 +76,7 @@ export async function removeCover(): Promise<PageResult> {
   const { data: before } = await s.supabase.from("online_booking_settings").select("cover_path").eq("business_id", s.me.business_id).maybeSingle();
   const { error } = await s.supabase.from("online_booking_settings").update({ cover_path: null }).eq("business_id", s.me.business_id);
   if (error) throw error;
-  if (before?.cover_path) await s.supabase.storage.from(LOGO_BUCKET).remove([before.cover_path]);
+  await removeStored(s.supabase, LOGO_BUCKET, [before?.cover_path]);
   return done("Removed the cover photo.");
 }
 
@@ -106,10 +106,10 @@ export async function uploadPortrait(staffId: string, formData: FormData): Promi
   const { data, error } = await s.supabase.from("staff").update({ photo_path: path }).eq("id", staffId).select("id");
   if (error) throw error;
   if (!data.length) {
-    await s.supabase.storage.from(STAFF_BUCKET).remove([path]);
+    await removeStored(s.supabase, STAFF_BUCKET, [path]);
     return { ok: false, message: TEAM_ONLY };
   }
-  if (before?.photo_path) await s.supabase.storage.from(STAFF_BUCKET).remove([before.photo_path]);
+  await removeStored(s.supabase, STAFF_BUCKET, [before?.photo_path]);
   revalidatePath("/schedule");
   return done("Saved the portrait.");
 }
@@ -121,7 +121,7 @@ export async function removePortrait(staffId: string): Promise<PageResult> {
   const { data, error } = await s.supabase.from("staff").update({ photo_path: null }).eq("id", staffId).select("id");
   if (error) throw error;
   if (!data.length) return { ok: false, message: TEAM_ONLY };
-  if (before?.photo_path) await s.supabase.storage.from(STAFF_BUCKET).remove([before.photo_path]);
+  await removeStored(s.supabase, STAFF_BUCKET, [before?.photo_path]);
   revalidatePath("/schedule");
   return done("Removed the portrait. Their initials show instead.");
 }
@@ -143,12 +143,12 @@ export async function addPortfolioPhoto(staffId: string, formData: FormData): Pr
     .eq("id", staffId)
     .select("id");
   if (error?.code === "23514") {
-    await s.supabase.storage.from(STAFF_BUCKET).remove([path]);
+    await removeStored(s.supabase, STAFF_BUCKET, [path]);
     return { ok: false, message: `Up to ${PORTFOLIO_MAX} photos. Remove one first.` };
   }
   if (error) throw error;
   if (!data.length) {
-    await s.supabase.storage.from(STAFF_BUCKET).remove([path]);
+    await removeStored(s.supabase, STAFF_BUCKET, [path]);
     return { ok: false, message: TEAM_ONLY };
   }
   return done("Added the photo.");
@@ -166,7 +166,7 @@ export async function removePortfolioPhoto(staffId: string, path: string): Promi
     .select("id");
   if (error) throw error;
   if (!data.length) return { ok: false, message: TEAM_ONLY };
-  await s.supabase.storage.from(STAFF_BUCKET).remove([path]);
+  await removeStored(s.supabase, STAFF_BUCKET, [path]);
   return done("Removed the photo.");
 }
 
@@ -183,7 +183,7 @@ export async function uploadCategoryPhoto(category: string, formData: FormData):
     .from("service_category_photos")
     .upsert({ business_id: s.me.business_id, category, photo_path: path, updated_at: new Date().toISOString() });
   if (error) throw error;
-  if (before) await s.supabase.storage.from(LOGO_BUCKET).remove([before.photo_path]);
+  await removeStored(s.supabase, LOGO_BUCKET, [before?.photo_path]);
   return done(`Saved the photo for ${category}.`);
 }
 
@@ -192,7 +192,7 @@ export async function removeCategoryPhoto(category: string): Promise<PageResult>
   if (!s) return { ok: false, message: SETTINGS_ONLY };
   const { data, error } = await s.supabase.from("service_category_photos").delete().eq("business_id", s.me.business_id).eq("category", category).select("photo_path");
   if (error) throw error;
-  if (data.length) await s.supabase.storage.from(LOGO_BUCKET).remove(data.map((d) => d.photo_path));
+  await removeStored(s.supabase, LOGO_BUCKET, data.map((d) => d.photo_path));
   return done(`Removed the photo for ${category}.`);
 }
 
