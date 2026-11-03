@@ -10,7 +10,7 @@ import { createContext, startTransition, useCallback, useContext, useEffect, use
 import { deniseCardCookie, fitCookie, mergeOrder, moveItem, nameVariants, offColumns, viewColumns, viewCookie, viewKey, type ViewKey } from "@/lib/calendar-views";
 import { DeniseFace } from "@/components/denise";
 import { Avatar } from "@/components/ui/avatar";
-import { LEVEL_BG, LevelBadge } from "@/components/ui/level";
+import { LevelBadge, LevelBar, useLevels } from "@/components/ui/level";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { FitText } from "@/components/ui/fit-text";
@@ -21,7 +21,6 @@ import { isEditable, STATUS_LABELS, type AppointmentStatus } from "@/lib/appoint
 import { reach } from "@/lib/reach";
 import type { DeniseRequest, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
 import { FAMILIES, FAMILY_LABELS, laneBox, layoutColumn, minutesLate, NOT_ARRIVED_MINUTES, quarterMarks, summaryVariants, timeRangeVariants, ZOOM_LABELS, ZOOM_PX_PER_MINUTE, ZOOMS, type CalendarZoom, type ServiceFamily } from "@/lib/calendar";
-import { LEVEL_LABELS, STAFF_LEVELS } from "@/lib/schedule-forms";
 import { BLOCK_LABELS } from "@/lib/scheduling/blocks";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, toLocal } from "@/lib/scheduling/time";
@@ -1137,7 +1136,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         data-dragging={columnDrag?.staffId === c.staffId || undefined}
                         data-level={c.level ?? undefined}
                       >
-                        {c.level && <span aria-hidden data-testid="level-bar" className={`absolute inset-x-0 top-0 h-1 ${LEVEL_BG[c.level]}`} />}
+                        {c.level && <LevelBar level={c.level} className="absolute inset-x-0 top-0 h-1" />}
                         {canReorder && !squeezed && (
                           <span
                             aria-hidden
@@ -1151,7 +1150,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         )}
                         <div className="flex min-w-0 items-center gap-2">
                           {/* Squeezed (Fit all), the avatar goes so the name fits. */}
-                          {!squeezed && <Avatar name={c.name} color={c.color} level={c.level} size="sm" />}
+                          {!squeezed && <Avatar name={c.name} color={c.color} level={c.level} photoUrl={c.photoUrl} size="sm" />}
                           <div className="min-w-0 flex-1">
                             <span title={squeezed ? `${c.name} · ${c.booked}` : c.name} className="block">
                               <FitText variants={nameVariants(c.name, c.firstName, squeezed)} className="text-sm font-semibold" />
@@ -1486,7 +1485,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                     setDoneMessage(message);
                     if (moved) setMovePrompt(moved);
                   }}
-                  team={data.columns.map((c) => ({ id: c.staffId, name: c.name }))}
+                  team={data.columns.map((c) => ({ id: c.staffId, name: c.name, color: c.color, photoUrl: c.photoUrl }))}
                   products={data.menu.products}
                 />
               ) : selection.kind === "walk-ins" ? (
@@ -2040,6 +2039,7 @@ function FixGhost({ block, y }: { block: Placed & { lane: number; lanes: number 
 // A small "Key" button under the calendar, opening what the colors,
 // statuses and level badges mean.
 function CalendarKey({ families }: { families: ServiceFamily[] }) {
+  const levels = useLevels();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const pop = useRef<HTMLDivElement>(null);
@@ -2121,10 +2121,10 @@ function CalendarKey({ families }: { families: ServiceFamily[] }) {
           <section className="flex flex-col gap-2">
             <h3 className="text-xs font-medium text-ink">Stylist levels</h3>
             <ul aria-label="Stylist levels" className="flex flex-col gap-1.5" data-testid="level-legend">
-              {[...STAFF_LEVELS].reverse().map((l) => (
-                <li key={l} className="flex items-center gap-2">
-                  <LevelBadge level={l} className="size-4.5" />
-                  {LEVEL_LABELS[l]}
+              {levels.map((l) => (
+                <li key={l.key} className="flex items-center gap-2">
+                  <LevelBadge level={l.key} className="size-4.5" />
+                  {l.name}
                 </li>
               ))}
             </ul>

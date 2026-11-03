@@ -1,3 +1,4 @@
+import { loadLevels, type Level } from "@/lib/levels";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import type { CoverageDay, CoveragePerson } from "@/lib/coverage";
@@ -7,7 +8,8 @@ import { loadWeekGrid, type WeekGrid } from "@/lib/team-schedule-load";
 
 type Supabase = SupabaseClient<Database>;
 
-export type CoverageWeek = { people: CoveragePerson[]; days: (CoverageDay & { weekStart: LocalDate })[] };
+// `levels`: the salon's, when loaded (for names and its top level).
+export type CoverageWeek = { people: CoveragePerson[]; days: (CoverageDay & { weekStart: LocalDate })[]; levels?: Level[] };
 
 // The week grid as Denise's checks read it: each day's hours (drafts
 // included when the grid has them), time off, clients, lent chairs, and
@@ -54,9 +56,14 @@ export async function loadCoverage(supabase: Supabase, location: { id: string; t
   const weeks: LocalDate[] = [];
   for (let w = startOfWeek(from); w <= to; w = addDays(w, 7)) weeks.push(w);
   const grids = await Promise.all(weeks.map((w) => loadWeekGrid(supabase, location, w, { drafts })));
-  const requests = await pendingRequests(supabase, grids[0].people.map((p) => p.id), from, to);
+  const [requests, place] = await Promise.all([
+    pendingRequests(supabase, grids[0].people.map((p) => p.id), from, to),
+    supabase.from("locations").select("business_id").eq("id", location.id).single(),
+  ]);
+  if (place.error) throw place.error;
   const all = grids.map((g) => coverageOf(g, requests));
-  return { people: all[0].people, days: all.flatMap((w) => w.days).filter((d) => d.date >= from && d.date <= to) };
+  const levels = await loadLevels(supabase, place.data.business_id);
+  return { people: all[0].people, days: all.flatMap((w) => w.days).filter((d) => d.date >= from && d.date <= to), levels };
 }
 
 // One week, from a grid already loaded for the Scheduling page.

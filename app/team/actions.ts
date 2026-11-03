@@ -38,7 +38,7 @@ export async function saveMember(staffId: string | null, _prev: MemberState, for
   if (!canManageMember(me, target)) return { message: NOT_ALLOWED };
   // Your own role stays as it is (the form doesn't offer it).
   const allowed = staffId === me.id ? [me.role] : rolesFor(me);
-  const parsed = parseMemberForm(formData, allowed);
+  const parsed = parseMemberForm(formData, allowed, me.levels.map((l) => l.key));
   if (!parsed.ok) return { errors: parsed.errors, message: "Fix the highlighted fields." };
   if (formData.get("invite") && !parsed.input.email) return { errors: { email: "Add their email to send an invite." }, message: "Fix the highlighted fields." };
 

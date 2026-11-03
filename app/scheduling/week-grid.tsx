@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useLayoutEffect, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, buttonClass } from "@/components/ui/button";
 import { ChevronLeftIcon, ChevronRightIcon, RepeatIcon, WarningIcon } from "@/components/ui/icons";
@@ -321,17 +321,7 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
                         <Link href={`/schedule?staff=${p.id}`} className={`${nameLinkClass} block text-sm leading-snug text-pretty break-words`} data-testid="team-name">
                           {p.name}
                         </Link>
-                        <p className="text-xs text-ink-muted tabular-nums">
-                          {hours(total)}
-                          {p.chair && (
-                            <>
-                              {" "}
-                              <span data-testid="home-chair" className="whitespace-nowrap">
-                                · {p.chair}
-                              </span>
-                            </>
-                          )}
-                        </p>
+                        <HoursAndChair hours={hours(total)} chair={p.chair} />
                       </div>
                       {editable && (
                         <Button
@@ -514,3 +504,44 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
   );
 }
 
+// "31 hr · Chair 7" on one line when it fits; otherwise the chair goes on
+// its own line under the hours, never a lone "· Chair 7".
+function HoursAndChair({ hours, chair }: { hours: string; chair: string | null }) {
+  const probe = useRef<HTMLSpanElement>(null);
+  const [stacked, setStacked] = useState(false);
+  useLayoutEffect(() => {
+    const el = probe.current;
+    if (!el || !chair) return;
+    const fit = () => setStacked(el.scrollWidth > el.clientWidth + 0.5);
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(el);
+    let live = true;
+    document.fonts?.ready.then(() => live && fit());
+    return () => {
+      live = false;
+      observer.disconnect();
+    };
+  }, [hours, chair]);
+  if (!chair) return <p className="text-xs text-ink-muted tabular-nums">{hours}</p>;
+  return (
+    <p className="relative text-xs text-ink-muted tabular-nums" data-stacked={stacked || undefined}>
+      {/* Measures the one-line version, out of sight. */}
+      <span ref={probe} aria-hidden className="invisible absolute inset-x-0 top-0 overflow-hidden whitespace-nowrap">
+        {hours} · {chair}
+      </span>
+      {stacked ? (
+        <>
+          <span className="block">{hours}</span>
+          <span data-testid="home-chair" className="block">
+            {chair}
+          </span>
+        </>
+      ) : (
+        <span className="whitespace-nowrap">
+          {hours} <span data-testid="home-chair">· {chair}</span>
+        </span>
+      )}
+    </p>
+  );
+}

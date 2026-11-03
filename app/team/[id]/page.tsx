@@ -1,3 +1,5 @@
+import { Avatar } from "@/components/ui/avatar";
+import { staffPhotoUrl } from "@/lib/branding";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -41,7 +43,7 @@ async function Member({ params, searchParams }: { params: Promise<{ id: string }
   if (!isUuid(id)) notFound();
   const { data: member, error } = await supabase
     .from("staff")
-    .select("id, first_name, last_name, email, phone, role, level, is_active, assists_staff_id, event_roles, staff_services(service_id)")
+    .select("id, first_name, last_name, email, phone, role, level, color, photo_path, is_active, assists_staff_id, event_roles, staff_services(service_id)")
     .eq("id", id)
     .eq("business_id", me.business_id)
     .maybeSingle();
@@ -70,6 +72,7 @@ async function Member({ params, searchParams }: { params: Promise<{ id: string }
       <BackLink href="/team">Team</BackLink>
       <PageHeader
         title={fullName(member)}
+        leading={<Avatar name={fullName(member)} color={member.color} level={member.level} photoUrl={staffPhotoUrl(member.photo_path)} size="lg" />}
         description={
           <>
             {member.is_active ? "On the team." : "Deactivated."} Hours, one-off changes, time off, pay rates and their photo are on{" "}

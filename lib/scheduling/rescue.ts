@@ -16,7 +16,8 @@
 import { checkMoves, itemEnd, pickResource, type BookedItem, type BookingContext, type BookingProblem, type ServiceTiming } from "./booking.ts";
 import { addDays, fromLocal, toLocal, type LocalDate } from "./time.ts";
 
-export type Level = "artisan" | "senior" | "master" | null;
+// A stylist level's key (lib/levels.ts).
+export type Level = string | null;
 
 export type RescueStylist = { id: string; firstName: string; level: Level };
 

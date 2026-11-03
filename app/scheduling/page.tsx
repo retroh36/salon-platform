@@ -1,3 +1,4 @@
+import { topLevel } from "@/lib/levels";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -42,7 +43,7 @@ async function Scheduling({ searchParams }: Pick<PageProps<"/scheduling">, "sear
   ]);
   // Denise's checks on the week shown (from today on), for those who plan it.
   const coverage = editable ? await coverageForGrid(supabase, grid) : null;
-  const flags = coverage ? coverage.days.filter((d) => d.date >= today).flatMap((d) => coverageFlags(coverage.people, d)) : [];
+  const flags = coverage ? coverage.days.filter((d) => d.date >= today).flatMap((d) => coverageFlags(coverage.people, d, topLevel(me.levels))) : [];
 
   return (
     <AppShell section={editable ? "scheduling" : "team"} me={me} wide denise="overlay">

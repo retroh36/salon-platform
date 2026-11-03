@@ -1,3 +1,4 @@
+import { levelName } from "@/lib/levels";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
@@ -8,7 +9,6 @@ import { Badge, nameLinkClass, PageHeader, Section } from "@/components/ui/page"
 import { TableCard, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
 import { staffPhotoUrl } from "@/lib/branding";
-import { LEVEL_LABELS } from "@/lib/schedule-forms";
 import { fullName, roleLabel, sortStaff } from "@/lib/staff";
 import { canManage } from "@/lib/auth";
 import { canManageMember, LOGIN_LABELS, loginState } from "@/lib/team";
@@ -114,7 +114,7 @@ async function Directory() {
                     </span>
                   </td>
                   <td className={`${tdClass} whitespace-nowrap text-ink`}>{roleLabel(member.role)}</td>
-                  <td className={`${tdClass} text-ink-muted`}>{member.level ? LEVEL_LABELS[member.level] : ""}</td>
+                  <td className={`${tdClass} text-ink-muted`}>{member.level ? levelName(me.levels, member.level) : ""}</td>
                   <td className={`${tdClass} text-ink-muted`}>
                     <a href={`mailto:${member.email}`} className="underline-offset-2 hover:text-ink hover:underline">
                       {member.email}

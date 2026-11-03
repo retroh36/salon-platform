@@ -12,10 +12,11 @@
 // or an answer that doesn't check out) and the chat shows a form for the
 // same fields instead, saying so.
 
+import { DEFAULT_LEVELS } from "@/lib/levels";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { PhoneRequest, When } from "@/lib/phone-booking";
 import type { PartOfDay } from "@/lib/scheduling/phone";
-import { STAFF_LEVELS, type StaffLevel } from "@/lib/schedule-forms";
+import { type StaffLevel } from "@/lib/schedule-forms";
 import { formatMinute, weekdayOf } from "@/lib/scheduling/time";
 import { CHAT_MODEL, type ClaudeClient } from "./claude";
 import { failureKind } from "./errors";
@@ -23,7 +24,11 @@ import { failureKind } from "./errors";
 export type BookingMenu = {
   services: readonly { id: string; name: string; category: string }[];
   stylists: readonly { id: string; firstName: string; level: StaffLevel | null }[];
+  // The salon's levels (lib/levels.ts); every salon's starting three if left out.
+  levels?: readonly { key: string; name: string }[];
 };
+
+const levelsOf = (menu: BookingMenu) => menu.levels ?? DEFAULT_LEVELS;
 
 // "booking": a new request for an appointment. "change": a follow-up that
 // changes the request already on screen. "other": anything else (a
@@ -59,7 +64,7 @@ export function describeCurrent(r: PhoneRequest, menu: BookingMenu): string {
   const code = (prefix: string, list: readonly { id: string }[], id: string) => `${prefix}${list.findIndex((x) => x.id === id) + 1}`;
   const parts = [
     `services ${r.serviceIds.length ? r.serviceIds.map((id) => code("s", menu.services, id)).join(", ") : "none yet"}`,
-    r.staffId ? `stylist ${code("t", menu.stylists, r.staffId)}` : r.level ? `any ${r.level} stylist` : "any stylist",
+    r.staffId ? `stylist ${code("t", menu.stylists, r.staffId)}` : r.level ? `any ${levelsOf(menu).find((l) => l.key === r.level)?.name ?? r.level} stylist` : "any stylist",
     r.from === r.to ? `on ${WEEKDAYS[weekdayOf(r.from)]}` : "over a range of days",
     r.part ? `${r.part}s` : r.after !== null ? `after ${formatMinute(r.after)}` : r.before !== null ? `before ${formatMinute(r.before)}` : "any time of day",
   ];
@@ -80,7 +85,7 @@ intent: booking when the line asks to book a client or find a time to book (a cl
 service_codes: the services asked for, in the order said, as codes from this menu. "cut" alone is a women's cut unless it says men's, kids or a fade; "color" alone is all-over color; "highlights" alone is full highlights. "same as last time" means same_as_last_time is true and service_codes stays empty unless services are also named.
 ${services}
 
-stylist_code: the stylist asked for by name, as a code from this list, else null. level: master, senior or artisan when the line asks for a level of stylist ("any master stylist"), else null. "anyone" or "whoever" means both are null.
+stylist_code: the stylist asked for by name, as a code from this list, else null. level: the level's code from this list when the line asks for a level of stylist ("any master stylist"), else null: ${levelsOf(menu).map((l) => `${l.key} (${l.name})`).join(", ")}. "anyone" or "whoever" means both are null.
 ${stylists}
 
 when: soon (no day said, or "asap", "earliest"), today, tomorrow, this_week, next_week, weekend, weekday (a day of the week: weekday is 1 for Monday to 7 for Sunday, and next is true only when it says "next Tuesday"), or date (a date written as a month and day: month 1-12, day 1-31). part_of_day: morning, afternoon or evening if said. after_hour and before_hour: 0-23 when it says "after 3" (15) or "before noon" (12); a bare number from 1 to 7 means pm. earliest is true when it asks for the earliest or soonest time.`;
@@ -101,7 +106,7 @@ export function schema(menu: BookingMenu) {
       same_as_last_time: { type: "boolean" },
       service_codes: { type: "array", items: { type: "string", enum: serviceCodes } },
       stylist_code: oneOrNull(stylistCodes),
-      level: oneOrNull(STAFF_LEVELS),
+      level: oneOrNull(levelsOf(menu).map((l) => l.key)),
       any_stylist: { type: "boolean" },
       when: oneOrNull(WHEN_KINDS),
       weekday: intOrNull,
@@ -160,7 +165,7 @@ export function checkedParse(raw: unknown, menu: BookingMenu): BookingParse | nu
   }
   const staffId = code(r.stylist_code, "t", menu.stylists);
   if (staffId === undefined) return null;
-  const level = STAFF_LEVELS.find((l) => l === r.level) ?? null;
+  const level = levelsOf(menu).find((l) => l.key === r.level)?.key ?? null;
   const kind = WHEN_KINDS.find((k) => k === r.when) ?? null;
   let when: When | null = null;
   if (kind === "weekday") {

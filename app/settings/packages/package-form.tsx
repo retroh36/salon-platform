@@ -1,11 +1,11 @@
 "use client";
 
+import { useLevels } from "@/components/ui/level";
 import { useRef, useState, useTransition } from "react";
 import { Button, IconButton } from "@/components/ui/button";
 import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { CloseIcon, PlusIcon } from "@/components/ui/icons";
 import { Alert } from "@/components/ui/page";
-import { LEVEL_LABELS, STAFF_LEVELS } from "@/lib/schedule-forms";
 import { centsToInput } from "@/lib/services";
 import type { PackageTemplate } from "@/lib/packages";
 import { savePackage, type PackageInput, type SaveResult } from "./actions";
@@ -13,6 +13,7 @@ import { savePackage, type PackageInput, type SaveResult } from "./actions";
 // Creating or editing a package: its services and counts, price, expiry
 // and the stylist levels it covers.
 export function PackageForm({ template, services, onSaved }: { template: PackageTemplate | null; services: { id: string; name: string }[]; onSaved?: () => void }) {
+  const levels = useLevels();
   const nextKey = useRef(1);
   const [f, setF] = useState<Omit<PackageInput, "items"> & { items: { key: number; serviceId: string; quantity: string }[] }>(() => ({
     id: template?.id ?? null,
@@ -88,18 +89,18 @@ export function PackageForm({ template, services, onSaved }: { template: Package
         <fieldset>
           <legend className="text-sm font-medium">For stylists who are</legend>
           <div className="mt-2 flex flex-wrap gap-3 text-sm">
-            {STAFF_LEVELS.map((l) => (
+            {levels.map(({ key: l, name }) => (
               <label key={l} className="flex items-center gap-1.5">
                 <input
                   type="checkbox"
                   className={checkboxClass}
                   checked={f.levels.length === 0 || f.levels.includes(l)}
                   onChange={(e) => {
-                    const current = f.levels.length === 0 ? [...STAFF_LEVELS] : f.levels;
+                    const current = f.levels.length === 0 ? levels.map((x) => x.key) : f.levels;
                     setF({ ...f, levels: e.target.checked ? [...current, l] : current.filter((x) => x !== l) });
                   }}
                 />
-                {LEVEL_LABELS[l]}
+                {name}
               </label>
             ))}
           </div>

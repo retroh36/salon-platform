@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { canBook, type AppointmentStatus } from "@/lib/appointments";
 import { getCurrentStaff } from "@/lib/auth";
+import { staffPhotoUrl } from "@/lib/branding";
 import { chairFor } from "@/lib/stations";
 import { bookedSummary, compactHours, FAMILIES, gridRange, isZoom, offHours, serviceFamily } from "@/lib/calendar";
 import { cardState, deniseCardCookie, fitCookie, offReason, viewCookie, viewKey, type CalendarView, type ViewKey } from "@/lib/calendar-views";
@@ -79,7 +80,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
   // database, made the calendar slow to load and to reload.)
   const [staffResult, itemsResult, servicesResult, resourcesResult, location, viewsResult, products, timeBlocks, { data: business }, { data: bookRow }, lentResult] = await Promise.all([
     // Everyone in the business, for "booked by" names; columns are this location's.
-    supabase.from("staff").select("id, first_name, last_name, role, level, color, is_active, location_id, calendar_position, home_resource_id"),
+    supabase.from("staff").select("id, first_name, last_name, role, level, color, photo_path, is_active, location_id, calendar_position, home_resource_id"),
     supabase
       .from("appointment_items")
       .select(
@@ -464,6 +465,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
       ),
       level: s.level,
       color: s.color,
+      photoUrl: staffPhotoUrl(s.photo_path),
       working,
       offReason: working ? null : offReason({ timeOff: allDay ? reasonOf(allDay) : null, salonOpen: open.length > 0, hasHours: day.hours.length > 0 }),
       hoursLabel: approved.some((t) => t.startMinute == null) ? "Time off" : day.hours.length ? formatIntervals(day.hours) : "Not working",

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentStaff } from "@/lib/auth";
 import { parseDollars } from "@/lib/checkout";
 import { isUuid } from "@/lib/ids";
-import { STAFF_LEVELS, type StaffLevel } from "@/lib/schedule-forms";
+import { type StaffLevel } from "@/lib/schedule-forms";
 import { can } from "@/lib/permissions";
 
 export type PackageInput = {
@@ -32,10 +32,11 @@ export async function savePackage(input: PackageInput): Promise<SaveResult> {
   if (!items.length || items.some((i) => !isUuid(i.service_id) || !Number.isInteger(i.quantity) || i.quantity < 1 || i.quantity > 100)) {
     return { ok: false, message: "Add services and how many of each (1 to 100)." };
   }
-  const levels = input.levels.filter((l) => (STAFF_LEVELS as readonly string[]).includes(l));
+  const keys = me.levels.map((l) => l.key);
+  const levels = input.levels.filter((l) => keys.includes(l));
   const { data, error } = await supabase.rpc("save_package_template", {
     p_template_id: input.id && isUuid(input.id) ? input.id : null!,
-    p_input: { name, price_cents: price, expiry_months: months, levels: levels.length && levels.length < STAFF_LEVELS.length ? levels : null, is_active: input.isActive, items },
+    p_input: { name, price_cents: price, expiry_months: months, levels: levels.length && levels.length < keys.length ? levels : null, is_active: input.isActive, items },
   });
   if (error) return { ok: false, message: ["22023", "42501", "P0002"].includes(error.code ?? "") ? error.message : "That didn't save. Try again." };
   revalidatePath("/settings/packages");

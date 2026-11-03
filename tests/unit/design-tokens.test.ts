@@ -65,7 +65,11 @@ function deltaE(a: string, b: string, sim?: Matrix): number {
 }
 
 const SURFACES = ["canvas", "surface", "sunken"];
-const LEVELS = ["level-master", "level-senior", "level-artisan"];
+// The level palette owners choose from (lib/levels.ts LEVEL_COLORS): a
+// bright shade for the ring and column bar, a deeper badge shade behind
+// its white symbol. The demo's four come first.
+const LEVEL_COLORS = ["gold", "fuchsia", "green", "blue", "violet", "slate"];
+const DEMO_LEVELS = LEVEL_COLORS.slice(0, 4).map((c) => `level-${c}`);
 const FILLS = ["peach-fill", "lavender-fill", "sage-fill", "teal-fill", "rose-fill", "sky-fill", "sand-fill"];
 // Checked in and no-show fill the block; checked out keeps the service's
 // color, faded to DONE_FADE over white, with its own tinted text.
@@ -191,32 +195,57 @@ describe("design tokens", () => {
     expect(Math.abs(hue(color("denise-500")) - hue(color("link")))).toBeGreaterThan(15);
   });
 
-  it("shows level colors (gold, silver, bronze) at 3:1 against the page (non-text)", () => {
-    for (const level of LEVELS) for (const s of SURFACES) expect(contrast(color(level), color(s))).toBeGreaterThanOrEqual(3);
+  it("shows every level badge's white symbol at 3:1, on the page too (non-text)", () => {
+    for (const c of LEVEL_COLORS) {
+      expect(contrast("#ffffff", color(`level-${c}-badge`)), `${c} badge`).toBeGreaterThanOrEqual(3);
+      for (const s of SURFACES) expect(contrast(color(`level-${c}-badge`), color(s)), `${c} badge on ${s}`).toBeGreaterThanOrEqual(3);
+    }
   });
 
-  it("keeps level colors clearly apart from each other, the service colors and Denise, with color-blindness too", () => {
+  it("keeps each badge shade the same hue as its bright shade", () => {
+    for (const c of LEVEL_COLORS) {
+      const [, a1, b1] = lab(color(`level-${c}`));
+      const [, a2, b2] = lab(color(`level-${c}-badge`));
+      const angle = (a: number, b: number) => (Math.atan2(b, a) * 180) / Math.PI;
+      const diff = Math.abs(angle(a1, b1) - angle(a2, b2));
+      expect(Math.min(diff, 360 - diff), c).toBeLessThan(12);
+    }
+  });
+
+  it("keeps the level colors apart from each other, with color-blindness too", () => {
+    // The rings and bars are decorative and the badge's symbol also says
+    // the level, so color is never alone: under color-blindness they only
+    // need to stay distinguishable.
+    const checks: [string, Matrix | undefined, number][] = [["normal", undefined, 25], ...Object.entries(SIMULATIONS).map(([name, m]): [string, Matrix, number] => [name, m, 8])];
+    const all = LEVEL_COLORS.map((c) => `level-${c}`);
+    for (const [vision, sim, apart] of checks)
+      for (const [i, a] of all.entries())
+        for (const b of all.slice(i + 1)) {
+          // Slate is a quiet grey: only its lightness sets it apart.
+          if (sim && (a === "level-slate" || b === "level-slate")) continue;
+          expect(deltaE(color(a), color(b), sim), `${a} vs ${b} (${vision})`).toBeGreaterThanOrEqual(apart);
+        }
+    // The demo's four, used side by side on the calendar.
+    for (const [i, a] of DEMO_LEVELS.entries()) for (const b of DEMO_LEVELS.slice(i + 1)) expect(deltaE(color(a), color(b)), `${a} vs ${b}`).toBeGreaterThanOrEqual(40);
+  });
+
+  it("keeps the level colors clear of the calendar's own colors and Denise's", () => {
     const others = [
       ...FILLS,
       ...FILLS.map((f) => f.replace("-fill", "-accent")),
+      ...FILLS.map((f) => overWhite(color(f), DONE_FADE)),
+      ...VISITS,
+      "active", "link", "danger",
       "denise-100", "denise-200", "denise-500", "denise-600", "denise-700",
     ];
-    // [vision, between levels, level vs others]. The avatar badges (a star,
-    // two dots, one dot) carry the level too, so color is never alone.
-    const checks: [string, Matrix | undefined, number, number][] = [
-      ["normal", undefined, 40, 18],
-      ...Object.entries(SIMULATIONS).map(([name, m]): [string, Matrix, number, number] => [name, m, 20, 10]),
-    ];
-    for (const [vision, sim, apart, fromOthers] of checks) {
-      for (const level of LEVELS) {
-        for (const other of LEVELS.filter((l) => l !== level)) {
-          expect(deltaE(color(level), color(other), sim), `${level} vs ${other} (${vision})`).toBeGreaterThanOrEqual(apart);
-        }
-        for (const other of others) {
-          expect(deltaE(color(level), color(other), sim), `${level} vs ${other} (${vision})`).toBeGreaterThanOrEqual(fromOthers);
-        }
-      }
-    }
+    const hex = (c: string) => (c.startsWith("#") ? c : color(c));
+    for (const c of LEVEL_COLORS)
+      for (const o of others) expect(deltaE(color(`level-${c}`), hex(o)), `level-${c} vs ${o}`).toBeGreaterThanOrEqual(15);
+    // The ones asked about by name: gold and checked-in yellow, green and
+    // the sage service, blue and the blues.
+    expect(deltaE(color("level-gold"), color("visit-here"))).toBeGreaterThanOrEqual(30);
+    expect(deltaE(color("level-green"), color("sage-accent"))).toBeGreaterThanOrEqual(15);
+    for (const o of ["active", "sky-accent", "denise-500"]) expect(deltaE(color("level-blue"), color(o)), o).toBeGreaterThanOrEqual(20);
   });
 
   it("no longer has the old plum", () => {

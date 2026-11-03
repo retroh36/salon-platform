@@ -1,3 +1,4 @@
+import { LevelsProvider } from "@/components/ui/level";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
@@ -102,6 +103,7 @@ async function Booking({ params, searchParams }: { params: Promise<{ slug: strin
           rebook={rebook}
         />
         <section id="book" aria-label="Book a visit" className="flex scroll-mt-4 flex-col lg:pt-10">
+          <LevelsProvider levels={site.levels}>
           <BookingFlow
             key={`${services.join(",")}:${staff}`}
             site={site}
@@ -111,6 +113,7 @@ async function Booking({ params, searchParams }: { params: Promise<{ slug: strin
             signedIn={account ? { firstName: account.firstName } : null}
             start={services.length ? { serviceIds: services, staffId: staff } : null}
           />
+          </LevelsProvider>
         </section>
       </div>
     </BookingFrame>

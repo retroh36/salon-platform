@@ -1,11 +1,12 @@
 "use client";
 
+import { useLevels } from "@/components/ui/level";
 import { useActionState, useState } from "react";
 import { Field, inputClass, submitWithoutReset } from "@/components/form";
 import { buttonClass } from "@/components/ui/button";
 import { checkboxClass, selectClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
-import { LEVEL_LABELS, STAFF_LEVELS, WEEKDAY_NAMES } from "@/lib/schedule-forms";
+import { WEEKDAY_NAMES } from "@/lib/schedule-forms";
 import { WEEKDAYS, type Weekday } from "@/lib/scheduling/time";
 import { roleLabel, type StaffRole } from "@/lib/staff";
 import { saveMember } from "./actions";
@@ -33,6 +34,7 @@ export function MemberForm({
   // A new member's starting hours (the salon's opening hours), as HH:MM.
   hours?: Partial<Record<Weekday, { start: string; end: string }>>;
 }) {
+  const levels = useLevels();
   const [state, action, pending] = useActionState(saveMember.bind(null, staffId), undefined);
   const errors = state?.errors ?? {};
   const [role, setRole] = useState<StaffRole>(initial.role);
@@ -72,9 +74,9 @@ export function MemberForm({
             <Field label="Level">
               <select name="level" defaultValue={initial.level} className={selectClass}>
                 <option value="">No level</option>
-                {STAFF_LEVELS.map((l) => (
-                  <option key={l} value={l}>
-                    {LEVEL_LABELS[l]}
+                {levels.map((l) => (
+                  <option key={l.key} value={l.key}>
+                    {l.name}
                   </option>
                 ))}
               </select>

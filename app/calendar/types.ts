@@ -28,6 +28,9 @@ export type ColumnData = {
   booked: string;
   level: StaffLevel | null;
   color: string | null;
+  // Their portrait, the same one as on Scheduling and the booking site
+  // (initials without one).
+  photoUrl: string | null;
   // On shift and the salon is open. Others are hidden behind the "off
   // today" chip (unless they have bookings), with why: "Day off",
   // "Vacation · Family trip", "Salon closed".

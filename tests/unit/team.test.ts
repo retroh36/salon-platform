@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { canManageMember, canResetPassword, loginState, parseMemberForm, rolesFor } from "@/lib/team";
 
+const KEYS = ["master", "senior", "artisan"];
+
 const form = (fields: Record<string, string | string[]>) => {
   const f = new FormData();
   for (const [k, v] of Object.entries(fields)) for (const x of Array.isArray(v) ? v : [v]) f.append(k, x);
@@ -38,8 +40,7 @@ describe("the member form", () => {
   it("reads someone new, with services and hours", () => {
     const r = parseMemberForm(
       form({ first_name: " Rae ", last_name: "Lin", email: "Rae@Example.com", phone: "312 555 0101", role: "stylist", level: "senior", service_ids: [SERVICE, SERVICE, "nope"], hours_included: "1", start_2: "09:00", end_2: "17:00" }),
-      ["manager", "front_desk", "stylist"],
-    );
+      ["manager", "front_desk", "stylist"], KEYS);
     expect(r).toEqual({
       ok: true,
       input: { first_name: "Rae", last_name: "Lin", email: "rae@example.com", phone: "(312) 555-0101", role: "stylist", level: "senior", service_ids: [SERVICE], hours: [{ weekday: 2, start_minute: 540, end_minute: 1020 }] },
@@ -47,13 +48,13 @@ describe("the member form", () => {
   });
 
   it("gives a level to stylists only, and only roles allowed", () => {
-    const r = parseMemberForm(form({ first_name: "Mo", role: "front_desk", level: "master" }), ["front_desk"]);
+    const r = parseMemberForm(form({ first_name: "Mo", role: "front_desk", level: "master" }), ["front_desk"], KEYS);
     expect(r.ok && r.input.level).toBeNull();
-    expect(parseMemberForm(form({ first_name: "Mo", role: "owner" }), ["manager", "stylist"])).toMatchObject({ ok: false, errors: { role: "Choose a role." } });
+    expect(parseMemberForm(form({ first_name: "Mo", role: "owner" }), ["manager", "stylist"], KEYS)).toMatchObject({ ok: false, errors: { role: "Choose a role." } });
   });
 
   it("says what's wrong", () => {
-    expect(parseMemberForm(form({ first_name: "", email: "nope", phone: "12", role: "stylist", hours_included: "1", start_3: "17:00", end_3: "09:00" }), ["stylist"])).toMatchObject({
+    expect(parseMemberForm(form({ first_name: "", email: "nope", phone: "12", role: "stylist", hours_included: "1", start_3: "17:00", end_3: "09:00" }), ["stylist"], KEYS)).toMatchObject({
       ok: false,
       errors: { first_name: "Enter their first name.", email: "Enter a valid email address.", phone: "Enter a 10-digit phone number.", hours: "Fix the highlighted days.", days: { 3: expect.any(String) } },
     });

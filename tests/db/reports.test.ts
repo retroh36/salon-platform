@@ -5,8 +5,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { briefFacts } from "@/lib/denise/brief";
 import { knowledgeFor, type Asker } from "@/lib/denise/knowledge";
 import { loadCloseout, loadGiftCardLiability, loadUnusedPackages } from "@/lib/reports-load";
-import { fromLocal, todayIn } from "@/lib/scheduling/time";
-import { admin, busyDay, DEFAULT_PERMISSIONS, makeRoom, SEED, signIn, type Client } from "./helpers";
+import { fromLocal, todayIn, toLocal } from "@/lib/scheduling/time";
+import { admin, DEFAULT_PERMISSIONS, makeRoom, SEED, signIn, type Client } from "./helpers";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -91,7 +91,11 @@ describe("closing out the day", () => {
 
 describe("the morning brief", () => {
   it("suggests reminder calls only for visits still to come: none once the day's done", async () => {
-    const { date } = await busyDay(TZ);
+    // The first day with visits still booked: today's may all be checked
+    // out already when the demo was loaded late in the day.
+    const { data: next, error } = await admin.from("appointments").select("starts_at").eq("location_id", L).in("status", ["booked", "confirmed"]).gt("starts_at", new Date().toISOString()).order("starts_at").limit(1).single();
+    if (error) throw error;
+    const date = toLocal(new Date(next.starts_at), TZ).date;
     const at = (minute: number) => briefFacts(frontDesk, { businessId: B, location: { id: L, timezone: TZ } }, date, { conflicts: [], openings: [] }, fromLocal(date, minute, TZ)!);
     const morning = await at(6 * 60);
     expect(morning.likelyNoShows.length).toBeGreaterThan(0);

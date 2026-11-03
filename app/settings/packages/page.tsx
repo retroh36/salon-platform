@@ -1,3 +1,4 @@
+import { levelName } from "@/lib/levels";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -6,7 +7,6 @@ import { Badge, Card, PageHeader, Section } from "@/components/ui/page";
 import { buttonClass } from "@/components/ui/button";
 import { getCurrentStaff } from "@/lib/auth";
 import { loadTemplates } from "@/lib/packages";
-import { LEVEL_LABELS } from "@/lib/schedule-forms";
 import { formatPrice } from "@/lib/services";
 import { SettingsNav } from "../settings-nav";
 import { PackageForm } from "./package-form";
@@ -46,7 +46,7 @@ async function PackagesSettings() {
           key={t.id}
           title={t.name}
           titleId={`package-${t.id}`}
-          description={`${formatPrice(t.priceCents)} · ${t.items.map((i) => `${i.quantity} × ${i.serviceName}`).join(" + ")} · ${t.expiryMonths ? `lasts ${t.expiryMonths} months` : "never expires"}${t.levels ? ` · ${t.levels.map((l) => LEVEL_LABELS[l]).join(", ")} stylists` : ""}`}
+          description={`${formatPrice(t.priceCents)} · ${t.items.map((i) => `${i.quantity} × ${i.serviceName}`).join(" + ")} · ${t.expiryMonths ? `lasts ${t.expiryMonths} months` : "never expires"}${t.levels ? ` · ${t.levels.map((l) => levelName(me.levels, l)).join(", ")} stylists` : ""}`}
           actions={t.isActive ? <Badge tone="green">On sale</Badge> : <Badge tone="neutral">Not on sale</Badge>}
         >
           <details>

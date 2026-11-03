@@ -103,13 +103,25 @@
   --color-sky-ink: #153a72;
   --color-sky-ink-muted: #2f528b;
 
-  /* Stylist levels: a ring and badge on the avatar and a bar along the top
-     of their calendar column (graphics, so 3:1 against the page). Gold,
-     berry and emerald: apart from each other, the service colors and
-     Denise, with color-blindness too (checked in the token tests). */
-  --color-level-master: #a0700a;
-  --color-level-senior: #7a1f55;
-  --color-level-artisan: #0b6a3c;
+  /* Stylist levels (lib/levels.ts): the colors owners choose from on
+     Settings → Levels. The bright shade is the ring on the avatar and the
+     bar along the top of their calendar column (decorative: the badge's
+     symbol carries the level too); the deeper -badge shade sits behind the
+     badge's white symbol, 3:1 or better. Apart from each other, the
+     service colors, checked-in yellow, the link blue and Denise, with
+     color-blindness too (checked in the token tests). */
+  --color-level-gold: #d4a017;
+  --color-level-gold-badge: #a8800a;
+  --color-level-fuchsia: #b80093;
+  --color-level-fuchsia-badge: #b80093;
+  --color-level-green: #22c55e;
+  --color-level-green-badge: #15803d;
+  --color-level-blue: #1e9bf0;
+  --color-level-blue-badge: #1880c8;
+  --color-level-violet: #8b3df0;
+  --color-level-violet-badge: #7a2edf;
+  --color-level-slate: #64748b;
+  --color-level-slate-badge: #56657a;
 
   /* Status: one set for every tag, alert and notice (a dot, a short label
      in the ink on the soft fill). Never a colored sentence. */

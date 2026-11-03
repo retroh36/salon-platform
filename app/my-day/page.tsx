@@ -1,3 +1,5 @@
+import { Avatar } from "@/components/ui/avatar";
+import { staffPhotoUrl } from "@/lib/branding";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
@@ -66,7 +68,7 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
   const book = me.role === "assistant" ? me.assists_staff_id : me.id;
   // The stylist they assist, today's services and their notices, all at once.
   const [{ data: stylist }, { data, error }, { data: notices }] = await Promise.all([
-    book && book !== me.id ? supabase.from("staff").select("first_name").eq("id", book).maybeSingle() : Promise.resolve({ data: null }),
+    book && book !== me.id ? supabase.from("staff").select("first_name, last_name, level, color, photo_path").eq("id", book).maybeSingle() : Promise.resolve({ data: null }),
     supabase
       .from("appointment_items")
       .select(
@@ -97,7 +99,16 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
     <AppShell section="my-day" me={me}>
       {/* A published week, approved time off or a booking shows here without a reload. */}
       <LiveRefresh locationId={me.location.id} />
-      <PageHeader title="My day" description={`${stylist ? `${stylist.first_name}'s day, ` : ""}${formatLongDay(today, false)} · ${bookedSummary(counted)}`} />
+      <PageHeader
+        title="My day"
+        leading={
+          stylist ? (
+            <Avatar name={`${stylist.first_name} ${stylist.last_name}`} color={stylist.color} level={stylist.level} photoUrl={staffPhotoUrl(stylist.photo_path)} size="lg" />
+          ) : (
+            <Avatar name={`${me.first_name} ${me.last_name}`} color={me.color} level={me.level} photoUrl={staffPhotoUrl(me.photo_path)} size="lg" />
+          )
+        }
+        description={`${stylist ? `${stylist.first_name}'s day, ` : ""}${formatLongDay(today, false)} · ${bookedSummary(counted)}`} />
       <div className="max-w-2xl">
       {/* Keyed by what's in it, so a new notice arriving live shows. */}
       <Notices key={(notices ?? []).map((n) => n.id).join()} notices={(notices ?? []).map((n) => ({ id: n.id, body: n.body, when: noticeTime(new Date(n.created_at), tz, today) }))} />

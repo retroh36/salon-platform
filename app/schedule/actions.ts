@@ -129,7 +129,7 @@ export async function saveCompensation(
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me || !canManage(me.role) || !isUuid(staffId)) return { message: "Only owners and managers can change levels and commission." };
 
-  const parsed = parseCompensationForm(formData);
+  const parsed = parseCompensationForm(formData, me.levels.map((l) => l.key));
   if (!parsed.ok) return { errors: parsed.errors, message: "Fix the highlighted fields." };
 
   const { level, ...pay } = parsed.value;

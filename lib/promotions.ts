@@ -12,10 +12,11 @@
 // booking site). Member prices come off first, then promotions in order,
 // each on what's left, then any discount staff give.
 
+import { DEFAULT_LEVELS } from "@/lib/levels";
 import type { LocalDate } from "./scheduling/time.ts";
 
 export type PromoKind = "code" | "automatic" | "last_minute";
-export type Level = "artisan" | "senior" | "master";
+export type Level = string;
 export type Exclusion = { level: Level | null; category: string | null };
 // "line": the first line it covers, in full (a reward's free service).
 export type PromoDiscount = { kind: "percent"; pct: number } | { kind: "amount"; cents: number } | { kind: "line" };
@@ -117,7 +118,7 @@ export function ruleOf(r: PromotionRow): PromoRule {
 export function exclusionsOf(json: unknown): Exclusion[] {
   if (!Array.isArray(json)) return [];
   return json.flatMap((e) => {
-    const level = ["artisan", "senior", "master"].includes(e?.level) ? (e.level as Level) : null;
+    const level = typeof e?.level === "string" && /^[a-z][a-z0-9_]*$/.test(e.level) ? (e.level as Level) : null;
     const category = typeof e?.category === "string" && e.category ? e.category : null;
     return level || category ? [{ level, category }] : [];
   });
@@ -232,7 +233,8 @@ export function specialFor(
 export const discountText = (d: PromoDiscount) => (d.kind === "percent" ? `${d.pct}% off` : d.kind === "line" ? "Free" : `${dollars(d.cents)} off`);
 
 // "15% off services · open time in the next 48 hours · never Master color".
-export function promotionSummary(rule: PromoRule, names: { services?: Record<string, string>; staff?: Record<string, string>; products?: Record<string, string> } = {}): string {
+export function promotionSummary(rule: PromoRule, names: { services?: Record<string, string>; staff?: Record<string, string>; products?: Record<string, string>; levels?: Record<string, string> } = {}): string {
+  const levelName = (l: Level) => names.levels?.[l] ?? DEFAULT_LEVELS.find((d) => d.key === l)?.name ?? l;
   const what =
     rule.services && rule.retail ? "services and retail" : rule.services ? "services" : "retail";
   const parts = [`${discountText(rule.discount)} ${rule.serviceIds?.length ? rule.serviceIds.map((id) => names.services?.[id] ?? "a service").join(", ") : rule.categories?.length ? rule.categories.join(", ") : what}`];
@@ -249,7 +251,6 @@ export function promotionSummary(rule: PromoRule, names: { services?: Record<str
   return parts.join(" · ");
 }
 
-const levelName = (l: Level) => ({ artisan: "Artisan", senior: "Senior", master: "Master" })[l];
 
 export const dollars = (cents: number) =>
   cents % 100 === 0 ? `$${(cents / 100).toLocaleString("en-US")}` : `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

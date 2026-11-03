@@ -16,6 +16,6 @@ What the colors, stripes and icons on the calendar mean.
 
 ## Good to know
 
-- Stylist levels show as a colored ring and badge on the avatar and a bar along the top of the column: Master, Senior or Artisan.
+- Stylist levels show as a colored ring and badge on the avatar and a bar along the top of the column, in your salon's level colors (for example gold for Master). The Key lists your levels.
 - Hover over (or focus) a visit for its full details: services, status, booked online, repeating, group and membership.
 - The visit you have open has a thin blue ring.

@@ -6,7 +6,7 @@ import { canManage, getCurrentStaff } from "@/lib/auth";
 import { parseUsageLines } from "@/lib/color-usage";
 import { isUuid } from "@/lib/ids";
 import { loadBackBarProducts } from "@/lib/inventory-load";
-import { STAFF_LEVELS, type StaffLevel } from "@/lib/schedule-forms";
+import { type StaffLevel } from "@/lib/schedule-forms";
 import { parseServiceForm, type ServiceFormErrors } from "@/lib/services";
 
 export type ServiceFormFields = {
@@ -42,7 +42,7 @@ export async function saveService(_prev: SaveServiceState, formData: FormData): 
     return { errors: {}, message: "That service doesn't exist.", fields };
   }
 
-  const parsed = parseServiceForm(formData);
+  const parsed = parseServiceForm(formData, me.levels.map((l) => l.key));
   if (!parsed.ok) {
     return { errors: parsed.errors, message: "Fix the highlighted fields.", fields };
   }
@@ -124,7 +124,7 @@ function readFields(formData: FormData): ServiceFormFields {
     processing_minutes: get("processing_minutes"),
     finishing_minutes: get("finishing_minutes"),
     price: get("price"),
-    level_prices: Object.fromEntries(STAFF_LEVELS.map((l) => [l, get(`level_price_${l}`)])) as Record<StaffLevel, string>,
+    level_prices: Object.fromEntries([...formData.keys()].filter((k) => k.startsWith("level_price_")).map((k) => [k.slice(12), get(k)])),
     requires_patch_test: formData.get("requires_patch_test") !== null,
     needs_room: formData.get("needs_room") !== null,
     staff,

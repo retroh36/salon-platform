@@ -119,13 +119,8 @@ export function parseTimeOffForm(
   return { ok: true, value: { starts_on, ends_on, start_minute, end_minute, reason, note: note || null } };
 }
 
-// Stylist levels, from newest to most experienced. Each has its own color
-// (gold, silver, bronze: the --color-level-* tokens) and can have its own
-// price for a service.
-export const STAFF_LEVELS = ["artisan", "senior", "master"] as const;
-export type StaffLevel = (typeof STAFF_LEVELS)[number];
-
-export const LEVEL_LABELS: Record<StaffLevel, string> = { artisan: "Artisan", senior: "Senior", master: "Master" };
+// A stylist's level: the key of one of the salon's levels (lib/levels.ts).
+export type StaffLevel = string;
 
 export type CompensationInput = { level: StaffLevel | null; service_commission_pct: number; retail_commission_pct: number; hourly_rate_cents: number | null };
 export type CompensationErrors = Partial<Record<"level" | "service_commission_pct" | "retail_commission_pct" | "hourly_rate_cents", string>>;
@@ -139,12 +134,13 @@ function parsePercent(value: string): number | null {
 // Fields: level ("" = none), service_commission_pct, retail_commission_pct.
 export function parseCompensationForm(
   form: FormLike,
+  levelKeys: readonly string[],
 ): { ok: true; value: CompensationInput } | { ok: false; errors: CompensationErrors } {
   const errors: CompensationErrors = {};
 
   const levelText = text(form, "level");
   const level = levelText === "" ? null : (levelText as StaffLevel);
-  if (level !== null && !STAFF_LEVELS.includes(level)) errors.level = "Choose a level.";
+  if (level !== null && !levelKeys.includes(level)) errors.level = "Choose a level.";
 
   const service = parsePercent(text(form, "service_commission_pct") || "0");
   if (service === null) errors.service_commission_pct = "Enter a percentage from 0 to 100.";

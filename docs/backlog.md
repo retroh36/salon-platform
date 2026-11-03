@@ -8,6 +8,10 @@ Known gaps to pick up later. Move an item into a task when it's scheduled.
 - [ ] **Salon-wide closures.** Holidays and other days the whole location is closed (or has shorter hours), separate from the weekly opening hours. Availability in `lib/scheduling/` should treat them like the location being closed.
 - [ ] **Warn about pending time off during booking.** Only approved time off blocks availability. When booking a stylist who has a pending request for that time, the booking engine should warn the front desk.
 
+## Settings
+
+- [ ] **Group Settings into sections.** Settings has 20+ tabs wrapping onto three rows. Group them into sections (Salon, Team, Booking, Money, Messages, Account) in a side menu, with a search box.
+
 ## Calendar and booking
 
 - [ ] **A console line on "We can't find that page".** Pages load their data inside a Suspense boundary (Cache Components), so when a link is bad (an old manage link, a salon that isn't there) the page's shell has already been sent when `notFound()` runs: the visitor sees the right page, rendered in the browser, with a 200 status and React's error #419 in the console. The browser tests let only that line through where they open a missing page on purpose (`allowNotFoundLogs`). If search engines or monitoring ever count it, check the slug or token before the Suspense boundary so the server can answer 404.

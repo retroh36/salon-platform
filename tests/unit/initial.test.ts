@@ -2,7 +2,7 @@
 // characters, never half an emoji (a broken character on screen).
 import { describe, expect, it } from "vitest";
 import { nameVariants } from "@/lib/calendar-views";
-import { initials } from "@/components/ui/avatar";
+import { initials } from "@/lib/initial";
 import { firstLetter } from "@/lib/initial";
 
 describe("first letters", () => {

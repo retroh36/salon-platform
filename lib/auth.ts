@@ -1,3 +1,4 @@
+import { loadLevels } from "@/lib/levels";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { homeFor, type StaffRole } from "@/lib/staff";
@@ -17,7 +18,7 @@ export const getCurrentStaff = cache(async () => {
   const { data: staff, error } = await supabase
     .from("staff")
     .select(
-      "id, first_name, role, business_id, calendar_zoom, assists_staff_id, location:locations(id, name, city, region, timezone, business:businesses(name, logo_path, auto_lock_minutes))",
+      "id, first_name, last_name, role, level, color, photo_path, business_id, calendar_zoom, assists_staff_id, location:locations(id, name, city, region, timezone, business:businesses(name, logo_path, auto_lock_minutes))",
     )
     .eq("user_id", userId)
     .eq("is_active", true)
@@ -26,10 +27,14 @@ export const getCurrentStaff = cache(async () => {
 
   if (error) throw error;
   if (!staff?.location) return { supabase, staff: null };
-  // What they can do, as the database sees it (lib/permissions.ts).
-  const { data: permissions, error: permError } = await supabase.rpc("my_permissions", { p_business_id: staff.business_id });
+  // What they can do, as the database sees it (lib/permissions.ts), and
+  // the salon's levels (lib/levels.ts).
+  const [{ data: permissions, error: permError }, levels] = await Promise.all([
+    supabase.rpc("my_permissions", { p_business_id: staff.business_id }),
+    loadLevels(supabase, staff.business_id),
+  ]);
   if (permError) throw permError;
-  return { supabase, staff: { ...staff, location: staff.location, permissions: permissions ?? [] } };
+  return { supabase, staff: { ...staff, location: staff.location, permissions: permissions ?? [], levels } };
 });
 
 // Where a sign-in goes: the calendar, or My day for stylists and assistants

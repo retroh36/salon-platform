@@ -1,9 +1,11 @@
+import { levelName } from "@/lib/levels";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { can } from "@/lib/permissions";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
-import { Avatar, initials } from "@/components/ui/avatar";
+import { Avatar } from "@/components/ui/avatar";
+import { initials } from "@/lib/initial";
 import { buttonClass } from "@/components/ui/button";
 import { ClockIcon } from "@/components/ui/icons";
 import { Alert, Badge, listClass, PageHeader, pillClass, rowClass, textLinkClass, type Tone } from "@/components/ui/page";
@@ -11,7 +13,7 @@ import { canManage, getCurrentStaff } from "@/lib/auth";
 import { staffPhotoUrl } from "@/lib/branding";
 import { isUuid } from "@/lib/ids";
 import { describeTimeOff, formatDay, formatDayAt, formatIntervals, STATUS_LABELS } from "@/lib/schedule-format";
-import { LEVEL_LABELS, WEEKDAY_NAMES } from "@/lib/schedule-forms";
+import { WEEKDAY_NAMES } from "@/lib/schedule-forms";
 import { dayView, type TimeOff } from "@/lib/scheduling/availability";
 import { loadLocationSchedule, loadStaffSchedules } from "@/lib/scheduling/load";
 import { addDays, datesBetween, isLocalDate, minuteToTime, startOfWeek, todayIn, WEEKDAYS } from "@/lib/scheduling/time";
@@ -178,7 +180,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
           </h2>
           <p className="text-sm text-ink-muted">
             {roleLabel(target.role)}
-            {target.level && ` · ${LEVEL_LABELS[target.level]}`}
+            {target.level && ` · ${levelName(me.levels, target.level)}`}
           </p>
         </div>
         {manager && target.role === "stylist" && <StaffPhotoForm key={target.id} staffId={target.id} hasPhoto={Boolean(target.photo_path)} />}
@@ -363,7 +365,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
             <dl className="flex flex-wrap gap-8 px-4 py-4 text-sm">
               <div>
                 <dt className="text-ink-muted">Level</dt>
-                <dd className="font-semibold">{target.level ? LEVEL_LABELS[target.level] : "—"}</dd>
+                <dd className="font-semibold">{target.level ? levelName(me.levels, target.level) : "—"}</dd>
               </div>
               <div>
                 <dt className="text-ink-muted">Service commission</dt>

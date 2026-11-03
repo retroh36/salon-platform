@@ -197,20 +197,36 @@ kind of color vision.
 
 ### Stylist levels
 
-| Level | Token | Hex | Badge |
+Levels are each salon's own (Settings → Levels): owners name them, put them
+in order and pick each one's color and badge. Every salon starts with
+Master, Senior and Artisan; the demo's Maple & Ash adds Junior stylist.
+The colors come from one fixed palette, each in two shades of the same hue:
+a bright one for the ring and the column bar, and a deeper one for the small
+badge circle, so its white symbol reads at 3:1 or better.
+
+| Color | Ring and bar | Badge | Starts on |
 | --- | --- | --- | --- |
-| Master | `level-master` | `#A0700A` rich gold | a star |
-| Senior | `level-senior` | `#7A1F55` berry | two dots |
-| Artisan | `level-artisan` | `#0B6A3C` emerald | one dot |
+| Gold | `level-gold` `#D4A017` | `level-gold-badge` `#A8800A` | Master (a star) |
+| Fuchsia | `level-fuchsia` `#B80093` | `level-fuchsia-badge` `#B80093` | Senior (two dots) |
+| Green | `level-green` `#22C55E` | `level-green-badge` `#15803D` | Artisan (one dot) |
+| Blue | `level-blue` `#1E9BF0` | `level-blue-badge` `#1880C8` | Junior stylist in the demo (a triangle) |
+| Violet | `level-violet` `#8B3DF0` | `level-violet-badge` `#7A2EDF` | |
+| Slate | `level-slate` `#64748B` | `level-slate-badge` `#56657A` | |
+
+Badges: star, two dots, one dot, triangle, diamond, three dots.
 
 On the calendar a level shows as a 3px ring around the stylist's avatar
 with a small badge in its corner (so it's never color alone), and a 4px bar
-along the top of their column, explained by the legend. They're graphics,
-so they meet 3:1 against the page. They're kept clearly apart from each
-other, the service colors and Denise's periwinkle, with normal vision and
-with protanopia, deuteranopia and tritanopia simulated (the token tests
-check all of it). The level's name appears in staff settings and on the
-booking site, not on the calendar.
+along the top of their column, explained by the Key. The rings and bars are
+decorative and may sit under 3:1 on white; the badge shades meet 3:1. The
+bright shades are kept apart from each other, the service colors (booked
+and checked out), checked-in yellow, Signal Blue and Denise's periwinkle,
+with protanopia, deuteranopia and tritanopia simulated too (the token
+tests check all of it). Green is `#22C55E` rather than a darker green,
+which sat too close to the sage service. Copper (too close to peach under
+color-blindness) and crimson (too close to the danger red) were left out.
+The level's name appears in staff settings and on the booking site, not on
+the calendar.
 
 Status chips have their own pairs (booked, confirmed, checked in, completed,
 running late, no-show) in `globals.css`.

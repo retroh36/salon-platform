@@ -10,6 +10,8 @@ import {
   stylistPrice,
 } from "@/lib/services";
 
+const KEYS = ["master", "senior", "artisan"];
+
 const STAFF_A = "d0000000-0000-4000-8000-00000000000a";
 const STAFF_B = "d0000000-0000-4000-8000-00000000000b";
 
@@ -108,8 +110,7 @@ describe("stylistPrice", () => {
 describe("parseServiceForm", () => {
   it("parses a valid form", () => {
     const result = parseServiceForm(
-      form({ ...valid, staff: [STAFF_A, STAFF_B], [`price_${STAFF_A}`]: "110", [`price_${STAFF_B}`]: "" }),
-    );
+      form({ ...valid, staff: [STAFF_A, STAFF_B], [`price_${STAFF_A}`]: "110", [`price_${STAFF_B}`]: "" }), KEYS);
     expect(result).toEqual({
       ok: true,
       value: {
@@ -130,24 +131,24 @@ describe("parseServiceForm", () => {
   });
 
   it("treats blank processing and finishing as zero", () => {
-    const result = parseServiceForm(form({ ...valid, processing_minutes: "", finishing_minutes: "" }));
+    const result = parseServiceForm(form({ ...valid, processing_minutes: "", finishing_minutes: "" }), KEYS);
     expect(result.ok && [result.value.processing_minutes, result.value.finishing_minutes]).toEqual([0, 0]);
   });
 
   it("keeps a stylist's own price as typed, even if it matches the default (their level may charge more)", () => {
-    const result = parseServiceForm(form({ ...valid, staff: STAFF_A, [`price_${STAFF_A}`]: "95.00" }));
+    const result = parseServiceForm(form({ ...valid, staff: STAFF_A, [`price_${STAFF_A}`]: "95.00" }), KEYS);
     expect(result.ok && result.value.staff).toEqual([{ staff_id: STAFF_A, price_cents: 9500 }]);
   });
 
   it("parses prices by level, blank meaning the default", () => {
-    const result = parseServiceForm(form({ ...valid, level_price_artisan: "75", level_price_senior: "", level_price_master: "$110.50" }));
+    const result = parseServiceForm(form({ ...valid, level_price_artisan: "75", level_price_senior: "", level_price_master: "$110.50" }), KEYS);
     expect(result.ok && result.value.level_prices).toEqual({ artisan: 7500, senior: null, master: 11050 });
-    const bad = parseServiceForm(form({ ...valid, level_price_master: "lots" }));
+    const bad = parseServiceForm(form({ ...valid, level_price_master: "lots" }), KEYS);
     expect(!bad.ok && bad.errors.level_prices).toEqual({ master: "Enter a price like 85, or leave blank." });
   });
 
   it("ignores duplicate staff ids", () => {
-    const result = parseServiceForm(form({ ...valid, staff: [STAFF_A, STAFF_A] }));
+    const result = parseServiceForm(form({ ...valid, staff: [STAFF_A, STAFF_A] }), KEYS);
     expect(result.ok && result.value.staff).toHaveLength(1);
   });
 
@@ -162,8 +163,7 @@ describe("parseServiceForm", () => {
         price: "cheap",
         staff: STAFF_A,
         [`price_${STAFF_A}`]: "lots",
-      }),
-    );
+      }), KEYS);
     expect(result.ok).toBe(false);
     expect(!result.ok && result.errors).toEqual({
       name: "Enter a name.",
@@ -177,14 +177,13 @@ describe("parseServiceForm", () => {
   });
 
   it("requires a processing gap before finishing time", () => {
-    const result = parseServiceForm(form({ ...valid, processing_minutes: "0", finishing_minutes: "15" }));
+    const result = parseServiceForm(form({ ...valid, processing_minutes: "0", finishing_minutes: "15" }), KEYS);
     expect(!result.ok && result.errors.finishing_minutes).toBe("Finishing time only applies after a processing gap.");
   });
 
   it("caps total time at 8 hours", () => {
     const result = parseServiceForm(
-      form({ ...valid, active_minutes: "240", processing_minutes: "120", finishing_minutes: "125" }),
-    );
+      form({ ...valid, active_minutes: "240", processing_minutes: "120", finishing_minutes: "125" }), KEYS);
     expect(!result.ok && result.errors.active_minutes).toBe("Total time must be 8 hours or less.");
   });
 });

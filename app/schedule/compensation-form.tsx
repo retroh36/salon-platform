@@ -1,5 +1,6 @@
 "use client";
 
+import { useLevels } from "@/components/ui/level";
 import { useActionState } from "react";
 import { Field, inputClass, submitWithoutReset } from "@/components/form";
 import { buttonClass } from "@/components/ui/button";
@@ -7,7 +8,7 @@ import { selectClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
 import { centsToInput } from "@/lib/services";
 import { SavedNote } from "./saved-note";
-import { LEVEL_LABELS, STAFF_LEVELS, type StaffLevel } from "@/lib/schedule-forms";
+import { type StaffLevel } from "@/lib/schedule-forms";
 import { saveCompensation } from "./actions";
 
 export function CompensationForm({
@@ -23,6 +24,7 @@ export function CompensationForm({
   retailPct: number;
   hourlyRateCents: number | null;
 }) {
+  const levels = useLevels();
   const [state, action, pending] = useActionState(saveCompensation.bind(null, staffId), undefined);
   const errors = state?.errors ?? {};
 
@@ -40,9 +42,9 @@ export function CompensationForm({
       <Field label="Level" error={errors.level}>
         <select name="level" defaultValue={level ?? ""} className={`${selectClass} w-40!`}>
           <option value="">No level</option>
-          {STAFF_LEVELS.map((l) => (
-            <option key={l} value={l}>
-              {LEVEL_LABELS[l]}
+          {levels.map((l) => (
+            <option key={l.key} value={l.key}>
+              {l.name}
             </option>
           ))}
         </select>

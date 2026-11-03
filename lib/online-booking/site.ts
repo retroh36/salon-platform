@@ -2,6 +2,7 @@
 // (lib/supabase/admin.ts). Only these fields ever leave the server: no
 // client records, notes, contact details of staff, or anything internal.
 
+import { loadLevels, type Level } from "@/lib/levels";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { salonLogoUrl, staffPhotoUrl } from "@/lib/branding";
@@ -44,6 +45,8 @@ export type SiteStylist = {
 };
 
 export type BookingSite = {
+  // The salon's stylist levels, for the badges and "Senior stylist".
+  levels: Level[];
   business: { id: string; name: string; slug: string; logoUrl: string | null; coverUrl: string | null };
   location: { id: string; name: string; timezone: string; address: string | null; phone: string | null; hours: OpeningHours[] };
   settings: {
@@ -86,7 +89,7 @@ export async function loadSite(admin: Admin, slug: string): Promise<SiteLookup> 
   const logoUrl = salonLogoUrl(business.logo_path);
   if (!loc || !settings?.enabled) return { status: "closed", name: business.name, logoUrl, phone: loc?.phone ?? null };
 
-  const [{ data: services, error: serviceError }, { data: staff, error: staffError }, { data: hours, error: hoursError }, { data: photos, error: photoError }] = await Promise.all([
+  const [{ data: services, error: serviceError }, { data: staff, error: staffError }, { data: hours, error: hoursError }, { data: photos, error: photoError }, levels] = await Promise.all([
     admin
       .from("services")
       .select("id, name, category, description, duration_minutes, price_cents, online_booking, requires_patch_test, deposit_kind, deposit_amount, service_level_prices(level, price_cents)")
@@ -102,6 +105,7 @@ export async function loadSite(admin: Admin, slug: string): Promise<SiteLookup> 
       .order("first_name"),
     admin.from("location_hours").select("weekday, start_minute, end_minute").eq("location_id", loc.id),
     admin.from("service_category_photos").select("category, photo_path").eq("business_id", business.id),
+    loadLevels(admin, business.id),
   ]);
   if (serviceError) throw serviceError;
   if (staffError) throw staffError;
@@ -152,6 +156,7 @@ export async function loadSite(admin: Admin, slug: string): Promise<SiteLookup> 
   return {
     status: "open",
     site: {
+      levels,
       business: { id: business.id, name: business.name, slug: business.slug!, logoUrl, coverUrl: salonLogoUrl(settings.cover_path) },
       location: {
         id: loc.id,

@@ -12,20 +12,33 @@ export function PageHeader({
   title,
   description,
   actions,
+  leading,
   children,
 }: {
   title: string;
   description?: React.ReactNode;
   actions?: React.ReactNode;
+  // Before the title, such as a person's photo.
+  leading?: React.ReactNode;
   children?: React.ReactNode;
 }) {
+  const heading = (
+    <>
+      <h1 className="text-2xl font-semibold tracking-[-0.015em] text-ink">{title}</h1>
+      {description && <div className="mt-1 max-w-2xl text-sm text-ink-muted">{description}</div>}
+      {children}
+    </>
+  );
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-      <div className="min-w-0">
-        <h1 className="text-2xl font-semibold tracking-[-0.015em] text-ink">{title}</h1>
-        {description && <div className="mt-1 max-w-2xl text-sm text-ink-muted">{description}</div>}
-        {children}
-      </div>
+      {leading ? (
+        <div className="flex min-w-0 items-center gap-4">
+          {leading}
+          <div className="min-w-0">{heading}</div>
+        </div>
+      ) : (
+        <div className="min-w-0">{heading}</div>
+      )}
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );

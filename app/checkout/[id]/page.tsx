@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { NotLinked } from "@/components/app-shell";
+import { LevelsProvider } from "@/components/ui/level";
 import { getCurrentStaff } from "@/lib/auth";
 import { loadCheckoutScreen } from "@/lib/checkout-screen";
 import { isUuid } from "@/lib/ids";
@@ -28,5 +29,9 @@ async function Checkout({ params }: Pick<PageProps<"/checkout/[id]">, "params">)
   if (!isUuid(id)) notFound();
   const data = await loadCheckoutScreen(supabase, me, id);
   if (!data) notFound();
-  return <CheckoutScreen data={data} denise={{ staffId: me.id, firstName: me.first_name, canBook: true, today: todayIn(me.location.timezone) }} />;
+  return (
+    <LevelsProvider levels={me.levels}>
+      <CheckoutScreen data={data} denise={{ staffId: me.id, firstName: me.first_name, canBook: true, today: todayIn(me.location.timezone) }} />
+    </LevelsProvider>
+  );
 }

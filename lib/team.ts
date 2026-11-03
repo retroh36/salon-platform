@@ -6,7 +6,7 @@
 
 import { isUuid } from "@/lib/ids";
 import { normalizePhone } from "@/lib/clients";
-import { parseWeeklyHoursForm, STAFF_LEVELS, type StaffLevel, type WeeklyHoursRow } from "@/lib/schedule-forms";
+import { parseWeeklyHoursForm, type StaffLevel, type WeeklyHoursRow } from "@/lib/schedule-forms";
 import { can } from "@/lib/permissions";
 import type { StaffRole } from "@/lib/staff";
 import type { Weekday } from "@/lib/scheduling/time";
@@ -48,7 +48,7 @@ export type MemberErrors = Partial<Record<"first_name" | "email" | "phone" | "ro
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const text = (form: FormLike, name: string) => String(form.get(name) ?? "").trim();
 
-export function parseMemberForm(form: FormLike, allowed: readonly StaffRole[]): { ok: true; input: MemberInput } | { ok: false; errors: MemberErrors } {
+export function parseMemberForm(form: FormLike, allowed: readonly StaffRole[], levelKeys: readonly string[]): { ok: true; input: MemberInput } | { ok: false; errors: MemberErrors } {
   const errors: MemberErrors = {};
   const first = text(form, "first_name");
   const email = text(form, "email").toLowerCase();
@@ -62,7 +62,7 @@ export function parseMemberForm(form: FormLike, allowed: readonly StaffRole[]): 
   if (phoneText && !phone) errors.phone = "Enter a 10-digit phone number.";
   if (!allowed.includes(role)) errors.role = "Choose a role.";
   // A level is for stylists only.
-  const level = role === "stylist" && (STAFF_LEVELS as readonly string[]).includes(levelText) ? (levelText as StaffLevel) : null;
+  const level = role === "stylist" && levelKeys.includes(levelText) ? (levelText as StaffLevel) : null;
   const service_ids = [...new Set(form.getAll("service_ids").map(String).filter(isUuid))];
   let hours: WeeklyHoursRow[] | undefined;
   if (form.get("hours_included")) {

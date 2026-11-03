@@ -801,14 +801,14 @@ isOneToOne: false
                   ]
                 },"client_packages": {
                   Row: {
-                    "business_id": string,"cancel_reason": string | null,"canceled_at": string | null,"canceled_by": string | null,"client_id": string,"created_at": string,"created_by": string | null,"expires_at": string | null,"id": string,"levels": (Database["public"]['Enums']["staff_level"])[] | null,"name": string,"price_cents": number,"refunded_cents": number,"sale_id": string | null,"status": Database["public"]['Enums']["client_package_status"],"template_id": string | null
+                    "business_id": string,"cancel_reason": string | null,"canceled_at": string | null,"canceled_by": string | null,"client_id": string,"created_at": string,"created_by": string | null,"expires_at": string | null,"id": string,"levels": (unknown)[] | null,"name": string,"price_cents": number,"refunded_cents": number,"sale_id": string | null,"status": Database["public"]['Enums']["client_package_status"],"template_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"canceled_by"?: string | null,"client_id": string,"created_at"?: string,"created_by"?: string | null,"expires_at"?: string | null,"id"?: string,"levels"?: (Database["public"]['Enums']["staff_level"])[] | null,"name": string,"price_cents": number,"refunded_cents"?: number,"sale_id"?: string | null,"status"?: Database["public"]['Enums']["client_package_status"],"template_id"?: string | null
+                    "business_id": string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"canceled_by"?: string | null,"client_id": string,"created_at"?: string,"created_by"?: string | null,"expires_at"?: string | null,"id"?: string,"levels"?: (unknown)[] | null,"name": string,"price_cents": number,"refunded_cents"?: number,"sale_id"?: string | null,"status"?: Database["public"]['Enums']["client_package_status"],"template_id"?: string | null
                   }
                   Update: {
-                    "business_id"?: string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"canceled_by"?: string | null,"client_id"?: string,"created_at"?: string,"created_by"?: string | null,"expires_at"?: string | null,"id"?: string,"levels"?: (Database["public"]['Enums']["staff_level"])[] | null,"name"?: string,"price_cents"?: number,"refunded_cents"?: number,"sale_id"?: string | null,"status"?: Database["public"]['Enums']["client_package_status"],"template_id"?: string | null
+                    "business_id"?: string,"cancel_reason"?: string | null,"canceled_at"?: string | null,"canceled_by"?: string | null,"client_id"?: string,"created_at"?: string,"created_by"?: string | null,"expires_at"?: string | null,"id"?: string,"levels"?: (unknown)[] | null,"name"?: string,"price_cents"?: number,"refunded_cents"?: number,"sale_id"?: string | null,"status"?: Database["public"]['Enums']["client_package_status"],"template_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -2215,14 +2215,14 @@ isOneToOne: false
                   ]
                 },"package_templates": {
                   Row: {
-                    "business_id": string,"created_at": string,"expiry_months": number | null,"id": string,"is_active": boolean,"levels": (Database["public"]['Enums']["staff_level"])[] | null,"name": string,"price_cents": number,"updated_at": string
+                    "business_id": string,"created_at": string,"expiry_months": number | null,"id": string,"is_active": boolean,"levels": (unknown)[] | null,"name": string,"price_cents": number,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"created_at"?: string,"expiry_months"?: number | null,"id"?: string,"is_active"?: boolean,"levels"?: (Database["public"]['Enums']["staff_level"])[] | null,"name": string,"price_cents": number,"updated_at"?: string
+                    "business_id": string,"created_at"?: string,"expiry_months"?: number | null,"id"?: string,"is_active"?: boolean,"levels"?: (unknown)[] | null,"name": string,"price_cents": number,"updated_at"?: string
                   }
                   Update: {
-                    "business_id"?: string,"created_at"?: string,"expiry_months"?: number | null,"id"?: string,"is_active"?: boolean,"levels"?: (Database["public"]['Enums']["staff_level"])[] | null,"name"?: string,"price_cents"?: number,"updated_at"?: string
+                    "business_id"?: string,"created_at"?: string,"expiry_months"?: number | null,"id"?: string,"is_active"?: boolean,"levels"?: (unknown)[] | null,"name"?: string,"price_cents"?: number,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -2515,14 +2515,14 @@ isOneToOne: false
                   ]
                 },"promotions": {
                   Row: {
-                    "amount_cents": number | null,"applies_retail": boolean,"applies_services": boolean,"archived_at": string | null,"business_id": string,"categories": (string)[] | null,"code": string | null,"created_at": string,"created_by": string | null,"discount_kind": string,"ends_on": string | null,"exclusions": NonNullable<Json>,"first_visit_only": boolean,"hours_ahead": number | null,"id": string,"kind": string,"levels": (Database["public"]['Enums']["staff_level"])[] | null,"max_uses": number | null,"max_uses_per_client": number | null,"min_spend_cents": number | null,"name": string,"new_clients_only": boolean,"online": boolean,"percent": number | null,"product_ids": (string)[] | null,"service_ids": (string)[] | null,"stackable": boolean,"staff_ids": (string)[] | null,"starts_on": string | null,"updated_at": string
+                    "amount_cents": number | null,"applies_retail": boolean,"applies_services": boolean,"archived_at": string | null,"business_id": string,"categories": (string)[] | null,"code": string | null,"created_at": string,"created_by": string | null,"discount_kind": string,"ends_on": string | null,"exclusions": NonNullable<Json>,"first_visit_only": boolean,"hours_ahead": number | null,"id": string,"kind": string,"levels": (unknown)[] | null,"max_uses": number | null,"max_uses_per_client": number | null,"min_spend_cents": number | null,"name": string,"new_clients_only": boolean,"online": boolean,"percent": number | null,"product_ids": (string)[] | null,"service_ids": (string)[] | null,"stackable": boolean,"staff_ids": (string)[] | null,"starts_on": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "amount_cents"?: number | null,"applies_retail"?: boolean,"applies_services"?: boolean,"archived_at"?: string | null,"business_id": string,"categories"?: (string)[] | null,"code"?: string | null,"created_at"?: string,"created_by"?: string | null,"discount_kind": string,"ends_on"?: string | null,"exclusions"?: NonNullable<Json>,"first_visit_only"?: boolean,"hours_ahead"?: number | null,"id"?: string,"kind": string,"levels"?: (Database["public"]['Enums']["staff_level"])[] | null,"max_uses"?: number | null,"max_uses_per_client"?: number | null,"min_spend_cents"?: number | null,"name": string,"new_clients_only"?: boolean,"online"?: boolean,"percent"?: number | null,"product_ids"?: (string)[] | null,"service_ids"?: (string)[] | null,"stackable"?: boolean,"staff_ids"?: (string)[] | null,"starts_on"?: string | null,"updated_at"?: string
+                    "amount_cents"?: number | null,"applies_retail"?: boolean,"applies_services"?: boolean,"archived_at"?: string | null,"business_id": string,"categories"?: (string)[] | null,"code"?: string | null,"created_at"?: string,"created_by"?: string | null,"discount_kind": string,"ends_on"?: string | null,"exclusions"?: NonNullable<Json>,"first_visit_only"?: boolean,"hours_ahead"?: number | null,"id"?: string,"kind": string,"levels"?: (unknown)[] | null,"max_uses"?: number | null,"max_uses_per_client"?: number | null,"min_spend_cents"?: number | null,"name": string,"new_clients_only"?: boolean,"online"?: boolean,"percent"?: number | null,"product_ids"?: (string)[] | null,"service_ids"?: (string)[] | null,"stackable"?: boolean,"staff_ids"?: (string)[] | null,"starts_on"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "amount_cents"?: number | null,"applies_retail"?: boolean,"applies_services"?: boolean,"archived_at"?: string | null,"business_id"?: string,"categories"?: (string)[] | null,"code"?: string | null,"created_at"?: string,"created_by"?: string | null,"discount_kind"?: string,"ends_on"?: string | null,"exclusions"?: NonNullable<Json>,"first_visit_only"?: boolean,"hours_ahead"?: number | null,"id"?: string,"kind"?: string,"levels"?: (Database["public"]['Enums']["staff_level"])[] | null,"max_uses"?: number | null,"max_uses_per_client"?: number | null,"min_spend_cents"?: number | null,"name"?: string,"new_clients_only"?: boolean,"online"?: boolean,"percent"?: number | null,"product_ids"?: (string)[] | null,"service_ids"?: (string)[] | null,"stackable"?: boolean,"staff_ids"?: (string)[] | null,"starts_on"?: string | null,"updated_at"?: string
+                    "amount_cents"?: number | null,"applies_retail"?: boolean,"applies_services"?: boolean,"archived_at"?: string | null,"business_id"?: string,"categories"?: (string)[] | null,"code"?: string | null,"created_at"?: string,"created_by"?: string | null,"discount_kind"?: string,"ends_on"?: string | null,"exclusions"?: NonNullable<Json>,"first_visit_only"?: boolean,"hours_ahead"?: number | null,"id"?: string,"kind"?: string,"levels"?: (unknown)[] | null,"max_uses"?: number | null,"max_uses_per_client"?: number | null,"min_spend_cents"?: number | null,"name"?: string,"new_clients_only"?: boolean,"online"?: boolean,"percent"?: number | null,"product_ids"?: (string)[] | null,"service_ids"?: (string)[] | null,"stackable"?: boolean,"staff_ids"?: (string)[] | null,"starts_on"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -3169,14 +3169,14 @@ isOneToOne: false
                   ]
                 },"service_level_prices": {
                   Row: {
-                    "business_id": string,"level": Database["public"]['Enums']["staff_level"],"price_cents": number,"service_id": string
+                    "business_id": string,"level": string,"price_cents": number,"service_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"level": Database["public"]['Enums']["staff_level"],"price_cents": number,"service_id": string
+                    "business_id": string,"level": string,"price_cents": number,"service_id": string
                   }
                   Update: {
-                    "business_id"?: string,"level"?: Database["public"]['Enums']["staff_level"],"price_cents"?: number,"service_id"?: string
+                    "business_id"?: string,"level"?: string,"price_cents"?: number,"service_id"?: string
                   }
                   Relationships: [
                     {
@@ -3185,6 +3185,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "businesses"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "service_level_prices_level_fkey"
+      columns: ["business_id","level"]
+isOneToOne: false
+      referencedRelation: "staff_levels"
+      referencedColumns: ["business_id","key"]
     },{
       foreignKeyName: "service_level_prices_service_id_business_id_fkey"
       columns: ["service_id","business_id"]
@@ -3363,14 +3369,14 @@ isOneToOne: false
                   ]
                 },"staff": {
                   Row: {
-                    "assists_staff_id": string | null,"bio": string | null,"business_id": string,"calendar_position": number | null,"calendar_zoom": string,"color": string | null,"created_at": string,"email": string | null,"event_roles": (string)[],"first_name": string,"goal_alert_seen_on": string | null,"goal_alerts": string,"home_resource_id": string | null,"hours_cycle_starts_on": string | null,"hours_cycle_weeks": number,"id": string,"is_active": boolean,"last_name": string,"level": Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone": string | null,"photo_path": string | null,"portfolio_paths": (string)[],"role": Database["public"]['Enums']["staff_role"],"specialty": string | null,"updated_at": string,"user_id": string | null
+                    "assists_staff_id": string | null,"bio": string | null,"business_id": string,"calendar_position": number | null,"calendar_zoom": string,"color": string | null,"created_at": string,"email": string | null,"event_roles": (string)[],"first_name": string,"goal_alert_seen_on": string | null,"goal_alerts": string,"home_resource_id": string | null,"hours_cycle_starts_on": string | null,"hours_cycle_weeks": number,"id": string,"is_active": boolean,"last_name": string,"level": string | null,"location_id": string,"phone": string | null,"photo_path": string | null,"portfolio_paths": (string)[],"role": Database["public"]['Enums']["staff_role"],"specialty": string | null,"updated_at": string,"user_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "assists_staff_id"?: string | null,"bio"?: string | null,"business_id": string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"event_roles"?: (string)[],"first_name": string,"goal_alert_seen_on"?: string | null,"goal_alerts"?: string,"home_resource_id"?: string | null,"hours_cycle_starts_on"?: string | null,"hours_cycle_weeks"?: number,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id": string,"phone"?: string | null,"photo_path"?: string | null,"portfolio_paths"?: (string)[],"role"?: Database["public"]['Enums']["staff_role"],"specialty"?: string | null,"updated_at"?: string,"user_id"?: string | null
+                    "assists_staff_id"?: string | null,"bio"?: string | null,"business_id": string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"event_roles"?: (string)[],"first_name": string,"goal_alert_seen_on"?: string | null,"goal_alerts"?: string,"home_resource_id"?: string | null,"hours_cycle_starts_on"?: string | null,"hours_cycle_weeks"?: number,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: string | null,"location_id": string,"phone"?: string | null,"photo_path"?: string | null,"portfolio_paths"?: (string)[],"role"?: Database["public"]['Enums']["staff_role"],"specialty"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
                   Update: {
-                    "assists_staff_id"?: string | null,"bio"?: string | null,"business_id"?: string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"event_roles"?: (string)[],"first_name"?: string,"goal_alert_seen_on"?: string | null,"goal_alerts"?: string,"home_resource_id"?: string | null,"hours_cycle_starts_on"?: string | null,"hours_cycle_weeks"?: number,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: Database["public"]['Enums']["staff_level"] | null,"location_id"?: string,"phone"?: string | null,"photo_path"?: string | null,"portfolio_paths"?: (string)[],"role"?: Database["public"]['Enums']["staff_role"],"specialty"?: string | null,"updated_at"?: string,"user_id"?: string | null
+                    "assists_staff_id"?: string | null,"bio"?: string | null,"business_id"?: string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"event_roles"?: (string)[],"first_name"?: string,"goal_alert_seen_on"?: string | null,"goal_alerts"?: string,"home_resource_id"?: string | null,"hours_cycle_starts_on"?: string | null,"hours_cycle_weeks"?: number,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: string | null,"location_id"?: string,"phone"?: string | null,"photo_path"?: string | null,"portfolio_paths"?: (string)[],"role"?: Database["public"]['Enums']["staff_role"],"specialty"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -3391,6 +3397,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "resources"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "staff_level_fkey"
+      columns: ["business_id","level"]
+isOneToOne: false
+      referencedRelation: "staff_levels"
+      referencedColumns: ["business_id","key"]
     },{
       foreignKeyName: "staff_location_id_business_id_fkey"
       columns: ["location_id","business_id"]
@@ -3507,6 +3519,26 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "staff"
       referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"staff_levels": {
+                  Row: {
+                    "business_id": string,"color": string,"key": string,"name": string,"position": number,"symbol": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"color": string,"key": string,"name": string,"position": number,"symbol": string
+                  }
+                  Update: {
+                    "business_id"?: string,"color"?: string,"key"?: string,"name"?: string,"position"?: number,"symbol"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "staff_levels_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
     }
                   ]
                 },"staff_permissions": {
@@ -4660,6 +4692,9 @@ isOneToOne: false
 "save_staff_goal":
 { Args: { "p_metric": string,"p_period": string,"p_staff_id": string,"p_target": number }; Returns: string
                            },
+"save_staff_levels":
+{ Args: { "p_business_id": string,"p_levels": Json }; Returns: undefined
+                           },
 "save_staff_policy":
 { Args: { "p": Json,"p_staff_id": string }; Returns: undefined
                            },
@@ -4852,7 +4887,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","client_package_status": "active"|"canceled"|"refunded","deposit_kind": "none"|"fixed"|"percent","disruption_kind": "overrun"|"client_late"|"call_out","event_party_role": "bride"|"bridesmaid"|"maid_of_honor"|"mother"|"flower_girl"|"groom"|"guest","event_status": "inquiry"|"proposal_sent"|"booked"|"trial_done"|"completed"|"lost","fee_kind": "none"|"fixed"|"percent"|"deposit","form_requirement": "none"|"first_visit"|"services","gift_card_kind": "purchased"|"promotional","gift_card_status": "active"|"voided","membership_status": "active"|"past_due"|"paused"|"canceled","notification_status": "pending"|"sent"|"canceled","online_service_mode": "bookable"|"consultation"|"off","patch_test_result": "no_reaction"|"reaction","payment_method": "cash"|"card"|"gift_card"|"package"|"membership","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station"|"color_bar"|"shampoo","sale_item_kind": "service"|"product"|"gift_card"|"gift_card_reload"|"package"|"membership","sale_status": "completed"|"partly_refunded"|"refunded"|"voided","shift_swap_status": "asked"|"accepted"|"approved"|"declined"|"canceled","staff_level": "artisan"|"senior"|"master","staff_role": "owner"|"manager"|"front_desk"|"stylist"|"assistant","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal"|"event","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
+            "ai_action_status": "proposed"|"approved"|"rejected"|"undone","appointment_source": "front_desk"|"phone"|"online"|"walk_in"|"import","appointment_status": "booked"|"confirmed"|"checked_in"|"completed"|"canceled"|"no_show","client_package_status": "active"|"canceled"|"refunded","deposit_kind": "none"|"fixed"|"percent","disruption_kind": "overrun"|"client_late"|"call_out","event_party_role": "bride"|"bridesmaid"|"maid_of_honor"|"mother"|"flower_girl"|"groom"|"guest","event_status": "inquiry"|"proposal_sent"|"booked"|"trial_done"|"completed"|"lost","fee_kind": "none"|"fixed"|"percent"|"deposit","form_requirement": "none"|"first_visit"|"services","gift_card_kind": "purchased"|"promotional","gift_card_status": "active"|"voided","membership_status": "active"|"past_due"|"paused"|"canceled","notification_status": "pending"|"sent"|"canceled","online_service_mode": "bookable"|"consultation"|"off","patch_test_result": "no_reaction"|"reaction","payment_method": "cash"|"card"|"gift_card"|"package"|"membership","product_type": "retail"|"back_bar","product_unit": "g"|"ml"|"unit","purchase_order_status": "draft"|"sent"|"partly_received"|"received","resource_kind": "chair"|"room"|"station"|"color_bar"|"shampoo","sale_item_kind": "service"|"product"|"gift_card"|"gift_card_reload"|"package"|"membership","sale_status": "completed"|"partly_refunded"|"refunded"|"voided","shift_swap_status": "asked"|"accepted"|"approved"|"declined"|"canceled","staff_role": "owner"|"manager"|"front_desk"|"stylist"|"assistant","stock_reason": "service_use"|"sale"|"count"|"order_received"|"adjustment","stocktake_status": "in_progress"|"completed"|"canceled","time_block_kind": "lunch"|"break"|"training"|"meeting"|"personal"|"event","time_off_reason": "vacation"|"sick"|"personal"|"other","time_off_status": "requested"|"approved"|"declined","waitlist_status": "waiting"|"booked"|"removed","walk_in_status": "waiting"|"booked"|"left"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -4972,7 +5007,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"client_package_status": ["active", "canceled", "refunded"],"deposit_kind": ["none", "fixed", "percent"],"disruption_kind": ["overrun", "client_late", "call_out"],"event_party_role": ["bride", "bridesmaid", "maid_of_honor", "mother", "flower_girl", "groom", "guest"],"event_status": ["inquiry", "proposal_sent", "booked", "trial_done", "completed", "lost"],"fee_kind": ["none", "fixed", "percent", "deposit"],"form_requirement": ["none", "first_visit", "services"],"gift_card_kind": ["purchased", "promotional"],"gift_card_status": ["active", "voided"],"membership_status": ["active", "past_due", "paused", "canceled"],"notification_status": ["pending", "sent", "canceled"],"online_service_mode": ["bookable", "consultation", "off"],"patch_test_result": ["no_reaction", "reaction"],"payment_method": ["cash", "card", "gift_card", "package", "membership"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station", "color_bar", "shampoo"],"sale_item_kind": ["service", "product", "gift_card", "gift_card_reload", "package", "membership"],"sale_status": ["completed", "partly_refunded", "refunded", "voided"],"shift_swap_status": ["asked", "accepted", "approved", "declined", "canceled"],"staff_level": ["artisan", "senior", "master"],"staff_role": ["owner", "manager", "front_desk", "stylist", "assistant"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal", "event"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
+            "ai_action_status": ["proposed", "approved", "rejected", "undone"],"appointment_source": ["front_desk", "phone", "online", "walk_in", "import"],"appointment_status": ["booked", "confirmed", "checked_in", "completed", "canceled", "no_show"],"client_package_status": ["active", "canceled", "refunded"],"deposit_kind": ["none", "fixed", "percent"],"disruption_kind": ["overrun", "client_late", "call_out"],"event_party_role": ["bride", "bridesmaid", "maid_of_honor", "mother", "flower_girl", "groom", "guest"],"event_status": ["inquiry", "proposal_sent", "booked", "trial_done", "completed", "lost"],"fee_kind": ["none", "fixed", "percent", "deposit"],"form_requirement": ["none", "first_visit", "services"],"gift_card_kind": ["purchased", "promotional"],"gift_card_status": ["active", "voided"],"membership_status": ["active", "past_due", "paused", "canceled"],"notification_status": ["pending", "sent", "canceled"],"online_service_mode": ["bookable", "consultation", "off"],"patch_test_result": ["no_reaction", "reaction"],"payment_method": ["cash", "card", "gift_card", "package", "membership"],"product_type": ["retail", "back_bar"],"product_unit": ["g", "ml", "unit"],"purchase_order_status": ["draft", "sent", "partly_received", "received"],"resource_kind": ["chair", "room", "station", "color_bar", "shampoo"],"sale_item_kind": ["service", "product", "gift_card", "gift_card_reload", "package", "membership"],"sale_status": ["completed", "partly_refunded", "refunded", "voided"],"shift_swap_status": ["asked", "accepted", "approved", "declined", "canceled"],"staff_role": ["owner", "manager", "front_desk", "stylist", "assistant"],"stock_reason": ["service_use", "sale", "count", "order_received", "adjustment"],"stocktake_status": ["in_progress", "completed", "canceled"],"time_block_kind": ["lunch", "break", "training", "meeting", "personal", "event"],"time_off_reason": ["vacation", "sick", "personal", "other"],"time_off_status": ["requested", "approved", "declined"],"waitlist_status": ["waiting", "booked", "removed"],"walk_in_status": ["waiting", "booked", "left"]
           }
         }
 } as const

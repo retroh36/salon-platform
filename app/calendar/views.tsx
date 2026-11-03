@@ -56,7 +56,7 @@ export function OffChip({ off, shown, onShow, isToday }: { off: ColumnData[]; sh
           <ul aria-label="Who's off" className="-mx-1 flex max-h-72 flex-col overflow-y-auto">
             {off.map((c) => (
               <li key={c.staffId} className="flex items-center gap-2.5 rounded-md px-1 py-1.5">
-                <Avatar name={c.name} color={c.color} level={c.level} size="sm" />
+                <Avatar name={c.name} color={c.color} level={c.level} photoUrl={c.photoUrl} size="sm" />
                 <span className="min-w-0 flex-1 truncate text-sm text-ink">{c.name}</span>
                 <span className="shrink-0 text-sm text-ink-muted">{c.offReason}</span>
               </li>
@@ -176,7 +176,7 @@ export function ViewEditor({
                 <li key={c.staffId}>
                   <label className="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-md px-2 text-sm text-ink hover:bg-sunken">
                     <input type="checkbox" checked={picked.includes(c.staffId)} onChange={(e) => pick([c.staffId], e.target.checked)} className={checkboxClass} />
-                    <Avatar name={c.name} color={c.color} level={c.level} size="sm" />
+                    <Avatar name={c.name} color={c.color} level={c.level} photoUrl={c.photoUrl} size="sm" />
                     <span className="truncate">{c.name}</span>
                   </label>
                 </li>

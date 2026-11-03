@@ -82,13 +82,12 @@ export type RescueFacts = {
   date: LocalDate;
   absentName: string;
   names: ReadonlyMap<string, string>;
+  // Each stylist's level, by name ("Senior").
   levels: ReadonlyMap<string, string | null>;
   // A stylist's price for a service, to say what changes.
   priceOf: (staffId: string, serviceId: string) => number | null;
   services: ReadonlyMap<string, string>;
 };
-
-const LEVEL_NAMES: Record<string, string> = { artisan: "Artisan", senior: "Senior", master: "Master" };
 
 function holdOf(m: { appointmentId: string; staffId: string; resourceId: string | null; start: Date; timing: ServiceTiming; serviceId: string }): Hold {
   const item = { ...m.timing, serviceId: m.serviceId, staffId: m.staffId, start: m.start };
@@ -100,7 +99,7 @@ const timeRange = (start: Date, end: Date, tz: string) => `${formatMinute(toLoca
 function describe(o: RescueOption, line: RescueLine, f: RescueFacts, absentId: string, firstOwn: boolean): { label: string; detail: string | null } {
   const name = f.names.get(o.staffId) ?? "another stylist";
   const time = formatMinute(toLocal(o.start, f.tz).minute);
-  const level = o.sameLevel ? "Same level" : (LEVEL_NAMES[f.levels.get(o.staffId) ?? ""] ?? "Another level");
+  const level = o.sameLevel ? "Same level" : (f.levels.get(o.staffId) ?? "Another level");
   if (o.kind === "reschedule") {
     const when = `${dayLabel(o.date)} at ${time}`;
     if (o.staffId === absentId) return { label: `Reschedule with ${name}`, detail: firstOwn ? `Next opening ${when}` : when };

@@ -106,13 +106,14 @@ test.describe("owners", () => {
     await fillService(page, { name, category: "Cuts", active: "45", processing: "0", finishing: "0", price: "50" });
     await ui(page).getByLabel("Artisan ($)").fill("40");
     await ui(page).getByLabel("Master ($)").fill("70");
-    for (const stylist of ["Bridget Callahan", "Nola Brennan", "Shae Morgan"]) await ui(page).getByRole("checkbox", { name: new RegExp(stylist) }).check();
+    await ui(page).getByLabel("Junior stylist ($)").fill("30");
+    for (const stylist of ["Bridget Callahan", "Nola Brennan", "Shae Morgan", "Hannah Novak"]) await ui(page).getByRole("checkbox", { name: new RegExp(stylist) }).check();
     // Each stylist's price input shows what they'd charge without their own.
     await expect(ui(page).getByLabel("Bridget Callahan price")).toHaveAttribute("placeholder", "Master $70");
     await expect(ui(page).getByLabel("Nola Brennan price")).toHaveAttribute("placeholder", "Default $50");
     await ui(page).getByRole("button", { name: "Add service" }).click();
-    // Shae (Artisan) $40, Nola (Senior, the default) $50, Bridget (Master) $70.
-    await expect(serviceRow(page, name)).toContainText("$40–$70");
+    // Hannah (Junior stylist) $30, Shae (Artisan) $40, Nola (Senior, the default) $50, Bridget (Master) $70.
+    await expect(serviceRow(page, name)).toContainText("$30–$70");
 
     await serviceRow(page, name).getByRole("link").click();
     await waitForHydration(page, "input[name=staff]");
@@ -121,7 +122,7 @@ test.describe("owners", () => {
     // Bridget's own price beats the Master price.
     await ui(page).getByLabel("Bridget Callahan price").fill("90");
     await ui(page).getByRole("button", { name: "Save changes" }).click();
-    await expect(serviceRow(page, name)).toContainText("$40–$90");
+    await expect(serviceRow(page, name)).toContainText("$30–$90");
   });
 
   test("reject a duplicate name", async ({ page }) => {

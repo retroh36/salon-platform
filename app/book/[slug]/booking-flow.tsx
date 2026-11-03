@@ -1,18 +1,18 @@
 "use client";
 
+import { levelTitle } from "@/lib/levels";
 import { DemoCode } from "@/components/demo-bar";
 import { APPOINTMENT_TEXTS_CONSENT, MARKETING_CONSENT } from "@/lib/messaging/consent";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { ChevronDownIcon } from "@/components/ui/icons";
-import { LevelBadge } from "@/components/ui/level";
+import { LevelBadge, useLevels } from "@/components/ui/level";
 import { fromPrice, stepLabel } from "@/lib/online-booking/intro";
 import { Alert, Badge } from "@/components/ui/page";
 import type { BookingSite, SiteService, SiteStylist } from "@/lib/online-booking/site";
 import { describeDeposit } from "@/lib/online-booking/settings";
 import type { BookingSource } from "@/lib/online-booking/sources";
-import { LEVEL_LABELS } from "@/lib/schedule-forms";
 import { formatMinute, type LocalDate } from "@/lib/scheduling/time";
 import { formatPrice, formatPriceRange } from "@/lib/services";
 import { formatDuration } from "@/lib/duration";
@@ -496,6 +496,7 @@ function StylistStep({
 // specialty, and what it costs with them. "About" opens their bio and up to
 // three photos of their work, without choosing them.
 function StylistCard({ stylist: s, on, price, onChoose }: { stylist: SiteStylist; on: boolean; price: string; onChoose: () => void }) {
+  const levels = useLevels();
   const [open, setOpen] = useState(false);
   const more = Boolean(s.bio || s.portfolio.length);
   return (
@@ -519,7 +520,7 @@ function StylistCard({ stylist: s, on, price, onChoose }: { stylist: SiteStylist
           {s.level && (
             <span className="mt-0.5 flex items-center gap-1.5 text-13 text-ink-muted">
               {s.photoUrl && <LevelBadge level={s.level} className="size-3.5" />}
-              {LEVEL_LABELS[s.level]} stylist
+              {levelTitle(levels, s.level)}
             </span>
           )}
           {s.specialty && <span className="mt-1 block text-sm leading-snug text-ink">{s.specialty}</span>}

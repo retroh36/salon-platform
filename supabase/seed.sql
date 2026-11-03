@@ -17,7 +17,7 @@
 --   nola@mapleandash.test        stylist, Senior
 --   lois@mapleandash.test        stylist, Senior
 --   shae@mapleandash.test        stylist, Artisan
---   hannah@mapleandash.test      stylist, Artisan
+--   hannah@mapleandash.test      stylist, Junior stylist
 --   ari@mapleandash.test         assistant (to Bridget)
 --
 -- PINs for the shared front-desk iPad (Settings → Shared devices):
@@ -236,7 +236,7 @@ with stylist (staff_id, categories, extra_services, except_services) as (
      array['Cuts'],
      array['Root Touch-Up', 'All-Over Color', 'Gloss / Toner', 'Men''s Gray Blending', 'Color Consultation', 'Blowout'],
      array[]::text[]),
-    -- Hannah (Artisan): blowouts, styling and add-on treatments
+    -- Hannah (Junior stylist): blowouts, styling and add-on treatments
     ('d0000000-0000-4000-8000-000000000006'::uuid,
      array['Blowouts & Styling', 'Treatments'],
      array['Women''s Cut & Style', 'Bang Trim'],
@@ -272,12 +272,17 @@ join public.services sv
  and (sv.category = any (st.categories) or sv.name = any (st.extra_services))
  and sv.name <> all (st.except_services);
 
--- Prices by level: Seniors charge the menu price, Masters about 15% more
--- and Artisans about 20% less, rounded to $5.
+-- Every salon starts with Master, Senior and Artisan; Maple & Ash adds a
+-- fourth, Junior stylist, below Artisan (blue, with a triangle).
+insert into public.staff_levels (business_id, key, name, position, color, symbol)
+values ('b0000000-0000-4000-8000-000000000001', 'junior', 'Junior stylist', 3, 'blue', 'triangle');
+
+-- Prices by level: Seniors charge the menu price, Masters about 15% more,
+-- Artisans about 20% less and Juniors about 30% less, rounded to $5.
 insert into public.service_level_prices (service_id, business_id, level, price_cents)
 select sv.id, sv.business_id, l.level::public.staff_level, round(sv.price_cents * l.factor / 500) * 500
 from public.services sv
-cross join (values ('artisan', 0.8), ('senior', 1.0), ('master', 1.15)) as l (level, factor)
+cross join (values ('junior', 0.7), ('artisan', 0.8), ('senior', 1.0), ('master', 1.15)) as l (level, factor)
 where sv.business_id = 'b0000000-0000-4000-8000-000000000001' and sv.price_cents > 0;
 
 -- A stylist's own price still overrides their level's: Gil's skin fade.
@@ -455,7 +460,7 @@ update public.staff s set level = l.level::public.staff_level
 from (values
   ('d0000000-0000-4000-8000-000000000004', 'master'),  -- Bridget
   ('d0000000-0000-4000-8000-000000000005', 'master'),  -- Gil
-  ('d0000000-0000-4000-8000-000000000006', 'artisan'), -- Hannah
+  ('d0000000-0000-4000-8000-000000000006', 'junior'),  -- Hannah
   ('d0000000-0000-4000-8000-000000000007', 'senior'),  -- Nola
   ('d0000000-0000-4000-8000-000000000008', 'master'),  -- Sandra
   ('d0000000-0000-4000-8000-000000000009', 'artisan'), -- Shae
@@ -559,7 +564,7 @@ from (values
 insert into public.staff_compensation (staff_id, business_id, service_commission_pct, retail_commission_pct)
 select s.id, s.business_id,
        case s.level when 'master' then 50 when 'senior' then 45 else 35 end,
-       case s.level when 'artisan' then 10 else 15 end
+       case when s.level in ('artisan', 'junior') then 10 else 15 end
 from public.staff s
 where s.business_id = 'b0000000-0000-4000-8000-000000000001' and s.role = 'stylist';
 

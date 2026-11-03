@@ -1,6 +1,6 @@
 import type { Tables } from "@/lib/database.types";
 import { formatDuration } from "@/lib/duration";
-import { STAFF_LEVELS, type StaffLevel } from "@/lib/schedule-forms";
+import { type StaffLevel } from "@/lib/schedule-forms";
 
 type ServiceTimes = Pick<Tables<"services">, "active_minutes" | "processing_minutes" | "finishing_minutes">;
 
@@ -126,6 +126,7 @@ function parseMinutes(value: string, { min }: { min: number }): number | string 
 // level's price, or the default).
 export function parseServiceForm(
   form: FormLike,
+  levelKeys: readonly string[],
 ): { ok: true; value: ServiceInput } | { ok: false; errors: ServiceFormErrors } {
   const errors: ServiceFormErrors = {};
 
@@ -158,8 +159,8 @@ export function parseServiceForm(
   const price = parsePrice(text(form, "price"));
   if (price === null) errors.price_cents = "Enter a price like 85 or 85.50.";
 
-  const levelPrices = {} as Record<StaffLevel, number | null>;
-  for (const level of STAFF_LEVELS) {
+  const levelPrices: Record<StaffLevel, number | null> = {};
+  for (const level of levelKeys) {
     const raw = text(form, `level_price_${level}`);
     const cents = raw ? parsePrice(raw) : null;
     if (raw && cents === null) errors.level_prices = { ...errors.level_prices, [level]: "Enter a price like 85, or leave blank." };

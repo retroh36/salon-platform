@@ -2,11 +2,12 @@
 
 import { useActionState, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
+import { staffPhotoUrl } from "@/lib/branding";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/page";
 import { switchUser, type SwitchState } from "./actions";
 
-export type Person = { id: string; first_name: string; last_initial: string; role: string; color: string | null };
+export type Person = { id: string; first_name: string; last_initial: string; role: string; color: string | null; photo_path: string | null };
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"] as const;
 // A number pad key: the outlined button's look, 64px square.
@@ -30,7 +31,7 @@ export function SwitchPad({ people }: { people: Person[] }) {
               onClick={() => (setChosen(p.id), setPin(""))}
               className="flex w-full items-center gap-3 rounded-lg border border-line bg-surface p-3 text-left text-sm font-medium text-ink transition-[background-color,border-color] duration-(--motion-fast) hover:border-line-strong hover:bg-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             >
-              <Avatar name={`${p.first_name} ${p.last_initial}`} color={p.color} size="md" halo={false} />
+              <Avatar name={`${p.first_name} ${p.last_initial}`} color={p.color} photoUrl={staffPhotoUrl(p.photo_path)} size="md" halo={false} />
               <span className="min-w-0 truncate">
                 {p.first_name} {p.last_initial}.
               </span>
@@ -46,7 +47,7 @@ export function SwitchPad({ people }: { people: Person[] }) {
       <input type="hidden" name="staff_id" value={person.id} />
       <input type="hidden" name="pin" value={pin} />
       <div className="flex items-center gap-3">
-        <Avatar name={`${person.first_name} ${person.last_initial}`} color={person.color} size="lg" halo={false} />
+        <Avatar name={`${person.first_name} ${person.last_initial}`} color={person.color} photoUrl={staffPhotoUrl(person.photo_path)} size="lg" halo={false} />
         <p className="text-xl font-semibold text-ink">Hi, {person.first_name}</p>
       </div>
       <p aria-live="polite" className="flex h-6 gap-3" aria-label={`${pin.length} digits entered`} data-testid="pin-dots">

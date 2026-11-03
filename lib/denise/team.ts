@@ -9,11 +9,11 @@ import type { Database } from "@/lib/database.types";
 import { formatIntervals } from "@/lib/schedule-format";
 import { isLocalDate, type LocalDate } from "@/lib/scheduling/time";
 import { roleLabel } from "@/lib/staff";
+import { DEFAULT_LEVELS, levelName, topLevel } from "@/lib/levels";
 
 type Supabase = SupabaseClient<Database>;
 
 export const PARTS = Object.keys(DAY_PARTS) as DayPart[];
-const LEVEL = { artisan: "Artisan", senior: "Senior", master: "Master" } as const;
 const pct = (share: number) => Math.round(share * 100);
 
 // Who's working that day (or that part of it), with their hours; owners and
@@ -29,10 +29,10 @@ export function teamFacts(week: CoverageWeek, date: LocalDate, part: DayPart, sa
     working: whoIsWorking(week.people, day, part).map((p) => ({
       first_name: p.firstName,
       role: roleLabel(p.role),
-      level: p.level ? LEVEL[p.level] : null,
+      level: p.level ? levelName(week.levels ?? DEFAULT_LEVELS, p.level) : null,
       hours: formatIntervals(p.hours),
     })),
-    ...(flags ? { flags: coverageFlags(week.people, day).map((f) => f.text) } : {}),
+    ...(flags ? { flags: coverageFlags(week.people, day, topLevel(week.levels ?? DEFAULT_LEVELS)).map((f) => f.text) } : {}),
   };
 }
 
@@ -43,7 +43,8 @@ export function dayOffFacts(week: CoverageWeek, date: LocalDate, firstName: stri
   const day = week.days.find((d) => d.date === date);
   if (!day) return { date: say(date), error: "I don't have the schedule for that day." };
   const who = matches[0];
-  const impact = timeOffImpact(week.people, day, who.id);
+  const top = topLevel(week.levels ?? DEFAULT_LEVELS);
+  const impact = timeOffImpact(week.people, day, who.id, top);
   if (!impact.working) return { first_name: who.firstName, date: say(date), already_off: true };
   return {
     first_name: who.firstName,
@@ -52,6 +53,8 @@ export function dayOffFacts(week: CoverageWeek, date: LocalDate, firstName: stri
     clients_booked_with_them: impact.clients,
     also_off: impact.alsoOff,
     stylists_left: impact.stylistsLeft,
+    // How many of the salon's most senior level ("Master") would be left.
+    top_level: top?.name ?? null,
     masters_left: who.role === "stylist" || impact.mastersLeft ? impact.mastersLeft : null,
     stylists_booked_after_pct: pct(impact.busyShareAfter),
     asked_for_it: day.requests.some((r) => r.staffId === who.id),

@@ -77,7 +77,7 @@ export function AppointmentPanel({
   // Moved to another day (or time): the calendar follows it there.
   onMoved: (date: LocalDate, appointmentId: string, message: string, moved?: Moved | null) => void;
   // Who can be named as doing a patch test.
-  team: { id: string; name: string }[];
+  team: { id: string; name: string; color?: string | null; photoUrl?: string | null }[];
 }) {
   const { client, items, status } = appointment;
   const [pending, startTransition] = useTransition();
@@ -262,7 +262,10 @@ export function AppointmentPanel({
                 <li key={i.id} data-item-id={i.id} data-testid="service-timer" data-state={state} className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <p className="text-ink">
-                      <span className="font-medium">{i.serviceName}</span> <span className="whitespace-nowrap text-ink-muted">with {i.staffName.split(" ")[0]}</span>
+                      <span className="font-medium">{i.serviceName}</span>{" "}
+                      <span className="whitespace-nowrap text-ink-muted">
+                        with <StylistFace person={team.find((t) => t.id === i.staffId)} name={i.staffName} />{i.staffName.split(" ")[0]}
+                      </span>
                     </p>
                     <p className="text-ink-muted">
                       <span className="whitespace-nowrap">
@@ -1287,5 +1290,15 @@ function PolicyInfo({ appointment, firstName }: { appointment: AppointmentDetail
       )}
       <CardLinkButton clientId={client.id} appointmentId={appointment.id} phone={client.phone} email={client.email} depositCents={p.depositNeededCents} sent={p.linkOut} />
     </div>
+  );
+}
+
+// The stylist's portrait beside their name in a line of text (initials
+// without one).
+function StylistFace({ person, name }: { person?: { color?: string | null; photoUrl?: string | null }; name: string }) {
+  return (
+    <span className="mr-1 inline-flex translate-y-[3px]">
+      <Avatar name={name} color={person?.color} photoUrl={person?.photoUrl} size="xs" halo={false} />
+    </span>
   );
 }

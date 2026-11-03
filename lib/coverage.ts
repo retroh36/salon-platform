@@ -7,7 +7,10 @@ import { formatDay, formatIntervals } from "./schedule-format.ts";
 import type { LocalDate } from "./scheduling/time.ts";
 
 export type CoverageRole = "owner" | "manager" | "front_desk" | "stylist" | "assistant";
-export type CoverageLevel = "artisan" | "senior" | "master" | null;
+// A stylist level's key (lib/levels.ts).
+const TOP = { key: "master", name: "Master" };
+
+export type CoverageLevel = string | null;
 
 export type CoveragePerson = { id: string; firstName: string; role: CoverageRole; level: CoverageLevel; chair: string | null };
 
@@ -70,7 +73,8 @@ export function bookedShare(day: CoverageDay, people: readonly CoveragePerson[])
 }
 
 // Everything worth a manager's attention on a day.
-export function coverageFlags(people: readonly CoveragePerson[], day: CoverageDay): CoverageFlag[] {
+// `top`: the salon's most senior level, whose absence is flagged.
+export function coverageFlags(people: readonly CoveragePerson[], day: CoverageDay, top: { key: string; name: string } | null = TOP): CoverageFlag[] {
   if (!day.open.length) return [];
   const flags: CoverageFlag[] = [];
   const person = new Map(people.map((p) => [p.id, p]));
@@ -85,9 +89,9 @@ export function coverageFlags(people: readonly CoveragePerson[], day: CoverageDa
   const stylists = hoursOf(day, people, ["stylist"]);
   for (const g of gaps(day, stylists)) flag("no_stylists", [], `No stylists working ${formatIntervals([g])} on ${label}.`);
 
-  const masters = people.filter((p) => p.role === "stylist" && p.level === "master");
-  if (masters.length && !masters.some((m) => day.cells.some((c) => c.staffId === m.id && working(c).length)))
-    flag("no_master", masters.map((m) => m.id), `No Master stylist working on ${label}.`);
+  const masters = top ? people.filter((p) => p.role === "stylist" && p.level === top.key) : [];
+  if (top && masters.length && !masters.some((m) => day.cells.some((c) => c.staffId === m.id && working(c).length)))
+    flag("no_master", masters.map((m) => m.id), `No ${/stylist/i.test(top.name) ? top.name : `${top.name} stylist`} working on ${label}.`);
 
   // Two people on one chair at once: its own stylist and someone it's lent to.
   const byChair = new Map<string, { id: string; hours: Interval[] }[]>();
@@ -153,7 +157,7 @@ export type TimeOffImpact = {
   newFlags: CoverageFlag[];
 };
 
-export function timeOffImpact(people: readonly CoveragePerson[], day: CoverageDay, staffId: string): TimeOffImpact {
+export function timeOffImpact(people: readonly CoveragePerson[], day: CoverageDay, staffId: string, top: { key: string; name: string } | null = TOP): TimeOffImpact {
   const cell = day.cells.find((c) => c.staffId === staffId);
   const isOn = (c: CoverageCell) => working(c).length > 0;
   // Their clients' time stays booked, on the stylists left.
@@ -166,7 +170,7 @@ export function timeOffImpact(people: readonly CoveragePerson[], day: CoverageDa
     const other = after.cells.find((c) => c.staffId !== staffId && isOn(c) && people.find((p) => p.id === c.staffId)?.role === "stylist");
     if (other) other.bookedMinutes += cell.bookedMinutes;
   }
-  const before = new Set(coverageFlags(people, { ...day, requests: [] }).map((f) => f.text));
+  const before = new Set(coverageFlags(people, { ...day, requests: [] }, top).map((f) => f.text));
   const stylistsOn = after.cells.filter((c) => isOn(c) && people.find((p) => p.id === c.staffId)?.role === "stylist");
   const scheduled = people.filter((p) => p.role !== "owner");
   return {
@@ -176,9 +180,9 @@ export function timeOffImpact(people: readonly CoveragePerson[], day: CoverageDa
     clients: cell?.clients ?? 0,
     alsoOff: scheduled.filter((p) => p.id !== staffId && !day.cells.some((c) => c.staffId === p.id && isOn(c))).map((p) => p.firstName),
     stylistsLeft: stylistsOn.length,
-    mastersLeft: stylistsOn.filter((c) => people.find((p) => p.id === c.staffId)?.level === "master").length,
+    mastersLeft: top ? stylistsOn.filter((c) => people.find((p) => p.id === c.staffId)?.level === top.key).length : 0,
     busyShareAfter: bookedShare(after, people),
-    newFlags: coverageFlags(people, after).filter((f) => !before.has(f.text)),
+    newFlags: coverageFlags(people, after, top).filter((f) => !before.has(f.text)),
   };
 }
 

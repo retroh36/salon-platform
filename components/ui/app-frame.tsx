@@ -28,7 +28,7 @@ type NavItem = {
   frontOfHouse?: boolean;
 };
 
-type User = { name: string; role: StaffRole; permissions: readonly string[] };
+type User = { name: string; role: StaffRole; permissions: readonly string[]; photoUrl?: string | null; color?: string | null };
 
 // The sidebar, in groups under small headings; Settings sits at the
 // bottom. Items (and whole groups) a role can't use are hidden.
@@ -193,7 +193,7 @@ export function AppFrame({
             </div>
           )}
           <div className="flex min-w-0 items-center gap-3">
-            <Avatar name={user.name} size="sm" halo={false} />
+            <Avatar name={user.name} color={user.color} photoUrl={user.photoUrl} size="sm" halo={false} />
             <div className="min-w-0 flex-1">
               <Link
                 href="/account"

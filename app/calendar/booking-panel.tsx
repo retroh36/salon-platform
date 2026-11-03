@@ -20,7 +20,7 @@ import type { BookingIdea, BookingIdeas } from "@/lib/denise/ideas";
 import { packageFor, usesLeft, type ClientPackage } from "@/lib/packages";
 import type { Scope } from "@/lib/scheduling/series";
 import { clientPackagesFor, clientPolicyNote, patchTestWarnings, findClients, previewSeries, quickAddClient, saveSeries, saveVisit, saveVisitScoped, type ClientOption, type SeriesPreviewVisit, type VisitInput } from "./actions";
-import type { AppointmentDetail, BoardData } from "./types";
+import type { AppointmentDetail, BoardData, ColumnData } from "./types";
 import { reach } from "@/lib/reach";
 import { useUnsavedChanges } from "@/components/unsaved";
 
@@ -359,13 +359,17 @@ export function BookingPanel({
                 ))}
               </LabeledSelect>
               {/* The stylist has the whole row, so a full name is never cut off. */}
-              <LabeledSelect label="Stylist" value={l.staffId} onChange={(v) => update(l.key, { staffId: v })}>
-                {columns.map((c) => (
-                  <option key={c.staffId} value={c.staffId}>
-                    {c.name}
-                  </option>
-                ))}
-              </LabeledSelect>
+              <div>
+                <div>
+                  <LabeledSelect label="Stylist" value={l.staffId} onChange={(v) => update(l.key, { staffId: v })} leading={<StylistPhoto column={columns.find((c) => c.staffId === l.staffId)} />}>
+                    {columns.map((c) => (
+                      <option key={c.staffId} value={c.staffId}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </LabeledSelect>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <label className={labelClass}>
                   Starts
@@ -584,13 +588,35 @@ export function BookingPanel({
   );
 }
 
-function LabeledSelect({ label, value, onChange, children }: { label: string; value: string; onChange: (v: string) => void; children: React.ReactNode }) {
+// The chosen stylist's portrait beside the picker (initials without one),
+// the same as their column on the calendar.
+function StylistPhoto({ column }: { column?: ColumnData }) {
+  if (!column) return null;
+  return (
+    <span className="pointer-events-none absolute top-1/2 left-2 flex -translate-y-1/2" data-testid="stylist-photo">
+      <Avatar name={column.name} color={column.color} photoUrl={column.photoUrl} size="xs" halo={false} />
+    </span>
+  );
+}
+
+// `leading` sits inside the field at its left, such as the stylist's photo.
+function LabeledSelect({ label, value, onChange, leading, children }: { label: string; value: string; onChange: (v: string) => void; leading?: React.ReactNode; children: React.ReactNode }) {
+  const select = (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={`${selectClass} ${leading ? "pl-9!" : ""}`}>
+      {children}
+    </select>
+  );
   return (
     <label className={labelClass}>
       {label}
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={selectClass}>
-        {children}
-      </select>
+      {leading ? (
+        <span className="relative flex">
+          {select}
+          {leading}
+        </span>
+      ) : (
+        select
+      )}
     </label>
   );
 }

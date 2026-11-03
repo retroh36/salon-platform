@@ -14,6 +14,7 @@ type Member = {
   detail?: string;
   color: string | null;
   level: StaffLevel | null;
+  photoUrl: string | null;
 };
 
 export function OrderForm({ team }: { team: Member[] }) {
@@ -40,7 +41,7 @@ export function OrderForm({ team }: { team: Member[] }) {
             label: m.name,
             detail: m.detail,
             leading: (
-              <Avatar name={m.name} color={m.color} level={m.level} size="sm" />
+              <Avatar name={m.name} color={m.color} level={m.level} photoUrl={m.photoUrl} size="sm" />
             ),
           };
         })}

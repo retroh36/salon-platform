@@ -1,6 +1,7 @@
 // The full-screen checkout: starting one (a draft ticket from a visit, or a
 // new sale) and loading everything the screen needs. Server side.
 
+import { staffPhotoUrl } from "@/lib/branding";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { describeClient } from "@/lib/insights/describe";
@@ -130,7 +131,7 @@ function depositPayment(a: { deposit_paid_cents: number; deposit_outcome: string
   return a.deposit_paid_cents > 0 && a.deposit_outcome === null ? [{ key: "deposit", method: "card", amountCents: a.deposit_paid_cents, reference: DEPOSIT_REFERENCE }] : [];
 }
 
-export type ScreenStaff = { id: string; firstName: string; name: string; level: StaffLevel | null; color: string | null };
+export type ScreenStaff = { id: string; firstName: string; name: string; level: StaffLevel | null; color: string | null; photoUrl: string | null };
 export type ScreenService = { id: string; name: string; category: string; priceFor: Record<string, number> };
 
 export type CheckoutScreenData = {
@@ -182,7 +183,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
   const today = todayIn(tz, now);
 
   const [staffRows, settings, products, templates, servicesRows, clientRow, overrides, plans, promo, rewards] = await Promise.all([
-    supabase.from("staff").select("id, first_name, last_name, role, level, color, is_active, location_id").eq("location_id", me.location.id).eq("is_active", true),
+    supabase.from("staff").select("id, first_name, last_name, role, level, color, photo_path, is_active, location_id").eq("location_id", me.location.id).eq("is_active", true),
     loadCheckoutSettings(supabase, me.business_id),
     loadRetailProducts(supabase, me.business_id, me.location.id),
     loadTemplates(supabase, me.business_id),
@@ -197,7 +198,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
   if (servicesRows.error) throw servicesRows.error;
   const offers = await loadOffers(supabase, staffRows.data.map((s) => s.id));
   const stylists = sortStaff(staffRows.data).filter((s) => (offers.get(s.id)?.size ?? 0) > 0);
-  const staff: ScreenStaff[] = stylists.map((s) => ({ id: s.id, firstName: s.first_name, name: fullName(s), level: s.level, color: s.color }));
+  const staff: ScreenStaff[] = stylists.map((s) => ({ id: s.id, firstName: s.first_name, name: fullName(s), level: s.level, color: s.color, photoUrl: staffPhotoUrl(s.photo_path) }));
   const services: ScreenService[] = servicesRows.data.map((sv) => ({
     id: sv.id,
     name: sv.name,
@@ -337,7 +338,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     defaultStaffId: visitStaff ?? me.id,
     creditStaff: staff.some((s) => s.id === me.id)
       ? staff
-      : [...staff, ...staffRows.data.filter((s) => s.id === me.id).map((s) => ({ id: s.id, firstName: s.first_name, name: fullName(s), level: s.level, color: s.color }))],
+      : [...staff, ...staffRows.data.filter((s) => s.id === me.id).map((s) => ({ id: s.id, firstName: s.first_name, name: fullName(s), level: s.level, color: s.color, photoUrl: staffPhotoUrl(s.photo_path) }))],
     templates,
     settings,
     role: me.role,

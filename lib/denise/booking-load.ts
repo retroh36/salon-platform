@@ -5,13 +5,14 @@
 // by her streaming endpoint and the chat's own actions (app/denise/).
 // Front of house only (the callers check).
 
+import { DEFAULT_LEVELS, loadLevels } from "@/lib/levels";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { searchClients } from "@/lib/client-search";
 import type { Database } from "@/lib/database.types";
 import { loadClientInsights, loadDurations, usualTimings } from "@/lib/insights/read";
 import { LATER_DAYS, MAX_DAYS, MAX_PHONE_SERVICES, phoneTimes, type PhoneRequest, type PhoneStylist } from "@/lib/phone-booking";
 import { clientStanding } from "@/lib/policy-load";
-import { STAFF_LEVELS, type StaffLevel } from "@/lib/schedule-forms";
+import { type StaffLevel } from "@/lib/schedule-forms";
 import { formatDay } from "@/lib/schedule-format";
 import { durationMinutes } from "@/lib/scheduling/booking";
 import { loadBookingContext } from "@/lib/scheduling/load";
@@ -32,10 +33,11 @@ export type PricedMenu = BookingMenu & {
 
 // The menu, the stylists who do something on it, and what each charges.
 export async function bookingMenu(s: Booker): Promise<PricedMenu> {
-  const [services, staff, offers] = await Promise.all([
+  const [services, staff, offers, levels] = await Promise.all([
     s.supabase.from("services").select("id, name, category, price_cents, service_level_prices(level, price_cents)").eq("business_id", s.me.business_id).is("archived_at", null).order("category").order("name"),
     s.supabase.from("staff").select("id, first_name, level, calendar_position").eq("location_id", s.me.location.id).eq("is_active", true).order("calendar_position", { nullsFirst: false }).order("first_name"),
     s.supabase.from("staff_services").select("staff_id, service_id, price_cents"),
+    loadLevels(s.supabase, s.me.business_id),
   ]);
   if (services.error) throw services.error;
   if (staff.error) throw staff.error;
@@ -47,6 +49,7 @@ export async function bookingMenu(s: Booker): Promise<PricedMenu> {
   return {
     services: services.data.map((sv) => ({ id: sv.id, name: sv.name, category: sv.category })),
     stylists: staff.data.filter((m) => doesServices.has(m.id)).map((m) => ({ id: m.id, firstName: m.first_name, level: m.level })),
+    levels: levels.map((l) => ({ key: l.key, name: l.name })),
     price: (staffId, serviceId) => {
       const service = byId.get(serviceId);
       return service ? stylistPrice(service, { level: level.get(staffId) ?? null, customCents: custom.get(`${staffId}:${serviceId}`) ?? null }) : 0;
@@ -135,7 +138,7 @@ export function requestProblem(r: PhoneRequest, today: LocalDate, menu: BookingM
   if (r.serviceIds.length > MAX_PHONE_SERVICES) return "Choose up to four services.";
   if (r.serviceIds.some((id) => !menu.services.some((sv) => sv.id === id))) return "One of those services isn't on the menu.";
   if (r.staffId !== null && !menu.stylists.some((m) => m.id === r.staffId)) return "Choose a stylist from the list.";
-  if (r.level !== null && !STAFF_LEVELS.includes(r.level)) return "Choose a level from the list.";
+  if (r.level !== null && !(menu.levels ?? DEFAULT_LEVELS).some((l) => l.key === r.level)) return "Choose a level from the list.";
   if (!isLocalDate(r.from) || !isLocalDate(r.to) || r.to < r.from) return "Choose the days the client can come.";
   if (r.to < today) return "Those days have passed.";
   if (daysBetween(r.from, r.to) > MAX_DAYS) return "Search up to a month at a time.";
@@ -156,7 +159,7 @@ export function cleanRequest(raw: unknown): PhoneRequest | null {
     sameAsLast: r.sameAsLast === true,
     serviceIds: r.serviceIds as string[],
     staffId: str(r.staffId),
-    level: STAFF_LEVELS.find((l) => l === r.level) ?? null,
+    level: typeof r.level === "string" && /^[a-z][a-z0-9_]{0,31}$/.test(r.level) ? r.level : null,
     from: str(r.from) ?? "",
     to: str(r.to) ?? "",
     part,

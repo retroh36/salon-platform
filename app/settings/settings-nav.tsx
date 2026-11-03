@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { can, type Permission } from "@/lib/permissions";
 
-type Page = "salon" | "stations" | "time-off" | "booking" | "booking-page" | "policies" | "checkout" | "gift-cards" | "packages" | "events" | "memberships" | "rewards" | "automations" | "messages" | "devices" | "payroll" | "commission" | "data" | "billing";
+type Page = "salon" | "levels" | "stations" | "time-off" | "booking" | "booking-page" | "policies" | "checkout" | "gift-cards" | "packages" | "events" | "memberships" | "rewards" | "automations" | "messages" | "devices" | "payroll" | "commission" | "data" | "billing";
 
 // Each settings page and the permission it needs (lib/permissions.ts).
 const LINKS: [Page, string, string, Permission][] = [
   ["salon", "/settings", "Your salon", "settings"],
+  ["levels", "/settings/levels", "Levels", "settings"],
   ["stations", "/settings/stations", "Stations", "settings"],
   ["time-off", "/settings/time-off", "Time off", "settings"],
   ["booking", "/settings/booking", "Online booking", "settings"],

@@ -1,3 +1,4 @@
+import { staffPhotoUrl } from "@/lib/branding";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -33,7 +34,7 @@ async function Durations() {
 
   const [learned, { data: staff, error: staffError }, { data: services, error: serviceError }, { data: own, error: ownError }, { data: applied, error: actionError }] = await Promise.all([
     loadDurations(supabase, me.business_id),
-    supabase.from("staff").select("id, first_name, last_name, level, color").eq("location_id", me.location.id).eq("is_active", true).eq("role", "stylist").order("first_name"),
+    supabase.from("staff").select("id, first_name, last_name, level, color, photo_path").eq("location_id", me.location.id).eq("is_active", true).eq("role", "stylist").order("first_name"),
     supabase.from("services").select("id, name, duration_minutes"),
     supabase.from("staff_services").select("staff_id, service_id, active_minutes, processing_minutes, finishing_minutes").not("active_minutes", "is", null),
     supabase.from("ai_actions").select("id, subject, decided_at").eq("feature", "duration").eq("status", "approved").order("decided_at", { ascending: false }),
@@ -64,7 +65,7 @@ async function Durations() {
             key={s.id}
             title={
               <span className="flex items-center gap-3">
-                <Avatar name={fullName(s)} color={s.color} level={s.level} size="sm" />
+                <Avatar name={fullName(s)} color={s.color} level={s.level} photoUrl={staffPhotoUrl(s.photo_path)} size="sm" />
                 {fullName(s)}
               </span>
             }

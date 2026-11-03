@@ -1,3 +1,5 @@
+import { levelName } from "@/lib/levels";
+import { staffPhotoUrl } from "@/lib/branding";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -5,7 +7,6 @@ import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { BackLink } from "@/components/ui/back-link";
 import { PageHeader } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
-import { LEVEL_LABELS } from "@/lib/schedule-forms";
 import { fullName, sortForCalendar } from "@/lib/staff";
 import { OrderForm } from "./order-form";
 import { can } from "@/lib/permissions";
@@ -28,7 +29,7 @@ async function CalendarOrder() {
   if (!can(me, "settings")) redirect("/team");
   const { data, error } = await supabase
     .from("staff")
-    .select("id, first_name, last_name, role, level, color, is_active, calendar_position, staff_services(service_id)")
+    .select("id, first_name, last_name, role, level, color, photo_path, is_active, calendar_position, staff_services(service_id)")
     .eq("location_id", me.location.id)
     .eq("is_active", true);
   if (error) throw error;
@@ -38,7 +39,7 @@ async function CalendarOrder() {
     <AppShell section="team" me={me}>
       <BackLink href="/team">Team</BackLink>
       <PageHeader title="Calendar order" description="The order of stylists on the calendar, left to right, for everyone. Saved views keep their own order." />
-      <OrderForm team={team.map((s) => ({ id: s.id, name: fullName(s), detail: s.level ? LEVEL_LABELS[s.level] : undefined, color: s.color, level: s.level }))} />
+      <OrderForm team={team.map((s) => ({ id: s.id, name: fullName(s), detail: s.level ? levelName(me.levels, s.level) : undefined, color: s.color, level: s.level, photoUrl: staffPhotoUrl(s.photo_path) }))} />
     </AppShell>
   );
 }

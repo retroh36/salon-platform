@@ -138,8 +138,8 @@ test("a new client books two services back to back on a phone", async ({ page })
   await expect(page.getByTestId("salon-intro").getByRole("heading", { level: 1 })).toHaveText("Maple & Ash Hair Studio");
   await expect(page.getByTestId("powered-by")).toHaveText("Powered by Maestra");
   await expect(page.getByText("Bang Trim")).toHaveCount(0); // not online
-  // From the lowest level's price.
-  await expect(flow(page).getByRole("button", { name: /^Women's Cut & Style/ })).toContainText("From $70");
+  // From the lowest level's price (Junior stylist).
+  await expect(flow(page).getByRole("button", { name: /^Women's Cut & Style/ })).toContainText("From $60");
 
   await chooseServices(page, ["Women's Cut & Style", "Blowout"]);
   await expect(flow(page).getByRole("heading", { name: "Choose your stylist" })).toBeFocused();
@@ -211,6 +211,11 @@ test("a new client books two services back to back on a phone", async ({ page })
   await expect(booked).toHaveAccessibleName(/booked online/);
   // In its details, not on the block.
   await expect(booked.getByTestId("online-badge")).toHaveCount(0);
+  // Wherever the time of day put it: out from under Denise's card (closed
+  // with Escape) and the sticky header row.
+  if (await calendar.getByTestId("denise-card").isVisible()) await calendar.keyboard.press("Escape");
+  await expect(calendar.getByTestId("denise-card")).toBeHidden();
+  await booked.evaluate((el) => el.scrollIntoView({ block: "center", inline: "center" }));
   await booked.click();
   // How it was booked is in its history.
   await visitTab(calendar.getByRole("complementary", { name: "Booking details" }), "History");

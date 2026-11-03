@@ -1,5 +1,7 @@
 "use client";
 
+import { useLevels } from "@/components/ui/level";
+import { levelTitle } from "@/lib/levels";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { ClientPicker } from "@/app/calendar/booking-panel";
@@ -13,7 +15,7 @@ import type { BookingCard, BookingSlot, ClientMatch } from "@/lib/denise/booking
 import type { ChatMessage } from "@/lib/denise/types";
 import { DEFAULT_DAYS, type PhoneRequest } from "@/lib/phone-booking";
 import { reach } from "@/lib/reach";
-import { LEVEL_LABELS, STAFF_LEVELS, type StaffLevel } from "@/lib/schedule-forms";
+import { type StaffLevel } from "@/lib/schedule-forms";
 import type { PartOfDay } from "@/lib/scheduling/phone";
 import { addDays, formatMinute } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
@@ -368,6 +370,7 @@ type Part = PartOfDay | "any";
 // The form (without Denise, or when she needs to know more): client,
 // service, stylist, day and time of day, searched the same way.
 function BookingForm({ card, index, today }: { card: Extract<BookingCard, { kind: "form" }>; index: number; today: string }) {
+  const levels = useLevels();
   const [client, setClient] = useState<ClientOption | null>(card.client ? optionOf(card.client) : null);
   const [request, setRequest] = useState<PhoneRequest>(card.request);
   const singleDay = request.from === request.to;
@@ -409,9 +412,9 @@ function BookingForm({ card, index, today }: { card: Extract<BookingCard, { kind
             className={selectClass}
           >
             <option value="anyone">Anyone</option>
-            {STAFF_LEVELS.map((l) => (
-              <option key={l} value={`level:${l}`}>
-                Any {LEVEL_LABELS[l].toLowerCase()} stylist
+            {levels.map((l) => (
+              <option key={l.key} value={`level:${l.key}`}>
+                Any {levelTitle(levels, l.key).toLowerCase()}
               </option>
             ))}
             {card.menu.stylists.map((s) => (

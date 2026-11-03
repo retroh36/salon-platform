@@ -305,10 +305,10 @@ describe("constraints", () => {
 });
 
 describe("prices by level", () => {
-  it("are seeded: Artisans charge less, Masters more, and a stylist's own price wins", async () => {
+  it("are seeded: Juniors and Artisans charge less, Masters more, and a stylist's own price wins", async () => {
     const { data: cut } = await admin.from("services").select("id, price_cents, service_level_prices(level, price_cents)").eq("business_id", SEED.business).eq("name", "Women's Cut & Style").single();
     const byLevel = Object.fromEntries(cut!.service_level_prices.map((p) => [p.level, p.price_cents]));
-    expect(byLevel).toEqual({ artisan: 7000, senior: 8500, master: 10000 });
+    expect(byLevel).toEqual({ junior: 6000, artisan: 7000, senior: 8500, master: 10000 });
     const { data: fade } = await admin.from("services").select("id").eq("business_id", SEED.business).eq("name", "Skin Fade").single();
     const { data: custom } = await admin.from("staff_services").select("price_cents").eq("staff_id", SEED.staff.gil).eq("service_id", fade!.id).single();
     expect(custom!.price_cents).toBe(5500);

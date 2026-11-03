@@ -1,17 +1,14 @@
-import type { StaffLevel } from "@/lib/schedule-forms";
-import { LEVEL_RING, LevelBadge } from "./level";
-import { firstLetter } from "@/lib/initial";
+"use client";
 
-// Initials in a soft circle, tinted with the person's calendar color. A
-// stylist's level shows as a colored ring around it, with a badge in the
-// corner (a star, two dots or one) so it isn't color alone.
-export function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return (firstLetter(parts[0] ?? "") + (parts.length > 1 ? firstLetter(parts.at(-1)!) : "")).toUpperCase() || "?";
-}
+import { LEVEL_RING, LevelBadge, useLevel } from "./level";
+import { initials } from "@/lib/initial";
 
-const SIZES = { sm: "size-8 text-xs", md: "size-10 text-sm", lg: "size-14 text-base", xl: "size-20 text-2xl" };
-const BADGES = { sm: "size-3.5 -right-1 -bottom-1", md: "size-4 -right-1 -bottom-1", lg: "size-5 -right-0.5 -bottom-0.5", xl: "size-6 right-0 bottom-0" };
+// Initials (or their photo) in a soft circle, tinted with the person's
+// calendar color. A stylist's level shows as a colored ring around it, with
+// a badge in the corner so it isn't color alone.
+
+const SIZES = { xs: "size-5 text-2xs", sm: "size-8 text-xs", md: "size-10 text-sm", lg: "size-14 text-base", xl: "size-20 text-2xl" };
+const BADGES = { xs: "hidden", sm: "size-3.5 -right-1 -bottom-1", md: "size-4 -right-1 -bottom-1", lg: "size-5 -right-0.5 -bottom-0.5", xl: "size-6 right-0 bottom-0" };
 
 export function Avatar({
   name,
@@ -23,16 +20,18 @@ export function Avatar({
 }: {
   name: string;
   color?: string | null;
-  level?: StaffLevel | null;
+  level?: string | null;
   photoUrl?: string | null;
-  size?: "sm" | "md" | "lg" | "xl";
+  // xs (20px, beside a line of text) leaves out the level ring and badge.
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
   // A thin ring in the page color, to separate avatars that touch.
   halo?: boolean;
 }) {
+  const l = useLevel(level);
   return (
     <span aria-hidden data-level={level ?? undefined} className="relative inline-flex shrink-0">
       <span
-        className={`inline-flex items-center justify-center overflow-hidden rounded-full bg-navy-100 font-semibold text-navy-900 ${halo ? "ring-2 ring-surface" : ""} ${level ? LEVEL_RING[level] : ""} ${SIZES[size]}`}
+        className={`inline-flex items-center justify-center overflow-hidden rounded-full bg-navy-100 font-semibold text-navy-900 ${halo ? "ring-2 ring-surface" : ""} ${l && size !== "xs" ? LEVEL_RING[l.color] : ""} ${SIZES[size]}`}
         style={color ? { backgroundColor: `color-mix(in srgb, ${color} 18%, white)`, boxShadow: `inset 0 0 0 1.5px color-mix(in srgb, ${color} 45%, white)` } : undefined}
       >
         {photoUrl ? (
@@ -42,7 +41,7 @@ export function Avatar({
           initials(name)
         )}
       </span>
-      {level && <LevelBadge level={level} className={`absolute ${BADGES[size]}`} />}
+      {l && size !== "xs" && <LevelBadge level={l.key} className={`absolute ${BADGES[size]}`} />}
     </span>
   );
 }

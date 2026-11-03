@@ -67,9 +67,9 @@ function setup(visits: RescueVisit[]) {
       ["gil", "Gil"],
     ]),
     levels: new Map([
-      ["nola", "senior"],
-      ["lois", "senior"],
-      ["gil", "master"],
+      ["nola", "Senior"],
+      ["lois", "Senior"],
+      ["gil", "Master"],
     ]),
     services: new Map([["cut", "Women's Cut"]]),
     priceOf: (s) => (s === "gil" ? 9000 : 7000),

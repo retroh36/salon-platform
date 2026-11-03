@@ -5,6 +5,7 @@
 // lib/scheduling/rescue.ts and put in rows by lib/rescue.ts. Read as the
 // signed-in staff member (RLS decides).
 
+import { levelName, loadLevels } from "@/lib/levels";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { loadDurations, usualTimings } from "@/lib/insights/read";
@@ -94,7 +95,7 @@ export async function loadRescue(
   if (error) throw error;
   const ids = [...new Set((mine ?? []).map((i) => i.appointment_id))];
 
-  const [visitRows, team, services, offers, ctx, learned] = await Promise.all([
+  const [visitRows, team, services, offers, ctx, learned, salonLevels] = await Promise.all([
     ids.length
       ? supabase
           .from("appointments")
@@ -109,6 +110,7 @@ export async function loadRescue(
     supabase.from("staff_services").select("staff_id, service_id, price_cents").eq("business_id", businessId),
     loadBookingContext(supabase, location, date, addDays(date, RESCHEDULE_DAYS)),
     loadDurations(supabase, businessId),
+    loadLevels(supabase, businessId),
   ]);
   if (visitRows.error) throw visitRows.error;
 
@@ -146,7 +148,7 @@ export async function loadRescue(
     date,
     absentName: person.first_name,
     names: new Map((team.data ?? []).map((s) => [s.id, s.first_name])),
-    levels: levelOf,
+    levels: new Map([...levelOf].map(([id, key]) => [id, key ? levelName(salonLevels, key) : null])),
     services: new Map((services.data ?? []).map((s) => [s.id, s.name])),
     priceOf: (sId, serviceId) => {
       const service = serviceRows.get(serviceId);

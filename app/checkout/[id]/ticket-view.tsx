@@ -307,7 +307,7 @@ export function TicketList({
           <section key={g.staffId ?? "none"} aria-label={stylist ? `${stylist.name}'s lines` : "Other lines"} className="rounded-lg border border-line bg-surface">
             {/* Stays in view while the stylist's lines scroll under it. */}
             <div className="sticky top-0 z-10 flex items-center gap-3 rounded-t-lg border-b border-line bg-surface px-4 py-3">
-              {stylist ? <Avatar name={stylist.name} color={stylist.color} level={stylist.level} size="sm" /> : null}
+              {stylist ? <Avatar name={stylist.name} color={stylist.color} level={stylist.level} photoUrl={stylist.photoUrl} size="sm" /> : null}
               <span className="text-sm font-semibold text-ink">{stylist ? stylist.name : "Not credited to a stylist"}</span>
               <span className="ml-auto text-sm text-ink-muted tabular-nums" data-testid="stylist-subtotal">
                 Subtotal <span className="font-semibold text-ink">{formatPrice(g.subtotalCents)}</span>

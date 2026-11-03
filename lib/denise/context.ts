@@ -3,13 +3,13 @@
 // and what they may look up (./knowledge.ts). Used by "Ask Denise" (her
 // chat, on every staff page) and the evaluation script (evals/).
 
+import { levelTitle, loadLevels } from "@/lib/levels";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { canBook } from "@/lib/appointments";
 import type { Database } from "@/lib/database.types";
 import { recordProposals } from "@/lib/scheduling/ai-actions";
 import type { BookingContext } from "@/lib/scheduling/booking";
 import { loadBookingContext, loadOffers } from "@/lib/scheduling/load";
-import { LEVEL_LABELS } from "@/lib/schedule-forms";
 import type { LocalDate } from "@/lib/scheduling/time";
 import type { StaffRole } from "@/lib/staff";
 import type { AssistantContext } from "./assistant";
@@ -41,7 +41,7 @@ export async function assistantContext(supabase: Supabase, me: Asking, date: Loc
   ]);
   if (services.error) throw services.error;
   if (staff.error) throw staff.error;
-  const [offers, learned] = await Promise.all([loadOffers(supabase, staff.data.map((m) => m.id)), loadDurations(supabase, me.businessId)]);
+  const [offers, learned, levels] = await Promise.all([loadOffers(supabase, staff.data.map((m) => m.id)), loadDurations(supabase, me.businessId), loadLevels(supabase, me.businessId)]);
   const calendars = new Map<string, Promise<BookingContext>>();
   const bookers = canBook(me.role);
 
@@ -54,7 +54,7 @@ export async function assistantContext(supabase: Supabase, me: Asking, date: Loc
     services: services.data.map((sv) => ({ id: sv.id, name: sv.name, category: sv.category, minutes: sv.duration_minutes ?? 0 })),
     staff: staff.data
       .filter((m) => (offers.get(m.id)?.size ?? 0) > 0)
-      .map((m) => ({ id: m.id, firstName: m.first_name, title: m.level ? `${LEVEL_LABELS[m.level]} stylist` : m.role })),
+      .map((m) => ({ id: m.id, firstName: m.first_name, title: m.level ? levelTitle(levels, m.level) : m.role })),
     calendar: (day) => {
       if (!calendars.has(day)) calendars.set(day, loadBookingContext(supabase, me.location, day, day));
       return calendars.get(day)!;

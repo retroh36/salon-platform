@@ -1,4 +1,7 @@
+import { staffPhotoUrl } from "@/lib/branding";
 import { StillLoading } from "@/components/still-loading";
+import { LevelsProvider } from "@/components/ui/level";
+import { loadLevels, type Level } from "@/lib/levels";
 import { AppFrame, type Section } from "@/components/ui/app-frame";
 import { canBook } from "@/lib/appointments";
 import { salonLogoUrl } from "@/lib/branding";
@@ -13,6 +16,10 @@ type Me = {
   business_id: string;
   role: StaffRole;
   permissions: readonly string[];
+  color?: string | null;
+  photo_path?: string | null;
+  // The salon's levels (getCurrentStaff loads them).
+  levels?: readonly Level[];
   location: { id?: string; name: string; timezone: string; business: { name: string; logo_path?: string | null; auto_lock_minutes?: number } | null };
 };
 
@@ -43,8 +50,13 @@ export async function AppShell({
   // On the shared iPad: Switch user, and lock when idle.
   const shared = (await deviceTokenHash()) ? { autoLockMinutes: me.location.business?.auto_lock_minutes ?? 5 } : null;
   // The salon's locations, for the sidebar's salon card.
-  const { data: locations } = await (await createClient()).from("locations").select("id, name, city, region").eq("business_id", me.business_id).order("name");
+  const supabase = await createClient();
+  const [{ data: locations }, levels] = await Promise.all([
+    supabase.from("locations").select("id, name, city, region").eq("business_id", me.business_id).order("name"),
+    me.levels ?? loadLevels(supabase, me.business_id),
+  ]);
   return (
+    <LevelsProvider levels={levels}>
     <AppFrame
       sharedDevice={shared}
       section={section}
@@ -53,12 +65,13 @@ export async function AppShell({
       locationName={me.location.name}
       locationId={me.location.id}
       locations={locations ?? []}
-      user={{ name: me.first_name, role: me.role, permissions: me.permissions }}
+      user={{ name: me.first_name, role: me.role, permissions: me.permissions, color: me.color, photoUrl: staffPhotoUrl(me.photo_path) }}
       deniseOverlay={denise === "overlay"}
       denise={denise ? { staffId: me.id, firstName: me.first_name, canBook: canBook(me.role), today: todayIn(me.location.timezone) } : null}
     >
       {bleed ? children : <div className={`mx-auto w-full animate-fade-in px-4 pt-8 pb-24 sm:px-8 ${wide ? "max-w-6xl" : "max-w-5xl"}`}>{children}</div>}
     </AppFrame>
+    </LevelsProvider>
   );
 }
 

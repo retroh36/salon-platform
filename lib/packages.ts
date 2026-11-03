@@ -2,6 +2,7 @@
 // wording and the pro-rated refund (the database works out the same in
 // cancel_package).
 
+import { DEFAULT_LEVELS, levelName, type Level } from "@/lib/levels";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import type { StaffLevel } from "@/lib/schedule-forms";
@@ -46,7 +47,7 @@ export async function loadTemplates(supabase: Supabase, businessId: string, acti
     name: t.name,
     priceCents: t.price_cents,
     expiryMonths: t.expiry_months,
-    levels: t.levels,
+    levels: t.levels as string[] | null,
     isActive: t.is_active,
     items: t.package_template_items.map((i) => ({ serviceId: i.service_id, serviceName: i.service.name, quantity: i.quantity })),
   }));
@@ -65,7 +66,7 @@ export async function loadClientPackages(supabase: Supabase, clientId: string, a
     id: p.id,
     name: p.name,
     priceCents: p.price_cents,
-    levels: p.levels,
+    levels: p.levels as string[] | null,
     expiresAt: p.expires_at,
     status: p.status,
     refundedCents: p.refunded_cents,
@@ -90,7 +91,6 @@ export function packageFor(packages: readonly ClientPackage[], serviceId: string
   return fits[0] ?? null;
 }
 
-const LEVEL_NAMES: Record<StaffLevel, string> = { artisan: "Artisan", senior: "Senior", master: "Master" };
 
 // Why Package can't be used at checkout, shown under the payment buttons
 // (null when it can): the button used to grey out with no reason. A
@@ -101,6 +101,7 @@ export function packageNote(
   packages: readonly ClientPackage[],
   client: { firstName: string } | null,
   now = new Date(),
+  levels: readonly Level[] = DEFAULT_LEVELS,
 ): string | null {
   if (lines.some((l) => !l.packageItemId && packageFor(packages, l.serviceId, l.staffLevel, now))) return null;
   if (!client) return "Packages need a client on the sale.";
@@ -110,7 +111,7 @@ export function packageNote(
   if (used) return `${client.firstName}'s package is already paying for ${used.name}.`;
   const left = usable.flatMap((p) => p.items.filter((i) => i.used < i.total).map((i) => usesLeft(i)));
   const levelOnly = usable.find((p) => p.levels && lines.some((l) => p.items.some((i) => i.serviceId === l.serviceId && i.used < i.total)));
-  if (levelOnly) return `${client.firstName}'s package is only for ${levelOnly.levels!.map((l) => LEVEL_NAMES[l]).join(" or ")} stylists.`;
+  if (levelOnly) return `${client.firstName}'s package is only for ${levelOnly.levels!.map((l) => levelName(levels, l)).join(" or ")} stylists.`;
   return `${client.firstName}'s package (${left.join(", ")}) doesn't cover anything on this sale.`;
 }
 
@@ -150,7 +151,7 @@ export async function loadPackagesByClient(supabase: Supabase, clientIds: readon
       id: p.id,
       name: p.name,
       priceCents: p.price_cents,
-      levels: p.levels,
+      levels: p.levels as string[] | null,
       expiresAt: p.expires_at,
       status: p.status,
       refundedCents: p.refunded_cents,

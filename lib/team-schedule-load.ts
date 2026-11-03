@@ -14,7 +14,7 @@ export type GridPerson = {
   name: string;
   firstName: string;
   role: StaffRole;
-  level: "artisan" | "senior" | "master" | null;
+  level: string | null;
   color: string | null;
   photoUrl: string | null;
   cycleWeeks: number;

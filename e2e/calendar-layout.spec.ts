@@ -131,9 +131,11 @@ test("shows each stylist's level as a colored ring, badge and bar, explained by 
   // The key has the same badges; the calendar names no levels otherwise.
   await ui(page).getByRole("button", { name: "Key" }).click();
   const legend = ui(page).getByTestId("level-legend");
-  for (const level of ["master", "senior", "artisan"]) await expect(legend.locator(`[data-level-badge=${level}]`)).toBeVisible();
-  await expect(legend).toHaveText(/Master.*Senior.*Artisan/);
-  await expect(ui(page).getByTestId("calendar-grid")).not.toContainText(/Master|Senior|Artisan|Stylist\b/);
+  // All four of Maple & Ash's levels, most senior first, Junior stylist in blue.
+  for (const level of ["master", "senior", "artisan", "junior"]) await expect(legend.locator(`[data-level-badge=${level}]`)).toBeVisible();
+  await expect(legend).toHaveText(/Master.*Senior.*Artisan.*Junior stylist/);
+  await expect(legend.locator("[data-level-badge=junior]")).toHaveAttribute("data-color", "blue");
+  await expect(ui(page).getByTestId("calendar-grid")).not.toContainText(/Master|Senior|Artisan|Junior|Stylist\b/);
 });
 
 test("each stylist's header shows their day at a glance", async ({ page }) => {
