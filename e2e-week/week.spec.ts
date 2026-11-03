@@ -285,7 +285,7 @@ async function bookOnline(page: Page, first: string) {
   await waitForHydration(page, "[data-testid=booking-flow] button[aria-pressed]");
   await flow.getByRole("button", { name: /^Blowout\s*\d/ }).click();
   await flow.getByRole("button", { name: "Continue" }).click();
-  await flow.getByRole("button", { name: /Lois/ }).click();
+  await flow.getByRole("button", { name: /^Lois Park/ }).click();
   await flow.getByRole("button", { name: "Continue" }).click();
   const dates = flow.getByRole("radiogroup", { name: "Date" });
   await expect(dates.getByRole("radio").first()).toBeVisible();
