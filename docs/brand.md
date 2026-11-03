@@ -172,8 +172,10 @@ tests check this). Her waving illustration sits above empty states
 Clear, saturated tints (the "A · Richer" style): a 4px edge in the full
 color, and dark text tinted to match (the name in the family's ink, the
 service and time in its muted ink), all AA on the fill and on its lighter
-processing part. Processing time keeps light stripes; nothing else on the
-calendar is striped but an event's travel.
+processing part. Processing time keeps fine, faint stripes (a 1.5px line
+every 6px at 12% of the edge color, `PROCESSING_STRIPES`), so a full day
+doesn't look busy; nothing else on the calendar is striped but an event's
+travel.
 
 | Family | Fill | Edge | Ink / muted ink |
 | --- | --- | --- | --- |

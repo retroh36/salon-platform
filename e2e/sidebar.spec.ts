@@ -36,6 +36,26 @@ test.describe("owner", () => {
     }
   });
 
+  test("the salon card shows the salon's logo, on the Calendar too", async ({ page, browser }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const harbor = await browser.newPage({ storageState: AUTH.largeFrontDesk, viewport: { width: 1440, height: 900 } });
+    try {
+      for (const [p, logo] of [
+        [page, "/demo/logos/maple-and-ash.svg"],
+        [harbor, "/demo/logos/harbor-and-vine.svg"],
+      ] as const) {
+        for (const path of ["/calendar", "/dashboard"]) {
+          await p.goto(path);
+          const card = sidebar(p).getByTestId("salon-switcher");
+          await expect(card.getByTestId("salon-logo"), path).toHaveAttribute("src", logo);
+          await expect(card.getByTestId("salon-initial")).toHaveCount(0);
+        }
+      }
+    } finally {
+      await harbor.close();
+    }
+  });
+
   test("sees every group, with Settings at the bottom", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/dashboard");

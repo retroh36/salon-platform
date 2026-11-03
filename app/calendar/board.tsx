@@ -2055,7 +2055,7 @@ function CalendarKey({ families }: { families: ServiceFamily[] }) {
                 <span
                   aria-hidden
                   className={`${swatch} border border-line-strong`}
-                  style={{ backgroundImage: "repeating-linear-gradient(135deg, transparent 0 3px, rgb(23 39 59 / 0.18) 3px 6px)" }}
+                  style={{ backgroundImage: "repeating-linear-gradient(135deg, transparent 0 3px, rgb(23 39 59 / 0.14) 3px 4.5px)" }}
                 />
                 Processing (stylist free)
               </li>
@@ -2111,13 +2111,18 @@ function CalendarKey({ families }: { families: ServiceFamily[] }) {
 }
 
 // Background for a block's parts: its fill (the service color, or where
-// the client is in their visit), lighter while processing, with stripes.
+// the client is in their visit), lighter while processing, with fine
+// stripes: a 1.5px line every 6px, faint enough that a day full of color
+// doesn't look busy.
+export const PROCESSING_STRIPES =
+  "repeating-linear-gradient(135deg, transparent 0 4.5px, color-mix(in srgb, var(--fam-accent) 12%, transparent) 4.5px 6px)";
+
 function segmentStyle(kind: string, visit: Visit): React.CSSProperties {
   // --visit-fill comes from data-visit on the block (globals.css).
   if (kind !== "processing") return { backgroundColor: "var(--visit-fill)" };
   return {
     backgroundColor: `color-mix(in srgb, var(--visit-fill) ${visit === "upcoming" ? 45 : 65}%, white)`,
-    backgroundImage: "repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--fam-accent) 12%, transparent) 6px 12px)",
+    backgroundImage: PROCESSING_STRIPES,
   };
 }
 

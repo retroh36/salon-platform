@@ -376,7 +376,9 @@ test.describe("front desk", () => {
       // Ana's booked time is over: no call to make, just to settle.
       const never = page.getByTestId("denise-never-in");
       const settle = (name: string) => never.getByRole("listitem").filter({ hasText: `${PREFIX}${name}` });
-      await expect(never).toContainText("Never checked in");
+      // Ana, and any demo visit over by now without a check-in, so the
+      // count isn't fixed ("Never checked in", or "5 never checked in").
+      await expect(never).toContainText(/(^|\d+ )never checked in/i);
       await expect(never).toContainText("Their booked time is over.");
       await expect(never).not.toContainText("Give them a call");
       await expect(settle("Ana")).toContainText(/Booked \d/);
@@ -421,7 +423,8 @@ test.describe("front desk", () => {
       await waitForHydration(page, "section[data-staff-id]");
       await page.getByTestId("denise-launcher").click();
       await expect(page.getByTestId("denise-late").getByRole("listitem").filter({ hasText: `${PREFIX}Ben` })).toBeVisible();
-      await expect(page.getByTestId("denise-never-in")).toHaveCount(0);
+      // Ana stays dismissed (the card may still list demo visits that are over).
+      await expect(page.getByTestId("denise-never-in").getByRole("listitem").filter({ hasText: `${PREFIX}Ana` })).toHaveCount(0);
 
       await line("Ben").getByRole("button", { name: "Open" }).click();
       await expect(details(page).getByTestId("client-name")).toHaveText(`${PREFIX}${BEN} Test`);
