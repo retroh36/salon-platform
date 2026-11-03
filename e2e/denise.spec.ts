@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, restoreLearnedDurations, SEED, setAsideLearnedDurations } from "../tests/db/helpers";
-import { askOnCalendar, AUTH, expect, moreAction, test, ui, waitForHydration } from "./fixtures";
+import { askOnCalendar, AUTH, expect, moreAction, showDenise, test, ui, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -85,8 +85,7 @@ async function openDay(page: Page) {
 
 // Denise's panel is closed until something opens it; her face opens it.
 async function openDenise(page: Page) {
-  await page.getByTestId("denise-launcher").click();
-  await expect(denisePanel(page)).toBeVisible();
+  await showDenise(page);
 }
 
 const block = (page: Page, client: string) => ui(page).getByRole("button", { name: new RegExp(`${PREFIX}${client} Lewis`) });

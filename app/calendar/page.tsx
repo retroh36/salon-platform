@@ -9,7 +9,7 @@ import { canBook, type AppointmentStatus } from "@/lib/appointments";
 import { getCurrentStaff } from "@/lib/auth";
 import { chairFor } from "@/lib/stations";
 import { bookedSummary, compactHours, FAMILIES, gridRange, isZoom, offHours, serviceFamily } from "@/lib/calendar";
-import { fitCookie, offReason, viewCookie, viewKey, type CalendarView, type ViewKey } from "@/lib/calendar-views";
+import { cardState, deniseCardCookie, fitCookie, offReason, viewCookie, viewKey, type CalendarView, type ViewKey } from "@/lib/calendar-views";
 import { formatAmount, productName } from "@/lib/inventory";
 import { loadBackBarProducts } from "@/lib/inventory-load";
 import { formatDay, formatIntervals } from "@/lib/schedule-format";
@@ -572,7 +572,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
       resources: resourcesResult.data,
       products,
     },
-    me: { staffId: me.id, role: me.role, canBook: canBook(me.role), canArrange: can(me, "settings"), freeText, zoom: isZoom(me.calendar_zoom) ? me.calendar_zoom : "comfortable", fitAll: jar.get(fitCookie(me.id))?.value === "1" },
+    me: { staffId: me.id, role: me.role, canBook: canBook(me.role), canArrange: can(me, "settings"), freeText, zoom: isZoom(me.calendar_zoom) ? me.calendar_zoom : "comfortable", fitAll: jar.get(fitCookie(me.id))?.value === "1", card: cardState(jar.get(deniseCardCookie(me.id))?.value) },
     views,
     initialView,
   };

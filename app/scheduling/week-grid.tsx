@@ -317,12 +317,20 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
                     <div role="rowheader" className="sticky left-0 z-10 flex items-center gap-2.5 border-b border-line bg-surface px-4 py-2">
                       <Avatar name={p.name} color={p.color} level={p.level} photoUrl={p.photoUrl} size="sm" />
                       <div className="min-w-0 flex-1">
-                        <Link href={`/schedule?staff=${p.id}`} className={`${nameLinkClass} block truncate text-sm`}>
+                        {/* The whole name, on two lines when it's long; never cut off. */}
+                        <Link href={`/schedule?staff=${p.id}`} className={`${nameLinkClass} block text-sm leading-snug text-pretty break-words`} data-testid="team-name">
                           {p.name}
                         </Link>
-                        <p className="truncate text-xs text-ink-muted tabular-nums">
+                        <p className="text-xs text-ink-muted tabular-nums">
                           {hours(total)}
-                          {p.chair && <span data-testid="home-chair"> · {p.chair}</span>}
+                          {p.chair && (
+                            <>
+                              {" "}
+                              <span data-testid="home-chair" className="whitespace-nowrap">
+                                · {p.chair}
+                              </span>
+                            </>
+                          )}
                         </p>
                       </div>
                       {editable && (

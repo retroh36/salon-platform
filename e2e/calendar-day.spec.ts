@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { addDays, fromLocal, toLocal, todayIn } from "@/lib/scheduling/time";
 import { admin, busyDay, openAllDay, SEED, throwawayStylist } from "../tests/db/helpers";
-import { AUTH, checkIn, expect, moreAction, openChecklist, openDisplayMenu, pxPerMinute, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, checkIn, expect, moreAction, openChecklist, openDisplayMenu, pxPerMinute, showDenise, test, ui, waitForHydration } from "./fixtures";
 
 // The calendar's day: undoing a check-in, the patch test notice in booking
 // details, zoom, opening at the current time, and Denise's late-arrivals
@@ -421,7 +421,7 @@ test.describe("front desk", () => {
       await expect.poll(async () => (await admin.from("denise_dismissals").select("id").eq("location_id", L).eq("day", today).like("item_key", "late:%")).data!.length).toBeGreaterThan(0);
       await page.reload();
       await waitForHydration(page, "section[data-staff-id]");
-      await page.getByTestId("denise-launcher").click();
+      await showDenise(page);
       await expect(page.getByTestId("denise-late").getByRole("listitem").filter({ hasText: `${PREFIX}Ben` })).toBeVisible();
       // Ana stays dismissed (the card may still list demo visits that are over).
       await expect(page.getByTestId("denise-never-in").getByRole("listitem").filter({ hasText: `${PREFIX}Ana` })).toHaveCount(0);

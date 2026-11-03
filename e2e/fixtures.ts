@@ -288,3 +288,15 @@ export async function setBridgetBalayage(keep?: (row: unknown) => void): Promise
   if (error) throw error;
   return key;
 }
+
+// Denise's tab on the calendar, however it was last left there (open,
+// minimized or closed, remembered per person: `deniseCardCookie`).
+export async function showDenise(page: Page) {
+  const panel = page.getByRole("tabpanel", { name: /Denise/ });
+  const launcher = page.getByTestId("denise-launcher");
+  const bar = page.getByTestId("denise-minimized");
+  await expect(launcher.or(bar).or(panel).first()).toBeVisible();
+  if (await bar.isVisible()) await bar.getByRole("button", { name: /^Open Denise/ }).click();
+  else if (await launcher.isVisible()) await launcher.click();
+  await expect(panel).toBeVisible();
+}

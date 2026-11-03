@@ -23,6 +23,9 @@ export const viewKey = (id: string): ViewKey => `view:${id}`;
 export const viewCookie = (staffId: string) => `calendar_view_${staffId.replaceAll("-", "")}`;
 // Whether Fit all is on (Compact zoom only), the same way.
 export const fitCookie = (staffId: string) => `calendar_fit_${staffId.replaceAll("-", "")}`;
+// Denise's card as last left on the calendar: open, minimized or closed.
+export const deniseCardCookie = (staffId: string) => `calendar_denise_${staffId.replaceAll("-", "")}`;
+export const cardState = (value: string | undefined): "open" | "min" | "closed" | null => (value === "open" || value === "min" || value === "closed" ? value : null);
 
 export const VIEW_NAME_MAX = 40;
 

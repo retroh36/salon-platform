@@ -329,7 +329,11 @@ Maestra's AI assistant, and the reason for the tagline's second half.
   onboarding and marketing, not shown in the app.
 - **Out of the way of the team:** on the Calendar (her tab, from `lg` up)
   and Scheduling she opens as a compact card over the bottom right corner,
-  below the stylists' header row, so the whole team stays in view; on other
-  pages she docks beside the page, and on a phone she fills the screen. On
+  380px wide and only as tall as what's in it (an empty chat is a short
+  card; it grows to a set height, then scrolls), below the stylists' header
+  row, so the whole team stays in view. It minimizes to a small bar
+  ("Denise · 8") without losing the conversation, and each page remembers
+  whether it was open, minimized or closed. On other pages she docks beside
+  the page, and on a phone she fills the screen. On
   the calendar her face sits at the end of the legend bar, never over
   appointments.

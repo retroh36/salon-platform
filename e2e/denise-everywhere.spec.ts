@@ -4,7 +4,7 @@
 // sale at iPad width, and never on the client's booking site.
 import { busyDay } from "../tests/db/helpers";
 import { openCheckout } from "./checkout-helpers";
-import { AUTH, expect, putBackSales, test, waitForHydration } from "./fixtures";
+import { AUTH, expect, putBackSales, showDenise, test, waitForHydration } from "./fixtures";
 
 // Stock and sales this file uses are put back afterwards.
 putBackSales();
@@ -32,7 +32,7 @@ test("the conversation carries over from page to page", async ({ page }) => {
   await waitForHydration(page, "[data-testid=denise-bubble-launcher], [data-testid=denise-bubble]");
   await page.goto(`/calendar?date=${(await busyDay("America/Chicago")).date}`);
   await waitForHydration(page, "section[data-staff-id]");
-  await page.getByTestId("denise-launcher").click();
+  await showDenise(page);
   await expect(page.getByRole("region", { name: "Conversation with Denise" })).toContainText("How do I sell a gift card?");
 });
 

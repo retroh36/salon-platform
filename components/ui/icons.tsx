@@ -98,6 +98,11 @@ export const SendIcon = (p: IconProps) => (
     <path d="M4.5 12h13M12.5 6l6 6-6 6" />
   </Icon>
 );
+export const MinimizeIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M6 17h12" />
+  </Icon>
+);
 export const CloseIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="m6 6 12 12M18 6 6 18" />

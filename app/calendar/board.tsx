@@ -7,7 +7,7 @@ import { formatDuration } from "@/lib/duration";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { createContext, startTransition, useCallback, useContext, useEffect, useLayoutEffect, useOptimistic, useRef, useState, ViewTransition } from "react";
-import { fitCookie, mergeOrder, moveItem, nameVariants, offColumns, viewColumns, viewCookie, viewKey, type ViewKey } from "@/lib/calendar-views";
+import { deniseCardCookie, fitCookie, mergeOrder, moveItem, nameVariants, offColumns, viewColumns, viewCookie, viewKey, type ViewKey } from "@/lib/calendar-views";
 import { DeniseFace } from "@/components/denise";
 import { Avatar } from "@/components/ui/avatar";
 import { LEVEL_BG, LevelBadge } from "@/components/ui/level";
@@ -39,6 +39,7 @@ import type { OutWhen } from "@/lib/rescue";
 import { approveDeniseFix, bookFromWaitlist, dismissDeniseItem, rejectDeniseFix, scanDenise, undoDeniseFix } from "./denise-actions";
 import { appendDenise, askDenise, focusDenise, hydrateDenise, startDenise, takeAdjust, useDenise } from "@/components/denise-chat/store";
 import { useDeniseShortcut } from "@/components/denise-chat/bubble";
+import { MinimizedBar, MinimizeButton } from "@/components/denise-chat/card";
 import { DeniseChat } from "@/components/denise-chat/chat";
 import { DenisePanel, type Outcome, type Preview } from "./denise-panel";
 import { BookingPanel, type BookingDraft, type BookingStart } from "./booking-panel";
@@ -216,7 +217,25 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const [tab, setTab] = useState<Tab>(linked || data.focus.book ? "details" : "denise");
   // The panel is closed until something opens it: a booking, a new
   // booking, Denise spotting something, or a question for her.
-  const [panelOpen, setPanelOpen] = useState(Boolean(linked || data.focus.book || data.focus.out || data.focus.late || data.focus.denise || data.focus.ask));
+  // A link asking for something opens the panel on it; otherwise Denise's
+  // card is as last left on the calendar (open, minimized or closed).
+  const asked = Boolean(linked || data.focus.book || data.focus.out || data.focus.late || data.focus.denise || data.focus.ask);
+  const [panelOpen, setPanelOpen] = useState(asked || me.card === "open" || me.card === "min");
+  // Denise's tab is a compact card over the corner from lg up, so the whole
+  // team stays in view while she's open; booking details, Running late and
+  // Mark out keep the full-height panel the page makes room for. The card
+  // stays below the stylists' header row (which ends about 19rem down), is
+  // only as tall as what's in it, and can be minimized to a small bar
+  // (`cardMin`), keeping the conversation.
+  const compact = tab === "denise" && selection.kind !== "late" && selection.kind !== "out";
+  const [minimized, setMinimized] = useState(!asked && me.card === "min");
+  if (minimized && (!compact || !panelOpen)) setMinimized(false);
+  const cardMin = panelOpen && compact && minimized;
+  // Remembered as it changes (a cookie per person, like the view).
+  useEffect(() => {
+    const value = !panelOpen ? "closed" : compact ? (minimized ? "min" : "open") : null;
+    if (value) document.cookie = `${deniseCardCookie(me.staffId)}=${value}; path=/; max-age=${COOKIE_AGE}; samesite=lax`;
+  }, [panelOpen, compact, minimized, me.staffId]);
   // What Denise has that hasn't been looked at in her panel yet.
   const [unseen, setUnseen] = useState<ReadonlySet<string>>(new Set());
 
@@ -489,10 +508,11 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     setFocusSeen(deniseFocus);
     setTab("denise");
     setPanelOpen(true);
+    setMinimized(false);
   }
 
   // Looking at Denise's panel clears what was new.
-  if (panelOpen && tab === "denise" && unseen.size) setUnseen(new Set());
+  if (panelOpen && !cardMin && tab === "denise" && unseen.size) setUnseen(new Set());
 
   const deniseState = denise && denise.state.date === data.date ? denise.state : null;
   const conflicts = (deniseState?.conflicts ?? []).filter((c) => !dismissed.has(c.subject));
@@ -589,7 +609,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // it: the one hovered there, or her first suggestion. Blocks it's about
   // glow; where they'd go shows dashed. Nothing is left on the calendar once
   // the panel closes, she moves on, or the fix is applied or dismissed.
-  const showingFixes = panelOpen && tab === "denise" && !deciding;
+  const showingFixes = panelOpen && !cardMin && tab === "denise" && !deciding;
   const previewConflict = showingFixes ? (preview && conflicts.find((c) => c.subject === preview.subject)) || conflicts[0] || null : null;
   const previewOption = previewConflict?.options[preview && previewConflict.subject === preview.subject ? preview.index : 0] ?? null;
   const highlighted = new Set(previewConflict?.itemIds ?? []);
@@ -597,11 +617,6 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // column's blocks so nothing overlaps.
   // The same for "Mark … out": where each client would move that day.
   const outShown = panelOpen && selection.kind === "out" && outPreview?.staffId === selection.staffId ? outPreview : null;
-  // Denise's tab is a compact card over the corner from lg up, so the whole
-  // team stays in view while she's open; booking details, Running late and
-  // Mark out keep the full-height panel the page makes room for. The card
-  // stays below the stylists' header row (which ends about 19rem down).
-  const compact = tab === "denise" && selection.kind !== "late" && selection.kind !== "out";
   const ghostMoves = [
     ...(previewOption?.moves ?? []).map((m) => ({ itemId: m.itemId, staffId: m.to.staffId, minute: m.to.minute, move: m as FixMove | undefined })),
     ...(outShown?.moves ?? []).map((m) => ({ ...m, move: undefined })),
@@ -850,7 +865,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // blocking their own time).
   function onSlotClick(e: React.MouseEvent<HTMLElement>, column: ColumnData) {
     if ((e.target as HTMLElement).closest("[data-block], [data-time-block]")) return;
-    if (panelOpen) return leave(() => setPanelOpen(false), closeDetails);
+    if (panelOpen && !cardMin) return leave(() => setPanelOpen(false), closeDetails);
     const top = e.currentTarget.getBoundingClientRect().top;
     const minute = range.start + Math.floor((e.clientY - top) / PX_PER_MINUTE / SLOT_STEP) * SLOT_STEP;
     const start = { staffId: column.staffId, startMinute: Math.min(minute, range.end - SLOT_STEP) };
@@ -1068,7 +1083,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             more stylists says so. */}
         {/* With Denise's compact card open (lg up), its footprint over the
             grid's right side (--denise-card) moves the right arrow clear of it. */}
-        <div className={`relative flex min-h-0 flex-col lg:flex-1 ${panelOpen && compact ? "lg:[--denise-card:24rem]" : ""}`}>
+        <div className={`relative flex min-h-0 flex-col lg:flex-1 ${panelOpen && compact && !cardMin ? "lg:[--denise-card:23.75rem]" : ""}`}>
         <ViewTransition key={data.date} enter={DAY_SLIDE} exit={DAY_SLIDE} default="none">
           <div
             ref={gridRef}
@@ -1378,6 +1393,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
         </div>
       )}
 
+      {cardMin && <MinimizedBar count={attention} onOpen={() => setMinimized(false)} onClose={() => setPanelOpen(false)} />}
       {/* Denise and booking details: a panel that slides over the calendar
           when something opens it (on Denise's tab from lg up, a compact card
           in the corner instead: see `compact`). */}
@@ -1386,10 +1402,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           aria-label="Assistant and booking details"
           data-compact={compact || undefined}
           className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col gap-4 border-l border-line bg-surface p-4 shadow-panel transition-[transform,visibility] duration-(--motion-slow) ease-out sm:w-96 ${
-            compact ? "lg:top-auto lg:right-4 lg:bottom-4 lg:h-[min(32rem,calc(100dvh-19rem-var(--demo-bar)))] lg:rounded-xl lg:border" : ""
+            compact ? "lg:top-auto lg:right-4 lg:bottom-4 lg:h-auto lg:max-h-[min(32rem,calc(100dvh-19rem-var(--demo-bar)))] lg:w-[23.75rem] lg:rounded-xl lg:border" : ""
           } ${
             // Closed, it's hidden once it has slid away, so keyboard focus skips it.
-            panelOpen ? "visible translate-x-0" : `invisible ${compact ? "translate-x-[calc(100%+1rem)]" : "translate-x-full"}`
+            panelOpen && !cardMin ? "visible translate-x-0" : `invisible ${compact ? "translate-x-[calc(100%+1rem)]" : "translate-x-full"}`
           }`}
         >
           {selection.kind === "late" ? (
@@ -1447,18 +1463,26 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               { value: "details", label: "Booking details", icon: <CalendarIcon className="size-4" /> },
             ]}
             trailing={
-              // The panel's one close button (a visit being viewed is let go too).
-              <IconButton
-                label="Close panel"
-                onClick={() =>
-                  leave(() => {
-                    setPanelOpen(false);
-                    if (selection.kind === "detail") closeDetails();
-                  }, closeDetails)
-                }
-              >
-                <CloseIcon />
-              </IconButton>
+              // The panel's one close button (a visit being viewed is let go
+              // too), with Minimize beside it on Denise's card.
+              <>
+                {compact && (
+                  <span className="hidden lg:contents">
+                    <MinimizeButton onMinimize={() => setMinimized(true)} />
+                  </span>
+                )}
+                <IconButton
+                  label="Close panel"
+                  onClick={() =>
+                    leave(() => {
+                      setPanelOpen(false);
+                      if (selection.kind === "detail") closeDetails();
+                    }, closeDetails)
+                  }
+                >
+                  <CloseIcon />
+                </IconButton>
+              </>
             }
           >
             {tab === "denise" ? (

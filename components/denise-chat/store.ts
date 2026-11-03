@@ -38,6 +38,8 @@ type State = {
   open: boolean;
   // Bumped to open her and put the cursor in her message box.
   focus: number;
+  // Her compact card shrunk to a small bar (Scheduling; components/denise-chat/card.tsx).
+  min: boolean;
   adjust: Adjust | null;
 };
 
@@ -56,20 +58,20 @@ const TOO_SLOW_REPORT = "That's taking me too long, so I stopped looking. What y
 const KEEP = 40;
 const PREFIX = "maestra:denise:";
 
-const EMPTY: State = { staffId: null, chat: [], run: IDLE, open: false, focus: 0, adjust: null };
+const EMPTY: State = { staffId: null, chat: [], run: IDLE, open: false, focus: 0, min: false, adjust: null };
 let state: State = EMPTY;
 const listeners = new Set<() => void>();
 
 function set(patch: Partial<State>) {
   state = { ...state, ...patch };
-  if ("chat" in patch || "open" in patch) save();
+  if ("chat" in patch || "open" in patch || "min" in patch) save();
   for (const l of listeners) l();
 }
 
 function save() {
   if (!state.staffId) return;
   try {
-    sessionStorage.setItem(PREFIX + state.staffId, JSON.stringify({ chat: state.chat.slice(-KEEP), open: state.open }));
+    sessionStorage.setItem(PREFIX + state.staffId, JSON.stringify({ chat: state.chat.slice(-KEEP), open: state.open, min: state.min }));
   } catch {
     // Private mode or full: the chat still works on this page.
   }
@@ -79,7 +81,7 @@ function save() {
 // nobody else's left behind.
 export function hydrateDenise(staffId: string) {
   if (state.staffId === staffId) return;
-  let saved: { chat?: ChatMessage[]; open?: boolean } = {};
+  let saved: { chat?: ChatMessage[]; open?: boolean; min?: boolean } = {};
   try {
     for (let i = sessionStorage.length - 1; i >= 0; i--) {
       const key = sessionStorage.key(i);
@@ -89,7 +91,7 @@ export function hydrateDenise(staffId: string) {
   } catch {
     saved = {};
   }
-  state = { ...EMPTY, staffId, chat: Array.isArray(saved.chat) ? saved.chat : [], open: saved.open === true };
+  state = { ...EMPTY, staffId, chat: Array.isArray(saved.chat) ? saved.chat : [], open: saved.open === true, min: saved.min === true };
   for (const l of listeners) l();
 }
 
@@ -106,9 +108,10 @@ export function useDenise(): State {
   );
 }
 
-export const setDeniseOpen = (open: boolean) => set({ open });
+export const setDeniseOpen = (open: boolean) => set(open ? { open } : { open, min: false });
+export const setDeniseMin = (min: boolean) => set({ min });
 // Opens her with the cursor in her message box (the keyboard shortcut).
-export const focusDenise = () => set({ open: true, focus: state.focus + 1 });
+export const focusDenise = () => set({ open: true, min: false, focus: state.focus + 1 });
 export const appendDenise = (message: ChatMessage) => set({ chat: [...state.chat, message].slice(-KEEP) });
 export const updateDenise = (index: number, patch: Partial<ChatMessage>) => set({ chat: state.chat.map((m, i) => (i === index ? { ...m, ...patch } : m)) });
 export const requestAdjust = (adjust: Adjust) => set({ adjust });

@@ -145,11 +145,24 @@ test("with Denise open, the calendar keeps its width: she's a compact card under
   const header = (await ui(page).locator("[data-grid-header]").boundingBox())!;
   const box = (await card.boundingBox())!;
   expect(box.y).toBeGreaterThanOrEqual(header.y + header.height - 1);
-  expect(box.width).toBeLessThanOrEqual(384 + 1);
   // The arrow for more stylists sits just left of the card, never under it.
   const arrow = (await page.getByRole("button", { name: "More stylists to the right" }).boundingBox())!;
   expect(arrow.x + arrow.width).toBeLessThanOrEqual(box.x);
   await expectScrollsWithArrows(page, grid, "More stylists");
+  expect(Math.abs(box.width - 380)).toBeLessThan(1);
+
+  // Minimized: a small bar with how many things are waiting, kept on a
+  // reload; opened again, the card is back.
+  await card.getByRole("button", { name: "Minimize Denise" }).click();
+  const bar = page.getByTestId("denise-minimized");
+  await expect(bar).toContainText(/^Denise( · \d+)?$/);
+  await expect(card).toHaveCSS("visibility", "hidden");
+  await page.reload();
+  await waitForHydration(page, "section[data-staff-id]");
+  await expect(bar).toBeVisible();
+  await bar.getByRole("button", { name: /^Open Denise/ }).click();
+  await expect(card).toHaveCSS("visibility", "visible");
+
   // Booking details is the full-height panel again, which the page makes room for.
   await card.getByRole("tab", { name: "Booking details" }).click();
   await expect(card).not.toHaveAttribute("data-compact", "true");
@@ -166,9 +179,41 @@ test("with Denise open, Scheduling keeps its full width: she's a compact card ov
   await expect(card).toHaveAttribute("data-overlay", "true");
   expect(Math.abs((await grid.boundingBox())!.width - before)).toBeLessThan(1);
   for (const day of await grid.locator("[role=columnheader][data-day]").all()) expect((await day.boundingBox())!.width).toBeGreaterThanOrEqual(91);
+  // About 380px wide, and only as tall as what's in it: a short card with
+  // just her greeting.
   const box = (await card.boundingBox())!;
-  expect(box.width).toBeLessThanOrEqual(352 + 1);
-  expect(box.height).toBeLessThanOrEqual(448 + 1);
+  expect(Math.abs(box.width - 380)).toBeLessThan(1);
+  expect(box.height).toBeLessThan(320);
+
+  // Minimized to a small bar, kept on a reload, and opened again with the
+  // conversation as it was.
+  await card.getByRole("button", { name: "Minimize Denise" }).click();
+  const bar = page.getByTestId("denise-minimized");
+  await expect(bar).toContainText("Denise");
+  await expect(card).toHaveCount(0);
+  await page.reload();
+  await expect(bar).toBeVisible();
+  await expect(card).toHaveCount(0);
+  // Elsewhere she stays out of the way: her face in the corner.
+  await page.goto("/dashboard");
+  await expect(page.getByTestId("denise-bubble-launcher")).toBeVisible();
+  await expect(card).toHaveCount(0);
+  await page.goto("/scheduling");
+  await bar.getByRole("button", { name: /^Open Denise/ }).click();
+  await expect(card.getByText(/^Hi /)).toBeVisible();
+  // Closed is remembered too.
+  await card.getByRole("button", { name: "Close Denise" }).click();
+  await page.reload();
+  await expect(page.getByTestId("denise-bubble-launcher")).toBeVisible();
+  await expect(bar).toHaveCount(0);
+});
+
+test("Scheduling's team column shows whole names, wrapping rather than cut off", async ({ page }) => {
+  await page.goto("/scheduling");
+  const names = ui(page).getByRole("grid", { name: /^Team schedule/ }).getByTestId("team-name");
+  await expect(names.first()).toBeVisible();
+  await expectWhole(names);
+  expect(await names.evaluateAll((els) => els.filter((el) => getComputedStyle(el).textOverflow === "ellipsis").length)).toBe(0);
 });
 
 test("Scheduling shows the whole week, Sunday included", async ({ page }) => {
