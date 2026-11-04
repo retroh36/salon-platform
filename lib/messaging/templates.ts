@@ -14,7 +14,13 @@ export const STAFF_TEMPLATES = {
   // After a visit is moved (one of Denise's fixes, applied by staff):
   // where and when it is now.
   visit_moved: { label: "Your visit has moved", needs: [] },
+  // After that move is undone, to a client who was already told: their
+  // visit is where it was.
+  visit_move_undone: { label: "Correction: your visit is staying put", needs: [] },
 } as const;
+
+// Only sent after a move or its undo, never picked from the list.
+export const AFTER_A_MOVE: readonly StaffTemplate[] = ["visit_move_undone"];
 
 export type StaffTemplate = keyof typeof STAFF_TEMPLATES;
 
@@ -42,6 +48,7 @@ export function renderStaffMessage(template: StaffTemplate, f: TemplateFacts, ch
     reminder: `Hi ${f.firstName}, a reminder of your visit at ${f.salon} ${f.when}${f.stylist ? ` with ${f.stylist}` : ""}.${f.manageLink ? ` Change or cancel:${link}` : ""}`,
     ready_early: `Hi ${f.firstName}, ${f.salon} here. We can take you early, at ${f.time ?? "an earlier time"}, for your visit ${f.when}. Call us${call} if that works.`,
     visit_moved: `Hi ${f.firstName}, ${f.salon} here. We've moved your visit to ${f.when}${f.stylist ? ` with ${f.stylist}` : ""}. Call us${call} if that doesn't work.`,
+    visit_move_undone: `Hi ${f.firstName}, ${f.salon} here. Sorry, please ignore our last message: your visit is still on for ${f.when}${f.stylist ? ` with ${f.stylist}` : ""}. Call us${call} if that doesn't work.`,
   }[template];
   const subject = {
     running_late: `${f.salon} is running a little behind`,
@@ -50,6 +57,7 @@ export function renderStaffMessage(template: StaffTemplate, f: TemplateFacts, ch
     reminder: `Your visit at ${f.salon}`,
     ready_early: `${f.salon} can take you early`,
     visit_moved: `Your visit at ${f.salon} has moved`,
+    visit_move_undone: `Correction: your visit at ${f.salon} hasn't moved`,
   }[template];
   return { subject, body: channel === "sms" ? withStopLine(text) : text };
 }

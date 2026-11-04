@@ -39,8 +39,9 @@ export type MessageInput = {
 
 export type SendResult = { ok: true; channel: Channel } | { ok: false; message: string };
 
-// The facts a quick pick is filled in with, from the visit.
-async function visitFacts(supabase: Client, appointmentId: string) {
+// The facts a quick pick is filled in with, from the visit (or, with `at`,
+// as it will be once an undo puts it back).
+async function visitFacts(supabase: Client, appointmentId: string, at?: { start: Date; staffId: string }) {
   const { data: a } = await supabase
     .from("appointments")
     .select("starts_at, business:businesses(name), location:locations(phone, timezone), client:clients(first_name), items:appointment_items(starts_at, staff:staff(first_name))")
@@ -48,26 +49,27 @@ async function visitFacts(supabase: Client, appointmentId: string) {
     .maybeSingle();
   if (!a?.client || !a.location) return null;
   const tz = a.location.timezone;
-  const local = toLocal(new Date(a.starts_at), tz);
+  const local = toLocal(at?.start ?? new Date(a.starts_at), tz);
   const day =
     local.date === todayIn(tz)
       ? "today"
       : new Date(`${local.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
   const first = [...(a.items ?? [])].sort((x, y) => x.starts_at.localeCompare(y.starts_at))[0];
+  const stylist = at ? ((await supabase.from("staff").select("first_name").eq("id", at.staffId).maybeSingle()).data?.first_name ?? null) : (first?.staff?.first_name ?? null);
   return {
     salon: a.business?.name ?? "The salon",
     phone: a.location.phone ?? null,
     firstName: a.client.first_name,
     when: `${day} at ${formatMinute(local.minute)}`,
-    stylist: first?.staff?.first_name ?? null,
+    stylist,
     manageLink: null,
   };
 }
 
 // What a quick pick says, for the panel's preview.
-export async function previewTemplate(supabase: Client, input: Pick<MessageInput, "appointmentId" | "template" | "channel" | "minutes" | "time">) {
+export async function previewTemplate(supabase: Client, input: Pick<MessageInput, "appointmentId" | "template" | "channel" | "minutes" | "time">, at?: { start: Date; staffId: string }) {
   if (!isStaffTemplate(input.template)) return null;
-  const facts = await visitFacts(supabase, input.appointmentId);
+  const facts = await visitFacts(supabase, input.appointmentId, at);
   if (!facts) return null;
   return renderStaffMessage(input.template, { ...facts, minutes: input.minutes, time: input.time }, input.channel);
 }

@@ -141,6 +141,11 @@ export type AppointmentDetail = {
   // What's happened to the visit, oldest first, after bookedBy: checked in
   // without a patch test, check-ins undone ("Check-in undone by Sam Rivera · …").
   log: string[];
+  // Denise's fixes that moved this visit, oldest first ("Moved by Denise's
+  // fix, applied by Sam Rivera · …", then "Put back by …" if undone), and
+  // the one still applied, to undo from here.
+  fixes: { line: string; undone: string | null }[];
+  fixActionId: string | null;
   // Patch tests and forms the visit needs, done or not.
   warnings: VisitWarnings | null;
   // The sale a checked-out visit was paid on (reversing it means voiding

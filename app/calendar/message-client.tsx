@@ -13,7 +13,7 @@ import { Alert, Badge } from "@/components/ui/page";
 import { Segmented } from "@/components/ui/segmented";
 import { withOptOut } from "@/lib/automations";
 import type { Channel, Purpose } from "@/lib/messaging/consent";
-import { smsCounterText, STAFF_TEMPLATES, withStopLine, type StaffTemplate } from "@/lib/messaging/templates";
+import { AFTER_A_MOVE, smsCounterText, STAFF_TEMPLATES, withStopLine, type StaffTemplate } from "@/lib/messaging/templates";
 import { previewClientMessage, sendClientMessage } from "./message-actions";
 
 export type MessageChannels = { appointment: Channel[]; marketing: Channel[] };
@@ -108,11 +108,13 @@ export function MessageClientForm({
         <select value={template} onChange={(e) => setTemplate(e.target.value as StaffTemplate | "custom")} className={selectClass}>
           {freeText && <option value="custom">Write my own</option>}
           <optgroup label="Quick picks">
-            {(Object.keys(STAFF_TEMPLATES) as StaffTemplate[]).map((k) => (
-              <option key={k} value={k}>
-                {STAFF_TEMPLATES[k].label}
-              </option>
-            ))}
+            {(Object.keys(STAFF_TEMPLATES) as StaffTemplate[])
+              .filter((k) => !AFTER_A_MOVE.includes(k))
+              .map((k) => (
+                <option key={k} value={k}>
+                  {STAFF_TEMPLATES[k].label}
+                </option>
+              ))}
           </optgroup>
         </select>
       </label>

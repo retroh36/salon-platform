@@ -28,6 +28,8 @@ import { loadPackagesByClient, withPackages } from "@/lib/packages";
 import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, parseTime, todayIn, toLocal, WEEKDAYS, type LocalDate } from "@/lib/scheduling/time";
 import { visitWarnings } from "@/lib/client-checks";
 import { fullName, sortForCalendar } from "@/lib/staff";
+import { proposalFromJson } from "@/lib/scheduling/ai-actions";
+import { movedVisits } from "@/lib/denise/fixes";
 import { CalendarBoard } from "./board";
 import { CalendarSkeleton } from "./skeleton";
 import { loadVisitPolicies } from "@/lib/policy-visits";
@@ -247,6 +249,8 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
       membership: null,
       policy: null,
       log: [],
+      fixes: [],
+      fixActionId: null,
       group: a.group ? { ...a.group, members: [] } : null,
       series: a.series_id ? { id: a.series_id, index: a.series_index!, count: seriesCounts.get(a.series_id) ?? 1, intervalWeeks: a.series?.interval_weeks ?? 1 } : null,
     };
@@ -331,7 +335,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
   const checkedOut = Object.values(appointments).filter((a) => a.status === "completed").map((a) => a.id);
   const visitIds = Object.keys(appointments);
   const clientIds = [...new Set(Object.values(appointments).flatMap((a) => (a.client ? [a.client.id] : [])))];
-  const [warnings, policies, salesResult, eventsLog, insights, packages, past, pastFormulas, memberships] = await Promise.all([
+  const [warnings, policies, salesResult, eventsLog, insights, packages, past, pastFormulas, memberships, fixesResult] = await Promise.all([
     visitWarnings(supabase, me.business_id, toCheck, tz),
     policyVisits ? loadVisitPolicies(supabase, me.business_id, me.role, policyVisits) : Promise.resolve(null),
     // The sale each checked-out visit was paid on (front of house only: RLS).
@@ -370,7 +374,31 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
           .limit(1000)
       : Promise.resolve({ data: [], error: null }),
     loadMembershipsByClient(supabase, clientIds),
+    // Denise's fixes applied on this day (front of house: RLS), for each
+    // visit's history and its Undo.
+    visitIds.length
+      ? supabase
+          .from("ai_actions")
+          .select("id, status, proposal, decided_by, decided_at, undone_by, undone_at")
+          .eq("location_id", me.location.id)
+          .like("subject", `${date}:%`)
+          .in("status", ["approved", "undone"])
+          .order("decided_at")
+      : Promise.resolve({ data: [], error: null }),
   ]);
+  if (fixesResult.error) throw fixesResult.error;
+  for (const f of fixesResult.data) {
+    for (const id of movedVisits(proposalFromJson(f.proposal))) {
+      const visit = appointments[id];
+      if (!visit || !f.decided_at) continue;
+      const by = staffName(f.decided_by);
+      visit.fixes.push({
+        line: `Moved by Denise's fix${by ? `, applied by ${by}` : ""} · ${when(f.decided_at)}`,
+        undone: f.status === "undone" && f.undone_at ? `Put back${staffName(f.undone_by) ? ` by ${staffName(f.undone_by)}` : ""} · ${when(f.undone_at)}` : null,
+      });
+      if (f.status === "approved") visit.fixActionId = f.id;
+    }
+  }
   for (const [id, w] of warnings) appointments[id].warnings = w;
   if (policies) for (const [id, p] of policies) appointments[id].policy = p;
   if (salesResult.error) throw salesResult.error;

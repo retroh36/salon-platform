@@ -35,10 +35,14 @@ async function desk() {
   return me && canBook(me.role) ? { supabase, me } : null;
 }
 
-export async function movedMessages(appointmentIds: string[], since: string): Promise<MovedMessages> {
+// `template`: the move's message, or the correction after it's undone.
+export type MoveTemplate = "visit_moved" | "visit_move_undone";
+const isMoveTemplate = (t: unknown): t is MoveTemplate => t === "visit_moved" || t === "visit_move_undone";
+
+export async function movedMessages(appointmentIds: string[], since: string, template: MoveTemplate = "visit_moved"): Promise<MovedMessages> {
   const s = await desk();
   const ids = Array.isArray(appointmentIds) ? appointmentIds.filter(isUuid).slice(0, 20) : [];
-  if (!s || !ids.length || Number.isNaN(Date.parse(since))) return { messages: [], freeText: false, askDefault: "send" };
+  if (!s || !ids.length || Number.isNaN(Date.parse(since)) || !isMoveTemplate(template)) return { messages: [], freeText: false, askDefault: "send" };
   const [{ data: visits }, { data: sent }, { data: business }] = await Promise.all([
     s.supabase.from("appointments").select(`id, client:clients(first_name, last_name, ${CONSENT_COLUMNS})`).in("id", ids),
     s.supabase.from("client_messages").select("appointment_id").in("appointment_id", ids).gte("created_at", since),
@@ -50,7 +54,7 @@ export async function movedMessages(appointmentIds: string[], since: string): Pr
     const visit = visits?.find((v) => v.id === id);
     if (!visit?.client) continue;
     const channel = channelFor(consentOf(visit.client), "appointment")?.channel ?? null;
-    const rendered = await previewTemplate(s.supabase, { appointmentId: id, template: "visit_moved", channel: channel ?? "sms" });
+    const rendered = await previewTemplate(s.supabase, { appointmentId: id, template, channel: channel ?? "sms" });
     if (!rendered) continue;
     messages.push({
       appointmentId: id,
@@ -71,14 +75,16 @@ export async function movedMessages(appointmentIds: string[], since: string): Pr
 
 // Sends one client their message: the template as it is, or what the staff
 // member wrote instead (for the roles the owner allows).
-export async function sendMovedMessage(input: { appointmentId: string; channel: Channel; edited: string | null; subject: string }): Promise<{ ok: true; message: string } | { ok: false; message: string }> {
+export async function sendMovedMessage(input: { appointmentId: string; channel: Channel; edited: string | null; subject: string; template?: MoveTemplate }): Promise<{ ok: true; message: string } | { ok: false; message: string }> {
   const s = await desk();
   if (!s) return { ok: false, message: "Only owners, managers and front desk can message clients about a move." };
   if (!isUuid(input.appointmentId)) return { ok: false, message: "Choose the visit again." };
+  const template = input.template ?? "visit_moved";
+  if (!isMoveTemplate(template)) return { ok: false, message: "Choose a message." };
   const result = await sendStaffMessage(s.supabase, {
     appointmentId: input.appointmentId,
     purpose: "appointment",
-    template: input.edited ? "custom" : "visit_moved",
+    template: input.edited ? "custom" : template,
     channel: input.channel,
     body: input.edited ?? undefined,
     subject: input.subject,

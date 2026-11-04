@@ -6,35 +6,38 @@ import { Alert } from "@/components/ui/page";
 import type { Moved } from "@/lib/denise/types";
 import { reach } from "@/lib/reach";
 import { ClientMessageRow } from "./client-message-row";
-import { movedMessages, sendMovedMessage, type MovedMessages as Loaded } from "./moved-actions";
+import { movedMessages, sendMovedMessage, type MovedMessages as Loaded, type MoveTemplate } from "./moved-actions";
 
 // Under "Moved Aria. Message ready to send." once one of Denise's fixes is
 // applied: each moved client's "Your visit has moved", filled in from the
 // visit as it is now, to check (and change, if their role may) and send.
-// Nothing reaches a client until it's sent here.
-export function MovedMessages({ moved }: { moved: Moved }) {
+// Nothing reaches a client until it's sent here. After an undo, the same
+// for the correction to clients who were told (`template`).
+export function MovedMessages({ moved, template = "visit_moved" }: { moved: Moved; template?: MoveTemplate }) {
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
   const [version, setVersion] = useState(0);
   const [sending, startSending] = useTransition();
 
   useEffect(() => {
     let live = true;
-    reach(movedMessages(moved.appointmentIds, moved.at)).then((r) => live && setLoaded("messages" in r ? r : "failed"));
+    reach(movedMessages(moved.appointmentIds, moved.at, template)).then((r) => live && setLoaded("messages" in r ? r : "failed"));
     return () => {
       live = false;
     };
-  }, [moved, version]);
+  }, [moved, version, template]);
 
   if (!loaded) return <p className="text-13 text-ink-muted">Getting the messages ready…</p>;
   if (loaded === "failed") return <Alert>The messages didn&rsquo;t load, so nobody has been told yet. Use Message client in each visit&rsquo;s booking details.</Alert>;
   if (!loaded.messages.length) return null;
   const unsent = loaded.messages.filter((m) => !m.sent && m.channel);
-  const send = (m: Loaded["messages"][number], edited: string | null) => sendMovedMessage({ appointmentId: m.appointmentId, channel: m.channel!, edited, subject: m.subject });
+  const send = (m: Loaded["messages"][number], edited: string | null) => sendMovedMessage({ appointmentId: m.appointmentId, channel: m.channel!, edited, subject: m.subject, template });
 
   return (
-    <div className="flex flex-col gap-3" data-testid="moved-messages">
+    <div className="flex flex-col gap-3" data-testid={template === "visit_moved" ? "moved-messages" : "correction-messages"}>
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-13 font-medium text-ink-muted">Messages to clients ({loaded.messages.length})</h3>
+        <h3 className="text-13 font-medium text-ink-muted">
+          {template === "visit_moved" ? "Messages to clients" : "Corrections to send"} ({loaded.messages.length})
+        </h3>
         {unsent.length > 1 && (
           <Button
             size="sm"

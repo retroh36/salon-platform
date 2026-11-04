@@ -1,24 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DeniseAvatar, DeniseFace, DenisePose, type Pose } from "@/components/denise";
 import { formatDuration } from "@/lib/duration";
 import type { DeniseRun } from "@/components/denise-chat/store";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/field";
-import { CheckCircleIcon, ChevronDownIcon, ClockIcon, CloseIcon, UndoIcon } from "@/components/ui/icons";
+import { CheckCircleIcon, ChevronDownIcon, ClockIcon, CloseIcon } from "@/components/ui/icons";
+import type { AppliedFix } from "@/lib/denise/applied";
+import { reach } from "@/lib/reach";
 import { noFixAdvice } from "@/lib/denise/respond";
 import type { ConflictView, DeniseNotice, DeniseState, FixView, Moved, OpeningMatch, WaitlistOpening } from "@/lib/denise/types";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
+import { appliedFixes } from "./denise-actions";
 import { MovedMessages } from "./moved-messages";
+import { UndoFix } from "./undo-fix";
 import { useNow } from "./now-line";
 import type { BoardData } from "./types";
 
 // What Denise said after the last approve, reject or undo.
-// `moved`: the clients an applied fix moved, whose messages wait to be sent.
-export type Outcome = { message: string; error: boolean; undoActionId: string | null; moved?: Moved };
+// `moved`: the clients an applied fix moved, whose messages wait to be sent;
+// `corrected`: after an undo, the clients who'd been told, whose
+// corrections wait to be sent.
+export type Outcome = { message: string; error: boolean; undoActionId: string | null; moved?: Moved; corrected?: Moved };
 
 // Which fix the calendar previews: a conflict's option.
 export type Preview = { subject: string; index: number };
@@ -68,7 +74,8 @@ export function DenisePanel({
   preview: Preview | null;
   onApprove: (option: FixView) => void;
   onReject: (option: FixView) => void;
-  onUndo: (actionId: string) => void;
+  // `told`: visits whose clients were messaged, to send a correction.
+  onUndo: (actionId: string, told: string[]) => void;
   // For a conflict with nothing to approve.
   onDismiss: (subject: string) => void;
   onPreview: (preview: Preview | null) => void;
@@ -131,15 +138,12 @@ export function DenisePanel({
         <div role="status" className={`flex animate-fade-in items-start gap-3 rounded-lg p-3 ${outcome.error ? "bg-danger-soft text-danger" : "bg-denise-50 text-ink"}`}>
           {!outcome.error && <CheckCircleIcon className="mt-0.5 size-5 text-denise-700" />}
           <p className="flex-1">{outcome.message}</p>
-          {outcome.undoActionId && (
-            <Button size="sm" onClick={() => onUndo(outcome.undoActionId!)} disabled={working}>
-              <UndoIcon className="size-4" />
-              Undo
-            </Button>
-          )}
+          {outcome.undoActionId && <UndoFix key={outcome.undoActionId} actionId={outcome.undoActionId} working={working} onUndo={onUndo} />}
         </div>
       )}
       {outcome?.moved && <MovedMessages moved={outcome.moved} />}
+      {outcome?.corrected && <MovedMessages moved={outcome.corrected} template="visit_move_undone" />}
+      {data.me.canBook && <FixesApplied data={data} hide={outcome?.undoActionId ?? null} working={working} onUndo={onUndo} />}
 
       {conflicts.map((c, i) => (
         <ConflictCard
@@ -426,3 +430,40 @@ function UpNext({ data, onOpen }: { data: BoardData; onOpen: (appointmentId: str
 
 
 
+
+// Her fixes still applied on this day, each with Undo, so undoing doesn't
+// depend on the card she showed when it was applied (a reload, another
+// page, the next fix). Loaded again whenever the day does.
+function FixesApplied({ data, hide, working, onUndo }: { data: BoardData; hide: string | null; working: boolean; onUndo: (actionId: string, told: string[]) => void }) {
+  const [fixes, setFixes] = useState<AppliedFix[]>([]);
+  useEffect(() => {
+    let live = true;
+    reach(appliedFixes(data.date))
+      .then((list) => live && Array.isArray(list) && setFixes(list))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [data]);
+  const shown = fixes.filter((f) => f.actionId !== hide);
+  if (!shown.length) return null;
+  return (
+    <section aria-label="Fixes applied" data-testid="fixes-applied" className="flex flex-col gap-2">
+      <h3 className="text-13 font-medium text-ink-muted">Fixes applied ({shown.length})</h3>
+      <ul className="flex flex-col gap-2">
+        {shown.map((f) => (
+          <li key={f.actionId} className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-line bg-surface p-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-ink">{f.names.join(", ")}</p>
+              <p className="text-13 text-ink-muted">
+                {f.summary}
+                {f.appliedBy ? ` · applied by ${f.appliedBy} at ${f.at}` : ` · applied at ${f.at}`}
+              </p>
+            </div>
+            <UndoFix actionId={f.actionId} working={working} onUndo={onUndo} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}

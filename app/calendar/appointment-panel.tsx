@@ -30,6 +30,7 @@ import type { BookingIdeas } from "@/lib/denise/ideas";
 import type { Scope } from "@/lib/scheduling/series";
 import { useNow } from "./now-line";
 import type { AppointmentDetail, BoardData } from "./types";
+import { UndoFix } from "./undo-fix";
 import { reach } from "@/lib/reach";
 import { useKeepOnScreen } from "@/components/ui/keep-on-screen";
 
@@ -49,6 +50,7 @@ export function AppointmentPanel({
   onCheckedIn,
   onNoShow,
   onMoved,
+  onUndoFix,
   team,
   products,
 }: {
@@ -76,6 +78,8 @@ export function AppointmentPanel({
   onNoShow: (appointmentId: string) => void;
   // Moved to another day (or time): the calendar follows it there.
   onMoved: (date: LocalDate, appointmentId: string, message: string, moved?: Moved | null) => void;
+  // Undo one of Denise's fixes from the History tab (her card says how it went).
+  onUndoFix: (actionId: string, told: string[]) => void;
   // Who can be named as doing a patch test.
   team: { id: string; name: string; color?: string | null; photoUrl?: string | null }[];
 }) {
@@ -377,7 +381,7 @@ export function AppointmentPanel({
             ) : tab === "photos" ? (
               <VisitPhotosTab key={appointment.id} appointmentId={appointment.id} today={today} />
             ) : (
-              <VisitHistory appointment={appointment} />
+              <VisitHistory appointment={appointment} onUndoFix={me.canBook ? onUndoFix : null} />
             )}
           </Tabs>
         </div>
@@ -596,7 +600,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 // Past visits, how it was booked, and what's happened to it since.
-function VisitHistory({ appointment }: { appointment: AppointmentDetail }) {
+function VisitHistory({ appointment, onUndoFix }: { appointment: AppointmentDetail; onUndoFix: ((actionId: string, told: string[]) => void) | null }) {
   return (
     <div className="flex flex-col gap-5">
       {appointment.client && (
@@ -636,6 +640,14 @@ function VisitHistory({ appointment }: { appointment: AppointmentDetail }) {
             <li key={i}>{line}</li>
           ))}
         </ul>
+        {appointment.fixes.length > 0 && (
+          <div data-testid="fix-history" className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-1 text-ink-muted">
+              {appointment.fixes.flatMap((f, i) => [<li key={`${i}a`}>{f.line}</li>, f.undone ? <li key={`${i}b`}>{f.undone}</li> : null])}
+            </ul>
+            {appointment.fixActionId && onUndoFix && <UndoFix actionId={appointment.fixActionId} working={false} onUndo={onUndoFix} />}
+          </div>
+        )}
       </section>
     </div>
   );

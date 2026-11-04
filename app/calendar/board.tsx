@@ -535,18 +535,28 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const attention = conflicts.length + notices.length + (deniseState?.reorders.length ?? 0) + (deniseState?.openings.length ?? 0);
   const scanning = denise?.for !== data;
 
-  async function decide(run: () => Promise<FixResult>, undoActionId: string | null) {
+  async function decide(run: () => Promise<FixResult>, undoActionId: string | null, corrected?: Moved) {
     setDeciding(true);
     setOutcome(null);
     setPreview(null);
     const result = await run();
     setDeciding(false);
     if (result.state) showDenise(result.state, data);
-    setOutcome({ message: result.message, error: !result.ok, undoActionId: result.ok ? undoActionId : null, moved: result.ok ? result.moved : undefined });
+    setOutcome({
+      message: result.message,
+      error: !result.ok,
+      undoActionId: result.ok ? undoActionId : null,
+      moved: result.ok ? result.moved : undefined,
+      corrected: result.ok ? corrected : undefined,
+    });
   }
   const approve = (o: FixView) => decide(() => approveDeniseFix(o.actionId!, data.date), o.actionId);
   const reject = (o: FixView) => decide(() => rejectDeniseFix(o.actionId!, data.date), null);
-  const undo = (actionId: string) => decide(() => undoDeniseFix(actionId, data.date), null);
+  // Clients already told about the move get a correction to send.
+  const undo = (actionId: string, told: string[]) => {
+    openDenise();
+    return decide(() => undoDeniseFix(actionId, data.date), null, told.length ? { appointmentIds: told, at: new Date().toISOString() } : undefined);
+  };
 
   // The visit open in booking details, so Denise knows whose it is.
   const openVisit = selection.kind === "detail" ? selection.appointmentId : null;
@@ -1485,6 +1495,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                     setDoneMessage(message);
                     if (moved) setMovePrompt(moved);
                   }}
+                  onUndoFix={undo}
                   team={data.columns.map((c) => ({ id: c.staffId, name: c.name, color: c.color, photoUrl: c.photoUrl }))}
                   products={data.menu.products}
                 />

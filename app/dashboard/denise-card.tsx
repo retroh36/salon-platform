@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { approveDeniseFix, bookFromWaitlist, rejectDeniseFix, undoDeniseFix } from "@/app/calendar/denise-actions";
 import { MovedMessages } from "@/app/calendar/moved-messages";
+import { UndoFix } from "@/app/calendar/undo-fix";
 import { DeniseAvatar, DeniseFace } from "@/components/denise";
 import { Button, buttonClass } from "@/components/ui/button";
-import { CheckCircleIcon, UndoIcon } from "@/components/ui/icons";
+import { CheckCircleIcon } from "@/components/ui/icons";
 import { Alert } from "@/components/ui/page";
 import type { DeniseState, FixResult, Moved } from "@/lib/denise/types";
 import { noFixAdvice } from "@/lib/denise/respond";
@@ -33,17 +34,18 @@ const REVIEW = "/calendar?denise=1";
 export function DeniseCard({ initial, today, canBook, seesMoney }: { initial: DeniseState; today: string; canBook: boolean; seesMoney: boolean }) {
   const [state, setState] = useState(initial);
   const [working, setWorking] = useState(false);
-  const [outcome, setOutcome] = useState<{ message: string; error: boolean; undo: string | null; moved?: Moved } | null>(null);
+  const [outcome, setOutcome] = useState<{ message: string; error: boolean; undo: string | null; moved?: Moved; corrected?: Moved } | null>(null);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
 
-  async function run(action: () => Promise<FixResult>, undo: string | null) {
+  // `corrected`: after an undo, clients who'd been told, with a correction to send.
+  async function run(action: () => Promise<FixResult>, undo: string | null, corrected?: Moved) {
     setWorking(true);
     setOutcome(null);
     const result = await action();
     setWorking(false);
     // Her panel's actions don't redo the brief; keep the one shown.
     if (result.state) setState((was) => ({ ...result.state!, brief: was.brief }));
-    setOutcome({ message: result.message, error: !result.ok, undo: result.ok ? undo : null, moved: result.ok ? result.moved : undefined });
+    setOutcome({ message: result.message, error: !result.ok, undo: result.ok ? undo : null, moved: result.ok ? result.moved : undefined, corrected: result.ok ? corrected : undefined });
   }
 
   const conflicts = state.conflicts.filter((c) => !dismissed.has(c.subject));
@@ -87,16 +89,23 @@ export function DeniseCard({ initial, today, canBook, seesMoney }: { initial: De
               <CheckCircleIcon className="size-4 shrink-0 text-denise-700" />
               <p className="min-w-0 flex-1">{outcome.message}</p>
               {outcome.undo && (
-                <Button size="xs" disabled={working} onClick={() => run(() => undoDeniseFix(outcome.undo!, today), null)}>
-                  <UndoIcon className="size-4" />
-                  Undo
-                </Button>
+                <UndoFix
+                  key={outcome.undo}
+                  actionId={outcome.undo}
+                  working={working}
+                  onUndo={(id, told) => run(() => undoDeniseFix(id, today), null, told.length ? { appointmentIds: told, at: new Date().toISOString() } : undefined)}
+                />
               )}
             </div>
           ))}
         {outcome?.moved && (
           <div className="pb-3">
             <MovedMessages moved={outcome.moved} />
+          </div>
+        )}
+        {outcome?.corrected && (
+          <div className="pb-3">
+            <MovedMessages moved={outcome.corrected} template="visit_move_undone" />
           </div>
         )}
 

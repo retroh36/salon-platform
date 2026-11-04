@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { fixesApplied, toldAboutFix, type AppliedFix, type Told } from "@/lib/denise/applied";
 import { approveFix, rejectFix, undoFix } from "@/lib/denise/fixes";
 import { deniseDay } from "@/lib/denise/day-state";
 import { askerOf, deniseSession, type DeniseSession } from "@/lib/denise/session";
@@ -57,6 +58,21 @@ export async function approveDeniseFix(actionId: string, date: string, clientId:
 
 export async function undoDeniseFix(actionId: string, date: string): Promise<FixResult> {
   return decide(actionId, date, (s) => undoFix(s.supabase, s.viewer, actionId));
+}
+
+// Her fixes still applied on a day, each with Undo (front of house).
+export async function appliedFixes(date: string): Promise<AppliedFix[]> {
+  const s = await session();
+  if (!s?.viewer.canBook || !isLocalDate(date)) return [];
+  return fixesApplied(s.supabase, s.viewer.location, date);
+}
+
+// Before an undo: the clients already told about the move, and the
+// correction each would be sent.
+export async function undoWarning(actionId: string): Promise<Told[]> {
+  const s = await session();
+  if (!s?.viewer.canBook || !isUuid(actionId)) return [];
+  return toldAboutFix(s.supabase, s.viewer.location.timezone, actionId);
 }
 
 export async function rejectDeniseFix(actionId: string, date: string): Promise<FixResult> {

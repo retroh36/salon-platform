@@ -182,7 +182,7 @@ test.describe("front desk", () => {
     await expect(message).toContainText(`${PREFIX}Grace Lewis`);
     await expect(message.getByRole("textbox", { name: `Message to ${PREFIX}Grace Lewis` })).toHaveValue(/We've moved your visit to .+ at 11:20am with Bridget\./);
     const { data: graceItem } = await admin.from("appointment_items").select("appointment_id").eq("id", grace).single();
-    const outbox = () => admin.from("client_messages").select("template, channel").eq("appointment_id", graceItem!.appointment_id);
+    const outbox = () => admin.from("client_messages").select("template, channel").eq("appointment_id", graceItem!.appointment_id).order("created_at");
     expect((await outbox()).data).toEqual([]);
     await message.getByRole("button", { name: "Send" }).click();
     await expect(message.getByText("Sent", { exact: true })).toBeVisible();
@@ -202,10 +202,42 @@ test.describe("front desk", () => {
     const { data: notices } = await admin.from("notifications").select("client_id, staff_id").eq("ai_action_id", logged!.id);
     expect(notices).toEqual([{ client_id: null, staff_id: BRIDGET }]);
 
-    // Undo, right there.
-    await panel.getByRole("button", { name: "Undo" }).click();
+    // Undo outlives the moment: after a reload it's in the visit's history
+    // and on Denise's card, among the fixes applied that day.
+    await page.reload();
+    await waitForHydration(page, "section[data-staff-id]");
+    await block(page, "Grace").click();
+    const graceDetails = page.getByRole("complementary", { name: "Booking details" });
+    await graceDetails.getByRole("tab", { name: "History" }).click();
+    const history = graceDetails.getByTestId("fix-history");
+    await expect(history).toContainText("Moved by Denise's fix, applied by Sam");
+    await expect(history.getByRole("button", { name: "Undo" })).toBeVisible();
+    await page.getByRole("button", { name: "Close panel" }).click();
+    await openDenise(page);
+    const applied = panel.getByTestId("fixes-applied");
+    await expect(applied).toContainText(`${PREFIX}Grace`);
+
+    // Grace was already told, so Undo asks first, with the correction to send.
+    await applied.getByRole("button", { name: "Undo" }).click();
+    const warn = panel.getByTestId("undo-warning");
+    await expect(warn).toContainText(new RegExp(`${PREFIX}Grace was told \\d{1,2}:\\d{2}(am|pm)\\. Undo and send a correction\\?`));
+    await expect(warn.getByTestId("correction-preview")).toContainText("please ignore our last message: your visit is still on for");
+    await expect(warn.getByTestId("correction-preview")).toContainText("11am with Bridget");
+    expect((await outbox()).data).toHaveLength(1);
+    await warn.getByRole("button", { name: "Undo and write the correction" }).click();
     await expect(panel.getByRole("status")).toContainText(`Undone — ${PREFIX}Grace is back at 11:00.`);
     expect(await startOf(grace)).toEqual({ start: at(11).getTime(), staffId: BRIDGET });
+    // The correction waits for staff to send it, like the first message.
+    expect((await outbox()).data).toHaveLength(1);
+    const correction = panel.getByTestId("correction-messages").getByTestId("client-message");
+    await expect(correction.getByRole("textbox", { name: `Message to ${PREFIX}Grace Lewis` })).toHaveValue(/please ignore our last message: your visit is still on for .+ at 11am with Bridget\./);
+    await correction.getByRole("button", { name: "Send" }).click();
+    await expect(correction.getByText("Sent", { exact: true })).toBeVisible();
+    expect((await outbox()).data).toEqual([
+      { template: "visit_moved", channel: "sms" },
+      { template: "visit_move_undone", channel: "sms" },
+    ]);
+    await expect(panel.getByTestId("fixes-applied")).toHaveCount(0);
     // The problem is back, so Denise offers the fix again.
     await expect(panel.getByTestId("denise-message")).toContainText("Bridget's running 20 min late.");
   });

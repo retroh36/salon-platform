@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { allowedChannels, channelFor, consentEventText, keywordOf, noTextsFlag, type ClientConsent } from "@/lib/messaging/consent";
 import { inboundDigits, twilioSignature, validSignature } from "@/lib/messaging/inbound";
-import { renderStaffMessage, smsCounterText, smsParts, templateProblem, withStopLine } from "@/lib/messaging/templates";
+import { AFTER_A_MOVE, renderStaffMessage, smsCounterText, smsParts, templateProblem, withStopLine } from "@/lib/messaging/templates";
 
 const client = (over: Partial<ClientConsent> = {}): ClientConsent => ({
   phone: "(312) 555-0142",
@@ -71,6 +71,14 @@ describe("staff messages", () => {
       subject: "Your visit at Maple & Ash has moved",
       body: "Hi Ava, Maple & Ash here. We've moved your visit to today at 2:00pm with Gil. Call us at (555) 010-0100 if that doesn't work. Reply STOP to stop texts.",
     });
+  });
+
+  it("correct that message when the fix is undone, and aren't offered as a quick pick", () => {
+    expect(renderStaffMessage("visit_move_undone", facts, "email")).toEqual({
+      subject: "Correction: your visit at Maple & Ash hasn't moved",
+      body: "Hi Ava, Maple & Ash here. Sorry, please ignore our last message: your visit is still on for today at 2:00pm with Gil. Call us at (555) 010-0100 if that doesn't work.",
+    });
+    expect(AFTER_A_MOVE).toEqual(["visit_move_undone"]);
   });
 });
 

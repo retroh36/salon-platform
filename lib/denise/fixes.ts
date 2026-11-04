@@ -27,7 +27,7 @@ function dateOf(proposal: Proposal, timeZone: string): string | null {
 }
 
 // The visits a proposal moves (to another time or stylist).
-function movedVisits(proposal: Proposal): string[] {
+export function movedVisits(proposal: Proposal): string[] {
   const ids = new Set<string>();
   for (const c of proposal.changes) {
     if (c.from.start.getTime() === c.to.start.getTime() && c.from.staffId === c.to.staffId) continue;
