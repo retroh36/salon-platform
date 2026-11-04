@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { canChange, cancelTerms, loadManaged } from "@/lib/online-booking/manage";
+import { heldOffer } from "@/lib/online-booking/promotions";
 import { loadSite } from "@/lib/online-booking/site";
 import { toLocal, todayIn } from "@/lib/scheduling/time";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -30,7 +31,7 @@ async function Manage({ params, searchParams }: { params: Promise<{ slug: string
   if (!booking) notFound();
   const tz = site.location.timezone;
   const start = toLocal(booking.start, tz);
-  const policy = await cancelTerms(admin, site, booking);
+  const [policy, offer] = await Promise.all([cancelTerms(admin, site, booking), heldOffer(admin, site.business.id, booking.promotionId, booking.items)]);
 
   return (
     <BookingFrame name={site.business.name} logoUrl={site.business.logoUrl} accent={site.settings.accent}>
@@ -46,6 +47,7 @@ async function Manage({ params, searchParams }: { params: Promise<{ slug: string
           minute: start.minute,
           endMinute: toLocal(booking.end, tz).minute,
           items: booking.items.map((i) => ({ name: i.serviceName, stylist: i.staffName, priceCents: i.priceCents })),
+          offer,
           depositCents: booking.depositCents,
           depositPaidCents: booking.depositPaidCents,
           canChange: canChange(site, booking),

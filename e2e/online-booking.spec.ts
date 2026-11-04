@@ -163,7 +163,8 @@ test("a new client books two services back to back on a phone", async ({ page })
   await cont(page).click();
 
   await expect(flow(page)).toContainText("with Shae");
-  await expect(flow(page)).toContainText("$115");
+  // Each service at Shae's price (the total is less any last-minute special).
+  await expect(flow(page).getByTestId("line-price")).toHaveText(["$70", "$45"]);
   await expect(flow(page)).toContainText("Cancellation policy");
   await expect(flow(page).getByRole("button", { name: "Book appointment" })).toBeDisabled();
 

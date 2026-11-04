@@ -228,6 +228,10 @@ export function AccountView({
                 <div className="min-w-0">
                   <p className="font-medium text-ink">{when(v)}</p>
                   <p className="text-sm text-ink-muted">{what(v)}</p>
+                  <p className="text-sm text-ink-muted">
+                    <span className="font-medium text-ink tabular-nums">{formatPrice(v.totalCents)}</span>
+                    {v.offer && ` · ${v.offer.label}, taken off at your visit`}
+                  </p>
                 </div>
                 {v.status !== "checked_in" && (
                   <button type="button" className={linkButton} disabled={pending} onClick={() => run(() => openVisit(slug, v.id))}>

@@ -17,6 +17,8 @@ type Booking = {
   minute: number;
   endMinute: number;
   items: { name: string; stylist: string; priceCents: number }[];
+  // The offer it was booked with, taken off at the visit.
+  offer: { label: string; discountCents: number } | null;
   depositCents: number;
   depositPaidCents: number;
   canChange: boolean;
@@ -35,7 +37,7 @@ export function ManageView({ slug, token, justBooked, today, booking, salon }: {
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [pending, start] = useTransition();
   const canceled = booking.status === "canceled";
-  const total = booking.items.reduce((sum, i) => sum + i.priceCents, 0);
+  const total = booking.items.reduce((sum, i) => sum + i.priceCents, 0) - (booking.offer?.discountCents ?? 0);
 
   const cancel = () =>
     start(async () => {
@@ -87,9 +89,20 @@ export function ManageView({ slug, token, justBooked, today, booking, salon }: {
             </li>
           ))}
         </ul>
+        {booking.offer && (
+          <div className="border-t border-line bg-(--accent-soft) px-4 py-3" data-testid="booking-offer">
+            <p className="flex justify-between gap-3 font-medium">
+              <span>{booking.offer.label}</span>
+              <span className="tabular-nums">−{formatPrice(booking.offer.discountCents)}</span>
+            </p>
+            <p className="mt-0.5 text-sm text-ink-muted">Taken off when you pay at your visit.</p>
+          </div>
+        )}
         <div className="flex justify-between border-t border-line px-4 py-3 font-semibold">
           <span>Total</span>
-          <span className="tabular-nums">{formatPrice(total)}</span>
+          <span className="tabular-nums" data-testid="booking-total">
+            {formatPrice(total)}
+          </span>
         </div>
         {booking.depositPaidCents > 0 && (
           <p className="border-t border-line px-4 py-3 text-sm text-ink-muted" data-testid="deposit-paid">

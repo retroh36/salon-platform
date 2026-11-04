@@ -19,7 +19,11 @@ What a client sees on your booking site, so you can walk them through it on the 
 - The code expires in 10 minutes; they can tap **Send a new code**.
 - Texts and email aren't connected yet, so codes and confirmations don't reach clients' phones for now. Ask an owner before promising a client a code by text.
 - On **Review and book**, texts about their appointments are ticked (they can untick it), and offers and news are unticked unless they choose them.
-- On **Review and book**, they can tap **Have a promo code?** to add a code. A code or special shows with about what it takes off; it comes off when they pay at the visit.
+- **Review and book** shows each service with its stylist and price, and the exact total. A price range shows only before they pick a stylist (or a time, with **No preference**).
+- A special picked with the time shows on **Review and book** straight away as a line like "Last-minute 15% off", with what it takes off and the total after it. The confirmation page and their account show the same price and line, and it comes off at checkout.
+- If the special can't apply to them (say it's for first visits only), **Review and book** says so before they book, like "Last-minute 15% off doesn't apply: it's for a client's first visit only."
+- With **No preference**, if the stylist free at their time changes before they book and the price with them is different, they're asked to pick a time again, so the confirmation always matches what they saw.
+- On **Review and book**, they can tap **Have a promo code?** to add a code; it takes the special's place, and comes off when they pay at the visit.
 - New clients can book only if the salon allows it; otherwise they're asked to call.
 - If their connection drops as they book, they're told to tap **Book** again: they're never booked (or charged) twice.
 - Deposits are paid online when they book, with test cards for now (no real money moves yet).

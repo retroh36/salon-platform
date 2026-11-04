@@ -6,6 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { nextTier, rewardProblem } from "@/lib/rewards";
+import { heldOffer } from "./promotions";
 import { entryLabel, loadRewardSettings, summaryOf } from "@/lib/rewards-load";
 import type { Account } from "./account";
 
@@ -17,6 +18,9 @@ export type AccountVisit = {
   start: string;
   end: string;
   items: { serviceId: string; service: string; staffId: string; stylist: string; priceCents: number }[];
+  // Coming up: what it costs after the offer it was booked with, if any.
+  totalCents: number;
+  offer: { label: string; discountCents: number } | null;
 };
 
 export type MessagePrefs = { sms: boolean; email: boolean; visitSms: boolean; visitEmail: boolean; stopped: boolean };
@@ -51,7 +55,7 @@ const PAST_SHOWN = 10;
 
 export async function loadAccount(admin: Admin, account: Account, now = new Date()): Promise<AccountData> {
   const { clientId, businessId } = account;
-  const visitColumns = "id, status, starts_at, ends_at, appointment_items(service_id, staff_id, starts_at, price_cents, service:services(name), staff:staff(first_name))";
+  const visitColumns = "id, status, starts_at, ends_at, promotion_id, appointment_items(service_id, staff_id, starts_at, price_cents, service:services(name), staff:staff(first_name))";
   const [client, upcoming, past, cards, packages, card, rewards] = await Promise.all([
     admin.from("clients").select("first_name, email, phone, sms_opt_in, email_opt_in, appointment_sms_ok, appointment_email_ok, sms_stopped_at").eq("id", clientId).eq("business_id", businessId).single(),
     admin
@@ -82,16 +86,20 @@ export async function loadAccount(admin: Admin, account: Account, now = new Date
   ]);
   for (const r of [client, upcoming, past, cards, packages, card]) if (r.error) throw r.error;
 
-  const visit = (a: NonNullable<typeof upcoming.data>[number]): AccountVisit => ({
-    id: a.id,
-    status: a.status,
-    start: a.starts_at,
-    end: a.ends_at,
-    items: [...a.appointment_items]
+  const visit = (a: NonNullable<typeof upcoming.data>[number]): AccountVisit => {
+    const items = [...a.appointment_items]
       .sort((x, y) => x.starts_at.localeCompare(y.starts_at))
-      .map((i) => ({ serviceId: i.service_id, service: i.service.name, staffId: i.staff_id, stylist: i.staff.first_name, priceCents: i.price_cents })),
-  });
+      .map((i) => ({ serviceId: i.service_id, service: i.service.name, staffId: i.staff_id, stylist: i.staff.first_name, priceCents: i.price_cents }));
+    return { id: a.id, status: a.status, start: a.starts_at, end: a.ends_at, items, totalCents: items.reduce((n, i) => n + i.priceCents, 0), offer: null };
+  };
   const pastVisits = past.data!.map(visit);
+  const upcomingVisits = await Promise.all(
+    upcoming.data!.map(async (a) => {
+      const v = visit(a);
+      const offer = await heldOffer(admin, businessId, a.promotion_id, v.items);
+      return { ...v, offer, totalCents: v.totalCents - (offer?.discountCents ?? 0) };
+    }),
+  );
   const last = pastVisits[0];
   const stylists = last ? [...new Set(last.items.map((i) => i.staffId))] : [];
   const c = client.data!;
@@ -99,7 +107,7 @@ export async function loadAccount(admin: Admin, account: Account, now = new Date
   return {
     firstName: c.first_name,
     contact: { email: c.email, phone: c.phone },
-    upcoming: upcoming.data!.map(visit),
+    upcoming: upcomingVisits,
     past: pastVisits,
     giftCards: cards.data!.map((g) => ({ last4: g.code.slice(-4), balanceCents: g.balance_cents, expiresAt: g.expires_at })).filter((g) => !g.expiresAt || new Date(g.expiresAt) > now),
     packages: packages

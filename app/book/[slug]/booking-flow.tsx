@@ -16,7 +16,7 @@ import type { BookingSource } from "@/lib/online-booking/sources";
 import { formatMinute, type LocalDate } from "@/lib/scheduling/time";
 import { formatPrice, formatPriceRange } from "@/lib/services";
 import { formatDuration } from "@/lib/duration";
-import { book, confirmCode, findTimes, requestCode, reviewPromotion, reviewTerms, type DayTimes, type PromotionResult, type TermsResult } from "./actions";
+import { book, confirmCode, findTimes, requestCode, reviewPromotion, reviewTerms, type DaySlot, type DayTimes, type PromotionResult, type TermsResult } from "./actions";
 import { LinesSkeleton, TimesSkeleton } from "./skeleton";
 import { accentLink, buttonSpinner, choiceClass, inputClass, primaryButton, secondaryButton, sectionTitle, smallButton } from "./styles";
 import { DateStrip, TimeGrid, longDate } from "./times";
@@ -37,6 +37,9 @@ const STEP_TITLES: Record<Step, string> = {
   confirm: "Review and book",
 };
 const MAX_SERVICES = 4;
+
+// The time chosen, with who does each service, the price and any special.
+type Slot = DaySlot & { date: LocalDate };
 
 type Identity =
   | { phase: "enter" }
@@ -73,7 +76,7 @@ export function BookingFlow({
   const [direction, setDirection] = useState<1 | -1>(1);
   const [serviceIds, setServiceIds] = useState<string[]>(startIds);
   const [staffId, setStaffId] = useState<string | null | undefined>(startStaff);
-  const [slot, setSlot] = useState<{ date: LocalDate; minute: number; staffIds: string[] } | null>(null);
+  const [slot, setSlot] = useState<Slot | null>(null);
   const [identity, setIdentity] = useState<Identity>(signedIn ? { phase: "done", session: "account", known: true, firstName: signedIn.firstName } : { phase: "enter" });
   const [remember, setRemember] = useState(false);
   // Texts about their appointments (on unless they untick it) and offers (off unless they tick it).
@@ -84,8 +87,8 @@ export function BookingFlow({
   // The policy for this visit (from the server), and the card entered.
   const [loaded, setLoaded] = useState<{ key: string; terms: TermsResult } | null>(null);
   const [cardRef, setCardRef] = useState("");
-  // The promotion for the visit: a code they applied, or the special for
-  // their time (from the server).
+  // The promotion for the visit, as the server checked it for this client:
+  // a code they applied, or the special picked with the time.
   const [promo, setPromo] = useState<{ key: string; code: string | null; result: PromotionResult } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [blockedServices, setBlockedServices] = useState<string[]>([]);
@@ -103,16 +106,16 @@ export function BookingFlow({
   const stylist = staffId ? site.stylists.find((s) => s.id === staffId) ?? null : null;
   const totalMinutes = selected.reduce((sum, s) => sum + s.minutes, 0);
 
-  // What the visit costs: with the chosen stylist, or the range across who
-  // could do each service.
+  // What the visit costs: exact once there's a time (each service with its
+  // stylist) or a chosen stylist, else the range across who could do each
+  // service.
   const priceRange = (ids: string[], who: SiteStylist[] | null) => {
     if (who && who.length === 1) return [ids.reduce((sum, id) => sum + who[0].prices[id], 0)];
     const lows = ids.map((id) => Math.min(...site.stylists.filter((s) => id in s.prices).map((s) => s.prices[id])));
     const highs = ids.map((id) => Math.max(...site.stylists.filter((s) => id in s.prices).map((s) => s.prices[id])));
     return [lows.reduce((a, b) => a + b, 0), highs.reduce((a, b) => a + b, 0)];
   };
-  const visitStylists = slot && staffId === null ? slot.staffIds.map((id) => site.stylists.find((s) => s.id === id)!) : stylist ? [stylist] : null;
-  const prices = serviceIds.length ? priceRange(serviceIds, visitStylists?.length === 1 ? visitStylists : stylist ? [stylist] : null) : [];
+  const prices = !serviceIds.length ? [] : slot ? [slot.cents] : priceRange(serviceIds, stylist ? [stylist] : null);
   const go = (next: Step) => {
     setDirection(STEPS.indexOf(next) > STEPS.indexOf(step) ? 1 : -1);
     setNotice(null);
@@ -148,7 +151,9 @@ export function BookingFlow({
       setLoaded({ key: review, terms: t });
       if (t.ok) setCardRef(t.cards[0]?.ref ?? "");
     });
-    reviewPromotion(site.business.slug, identity.session, serviceIds, staffId ?? null, slot.date, slot.minute, null).then((result) => live && setPromo({ key: review, code: null, result }));
+    reviewPromotion(site.business.slug, identity.session, serviceIds, staffId ?? null, slot.date, slot.minute, null, slot.special?.id ?? null).then(
+      (result) => live && setPromo({ key: review, code: null, result }),
+    );
     return () => {
       live = false;
     };
@@ -157,9 +162,12 @@ export function BookingFlow({
   const terms = loaded && loaded.key === review ? loaded.terms : null;
   const needsCard = terms?.ok === true && terms.cardNeeded && !terms.cardOnFile;
   const visitPromo = promo && promo.key === review ? promo : null;
+  // Until the server has checked it, Review shows the special picked with the time.
+  const shownPromo = visitPromo ?? (slot ? { code: null, result: { ok: true as const, promo: slot.special } } : null);
+  const offer = shownPromo?.result.ok ? shownPromo.result.promo : null;
   const applyCode = async (code: string | null) => {
     if (identity.phase !== "done" || !slot || !review) return null;
-    const result = await reviewPromotion(site.business.slug, identity.session, serviceIds, staffId ?? null, slot.date, slot.minute, code);
+    const result = await reviewPromotion(site.business.slug, identity.session, serviceIds, staffId ?? null, slot.date, slot.minute, code, slot.special?.id ?? null);
     // A code that can't be used leaves what was there.
     if (result.ok) setPromo({ key: review, code, result });
     return result.ok ? null : result.message;
@@ -193,6 +201,8 @@ export function BookingFlow({
         appointmentTexts,
         offers,
         promoCode: visitPromo?.code ?? undefined,
+        specialId: !visitPromo?.code && offer ? offer.id : undefined,
+        expectedCents: slot.cents,
         attempt: attempt.current,
       }).catch(() => null);
       // No answer: it may or may not have booked, and tapping Book again
@@ -213,6 +223,9 @@ export function BookingFlow({
         setBlockedServices(result.serviceIds ?? []);
         go("services");
         setNotice(result.message);
+      } else if (result.reason === "promotion" && result.lost && review) {
+        // The special stopped applying since Review: Review now says so.
+        setPromo({ key: review, code: null, result: { ok: true, promo: null, lost: result.message } });
       } else if (result.reason === "session") {
         setIdentity({ phase: "enter" });
         go("details");
@@ -308,11 +321,8 @@ export function BookingFlow({
         {step === "confirm" && slot && (
           <ConfirmStep
             site={site}
-            selected={selected}
             slot={slot}
-            stylists={visitStylists ?? []}
             noPreference={staffId === null}
-            total={prices}
             terms={terms}
             cardRef={cardRef}
             setCardRef={setCardRef}
@@ -322,7 +332,7 @@ export function BookingFlow({
             offers={offers}
             setOffers={setOffers}
             setAgreed={setAgreed}
-            promo={visitPromo}
+            promo={shownPromo}
             onCode={applyCode}
           />
         )}
@@ -574,7 +584,7 @@ function TimeStep({
   staffId: string | null;
   stylists: SiteStylist[];
   slot: { date: LocalDate; minute: number } | null;
-  onPick: (slot: { date: LocalDate; minute: number; staffIds: string[] }) => void;
+  onPick: (slot: Slot) => void;
 }) {
   const [days, setDays] = useState<DayTimes[] | null>(null);
   const [lastDay, setLastDay] = useState<LocalDate | null>(null);
@@ -633,9 +643,9 @@ function TimeStep({
             <TimeGrid
               times={day.times}
               selected={slot && slot.date === day.date ? slot.minute : null}
-              onPick={(t) => onPick({ date: day.date, minute: t.minute, staffIds: t.staffIds })}
+              onPick={(t) => onPick({ date: day.date, ...t })}
               label={staffId === null ? (t) => t.staffIds.map(name).join(" & ") : undefined}
-              badge={(t) => t.special}
+              badge={(t) => t.special?.text ?? null}
             />
           ) : (
             <p className="py-8 text-center text-ink-muted">No times this day. Try another date.</p>
@@ -856,11 +866,8 @@ function DetailsStep({
 
 function ConfirmStep({
   site,
-  selected,
   slot,
-  stylists,
   noPreference,
-  total,
   terms,
   cardRef,
   setCardRef,
@@ -874,11 +881,8 @@ function ConfirmStep({
   onCode,
 }: {
   site: BookingSite;
-  selected: SiteService[];
-  slot: { date: LocalDate; minute: number };
-  stylists: SiteStylist[];
+  slot: Slot;
   noPreference: boolean;
-  total: number[];
   terms: TermsResult | null;
   cardRef: string;
   setCardRef: (v: string) => void;
@@ -891,8 +895,10 @@ function ConfirmStep({
   promo: { code: string | null; result: PromotionResult } | null;
   onCode: (code: string | null) => Promise<string | null>;
 }) {
-  const single = stylists.length === 1 ? stylists[0] : null;
   const card = terms?.ok && terms.cardNeeded;
+  const offer = promo?.result.ok ? promo.result.promo : null;
+  const lost = promo?.result.ok ? promo.result.lost : undefined;
+  const discount = offer?.discountCents ?? 0;
   return (
     <div className="flex flex-col gap-5">
       <div className="overflow-hidden rounded-lg border border-line bg-surface">
@@ -903,32 +909,50 @@ function ConfirmStep({
           </p>
         </div>
         <ul className="divide-y divide-line">
-          {selected.map((s) => (
-            <li key={s.id} className="flex items-baseline justify-between gap-3 px-4 py-3">
-              <span>
-                <span className="block font-medium text-ink">{s.name}</span>
-                <span className="text-sm text-ink-muted">
-                  {formatDuration(s.minutes)}
-                  {single && ` · with ${single.firstName}`}
+          {slot.items.map((item) => {
+            const service = site.services.find((s) => s.id === item.serviceId)!;
+            const who = site.stylists.find((s) => s.id === item.staffId);
+            return (
+              <li key={item.serviceId} className="flex items-baseline justify-between gap-3 px-4 py-3" data-testid="review-line">
+                <span>
+                  <span className="block font-medium text-ink">{service.name}</span>
+                  <span className="text-sm text-ink-muted">
+                    {formatDuration(service.minutes)}
+                    {who && ` · with ${who.firstName}`}
+                  </span>
                 </span>
-              </span>
-              {single && <span className="text-sm font-medium text-ink tabular-nums">{formatPrice(single.prices[s.id])}</span>}
-            </li>
-          ))}
+                <span className="text-sm font-medium text-ink tabular-nums" data-testid="line-price">
+                  {formatPrice(who?.prices[item.serviceId] ?? 0)}
+                </span>
+              </li>
+            );
+          })}
         </ul>
+        {offer && (
+          <div className="border-t border-line bg-(--accent-soft) px-4 py-3" data-testid="online-promotion">
+            <p className="flex justify-between gap-3 font-medium text-ink">
+              <span>{offer.label}</span>
+              <span className="tabular-nums">−{formatPrice(offer.discountCents)}</span>
+            </p>
+            <p className="mt-0.5 text-sm text-ink-muted">Taken off when you pay at your visit.</p>
+          </div>
+        )}
         <div className="flex justify-between border-t border-line px-4 py-3 font-semibold text-ink">
           <span>Total</span>
-          <span className="tabular-nums">{formatPriceRange(total)}</span>
+          <span className="tabular-nums" data-testid="review-total">
+            {formatPrice(slot.cents - discount)}
+          </span>
         </div>
-        {!single && stylists.length > 1 && (
-          <p className="border-t border-line px-4 py-3 text-sm text-ink-muted">With {stylists.map((s) => s.firstName).join(" and ")}.</p>
-        )}
         {noPreference && (
-          <p className="border-t border-line px-4 py-3 text-sm text-ink-muted">
-            {stylists.length ? "If they're booked by the time you confirm, we'll match you with another stylist who's free." : "We'll match you with a stylist who's free."}
-          </p>
+          <p className="border-t border-line px-4 py-3 text-sm text-ink-muted">If they&rsquo;re booked by the time you confirm, we&rsquo;ll match you with another stylist who&rsquo;s free.</p>
         )}
       </div>
+
+      {lost && (
+        <Alert tone="info">
+          <span data-testid="offer-lost">{lost}</span>
+        </Alert>
+      )}
 
       <PromoCode promo={promo} onCode={onCode} />
 
@@ -1007,31 +1031,19 @@ function ConfirmStep({
   );
 }
 
-// The promotion on the visit (a special for the time, or their code), and
-// a place to enter a promo code. It comes off when they pay.
+// A place to enter a promo code (it takes the special's place), and to
+// take it off again. What it takes off is in the visit's summary above.
 function PromoCode({ promo, onCode }: { promo: { code: string | null; result: PromotionResult } | null; onCode: (code: string | null) => Promise<string | null> }) {
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const applied = promo?.result.ok ? promo.result.promo : null;
   return (
     <div className="flex flex-col gap-2">
-      {applied && (
-        <div className="rounded-lg bg-(--accent-soft) px-4 py-3" data-testid="online-promotion">
-          <p className="flex justify-between gap-3 font-semibold text-ink">
-            <span>
-              {applied.name}: {applied.text}
-            </span>
-            <span className="tabular-nums">about −{formatPrice(applied.discountCents)}</span>
-          </p>
-          <p className="mt-0.5 text-sm text-ink-muted">Taken off when you pay at your visit.</p>
-          {promo?.code && (
-            <button type="button" className={`mt-1 min-h-9 text-sm ${accentLink}`} onClick={() => start(async () => void (await onCode(null)))}>
-              Remove code
-            </button>
-          )}
-        </div>
+      {promo?.code && (
+        <button type="button" className={`min-h-9 self-start text-sm ${accentLink}`} onClick={() => start(async () => void (await onCode(null)))}>
+          Remove code
+        </button>
       )}
       {!promo?.code &&
         (open ? (

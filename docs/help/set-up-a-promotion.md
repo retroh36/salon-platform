@@ -18,7 +18,7 @@ A promotion takes a percent or an amount off what it covers: as a code, by itsel
 
 ## Good to know
 
-- Specials show a badge on the times they cover on your booking site, and come off at checkout.
+- Specials show a badge on the times they cover on your booking site. The client sees "Last-minute 15% off" and the price after it on review, on their confirmation and in their account, and it comes off at checkout.
 - A promotion can't be used with another discount unless you tick **Can be used with other promotions and discounts**.
 - Member prices come off first, then promotions, then any discount staff give.
 - Owners and managers see under each promotion how it did in the last 90 days: sales, what they brought in, what the discount cost, openings filled and first visits. Reports has the same for any period.

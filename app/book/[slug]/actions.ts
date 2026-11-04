@@ -26,7 +26,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { patchExplanation } from "@/lib/online-booking/patch";
 import { loadManaged, canChange } from "@/lib/online-booking/manage";
 import { onlineTerms, type OnlineTerms } from "@/lib/online-booking/terms";
-import { badgeFor, onlinePromotion, onlineSpecials, plannedItems, type OnlinePromo } from "@/lib/online-booking/promotions";
+import { onlinePromotion, onlineSpecials, plannedItems, specialAt, type OnlinePromotion, type OnlinePromo } from "@/lib/online-booking/promotions";
 import { loadPromotions } from "@/lib/promotions-load";
 import { currentProvider, providerFor } from "@/lib/payments";
 import { ACCOUNT_SESSION, accountContact, currentAccount, startAccountSession } from "@/lib/online-booking/account";
@@ -67,8 +67,13 @@ function bookingWindow(site: BookingSite, now = new Date()) {
   };
 }
 
-// special: a last-minute special's badge ("15% off") for that time.
-export type DayTimes = { date: LocalDate; times: { minute: number; staffIds: string[]; special: string | null }[] };
+// Each time: who does each service (`items`, in order), what the visit costs
+// with them (`cents`), and the last-minute special for that time, if any
+// (its badge is `special.text`, "15% off"). The client's choice keeps all
+// of it, so Review shows the same price and offer from the start.
+export type SlotItem = { serviceId: string; staffId: string };
+export type DaySlot = { minute: number; staffIds: string[]; items: SlotItem[]; cents: number; special: OnlinePromo | null };
+export type DayTimes = { date: LocalDate; times: DaySlot[] };
 export type TimesResult = { ok: true; days: DayTimes[]; lastDay: LocalDate } | { ok: false; message: string };
 
 // Free times for the visit over two weeks from `from`.
@@ -108,11 +113,20 @@ export async function findTimes(slug: string, serviceIds: string[], staffId: str
     const times = visitTimes(ctx, request, date, { notBefore: window.notBefore, notAfter: window.notAfter, replacingAppointmentId: replacing });
     days.push({
       date,
-      times: times.map((t) => ({ minute: t.minute, staffIds: [...new Set(t.items.map((i) => i.staffId))], special: specials.length ? badgeFor(site, specials, t.items, t.start, now, window.today) : null })),
+      times: times.map((t) => ({
+        minute: t.minute,
+        staffIds: [...new Set(t.items.map((i) => i.staffId))],
+        items: t.items.map((i) => ({ serviceId: i.serviceId, staffId: i.staffId })),
+        cents: visitCents(site, t.items),
+        special: specials.length ? specialAt(site, specials, t.items, t.start, now, window.today) : null,
+      })),
     });
   }
   return { ok: true, days, lastDay: window.lastDay };
 }
+
+// What a planned visit costs, at each stylist's price.
+const visitCents = (site: BookingSite, items: readonly SlotItem[]) => items.reduce((n, i) => n + (site.stylists.find((s) => s.id === i.staffId)?.prices[i.serviceId] ?? 0), 0);
 
 // demoCode: the code, shown on screen in the demo (nothing is sent).
 export type CodeResult = { ok: true; verificationId: string; sentTo: string; demoCode?: string } | { ok: false; message: string };
@@ -198,11 +212,20 @@ async function findClient(admin: ReturnType<typeof createAdminClient>, site: Boo
   return data as string | null;
 }
 
-export type PromotionResult = { ok: true; promo: OnlinePromo | null } | { ok: false; message: string };
+export type PromotionResult = OnlinePromotion;
 
 // At review: the promo code they typed (or why it can't be used), else the
-// special for their time.
-export async function reviewPromotion(slug: string, session: string, serviceIds: string[], staffId: string | null, date: string, minute: number, code: string | null): Promise<PromotionResult> {
+// special picked with their time (or why it doesn't apply to them).
+export async function reviewPromotion(
+  slug: string,
+  session: string,
+  serviceIds: string[],
+  staffId: string | null,
+  date: string,
+  minute: number,
+  code: string | null,
+  specialId: string | null = null,
+): Promise<PromotionResult> {
   const site = await openSite(slug);
   if (!site) return { ok: false, message: "Online booking isn't available right now." };
   const admin = createAdminClient();
@@ -217,7 +240,7 @@ export async function reviewPromotion(slug: string, session: string, serviceIds:
   if (!who) return { ok: false, message: "Your code has expired. Please confirm your details again." };
   const items = await plannedItems(admin, site, request, start);
   if (!items) return { ok: false, message: "Sorry, that time was just taken. Please pick another." };
-  return onlinePromotion(admin, site, who.clientId, items, start, code);
+  return onlinePromotion(admin, site, who.clientId, items, start, { code, specialId });
 }
 
 export type TermsResult =
@@ -271,8 +294,12 @@ export type BookInput = {
   cardRef?: string;
   // Keep them signed in to their account on this device afterwards.
   remember?: boolean;
-  // A promo code they gave at review (else the special for the time applies).
+  // A promo code they gave at review, else the special picked with the time.
   promoCode?: string;
+  specialId?: string;
+  // What Review showed the visit costing (before any offer): booked only
+  // at that price, so the confirmation matches it.
+  expectedCents?: number;
   // Their answers at review: texts about their appointments (a no turns
   // them off), and offers (a yes turns them on; leaving it unticked keeps
   // what they said before).
@@ -285,7 +312,7 @@ export type BookInput = {
 
 export type BookResult =
   | { ok: true; manageUrl: string }
-  | { ok: false; message: string; reason?: "taken" | "patch_test" | "session" | "details" | "new_clients" | "card" | "promotion" | "pending"; serviceIds?: string[] };
+  | { ok: false; message: string; reason?: "taken" | "patch_test" | "session" | "details" | "new_clients" | "card" | "promotion" | "pending"; serviceIds?: string[]; lost?: boolean };
 
 export async function book(slug: string, input: BookInput): Promise<BookResult> {
   const site = await openSite(slug);
@@ -358,10 +385,16 @@ async function bookAttempt(
   // saved (and any deposit taken) before the booking is confirmed.
   const terms = await onlineTerms(admin, site, clientId!, request, start);
   if (!terms) return { ok: false, reason: "taken", message: "Sorry, that time was just taken. Please pick another." };
-  // Their promo code, or the special for this time: checked before booking.
   const items = await plannedItems(admin, site, request, start);
-  const promotion = items ? await onlinePromotion(admin, site, clientId!, items, start, input.promoCode ?? null) : null;
-  if (promotion && !promotion.ok) return { ok: false, reason: "promotion", message: promotion.message };
+  if (!items) return { ok: false, reason: "taken", message: "Sorry, that time was just taken. Please pick another." };
+  // With no preference, whoever is free may have changed since Review.
+  if (input.expectedCents !== undefined && visitCents(site, items) !== input.expectedCents) {
+    return { ok: false, reason: "taken", message: "The stylist free at that time has changed, so the price has too. Please pick a time again." };
+  }
+  // Their promo code, or the special picked with the time: checked before booking.
+  const promotion = await onlinePromotion(admin, site, clientId!, items, start, { code: input.promoCode ?? null, specialId: input.specialId ?? null });
+  if (!promotion.ok) return { ok: false, reason: "promotion", message: promotion.message };
+  if (promotion.lost) return { ok: false, reason: "promotion", lost: true, message: `${promotion.lost} Check the total, then book.` };
   const card = await cardFor(terms, input.cardRef);
   if (!card.ok) return { ok: false, reason: "card", message: card.message };
   let deposit: { amount_cents: number; provider: string; reference: string } | null = null;
@@ -407,7 +440,7 @@ async function bookCharged(
     request: VisitRequest;
     start: Date;
     terms: OnlineTerms;
-    promotion: Awaited<ReturnType<typeof onlinePromotion>> | null;
+    promotion: OnlinePromotion;
     card: { save?: { provider: string; ref: string; label: string } };
     deposit: { amount_cents: number; provider: string; reference: string } | null;
     token: string;
@@ -435,7 +468,7 @@ async function bookCharged(
   // The promotion stays with the visit, to come off at checkout (if the
   // rules no longer allow it, say because the last use just went, the
   // booking stands without it).
-  if (promotion?.ok && promotion.promo) await admin.rpc("attach_online_promotion", { p_appointment_id: result.appointmentId, p_promotion_id: promotion.promo.id });
+  if (promotion.ok && promotion.promo) await admin.rpc("attach_online_promotion", { p_appointment_id: result.appointmentId, p_promotion_id: promotion.promo.id });
   // What they agreed to and when, the card, and the deposit.
   const { error: consentError } = await admin.rpc("record_online_card", {
     p_appointment_id: result.appointmentId,

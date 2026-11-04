@@ -24,6 +24,8 @@ export type ManagedBooking = {
   // Paid ahead (online or by a card link).
   depositPaidCents: number;
   bookedAt: Date;
+  // The offer it was booked with (a code or a last-minute special).
+  promotionId: string | null;
   // The same services with the same stylist (or anyone, if they differ).
   request: VisitRequest;
 };
@@ -38,7 +40,7 @@ export async function loadManaged(admin: SupabaseClient<Database>, site: Booking
   const { data, error } = await admin
     .from("appointments")
     .select(
-      "id, client_id, status, notes, starts_at, ends_at, created_at, deposit_cents, deposit_paid_cents, client:clients(first_name), appointment_items(service_id, staff_id, starts_at, price_cents, service:services(name), staff:staff(first_name))",
+      "id, client_id, status, notes, starts_at, ends_at, created_at, deposit_cents, deposit_paid_cents, promotion_id, client:clients(first_name), appointment_items(service_id, staff_id, starts_at, price_cents, service:services(name), staff:staff(first_name))",
     )
     .eq("business_id", site.business.id)
     .eq("id", link.appointment_id)
@@ -61,6 +63,7 @@ export async function loadManaged(admin: SupabaseClient<Database>, site: Booking
     depositCents: data.deposit_cents,
     depositPaidCents: data.deposit_paid_cents,
     bookedAt: new Date(data.created_at),
+    promotionId: data.promotion_id,
     request: {
       serviceIds: items.map((i) => i.serviceId),
       staffId: staffIds.length === 1 ? staffIds[0] : null,

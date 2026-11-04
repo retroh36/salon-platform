@@ -197,9 +197,9 @@ test.describe("booking site", () => {
     await flow(page).getByLabel("Email").fill(`pr-${RUN}@example.com`);
     await cont(page).click();
 
-    // The special, with about what it takes off ($70 cut, 20%).
-    await expect(flow(page).getByTestId("online-promotion")).toContainText(`Pr${RUN} Week: 20% off`);
-    await expect(flow(page).getByTestId("online-promotion")).toContainText("about −$14");
+    // The special, with what it takes off ($70 cut, 20%).
+    await expect(flow(page).getByTestId("online-promotion")).toContainText("Last-minute 20% off");
+    await expect(flow(page).getByTestId("online-promotion")).toContainText("−$14");
     await flow(page).getByRole("button", { name: "Have a promo code?" }).click();
     await flow(page).getByLabel("Promo code").fill("NOTACODE");
     await flow(page).getByRole("button", { name: "Apply" }).click();
