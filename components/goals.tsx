@@ -75,8 +75,9 @@ export function GoalCard({ pacing, children }: { pacing: Pacing; children?: Reac
   );
 }
 
-// Denise's goal alert: her line on each goal, any celebration, and what to
-// do next. "Got it" puts it away until the next one is due.
+// Denise's goal alert: one line over every goal (each goal's own line is in
+// its card), any celebration, and what to do next. "Got it" puts it away
+// until the next one is due.
 export function GoalAlertCard({ alert, today }: { alert: GoalAlert; today: string }) {
   return (
     <section aria-label="Denise on your goals" className="mb-6 flex gap-3 rounded-lg border border-denise-200 bg-denise-50 p-4 text-sm text-denise-900" data-testid="goal-alert">
@@ -87,11 +88,9 @@ export function GoalAlertCard({ alert, today }: { alert: GoalAlert; today: strin
             {c.text}
           </p>
         ))}
-        <ul className="flex flex-col gap-1">
-          {alert.lines.map((l) => (
-            <li key={l}>{l}</li>
-          ))}
-        </ul>
+        <p className="font-medium" data-testid="goal-summary">
+          {alert.summary}
+        </p>
         {alert.actions.length > 0 && (
           <ul className="flex list-disc flex-col gap-1 pl-5" aria-label="Ideas from Denise" data-testid="goal-actions">
             {alert.actions.map((a) => (

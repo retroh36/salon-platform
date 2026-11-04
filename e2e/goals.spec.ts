@@ -22,17 +22,20 @@ test.describe("stylist", () => {
     const goals = ui(page).getByTestId("my-goals");
     const alert = goals.getByTestId("goal-alert");
     await expect(alert).toBeVisible();
-    // Her line on the revenue goal, from our numbers.
-    await expect(alert).toContainText(/(You're (on pace|ahead|a little behind)|Goal hit) — \$[\d,]+ of \$9,000/);
-    await expect(alert).toContainText(/rebooked against your 70% goal|No checkouts yet/);
-
+    // Her alert sums the goals up in one line; each goal's own line is said
+    // once, in its card.
+    await expect(alert.getByTestId("goal-summary")).toHaveText(/^(On pace for|Ahead on|Behind on|Goal hit for) service revenue · (on pace for|ahead on|behind on|goal hit for) rebooking$/);
+    await expect(alert).not.toContainText("of $9,000");
     const revenue = goals.getByTestId("goal").filter({ hasText: "Service revenue" });
+    await expect(revenue.getByTestId("goal-line")).toContainText(/(You're (on pace|ahead|a little behind)|Goal hit) — \$[\d,]+ of \$9,000/);
+    await expect(goals.getByTestId("goal").filter({ hasText: "Rebooked at checkout" }).getByTestId("goal-line")).toContainText(/rebooked at checkout against your 70% goal|No checkouts yet/);
+
     await expect(revenue.getByTestId("goal-status")).toHaveText(/^(Ahead|On pace|Behind|Goal hit)$/);
     await expect(revenue.getByRole("progressbar")).toHaveAttribute("aria-valuetext", /of \$9,000$/);
     // The owner set it: hers to see, not to remove.
     await expect(revenue).toContainText("Set by the owner.");
     await expect(revenue.getByRole("button", { name: /Remove/ })).toHaveCount(0);
-    await expect(goals.getByTestId("goal").filter({ hasText: "Rebooking" }).getByRole("button", { name: /Remove/ })).toBeVisible();
+    await expect(goals.getByTestId("goal").filter({ hasText: "Rebooked at checkout" }).getByRole("button", { name: /Remove/ })).toBeVisible();
 
     // Got it: away until tomorrow.
     await alert.getByRole("button", { name: "Got it" }).click();

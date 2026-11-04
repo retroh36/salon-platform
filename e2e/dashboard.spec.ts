@@ -152,7 +152,11 @@ test.describe("stylist", () => {
     await expect(main.getByTestId("dashboard")).toHaveAttribute("data-role", "stylist");
     await expect(main.getByTestId("my-denise-notes")).toBeVisible();
     await expect(main.getByTestId("my-next-client")).toBeVisible();
-    await expect(main.getByTestId("my-stats")).toBeVisible();
+    // Their numbers in one strip, each once: Book filled isn't repeated.
+    await expect(main.getByTestId("my-stats")).toHaveCount(0);
+    await expect(main.getByTestId("tile-to-come")).toBeVisible();
+    await expect(main.getByTestId("tile-rebooked")).toContainText("Past 12 months");
+    await expect(main.getByText("Book filled", { exact: true })).toHaveCount(1);
     await expect(main.getByTestId("my-visits")).toBeVisible();
     await expect(main.getByTestId("dashboard-denise")).toHaveCount(0);
     await expect(main.getByTestId("tile-revenue")).toHaveCount(0);

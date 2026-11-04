@@ -11,6 +11,7 @@ import { formatPrice } from "@/lib/services";
 import { EmptyState, Section } from "@/components/ui/page";
 import { StatusChip } from "@/components/ui/status-chip";
 import { AllClear } from "./all-clear";
+import { FoldSection } from "./fold";
 
 const cardClass = "rounded-lg border border-line bg-surface";
 const seeAllClass = "inline-flex items-center gap-0.5 text-sm font-medium text-link hover:text-link-hover hover:underline";
@@ -78,14 +79,28 @@ export function Glance({ data, lastWeek }: { data: DashboardData; lastWeek: stri
         {t.revenueCents && (
           <StatCell testId="tile-revenue" label="Expected revenue" value={formatPrice(t.revenueCents.now)} note={change(t.revenueCents, formatPrice, lastWeek)} href="/calendar" />
         )}
-        <StatCell testId="tile-checked-in" label="Checked in so far" value={count(t.checkedIn.now)} note={change(t.checkedIn, count, `${lastWeek} by now`)} href="/calendar" />
+        {mine && data.me ? (
+          <StatCell testId="tile-to-come" label="Still to come" value={count(data.me.stats.toCome)} note={`${data.me.stats.done} done so far`} href="/my-day" />
+        ) : (
+          <StatCell testId="tile-checked-in" label="Checked in so far" value={count(t.checkedIn.now)} note={change(t.checkedIn, count, `${lastWeek} by now`)} href="/calendar" />
+        )}
         <StatCell
           testId="tile-missed"
           label="No-shows · canceled"
-          value={`${t.missed.noShows} · ${t.missed.canceled}`}
+          value={missed === 0 ? "None" : `${t.missed.noShows} · ${t.missed.canceled}`}
           note={change({ change: missed - thenMissed }, count, lastWeek)}
           href="/calendar"
         />
+        {/* Denise's learned figure, a year of visits; the rebooking goal
+            counts only this period's checkouts (lib/goals/pacing.ts). */}
+        {mine && data.me && (
+          <StatCell
+            testId="tile-rebooked"
+            label="Rebooked before leaving"
+            value={data.me.stats.rebookedPercent === null ? "–" : `${data.me.stats.rebookedPercent}%`}
+            note={["Past 12 months", data.me.stats.salonRebookedPercent !== null && `salon ${data.me.stats.salonRebookedPercent}%`].filter(Boolean).join(" · ")}
+          />
+        )}
       </StatStrip>
     </Section>
   );
@@ -181,10 +196,10 @@ export function OpportunitySections({ o, today, mine }: { o: Opportunities; toda
   const shown = cards.filter((c) => c.card);
   const clear = cards.filter((c) => !c.card);
   return (
-    <Section title="Opportunities" titleId="opportunities-heading">
+    <FoldSection title="Opportunities" titleId="opportunities-heading" fold={!mine}>
       {shown.length > 0 && <div className={`flex flex-wrap gap-3 ${clear.length ? "mb-3" : ""}`}>{shown.map((c) => c.card)}</div>}
       <AllClear items={clear.map((c) => ({ title: c.title, why: c.why, testId: c.testId }))} />
-    </Section>
+    </FoldSection>
   );
 }
 
@@ -194,7 +209,7 @@ export function ThisWeek({ week, mine }: { week: DashboardData["week"]; mine: bo
   const top = Math.max(100, ...week.days.map((d) => d.percent ?? 0));
   const sales = week.sales;
   return (
-    <Section title="This week" titleId="week-heading">
+    <FoldSection title="This week" titleId="week-heading" fold={!mine}>
       {sales && (
         <StatStrip className="mb-3" data-testid="week-sales">
           <StatCell label={`Sales this week (Mon–${sales.through})`} value={formatPrice(Math.round(sales.thisWeek * 100))} note={`${formatPrice(Math.round(sales.lastWeek * 100))} the same days last week`} />
@@ -224,12 +239,13 @@ export function ThisWeek({ week, mine }: { week: DashboardData["week"]; mine: bo
           ))}
         </ol>
       </figure>
-    </Section>
+    </FoldSection>
   );
 }
 
 // A stylist's own day: Denise's notes for them, their next client with
-// what she knows about them, their visits and their stats.
+// what she knows about them, and their visits (their numbers are in the
+// glance strip below, each once).
 export function MyDaySections({ me }: { me: MyDay }) {
   return (
     <>
@@ -254,54 +270,42 @@ export function MyDaySections({ me }: { me: MyDay }) {
         </div>
       </section>
 
-      <div className="mb-8 grid gap-3 lg:grid-cols-[3fr_2fr] lg:items-start">
-        <section aria-labelledby="next-client-heading" className={`${cardClass} animate-fade-in p-4`} data-testid="my-next-client">
-          <h2 id="next-client-heading" className="text-13 text-ink-muted">
-            {me.next?.status === "checked_in" ? "In your chair" : "Your next client"}
-          </h2>
-          {me.next ? (
-            <>
-              <p className="mt-1 text-xl font-semibold text-ink">
-                {me.next.client} · <span className="tabular-nums">{formatMinute(me.next.start)}</span>
-              </p>
-              <p className="text-sm text-ink-muted">{me.next.service}</p>
-              {me.next.insight && (
-                <div className="mt-3 border-t border-line pt-3">
-                  <ClientInsightCard insight={me.next.insight} plain />
-                </div>
-              )}
-              <Link href={`/calendar?open=${me.next.appointmentId}`} className={buttonClass("secondary", "sm", "mt-4")}>
-                Open booking
-              </Link>
-            </>
-          ) : (
-            <p className="mt-1 text-sm text-ink-muted">No one else on your book today.</p>
-          )}
-        </section>
-        <section aria-labelledby="my-stats-heading" className={`${cardClass} flex animate-fade-in flex-col overflow-hidden`} data-testid="my-stats">
-          <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
-            <h2 id="my-stats-heading" className="text-sm font-semibold text-ink">
-              Your numbers
-            </h2>
-            <Link href="/my-day" className={seeAllClass}>
-              Open My day
-              <ChevronRightIcon className="size-4" />
+      <section aria-labelledby="next-client-heading" className={`${cardClass} mb-8 animate-fade-in p-4`} data-testid="my-next-client">
+        <h2 id="next-client-heading" className="text-13 text-ink-muted">
+          {me.next?.status === "checked_in" ? "In your chair" : "Your next client"}
+        </h2>
+        {me.next ? (
+          <>
+            <p className="mt-1 text-xl font-semibold text-ink">
+              {me.next.client} · <span className="tabular-nums">{formatMinute(me.next.start)}</span>
+            </p>
+            <p className="text-sm text-ink-muted">{me.next.service}</p>
+            {me.next.insight && (
+              <div className="mt-3 border-t border-line pt-3">
+                <ClientInsightCard insight={me.next.insight} plain />
+              </div>
+            )}
+            <Link href={`/calendar?open=${me.next.appointmentId}`} className={buttonClass("secondary", "sm", "mt-4")}>
+              Open booking
             </Link>
-          </div>
-          <dl className="grid flex-1 grid-cols-2 gap-px bg-line">
-            <Stat label="Still to come" value={String(me.stats.toCome)} />
-            <Stat label="Done so far" value={String(me.stats.done)} />
-            <Stat label="Book filled" value={me.stats.percent === null ? "–" : `${me.stats.percent}%`} />
-            <Stat
-              label="Rebook before leaving"
-              value={me.stats.rebookedPercent === null ? "–" : `${me.stats.rebookedPercent}%`}
-              note={me.stats.salonRebookedPercent !== null ? `Salon ${me.stats.salonRebookedPercent}%` : undefined}
-            />
-          </dl>
-        </section>
-      </div>
+          </>
+        ) : (
+          <p className="mt-1 text-sm text-ink-muted">No one else on your book today.</p>
+        )}
+      </section>
 
-      <Section title="Your day" titleId="my-visits-heading" count={me.visits.length || undefined} data-testid="my-visits">
+      <Section
+        title="Your day"
+        titleId="my-visits-heading"
+        count={me.visits.length || undefined}
+        data-testid="my-visits"
+        actions={
+          <Link href="/my-day" className={seeAllClass}>
+            Open My day
+            <ChevronRightIcon className="size-4" />
+          </Link>
+        }
+      >
         {me.visits.length ? (
           <ul className={`${cardClass} animate-fade-in divide-y divide-line overflow-hidden`}>
             {me.visits.map((v) => (
@@ -323,16 +327,6 @@ export function MyDaySections({ me }: { me: MyDay }) {
         )}
       </Section>
     </>
-  );
-}
-
-function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
-  return (
-    <div className="flex flex-col gap-1 bg-surface px-4 py-3">
-      <dt className="text-13 text-ink-muted">{label}</dt>
-      <dd className="text-2xl font-semibold text-ink tabular-nums">{value}</dd>
-      {note && <dd className="text-xs text-ink-subtle tabular-nums">{note}</dd>}
-    </div>
   );
 }
 

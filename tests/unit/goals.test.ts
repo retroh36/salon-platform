@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { alertDue, goalPeriod, pace, parseTarget, workingDays, type Goal, type Progress } from "@/lib/goals/pacing";
-import { celebration, goalActions, goalLine, periodName } from "@/lib/goals/wording";
+import { celebration, goalActions, goalLine, goalSummary, periodName } from "@/lib/goals/wording";
 import { datesBetween } from "@/lib/scheduling/time";
 
 const revenue: Goal = { id: "g1", staffId: "ana", metric: "service_revenue", period: "month", target: 900000 };
@@ -74,14 +74,21 @@ describe("pacing rates and counts", () => {
     // 58% of 24 so far; 12 still booked: 70% of 36 is 25.2, so 12 more.
     const p = pace(rebooking, nov, { ...none, visits: 24, rebooked: 14, upcomingVisits: 12 }, mid);
     expect(p).toMatchObject({ current: 58, status: "behind", neededRebooks: 12, milestone: 0 });
-    expect(goalLine(p)).toBe("You're a little behind — 58% rebooked against your 70% goal; rebook 12 of your 12 booked visits left to get there.");
+    expect(goalLine(p)).toBe("You're a little behind — 58% rebooked at checkout against your 70% goal; rebook 12 of your 12 booked visits left to get there.");
     expect(pace(rebooking, nov, { ...none, visits: 20, rebooked: 14, upcomingVisits: 5 }, mid)).toMatchObject({ current: 70, status: "ahead", neededRebooks: null });
     expect(pace(rebooking, nov, { ...none, visits: 20, rebooked: 14 }, workingDays(days, "2026-11-30", 0))).toMatchObject({ status: "hit", milestone: 100 });
     expect(goalLine(pace(rebooking, nov, none, mid))).toBe("No checkouts yet in November; your rebooking goal is 70%.");
     // Out of reach this time: 6 of 20, 10 booked; all 10 rebooked is 53%.
     const far = pace(rebooking, nov, { ...none, visits: 20, rebooked: 6, upcomingVisits: 10 }, mid);
     expect(far).toMatchObject({ current: 30, neededRebooks: null, bestRate: 53 });
-    expect(goalLine(far)).toBe("You're a little behind — 30% rebooked against your 70% goal; even with every one of your 10 booked visits left rebooked, it would reach 53% this time.");
+    expect(goalLine(far)).toBe("You're a little behind — 30% rebooked at checkout against your 70% goal; even with every one of your 10 booked visits left rebooked, it would reach 53% this time.");
+  });
+
+  it("sums every goal up in one line for her alert, each goal's own line staying in its card", () => {
+    const onPace = pace(revenue, nov, none, workingDays(days, "2026-11-01", 0));
+    const behind = pace(rebooking, nov, { ...none, visits: 24, rebooked: 14, upcomingVisits: 12 }, mid);
+    expect([onPace.status, behind.status]).toEqual(["on_pace", "behind"]);
+    expect(goalSummary([onPace, behind])).toBe("On pace for service revenue · behind on rebooking");
   });
 
   it("says what the rest of the visits need to average", () => {

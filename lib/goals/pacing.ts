@@ -11,12 +11,15 @@ import { addDays, startOfWeek, type LocalDate } from "../scheduling/time.ts";
 export type GoalMetric = "service_revenue" | "retail_revenue" | "rebooking_rate" | "new_clients" | "average_ticket";
 export type GoalPeriod = "week" | "month" | "quarter" | "year";
 
-export const GOAL_METRICS: { value: GoalMetric; label: string; unit: "cents" | "percent" | "count" }[] = [
-  { value: "service_revenue", label: "Service revenue", unit: "cents" },
-  { value: "retail_revenue", label: "Retail sales", unit: "cents" },
-  { value: "rebooking_rate", label: "Rebooking", unit: "percent" },
-  { value: "new_clients", label: "New clients", unit: "count" },
-  { value: "average_ticket", label: "Average ticket", unit: "cents" },
+// `short` names it in Denise's one-line summary ("behind on rebooking").
+// Rebooking here is next visits booked at checkout (sales.rebook_appointment_id,
+// like Reports), not Denise's learned "rebooked before leaving".
+export const GOAL_METRICS: { value: GoalMetric; label: string; short: string; unit: "cents" | "percent" | "count" }[] = [
+  { value: "service_revenue", label: "Service revenue", short: "service revenue", unit: "cents" },
+  { value: "retail_revenue", label: "Retail sales", short: "retail sales", unit: "cents" },
+  { value: "rebooking_rate", label: "Rebooked at checkout", short: "rebooking", unit: "percent" },
+  { value: "new_clients", label: "New clients", short: "new clients", unit: "count" },
+  { value: "average_ticket", label: "Average ticket", short: "average ticket", unit: "cents" },
 ];
 export const GOAL_PERIODS: { value: GoalPeriod; label: string }[] = [
   { value: "week", label: "Week" },

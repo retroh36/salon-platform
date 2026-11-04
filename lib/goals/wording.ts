@@ -54,7 +54,7 @@ export function goalLine(p: Pacing, who?: string): string {
       : p.status === "ahead" && !who
         ? "; keep offering the next visit at checkout"
         : "";
-    return `${status[p.status]} — ${p.current}% rebooked against ${v.your} ${p.target}% goal${need}.`;
+    return `${status[p.status]} — ${p.current}% rebooked at checkout against ${v.your} ${p.target}% goal${need}.`;
   }
   if (p.goal.metric === "average_ticket") {
     if (p.current === null) return `No tickets yet; ${v.your} average ticket goal is ${goalValue(p, p.target)}.`;
@@ -71,9 +71,17 @@ export function goalLine(p: Pacing, who?: string): string {
   return `${status[p.status]} — ${of} ${left}${per}${booked}.`;
 }
 
+// Her alert's one line over every goal, so each goal's own line is said once,
+// in its card: "On pace for revenue · behind on rebooking".
+export function goalSummary(pacings: readonly Pacing[]): string {
+  const phrase = { hit: "goal hit for", ahead: "ahead on", on_pace: "on pace for", behind: "behind on" } as const;
+  const text = pacings.map((p) => `${phrase[p.status]} ${metricInfo(p.goal.metric).short}`).join(" · ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 // A celebration the first time a milestone is reached.
 export function celebration(p: Pacing): string | null {
-  const what = `${metricInfo(p.goal.metric).label.toLowerCase()} goal for ${periodName(p.goal.period, p.from)}`;
+  const what = `${metricInfo(p.goal.metric).short} goal for ${periodName(p.goal.period, p.from)}`;
   if (p.milestone === 100) return `You hit your ${what}. Well done.`;
   if (p.milestone === 75) return `Three quarters of the way to your ${what}.`;
   if (p.milestone === 50) return `Halfway to your ${what}.`;

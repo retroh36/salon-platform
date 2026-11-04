@@ -1,7 +1,8 @@
 // A stylist's own goals for My day and their Dashboard: each paced for its
 // period, and Denise's alert when it's due (daily or weekly, their choice)
-// or a milestone hasn't been celebrated yet: a line per goal, the
-// celebrations, and up to three things to do from real data.
+// or a milestone hasn't been celebrated yet: one line over every goal (each
+// goal's own line is in its card), the celebrations, and up to three things
+// to do from real data.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DashboardMe } from "@/lib/dashboard-load";
@@ -10,12 +11,12 @@ import { toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { loadGoalFacts } from "./facts";
 import { loadGoals, paceGoals } from "./load";
 import { alertDue, type AlertFrequency, type Pacing } from "./pacing";
-import { celebration, goalActions, goalLine } from "./wording";
+import { celebration, goalActions, goalSummary } from "./wording";
 
 type Supabase = SupabaseClient<Database>;
 
 export type GoalAlert = {
-  lines: string[];
+  summary: string;
   celebrations: { text: string; goalId: string; periodFrom: LocalDate; milestone: 50 | 75 | 100 }[];
   actions: string[];
 };
@@ -42,5 +43,5 @@ export async function loadMyGoals(supabase: Supabase, me: Pick<DashboardMe, "id"
   if (!alertDue(frequency, staff.goal_alert_seen_on, today) && !celebrations.length) return { today, frequency, pacings, alert: null };
   const open = pacings.filter((p) => p.status !== "hit");
   const facts = open.length ? await loadGoalFacts(supabase, me, me.id, Math.max(0, ...pacings.map((p) => p.upcomingVisits)), now) : null;
-  return { today, frequency, pacings, alert: { lines: pacings.map((p) => goalLine(p)), celebrations, actions: facts ? goalActions(pacings, facts) : [] } };
+  return { today, frequency, pacings, alert: { summary: goalSummary(pacings), celebrations, actions: facts ? goalActions(pacings, facts) : [] } };
 }

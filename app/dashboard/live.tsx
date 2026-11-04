@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { formatDuration } from "@/lib/duration";
-import { Badge, EmptyState, Section, textLinkClass, type Tone } from "@/components/ui/page";
+import { Badge, EmptyState, textLinkClass, type Tone } from "@/components/ui/page";
+import { FoldSection } from "./fold";
 import type { LiveData, LiveVisit, StylistCard } from "@/lib/dashboard-load";
 import type { StylistStatus } from "@/lib/dashboard";
 import { formatMinute } from "@/lib/scheduling/time";
@@ -117,11 +118,10 @@ function Column({ title, empty, visits, line, tag, testId }: { title: string; em
 
 function TeamToday({ team }: { team: StylistCard[] }) {
   return (
-    <Section
+    <FoldSection
       title="Team today"
       titleId="team-today-heading"
       count={team.length || undefined}
-      className="animate-fade-in"
       actions={
         <Link href="/team" className={`text-sm ${textLinkClass}`}>
           Team
@@ -160,6 +160,6 @@ function TeamToday({ team }: { team: StylistCard[] }) {
           ))}
         </ul>
       )}
-    </Section>
+    </FoldSection>
   );
 }

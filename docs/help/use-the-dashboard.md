@@ -19,7 +19,9 @@ The Dashboard is the day at a glance, starting with Denise's brief: what might g
 
 - Sections with nothing in them today are listed together in one **All clear** line, in the brief and under **Opportunities**.
 - A dismissed brief item is gone for the day for everyone at the location.
-- Stylists see their own day, clients and regulars, with no salon money.
+- Stylists see their own day, clients and regulars, with no salon money. Their numbers are in **Your day at a glance**, including **Rebooked before leaving** (the past 12 months).
+- On a phone, **Team today**, **Opportunities** and **This week** are folded: tap a header to open it.
+- **No-shows · canceled** says **None** when there are neither.
 - Front desk sees everything except money.
 - Denise's brief is worked out from your own bookings and sales.
 - **Events coming up** checks booked events for the next 60 days: a payment that didn't go through, a balance still due within a week, a trial not booked within a month, the headcount cutoff closing or just passed, someone on the team who has time off or clients then, and artists not chosen. Each event is listed once, with everything to sort out under its name; dismiss each one on its own.

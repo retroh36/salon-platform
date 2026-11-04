@@ -395,7 +395,13 @@ the one main action, one layer of containers.
   the browser's marker. Dismiss buttons sit on the middle of the first line
   they dismiss. A section's actions sit on its title's line (at the foot of
   its description when it has one). Team today's cards share the row's
-  width, two across on a phone.
+  width, two across on a phone. Each figure shows once on a page (a
+  stylist's numbers are one strip), and two figures that sound alike say
+  what they count and over when ("Rebooked before leaving · past 12
+  months" against the goal's "Rebooked at checkout"). Nothing to count is
+  "None", never "0 · 0". Denise says a thing once: her alert sums goals up
+  in a line, each goal's own line is in its card. On a phone the front
+  desk's Dashboard folds what's below Right now into tappable headers.
 
 Every component, in each of its states, is on the owners' style guide at
 `/design` (not in the sidebar).
