@@ -568,7 +568,9 @@ times as (
   from timed t
 )
 update public.appointment_items i set
-  started_at = case when x.started <= now() then x.started end,
+  -- A completed visit started before it finished, even one checked out just
+  -- now whose client arrived late (a start after now, a finish before it).
+  started_at = case when x.status = 'completed' then least(x.started, now() - interval '10 minutes') when x.started <= now() then x.started end,
   processing_started_at = case when x.processing_minutes > 0 and x.proc_start <= now() then x.proc_start end,
   processing_ended_at = case when x.processing_minutes > 0 and x.proc_end <= now() then x.proc_end end,
   -- A completed visit is done by now, even one that ran long.
