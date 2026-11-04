@@ -263,8 +263,11 @@ async function capture(browser: Browser, first: boolean) {
     const overrun = await colorRunningOver();
     if (!overrun) throw new Error("no color in the chair today with a client booked after it");
     const title = new RegExp(`${overrun.stylist}'s? running 20 min(utes)? late`);
-    if (!first) {
-      // Reported at the first width: her card for it again, its fix previewed.
+    // Reported once (at the first width, or by an earlier run over the same
+    // data with --reuse), so before and after shots show the same day.
+    const { data: reports } = await admin.from("schedule_disruptions").select("id").eq("item_id", overrun.itemId).limit(1);
+    if (!first || reports?.length) {
+      // Already reported: her card for it again, its fix previewed.
       await page.goto("/calendar?denise=1");
       await waitForReact(page, "section[data-staff-id]");
       const card = page.locator("section[data-conflict]").filter({ visible: true }).filter({ hasText: title });
