@@ -193,6 +193,8 @@
   --radius-md: 8px;
   --radius-lg: 8px;
   --radius-xl: 12px;
+  /* Calendar blocks: a touch rounder than cards, so they read as objects on the grid. */
+  --radius-block: 10px;
 
   /* Shadows: cards are flat (a 1px border, never a shadow too); only
      things floating over the page lift (menus, popovers, a dragged block). */

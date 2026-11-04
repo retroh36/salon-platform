@@ -77,6 +77,9 @@ export async function expectTidyLayout(page: Page, where: string) {
         const scrolls = /auto|scroll/.test(s.overflowX + s.overflowY);
         if (scrolls) {
           view = { left: Math.max(view.left, r.left), top: Math.max(view.top, r.top), right: Math.min(view.right, r.right), bottom: Math.min(view.bottom, r.bottom) };
+          // Running past a scroller's edge is scrolled, not cut: the boxes
+          // further out are no narrower than the scroller's view.
+          if (text.right > view.right + 1 || text.left < view.left - 1 || text.bottom > view.bottom + 1 || text.top < view.top - 1) break;
           continue;
         }
         if (shortened(e)) break;
@@ -104,4 +107,51 @@ export async function expectTidyLayout(page: Page, where: string) {
     return out;
   });
   expect(problems, `layout problems ${where}`).toEqual([]);
+}
+
+// The calendar's column headers, whole: each stylist's name, hours and day
+// read in one of their own forms ("Bridget Callahan", "Bridget C."), never
+// cut mid-word with "…"; the day keeps its label ("6 visits", not "6"). The
+// name has all the room beside the photo, and is shortened only when the
+// full name doesn't fit there.
+export async function expectWholeHeaders(page: Page, where: string) {
+  const problems = await page.evaluate(() => {
+    const out: string[] = [];
+    const cut = (el: Element | null) => !!el && (el.scrollWidth > el.clientWidth + 0.5 || (el.textContent ?? "").includes("…"));
+    for (const header of document.querySelectorAll<HTMLElement>("main [data-column-header]")) {
+      if (!header.offsetParent) continue;
+      const nameBox = header.querySelector<HTMLElement>("[data-column-name]");
+      const name = nameBox?.title ?? "";
+      const shown = (nameBox?.textContent ?? "").trim();
+      const fits = nameBox?.querySelector("span") ?? nameBox;
+      if (cut(fits)) out.push(`${name}: the name is cut ("${shown}")`);
+      else if (nameBox && shown !== name) {
+        // Shortened: only when the full name needs more room than there is.
+        const probe = document.createElement("span");
+        probe.textContent = name;
+        probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font:${getComputedStyle(fits!).font}`;
+        document.body.append(probe);
+        const needs = probe.getBoundingClientRect().width;
+        probe.remove();
+        if (needs <= nameBox.getBoundingClientRect().width) out.push(`${name}: shows "${shown}" though the full name fits`);
+      }
+      // The name's room: the header less its padding, the photo and the gap.
+      const row = nameBox?.closest("[data-column-header] > div");
+      const photo = row?.firstElementChild;
+      if (nameBox && row && photo && !photo.contains(nameBox)) {
+        const room = row.getBoundingClientRect().width - photo.getBoundingClientRect().width - parseFloat(getComputedStyle(row).columnGap || "0");
+        if (nameBox.getBoundingClientRect().width < room - 1) out.push(`${name}: the name has ${nameBox.getBoundingClientRect().width.toFixed(0)}px of ${room.toFixed(0)}px beside the photo`);
+      }
+      const hours = header.querySelector<HTMLElement>("[data-testid=column-hours]");
+      if (hours && (cut(hours.querySelector("span") ?? hours) || cut(hours))) out.push(`${name}: the hours are cut ("${hours.textContent}")`);
+      const day = header.querySelector<HTMLElement>("[data-testid=booked-summary]");
+      if (day) {
+        const text = (day.textContent ?? "").trim();
+        if (cut(day.querySelector("span") ?? day) || cut(day)) out.push(`${name}: the day is cut ("${text}")`);
+        else if (!/^(\d+ visits?\b|No bookings)/.test(text)) out.push(`${name}: the day has no label ("${text}")`);
+      }
+    }
+    return out;
+  });
+  expect(problems, `column headers ${where}`).toEqual([]);
 }

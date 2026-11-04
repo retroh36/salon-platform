@@ -117,7 +117,7 @@ test("shows each stylist's level as a colored ring, badge and bar, explained by 
   const colors = new Set<string>();
   for (const [name, level] of [["Bridget Callahan", "master"], ["Nola Brennan", "senior"], ["Shae Morgan", "artisan"]] as const) {
     await expect(header(name)).toHaveAttribute("data-level", level);
-    // A 4px bar along the top of the column, in the level's color.
+    // A 4px bar along the foot of the column's header, in the level's color.
     const bar = header(name).getByTestId("level-bar");
     expect((await bar.boundingBox())!.height).toBeCloseTo(4, 1);
     const color = await bar.evaluate((el) => getComputedStyle(el).backgroundColor);

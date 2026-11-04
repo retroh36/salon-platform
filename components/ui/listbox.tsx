@@ -19,12 +19,15 @@ export function Listbox<T extends string>({
   options,
   onChange,
   className = "",
+  buttonClassName = "",
 }: {
   label: string;
   value: T;
   options: ListboxOption<T>[];
   onChange: (value: T) => void;
   className?: string;
+  // Extra classes for the button (a toolbar's lighter outline).
+  buttonClassName?: string;
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -100,7 +103,7 @@ export function Listbox<T extends string>({
         }}
         // The label on the left and the arrow on the right (the button's own
         // centering would otherwise win), the label shortened before the arrow.
-        className={buttonClass("secondary", "md", "w-full justify-between!")}
+        className={buttonClass("secondary", "md", `w-full justify-between! ${buttonClassName}`)}
       >
         <span id={`${id}-value`} className="flex min-w-0 items-center gap-2 truncate">
           {current.icon}

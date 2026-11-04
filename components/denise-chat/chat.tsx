@@ -221,7 +221,7 @@ function SuggestionCard({ suggestion, today, canBook }: { suggestion: BookingSug
       if (r.ok) router.refresh();
     });
   return (
-    <section aria-label="Suggested booking" data-testid="denise-suggestion" className="flex animate-fade-in flex-col gap-3 rounded-lg border border-denise-200 bg-surface p-3">
+    <section aria-label="Suggested booking" data-testid="denise-suggestion" className="flex animate-fade-in flex-col gap-3 rounded-lg border border-denise-200 bg-surface p-4">
       <div>
         <p className="font-semibold text-ink">
           {suggestion.serviceName} with {suggestion.staffName}

@@ -143,10 +143,11 @@ async function Design() {
         <Card>
           <div className="flex flex-wrap items-start gap-3">
             {["14rem", "8rem", "5rem"].map((w) => (
-              <div key={w} style={{ width: w }} className="flex flex-col gap-0.5 rounded-md border-l-4 border-(--fam-accent) bg-(--fam-fill) px-2 py-1 text-(--fam-ink)" data-family="cut">
+              <div key={w} style={{ width: w }} className="relative flex flex-col gap-0.5 rounded-block bg-(--fam-fill) py-1.5 pr-2 pl-3 text-(--fam-ink)" data-family="cut">
+                <span aria-hidden className="absolute top-1 bottom-1 left-1 w-[3px] rounded-full bg-(--fam-accent)" />
                 <FitText variants={["Bridget Callahan", "Bridget C.", "Bridget"]} className="text-sm font-semibold" />
                 <FitText variants={["Kids\u2019 Cut (12 & under)", "Kids\u2019 Cut"]} lines={2} className="text-13 text-(--fam-ink-muted)" />
-                <FitText variants={["10am–10:45am", "10–10:45am", "10–10:45"]} className="text-13 text-(--fam-ink-muted)" />
+                <FitText variants={["10am–10:45am", "10–10:45am", "10–10:45"]} className="text-xs text-(--fam-ink-muted) tabular-nums" />
               </div>
             ))}
           </div>

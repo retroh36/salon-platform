@@ -220,7 +220,7 @@ test.describe("front desk", () => {
     // Grace was already told, so Undo asks first, with the correction to send.
     await applied.getByRole("button", { name: "Undo" }).click();
     const warn = panel.getByTestId("undo-warning");
-    await expect(warn).toContainText(new RegExp(`${PREFIX}Grace was told \\d{1,2}:\\d{2}(am|pm)\\. Undo and send a correction\\?`));
+    await expect(warn).toContainText(new RegExp(`${PREFIX}Grace was told (\\d{1,2}:\\d{2}(am|pm)|noon|midnight)\\. Undo and send a correction\\?`));
     await expect(warn.getByTestId("correction-preview")).toContainText("please ignore our last message: your visit is still on for");
     await expect(warn.getByTestId("correction-preview")).toContainText("11am with Bridget");
     expect((await outbox()).data).toHaveLength(1);

@@ -8,7 +8,7 @@ open: /calendar | Open calendar
 Mark a visit as a no-show when the client doesn't come.
 
 1. On the calendar, tap the visit to open booking details.
-2. Tap **⋯** (More actions) at the bottom.
+2. Tap **⋯** (More actions) next to the client's name.
 3. Tap **Mark no-show**.
 4. Check the name, then tap **Mark no-show** again to confirm (or **Not yet**).
 5. Marked by mistake? Tap **Undo** on the message at the bottom of the screen (for 10 seconds), or later tap **⋯** and **Undo no-show**.

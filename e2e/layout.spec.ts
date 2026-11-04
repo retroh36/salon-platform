@@ -8,7 +8,7 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { fromLocal } from "@/lib/scheduling/time";
 import { admin, busyDay, makeRoom, SEED } from "../tests/db/helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
-import { expectTidyLayout } from "./layout";
+import { expectTidyLayout, expectWholeHeaders } from "./layout";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -63,6 +63,15 @@ for (const size of WIDTHS) {
       const card = page.getByTestId("denise-card");
       if (await card.getByRole("button", { name: "Close Denise" }).isVisible()) await card.getByRole("button", { name: "Close Denise" }).click();
       await expectTidyLayout(page, "on the calendar");
+      await expectWholeHeaders(page, "on the calendar");
+      if (size.width < 500) {
+        // Scrolled to the end, the day and the key row end above the floating New booking.
+        await page.evaluate(() => document.scrollingElement!.scrollTo(0, document.scrollingElement!.scrollHeight));
+        const fab = (await page.getByTestId("new-booking-fab").boundingBox())!;
+        const key = (await ui(page).getByRole("button", { name: "Key" }).boundingBox())!;
+        expect(key.y + key.height).toBeLessThanOrEqual(fab.y);
+        await page.evaluate(() => document.scrollingElement!.scrollTo(0, 0));
+      }
 
       // Booking details for the long name and service.
       const block = ui(page).getByRole("button", { name: new RegExp(LONG_NAME.first) });
@@ -71,6 +80,8 @@ for (const size of WIDTHS) {
       const details = page.getByTestId("side-panel");
       await expect(details.getByTestId("client-name")).toHaveText(`${LONG_NAME.first} ${LONG_NAME.last}`);
       await expectTidyLayout(page, "in booking details");
+      // Beside the panel, the headers stay whole (on a laptop and an iPad).
+      if (size.width >= 1180) await expectWholeHeaders(page, "beside booking details");
       await details.getByRole("button", { name: "Close panel" }).click();
 
       // Denise's card, open on the day.

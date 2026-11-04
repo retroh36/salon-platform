@@ -39,7 +39,7 @@ export function OffChip({ off, shown, onShow, isToday }: { off: ColumnData[]; sh
         onClick={() => setOpen(!open)}
         data-testid="off-chip"
         className={`inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium whitespace-nowrap transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-focus ${
-          shown ? "border-navy-700 bg-navy-100 text-navy-900" : "border-line-strong bg-surface text-ink-muted hover:bg-sunken"
+          shown ? "border-navy-700 bg-navy-100 text-navy-900" : "border-line bg-surface text-ink-muted hover:bg-sunken"
         }`}
       >
         {label}

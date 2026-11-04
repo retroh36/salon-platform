@@ -57,7 +57,7 @@ export function BookingCardView({
 
 function Outcome({ outcome }: { outcome: NonNullable<ChatMessage["outcome"]> }) {
   return (
-    <div className="flex flex-col items-start gap-2 rounded-lg border border-denise-200 bg-surface p-3" data-testid="booking-outcome">
+    <div className="flex flex-col items-start gap-2 rounded-lg border border-denise-200 bg-surface p-4" data-testid="booking-outcome">
       <p className="font-medium text-ink">{outcome.text}</p>
       {outcome.appointmentId && outcome.date && (
         <a href={`/calendar?date=${outcome.date}&open=${outcome.appointmentId}`} className={buttonClass("secondary", "sm")}>
@@ -68,7 +68,7 @@ function Outcome({ outcome }: { outcome: NonNullable<ChatMessage["outcome"]> }) 
   );
 }
 
-const cardClass = "flex animate-fade-in flex-col gap-3 rounded-lg border border-denise-200 bg-surface p-3";
+const cardClass = "flex animate-fade-in flex-col gap-3 rounded-lg border border-denise-200 bg-surface p-4";
 
 // The next reply, after staff answer a card's question.
 function useNext(index: number) {

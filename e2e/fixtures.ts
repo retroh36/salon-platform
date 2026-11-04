@@ -135,7 +135,7 @@ export async function checkIn(panel: Locator) {
 }
 
 // Booking details' other actions (Running late, Edit booking, Undo
-// check-in, Mark no-show, Cancel booking) are in the "⋯" menu in its footer.
+// check-in, Mark no-show, Cancel booking) are in the "⋯" menu by the client's name.
 export async function moreAction(panel: Locator, name: string) {
   const more = panel.getByRole("button", { name: "More actions" });
   if ((await more.getAttribute("aria-expanded")) !== "true") await more.click();

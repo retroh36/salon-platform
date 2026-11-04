@@ -146,7 +146,8 @@ export function timeRangeVariants(start: number, end: number): string[] {
 
 export function summaryVariants(summary: string): string[] {
   const short = summary.replace(/ booked$/, "");
-  return [...new Set([summary, short, short.replace(/ visits? · /, " · ")])];
+  // Then the visits alone ("6 visits"): never a bare number without its label.
+  return [...new Set([summary, short, short.split(" · ")[0]])];
 }
 
 // Working hours on one line for a column header: "9–1, 2–6", "10–7",

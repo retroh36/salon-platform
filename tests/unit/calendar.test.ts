@@ -180,8 +180,8 @@ describe("bookedSummary", () => {
   });
 
   it("shortens to fit a narrow header", () => {
-    expect(summaryVariants("7 visits · 6 hr 10 min booked")).toEqual(["7 visits · 6 hr 10 min booked", "7 visits · 6 hr 10 min", "7 · 6 hr 10 min"]);
-    expect(summaryVariants("1 visit · 45 min booked")).toEqual(["1 visit · 45 min booked", "1 visit · 45 min", "1 · 45 min"]);
+    expect(summaryVariants("7 visits · 6 hr 10 min booked")).toEqual(["7 visits · 6 hr 10 min booked", "7 visits · 6 hr 10 min", "7 visits"]);
+    expect(summaryVariants("1 visit · 45 min booked")).toEqual(["1 visit · 45 min booked", "1 visit · 45 min", "1 visit"]);
     expect(summaryVariants("No bookings")).toEqual(["No bookings"]);
   });
 });

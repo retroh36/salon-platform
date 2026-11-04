@@ -13,7 +13,7 @@ export function Segmented<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex h-9 items-center rounded-md border border-line-strong bg-surface p-0.5">
+    <div role="radiogroup" aria-label={label} className="inline-flex h-9 items-center rounded-md border border-line bg-surface p-0.5">
       {options.map((o) => {
         const selected = o.value === value;
         return (

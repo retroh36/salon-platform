@@ -109,7 +109,7 @@ export function DatePicker({
         aria-controls={open ? `${id}-dialog` : undefined}
         aria-label={`${label}: ${formatLongDay(value)}`}
         onClick={() => (open ? setOpen(false) : show())}
-        className={buttonClass("secondary", "md", "justify-start! @min-[62rem]/toolbar:min-w-44")}
+        className={buttonClass("secondary", "md", "justify-start! border-line! @min-[62rem]/toolbar:min-w-44")}
       >
         <CalendarIcon className="size-4 text-navy-700" />
         {/* "Tue, Oct 27" where the toolbar is short (an iPad, or booking details open), "Tue, October 27" where it has room. */}

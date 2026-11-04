@@ -170,10 +170,11 @@ test.describe("front desk", () => {
       .filter({ hasText: /^Color$/ })
       .locator("span")
       .evaluate((el) => getComputedStyle(el).borderLeftColor);
-    expect(await color.evaluate((el) => getComputedStyle(el).borderLeftColor)).toBe(legendColor);
+    // The block's edge is its accent bar, inset on the left.
+    expect(await color.locator("[data-accent]").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(legendColor);
     await page.keyboard.press("Escape");
     const trim = bridget.getByRole("button", { name: new RegExp(`^10:45am–11am, ${PREFIX}Ben Test, Bang Trim`) });
-    expect(await trim.evaluate((el) => getComputedStyle(el).borderLeftColor)).not.toBe(legendColor);
+    expect(await trim.locator("[data-accent]").evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(legendColor);
 
     // Ben's trim sits in Ava's processing gap, in its own lane on the right:
     // side by side, not on top.
@@ -369,7 +370,7 @@ test.describe("design", () => {
     const nola = column(page, "Nola Brennan");
     const block = (name: string) => nola.getByRole("button", { name: new RegExp(`${PREFIX}${name}`) });
     const fill = (name: string) => block(name).locator("[data-segment=active]").evaluate((el) => getComputedStyle(el).backgroundColor);
-    const stripe = (name: string) => block(name).evaluate((el) => getComputedStyle(el).borderLeftColor);
+    const stripe = (name: string) => block(name).locator("[data-accent]").evaluate((el) => getComputedStyle(el).backgroundColor);
 
     // Not here yet (booked or confirmed): the service color.
     for (const name of ["Lou", "Rey"]) await expect(block(name)).toHaveAttribute("data-visit", "upcoming");

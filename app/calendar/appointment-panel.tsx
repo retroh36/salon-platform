@@ -202,17 +202,17 @@ export function AppointmentPanel({
     actions.includes("cancel") && { key: "cancel", label: ACTION_LABELS.cancel, danger: true, onSelect: () => setCanceling(true) },
   ].filter((a): a is MenuAction => Boolean(a));
   const checkedOutNote = status === "completed" && me.canBook;
-  const footer = Boolean(step || menuActions.length || checkedOutNote || message);
+  const footer = Boolean(step || checkedOutNote || message || sentNote || confirmingCheckIn || moving || confirmingNoShow || (messaging && client) || reportingLate || canceling);
 
   return (
     <div className="flex min-h-full flex-col text-sm">
       <div className="flex flex-col gap-6 pt-3 pb-6">
         {/* Who, and where the visit's at. */}
-        <header className="flex items-center gap-3">
+        <header className="flex items-start gap-3.5">
           <Avatar name={client?.name ?? appointment.group?.label ?? "Walk in"} size="lg" />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 pt-0.5">
             <div className="flex items-center gap-1">
-              <h3 className="min-w-0 text-xl font-semibold text-pretty wrap-anywhere" data-testid="client-name">
+              <h3 className="min-w-0 text-2xl leading-8 font-semibold tracking-tight text-pretty wrap-anywhere" data-testid="client-name">
                 {client ? (
                   <Link href={`/clients/${client.id}`} className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-focus">
                     {client.name}
@@ -230,7 +230,7 @@ export function AppointmentPanel({
               )}
             </div>
             {/* One status line: where the visit's at, as a tag (and no texts, if so). */}
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <span data-testid="visit-status" data-status={status} className="inline-flex min-w-0">
                 <Badge tone={STATUS_TONES[status]}>{visitStatusText(status, STATUS_LABELS, appointment, timeZone)}</Badge>
               </span>
@@ -241,6 +241,8 @@ export function AppointmentPanel({
               )}
             </div>
           </div>
+          {/* The visit's other actions, by its name; the footer keeps the one main step. */}
+          {menuActions.length > 0 && <ActionsMenu actions={menuActions} disabled={pending} />}
         </header>
 
         {client?.allergies && (
@@ -295,7 +297,7 @@ export function AppointmentPanel({
             })}
           </ul>
           {several && (
-            <p className="flex justify-between border-t border-line pt-3 font-medium">
+            <p className="flex justify-between pt-1 font-semibold text-ink">
               <span>Total</span>
               <span className="tabular-nums">{formatPrice(total)}</span>
             </p>
@@ -387,9 +389,14 @@ export function AppointmentPanel({
         </div>
       </div>
 
-      {/* One main button for the next step; everything else is under "⋯". */}
+      {/* One main button for the next step, the panel's full width; everything
+          else is under "⋯" by the name. No rule above it: the visit fades
+          out under it as it scrolls. */}
       {footer && (
-        <footer aria-label="Actions" className="sticky bottom-0 mt-auto flex flex-col gap-3 border-t border-line bg-surface pt-3">
+        <footer
+          aria-label="Actions"
+          className="sticky bottom-0 mt-auto flex flex-col gap-3 bg-surface pt-3 before:pointer-events-none before:absolute before:inset-x-0 before:-top-6 before:h-6 before:bg-linear-to-t before:from-surface before:to-transparent"
+        >
           {message && <Alert>{message}</Alert>}
           {sentNote && !messaging && (
             <p role="status" className="text-ink-muted" data-testid="message-sent">
@@ -478,7 +485,7 @@ export function AppointmentPanel({
           ) : (
             <div className="flex items-center gap-2">
               {step ? (
-                <Button variant="primary" size="lg" disabled={pending} onClick={primary} data-testid="primary-action" className="min-w-0 flex-1">
+                <Button variant="primary" size="lg" disabled={pending} onClick={primary} data-testid="primary-action" className="h-11 min-w-0 flex-1">
                   {step.kind === "check_in" ? "Check in" : "Check out"}
                 </Button>
               ) : checkedOutNote ? (
@@ -498,10 +505,7 @@ export function AppointmentPanel({
                     "."
                   )}
                 </p>
-              ) : (
-                <span className="flex-1" />
-              )}
-              {menuActions.length > 0 && <ActionsMenu actions={menuActions} disabled={pending} />}
+              ) : null}
             </div>
           )}
         </footer>
@@ -522,8 +526,8 @@ const STATUS_TONES: Record<AppointmentStatus, Tone> = {
 
 type MenuAction = { key: string; label: string; onSelect: () => void; danger?: boolean };
 
-// "⋯": the visit's other actions, in a menu that opens upward from the
-// footer. Arrow keys move through it; Escape or a click outside closes it.
+// "⋯": the visit's other actions, in a menu that opens down from beside
+// the client's name. Arrow keys move through it; Escape or a click outside closes it.
 function ActionsMenu({ actions, disabled }: { actions: MenuAction[]; disabled: boolean }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -561,7 +565,7 @@ function ActionsMenu({ actions, disabled }: { actions: MenuAction[]; disabled: b
 
   return (
     <div ref={root} className="relative" onKeyDown={onKeyDown}>
-      <Button ref={button} aria-label="More actions" title="More actions" size="lg" square aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={(e) => {
+      <Button ref={button} aria-label="More actions" title="More actions" variant="ghost" size="md" square className="-mr-1.5 text-ink-muted hover:text-ink" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={(e) => {
           byKeys.current = e.detail === 0;
           setOpen(!open);
         }}>
@@ -572,7 +576,7 @@ function ActionsMenu({ actions, disabled }: { actions: MenuAction[]; disabled: b
           ref={menu}
           role="menu"
           aria-label="More actions"
-          className="absolute right-0 bottom-full z-10 mb-2 flex w-max max-w-[min(18rem,calc(100vw-2rem))] min-w-52 origin-bottom-right animate-pop-in flex-col rounded-lg border border-line bg-surface p-1.5 shadow-lift"
+          className="absolute top-full right-0 z-10 mt-1.5 flex w-max max-w-[min(18rem,calc(100vw-2rem))] min-w-52 origin-top-right animate-pop-in flex-col rounded-lg border border-line bg-surface p-1.5 shadow-lift"
         >
           {actions.map((a) => (
             <button

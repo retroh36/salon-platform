@@ -8,7 +8,7 @@ open: /calendar | Open calendar
 Cancel a visit and record why.
 
 1. On the calendar, tap the visit to open booking details.
-2. Tap **⋯** (More actions) at the bottom, then **Cancel booking**.
+2. Tap **⋯** (More actions) next to the client's name, then **Cancel booking**.
 3. Choose a **Reason**: Client canceled, Client rescheduled, Client is sick, Stylist unavailable, Salon closed or Other.
 4. Add **Details** if you like (needed for **Other**).
 5. For a repeating or group visit, choose **This visit only**, **The whole group**, **This and following visits** or **All visits in the series**.

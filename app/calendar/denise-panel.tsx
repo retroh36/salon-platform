@@ -7,7 +7,7 @@ import { formatDuration } from "@/lib/duration";
 import type { DeniseRun } from "@/components/denise-chat/store";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/field";
-import { CheckCircleIcon, ChevronDownIcon, ClockIcon, CloseIcon } from "@/components/ui/icons";
+import { CheckCircleIcon, CheckIcon, ChevronDownIcon, ClockIcon, CloseIcon } from "@/components/ui/icons";
 import { noFixAdvice } from "@/lib/denise/respond";
 import type { ConflictView, DeniseNotice, DeniseState, FixView, Moved, OpeningMatch, WaitlistOpening } from "@/lib/denise/types";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
@@ -165,7 +165,7 @@ export function DenisePanel({
         const these = notices.filter((n) => n.over === (kind === "over"));
         if (!these.length) return null;
         return (
-            <section key={kind} aria-label={kind === "over" ? "Never checked in" : "Not arrived"} data-testid={kind === "over" ? "denise-never-in" : "denise-late"} className="flex animate-fade-in flex-col gap-2 rounded-lg border border-denise-200 bg-surface p-3">
+            <section key={kind} aria-label={kind === "over" ? "Never checked in" : "Not arrived"} data-testid={kind === "over" ? "denise-never-in" : "denise-late"} className="flex animate-fade-in flex-col gap-2 rounded-lg border border-denise-200 bg-surface p-4">
               <p className="flex items-center gap-2 font-semibold text-denise-900">
                 <ClockIcon className="size-4 shrink-0 text-denise-700" />
                 {kind === "over" ? (these.length === 1 ? "Never checked in" : `${these.length} never checked in`) : these.length === 1 ? "Not arrived yet" : `${these.length} not arrived yet`}
@@ -222,7 +222,7 @@ export function DenisePanel({
       {openings.length > 0 && (
         <section aria-label="Waitlist" className="flex flex-col gap-2">
           {openings.map((o) => (
-            <div key={o.key} data-testid="denise-opening" className="flex animate-fade-in gap-2.5 rounded-lg border border-denise-200 bg-surface p-3">
+            <div key={o.key} data-testid="denise-opening" className="flex animate-fade-in gap-2.5 rounded-lg border border-denise-200 bg-surface p-4">
               <DeniseFace size={24} className="mt-0.5" />
               <div className="flex flex-1 flex-col gap-2">
                 <p className="font-semibold text-denise-900">{o.headline}</p>
@@ -256,7 +256,7 @@ export function DenisePanel({
       {(state?.reorders.length ?? 0) > 0 && (
         // Every reorder she's drafted in one card: a line per supplier, and
         // one way to the Inventory page to review them.
-        <section aria-label="Reorders" data-testid="denise-reorders" className="flex animate-fade-in gap-2.5 rounded-lg border border-denise-200 bg-surface p-3">
+        <section aria-label="Reorders" data-testid="denise-reorders" className="flex animate-fade-in gap-2.5 rounded-lg border border-denise-200 bg-surface p-4">
           <DeniseFace size={24} className="mt-0.5" />
           <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
             <p className="font-semibold text-denise-900">
@@ -324,7 +324,7 @@ function ConflictCard({
   return (
     // Laid out like her other cards: her face, and everything she says and
     // offers lined up beside it.
-    <section aria-label={conflict.headline} data-conflict={conflict.kind} className="flex animate-fade-in gap-2.5 rounded-lg border border-denise-200 bg-surface p-3">
+    <section aria-label={conflict.headline} data-conflict={conflict.kind} className="flex animate-fade-in gap-2.5 rounded-lg border border-denise-200 bg-surface p-4">
       <DeniseFace size={24} className="mt-0.5" />
       <div className="flex min-w-0 flex-1 flex-col gap-3">
       <div className="flex flex-col gap-1">
@@ -341,11 +341,14 @@ function ConflictCard({
             {top.reason}
           </p>
           {canApprove && top.actionId ? (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="primary" disabled={working} onClick={() => onApprove(top)}>
+            // The fix she recommends, as the card's one strong action;
+            // Dismiss beside it, quietly.
+            <div className="flex items-center gap-2">
+              <Button variant="primary" disabled={working} className="flex-1" onClick={() => onApprove(top)}>
+                <CheckIcon className="size-4" />
                 Apply fix
               </Button>
-              <Button variant="ghost" disabled={working} onClick={() => onReject(top)}>
+              <Button variant="quiet" disabled={working} className="text-ink-muted" onClick={() => onReject(top)}>
                 Dismiss
               </Button>
             </div>
@@ -356,7 +359,7 @@ function ConflictCard({
       )}
 
       {!top && (
-        <Button variant="ghost" size="sm" className="self-start" onClick={() => onDismiss(conflict.subject)}>
+        <Button variant="quiet" size="sm" className="-ml-3 self-start text-ink-muted" onClick={() => onDismiss(conflict.subject)}>
           Dismiss
         </Button>
       )}
@@ -379,12 +382,12 @@ function ConflictCard({
                   key={o.actionId ?? i}
                   {...previewProps(i + 1)}
                   data-previewing={previewing(i + 1) || undefined}
-                  className="-mx-2 flex animate-fade-in flex-col gap-2 rounded-md px-2 py-2 transition-colors duration-(--motion-fast) hover:bg-denise-50 data-previewing:bg-denise-50"
+                  className="-mx-2 flex animate-fade-in flex-col gap-1 rounded-md px-2 py-2.5 transition-colors duration-(--motion-fast) hover:bg-denise-50 data-previewing:bg-denise-50"
                 >
-                  <p className="font-medium text-ink">{o.summary}</p>
+                  <p className="text-ink">{o.summary}</p>
                   <p className="text-xs text-ink-muted">{meta(o)}</p>
                   {canApprove && o.actionId && (
-                    <Button size="sm" className="self-start" disabled={working} onClick={() => onApprove(o)}>
+                    <Button size="xs" variant="quiet" className="-ml-2.5 self-start text-denise-700 hover:text-denise-900" disabled={working} onClick={() => onApprove(o)}>
                       Use this instead
                     </Button>
                   )}

@@ -11,10 +11,11 @@ Move between days, zoom in or out, and filter the calendar.
 2. Use the arrows (**Previous day**, **Next day**), **Today**, or tap the date to pick any day.
 3. Open the display menu in the toolbar (named after the zoom it's on; on an iPad it's just its icon) and choose a **Zoom**: **Compact**, **Comfortable** or **Detailed**. On an iPad you can also pinch the calendar. Your choice is remembered.
 4. To see only one kind of service, pick a department (for example **Color**, **Cuts** or **Nails**) instead of **All departments**, or one of your saved views.
-5. Tap a visit to open booking details. Tap **Close panel** (×), press Escape, or tap empty space to close it.
+5. Tap a visit to open booking details. Its other actions are under **⋯** (More actions) next to the client's name. Tap **Close panel** (×), press Escape, or tap empty space to close it.
 
 ## Good to know
 
+- On a phone the toolbar is one row: the date controls and **⋯** (Calendar options), which holds the department menu, the display menu, Day or Week, **New sale**, **Waitlist**, **Walk-ins** and **Block time**. **New booking** floats at the bottom right.
 - Only the **Day** view works for now. **Week** is coming soon.
 - Each column header shows the stylist's hours and a summary of their day; hover for the full text.
 - Stylists who are off with nothing booked are left off the calendar; the **off today** chip lists them. See See who's off today.

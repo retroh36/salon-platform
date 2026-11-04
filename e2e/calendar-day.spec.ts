@@ -163,7 +163,7 @@ test.describe("front desk", () => {
     await expect(panel).not.toContainText("Total");
     await expect(panel).not.toContainText("Not started");
 
-    // One primary button, pinned at the bottom; the rest under ⋯.
+    // One primary button, the panel's full width, pinned at the bottom; the rest under ⋯ by the name.
     await expect(panel.locator("button.bg-navy-900:visible")).toHaveCount(1);
     await expect(panel.getByTestId("primary-action")).toHaveText("Check in");
     const footer = panel.locator("footer");

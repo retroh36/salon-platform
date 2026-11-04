@@ -328,7 +328,30 @@ the one main action, one layer of containers.
   header's name, never over it.
 - **Phones:** beside the client search, the salon shows as its mark alone;
   the page links scroll sideways with a fade and an arrow at the edge with
-  more (`SideScroll`), like every other row that scrolls.
+  more (`SideScroll`), like every other row that scrolls. A busy toolbar
+  folds to one row (the calendar's: the date controls and one "⋯" opening
+  a sheet with the rest), and a page's main action floats at the bottom
+  right (the calendar's New booking).
+
+### Finish: crafted, not default
+
+- **Grouped controls.** Controls that belong together share one outline,
+  split by hairlines (the calendar's Previous, Today and Next; Day and
+  Week), all 36px high. Toolbar outlines are the light `line`, not
+  `line-strong`.
+- **Hierarchy inside a card.** The thing's name semibold in ink, what it
+  is in a lighter color, the time smallest and muted (calendar blocks:
+  name, service, time). Calendar blocks have 10px corners
+  (`rounded-block`) and their color as a soft 3px bar inset on the left,
+  not a hard border.
+- **Space before rules.** Sections of a panel are separated by space, not
+  lines; a panel's one main action is its full width (booking details'
+  Check in). Secondary actions are quiet text beside it, and "⋯" sits by
+  the title of what it acts on.
+- **Denise's header strip.** Her card and bubble open under a light
+  periwinkle strip (`denise-50`) with her name in `denise-900`; inside,
+  her cards have 16px of room, the fix she recommends is one strong
+  button and everything else is quiet.
 
 Every component, in each of its states, is on the owners' style guide at
 `/design` (not in the sidebar).

@@ -14,7 +14,7 @@ Tell Denise a stylist is running late, a visit is running over, or a client is l
 5. To use a fix, tap **Apply fix**. Then check each moved client's message and tap **Send** (see Approve Denise's fixes). **Undo** puts everyone back.
 6. With nobody in the chair yet, tap **Plan for** (the time they'll be in). The **Mark … out** panel opens on **Coming in late…** with Denise's plan for each client (see Mark a stylist out).
 
-For a single client who's late, or one visit running over: tap the visit, then **⋯** (More actions) at the bottom, **Running late**, the minutes and **Tell Denise**.
+For a single client who's late, or one visit running over: tap the visit, then **⋯** (More actions) next to the client's name, **Running late**, the minutes and **Tell Denise**.
 
 ## Good to know
 

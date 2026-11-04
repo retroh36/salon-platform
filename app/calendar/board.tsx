@@ -17,6 +17,7 @@ import { FitText } from "@/components/ui/fit-text";
 import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, CloseIcon, GripIcon, MoreIcon, PlusIcon, SlidersIcon } from "@/components/ui/icons";
 import { Listbox } from "@/components/ui/listbox";
 import { Segmented } from "@/components/ui/segmented";
+import { Sheet } from "@/components/ui/sheet";
 import { isEditable, STATUS_LABELS, type AppointmentStatus } from "@/lib/appointments";
 import { reach } from "@/lib/reach";
 import type { DeniseRequest, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
@@ -215,7 +216,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // booking form, walk-ins, Running late, Mark out) is open exactly while
   // something is chosen, and the page makes room for it. Denise is her own
   // card: from lg up over the calendar's bottom right corner, below the
-  // stylists' header row (which ends about 19rem down), only as tall as
+  // stylists' header row (which ends about 20rem down), only as tall as
   // what's in it, minimized to a small bar or closed; below lg a panel that
   // slides over. The two never overlap: the side panel opening minimizes
   // her (`autoMin`, and she comes back when it closes), and opened on
@@ -959,6 +960,43 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const goTo = (d: string) => leave(() => router.push(dayLink(d), { transitionTypes: [d > data.date ? "nav-forward" : "nav-back"] }), closeDetails);
   // A form's own Cancel.
   const cancel = () => leave(closeDetails);
+  // The toolbar's pieces, shared by its row and a phone's options sheet.
+  const [phoneMenu, setPhoneMenu] = useState(false);
+  const moreItems: MoreItem[] = [
+    { label: "Waitlist", href: "/calendar/waitlist" },
+    ...(me.canBook ? [{ label: "Walk-ins", onSelect: () => select({ kind: "walk-ins" }) }] : []),
+    ...(blockStaff.length > 0
+      ? [{ label: "Block time", onSelect: () => select({ kind: "new-block", start: { staffId: blockStaff.includes(me.staffId) ? me.staffId : blockStaff[0], startMinute: 12 * 60 } }) }]
+      : []),
+  ];
+  // Today, from the next quarter hour rather than a time already gone.
+  const newBooking = () =>
+    select({
+      kind: "book",
+      start: {
+        staffId: (columns.find((c) => c.working) ?? columns[0] ?? data.columns[0]).staffId,
+        startMinute: nowMinute === null ? range.start : Math.min(Math.max(Math.ceil(nowMinute / 15) * 15, range.start), range.end - 15),
+      },
+    });
+  const viewValue = currentView || !view.startsWith("view:") ? view : "all";
+  const onViewChange = (next: string) => {
+    if (next === "action:new") setEditing({ viewId: null });
+    else if (next === "action:edit") setEditing({ viewId: currentView!.id });
+    else setView(next as ViewKey);
+  };
+  const viewOptions = [
+    { value: "all", label: "All departments" },
+    ...departments.map((f) => ({
+      value: f,
+      label: FAMILY_LABELS[f],
+      group: "Departments",
+      icon: <span data-family={f} aria-hidden className="h-3 w-3 shrink-0 rounded-[3px] border-l-[3px] border-(--fam-accent) bg-(--fam-fill)" />,
+    })),
+    ...data.views.filter((v) => v.shared).map((v) => ({ value: viewKey(v.id), label: v.name, group: "Views for everyone" })),
+    ...data.views.filter((v) => !v.shared).map((v) => ({ value: viewKey(v.id), label: v.name, group: "My views" })),
+    ...(currentView?.editable ? [{ value: "action:edit", label: `Edit ${currentView.name}…`, group: "Views", action: true }] : []),
+    { value: "action:new", label: "New view…", group: "Views", action: true, icon: <PlusIcon className="size-4 text-ink-muted" /> },
+  ];
   // A visit moved to another day: go there, with it open.
   const openOn = (d: string, appointmentId: string) => {
     setArriving(appointmentId);
@@ -972,8 +1010,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
       <div
         className={`flex min-w-0 flex-1 flex-col gap-4 px-4 pt-6 pb-4 transition-[padding] duration-(--motion-slow) sm:px-6 lg:min-h-0 ${sideOpen ? "lg:pr-[25.5rem]" : ""}`}
       >
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-4 max-sm:contents">
+          {/* On a phone the title and date are for screen readers: the toolbar's
+              one row says the day, so the calendar starts near the top. */}
+          <div className="max-sm:sr-only">
             <h1 className="text-2xl font-semibold tracking-tight text-ink">Appointments</h1>
             <ViewTransition key={data.date} enter={DAY_SLIDE} exit="none" default="none">
               <p className="mt-1 text-base text-ink-muted" data-testid="calendar-date">
@@ -985,33 +1025,13 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               </p>
             </ViewTransition>
           </div>
-          {/* New booking and New sale stay in view; the rest are under More. */}
-          <div className="flex min-w-0 flex-wrap gap-2">
-            <MoreMenu
-              items={[
-                { label: "Waitlist", href: "/calendar/waitlist" },
-                ...(me.canBook ? [{ label: "Walk-ins", onSelect: () => select({ kind: "walk-ins" }) }] : []),
-                ...(blockStaff.length > 0
-                  ? [{ label: "Block time", onSelect: () => select({ kind: "new-block", start: { staffId: blockStaff.includes(me.staffId) ? me.staffId : blockStaff[0], startMinute: 12 * 60 } }) }]
-                  : []),
-              ]}
-            />
-            {me.canBook && <NewSaleLink size="lg" />}
+          {/* New booking and New sale stay in view; the rest are under More.
+              On a phone they're in the options sheet, and New booking floats. */}
+          <div className="flex min-w-0 flex-wrap gap-2 max-sm:hidden">
+            <MoreMenu items={moreItems} />
+            {me.canBook && <NewSaleLink />}
             {me.canBook && (
-              <button
-                type="button"
-                className={buttonClass("primary", "lg")}
-                // Today, from the next quarter hour rather than a time already gone.
-                onClick={() =>
-                  select({
-                    kind: "book",
-                    start: {
-                      staffId: (columns.find((c) => c.working) ?? columns[0] ?? data.columns[0]).staffId,
-                      startMinute: nowMinute === null ? range.start : Math.min(Math.max(Math.ceil(nowMinute / 15) * 15, range.start), range.end - 15),
-                    },
-                  })
-                }
-              >
+              <button type="button" className={buttonClass("primary", "md")} onClick={newBooking}>
                 <PlusIcon className="size-5" />
                 New booking
               </button>
@@ -1019,68 +1039,88 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           </div>
         </div>
 
-        {/* Its controls take their short forms by the toolbar's own width,
-            so it stays one row on an iPad and with booking details open. */}
         <div className="@container/toolbar">
         <div className="flex flex-wrap items-center gap-2">
-          <nav aria-label="Date" className="flex flex-wrap items-center gap-2">
-            <Link href={dayLink(addDays(data.date, -1))} transitionTypes={["nav-back"]} aria-label="Previous day" title="Previous day" className={buttonClass("secondary", "md", "", { square: true })}>
-              <ChevronLeftIcon />
-            </Link>
-            <Link href={dayLink(addDays(data.date, 1))} transitionTypes={["nav-forward"]} aria-label="Next day" title="Next day" className={buttonClass("secondary", "md", "", { square: true })}>
-              <ChevronRightIcon />
-            </Link>
-            <Link
-              href="/calendar"
-              transitionTypes={[data.today > data.date ? "nav-forward" : "nav-back"]}
-              aria-current={data.date === data.today ? "date" : undefined}
-              // On today: in the active blue, so it's clear where you are.
-              className={buttonClass("secondary", "md", data.date === data.today ? "border-active/40! bg-active-soft! text-active-ink!" : "")}
-            >
-              Today
-            </Link>
+          <nav aria-label="Date" className="flex items-center gap-2">
+            {/* Previous, Today and Next as one group. */}
+            <div className={TOOL_GROUP}>
+              <Link href={dayLink(addDays(data.date, -1))} transitionTypes={["nav-back"]} aria-label="Previous day" title="Previous day" className={`${TOOL_SEGMENT} w-9`}>
+                <ChevronLeftIcon />
+              </Link>
+              <Link
+                href="/calendar"
+                transitionTypes={[data.today > data.date ? "nav-forward" : "nav-back"]}
+                aria-current={data.date === data.today ? "date" : undefined}
+                // On today: in the active blue, so it's clear where you are.
+                className={`${TOOL_SEGMENT} px-3 ${data.date === data.today ? "bg-active-soft! text-active-ink" : ""}`}
+              >
+                Today
+              </Link>
+              <Link href={dayLink(addDays(data.date, 1))} transitionTypes={["nav-forward"]} aria-label="Next day" title="Next day" className={`${TOOL_SEGMENT} w-9`}>
+                <ChevronRightIcon />
+              </Link>
+            </div>
             <DatePicker value={data.date} today={data.today} onChange={goTo} label="Go to date" />
           </nav>
-          <Listbox
-            label="Department or view"
-            value={currentView || !view.startsWith("view:") ? view : "all"}
-            onChange={(next: string) => {
-              if (next === "action:new") setEditing({ viewId: null });
-              else if (next === "action:edit") setEditing({ viewId: currentView!.id });
-              else setView(next as ViewKey);
-            }}
-            className="w-44 @min-[62rem]/toolbar:w-56"
-            options={[
-              { value: "all", label: "All departments" },
-              ...departments.map((f) => ({
-                value: f,
-                label: FAMILY_LABELS[f],
-                group: "Departments",
-                icon: (
-                  <span data-family={f} aria-hidden className="h-3 w-3 shrink-0 rounded-[3px] border-l-[3px] border-(--fam-accent) bg-(--fam-fill)" />
-                ),
-              })),
-              ...data.views.filter((v) => v.shared).map((v) => ({ value: viewKey(v.id), label: v.name, group: "Views for everyone" })),
-              ...data.views.filter((v) => !v.shared).map((v) => ({ value: viewKey(v.id), label: v.name, group: "My views" })),
-              ...(currentView?.editable ? [{ value: "action:edit", label: `Edit ${currentView.name}…`, group: "Views", action: true }] : []),
-              { value: "action:new", label: "New view…", group: "Views", action: true, icon: <PlusIcon className="size-4 text-ink-muted" /> },
-            ]}
-          />
-          {off.length > 0 && <OffChip off={off} shown={showOff} onShow={setShowOff} isToday={data.date === data.today} />}
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Listbox label="Department or view" value={viewValue} onChange={onViewChange} className="w-44 max-sm:hidden @min-[62rem]/toolbar:w-56" buttonClassName={TOOL_OUTLINE} options={viewOptions} />
+          {off.length > 0 && (
+            <div className="max-sm:hidden">
+              <OffChip off={off} shown={showOff} onShow={setShowOff} isToday={data.date === data.today} />
+            </div>
+          )}
+          <div className="ml-auto flex items-center gap-2 max-sm:hidden">
             <ViewMenu zoom={zoom} onZoom={setZoom} fitAll={fitAll} onFitAll={setFitAll} />
-            <Segmented
-              label="View"
-              value="day"
-              onChange={() => {}}
-              options={[
-                { value: "day", label: "Day" },
-                { value: "week", label: "Week", disabled: true, title: "Week view is coming soon" },
-              ]}
-            />
+            <Segmented label="View" value="day" onChange={() => {}} options={DAY_WEEK} />
           </div>
+          <button type="button" aria-label="Calendar options" title="Calendar options" onClick={() => setPhoneMenu(true)} className={`${buttonClass("secondary", "md", `ml-auto ${TOOL_OUTLINE}`, { square: true })} sm:hidden`}>
+            <MoreIcon className="size-5" />
+          </button>
         </div>
         </div>
+
+        {/* A phone's toolbar options, in one sheet: who's shown, the display
+            and the day's other actions. */}
+        {phoneMenu && (
+          <Sheet title="Calendar options" onClose={() => setPhoneMenu(false)}>
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <span className="text-13 font-medium text-ink-muted">Show</span>
+                <Listbox label="Department or view" value={viewValue} onChange={(v: string) => (setPhoneMenu(false), onViewChange(v))} className="w-full" options={viewOptions} />
+                {off.length > 0 && <OffChip off={off} shown={showOff} onShow={setShowOff} isToday={data.date === data.today} />}
+              </div>
+              <DisplayOptions zoom={zoom} onZoom={setZoom} fitAll={fitAll} onFitAll={setFitAll} />
+              <div className="flex flex-col gap-2">
+                <span className="text-13 font-medium text-ink-muted">View</span>
+                <Segmented label="View" value="day" onChange={() => {}} options={DAY_WEEK} />
+              </div>
+              <div className="flex flex-col gap-1 border-t border-line pt-4">
+                {me.canBook && <NewSaleLink variant="secondary" className="w-full justify-start!" />}
+                {moreItems.map((item) =>
+                  item.href ? (
+                    <Link key={item.label} href={item.href} className={buttonClass("quiet", "md", "w-full justify-start!")} onClick={() => setPhoneMenu(false)}>
+                      {item.label}
+                    </Link>
+                  ) : (
+                    <button key={item.label} type="button" className={buttonClass("quiet", "md", "w-full justify-start!")} onClick={() => (setPhoneMenu(false), item.onSelect?.())}>
+                      {item.label}
+                    </button>
+                  ),
+                )}
+              </div>
+            </div>
+          </Sheet>
+        )}
+        {me.canBook && !sideOpen && (
+          <button
+            type="button"
+            onClick={newBooking}
+            data-testid="new-booking-fab"
+            className={`${buttonClass("primary", "lg", "fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] z-[48] h-12! rounded-xl! px-5! shadow-lift")} sm:hidden!`}
+          >
+            <PlusIcon className="size-5" />
+            New booking
+          </button>
+        )}
 
         {doneMessage && (
           <div role="status" className="flex animate-fade-in items-start justify-between gap-4 rounded-md border border-status-confirmed-ink/25 bg-status-confirmed-bg px-3 py-2 text-sm text-status-confirmed-ink">
@@ -1145,19 +1185,24 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                           if (el) headerRefs.current.set(c.staffId, el);
                           else headerRefs.current.delete(c.staffId);
                         }}
-                        className={`relative flex min-w-0 flex-col gap-1 border-l border-line pb-2.5 ${canReorder && !squeezed ? "pt-4" : "pt-2.5"} ${squeezed ? "px-1.5" : "px-2.5"} ${columnDrag?.staffId === c.staffId ? "z-10 bg-navy-100 shadow-lift" : ""}`}
+                        // Photo beside the name and hours, their day across the
+                        // column under them, and the level's color as the
+                        // header's bottom edge.
+                        className={`group/head relative flex min-w-0 flex-col gap-1.5 border-l border-line pb-3 pointer-coarse:pb-1.5 ${canReorder && !squeezed ? "pt-4" : "pt-3"} ${squeezed ? "px-1.5" : "px-2.5"} ${columnDrag?.staffId === c.staffId ? "z-10 bg-navy-100 shadow-lift" : ""}`}
                         data-column-header
                         data-dragging={columnDrag?.staffId === c.staffId || undefined}
                         data-level={c.level ?? undefined}
                       >
-                        {c.level && <LevelBar level={c.level} className="absolute inset-x-0 top-0 h-1" />}
+                        {c.level && <LevelBar level={c.level} className="absolute inset-x-0 bottom-0 h-1" />}
                         {canReorder && !squeezed && (
+                          // Quiet until the header is pointed at (always shown on a
+                          // touchscreen, where there's no pointing).
                           <span
                             aria-hidden
                             data-column-grip
                             title="Drag to change the order"
                             onPointerDown={(e) => onHeaderGrip(e, c.staffId)}
-                            className="absolute top-1 left-1/2 flex h-3 w-8 -translate-x-1/2 cursor-grab touch-none items-center justify-center rounded text-ink-subtle opacity-60 hover:bg-sunken hover:opacity-100 active:cursor-grabbing"
+                            className="absolute top-1 left-1/2 flex h-3 w-8 -translate-x-1/2 cursor-grab touch-none items-center justify-center rounded text-ink-subtle opacity-0 transition-opacity duration-(--motion-fast) group-hover/head:opacity-60 hover:bg-sunken hover:opacity-100! active:cursor-grabbing pointer-coarse:opacity-50"
                           >
                             <GripIcon className="size-3.5 rotate-90" />
                           </span>
@@ -1165,9 +1210,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                         <div className="flex min-w-0 items-center gap-2">
                           {/* Squeezed (Fit all), the avatar goes so the name fits. */}
                           {!squeezed && <Avatar name={c.name} color={c.color} level={c.level} photoUrl={c.photoUrl} size="sm" />}
-                          <div className="min-w-0 flex-1">
-                            <span title={squeezed ? `${c.name} · ${c.booked}` : c.name} className="block">
-                              <FitText variants={nameVariants(c.name, c.firstName, squeezed)} className="text-sm font-semibold" />
+                          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                            <span title={squeezed ? `${c.name} · ${c.booked}` : c.name} className="block leading-5" data-column-name>
+                              <FitText variants={nameVariants(c.name, c.firstName, squeezed)} className="text-sm leading-5 font-semibold text-ink" />
                             </span>
                             {/* One line, the full hours on hover: the chair goes
                                 first when the column is narrow, never cut off. */}
@@ -1181,16 +1226,20 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                             </div>
                           </div>
                         </div>
-                        {/* Their day at a glance, across the column: shortened to
-                            fit, never cut off, with the full text on hover. */}
+                        {/* Their day at a glance, across the column, with the ⋯
+                            beside it (in the row, so a finger-sized button never
+                            sits over the name or hours): shortened to fit, never
+                            cut off, with the full text on hover. */}
                         {!squeezed && (
-                          <div title={c.booked} className={`text-13 text-ink-muted ${c.working && data.date >= data.today && (me.canBook || me.staffId === c.staffId) ? "pr-7" : ""}`} data-testid="booked-summary">
-                            <FitText variants={summaryVariants(c.booked)} />
-                          </div>
-                        )}
-                        {!squeezed && c.working && data.date >= data.today && (me.canBook || me.staffId === c.staffId) && (
-                          <div className="absolute right-1 bottom-1">
-                            <OutMenu column={c} self={me.staffId === c.staffId} onMarkOut={openOut} onRunningLate={data.date >= data.today ? openLate : null} />
+                          <div className="flex min-w-0 items-center gap-1">
+                            <div title={c.booked} className="min-w-0 flex-1 text-xs leading-4 text-ink-subtle" data-testid="booked-summary">
+                              <FitText variants={summaryVariants(c.booked)} />
+                            </div>
+                            {c.working && data.date >= data.today && (me.canBook || me.staffId === c.staffId) && (
+                              <div className="-my-1 -mr-1 pointer-coarse:my-0">
+                                <OutMenu column={c} self={me.staffId === c.staffId} onMarkOut={openOut} onRunningLate={data.date >= data.today ? openLate : null} />
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1358,8 +1407,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
         </div>
 
         {/* The key, with Denise's face at the end of the row while her panel
-            is closed (so she never sits on top of the calendar). */}
-        <div className="flex items-center gap-4">
+            is closed (so she never sits on top of the calendar). On a phone,
+            room under it for the floating New booking button, so the day's
+            last visits and this row scroll clear of it. */}
+        <div className="flex items-center gap-4 max-sm:mb-[calc(4rem+env(safe-area-inset-bottom,0px))]">
           <CalendarKey families={FAMILIES.filter((f) => f !== "other" && data.menu.services.some((s) => s.family === f && !s.archived))} />
           {/* Minimized, she's a bar in the corner from lg up; below lg, and
               from lg while the side panel's footer is there, her face here. */}
@@ -1578,13 +1629,14 @@ export function CalendarBoard({ data }: { data: BoardData }) {
         <aside
           aria-label="Denise"
           data-testid="denise-card"
-          className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col border-l border-line bg-surface shadow-panel transition-[transform,visibility] duration-(--motion-slow) ease-out sm:w-96 lg:top-auto lg:bottom-4 lg:h-auto lg:max-h-[min(32rem,calc(100dvh-19rem-var(--demo-bar)))] lg:w-[23.75rem] lg:overflow-hidden lg:rounded-xl lg:border ${
+          className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col border-l border-line bg-surface shadow-panel transition-[transform,visibility] duration-(--motion-slow) ease-out sm:w-96 lg:top-auto lg:bottom-4 lg:h-auto lg:max-h-[min(32rem,calc(100dvh-20rem-var(--demo-bar)))] lg:w-[23.75rem] lg:overflow-hidden lg:rounded-xl lg:border ${
             sideOpen ? "lg:right-[25rem]" : "lg:right-4"
           } ${deniseShown ? "visible translate-x-0" : "invisible translate-x-[calc(100%+1rem)]"}`}
         >
-          <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2.5">
+          {/* Her header: a periwinkle strip, so the card is plainly hers. */}
+          <div className="flex shrink-0 items-center gap-2.5 border-b border-denise-100 bg-denise-50 py-2.5 pr-2.5 pl-4">
             <DeniseFace />
-            <h2 className="flex-1 text-base font-semibold text-ink">Denise</h2>
+            <h2 className="flex-1 text-base font-semibold text-denise-900">Denise</h2>
             <span className="hidden lg:contents">
               <MinimizeButton
                 onMinimize={() => {
@@ -1707,7 +1759,7 @@ function ViewMenu({ zoom, onZoom, fitAll, onFitAll }: { zoom: CalendarZoom; onZo
   }, [open]);
   return (
     <div ref={root} className="relative">
-      <button type="button" aria-expanded={open} aria-haspopup="dialog" aria-label={ZOOM_LABELS[zoom]} title="Calendar display" onClick={() => setOpen(!open)} className={buttonClass("secondary", "md")}>
+      <button type="button" aria-expanded={open} aria-haspopup="dialog" aria-label={ZOOM_LABELS[zoom]} title="Calendar display" onClick={() => setOpen(!open)} className={buttonClass("secondary", "md", TOOL_OUTLINE)}>
         <SlidersIcon className="size-4" />
         {/* Its name where there's room; the icon alone on an iPad, so the
             toolbar stays on one row (the name is still its label). */}
@@ -1715,19 +1767,28 @@ function ViewMenu({ zoom, onZoom, fitAll, onFitAll }: { zoom: CalendarZoom; onZo
         <ChevronDownIcon className="size-4 text-ink-muted" />
       </button>
       {open && (
-        <div ref={pop} role="dialog" aria-label="Calendar display" className="absolute top-full right-0 z-50 mt-1.5 flex w-72 animate-pop-in flex-col gap-3 rounded-lg border border-line bg-surface p-3 shadow-lift">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-13 font-medium text-ink-muted">Zoom</span>
-            <Segmented label="Zoom" value={zoom} onChange={onZoom} options={ZOOMS.map((z) => ({ value: z, label: ZOOM_LABELS[z] }))} />
-          </div>
-          {zoom === "compact" && (
-            <button type="button" aria-pressed={fitAll} title="Squeeze every stylist on screen" onClick={() => onFitAll(!fitAll)} className={buttonClass(fitAll ? "primary" : "secondary", "md", "w-full")}>
-              Fit all
-            </button>
-          )}
-          <p className="text-xs text-ink-muted">Pinch the calendar, or ctrl + scroll, to zoom too.</p>
+        <div ref={pop} role="dialog" aria-label="Calendar display" className="absolute top-full right-0 z-50 mt-1.5 w-72 animate-pop-in rounded-lg border border-line bg-surface p-3 shadow-lift">
+          <DisplayOptions zoom={zoom} onZoom={onZoom} fitAll={fitAll} onFitAll={onFitAll} />
         </div>
       )}
+    </div>
+  );
+}
+
+// The zoom and Fit all: in the display menu, and in a phone's options sheet.
+function DisplayOptions({ zoom, onZoom, fitAll, onFitAll }: { zoom: CalendarZoom; onZoom: (z: CalendarZoom) => void; fitAll: boolean; onFitAll: (on: boolean) => void }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
+        <span className="text-13 font-medium text-ink-muted">Zoom</span>
+        <Segmented label="Zoom" value={zoom} onChange={onZoom} options={ZOOMS.map((z) => ({ value: z, label: ZOOM_LABELS[z] }))} />
+      </div>
+      {zoom === "compact" && (
+        <button type="button" aria-pressed={fitAll} title="Squeeze every stylist on screen" onClick={() => onFitAll(!fitAll)} className={buttonClass(fitAll ? "primary" : "secondary", "md", "w-full")}>
+          Fit all
+        </button>
+      )}
+      <p className="text-xs text-ink-muted">Pinch the calendar, or ctrl + scroll, to zoom too.</p>
     </div>
   );
 }
@@ -2031,12 +2092,12 @@ function FixGhost({ block, y }: { block: Placed & { lane: number; lanes: number 
     <li aria-hidden className="contents">
       <div
         data-fix-ghost
-        className="pointer-events-none absolute z-30 animate-fade-in overflow-hidden rounded-md border-2 border-dashed border-denise-500 bg-denise-50 px-1.5 py-0.5"
+        className="pointer-events-none absolute z-30 animate-fade-in overflow-hidden rounded-block border-2 border-dashed border-denise-500 bg-denise-50 px-1.5 py-0.5"
         style={{
           top: y(block.start),
           height: length * PX_PER_MINUTE,
-          left: `calc(${box.left}% + ${block.lane > 0 ? 1 : 3}px)`,
-          width: `calc(${box.width}% - ${block.lanes > 1 ? 4 : 6}px)`,
+          left: `calc(${box.left}% + ${block.lane > 0 ? 2 : 4}px)`,
+          width: `calc(${box.width}% - ${block.lanes > 1 ? 6 : 8}px)`,
         }}
       >
         {length * PX_PER_MINUTE >= 40 && (
@@ -2191,7 +2252,7 @@ function EventHoldBox({ block, y, columnName }: { block: TimeBlockData; y: (minu
     </>
   );
   const className =
-    "absolute inset-x-1 z-[5] overflow-hidden rounded-md border-l-4 border-lavender-accent bg-lavender-fill px-2 py-1 text-xs focus-visible:outline-2 focus-visible:outline-focus";
+    "absolute inset-x-1 z-[5] overflow-hidden rounded-block border-l-4 border-lavender-accent bg-lavender-fill px-2 py-1 text-xs focus-visible:outline-2 focus-visible:outline-focus";
   const style = { top: y(block.start), height };
   return block.event ? (
     <Link href={`/events/${block.event.id}`} aria-label={label} title={label} data-time-block="event" className={className} style={style}>
@@ -2256,7 +2317,7 @@ function TimeBlockBox({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      className={`absolute inset-x-1 touch-pan-x touch-pan-y overflow-hidden [-webkit-touch-callout:none] rounded-md border border-dashed border-line-strong px-2 py-1 text-xs text-ink-muted select-none transition-[box-shadow] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-focus ${
+      className={`absolute inset-x-1 touch-pan-x touch-pan-y overflow-hidden [-webkit-touch-callout:none] rounded-block border border-dashed border-line-strong px-2 py-1 text-xs text-ink-muted select-none transition-[box-shadow] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-focus ${
         editable ? "cursor-grab" : "cursor-pointer"
       } ${selected ? "ring-2 ring-link/70 ring-inset" : ""} ${dragging ? "z-40 shadow-lift" : ""}`}
       style={{
@@ -2300,9 +2361,10 @@ function DragGhost({ block, start, stylist, y }: { block: BlockData; start: numb
       data-drag-ghost
       data-family={block.family}
       aria-hidden
-      className="pointer-events-none absolute inset-x-1 z-40 overflow-hidden rounded-md border-l-4 border-(--fam-accent) bg-(--fam-fill) px-2 py-1 text-sm text-(--fam-ink) shadow-lift ring-2 ring-link"
+      className="pointer-events-none absolute inset-x-1 z-40 overflow-hidden rounded-block bg-(--fam-fill) py-1.5 pr-2 pl-3 text-sm text-(--fam-ink) shadow-lift ring-2 ring-link"
       style={{ top: y(start), height: length * PX_PER_MINUTE }}
     >
+      <span className="absolute top-1 bottom-1 left-1 w-[3px] rounded-full bg-(--fam-accent)" />
       <div className="truncate font-semibold">{block.clientName}</div>
       <div className="truncate text-13 font-medium">
         {formatMinute(start)}–{formatMinute(start + length)} · {stylist}
@@ -2321,9 +2383,10 @@ type Visit = "upcoming" | "here" | "done" | "off";
 const visitOf = (status: BlockData["status"]): Visit =>
   status === "checked_in" ? "here" : status === "completed" ? "done" : status === "no_show" || status === "canceled" ? "off" : "upcoming";
 
-// Line heights in a block, in px.
+// Line heights in a block, in px: the name, then the service and the time.
 const NAME_LINE = 18;
 const LINE = 17;
+const TIME_LINE = 16;
 
 function AppointmentBlock({
   block,
@@ -2381,16 +2444,17 @@ function AppointmentBlock({
   const lateText = notArrived ? "not arrived" : late ? `${formatDuration(lateBy)} late` : "";
 
   // Only lines that fit whole: name, service, then time.
-  let room = height - 6;
+  // 6px above the name, a little below the last line.
+  let room = height - 8;
   const show = { name: room >= NAME_LINE, service: false, time: false, serviceLines: 1 as 1 | 2 };
   if (show.name) room -= NAME_LINE;
   if (room >= LINE) {
     show.service = true;
     room -= LINE;
   }
-  if (room >= LINE) {
+  if (room >= TIME_LINE + 1) {
     show.time = true;
-    room -= LINE;
+    room -= TIME_LINE + 1;
   }
   // Leftover room lets a long service name wrap rather than shorten.
   if (show.service && room >= LINE) show.serviceLines = 2;
@@ -2472,14 +2536,14 @@ function AppointmentBlock({
         onBlur={(e) => onHint(null, e.currentTarget.getBoundingClientRect())}
         aria-describedby={`hint-${block.itemId}`}
         {...pointer}
-        className={`@container absolute block touch-pan-x touch-pan-y overflow-hidden [-webkit-touch-callout:none] rounded-md border-l-4 border-(--fam-accent) bg-surface text-left text-(--visit-ink) select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
+        className={`@container absolute block touch-pan-x touch-pan-y overflow-hidden [-webkit-touch-callout:none] rounded-block bg-surface text-left text-(--visit-ink) select-none transition-[transform,box-shadow,opacity] duration-(--motion-fast) ease-out hover:z-30 hover:-translate-y-0.5 hover:shadow-lift focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
  selected || highlight || grouped ? "" : "ring-1 ring-surface"
  } ${draggable ? "cursor-grab" : "cursor-pointer"} ${dragging ? "opacity-40 shadow-none outline-2 outline-ink-subtle outline-dashed" : ""} ${settling ? "animate-settle" : ""}`}
         style={{
           top: y(block.start),
           height,
-          left: `calc(${box.left}% + ${block.lane > 0 ? 1 : 3}px)`,
-          width: `calc(${box.width}% - ${block.lanes > 1 ? 4 : 6}px)`,
+          left: `calc(${box.left}% + ${block.lane > 0 ? 2 : 4}px)`,
+          width: `calc(${box.width}% - ${block.lanes > 1 ? 6 : 8}px)`,
           zIndex: 10 + block.lane,
         }}
       >
@@ -2492,17 +2556,19 @@ function AppointmentBlock({
             style={{ top: (s.start - block.start) * PX_PER_MINUTE, height: (s.end - s.start) * PX_PER_MINUTE, ...segmentStyle(s.kind, visit) }}
           />
         ))}
+        {/* The service's color: a soft rounded bar just inside the left edge. */}
+        <span aria-hidden data-accent className="pointer-events-none absolute top-1 bottom-1 left-1 z-[1] w-[3px] rounded-full bg-(--fam-accent)" />
         {/* The selection (and Denise's or a group's outline) is drawn inside
             the block, over its segments, so it never covers a neighbor. */}
         {(selected || highlight || grouped) && (
           <span
             aria-hidden
             data-ring={selected ? "selected" : highlight ? "denise" : "group"}
-            className={`pointer-events-none absolute inset-0 z-10 rounded-md ring-inset ${selected ? "ring-2 ring-link/70" : highlight ? "animate-glow ring-2 ring-denise-500" : "ring-2 ring-navy-700/50"}`}
+            className={`pointer-events-none absolute inset-0 z-10 rounded-block ring-inset ${selected ? "ring-2 ring-link/70" : highlight ? "animate-glow ring-2 ring-denise-500" : "ring-2 ring-navy-700/50"}`}
           />
         )}
         {show.name && (
-          <span aria-hidden className={`relative flex items-center gap-1 pt-1 ${narrow ? "px-1.5" : "px-2"}`}>
+          <span aria-hidden className={`relative flex items-center gap-1 pt-1.5 ${narrow ? "pr-1.5 pl-2.5" : "pr-2 pl-3"}`}>
             <FitText variants={names} className={`flex-1 text-sm leading-[18px] font-semibold ${visit === "off" ? "text-block-ink-muted line-through" : ""}`} />
             {/* Only what needs attention right now. */}
             {showLate && (
@@ -2526,13 +2592,13 @@ function AppointmentBlock({
           </span>
         )}
         {show.service && (
-          <span aria-hidden className={`relative block ${narrow ? "px-1.5" : "px-2"}`}>
+          <span aria-hidden className={`relative block ${narrow ? "pr-1.5 pl-2.5" : "pr-2 pl-3"}`}>
             <FitText variants={services} lines={show.serviceLines} className="text-13 leading-[17px] text-(--visit-ink-muted)" />
           </span>
         )}
         {show.time && (
-          <span aria-hidden className={`relative block ${narrow ? "px-1.5" : "px-2"}`}>
-            <FitText variants={ranges} className="text-13 leading-[17px] text-(--visit-ink-muted)" />
+          <span aria-hidden className={`relative block pt-px ${narrow ? "pr-1.5 pl-2.5" : "pr-2 pl-3"}`}>
+            <FitText variants={ranges} className="text-xs leading-4 text-(--visit-ink-muted) tabular-nums" />
           </span>
         )}
       </div>
@@ -2541,6 +2607,18 @@ function AppointmentBlock({
 }
 
 type MoreItem = { label: string; href?: string; onSelect?: () => void };
+
+// The toolbar's quieter outline (the hairline, not the stronger field
+// border), and its grouped controls: one outline around Previous, Today and
+// Next, with hairlines between, every control 36px tall.
+const TOOL_OUTLINE = "border-line!";
+const TOOL_GROUP = "inline-flex items-stretch divide-x divide-line overflow-hidden rounded-md border border-line bg-surface";
+const TOOL_SEGMENT =
+  "touch-target inline-flex h-9 items-center justify-center text-sm font-medium text-ink transition-colors duration-(--motion-fast) select-none hover:bg-sunken active:bg-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus";
+const DAY_WEEK: { value: "day" | "week"; label: string; disabled?: boolean; title?: string }[] = [
+  { value: "day", label: "Day" },
+  { value: "week", label: "Week", disabled: true, title: "Week view is coming soon" },
+];
 
 // "More" in the toolbar: Waitlist, Walk-ins and Block time, so New booking
 // and New sale stay in view. Arrow keys move through it; Escape or a click
@@ -2584,7 +2662,7 @@ function MoreMenu({ items }: { items: MoreItem[] }) {
         all[(i + (e.key === "ArrowDown" ? 1 : -1) + all.length) % all.length]?.focus();
       }}
     >
-      <button ref={button} type="button" className={buttonClass("secondary", "lg")} aria-haspopup="menu" aria-expanded={open} onClick={(e) => {
+      <button ref={button} type="button" className={buttonClass("secondary", "md")} aria-haspopup="menu" aria-expanded={open} onClick={(e) => {
           byKeys.current = e.detail === 0;
           setOpen(!open);
         }}>

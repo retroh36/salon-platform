@@ -8,7 +8,7 @@ open: /calendar | Open calendar
 Change a visit's date, services, stylist, start time, chair, client or notes.
 
 1. On the calendar, tap the visit to open booking details.
-2. Tap **⋯** (More actions) at the bottom, then **Edit booking**.
+2. Tap **⋯** (More actions) next to the client's name, then **Edit booking**.
 3. Change what you need: the **Date**, the **Service**, **Stylist**, **Starts** time or **Chair** on each service, **Add another service**, or **Remove** one. Tap **Change client** to pick someone else.
 4. If the visit is part of a repeating series, choose under **Change**: **This visit only**, **This and following visits** or **All visits in the series**.
 5. Tap **Save changes**.
