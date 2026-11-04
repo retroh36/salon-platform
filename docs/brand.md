@@ -385,6 +385,17 @@ the one main action, one layer of containers.
   Narrow (the ticket over the payment), the whole screen scrolls as one
   page, with Complete sale pinned at the bottom of the payment; side by
   side, the ticket's lines and the payment scroll on their own.
+- **Dashboard and My day.** One primary button in a list of cards: on My
+  day only the visit in the chair (else the next to start) has the navy
+  Start service, the rest are outlined. A choice between two views of the
+  same thing (This period / Last period) looks like the Segmented control,
+  the chosen one in the active blue, never two navy and white buttons. A
+  long list on the Dashboard shows its newest five, then "Show 7 more". A
+  disclosure ("My tips") is a link with a chevron that turns at once, never
+  the browser's marker. Dismiss buttons sit on the middle of the first line
+  they dismiss. A section's actions sit on its title's line (at the foot of
+  its description when it has one). Team today's cards share the row's
+  width, two across on a phone.
 
 Every component, in each of its states, is on the owners' style guide at
 `/design` (not in the sidebar).

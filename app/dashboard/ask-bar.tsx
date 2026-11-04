@@ -31,7 +31,7 @@ export function AskBar({ example, today }: { example: string; today: string }) {
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
         placeholder={`Ask Denise… “${example}”`}
-        className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-ink-muted focus:outline-none"
+        className="min-w-0 flex-1 truncate bg-transparent text-sm placeholder:text-ink-muted focus:outline-none"
       />
       <IconButton type="submit" label="Ask" variant="primary" size="sm">
         <SendIcon className="size-4" />

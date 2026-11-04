@@ -181,5 +181,29 @@ for (const size of WIDTHS) {
       await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
       await expectTidyLayout(page, "taking cash");
     });
+
+    // Whatever today holds (a closed day shows its quiet states instead).
+    test("the Dashboard and My day", async ({ page, browser }) => {
+      await page.goto("/dashboard");
+      await expect(ui(page).getByTestId("dashboard-brief")).toBeVisible();
+      await waitForHydration(page, "form[aria-label='Ask Denise']");
+      await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished)));
+      await expectTidyLayout(page, "on the owner's Dashboard");
+
+      const stylist = await browser.newContext({ viewport: size, hasTouch: size.width < 1440, isMobile: size.width < 500, storageState: AUTH.stylist });
+      try {
+        const own = await stylist.newPage();
+        await own.goto("/dashboard");
+        await expect(ui(own).getByRole("heading", { level: 1 })).toHaveText(/Bridget$/);
+        await own.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished)));
+        await expectTidyLayout(own, "on a stylist's Dashboard");
+        await own.goto("/my-day");
+        await expect(ui(own).getByTestId("my-earnings")).toBeVisible();
+        await own.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished)));
+        await expectTidyLayout(own, "on My day");
+      } finally {
+        await stylist.close();
+      }
+    });
   });
 }

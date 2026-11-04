@@ -16,7 +16,7 @@ import { loadLocationSchedule, loadStaffSchedules, startOfLocalDay } from "@/lib
 import { addDays, datesBetween, formatMinute, todayIn, toLocal } from "@/lib/scheduling/time";
 import type { AppointmentStatus } from "@/lib/appointments";
 import { PayTickets } from "@/components/pay-tickets";
-import { pillClass } from "@/components/ui/page";
+import { ChevronDownIcon } from "@/components/ui/icons";
 import { formatPrice } from "@/lib/services";
 import { periodContaining, previousPeriod, ratesText } from "@/lib/payroll";
 import { loadPayroll, loadPaySettings } from "@/lib/payroll-load";
@@ -36,9 +36,10 @@ import { firstLetter } from "@/lib/initial";
 
 export const metadata: Metadata = { title: "My day" };
 
-// A disclosure's summary: a quiet text link with a turning chevron.
-const summaryClass =
-  "inline-flex cursor-pointer list-none items-center gap-1 text-sm font-medium text-link hover:text-link-hover hover:underline [&::-webkit-details-marker]:hidden before:inline-block before:text-ink-subtle before:transition-transform before:duration-(--motion-fast) before:content-['▸'] group-open:before:rotate-90";
+// A disclosure's summary: a quiet text link with a chevron that turns (at
+// once: one caught part-way points sideways).
+const summaryClass = "inline-flex w-fit cursor-pointer list-none items-center gap-1 text-sm font-medium text-link hover:text-link-hover hover:underline [&::-webkit-details-marker]:hidden";
+const summaryChevron = <ChevronDownIcon className="size-4 group-open:rotate-180" />;
 
 // A stylist's day on their phone: each client in order, with optional taps
 // for Start service, Processing, Back in chair and Finish service. The only
@@ -94,6 +95,10 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
 
   const visits = data.map((i) => ({ ...i, minutes: i.active_minutes + i.processing_minutes + i.finishing_minutes }));
   const counted = visits.filter((i) => i.appointment.status !== "no_show").map((i) => ({ appointmentId: i.appointment_id, minutes: i.minutes }));
+  // The one visit whose tap is the primary button: in the chair, else the
+  // next still to start.
+  const open = visits.filter((i) => !i.finished_at && !["no_show", "completed"].includes(i.appointment.status));
+  const leadId = (open.find((i) => i.started_at) ?? open[0])?.id;
 
   return (
     <AppShell section="my-day" me={me}>
@@ -148,6 +153,7 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
                   <ServiceTimer
                     itemId={i.id}
                     big
+                    lead={i.id === leadId}
                     timeZone={tz}
                     times={{ startedAt: i.started_at, processingStartedAt: i.processing_started_at, processingEndedAt: i.processing_ended_at, finishedAt: i.finished_at }}
                     hasProcessing={i.processing_minutes > 0}
@@ -245,6 +251,14 @@ async function MyGoalsSection({ supabase, me }: { supabase: Awaited<ReturnType<t
   );
 }
 
+// This period / Last period: links that look like the Segmented control
+// (Day / Week), the chosen one in the active blue.
+function periodClass(selected: boolean) {
+  return `touch-target inline-flex h-full items-center rounded-[6px] px-3 text-sm font-medium whitespace-nowrap transition-[background-color,color] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus ${
+    selected ? "bg-active text-white" : "text-ink-muted hover:text-ink"
+  }`;
+}
+
 // Their own earnings only (payroll_sales gives anyone but owners and
 // managers just their own lines and tips): this pay period so far, or the
 // last one.
@@ -271,11 +285,11 @@ async function MyEarnings({ supabase, me, last }: { supabase: Awaited<ReturnType
       titleId="earnings-heading"
       description={`${formatLongDay(period.from, false)} to ${formatLongDay(period.to, false)}${last ? "" : " so far"}`}
       actions={
-        <nav aria-label="Earnings period" className="flex gap-2">
-          <Link href="/my-day" className={pillClass(!last)} aria-current={!last ? "page" : undefined}>
+        <nav aria-label="Earnings period" className="inline-flex h-9 items-center rounded-md border border-line bg-surface p-0.5">
+          <Link href="/my-day" className={periodClass(!last)} aria-current={!last ? "page" : undefined}>
             This period
           </Link>
-          <Link href="/my-day?pay=last" className={pillClass(last)} aria-current={last ? "page" : undefined}>
+          <Link href="/my-day?pay=last" className={periodClass(last)} aria-current={last ? "page" : undefined}>
             Last period
           </Link>
         </nav>
@@ -309,6 +323,7 @@ async function MyEarnings({ supabase, me, last }: { supabase: Awaited<ReturnType
         <details className="group mt-6" data-testid="my-tips">
           <summary className={summaryClass}>
             My tips ({formatPrice(pay.tipCents)}, {pctText(averageTipPct(pay.tickets))} average)
+            {summaryChevron}
           </summary>
           <div className="mt-3 overflow-hidden rounded-lg border border-line bg-surface p-4">
             <TipDetails tickets={pay.tickets} period={period} timeZone={tz} linkSales={false} ownView />
@@ -317,7 +332,10 @@ async function MyEarnings({ supabase, me, last }: { supabase: Awaited<ReturnType
       )}
       {pay.tickets.length > 0 && (
         <details className="group mt-4">
-          <summary className={summaryClass}>Tickets behind it ({pay.tickets.length})</summary>
+          <summary className={summaryClass}>
+            Tickets behind it ({pay.tickets.length})
+            {summaryChevron}
+          </summary>
           <TableCard className="mt-3">
             <PayTickets tickets={pay.tickets} timeZone={tz} linkSales={false} label="My tickets" />
           </TableCard>

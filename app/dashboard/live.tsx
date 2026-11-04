@@ -133,7 +133,7 @@ function TeamToday({ team }: { team: StylistCard[] }) {
           <EmptyState art={false} className="py-6">No one is working today.</EmptyState>
         </div>
       ) : (
-        <ul className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3" aria-label="Stylists working today">
+        <ul className="grid grid-cols-[repeat(auto-fit,minmax(10rem,1fr))] gap-3" aria-label="Stylists working today">
           {team.map((s) => (
             <li key={s.staffId}>
               <Link

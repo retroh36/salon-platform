@@ -18,4 +18,4 @@ Fees charge themselves: mark the no-show or cancel the visit as usual, and the p
 - Only late cancellations by the client cost anything. Cancellations by the salon don't.
 - Undo the no-show within 10 minutes and nothing is charged.
 - A deposit paid ahead counts toward the fee.
-- Fees that didn't go through are listed on the Dashboard under **Fees that didn't go through**.
+- Fees that didn't go through are listed on the Dashboard under **Fees that didn't go through**, the newest five first; tap **Show … more** for the rest.

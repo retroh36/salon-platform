@@ -28,9 +28,11 @@ export function LiveEarningsCard({ live }: { live: LiveEarnings }) {
           <Alert tone="info">{live.nextTier}</Alert>
         </div>
       )}
-      <dl className="mb-3 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-line bg-line" aria-label="Running totals">
+      {/* On a phone, today across the top and the week and pay period under
+          it, so a four-figure total fits its tile. */}
+      <dl className="mb-3 grid grid-cols-2 gap-px sm:grid-cols-3 overflow-hidden rounded-lg border border-line bg-line" aria-label="Running totals">
         {totals.map(([label, t]) => (
-          <div key={label} className="flex min-w-0 flex-col gap-1 bg-surface px-3 py-3 sm:px-4">
+          <div key={label} className="flex min-w-0 flex-col gap-1 bg-surface px-3 py-3 first:col-span-2 sm:px-4 sm:first:col-span-1">
             <dt className="text-13 text-ink-muted">{label}</dt>
             <dd className="text-xl font-semibold text-ink tabular-nums sm:text-2xl" data-testid={`earned-${label.toLowerCase().replace(/ /g, "-")}`}>
               {money(t.earnedCents)}

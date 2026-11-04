@@ -107,7 +107,8 @@ export function Section({
 } & Omit<React.HTMLAttributes<HTMLElement>, "title">) {
   return (
     <section className={`mb-8 ${className}`} aria-labelledby={titleId} {...rest}>
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+      {/* Actions sit on the title's line; with a description under it, at its foot. */}
+      <div className={`mb-3 flex flex-wrap justify-between gap-2 ${description ? "items-end" : "items-center"}`}>
         <div className="min-w-0">
           <h2 id={titleId} className="text-base font-semibold text-ink">
             {title}

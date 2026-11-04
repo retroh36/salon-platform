@@ -17,7 +17,8 @@
 // staff and clients would.
 //
 // --reuse takes the shots again without resetting, seeding or building
-// (the same day, after a full run); with --build it builds again first (the
+// (the same moment as the full run before it, kept in screenshots/.moment,
+// even once the real clock has passed it); with --build it builds again first (the
 // same data, the app as it is now). --out=<folder> saves them somewhere
 // else (screenshots/polish/… for before-and-after pairs, scripts/polish-pairs.ts).
 // --only=01-calendar,02-denise-fix takes just those shots; --widths=1440,1180,390
@@ -26,7 +27,7 @@
 // calls the real API.
 
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { mkdirSync, openSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { chromium, type Browser, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
@@ -95,7 +96,14 @@ if (!reuse) {
 const { data: location, error: locationError } = await admin.from("locations").select("id, timezone, location_hours(weekday, start_minute, end_minute)").eq("business_id", BUSINESS).single();
 if (locationError) throw locationError;
 const tz = location.timezone;
-const moment = busyMoment(location.location_hours, tz, new Date());
+// The moment the data was loaded for: a --reuse run keeps it, so the app's
+// clock still matches the data however much later it runs.
+const MOMENT_FILE = "screenshots/.moment";
+const moment = reuse && existsSync(MOMENT_FILE) ? new Date(readFileSync(MOMENT_FILE, "utf8").trim()) : busyMoment(location.location_hours, tz, new Date());
+if (!reuse) {
+  mkdirSync("screenshots", { recursive: true });
+  writeFileSync(MOMENT_FILE, moment.toISOString());
+}
 const offset = moment.getTime() - Date.now();
 const clock = { MAESTRA_DEMO_OFFSET_MS: String(offset) };
 const now = () => new Date(Date.now() + offset);
@@ -149,7 +157,7 @@ try {
   browser = await chromium.launch();
   for (const [i, width] of WIDTHS.entries()) {
     VIEWPORT = { width, height: WINDOWS[width]?.height ?? 900 };
-    SUFFIX = WIDTHS.length > 1 ? `@${width}` : "";
+    SUFFIX = process.argv.some((a) => a.startsWith("--widths=")) ? `@${width}` : "";
     await capture(browser, i === 0);
   }
 } finally {
@@ -335,6 +343,34 @@ async function capture(browser: Browser, first: boolean) {
     const tips = main(page).getByTestId("my-tips");
     return { clip: await union([main(page).getByTestId("live-earnings"), main(page).getByTestId("goal-alert"), tips.locator("summary"), tips.getByTestId("tip-item").nth(2)], 32) };
   });
+
+  // The Dashboard for each role and My day for a stylist and an assistant,
+  // the whole page (the window grown to fit it).
+  const whole = async (page: Page) => {
+    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
+    const height = await main(page).evaluate((el) => el.scrollHeight + 40);
+    await page.setViewportSize({ width: VIEWPORT.width, height: Math.min(6000, Math.max(VIEWPORT.height, height)) });
+  };
+  for (const [name, who] of [["60-dashboard-owner", owner], ["61-dashboard-front-desk", front], ["62-dashboard-stylist", stylist]] as const)
+    await shot(name, who, async (page) => {
+      await page.goto("/dashboard");
+      await main(page).getByRole("heading", { level: 1 }).waitFor();
+      await whole(page);
+    });
+  await shot("63-my-day", stylist, async (page) => {
+    await page.goto("/my-day");
+    await main(page).getByTestId("live-earnings").waitFor();
+    await whole(page);
+  });
+  if (!ONLY || ONLY.includes("64-my-day-assistant")) {
+    const assistant = await signedIn(browser, "ari@mapleandash.test");
+    await shot("64-my-day-assistant", assistant, async (page) => {
+      await page.goto("/my-day");
+      await main(page).getByRole("heading", { level: 1 }).waitFor();
+      await whole(page);
+    });
+    await assistant.close();
+  }
 
   await shot("06-policies", owner, async (page) => {
     await page.goto("/policy");
@@ -752,8 +788,9 @@ async function settle(page: Page, keepMouse = false) {
   if (!keepMouse) await page.mouse.move(700, 1);
   await page.evaluate(async () => {
     await document.fonts.ready;
-    // Lazy images below the fold never load until scrolled to.
-    await Promise.all([...document.images].filter((i) => !i.complete && (i.loading !== "lazy" || i.getBoundingClientRect().top < innerHeight)).map((i) => new Promise((done) => {
+    // Lazy images below the fold never load until scrolled to, nor do hidden
+    // ones (the sidebar's on a phone).
+    await Promise.all([...document.images].filter((i) => !i.complete && i.checkVisibility() && (i.loading !== "lazy" || i.getBoundingClientRect().top < innerHeight)).map((i) => new Promise((done) => {
       i.addEventListener("load", done);
       i.addEventListener("error", done);
     })));

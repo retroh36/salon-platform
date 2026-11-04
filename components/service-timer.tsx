@@ -7,7 +7,9 @@ import { EVENT_LABELS, nextEvents, timerState, timerStatus, type ItemTimes, type
 
 // One-tap times for a service: Start service, Processing, Back in chair,
 // Finish service, with Undo, under its status in words ("In service since
-// 10:52am"). Big targets, for a stylist's phone (My day).
+// 10:52am"). Big targets, for a stylist's phone (My day). Only the `lead`
+// timer's main tap is the primary button (the visit in the chair, else the
+// next one), so a day of visits isn't a column of navy.
 export function ServiceTimer({
   itemId,
   times,
@@ -16,6 +18,7 @@ export function ServiceTimer({
   canRecord,
   timeZone,
   big = false,
+  lead = true,
 }: {
   itemId: string;
   times: ItemTimes;
@@ -24,6 +27,7 @@ export function ServiceTimer({
   canRecord: boolean;
   timeZone: string;
   big?: boolean;
+  lead?: boolean;
 }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +53,7 @@ export function ServiceTimer({
           {events.map((e, i) => (
             <Button
               key={e}
-              variant={i === 0 ? "primary" : "secondary"}
+              variant={i === 0 && lead ? "primary" : "secondary"}
               size={big ? "lg" : "md"}
               disabled={pending}
               onClick={() => tap(e)}

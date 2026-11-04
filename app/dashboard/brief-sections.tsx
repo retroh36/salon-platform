@@ -172,7 +172,7 @@ function BriefSection({
                       <Link href={r.href} className="min-w-0 flex-1 text-13 text-ink-muted hover:text-ink">
                         {p.detail}
                       </Link>
-                      <DismissButton label={p.label} onClick={() => onDismiss(p.key)} />
+                      <DismissButton label={p.label} onClick={() => onDismiss(p.key)} className="-my-1.5" />
                     </li>
                   ))}
                 </ul>
@@ -183,7 +183,7 @@ function BriefSection({
                 <span className="block font-medium text-ink underline-offset-2 group-hover:underline">{r.title}</span>
                 <span className="block text-13 text-ink-muted">{r.detail}</span>
               </Link>
-              <DismissButton label={r.label ?? r.title} onClick={() => onDismiss(r.key)} />
+              <DismissButton label={r.label ?? r.title} onClick={() => onDismiss(r.key)} className="-mt-1" />
             </li>
             ),
           )}
@@ -208,14 +208,16 @@ function BriefSection({
   );
 }
 
-function DismissButton({ label, onClick }: { label: string; onClick: () => void }) {
+// Centered on the first line of what it dismisses (`className` pulls the
+// 28px target up to the line's middle).
+function DismissButton({ label, onClick, className }: { label: string; onClick: () => void; className: string }) {
   return (
     <button
       type="button"
       aria-label={`Dismiss ${label}`}
       title="Dismiss"
       onClick={onClick}
-      className="-mr-1.5 flex size-7 shrink-0 items-center justify-center rounded-md text-ink-subtle transition-colors duration-(--motion-fast) hover:bg-denise-100 hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+      className={`-mr-1.5 flex size-7 shrink-0 items-center justify-center rounded-md text-ink-subtle transition-colors duration-(--motion-fast) hover:bg-denise-100 hover:text-ink focus-visible:outline-2 focus-visible:outline-focus ${className}`}
     >
       <CloseIcon className="size-4" />
     </button>

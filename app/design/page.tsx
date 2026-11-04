@@ -10,7 +10,7 @@ import { Button, IconButton } from "@/components/ui/button";
 import { Skeleton, toastActionClass } from "@/components/ui/feedback";
 import { checkboxClass, Eyebrow, fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { FitText } from "@/components/ui/fit-text";
-import { CalendarIcon, MoreIcon, PlusIcon, SearchIcon, UndoIcon } from "@/components/ui/icons";
+import { CalendarIcon, ChevronDownIcon, MoreIcon, PlusIcon, SearchIcon, UndoIcon } from "@/components/ui/icons";
 import { Alert, Badge, Card, EmptyState, nameLinkClass, PageHeader, pillClass, Section, textLinkClass, type Tone } from "@/components/ui/page";
 import { StatusChip } from "@/components/ui/status-chip";
 import { actionsClass, numClass, TableCard, tableClass, tdClass, theadClass, thClass, trClass } from "@/components/ui/table";
@@ -210,6 +210,14 @@ async function Design() {
               <span className={pillClass(true)}>Selected</span>
               <span className={pillClass(false)}>Not selected</span>
             </div>
+            {/* A disclosure: a link with a chevron that turns at once. */}
+            <details className="group">
+              <summary className="inline-flex w-fit cursor-pointer list-none items-center gap-1 text-sm font-medium text-link hover:text-link-hover hover:underline [&::-webkit-details-marker]:hidden">
+                My tips ($286, 14.1% average)
+                <ChevronDownIcon className="size-4 group-open:rotate-180" />
+              </summary>
+              <p className="mt-2 text-sm text-ink-muted">What it opens shows here.</p>
+            </details>
           </div>
         </Card>
       </Section>
