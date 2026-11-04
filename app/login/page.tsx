@@ -36,11 +36,6 @@ export default function LoginPage({ searchParams }: { searchParams: Promise<{ li
         <LinkNote searchParams={searchParams} />
       </Suspense>
       <LoginForm />
-      <p className="mt-4 text-sm">
-        <Link href="/login/forgot" className="font-medium text-link underline underline-offset-2 hover:text-link-hover">
-          Forgot password?
-        </Link>
-      </p>
     </AuthScreen>
   );
 }

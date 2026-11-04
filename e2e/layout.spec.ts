@@ -10,7 +10,7 @@ import { EMPTY_TICKET, type Ticket } from "@/lib/ticket";
 import { formatLongDay } from "@/lib/schedule-format";
 import { fromLocal } from "@/lib/scheduling/time";
 import { admin, busyDay, makeRoom, SEED, signIn } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, putBackSales, test, ui, waitForHydration } from "./fixtures";
 import { expectTidyLayout, expectWholeHeaders } from "./layout";
 
 const B = SEED.business;
@@ -31,6 +31,9 @@ let appointmentId: string;
 let serviceId: string;
 let clientId: string;
 let putBack: () => Promise<void>;
+
+// The checkout is opened (a draft), never completed.
+putBackSales();
 
 test.beforeAll(async () => {
   ({ date: day } = await busyDay(TZ));
@@ -145,6 +148,38 @@ for (const size of WIDTHS) {
       await page.goto("/book/maple-and-ash/account");
       await expect(page.getByRole("button", { name: "Send my code" })).toBeVisible();
       await expectTidyLayout(page, "signing in to an account");
+    });
+
+    test("signing in, and the checkout", async ({ page, browser }) => {
+      const out = await browser.newContext({ viewport: size, hasTouch: size.width < 1440, isMobile: size.width < 500, storageState: { cookies: [], origins: [] } });
+      try {
+        const signedOut = await out.newPage();
+        await signedOut.goto("/login");
+        await expect(signedOut.getByRole("link", { name: "Forgot password?" })).toBeVisible();
+        await expectTidyLayout(signedOut, "signing in");
+        await signedOut.goto("/login/forgot");
+        await expect(signedOut.getByRole("button", { name: "Send the link" })).toBeVisible();
+        await expectTidyLayout(signedOut, "on forgot password");
+      } finally {
+        await out.close();
+      }
+
+      await page.goto(`/checkout/new?appointment=${appointmentId}&from=/calendar`);
+      await page.waitForURL(/\/checkout\/[0-9a-f-]{36}$/);
+      await waitForHydration(page, "#product-search");
+      await expect(page.getByTestId("checkout-client")).toContainText(LONG_NAME.last);
+      await expectTidyLayout(page, "at checkout");
+      // The payment link test above leaves its link out on this checkout.
+      const cancel = page.getByRole("button", { name: "Cancel the link" });
+      if (await cancel.isVisible()) {
+        await cancel.click();
+        await expect(cancel).toBeHidden();
+      }
+      await page.getByRole("complementary", { name: "Payment" }).getByRole("button", { name: "Cash", exact: true }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      // Measured once it has faded in.
+      await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+      await expectTidyLayout(page, "taking cash");
     });
   });
 }

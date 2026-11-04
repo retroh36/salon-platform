@@ -56,8 +56,8 @@ export function PaymentPanel({
   const membershipUsable = ticket.lines.some((l) => l.kind === "service" && !l.packageItemId && !l.membershipCreditId && l.quantity === 1 && creditFor(data.memberships, l.serviceId));
   const blocking = message ?? problems[0] ?? null;
   return (
-    <aside aria-label="Payment" className="flex min-h-0 flex-col border-t border-line bg-surface @3xl:border-t-0 @3xl:border-l">
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
+    <aside aria-label="Payment" className="flex flex-col @3xl:min-h-0 border-t border-line bg-surface @3xl:border-t-0 @3xl:border-l">
+      <div className="flex-1 space-y-4 px-4 @3xl:min-h-0 @3xl:overflow-y-auto py-4 sm:px-5">
         <dl className="flex flex-col gap-1 tabular-nums" data-testid="checkout-totals">
           <Row label="Subtotal" value={formatPrice(totals.subtotalCents)} />
           {totals.discountCents > 0 && <Row label="Discounts" value={`−${formatPrice(totals.discountCents)}`} testId="total-discounts" />}
@@ -153,7 +153,7 @@ export function PaymentPanel({
         {data.client && data.draft.appointmentId && <Rebook data={data} ticket={ticket} onChange={onChange} />}
       </div>
 
-      <div className="shrink-0 space-y-2 border-t border-line bg-surface px-4 py-3 sm:px-5">
+      <div className="sticky bottom-0 z-10 shrink-0 space-y-2 border-t border-line bg-surface px-4 py-3 sm:px-5 @3xl:static">
         {blocking && (
           <p role={message ? "alert" : "status"} className={`text-sm ${message ? "font-medium text-danger" : "text-ink-muted"}`} data-testid="checkout-blocked">
             {blocking}

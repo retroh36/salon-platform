@@ -73,7 +73,8 @@ export function SwitchPad({ people }: { people: Person[] }) {
           ),
         )}
       </div>
-      <div className="flex w-full gap-3">
+      {/* As wide as the pad, under it. */}
+      <div className="flex w-full max-w-[18.75rem] gap-3">
         <Button className="flex-1" onClick={() => (setChosen(null), setPin(""))}>
           Not me
         </Button>

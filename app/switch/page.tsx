@@ -3,12 +3,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AuthScreen } from "@/app/login/auth-screen";
-import { Alert } from "@/components/ui/page";
+import { Alert, textLinkClass } from "@/components/ui/page";
 import { deviceTokenHash } from "@/lib/shared-device";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SwitchPad, type Person } from "./switch-pad";
 
-export const metadata: Metadata = { title: "Who's at the desk?" };
+export const metadata: Metadata = { title: "Who’s at the desk?" };
 
 export default function SwitchPage({ searchParams }: { searchParams: Promise<{ idle?: string }> }) {
   return (
@@ -31,11 +31,11 @@ async function Switch({ searchParams }: { searchParams: Promise<{ idle?: string 
   const { idle } = await searchParams;
   return (
     <AuthScreen
-      title="Who's at the desk?"
+      title="Who’s at the desk?"
       subtitle={`${device.salon} · ${device.name}`}
       footer={
         <p className="mt-10 text-xs text-ink-subtle">
-          No PIN yet? <Link href="/login" className="font-medium text-link hover:underline">Sign in with your password</Link>, then set one on Your account.
+          No PIN yet? <Link href="/login" className={textLinkClass}>Sign in with your password</Link>, then set one on Your account.
         </p>
       }
     >

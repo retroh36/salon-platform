@@ -279,7 +279,7 @@ export function CheckoutScreen({ data, denise }: { data: CheckoutScreenData; den
       <div className="@container flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto @3xl:grid-cols-[minmax(0,1fr)_20rem] @3xl:overflow-hidden @5xl:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)]">
         <main
-          className={`flex min-h-0 flex-col @3xl:overflow-hidden ${linkOut ? "opacity-60" : ""}`}
+          className={`flex flex-col @3xl:min-h-0 @3xl:overflow-hidden ${linkOut ? "opacity-60" : ""}`}
           aria-label="Ticket"
           inert={Boolean(linkOut)}
         >
@@ -312,8 +312,9 @@ export function CheckoutScreen({ data, denise }: { data: CheckoutScreenData; den
             />
           </div>
           {/* No padding on the scroller itself, so stylist headers pin flush
-              to its top. */}
-          <div className="min-h-0 flex-1 overflow-y-auto">
+              to its top. Stacked (narrow), the whole screen scrolls instead,
+              so the ticket is never squeezed under the payment. */}
+          <div className="@3xl:min-h-0 @3xl:flex-1 @3xl:overflow-y-auto">
             <div className="px-4 py-4 sm:px-6">
               <TicketList
                 data={data}

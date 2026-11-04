@@ -348,14 +348,32 @@ async function capture(browser: Browser, first: boolean) {
     await page.waitForURL(/\/checkout\/[0-9a-f-]{36}$/);
     await waitForReact(page, "#product-search");
     const ticket = page.getByRole("main", { name: "Ticket" });
-    await ticket.getByLabel("Add a product: name, brand, SKU or scan").fill(visit.product);
-    await ticket.getByRole("list", { name: "Matching products" }).getByRole("button").first().click();
-    await ticket.getByRole("button", { name: "Promotion" }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByTestId("promotion-offer").filter({ hasText: "Retail $10 off $60" }).getByRole("button", { name: "Apply" }).click();
-    await dialog.waitFor({ state: "detached" });
+    // The checkout is saved as it's built: a rerun finds the product and
+    // promotion already on it.
+    if (!(await ticket.getByTestId("applied-promotion").count())) {
+      await ticket.getByLabel("Add a product: name, brand, SKU or scan").fill(visit.product);
+      await ticket.getByRole("list", { name: "Matching products" }).getByRole("button").first().click();
+      await ticket.getByRole("button", { name: "Promotion" }).click();
+      const dialog = page.getByRole("dialog");
+      await dialog.getByTestId("promotion-offer").filter({ hasText: "Retail $10 off $60" }).getByRole("button", { name: "Apply" }).click();
+      await dialog.waitFor({ state: "detached" });
+    }
     await ticket.getByTestId("applied-promotion").first().waitFor();
   });
+
+  // The same checkout taking cash (the number pad), then a card.
+  const paying = async (page: Page, how: "Cash" | "Card") => {
+    const visit = await visitToCheckOut();
+    if (!visit) throw new Error("no checked-in visit today of $60 or more without a membership or package");
+    await page.goto(`/checkout/new?appointment=${visit.appointmentId}&from=/calendar`);
+    await page.waitForURL(/\/checkout\/[0-9a-f-]{36}$/);
+    await waitForReact(page, "#product-search");
+    await page.getByRole("complementary", { name: "Payment" }).getByRole("button", { name: how, exact: true }).click();
+    await page.getByRole("dialog").waitFor();
+    if (how === "Cash") await page.getByRole("dialog").getByRole("group", { name: "Quick amounts" }).getByRole("button").nth(1).click();
+  };
+  await shot("55-checkout-cash", owner, (page) => paying(page, "Cash"));
+  await shot("56-checkout-card", owner, (page) => paying(page, "Card"));
 
   await shot("08-client-account", visitor, async (page) => {
     const client = await accountClient();
@@ -500,6 +518,14 @@ async function capture(browser: Browser, first: boolean) {
     await waitForReact(page, "main button[type=submit]");
   });
 
+  // Back at the desk while the pay link is out: the checkout waits.
+  await shot("57-checkout-waiting", front, async (page) => {
+    const { data: link } = await admin.from("payment_links").select("draft_id").eq("business_id", BUSINESS).eq("status", "open").order("created_at").limit(1).single();
+    if (!link) throw new Error("no payment link out (shot 45 sends it)");
+    await page.goto(`/checkout/${link.draft_id}`);
+    await page.getByText("Waiting for payment").waitFor();
+  });
+
   // A card link for a new client's next visit (the salon asks new clients
   // for a card), then the same with a deposit, as for a service that takes
   // one: sent by the front desk the way booking details sends it.
@@ -548,6 +574,55 @@ async function capture(browser: Browser, first: boolean) {
     await page.goto(`/event/${token}`);
     await waitForReact(page, "main button[type=submit]");
   });
+
+  // Signing in: the sign-in page, forgot password, choosing a password
+  // (as from an invite), and the shared iPad's PIN screen.
+  await shot("50-sign-in", await context(browser), async (page) => {
+    await page.goto("/login");
+    await waitForReact(page, "input[name=email]");
+  });
+
+  await shot("51-forgot-password", await context(browser), async (page) => {
+    await page.goto("/login/forgot");
+    await waitForReact(page, "main button[type=submit]");
+  });
+
+  await shot("52-new-password", owner, async (page) => {
+    await page.goto("/account/password?welcome=1");
+    await waitForReact(page, "main button[type=submit]");
+  });
+
+  // The shared iPad: this browser registered as one by the owner, then
+  // Switch user, then Sam (the front desk) chosen with two digits in.
+  const shared = async (page: Page, pin: boolean) => {
+    const device = await signedIn(browser, "owner@mapleandash.test");
+    try {
+      const setup = await device.newPage();
+      await admin.from("shared_devices").delete().eq("business_id", BUSINESS).eq("name", "Front desk iPad");
+      await setup.goto("/settings/devices");
+      await waitForReact(setup, "form[aria-label='Share this device'] button");
+      await setup.getByRole("main").getByLabel("Name").fill("Front desk iPad");
+      await setup.getByRole("main").getByRole("button", { name: "Use this device as a shared device" }).click();
+      await setup.getByRole("main").getByRole("status").waitFor();
+      await setup.goto("/dashboard");
+      await setup.waitForLoadState("networkidle");
+      await setup.getByRole("button", { name: "Switch user" }).first().click();
+      await setup.waitForURL("/switch");
+      await setup.close();
+      for (const c of await device.cookies()) await page.context().addCookies([c]);
+    } finally {
+      await device.close();
+    }
+    await page.goto("/switch");
+    await waitForReact(page, "ul[aria-label='Choose who you are'] button");
+    if (pin) {
+      await page.getByRole("button", { name: "Sam R." }).click();
+      for (const d of "48") await page.getByRole("button", { name: d, exact: true }).click();
+    }
+  };
+  await shot("53-switch-user", await context(browser), (page) => shared(page, false));
+  await shot("54-switch-pin", await context(browser), (page) => shared(page, true));
+  await admin.from("shared_devices").delete().eq("business_id", BUSINESS).eq("name", "Front desk iPad");
 
   await shot("11-denise-gaps", owner, async (page) => {
     await page.goto("/promotions");

@@ -72,7 +72,12 @@ export async function expectTidyLayout(page: Page, where: string) {
       let view = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
       for (let e: Element | null = own ? el.parentElement : el; e && e !== document.body; e = e.parentElement) {
         const s = getComputedStyle(e);
-        if (s.overflowX === "visible" && s.overflowY === "visible") continue;
+        // Nothing above a fixed box (a sheet drawn into the page's main)
+        // clips it.
+        if (s.overflowX === "visible" && s.overflowY === "visible") {
+          if (s.position === "fixed") break;
+          continue;
+        }
         const r = e.getBoundingClientRect();
         const scrolls = /auto|scroll/.test(s.overflowX + s.overflowY);
         if (scrolls) {
@@ -89,6 +94,7 @@ export async function expectTidyLayout(page: Page, where: string) {
           clipped = true;
           break;
         }
+        if (s.position === "fixed") break;
       }
       if (clipped) continue;
 

@@ -374,6 +374,17 @@ the one main action, one layer of containers.
   A reward a client can take says "Use at checkout". Items in a list line up: the same
   inner padding, and a price at the top right of its card, whatever the
   card holds.
+- **Signing in.** One link style on Maestra's own screens (`textLinkClass`:
+  the link blue, underlined on hover). "Forgot password?" sits on the
+  Password label's line, at its right, where people look for it; "Back to
+  sign in" is just under its form. Curly apostrophes in every heading
+  ("Who’s at the desk?"). On the shared iPad, Not me and Unlock are as wide
+  as the number pad above them.
+- **Checkout.** A reason every disabled choice shares ("Rewards can't be
+  used with a promotion.") is said once, under them, not under each one.
+  Narrow (the ticket over the payment), the whole screen scrolls as one
+  page, with Complete sale pinned at the bottom of the payment; side by
+  side, the ticket's lines and the payment scroll on their own.
 
 Every component, in each of its states, is on the owners' style guide at
 `/design` (not in the sidebar).

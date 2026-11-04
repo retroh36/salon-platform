@@ -7,7 +7,7 @@ open: /login/forgot | Open Forgot password
 
 Choose a new password if you've forgotten yours.
 
-1. On the sign-in screen, tap **Forgot password?**.
+1. On the sign-in screen, tap **Forgot password?** (beside Password).
 2. Enter the **Email** you sign in with and tap **Send the link**.
 3. Open the email "Choose your Maestra password" and tap **Choose a password**.
 4. Enter a **New password** (at least 8 characters) and **The same again**.

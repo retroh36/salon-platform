@@ -135,7 +135,8 @@ const tierName = (data: CheckoutScreenData) => data.rewards?.tiers.find((t) => t
 
 // The client's rewards: one tap takes one off (as complete_sale will), with
 // why one can't be taken yet. Below the program's minimum that's the same
-// for every reward, so it's said once, above them.
+// for every reward, so it's said once, above them; any other reason every
+// reward shares (a promotion on the sale) is said once, below them.
 function RewardsPanel({ data, ticket, rates, onChange }: { data: CheckoutScreenData; ticket: Ticket; rates: Rates; onChange: (f: (t: Ticket) => Ticket) => void }) {
   const r = data.rewards;
   if (!r || (!r.catalog.length && !clientTier(rates)?.freeAddonServiceId)) return null;
@@ -147,6 +148,13 @@ function RewardsPanel({ data, ticket, rates, onChange }: { data: CheckoutScreenD
   const perkProblem = ticket.tierPerk ? null : (rewardProblems({ ...ticket, tierPerk: true }, rates, true)[0] ?? null);
   const program = used.length ? { ...r.program, minRedeemPoints: 0 } : r.program;
   const belowMinimum = left.balance < program.minRedeemPoints;
+  const offered = r.catalog
+    .filter((x) => !used.includes(x.id))
+    .map((x) => {
+      const problem = rewardProblem(x, left, program, r.tiers) ?? (rewardProblems({ ...ticket, rewards: [...used, x.id] }, rates, true)[0] ?? null);
+      return { x, problem: problem && problem.replace(`${x.name}: `, "") };
+    });
+  const shared = !belowMinimum && offered.length > 1 && offered.every((o) => o.problem && o.problem === offered[0].problem) ? offered[0].problem : null;
   return (
     <section aria-label="Rewards" className="flex flex-col gap-2" data-testid="rewards">
       <p className="text-13 font-medium text-ink-muted">
@@ -162,20 +170,16 @@ function RewardsPanel({ data, ticket, rates, onChange }: { data: CheckoutScreenD
             {perkProblem && <span className="max-w-56 text-xs text-ink-muted">{perkProblem}</span>}
           </li>
         )}
-        {r.catalog
-          .filter((x) => !used.includes(x.id))
-          .map((x) => {
-            const problem = rewardProblem(x, left, program, r.tiers) ?? (rewardProblems({ ...ticket, rewards: [...used, x.id] }, rates, true)[0] ?? null);
-            return (
-              <li key={x.id} className="flex flex-col gap-1">
-                <Button variant="secondary" disabled={Boolean(problem)} onClick={() => onChange((t) => ({ ...t, rewards: [...(t.rewards ?? []), x.id] }))}>
-                  {x.name} <span className="font-normal text-ink-muted tabular-nums">· {points(x.points)}</span>
-                </Button>
-                {problem && !belowMinimum && <span className="max-w-56 text-xs text-ink-muted">{problem.replace(`${x.name}: `, "")}</span>}
-              </li>
-            );
-          })}
+        {offered.map(({ x, problem }) => (
+          <li key={x.id} className="flex flex-col gap-1">
+            <Button variant="secondary" disabled={Boolean(problem)} onClick={() => onChange((t) => ({ ...t, rewards: [...(t.rewards ?? []), x.id] }))}>
+              {x.name} <span className="font-normal text-ink-muted tabular-nums">· {points(x.points)}</span>
+            </Button>
+            {problem && !belowMinimum && !shared && <span className="max-w-56 text-xs text-ink-muted">{problem}</span>}
+          </li>
+        ))}
       </ul>
+      {shared && <p className="text-xs text-ink-muted" data-testid="rewards-why">{shared}</p>}
     </section>
   );
 }

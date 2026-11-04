@@ -100,7 +100,7 @@ test.describe("the shared iPad", () => {
       await page.waitForLoadState("networkidle");
       await page.getByRole("button", { name: "Switch user" }).first().click();
       await expect(page).toHaveURL("/switch");
-      await expect(page.getByRole("heading", { name: "Who's at the desk?" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Who’s at the desk?" })).toBeVisible();
 
       // A wrong PIN, then the right one.
       await waitForHydration(page, "ul[aria-label='Choose who you are'] button");
