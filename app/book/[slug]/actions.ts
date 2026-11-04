@@ -24,7 +24,8 @@ import { addDays, fromLocal, isLocalDate, todayIn, toLocal, type LocalDate } fro
 import { formatMinute } from "@/lib/scheduling/time";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { patchExplanation } from "@/lib/online-booking/patch";
-import { loadManaged, canChange } from "@/lib/online-booking/manage";
+import { loadManaged, canChange, cancelTerms } from "@/lib/online-booking/manage";
+import { canceledMessage, rescheduledMessage } from "@/lib/online-booking/messages";
 import { onlineTerms, type OnlineTerms } from "@/lib/online-booking/terms";
 import { onlinePromotion, onlineSpecials, plannedItems, specialAt, type OnlinePromotion, type OnlinePromo } from "@/lib/online-booking/promotions";
 import { loadPromotions } from "@/lib/promotions-load";
@@ -538,18 +539,30 @@ async function confirmationMessage(
   manageUrl: string,
   terms: OnlineTerms,
 ) {
-  const to = await appointmentChannel(admin, clientId, contact.channel);
-  if (!to) return;
+  const body = `${site.business.name}: you're booked for ${whenText(site, start)}.${terms.depositCents ? ` Deposit paid: $${(terms.depositCents / 100).toFixed(2)}.` : ""} View, change or cancel: ${siteUrl()}${manageUrl}\n\nOur cancellation policy: ${terms.lines.join(" ")}`;
+  await sendToClient(admin, site, clientId, contact.channel, `You're booked at ${site.business.name}`, body);
+}
+
+// "Friday, November 6 at 10am", at the salon.
+function whenText(site: BookingSite, start: Date): string {
   const local = toLocal(start, site.location.timezone);
-  const when = `${new Date(`${local.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })} at ${formatMinute(local.minute)}`;
-  const body = `${site.business.name}: you're booked for ${when}.${terms.depositCents ? ` Deposit paid: $${(terms.depositCents / 100).toFixed(2)}.` : ""} View, change or cancel: ${siteUrl()}${manageUrl}\n\nOur cancellation policy: ${terms.lines.join(" ")}`;
-  await admin.from("outbox_messages").insert({
+  return `${new Date(`${local.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })} at ${formatMinute(local.minute)}`;
+}
+
+// A message about the client's own visit, on a channel they get those on
+// (the preferred one if allowed, else the other), through the outbox.
+async function sendToClient(admin: ReturnType<typeof createAdminClient>, site: BookingSite, clientId: string, prefer: Channel, subject: string, body: string) {
+  const to = await appointmentChannel(admin, clientId, prefer);
+  if (!to) return;
+  const { error } = await admin.from("outbox_messages").insert({
     business_id: site.business.id,
     channel: to.channel,
     to_address: to.channel === "sms" ? phoneDigits(to.to) ?? to.to : to.to,
-    subject: to.channel === "email" ? `You're booked at ${site.business.name}` : null,
+    subject: to.channel === "email" ? subject : null,
     body: to.channel === "sms" ? withStopLine(body) : body,
   });
+  // The booking or change stands either way; the outbox is only told.
+  if (error) console.error(`[book] confirmation not recorded: ${error.code ?? "unknown"}`);
 }
 
 // The card for a booking that needs one: one entered now (saved with the
@@ -596,9 +609,21 @@ export async function cancelBooking(slug: string, token: string): Promise<Manage
   if (!managed) return { ok: false, message: "We couldn't find this booking." };
   if (!canChange(site, managed)) return { ok: false, message: `It's too close to your visit to cancel online. Please call ${site.location.phone ?? "the salon"}.` };
   const { ipHash, userAgent } = await requestInfo();
+  // What canceling costs, worked out as the page showed it (the database records the fee as it cancels).
+  const terms = await cancelTerms(admin, site, managed);
   const result = await cancelOnline(admin, managed.id, sha256(token));
   if (!result.ok) return { ok: false, message: "This booking can't be canceled online." };
   await admin.from("online_booking_log").insert({ business_id: site.business.id, appointment_id: managed.id, client_id: managed.clientId, action: "canceled", ip_hash: ipHash, user_agent: userAgent });
+  // The client canceled it, so they get the confirmation (with any fee).
+  const body = canceledMessage({
+    salon: site.business.name,
+    when: whenText(site, managed.start),
+    bookUrl: `${siteUrl()}/book/${site.business.slug}`,
+    feeCents: terms.feeCents,
+    depositPaidCents: managed.depositPaidCents,
+    cardLabel: terms.cardLabel,
+  });
+  await sendToClient(admin, site, managed.clientId, "sms", `Your visit at ${site.business.name} is canceled`, body);
   return { ok: true };
 }
 
@@ -629,5 +654,8 @@ export async function reschedule(slug: string, token: string, date: string, minu
     return { ok: false, message: "Sorry, that time was just taken. Please pick another." };
   }
   await admin.from("online_booking_log").insert({ business_id: site.business.id, appointment_id: managed.id, client_id: managed.clientId, action: "rescheduled", ip_hash: ipHash, user_agent: userAgent });
+  // The client moved it, so they get the confirmation.
+  const body = rescheduledMessage({ salon: site.business.name, when: whenText(site, start), manageUrl: `${siteUrl()}/book/${site.business.slug}/manage/${token}` });
+  await sendToClient(admin, site, managed.clientId, "sms", `Your visit at ${site.business.name} has moved`, body);
   return { ok: true };
 }

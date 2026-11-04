@@ -378,6 +378,15 @@ test("a client reschedules, then cancels, with their private link", async ({ pag
   await expect(page.getByRole("status")).toContainText("Moved to");
   const after = (await admin.from("appointments").select("starts_at, status").eq("client_id", client!.id).single()).data!;
   expect(after.starts_at).not.toBe(before);
+  // Client-made changes send their own confirmation, like the booking did.
+  const messages = async () => {
+    const box = await page.context().newPage();
+    await box.goto(`/dev/outbox?to=${number.replace(/\D/g, "")}`);
+    const bodies = await box.getByTestId("outbox-body").allInnerTexts();
+    await box.close();
+    return bodies;
+  };
+  expect((await messages()).some((m) => /your visit is moved to .+\. View, change or cancel:/.test(m))).toBe(true);
 
   await page.getByRole("button", { name: "Cancel booking" }).click();
   await page.getByRole("button", { name: "Yes, cancel it" }).click();
@@ -386,6 +395,7 @@ test("a client reschedules, then cancels, with their private link", async ({ pag
   expect(done).toMatchObject({ status: "canceled", cancel_reason: "Canceled online by the client" });
   const { data: log } = await admin.from("online_booking_log").select("action").eq("appointment_id", done.id).order("created_at");
   expect(log!.map((l) => l.action)).toEqual(["booked", "rescheduled", "canceled"]);
+  expect((await messages()).some((m) => /your visit on .+ is canceled\./.test(m))).toBe(true);
 });
 
 test("color needs a patch test: with no patch test service set up, a new client is told to call at the service step", async ({ page }) => {
