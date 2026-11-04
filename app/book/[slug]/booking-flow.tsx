@@ -106,6 +106,29 @@ export function BookingFlow({
   const attempt = useRef("");
   const heading = useRef<HTMLHeadingElement>(null);
   const root = useRef<HTMLDivElement>(null);
+  // The sticky Continue bar's height, as --continue-bar: every step keeps
+  // that much room under its content, and anything scrolled into view (a
+  // tap, the keyboard) stops above the bar instead of under it.
+  const bar = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = bar.current;
+    const flow = root.current;
+    if (!el || !flow) return;
+    const page = document.documentElement;
+    const set = () => {
+      const h = `${Math.ceil(el.getBoundingClientRect().height)}px`;
+      flow.style.setProperty("--continue-bar", h);
+      // A little more, so a card brought into view isn't flush against it.
+      page.style.scrollPaddingBottom = `calc(${h} + 0.75rem)`;
+    };
+    set();
+    const watch = new ResizeObserver(set);
+    watch.observe(el);
+    return () => {
+      watch.disconnect();
+      page.style.scrollPaddingBottom = "";
+    };
+  }, []);
 
   const services = useMemo(() => new Map(site.services.map((s) => [s.id, s])), [site.services]);
   const selected = serviceIds.map((id) => services.get(id)!);
@@ -296,7 +319,7 @@ export function BookingFlow({
       <section
         key={step}
         aria-labelledby="step-title"
-        className="flex flex-1 animate-step-in flex-col"
+        className="flex flex-1 animate-step-in flex-col pb-(--continue-bar)"
         style={{ "--step-from": `${direction * 16}px` } as React.CSSProperties}
       >
         <h2 id="step-title" ref={heading} tabIndex={-1} className="mb-4 font-serif text-2xl font-semibold tracking-[-0.01em] text-ink focus:outline-none">
@@ -393,7 +416,7 @@ export function BookingFlow({
         )}
       </section>
 
-      <div className="sticky bottom-0 -mx-4 mt-6 border-t border-line bg-surface/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <div ref={bar} data-testid="continue-bar" className="sticky bottom-0 -mx-4 border-t border-line bg-surface/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
         {serviceIds.length > 0 && step !== "confirm" && (
           <p className="mb-2 flex justify-between gap-3 text-sm text-ink-muted" data-testid="summary">
             <span>
