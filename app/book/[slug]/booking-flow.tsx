@@ -110,6 +110,25 @@ export function BookingFlow({
   // that much room under its content, and anything scrolled into view (a
   // tap, the keyboard) stops above the bar instead of under it.
   const bar = useRef<HTMLDivElement>(null);
+  // On a phone the salon's intro comes first: the bar waits below the
+  // screen until the steps are well in view (their top above the lower
+  // third), so a grey Continue never sits under Book now. Beside the intro
+  // (from lg) the steps are always in view.
+  const [barShown, setBarShown] = useState(true);
+  useEffect(() => {
+    const flow = root.current;
+    if (!flow) return;
+    const wide = window.matchMedia("(min-width: 64rem)");
+    let inView = true;
+    const update = () => setBarShown(wide.matches || inView);
+    const watch = new IntersectionObserver(([entry]) => ((inView = entry.isIntersecting), update()), { rootMargin: "0px 0px -35% 0px" });
+    watch.observe(flow);
+    wide.addEventListener("change", update);
+    return () => {
+      watch.disconnect();
+      wide.removeEventListener("change", update);
+    };
+  }, []);
   useEffect(() => {
     const el = bar.current;
     const flow = root.current;
@@ -301,7 +320,9 @@ export function BookingFlow({
 
   return (
     <div ref={root} className="flex flex-1 flex-col" data-testid="booking-flow">
-      <nav aria-label="Booking steps" className="mb-3 flex min-h-11 items-center gap-3">
+      {/* On the first step, with no Back, the step's name sits just above
+          its title. */}
+      <nav aria-label="Booking steps" className={`flex items-center gap-3 ${index > 0 ? "mb-3 min-h-11" : "mb-1.5"}`}>
         {index > 0 && (
           <button
             type="button"
@@ -311,7 +332,7 @@ export function BookingFlow({
             <span aria-hidden>←</span> Back
           </button>
         )}
-        <p className="ml-auto text-13 font-medium text-ink-muted" aria-current="step" data-testid="step-label">
+        <p className={`text-13 font-medium text-ink-muted ${index > 0 ? "ml-auto" : ""}`} aria-current="step" data-testid="step-label">
           {stepLabel(index)}
         </p>
       </nav>
@@ -416,7 +437,13 @@ export function BookingFlow({
         )}
       </section>
 
-      <div ref={bar} data-testid="continue-bar" className="sticky bottom-0 -mx-4 border-t border-line bg-surface/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <div
+        ref={bar}
+        data-testid="continue-bar"
+        data-hidden={barShown ? undefined : ""}
+        inert={!barShown}
+        className="sticky bottom-0 -mx-4 border-t border-line bg-canvas/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-[translate,opacity] duration-(--motion-base) data-hidden:pointer-events-none data-hidden:translate-y-full data-hidden:opacity-0"
+      >
         {serviceIds.length > 0 && step !== "confirm" && (
           <p className="mb-2 flex justify-between gap-3 text-sm text-ink-muted" data-testid="summary">
             <span>
@@ -598,7 +625,7 @@ function StylistStep({
             <span className="block font-medium text-ink">No preference</span>
             <span className="block text-sm text-ink-muted">The first stylist free at your time</span>
           </span>
-          <span className="shrink-0 text-sm font-medium text-ink tabular-nums">{formatPriceRange(priceRange(serviceIds, null))}</span>
+          <span className="shrink-0 self-start pt-0.5 text-sm font-medium text-ink tabular-nums">{formatPriceRange(priceRange(serviceIds, null))}</span>
         </button>
       </li>
       {able.map((s) => (
@@ -625,7 +652,7 @@ function StylistCard({ stylist: s, on, price, onChoose }: { stylist: SiteStylist
         type="button"
         aria-pressed={on}
         onClick={onChoose}
-        className="flex w-full items-center gap-4 rounded-lg px-3 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        className="flex w-full items-center gap-4 rounded-lg px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       >
         {s.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -648,7 +675,7 @@ function StylistCard({ stylist: s, on, price, onChoose }: { stylist: SiteStylist
         <span className="shrink-0 self-start pt-0.5 text-sm font-medium text-ink tabular-nums">{price}</span>
       </button>
       {more && (
-        <div className="-mt-1 px-3 pb-2">
+        <div className="-mt-1 px-4 pb-2">
           <button
             type="button"
             aria-expanded={open}

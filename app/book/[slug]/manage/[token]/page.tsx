@@ -46,8 +46,9 @@ async function Manage({ params, searchParams }: { params: Promise<{ slug: string
     : null;
   const [policy, offer] = await Promise.all([cancelTerms(admin, site, booking), heldOffer(admin, site.business.id, booking.promotionId, booking.items)]);
 
+  const photos = new Map(site.stylists.map((s) => [s.id, s.photoUrl]));
   return (
-    <BookingFrame name={site.business.name} logoUrl={site.business.logoUrl} accent={site.settings.accent}>
+    <BookingFrame name={site.business.name} logoUrl={site.business.logoUrl} accent={site.settings.accent} cover={site.business.coverUrl}>
       <ManageView
         slug={slug}
         token={token}
@@ -60,7 +61,7 @@ async function Manage({ params, searchParams }: { params: Promise<{ slug: string
           date: start.date,
           minute: start.minute,
           endMinute: toLocal(booking.end, tz).minute,
-          items: booking.items.map((i) => ({ name: i.serviceName, stylist: i.staffName, priceCents: i.priceCents })),
+          items: booking.items.map((i) => ({ name: i.serviceName, stylist: i.staffName, photoUrl: photos.get(i.staffId) ?? null, priceCents: i.priceCents })),
           offer,
           depositCents: booking.depositCents,
           depositPaidCents: booking.depositPaidCents,

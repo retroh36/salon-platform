@@ -8,13 +8,14 @@ import type { AccountData, AccountRewards, AccountVisit } from "@/lib/online-boo
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { Alert } from "@/components/ui/page";
-import { accentLink, inputClass, pageLead, pageTitle, primaryButton, sectionTitle, smallButton } from "../styles";
+import { accentLink, inputClass, pageLead, pageTitle, primaryButton, smallButton } from "../styles";
+import { StylistPhoto } from "../stylist-photo";
 import { longDate } from "../times";
 import { addCard, confirmSignIn, createAccount, openVisit, removeCard, requestSignIn, saveMessagePreferences, signOut, type AccountResult } from "./actions";
 
-// Sections are a title over a thin rule, with the items below (no boxes).
-const sectionClass = "flex flex-col gap-3";
-const headingClass = sectionTitle;
+// Each section of the signed-in account is a card (a title, then its items).
+const sectionClass = "flex flex-col gap-3 rounded-lg border border-line bg-surface p-4 md:p-5";
+const headingClass = "text-base font-semibold text-ink";
 const linkButton = `min-h-9 text-sm ${accentLink}`;
 
 function Problem({ text }: { text: string | null }) {
@@ -203,7 +204,7 @@ export function AccountView({
     });
 
   return (
-    <div className="flex flex-col gap-8" data-testid="client-account">
+    <div className="flex flex-col gap-6" data-testid="client-account">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className={pageTitle}>Hi, {data.firstName}</h1>
@@ -215,29 +216,36 @@ export function AccountView({
           </button>
         </form>
       </div>
-      {result && (result.ok ? <Alert tone="success" className="-mt-4">{result.message}</Alert> : <Problem text={result.message} />)}
+      {result && (result.ok ? <Alert tone="success" className="-mt-2">{result.message}</Alert> : <Problem text={result.message} />)}
 
+      {/* Two columns from lg: visits on the left, balances, rewards, card
+          and messages on the right. On a phone the columns dissolve
+          (contents) into one list, past visits last. */}
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-2 lg:items-start">
+      <div className="contents lg:flex lg:flex-col lg:gap-6">
       <section aria-labelledby="upcoming-heading" className={sectionClass}>
         <h2 id="upcoming-heading" className={headingClass}>
           Coming up
         </h2>
         {data.upcoming.length ? (
-          <ul className="flex flex-col gap-2">
+          <ul className="-my-1 flex flex-col divide-y divide-line">
             {data.upcoming.map((v) => (
-              <li key={v.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-line bg-surface px-4 py-3" data-testid="upcoming-visit">
-                <div className="min-w-0">
+              <li key={v.id} className="flex items-start gap-3 py-3" data-testid="upcoming-visit">
+                {v.items[0] && <StylistPhoto name={v.items[0].stylist} url={v.items[0].photoUrl} className="size-12" />}
+                {/* Change or cancel under the visit, so the date keeps the row's width. */}
+                <div className="flex min-w-0 flex-1 flex-col items-start">
                   <p className="font-medium text-ink">{when(v)}</p>
                   <p className="text-sm text-ink-muted">{what(v)}</p>
                   <p className="text-sm text-ink-muted">
                     <span className="font-medium text-ink tabular-nums">{formatPrice(v.totalCents)}</span>
                     {v.offer && ` · ${v.offer.label}, taken off at your visit`}
                   </p>
+                  {v.status !== "checked_in" && (
+                    <button type="button" className={`${linkButton} mt-0.5`} disabled={pending} onClick={() => run(() => openVisit(slug, v.id))}>
+                      Change or cancel
+                    </button>
+                  )}
                 </div>
-                {v.status !== "checked_in" && (
-                  <button type="button" className={linkButton} disabled={pending} onClick={() => run(() => openVisit(slug, v.id))}>
-                    Change or cancel
-                  </button>
-                )}
               </li>
             ))}
           </ul>
@@ -252,6 +260,7 @@ export function AccountView({
             href={`/book/${slug}?services=${data.rebook.serviceIds.join(",")}${data.rebook.staffId ? `&staff=${data.rebook.staffId}` : ""}&src=rebook`}
             className={`${primaryButton} mt-1`}
           >
+            {data.rebook.stylist && <StylistPhoto name={data.rebook.stylist.name} url={data.rebook.stylist.photoUrl} className="-ml-1 size-7 ring-2 ring-white/40" />}
             Book again: {data.rebook.label}
           </Link>
         ) : (
@@ -261,12 +270,30 @@ export function AccountView({
         )}
       </section>
 
+      {data.past.length > 0 && (
+        <section aria-labelledby="past-heading" className={`${sectionClass} max-lg:order-1`}>
+          <h2 id="past-heading" className={headingClass}>
+            Past visits
+          </h2>
+          <ul className="-my-1 flex flex-col divide-y divide-line text-sm">
+            {data.past.map((v) => (
+              <li key={v.id} className="py-3">
+                <p className="font-medium text-ink">{longDate(toLocal(new Date(v.start), timezone).date)}</p>
+                <p className="text-ink-muted">{what(v)}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      </div>
+
+      <div className="contents lg:flex lg:flex-col lg:gap-6">
       {(data.giftCards.length > 0 || data.packages.length > 0) && (
         <section aria-labelledby="balances-heading" className={sectionClass}>
           <h2 id="balances-heading" className={headingClass}>
             Balances
           </h2>
-          <ul className="-mt-3 flex flex-col divide-y divide-line text-sm" data-testid="balances">
+          <ul className="-my-1 flex flex-col divide-y divide-line text-sm" data-testid="balances">
             {data.giftCards.map((g) => (
               <li key={g.last4} className="flex justify-between gap-3 py-3">
                 <span className="text-ink">Gift card ending {g.last4}</span>
@@ -341,21 +368,8 @@ export function AccountView({
         ))}
       </section>
 
-      {data.past.length > 0 && (
-        <section aria-labelledby="past-heading" className={sectionClass}>
-          <h2 id="past-heading" className={headingClass}>
-            Past visits
-          </h2>
-          <ul className="-mt-3 flex flex-col divide-y divide-line text-sm">
-            {data.past.map((v) => (
-              <li key={v.id} className="py-3">
-                <p className="font-medium text-ink">{longDate(toLocal(new Date(v.start), timezone).date)}</p>
-                <p className="text-ink-muted">{what(v)}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      </div>
+      </div>
       {salon.phone && <p className="text-center text-sm text-ink-muted">Questions? Call {salon.phone}.</p>}
     </div>
   );
@@ -380,9 +394,9 @@ function RewardsSection({ slug, rewards, timezone }: { slug: string; rewards: Ac
       {rewards.rewards.length > 0 && (
         <ul className="flex flex-col divide-y divide-line text-sm">
           {rewards.rewards.map((r) => (
-            <li key={r.name} className="flex justify-between gap-3 py-2">
+            <li key={r.name} className="flex items-baseline justify-between gap-3 py-2">
               <span className="text-ink">{r.name}</span>
-              <span className={r.ready ? "font-medium text-ink" : "text-ink-muted tabular-nums"}>{r.ready ? "Ready to use" : pts(r.points)}</span>
+              <span className={r.ready ? "text-xs text-ink-muted" : "text-ink-muted tabular-nums"}>{r.ready ? "Use at checkout" : pts(r.points)}</span>
             </li>
           ))}
         </ul>

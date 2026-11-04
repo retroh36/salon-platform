@@ -33,7 +33,7 @@ async function Account({ params, searchParams }: { params: Promise<{ slug: strin
   const { site } = found;
   const account = await currentAccount(admin, site.business.id);
   const frame = (children: React.ReactNode) => (
-    <BookingFrame name={site.business.name} logoUrl={site.business.logoUrl} accent={site.settings.accent}>
+    <BookingFrame name={site.business.name} logoUrl={site.business.logoUrl} accent={site.settings.accent} cover={site.business.coverUrl} wide={Boolean(account)}>
       {children}
     </BookingFrame>
   );

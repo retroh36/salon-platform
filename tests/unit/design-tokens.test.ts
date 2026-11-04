@@ -79,7 +79,7 @@ const STATUSES = ["booked", "confirmed", "checked-in", "completed", "late", "no-
 
 // [text, background]: normal-size text needs 4.5:1.
 const PAIRS: [string, string][] = [
-  ...["ink", "ink-muted", "ink-subtle", "navy-900", "navy-700", "link", "link-hover", "danger"].flatMap((t) => SURFACES.map((s): [string, string] => [t, s])),
+  ...["ink", "ink-muted", "ink-soft", "ink-subtle", "navy-900", "navy-700", "link", "link-hover", "danger"].flatMap((t) => SURFACES.map((s): [string, string] => [t, s])),
   ...["ink", "ink-muted"].flatMap((t) => FILLS.map((f): [string, string] => [t, f])),
   // A booked block's own tinted text on its service color.
   ...FILLS.flatMap((f): [string, string][] => [[f.replace("-fill", "-ink"), f], [f.replace("-fill", "-ink-muted"), f]]),

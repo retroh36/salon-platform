@@ -261,7 +261,10 @@ or one-off hex values.
   dense grids (the calendar's quarter hours and time pill, the week grid,
   the sidebar's group headings, small status chips), and 28/32px
   (`text-display`, `text-display-lg`) for the salon's name on its booking
-  site and the sign-in headline, in the serif. No other sizes.
+  site and the sign-in headline, in the serif. And on client pages from
+  `lg` up (a laptop, an iPad in landscape), 13 and 14px text reads 15px
+  and secondary text takes the darker `ink-soft`, for reading at a desk
+  (`BookingFrame`); phones keep the scale. No other sizes.
 - Small labels are sentence case, never spaced-out capitals.
 - The wordmark is part of the logo: never set "Maestra" in a font to stand
   in for it.
@@ -352,6 +355,25 @@ the one main action, one layer of containers.
   periwinkle strip (`denise-50`) with her name in `denise-900`; inside,
   her cards have 16px of room, the fix she recommends is one strong
   button and everything else is quiet.
+- **Client pages.** Text links in the salon's color are underlined in a
+  lighter shade of it (`accentLink`: `--accent-line`, 1px, set below the
+  letters), darkening on hover; a full-strength underline reads heavy. The
+  booking site's Continue bar sits on the page's own off-white with a
+  hairline above, not a white slab, and on a phone it slides in only once
+  the steps are in view (never a grey Continue under the salon's Book
+  now). On the first step, with no Back, the step's name ("Services ·
+  Step 1 of 5") sits just above the title. The salon's address and phone
+  read the same wherever a client sees them: an icon, the address with
+  Map, the number as a link.
+- **Client account and a visit's own page.** Both open under the salon's
+  cover photo as a strip, with its logo over the edge and its name beside
+  it, like the booking site. Stylists show their portrait (their initial
+  without one) on visits and on Book again. The account's sections are
+  cards, in two columns from `lg` (visits on the left; balances, rewards,
+  card and messages on the right) and one on a phone, past visits last.
+  A reward a client can take says "Use at checkout". Items in a list line up: the same
+  inner padding, and a price at the top right of its card, whatever the
+  card holds.
 
 Every component, in each of its states, is on the owners' style guide at
 `/design` (not in the sidebar).

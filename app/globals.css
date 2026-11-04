@@ -27,6 +27,9 @@
   --color-ink: #191c22;
   --color-ink-muted: #5c6170;
   --color-ink-subtle: #696e7b;
+  /* Secondary text on client pages from lg up: a little darker than
+     ink-muted, for reading at a desk (BookingFrame) */
+  --color-ink-soft: #4a4f5c;
 
   /* Primary: deep navy, the Maestra logo's #17273b (buttons, selected
      states, the active nav item, headings) */

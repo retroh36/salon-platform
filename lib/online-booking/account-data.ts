@@ -1,9 +1,11 @@
 // What a signed-in client sees in their account (./account.ts): their own
 // visits, balances, card and message preferences at this salon, and nothing
 // internal (no notes, no other clients, no staff details beyond a first
-// name). Every query is filtered by the account's client and salon.
+// name and the portrait the booking site shows). Every query is filtered by
+// the account's client and salon.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { staffPhotoUrl } from "@/lib/branding";
 import type { Database } from "@/lib/database.types";
 import { nextTier, rewardProblem } from "@/lib/rewards";
 import { heldOffer } from "./promotions";
@@ -17,7 +19,7 @@ export type AccountVisit = {
   status: string;
   start: string;
   end: string;
-  items: { serviceId: string; service: string; staffId: string; stylist: string; priceCents: number }[];
+  items: { serviceId: string; service: string; staffId: string; stylist: string; photoUrl: string | null; priceCents: number }[];
   // Coming up: what it costs after the offer it was booked with, if any.
   totalCents: number;
   offer: { label: string; discountCents: number } | null;
@@ -36,7 +38,8 @@ export type AccountData = {
   // Offers (sms, email) and messages about their visits, and whether they replied STOP.
   messages: MessagePrefs;
   // The last finished visit's services and stylist, to book again.
-  rebook: { serviceIds: string[]; staffId: string | null; label: string } | null;
+  // With the stylist's name and portrait when there was one stylist.
+  rebook: { serviceIds: string[]; staffId: string | null; label: string; stylist: { name: string; photoUrl: string | null } | null } | null;
   // Their rewards (null when the salon has no program on).
   rewards: AccountRewards | null;
 };
@@ -55,7 +58,7 @@ const PAST_SHOWN = 10;
 
 export async function loadAccount(admin: Admin, account: Account, now = new Date()): Promise<AccountData> {
   const { clientId, businessId } = account;
-  const visitColumns = "id, status, starts_at, ends_at, promotion_id, appointment_items(service_id, staff_id, starts_at, price_cents, service:services(name), staff:staff(first_name))";
+  const visitColumns = "id, status, starts_at, ends_at, promotion_id, appointment_items(service_id, staff_id, starts_at, price_cents, service:services(name), staff:staff(first_name, photo_path))";
   const [client, upcoming, past, cards, packages, card, rewards] = await Promise.all([
     admin.from("clients").select("first_name, email, phone, sms_opt_in, email_opt_in, appointment_sms_ok, appointment_email_ok, sms_stopped_at").eq("id", clientId).eq("business_id", businessId).single(),
     admin
@@ -89,7 +92,7 @@ export async function loadAccount(admin: Admin, account: Account, now = new Date
   const visit = (a: NonNullable<typeof upcoming.data>[number]): AccountVisit => {
     const items = [...a.appointment_items]
       .sort((x, y) => x.starts_at.localeCompare(y.starts_at))
-      .map((i) => ({ serviceId: i.service_id, service: i.service.name, staffId: i.staff_id, stylist: i.staff.first_name, priceCents: i.price_cents }));
+      .map((i) => ({ serviceId: i.service_id, service: i.service.name, staffId: i.staff_id, stylist: i.staff.first_name, photoUrl: staffPhotoUrl(i.staff.photo_path), priceCents: i.price_cents }));
     return { id: a.id, status: a.status, start: a.starts_at, end: a.ends_at, items, totalCents: items.reduce((n, i) => n + i.priceCents, 0), offer: null };
   };
   const pastVisits = past.data!.map(visit);
@@ -116,7 +119,9 @@ export async function loadAccount(admin: Admin, account: Account, now = new Date
       .filter((p) => p.left.length > 0),
     card: card.data ? { label: card.data.label, since: card.data.created_at } : null,
     messages: { sms: c.sms_opt_in, email: c.email_opt_in, visitSms: c.appointment_sms_ok, visitEmail: c.appointment_email_ok, stopped: Boolean(c.sms_stopped_at) },
-    rebook: last ? { serviceIds: last.items.map((i) => i.serviceId), staffId: stylists.length === 1 ? stylists[0] : null, label: rebookLabel(last) } : null,
+    rebook: last
+      ? { serviceIds: last.items.map((i) => i.serviceId), staffId: stylists.length === 1 ? stylists[0] : null, label: rebookLabel(last), stylist: stylists.length === 1 ? { name: last.items[0].stylist, photoUrl: last.items[0].photoUrl } : null }
+      : null,
     rewards,
   };
 }
@@ -151,7 +156,7 @@ export async function loadAccountRewards(admin: Admin, account: Account): Promis
 export async function loadRebook(admin: Admin, account: Account): Promise<AccountData["rebook"]> {
   const { data, error } = await admin
     .from("appointments")
-    .select("appointment_items(service_id, staff_id, starts_at, service:services(name), staff:staff(first_name))")
+    .select("appointment_items(service_id, staff_id, starts_at, service:services(name), staff:staff(first_name, photo_path))")
     .eq("client_id", account.clientId)
     .eq("business_id", account.businessId)
     .eq("status", "completed")
@@ -162,9 +167,14 @@ export async function loadRebook(admin: Admin, account: Account): Promise<Accoun
   if (!data?.appointment_items.length) return null;
   const items = [...data.appointment_items]
     .sort((x, y) => x.starts_at.localeCompare(y.starts_at))
-    .map((i) => ({ serviceId: i.service_id, service: i.service.name, staffId: i.staff_id, stylist: i.staff.first_name, priceCents: 0 }));
+    .map((i) => ({ serviceId: i.service_id, service: i.service.name, staffId: i.staff_id, stylist: i.staff.first_name, photoUrl: staffPhotoUrl(i.staff.photo_path), priceCents: 0 }));
   const stylists = [...new Set(items.map((i) => i.staffId))];
-  return { serviceIds: items.map((i) => i.serviceId), staffId: stylists.length === 1 ? stylists[0] : null, label: rebookLabel({ items }) };
+  return {
+    serviceIds: items.map((i) => i.serviceId),
+    staffId: stylists.length === 1 ? stylists[0] : null,
+    label: rebookLabel({ items }),
+    stylist: stylists.length === 1 ? { name: items[0].stylist, photoUrl: items[0].photoUrl } : null,
+  };
 }
 
 // "Women's Cut & Style with Bridget"

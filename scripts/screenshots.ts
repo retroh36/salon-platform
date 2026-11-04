@@ -389,7 +389,7 @@ async function capture(browser: Browser, first: boolean) {
     const flow = page.getByTestId("booking-flow");
     await flow.getByRole("button", { name: /^Women's Cut & Style\s*\d/ }).click();
     await flow.getByRole("button", { name: "Continue" }).click();
-    await flow.getByRole("button", { name: /Shae M\./ }).click();
+    await flow.getByRole("button", { name: /Shae M/ }).click();
     await flow.getByRole("button", { name: "Continue" }).click();
     await flow.getByTestId("specials-note").waitFor();
     const badge = flow.getByTestId("special-badge").first();
@@ -400,6 +400,153 @@ async function capture(browser: Browser, first: boolean) {
     }
     await badge.waitFor({ timeout: 5_000 });
     await flow.getByRole("radiogroup", { name: "Date" }).scrollIntoViewIfNeeded();
+  });
+
+  // The booking site, step by step, as a new visitor: the salon first, then
+  // a stylist, then review for a client on file (their code confirmed, never
+  // booked, so reruns over the same data match).
+  await shot("40-booking-start", await context(browser), async (page) => {
+    await page.goto(`/book/${SLUG}`);
+    await waitForReact(page, "[data-testid=booking-flow] button[aria-pressed]");
+  });
+
+  await shot("41-booking-stylist", await context(browser), async (page) => {
+    await page.goto(`/book/${SLUG}`);
+    await waitForReact(page, "[data-testid=booking-flow] button[aria-pressed]");
+    const flow = page.getByTestId("booking-flow");
+    await flow.getByRole("button", { name: /^Women's Cut & Style\s*\d/ }).click();
+    await flow.getByRole("button", { name: "Continue" }).click();
+    await flow.getByRole("heading", { name: "Choose your stylist" }).waitFor();
+  });
+
+  await shot("42-booking-review", await context(browser), async (page) => {
+    const client = await accountClient();
+    if (!client?.phone) throw new Error("no client with a phone for the review shot");
+    await admin.from("rate_limits").delete().neq("key", "");
+    await page.goto(`/book/${SLUG}`);
+    await waitForReact(page, "[data-testid=booking-flow] button[aria-pressed]");
+    const flow = page.getByTestId("booking-flow");
+    await flow.getByRole("button", { name: /^Women's Cut & Style\s*\d/ }).click();
+    await flow.getByRole("button", { name: "Continue" }).click();
+    await flow.getByRole("button", { name: /Shae M/ }).click();
+    await flow.getByRole("button", { name: "Continue" }).click();
+    await flow.getByRole("radiogroup", { name: /Morning|Afternoon|Evening/ }).first().getByRole("radio").first().click();
+    await flow.getByRole("button", { name: "Continue" }).click();
+    await flow.getByLabel("Mobile number").fill(client.phone);
+    await flow.getByRole("button", { name: "Send code" }).click();
+    await flow.getByLabel("Code", { exact: true }).waitFor();
+    const digits = client.phone.replace(/\D/g, "").slice(-10);
+    const { data: sent } = await admin.from("outbox_messages").select("body").ilike("to_address", `%${digits}`).order("created_at", { ascending: false }).limit(1).single();
+    const code = /code is (\d{6})/.exec(sent?.body ?? "")?.[1];
+    if (!code) throw new Error("the booking code didn't reach the outbox");
+    await flow.getByLabel("Code", { exact: true }).fill(code);
+    await flow.getByRole("button", { name: "Confirm" }).click();
+    const policy = flow.getByText("Cancellation policy").first();
+    const cont = flow.getByRole("button", { name: "Continue" });
+    await policy.or(cont).first().waitFor();
+    if (await cont.isVisible()) await cont.click();
+    await policy.waitFor();
+  });
+
+  // A client's own page for a visit, from the link in their confirmation
+  // (a fixed link, so every run opens the same visit): an online booking
+  // far enough ahead to change.
+  await shot("43-booking-manage", await context(browser), async (page) => {
+    const { data: visit } = await admin.from("appointments").select("id").eq("business_id", BUSINESS).eq("source", "online").not("client_id", "is", null).in("status", ["booked", "confirmed"]).gt("starts_at", new Date(now().getTime() + 72 * 3_600_000).toISOString()).order("starts_at").order("id").limit(1).maybeSingle();
+    if (!visit) throw new Error("no online booking far enough ahead to change");
+    const token = "screenshots-manage-link-0000000000000000000";
+    const { createHash } = await import("node:crypto");
+    const { error } = await admin.from("appointment_manage_links").upsert({ business_id: BUSINESS, appointment_id: visit!.id, token_hash: createHash("sha256").update(token).digest("hex") }, { onConflict: "token_hash" });
+    if (error) throw new Error(`manage link: ${error.message}`);
+    await page.goto(`/book/${SLUG}/manage/${token}`);
+    await waitForReact(page, "main button");
+    await page.getByRole("button", { name: "Reschedule" }).waitFor();
+  });
+
+  await shot("44-account-sign-in", await context(browser), async (page) => {
+    await page.goto(`/book/${SLUG}/account`);
+    await waitForReact(page, "form[aria-label='Sign in'] button[type=submit]");
+  });
+
+  // The other pages clients open from a link, each at a fixed link so
+  // every run opens the same one, open until a day after the moment.
+  const { createHash } = await import("node:crypto");
+  const hashOf = (token: string) => createHash("sha256").update(token).digest("hex");
+  const openFor = new Date(now().getTime() + 24 * 3_600_000).toISOString();
+
+  // Pay by text: the front desk sends the link from a checkout (the first
+  // run; later runs find it still open), then the client opens it.
+  await shot("45-pay-link", await context(browser), async (page) => {
+    const token = "screenshots-pay-link-0000000000000000000000";
+    let { data: link } = await admin.from("payment_links").select("id").eq("business_id", BUSINESS).eq("status", "open").order("created_at").limit(1).maybeSingle();
+    if (!link) {
+      const skip = (await visitToCheckOut())?.appointmentId;
+      const { from, to } = dayRange();
+      const { data: visit } = await admin.from("appointments").select("id").eq("business_id", BUSINESS).eq("status", "checked_in").gte("starts_at", from).lt("starts_at", to).not("client_id", "is", null).neq("id", skip ?? BUSINESS).order("starts_at").limit(1).maybeSingle();
+      if (!visit) throw new Error("no second checked-in visit today to send a payment link for");
+      const desk = await front.newPage();
+      await desk.goto(`/checkout/new?appointment=${visit.id}&from=/calendar`);
+      await desk.waitForURL(/\/checkout\/[0-9a-f-]{36}$/);
+      await waitForReact(desk, "#product-search");
+      await desk.getByRole("button", { name: "Text a payment link instead" }).click();
+      await desk.getByRole("button", { name: "Send payment link" }).click();
+      await desk.getByText("Waiting for payment").waitFor();
+      await desk.close();
+      ({ data: link } = await admin.from("payment_links").select("id").eq("business_id", BUSINESS).eq("status", "open").order("created_at").limit(1).single());
+    }
+    const { error } = await admin.from("payment_links").update({ token_hash: hashOf(token), expires_at: openFor }).eq("id", link!.id);
+    if (error) throw new Error(`payment link: ${error.message}`);
+    await page.goto(`/pay/${token}`);
+    await waitForReact(page, "main button[type=submit]");
+  });
+
+  // A card link for a new client's next visit (the salon asks new clients
+  // for a card), then the same with a deposit, as for a service that takes
+  // one: sent by the front desk the way booking details sends it.
+  const cardLink = async (page: Page, token: string, depositPercent: number) => {
+    await admin.from("card_requests").delete().eq("token_hash", hashOf(token));
+    const { data: visits } = await admin
+      .from("appointments")
+      .select("id, client_id, client:clients!inner(email, created_at, client_cards(id)), appointment_items(price_cents)")
+      .eq("business_id", BUSINESS)
+      .in("status", ["booked", "confirmed"])
+      .gt("starts_at", new Date(now().getTime() + 48 * 3_600_000).toISOString())
+      .not("client.email", "is", null)
+      .order("starts_at")
+      .limit(400);
+    const visit = (visits ?? []).find((v) => !v.client.client_cards.length && v.appointment_items.length === 1);
+    if (!visit) throw new Error("no visit coming up for a client without a card");
+    const desk = createClient<Database>(url!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { error: signInError } = await desk.auth.signInWithPassword({ email: "frontdesk@mapleandash.test", password: PASSWORD });
+    if (signInError) throw new Error(`front desk sign-in: ${signInError.message}`);
+    const cents = visit.appointment_items[0].price_cents;
+    const { error } = await desk.rpc("create_card_request", {
+      p_client_id: visit.client_id!,
+      p_appointment_id: visit.id,
+      p_token_hash: hashOf(token),
+      p_deposit_cents: Math.round((cents * depositPercent) / 100 / 100) * 100,
+      p_channel: "email",
+      p_to: visit.client.email!,
+      p_hours: 72,
+    });
+    if (error) throw new Error(`card link: ${error.message}`);
+    await admin.from("card_requests").update({ expires_at: openFor }).eq("token_hash", hashOf(token));
+    await page.goto(`/card/${token}`);
+    await waitForReact(page, "main button[type=submit]");
+  };
+  await shot("46-card-link", await context(browser), (page) => cardLink(page, "screenshots-card-link-000000000000000000000", 0));
+  await shot("47-deposit-link", await context(browser), (page) => cardLink(page, "screenshots-deposit-link-000000000000000000", 25));
+
+  // The Patel wedding's proposal (out in the demo seed), its link given a
+  // fixed token.
+  await shot("48-event-proposal", await context(browser), async (page) => {
+    const token = "screenshots-event-proposal-0000000000000000";
+    const { data: sent } = await admin.from("event_links").select("id, event:events!inner(title)").eq("business_id", BUSINESS).eq("kind", "proposal").eq("status", "open").eq("event.title", "Patel wedding").limit(1).single();
+    if (!sent) throw new Error("no open proposal for the Patel wedding in the demo data");
+    const { error } = await admin.from("event_links").update({ token_hash: hashOf(token), expires_at: openFor }).eq("id", sent.id);
+    if (error) throw new Error(`proposal link: ${error.message}`);
+    await page.goto(`/event/${token}`);
+    await waitForReact(page, "main button[type=submit]");
   });
 
   await shot("11-denise-gaps", owner, async (page) => {
@@ -523,14 +670,15 @@ async function union(locators: Locator[], pad: number): Promise<Clip> {
   return { x, y, width: Math.max(...boxes.map((b) => b.x + b.width)) + pad - x, height: Math.max(...boxes.map((b) => b.y + b.height)) + pad - y };
 }
 
-// Fonts loaded, images in, finite animations done, nothing hovered (unless
+// Fonts loaded, images in view in, finite animations done, nothing hovered (unless
 // the shot hovers something on purpose).
 async function settle(page: Page, keepMouse = false) {
   await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
   if (!keepMouse) await page.mouse.move(700, 1);
   await page.evaluate(async () => {
     await document.fonts.ready;
-    await Promise.all([...document.images].filter((i) => !i.complete).map((i) => new Promise((done) => {
+    // Lazy images below the fold never load until scrolled to.
+    await Promise.all([...document.images].filter((i) => !i.complete && (i.loading !== "lazy" || i.getBoundingClientRect().top < innerHeight)).map((i) => new Promise((done) => {
       i.addEventListener("load", done);
       i.addEventListener("error", done);
     })));
@@ -679,17 +827,18 @@ async function visitToCheckOut() {
 async function accountClient() {
   const { data: cards } = await admin
     .from("gift_cards")
-    .select("client_id, expires_at, client:clients!inner(email)")
+    .select("client_id, expires_at, client:clients!inner(email, phone)")
     .eq("business_id", BUSINESS)
     .eq("kind", "purchased")
     .eq("status", "active")
     .gt("balance_cents", 0)
     .not("client.email", "is", null);
-  let best: { email: string; upcoming: number } | null = null;
+  let best: { id: string; email: string; phone: string | null; upcoming: number } | null = null;
   for (const card of cards ?? []) {
     if (card.expires_at && Date.parse(card.expires_at) < now().getTime()) continue;
     const { count } = await admin.from("appointments").select("id", { count: "exact", head: true }).eq("client_id", card.client_id!).in("status", ["booked", "confirmed"]).gt("starts_at", now().toISOString());
-    if (count && (!best || count > best.upcoming)) best = { email: (card.client as { email: string }).email, upcoming: count };
+    const who = card.client as { email: string; phone: string | null };
+    if (count && (!best || count > best.upcoming)) best = { id: card.client_id!, email: who.email, phone: who.phone, upcoming: count };
   }
   return best;
 }

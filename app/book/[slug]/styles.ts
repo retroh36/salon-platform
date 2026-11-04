@@ -19,8 +19,10 @@ export const dangerButton = `${buttonBase} bg-danger text-white hover:brightness
 // A smaller outlined button inside an item.
 export const smallButton =
   "inline-flex min-h-11 items-center justify-center rounded-lg border border-line-strong bg-surface px-4 text-sm font-medium text-ink transition-colors duration-(--motion-fast) hover:bg-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-55";
-// A text link in the salon's color.
-export const accentLink = "font-medium text-(--accent) underline underline-offset-2 hover:no-underline disabled:opacity-50";
+// A text link in the salon's color, underlined in a lighter shade of it
+// (a full-strength underline read heavy) that darkens on hover.
+export const accentLink =
+  "font-medium text-(--accent) underline decoration-(--accent-line) decoration-1 underline-offset-[5px] transition-[text-decoration-color] duration-(--motion-fast) hover:decoration-(--accent) disabled:opacity-50";
 export const choiceClass =
   "group flex min-h-16 w-full items-center gap-4 rounded-lg border bg-surface px-4 py-3 text-left transition-[border-color,background-color,box-shadow] duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 export const inputClass =
@@ -36,6 +38,6 @@ export function chipClass(on: boolean) {
 }
 // A page's title on a client page (24px, in the serif), and the line under it.
 export const pageTitle = "font-serif text-2xl font-semibold tracking-[-0.01em] text-balance text-ink";
-export const pageLead = "mt-1.5 text-ink-muted";
+export const pageLead = "mt-1.5 text-pretty text-ink-muted";
 // Outlined in red: the first step of something that can't be taken back.
 export const dangerOutlineButton = `${buttonBase} border border-line-strong bg-surface text-danger hover:bg-danger-soft disabled:opacity-55`;

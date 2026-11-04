@@ -6,8 +6,11 @@ import { useEffect, useState, useTransition } from "react";
 import { formatMinute, type LocalDate } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { cancelBooking, findTimes, reschedule, type DayTimes } from "../../actions";
+import { MapPinIcon, PhoneIcon } from "@/components/ui/icons";
 import { Alert, Badge } from "@/components/ui/page";
+import { mapLink } from "@/lib/online-booking/intro";
 import { accentLink, dangerButton, dangerOutlineButton, pageLead, pageTitle, primaryButton, secondaryButton, sectionTitle } from "../../styles";
+import { StylistPhoto } from "../../stylist-photo";
 import { DateStrip, longDate, TimeGrid } from "../../times";
 
 type Booking = {
@@ -16,7 +19,7 @@ type Booking = {
   date: LocalDate;
   minute: number;
   endMinute: number;
-  items: { name: string; stylist: string; priceCents: number }[];
+  items: { name: string; stylist: string; photoUrl: string | null; priceCents: number }[];
   // The offer it was booked with, taken off at the visit.
   offer: { label: string; discountCents: number } | null;
   depositCents: number;
@@ -100,12 +103,13 @@ export function ManageView({
         </div>
         <ul className="divide-y divide-line">
           {booking.items.map((i, n) => (
-            <li key={n} className="flex items-baseline justify-between gap-3 px-4 py-3">
-              <span>
+            <li key={n} className="flex items-center gap-3 px-4 py-3">
+              <StylistPhoto name={i.stylist} url={i.photoUrl} />
+              <span className="min-w-0 flex-1">
                 <span className="block font-medium">{i.name}</span>
                 <span className="text-sm text-ink-muted">with {i.stylist}</span>
               </span>
-              <span className="text-sm font-medium tabular-nums">{formatPrice(i.priceCents)}</span>
+              <span className="self-start pt-0.5 text-sm font-medium tabular-nums">{formatPrice(i.priceCents)}</span>
             </li>
           ))}
         </ul>
@@ -143,11 +147,28 @@ export function ManageView({
         </section>
       )}
 
-      {salon.address && (
-        <p className="text-sm text-ink-muted">
-          {salon.name}, {salon.address}
-          {salon.phone && ` · ${salon.phone}`}
-        </p>
+      {(salon.address || salon.phone) && (
+        <ul className="flex flex-col gap-3 text-sm text-ink" aria-label={salon.name}>
+          {salon.address && (
+            <li className="flex gap-3">
+              <MapPinIcon className="mt-px size-5 shrink-0 text-ink-muted" />
+              <span>
+                {salon.address}
+                <a href={mapLink(salon.name, salon.address)} target="_blank" rel="noreferrer" className={`${accentLink} ml-2 whitespace-nowrap`}>
+                  Map
+                </a>
+              </span>
+            </li>
+          )}
+          {salon.phone && (
+            <li className="flex gap-3">
+              <PhoneIcon className="mt-px size-5 shrink-0 text-ink-muted" />
+              <a href={`tel:${salon.phone.replace(/[^\d+]/g, "")}`} className={accentLink}>
+                {salon.phone}
+              </a>
+            </li>
+          )}
+        </ul>
       )}
 
       {!canceled && booking.canChange && mode === "view" && (

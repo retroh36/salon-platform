@@ -2,11 +2,14 @@
 // iPad (1180) and a laptop (1440), with Denise open too: no text cut off,
 // spilling out or covered, and no sideways page scroll (`expectTidyLayout`).
 // A client with a long name booked for a long-titled service is the worst
-// case for each screen.
+// case for each screen, on the staff app and on the pages clients open.
+import { createHash, randomBytes } from "node:crypto";
 import type { Page } from "@playwright/test";
+import { linkSnapshot, type LinkSnapshot } from "@/lib/payment-links";
+import { EMPTY_TICKET, type Ticket } from "@/lib/ticket";
 import { formatLongDay } from "@/lib/schedule-format";
 import { fromLocal } from "@/lib/scheduling/time";
-import { admin, busyDay, makeRoom, SEED } from "../tests/db/helpers";
+import { admin, busyDay, makeRoom, SEED, signIn } from "../tests/db/helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 import { expectTidyLayout, expectWholeHeaders } from "./layout";
 
@@ -15,6 +18,8 @@ const L = SEED.location;
 const TZ = "America/Chicago";
 const PREFIX = `Ly${Date.now().toString(36)}`;
 const LONG_NAME = { first: `${PREFIX}Maximiliana`, last: "Featherstonehaugh-Delacroix" };
+const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+const newToken = () => randomBytes(32).toString("base64url");
 const WIDTHS = [
   { width: 390, height: 844 },
   { width: 1180, height: 820 },
@@ -40,6 +45,8 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  await admin.from("sale_drafts").delete().eq("client_id", clientId);
+  await admin.from("card_requests").delete().eq("client_id", clientId);
   await admin.from("appointments").delete().eq("id", appointmentId);
   await admin.from("clients").delete().eq("id", clientId);
   await admin.from("services").delete().eq("id", serviceId);
@@ -88,6 +95,56 @@ for (const size of WIDTHS) {
       await openDay(page, "&denise=1");
       await expect(card).toBeVisible();
       await expectTidyLayout(page, "with Denise open");
+    });
+
+    // The pages clients see: the booking site's first steps, a visit's own
+    // page, a card link with a deposit, a payment link and signing in.
+    test("the booking site and the client's link pages", async ({ page }) => {
+      await page.goto("/book/maple-and-ash");
+      await waitForHydration(page, "[data-testid=booking-flow] button[aria-pressed]");
+      await expectTidyLayout(page, "on the booking site");
+      const flow = page.getByTestId("booking-flow");
+      await flow.getByRole("button", { name: /^Women's Cut & Style\s*\d/ }).click();
+      await flow.getByRole("button", { name: "Continue" }).click();
+      await expect(flow.getByRole("heading", { name: "Choose your stylist" })).toBeVisible();
+      await expectTidyLayout(page, "choosing a stylist");
+      await flow.getByTestId("stylist-card").first().getByRole("button").first().click();
+      await flow.getByRole("button", { name: "Continue" }).click();
+      await expect(flow.getByRole("radiogroup", { name: "Date" })).toBeVisible();
+      await expectTidyLayout(page, "choosing a time");
+
+      const manage = newToken();
+      await admin.from("appointment_manage_links").insert({ business_id: B, appointment_id: appointmentId, token_hash: sha256(manage) });
+      await page.goto(`/book/maple-and-ash/manage/${manage}`);
+      await expect(page.getByRole("heading", { name: "Your booking" })).toBeVisible();
+      await expectTidyLayout(page, "on a visit's own page");
+
+      const desk = await signIn("frontdesk@mapleandash.test");
+      const card = newToken();
+      const { error: cardError } = await desk.rpc("create_card_request", { p_client_id: clientId, p_appointment_id: appointmentId, p_token_hash: sha256(card), p_deposit_cents: 2400, p_channel: "email", p_to: "layout@example.test", p_hours: 24 });
+      expect(cardError).toBeNull();
+      await page.goto(`/card/${card}`);
+      await expect(page.getByText("Deposit, paid now")).toBeVisible();
+      await expectTidyLayout(page, "on a card link");
+
+      await admin.from("sale_drafts").delete().eq("client_id", clientId);
+      const ticket: Ticket = {
+        ...EMPTY_TICKET,
+        lines: [{ key: "k", kind: "service", appointmentItemId: null, serviceId, name: `${PREFIX} Restorative Bond-Building Treatment with Scalp Massage`, staffId: SEED.staff.bridget, unitPriceCents: 9500, basePriceCents: 9500, priceReason: "", quantity: 1, discount: null, packageItemId: null }],
+      };
+      const { data: draft, error: draftError } = await desk.from("sale_drafts").insert({ business_id: B, location_id: L, appointment_id: appointmentId, client_id: clientId, ticket: ticket as never, created_by: SEED.staff.frontDesk }).select("id").single();
+      expect(draftError).toBeNull();
+      const snapshot = linkSnapshot(ticket, { taxServicesBp: 0, taxRetailBp: 0, member: null }, { appointmentId, clientId }, [{ id: SEED.staff.bridget, firstName: "Bridget" }], LONG_NAME.first) as LinkSnapshot;
+      const pay = newToken();
+      const { error: payError } = await desk.rpc("create_payment_link", { p_draft_id: draft!.id, p_token_hash: sha256(pay), p_snapshot: snapshot as never, p_amount_cents: snapshot.dueCents, p_channel: "email", p_to: "layout@example.test", p_hours: 24 });
+      expect(payError).toBeNull();
+      await page.goto(`/pay/${pay}`);
+      await expect(page.getByRole("button", { name: /^Pay \$/ })).toBeVisible();
+      await expectTidyLayout(page, "on a payment link");
+
+      await page.goto("/book/maple-and-ash/account");
+      await expect(page.getByRole("button", { name: "Send my code" })).toBeVisible();
+      await expectTidyLayout(page, "signing in to an account");
     });
   });
 }
