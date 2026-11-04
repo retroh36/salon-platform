@@ -545,10 +545,19 @@ test("the week reconciles: calendar, Sales, Payroll, Inventory, Policy and Repor
   });
 
   await test.step("Policy: the fees recovered", async () => {
-    await page.goto(`/policy?month=${week[0].slice(0, 7)}`);
-    const recovered = ledger.fees.reduce((n, f) => n + f.cents, 0);
-    await expect(ui(page).getByTestId("policy-recovered")).toContainText(formatPrice(recovered));
-    await expect(ui(page).getByTestId("policy-charged")).toContainText(String(ledger.fees.length));
+    // The week can straddle two months (it ends today), so every month it
+    // touches is added up.
+    const months = [...new Set([...week, today()].map((d) => d.slice(0, 7)))];
+    let shown = 0;
+    let count = 0;
+    for (const month of months) {
+      await page.goto(`/policy?month=${month}`);
+      await expect(ui(page).getByTestId("policy-recovered")).toHaveText(/^\$[\d,]+\.\d\d$/);
+      shown += Math.round(Number((await ui(page).getByTestId("policy-recovered").textContent())!.replace(/[^\d.]/g, "")) * 100);
+      count += Number(await ui(page).getByTestId("policy-charged").textContent());
+    }
+    expect(shown).toBe(ledger.fees.reduce((n, f) => n + f.cents, 0));
+    expect(count).toBe(ledger.fees.length);
   });
 
   await test.step("Reports: each day's close-out balances, and the week's sales by tender", async () => {
