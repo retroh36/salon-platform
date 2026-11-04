@@ -220,6 +220,9 @@ export type BoardData = {
   initialView: ViewKey;
   // See loadCalendarStamp: the board reloads when it changes.
   stamp: string;
+  // Denise's fixes still applied on this day, each with Undo (her card's
+  // "Fixes applied"; front of house, by RLS).
+  fixesApplied: { actionId: string; summary: string; names: string[]; appliedBy: string | null; at: string }[];
   // The location whose calendar changes it listens for (useCalendarChanges).
   locationId: string;
   // What a link asked to show (from the Dashboard): a stylist's column,

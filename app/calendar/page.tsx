@@ -379,7 +379,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
     visitIds.length
       ? supabase
           .from("ai_actions")
-          .select("id, status, proposal, decided_by, decided_at, undone_by, undone_at")
+          .select("id, status, summary, proposal, decided_by, decided_at, undone_by, undone_at")
           .eq("location_id", me.location.id)
           .like("subject", `${date}:%`)
           .in("status", ["approved", "undone"])
@@ -387,8 +387,18 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
       : Promise.resolve({ data: [], error: null }),
   ]);
   if (fixesResult.error) throw fixesResult.error;
+  const fixesApplied: BoardData["fixesApplied"] = [];
   for (const f of fixesResult.data) {
-    for (const id of movedVisits(proposalFromJson(f.proposal))) {
+    const moved = movedVisits(proposalFromJson(f.proposal));
+    if (f.status === "approved" && f.decided_at && moved.length)
+      fixesApplied.push({
+        actionId: f.id,
+        summary: f.summary,
+        names: [...new Set(moved.map((id) => appointments[id]?.client?.name.split(" ")[0] ?? "The walk-in"))],
+        appliedBy: (f.decided_by && staffById.get(f.decided_by)?.first_name) || null,
+        at: formatMinute(toLocal(new Date(f.decided_at), tz).minute),
+      });
+    for (const id of moved) {
       const visit = appointments[id];
       if (!visit || !f.decided_at) continue;
       const by = staffName(f.decided_by);
@@ -536,6 +546,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
       : null;
   const data: BoardData = {
     stamp,
+    fixesApplied,
     locationId: me.location.id,
     focus: {
       staffId: typeof params.staff === "string" && isUuid(params.staff) ? params.staff : null,

@@ -1,20 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { DeniseAvatar, DeniseFace, DenisePose, type Pose } from "@/components/denise";
 import { formatDuration } from "@/lib/duration";
 import type { DeniseRun } from "@/components/denise-chat/store";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/field";
 import { CheckCircleIcon, ChevronDownIcon, ClockIcon, CloseIcon } from "@/components/ui/icons";
-import type { AppliedFix } from "@/lib/denise/applied";
-import { reach } from "@/lib/reach";
 import { noFixAdvice } from "@/lib/denise/respond";
 import type { ConflictView, DeniseNotice, DeniseState, FixView, Moved, OpeningMatch, WaitlistOpening } from "@/lib/denise/types";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
-import { appliedFixes } from "./denise-actions";
 import { MovedMessages } from "./moved-messages";
 import { UndoFix } from "./undo-fix";
 import { useNow } from "./now-line";
@@ -433,19 +430,9 @@ function UpNext({ data, onOpen }: { data: BoardData; onOpen: (appointmentId: str
 
 // Her fixes still applied on this day, each with Undo, so undoing doesn't
 // depend on the card she showed when it was applied (a reload, another
-// page, the next fix). Loaded again whenever the day does.
+// page, the next fix). They come with the day (BoardData.fixesApplied).
 function FixesApplied({ data, hide, working, onUndo }: { data: BoardData; hide: string | null; working: boolean; onUndo: (actionId: string, told: string[]) => void }) {
-  const [fixes, setFixes] = useState<AppliedFix[]>([]);
-  useEffect(() => {
-    let live = true;
-    reach(appliedFixes(data.date))
-      .then((list) => live && Array.isArray(list) && setFixes(list))
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [data]);
-  const shown = fixes.filter((f) => f.actionId !== hide);
+  const shown = data.fixesApplied.filter((f) => f.actionId !== hide);
   if (!shown.length) return null;
   return (
     <section aria-label="Fixes applied" data-testid="fixes-applied" className="flex flex-col gap-2">
