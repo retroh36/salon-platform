@@ -322,15 +322,16 @@ function ConflictCard({
   });
 
   return (
-    <section aria-label={conflict.headline} data-conflict={conflict.kind} className="flex animate-fade-in flex-col gap-3 rounded-lg border border-denise-200 bg-surface p-4">
-      <div className="flex items-start gap-2.5">
-        <DeniseFace />
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <p className="text-ink" data-testid="denise-message">
-            <strong className="font-semibold text-denise-900">{conflict.headline}</strong> {top ? top.intro : noFixAdvice(conflict.kind)}
-          </p>
-          {conflict.note && <p className="text-ink-muted">{conflict.note}</p>}
-        </div>
+    // Laid out like her other cards: her face, and everything she says and
+    // offers lined up beside it.
+    <section aria-label={conflict.headline} data-conflict={conflict.kind} className="flex animate-fade-in gap-2.5 rounded-lg border border-denise-200 bg-surface p-3">
+      <DeniseFace size={24} className="mt-0.5" />
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <p className="text-ink" data-testid="denise-message">
+          <strong className="font-semibold text-denise-900">{conflict.headline}</strong> {top ? top.intro : noFixAdvice(conflict.kind)}
+        </p>
+        {conflict.note && <p className="text-ink-muted">{conflict.note}</p>}
       </div>
 
       {top && (
@@ -393,6 +394,7 @@ function ConflictCard({
           )}
         </div>
       )}
+      </div>
     </section>
   );
 }
@@ -413,7 +415,7 @@ function UpNext({ data, onOpen }: { data: BoardData; onOpen: (appointmentId: str
         <ClockIcon className="size-4" />
         <span id="up-next">Up next</span>
       </Eyebrow>
-      <p className="mt-2 text-xl font-semibold text-ink">
+      <p className="mt-2 text-base font-semibold text-ink">
         {next.clientName} · {formatMinute(next.start)}
       </p>
       <p className="text-ink-muted">{next.service}</p>
@@ -424,9 +426,6 @@ function UpNext({ data, onOpen }: { data: BoardData; onOpen: (appointmentId: str
     </section>
   );
 }
-
-
-
 
 // Her fixes still applied on this day, each with Undo, so undoing doesn't
 // depend on the card she showed when it was applied (a reload, another

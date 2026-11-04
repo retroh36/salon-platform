@@ -211,7 +211,7 @@ export function AppointmentPanel({
         <header className="flex items-center gap-3">
           <Avatar name={client?.name ?? appointment.group?.label ?? "Walk in"} size="lg" />
           <div className="min-w-0 flex-1">
-            <div className="flex items-start gap-1">
+            <div className="flex items-center gap-1">
               <h3 className="min-w-0 text-xl font-semibold text-pretty wrap-anywhere" data-testid="client-name">
                 {client ? (
                   <Link href={`/clients/${client.id}`} className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-focus">
@@ -263,7 +263,7 @@ export function AppointmentPanel({
             {items.map((i) => {
               const state = timerState(i.times);
               return (
-                <li key={i.id} data-item-id={i.id} data-testid="service-timer" data-state={state} className="flex items-start justify-between gap-4">
+                <li key={i.id} data-item-id={i.id} data-testid="service-timer" data-state={state} className="flex items-baseline justify-between gap-4">
                   <div className="min-w-0">
                     <p className="text-ink">
                       <span className="font-medium">{i.serviceName}</span>{" "}

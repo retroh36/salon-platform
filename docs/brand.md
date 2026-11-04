@@ -302,6 +302,34 @@ the one main action, one layer of containers.
   and navy toasts at the foot of the screen with at most one action
   (`components/ui/feedback.tsx`).
 
+### Finish: nothing cut off, nothing awkward
+
+- **Text is whole or shortened on purpose.** No text is clipped by its box,
+  spills out of it or sits under another element, and no page scrolls
+  sideways, at a phone (390px), an iPad (1180px) and a laptop (1440px), with
+  Denise open too. Where room is short, text takes a shorter form
+  (`FitText`: "Bridget Callahan", "Bridget C.", "Bridget") or ends in "…"
+  as a last resort, never mid-letter. `e2e/layout.spec.ts` checks it
+  (`expectTidyLayout` in `e2e/layout.ts`), with a long client name and a long
+  service title; each screen joins it as it's refined.
+- **Wrapping breaks between words, never inside a unit.** Two lines are
+  allowed only where the space has them, and a shorter form on one line wins
+  over a longer one wrapped ("Kids' Cut" before "Kids' Cut (12 &" / "under)").
+  Hyphenated names don't break at the hyphen ("Root Touch-Up"), and a date,
+  a time range or "Open 9am–7pm" stays on one line (`whitespace-nowrap`).
+- **Controls fit their row.** A toolbar's controls take their short forms by
+  the toolbar's own width, not the window's (a container query: the
+  calendar's date reads "Tue, Nov 3" and its display menu is its icon when
+  booking details is open on a laptop, or on an iPad), so it stays one row
+  where it can.
+- **Things line up.** A price or total sits on the baseline of the line it
+  belongs to. Denise's cards are one layout: her face, and everything she
+  says and offers lined up beside it. A drag grip has its own strip above a
+  header's name, never over it.
+- **Phones:** beside the client search, the salon shows as its mark alone;
+  the page links scroll sideways with a fade and an arrow at the edge with
+  more (`SideScroll`), like every other row that scrolls.
+
 Every component, in each of its states, is on the owners' style guide at
 `/design` (not in the sidebar).
 

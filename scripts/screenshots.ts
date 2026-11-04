@@ -20,6 +20,10 @@
 // (the same day, after a full run); with --build it builds again first (the
 // same data, the app as it is now). --out=<folder> saves them somewhere
 // else (screenshots/polish/… for before-and-after pairs, scripts/polish-pairs.ts).
+// --only=01-calendar,02-denise-fix takes just those shots; --widths=1440,1180,390
+// takes each at those widths (the iPad and the phone with touch), saved as
+// <name>@<width>.png; --no-ai runs the app without the Claude key, so no shot
+// calls the real API.
 
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync, openSync, readFileSync } from "node:fs";
@@ -43,7 +47,17 @@ const BASE = `http://localhost:${PORT}`;
 const OUT = process.argv.find((a) => a.startsWith("--out="))?.slice(6) || "screenshots";
 const DIST = ".next-screenshots";
 const PASSWORD = "password123";
-const VIEWPORT = { width: 1440, height: 900 };
+const ONLY = process.argv.find((a) => a.startsWith("--only="))?.slice(7).split(",").filter(Boolean);
+const WIDTHS = (process.argv.find((a) => a.startsWith("--widths="))?.slice(9) ?? "1440").split(",").map(Number);
+const NO_AI = process.argv.includes("--no-ai");
+// Each width's window: a laptop, the front desk's iPad (landscape) and a phone.
+const WINDOWS: Record<number, { height: number; touch: boolean; mobile: boolean }> = {
+  1440: { height: 900, touch: false, mobile: false },
+  1180: { height: 820, touch: true, mobile: false },
+  390: { height: 844, touch: true, mobile: true },
+};
+let VIEWPORT = { width: 1440, height: 900 };
+let SUFFIX = "";
 const ASK = "Who’s cancelled late this month?";
 // What to keep off the shots (there are no cookie banners).
 const HIDE = `[class*="animate-toast-in"], [data-testid$="-toast"], a[href^="/dev/outbox"] { display: none !important; } * { caret-color: transparent !important; }`;
@@ -109,19 +123,22 @@ if (!reuse) {
   for (const file of ["supabase/seed-demo.sql", "supabase/seed-large.sql"]) {
     run("docker", ["exec", "-i", "supabase_db_salon-platform", "psql", "-q", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres"], {}, `${prelude}${readFileSync(file, "utf8")}${postlude}`);
   }
-  if (!(await colorRunningOver()) || !(await visitToCheckOut())) throw new Error("The demo data has no color in the chair with a client after it, or no visit to check out.");
+  // Only for the shots being taken.
+  const wants = (name: string) => !ONLY || ONLY.includes(name);
+  if ((wants("02-denise-fix") && !(await colorRunningOver())) || (wants("07-checkout") && !(await visitToCheckOut())))
+    throw new Error("The demo data has no color in the chair with a client after it, or no visit to check out.");
 }
 if (!reuse) run("node", ["--disable-warning=MODULE_TYPELESS_PACKAGE_JSON", "--import", "./scripts/demo-clock.ts", "scripts/insights.ts"], clock);
 
 // 3. A production build on its own port, on the demo clock.
-const appEnv = { NEXT_DIST_DIR: DIST, NEXT_PUBLIC_SITE_URL: BASE };
+const appEnv = { NEXT_DIST_DIR: ".next-screenshots", NEXT_PUBLIC_SITE_URL: BASE };
 if (!reuse || process.argv.includes("--build")) {
   console.log("Building for production…");
   run("npx", ["next", "build"], appEnv);
 }
 mkdirSync(OUT, { recursive: true });
 const server: ChildProcess = spawn("npx", ["next", "start", "--port", String(PORT)], {
-  env: { ...process.env, ...appEnv, ...clock, NODE_OPTIONS: "--import ./scripts/demo-clock.ts" },
+  env: { ...process.env, ...appEnv, ...clock, ...(NO_AI ? { ANTHROPIC_API_KEY: "" } : {}), NODE_OPTIONS: "--import ./scripts/demo-clock.ts" },
   stdio: ["ignore", openSync(`${DIST}/server.log`, "w"), openSync(`${DIST}/server.log`, "a")],
   detached: true,
 });
@@ -130,7 +147,11 @@ let browser: Browser | null = null;
 try {
   await waitForServer();
   browser = await chromium.launch();
-  await capture(browser);
+  for (const [i, width] of WIDTHS.entries()) {
+    VIEWPORT = { width, height: WINDOWS[width]?.height ?? 900 };
+    SUFFIX = WIDTHS.length > 1 ? `@${width}` : "";
+    await capture(browser, i === 0);
+  }
 } finally {
   await browser?.close();
   if (server.pid) process.kill(-server.pid);
@@ -145,7 +166,9 @@ if (failed.length) {
 
 // ---------------------------------------------------------------------------
 
-async function capture(browser: Browser) {
+// `first`: the first width, which makes the changes some shots need (the
+// later widths show the same state again).
+async function capture(browser: Browser, first: boolean) {
   const owner = await signedIn(browser, "owner@mapleandash.test");
   const stylist = await signedIn(browser, "bridget@mapleandash.test");
   const visitor = await context(browser);
@@ -155,6 +178,11 @@ async function capture(browser: Browser) {
   await shot("01-calendar", owner, async (page) => {
     await page.goto("/calendar");
     await waitForReact(page, "section[data-staff-id]");
+    // The calendar itself: Denise's card closed once her look over the day
+    // has opened it (on a phone it covers the screen).
+    const close = page.getByTestId("denise-card").getByRole("button", { name: "Close Denise" });
+    await close.waitFor({ timeout: 8000 }).catch(() => {});
+    if (await close.isVisible()) await close.click();
   });
 
   // Mid-drag: a booked visit picked up and held half an hour later.
@@ -185,7 +213,7 @@ async function capture(browser: Browser) {
   await shot("15-denise-panel", front, async (page) => {
     await page.goto("/calendar?denise=1");
     await waitForReact(page, "section[data-staff-id]");
-    await page.getByRole("tabpanel", { name: /Denise/ }).waitFor();
+    await page.getByTestId("denise-card").locator("section[data-conflict], [data-testid=denise-notice]").first().waitFor({ timeout: 30_000 }).catch(() => {});
   });
   // A booking in Denise's bubble on the Clients page: Maria Lopez's
   // balayage with Bridget, afternoons, through "Book with the form" (so no
@@ -234,11 +262,22 @@ async function capture(browser: Browser) {
   await shot("02-denise-fix", owner, async (page) => {
     const overrun = await colorRunningOver();
     if (!overrun) throw new Error("no color in the chair today with a client booked after it");
+    const title = new RegExp(`${overrun.stylist}'s? running 20 min(utes)? late`);
+    if (!first) {
+      // Reported at the first width: her card for it again, its fix previewed.
+      await page.goto("/calendar?denise=1");
+      await waitForReact(page, "section[data-staff-id]");
+      const card = page.locator("section[data-conflict]").filter({ visible: true }).filter({ hasText: title });
+      await card.getByRole("button", { name: "Apply fix" }).waitFor({ timeout: 30_000 });
+      await card.evaluate((el) => el.scrollIntoView({ block: "start" }));
+      await card.getByRole("button", { name: "Apply fix" }).hover();
+      return { keepMouse: true };
+    }
     await page.goto("/calendar");
     await waitForReact(page, "section[data-staff-id]");
     const column = main(page).getByRole("region", { name: staff.get(overrun.staffId), exact: true });
     await column.getByRole("button", { name: new RegExp(escape(overrun.client)) }).first().click();
-    const details = page.getByRole("tabpanel", { name: "Booking details" });
+    const details = page.getByRole("complementary", { name: "Booking details" });
     await details.getByRole("button", { name: "More actions" }).click();
     await details.getByRole("menu", { name: "More actions" }).getByRole("menuitem", { name: "Running late", exact: true }).click();
     const form = details.getByRole("form", { name: "Running late" });
@@ -248,8 +287,8 @@ async function capture(browser: Browser) {
     const which = form.getByLabel("Which service is running over?");
     if (await which.count()) await which.selectOption(overrun.itemId);
     await form.getByRole("button", { name: "Tell Denise" }).click();
-    const denise = page.getByRole("tabpanel", { name: /Denise/ });
-    const card = denise.locator("section[data-conflict]").filter({ hasText: `${overrun.stylist.endsWith("s") ? `${overrun.stylist}'` : `${overrun.stylist}'s`} running 20 minutes late` });
+    const denise = page.getByTestId("denise-card");
+    const card = denise.locator("section[data-conflict]").filter({ hasText: title });
     await card.getByRole("button", { name: "Apply fix" }).waitFor({ timeout: 90_000 });
     await page.waitForFunction(() => !document.querySelector("[data-testid=denise-thinking]"), null, { timeout: 90_000, polling: 250 });
     // Her card for it at the top of her panel (her overnight risk check
@@ -456,6 +495,8 @@ async function busiestTomorrow() {
 // One screenshot: the steps, then a still page. A failure is reported at
 // the end rather than stopping the rest.
 async function shot(name: string, ctx: BrowserContext, steps: (page: Page) => Promise<{ clip?: Clip; keepMouse?: boolean } | void>) {
+  if (ONLY && !ONLY.includes(name)) return;
+  name += SUFFIX;
   const page = await ctx.newPage();
   try {
     const { clip, keepMouse } = (await steps(page)) ?? {};
@@ -496,7 +537,8 @@ async function settle(page: Page, keepMouse = false) {
 }
 
 async function context(browser: Browser) {
-  const ctx = await browser.newContext({ baseURL: BASE, viewport: VIEWPORT, deviceScaleFactor: 2, colorScheme: "light", locale: "en-US", timezoneId: tz });
+  const window = WINDOWS[VIEWPORT.width];
+  const ctx = await browser.newContext({ baseURL: BASE, viewport: VIEWPORT, deviceScaleFactor: 2, colorScheme: "light", locale: "en-US", timezoneId: tz, hasTouch: window?.touch ?? false, isMobile: window?.mobile ?? false });
   await ctx.clock.install({ time: now() });
   await ctx.addInitScript((css) => {
     addEventListener("DOMContentLoaded", () => document.head.append(Object.assign(document.createElement("style"), { textContent: css })));

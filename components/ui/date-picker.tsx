@@ -109,12 +109,12 @@ export function DatePicker({
         aria-controls={open ? `${id}-dialog` : undefined}
         aria-label={`${label}: ${formatLongDay(value)}`}
         onClick={() => (open ? setOpen(false) : show())}
-        className={buttonClass("secondary", "md", "justify-start! xl:min-w-44")}
+        className={buttonClass("secondary", "md", "justify-start! @min-[62rem]/toolbar:min-w-44")}
       >
         <CalendarIcon className="size-4 text-navy-700" />
-        {/* "Tue, Oct 27" where room is short (an iPad), "Tue, October 27" on a wide screen. */}
-        <span className="xl:hidden">{formatLongDay(value, false).replace(/^(\w{3})\w*, (\w{3})\w*/, "$1, $2")}</span>
-        <span className="hidden xl:inline">{formatLongDay(value, false).replace(/^(\w{3})\w*,/, "$1,")}</span>
+        {/* "Tue, Oct 27" where the toolbar is short (an iPad, or booking details open), "Tue, October 27" where it has room. */}
+        <span className="@min-[62rem]/toolbar:hidden">{formatLongDay(value, false).replace(/^(\w{3})\w*, (\w{3})\w*/, "$1, $2")}</span>
+        <span className="hidden @min-[62rem]/toolbar:inline">{formatLongDay(value, false).replace(/^(\w{3})\w*,/, "$1,")}</span>
       </button>
 
       {open && (

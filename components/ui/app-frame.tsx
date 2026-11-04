@@ -2,6 +2,7 @@ import Link from "next/link";
 import { logout } from "@/app/login/actions";
 import { Avatar } from "@/components/ui/avatar";
 import { buttonClass } from "@/components/ui/button";
+import { SideScroll } from "@/components/ui/side-scroll";
 import { BoxIcon, CalendarIcon, RingIcon, ChartIcon, GiftIcon, ReceiptIcon, ClockIcon, ClipboardIcon, HomeIcon, LogOutIcon, ScissorsIcon, SearchIcon, SettingsIcon, ShiftsIcon, TeamIcon, ShieldIcon, TagIcon, UserIcon, WalletIcon } from "@/components/ui/icons";
 import { SalonMark } from "@/components/ui/salon-mark";
 import { SalonSwitcher, type SwitcherLocation } from "@/components/salon-switcher";
@@ -237,7 +238,8 @@ export function AppFrame({
           {/* Compact header for screens without the sidebar. */}
           <div className="flex items-center gap-2 lg:hidden">
             <SalonMark name={businessName} logoUrl={logoUrl} />
-            <span className="font-semibold text-ink">{businessName}</span>
+            {/* Beside the search on a phone, the salon's mark alone (its name would wrap to three lines). */}
+            <span className={`font-semibold text-ink ${search ? "sr-only sm:not-sr-only" : ""}`}>{businessName}</span>
           </div>
           {search && (
           <form action="/clients" role="search" className="relative ml-auto w-full max-w-xl min-w-0 lg:ml-0">
@@ -246,7 +248,7 @@ export function AppFrame({
               type="search"
               name="q"
               aria-label="Search clients"
-              placeholder="Search clients by name or phone"
+              placeholder="Search by name or phone"
               className="h-9 w-full rounded-md border border-line bg-surface pr-3 pl-9 text-sm placeholder:text-ink-subtle focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25 focus:outline-none"
             />
           </form>
@@ -270,7 +272,8 @@ export function AppFrame({
             </form>
           )}
         </header>
-        <nav aria-label="Main" className="flex gap-1 overflow-x-auto border-b border-line px-4 py-2 lg:hidden">
+        <nav aria-label="Main" className="border-b border-line lg:hidden">
+          <SideScroll label="More pages" className="gap-1 px-4 py-2">
           {[...groups.flatMap((g) => g.items), ...(settings ? [settings] : [])].map(({ section: s, href, label }) => (
             <Link
               key={href}
@@ -281,6 +284,7 @@ export function AppFrame({
               {label}
             </Link>
           ))}
+          </SideScroll>
         </nav>
         {/* Room under the last row for Denise's face, so it never covers the
             page's own buttons once scrolled to the end. */}

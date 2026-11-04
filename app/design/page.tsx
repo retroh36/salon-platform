@@ -9,6 +9,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button, IconButton } from "@/components/ui/button";
 import { Skeleton, toastActionClass } from "@/components/ui/feedback";
 import { checkboxClass, Eyebrow, fieldClass, labelClass, selectClass } from "@/components/ui/field";
+import { FitText } from "@/components/ui/fit-text";
 import { CalendarIcon, MoreIcon, PlusIcon, SearchIcon, UndoIcon } from "@/components/ui/icons";
 import { Alert, Badge, Card, EmptyState, nameLinkClass, PageHeader, pillClass, Section, textLinkClass, type Tone } from "@/components/ui/page";
 import { StatusChip } from "@/components/ui/status-chip";
@@ -135,6 +136,20 @@ async function Design() {
               </li>
             ))}
           </ul>
+        </Card>
+      </Section>
+
+      <Section title="Text that fits" description="Never cut off: a shorter form where room is short, a second line only between words, and an ellipsis only as a last resort. Checked at 390, 1180 and 1440px.">
+        <Card>
+          <div className="flex flex-wrap items-start gap-3">
+            {["14rem", "8rem", "5rem"].map((w) => (
+              <div key={w} style={{ width: w }} className="flex flex-col gap-0.5 rounded-md border-l-4 border-(--fam-accent) bg-(--fam-fill) px-2 py-1 text-(--fam-ink)" data-family="cut">
+                <FitText variants={["Bridget Callahan", "Bridget C.", "Bridget"]} className="text-sm font-semibold" />
+                <FitText variants={["Kids\u2019 Cut (12 & under)", "Kids\u2019 Cut"]} lines={2} className="text-13 text-(--fam-ink-muted)" />
+                <FitText variants={["10am–10:45am", "10–10:45am", "10–10:45"]} className="text-13 text-(--fam-ink-muted)" />
+              </div>
+            ))}
+          </div>
         </Card>
       </Section>
 

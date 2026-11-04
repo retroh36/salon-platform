@@ -977,8 +977,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             <h1 className="text-2xl font-semibold tracking-tight text-ink">Appointments</h1>
             <ViewTransition key={data.date} enter={DAY_SLIDE} exit="none" default="none">
               <p className="mt-1 text-base text-ink-muted" data-testid="calendar-date">
-                {formatLongDay(data.date)}
-                <span className="ml-2 text-sm">
+                <span className="whitespace-nowrap">{formatLongDay(data.date)}</span>{" "}
+                <span className="text-sm whitespace-nowrap">
                   {data.date === data.today ? "Today · " : ""}
                   {data.openLabel}
                 </span>
@@ -1019,6 +1019,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           </div>
         </div>
 
+        {/* Its controls take their short forms by the toolbar's own width,
+            so it stays one row on an iPad and with booking details open. */}
+        <div className="@container/toolbar">
         <div className="flex flex-wrap items-center gap-2">
           <nav aria-label="Date" className="flex flex-wrap items-center gap-2">
             <Link href={dayLink(addDays(data.date, -1))} transitionTypes={["nav-back"]} aria-label="Previous day" title="Previous day" className={buttonClass("secondary", "md", "", { square: true })}>
@@ -1046,7 +1049,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               else if (next === "action:edit") setEditing({ viewId: currentView!.id });
               else setView(next as ViewKey);
             }}
-            className="w-48 xl:w-56"
+            className="w-44 @min-[62rem]/toolbar:w-56"
             options={[
               { value: "all", label: "All departments" },
               ...departments.map((f) => ({
@@ -1076,6 +1079,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               ]}
             />
           </div>
+        </div>
         </div>
 
         {doneMessage && (
@@ -1141,7 +1145,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                           if (el) headerRefs.current.set(c.staffId, el);
                           else headerRefs.current.delete(c.staffId);
                         }}
-                        className={`relative flex min-w-0 flex-col gap-1 border-l border-line py-2.5 ${squeezed ? "px-1.5" : "px-2.5"} ${columnDrag?.staffId === c.staffId ? "z-10 bg-navy-100 shadow-lift" : ""}`}
+                        className={`relative flex min-w-0 flex-col gap-1 border-l border-line pb-2.5 ${canReorder && !squeezed ? "pt-4" : "pt-2.5"} ${squeezed ? "px-1.5" : "px-2.5"} ${columnDrag?.staffId === c.staffId ? "z-10 bg-navy-100 shadow-lift" : ""}`}
                         data-column-header
                         data-dragging={columnDrag?.staffId === c.staffId || undefined}
                         data-level={c.level ?? undefined}
@@ -1153,7 +1157,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                             data-column-grip
                             title="Drag to change the order"
                             onPointerDown={(e) => onHeaderGrip(e, c.staffId)}
-                            className="absolute top-1 left-1/2 flex h-4 w-8 -translate-x-1/2 cursor-grab touch-none items-center justify-center rounded text-ink-subtle opacity-60 hover:bg-sunken hover:opacity-100 active:cursor-grabbing"
+                            className="absolute top-1 left-1/2 flex h-3 w-8 -translate-x-1/2 cursor-grab touch-none items-center justify-center rounded text-ink-subtle opacity-60 hover:bg-sunken hover:opacity-100 active:cursor-grabbing"
                           >
                             <GripIcon className="size-3.5 rotate-90" />
                           </span>
@@ -1707,7 +1711,7 @@ function ViewMenu({ zoom, onZoom, fitAll, onFitAll }: { zoom: CalendarZoom; onZo
         <SlidersIcon className="size-4" />
         {/* Its name where there's room; the icon alone on an iPad, so the
             toolbar stays on one row (the name is still its label). */}
-        <span className="hidden xl:inline">{ZOOM_LABELS[zoom]}</span>
+        <span className="hidden @min-[62rem]/toolbar:inline">{ZOOM_LABELS[zoom]}</span>
         <ChevronDownIcon className="size-4 text-ink-muted" />
       </button>
       {open && (
@@ -2421,7 +2425,8 @@ function AppointmentBlock({
   ];
   const plainService = block.service.replace(/\s*\([^)]*\)/g, "");
   // This stylist's part of the visit only; the rest is in the tooltip.
-  const services = [...new Set([...(block.group ? [`${block.service} · ${block.group.label}`] : []), block.service, plainService])];
+  // A hyphenated word ("Touch-Up") never breaks at its hyphen.
+  const services = [...new Set([...(block.group ? [`${block.service} · ${block.group.label}`] : []), block.service, plainService])].map((v) => v.replace(/(\w)-(\w)/g, "$1\u2011$2"));
 
   const label = [
     time,
