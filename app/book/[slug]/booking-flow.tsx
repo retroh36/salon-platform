@@ -9,14 +9,14 @@ import { Avatar } from "@/components/ui/avatar";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { LevelBadge, useLevels } from "@/components/ui/level";
 import { fromPrice, stepLabel } from "@/lib/online-booking/intro";
-import { Alert, Badge } from "@/components/ui/page";
+import { Alert } from "@/components/ui/page";
 import type { BookingSite, SiteService, SiteStylist } from "@/lib/online-booking/site";
 import { describeDeposit } from "@/lib/online-booking/settings";
 import type { BookingSource } from "@/lib/online-booking/sources";
-import { formatMinute, type LocalDate } from "@/lib/scheduling/time";
+import { formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { formatPrice, formatPriceRange } from "@/lib/services";
 import { formatDuration } from "@/lib/duration";
-import { book, confirmCode, findTimes, requestCode, reviewPromotion, reviewTerms, type DaySlot, type DayTimes, type PromotionResult, type TermsResult } from "./actions";
+import { book, confirmCode, findTimes, patchCheck, requestCode, reviewPromotion, reviewTerms, type DaySlot, type DayTimes, type PromotionResult, type TermsResult } from "./actions";
 import { LinesSkeleton, TimesSkeleton } from "./skeleton";
 import { accentLink, buttonSpinner, choiceClass, inputClass, primaryButton, secondaryButton, sectionTitle, smallButton } from "./styles";
 import { DateStrip, TimeGrid, longDate } from "./times";
@@ -53,7 +53,8 @@ const notChosen = "border-line hover:border-(--accent-line)";
 
 // signedIn: a client signed in to their account books as themselves (no
 // code; the server sees the account, "account" in place of a code session).
-// start: services (and a stylist) to begin with, from "Book this again".
+// start: services (and a stylist) to begin with, from "Book this again", or
+// the color after a patch test they've booked (`after`: no times before it).
 export function BookingFlow({
   site,
   today,
@@ -67,7 +68,7 @@ export function BookingFlow({
   source: BookingSource;
   referral?: string | null;
   signedIn?: { firstName: string } | null;
-  start?: { serviceIds: string[]; staffId: string | null } | null;
+  start?: { serviceIds: string[]; staffId: string | null; after?: string | null } | null;
 }) {
   const router = useRouter();
   const startIds = (start?.serviceIds ?? []).filter((id) => site.services.some((s) => s.id === id && s.mode === "bookable")).slice(0, MAX_SERVICES);
@@ -92,6 +93,12 @@ export function BookingFlow({
   const [promo, setPromo] = useState<{ key: string; code: string | null; result: PromotionResult } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [blockedServices, setBlockedServices] = useState<string[]>([]);
+  // Color needing a patch test: what they said at the service step, the
+  // color to book after a patch test they book first, and the server's
+  // answer once it knows who they are (for this client, visit and time).
+  const [patchAnswer, setPatchAnswer] = useState<"yes" | "no" | null>(null);
+  const [colorAfter, setColorAfter] = useState<string[] | null>(null);
+  const [patchChecked, setPatchChecked] = useState<{ key: string; message: string | null } | null>(null);
   const [pending, startTransition] = useTransition();
   const honeypot = useRef<HTMLInputElement>(null);
   // This booking attempt's key: new each time they reach review, the same
@@ -173,6 +180,31 @@ export function BookingFlow({
     return result.ok ? null : result.message;
   };
 
+  const needsPatch = selected.some((s) => s.requiresPatchTest);
+  const patchKey = needsPatch && identity.phase === "done" && slot ? `${identity.session}|${serviceIds.join(",")}|${slot.date}|${slot.minute}` : null;
+  useEffect(() => {
+    if (!patchKey || identity.phase !== "done" || !slot) return;
+    let live = true;
+    patchCheck(site.business.slug, identity.session, serviceIds, slot.date, slot.minute).then((r) => live && setPatchChecked({ key: patchKey, message: r.ok ? null : r.message }));
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `patchKey` holds everything it depends on.
+  }, [patchKey]);
+  const patchReady = !patchKey || patchChecked?.key === patchKey;
+  const patchMessage = patchKey && patchChecked?.key === patchKey ? patchChecked.message : null;
+  // The patch test first (at the service the salon does them at), with the
+  // color to book after it.
+  const bookPatchFirst = () => {
+    setColorAfter(serviceIds.filter((id) => id !== site.patchTest.serviceId));
+    setServiceIds([site.patchTest.serviceId!]);
+    setStaffId(undefined);
+    setSlot(null);
+    setPatchAnswer(null);
+    setBlockedServices([]);
+    if (step !== "services") go("services");
+  };
+
   const toggleService = (id: string) => {
     setBlockedServices([]);
     setSlot(null);
@@ -212,7 +244,8 @@ export function BookingFlow({
       // Any other answer (but "still booking it") ends the attempt.
       if (!result.ok && result.reason !== "pending") attempt.current = newAttemptKey();
       if (result.ok) {
-        router.push(result.manageUrl);
+        const patchFirst = colorAfter?.length && site.patchTest.serviceId && serviceIds.includes(site.patchTest.serviceId);
+        router.push(patchFirst ? `${result.manageUrl}&then=${colorAfter.join(",")}` : result.manageUrl);
         return;
       }
       if (result.reason === "taken") {
@@ -238,10 +271,10 @@ export function BookingFlow({
 
   const index = STEPS.indexOf(step);
   const canContinue =
-    (step === "services" && serviceIds.length > 0) ||
+    (step === "services" && serviceIds.length > 0 && (!needsPatch || patchAnswer === "yes")) ||
     (step === "stylist" && staffId !== undefined) ||
     (step === "time" && slot !== null) ||
-    (step === "details" && identity.phase === "done" && (identity.known || (site.settings.allowNewClients && detailsComplete(details, identity.channel))));
+    (step === "details" && identity.phase === "done" && patchReady && !patchMessage && (identity.known || (site.settings.allowNewClients && detailsComplete(details, identity.channel))));
 
   return (
     <div ref={root} className="flex flex-1 flex-col" data-testid="booking-flow">
@@ -289,6 +322,7 @@ export function BookingFlow({
             }}
           />
         )}
+        {step === "services" && needsPatch && <PatchQuestion site={site} answer={patchAnswer} onAnswer={setPatchAnswer} onBookTest={bookPatchFirst} />}
 
         {step === "stylist" && (
           <StylistStep site={site} serviceIds={serviceIds} able={able} chosen={staffId} priceRange={priceRange} onChoose={(id) => (setStaffId(id), setSlot(null))} />
@@ -304,6 +338,8 @@ export function BookingFlow({
             stylists={site.stylists}
             slot={slot}
             onPick={setSlot}
+            notBefore={start?.after && serviceIds.join(",") === startIds.join(",") ? start.after : null}
+            timezone={site.location.timezone}
           />
         )}
 
@@ -316,6 +352,16 @@ export function BookingFlow({
             setDetails={setDetails}
             honeypot={honeypot}
           />
+        )}
+        {step === "details" && patchMessage && (
+          <div className="mt-5 flex flex-col gap-3 rounded-lg border border-line bg-surface p-4" data-testid="patch-check">
+            <p className="text-sm text-ink">{patchMessage}</p>
+            {site.patchTest.serviceId && (
+              <button type="button" className={`${secondaryButton} self-start`} onClick={bookPatchFirst}>
+                Book a patch test first
+              </button>
+            )}
+          </div>
         )}
 
         {step === "confirm" && slot && (
@@ -363,7 +409,7 @@ export function BookingFlow({
           </button>
         ) : (
           // On the details step, the code form has its own button until it's done.
-          (step !== "details" || identity.phase === "done") && (
+          (step !== "details" || (identity.phase === "done" && !patchMessage)) && (
             <button type="button" className={primaryButton} disabled={!canContinue} onClick={() => go(STEPS[index + 1])}>
               Continue
             </button>
@@ -444,9 +490,9 @@ function ServicesStep({
                         </span>
                         {s.description && <span className="mt-1 block text-sm leading-snug text-ink-muted">{s.description}</span>}
                         {s.requiresPatchTest && (
-                          <Badge tone={blocked.includes(s.id) ? "danger" : "neutral"} className="mt-1.5">
-                            Needs a patch test on file
-                          </Badge>
+                          <span data-testid="patch-note" className={`mt-1.5 block text-13 font-medium ${blocked.includes(s.id) ? "text-danger" : "text-ink"}`}>
+                            New clients need a patch test {site.patchTest.minHours} hours before color.
+                          </span>
                         )}
                       </span>
                       <span className="shrink-0 self-start pt-0.5 text-sm font-medium text-ink tabular-nums">{price(s)}</span>
@@ -458,6 +504,47 @@ function ServicesStep({
         </section>
       ))}
       {selected.length >= MAX_SERVICES && <p className="text-sm text-ink-muted">You can book up to {MAX_SERVICES} services online.</p>}
+    </div>
+  );
+}
+
+// At the service step, for color that needs a patch test: whether they've
+// had one, and if not, the next step (book one first, or call).
+function PatchQuestion({ site, answer, onAnswer, onBookTest }: { site: BookingSite; answer: "yes" | "no" | null; onAnswer: (a: "yes" | "no") => void; onBookTest: () => void }) {
+  const months = Math.round(site.patchTest.validDays / 30.4);
+  const hours = site.patchTest.minHours;
+  const patchService = site.services.find((s) => s.id === site.patchTest.serviceId);
+  return (
+    <div role="group" aria-label="Patch test" className="mt-6 flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
+      <p className="font-medium text-ink">Have you had a patch test with us in the last {months} months?</p>
+      <div className="grid grid-cols-2 gap-2">
+        {(
+          [
+            ["yes", "Yes, I have"],
+            ["no", "No, not yet"],
+          ] as const
+        ).map(([value, label]) => (
+          <button key={value} type="button" aria-pressed={answer === value} onClick={() => onAnswer(value)} className={`${choiceClass} justify-center ${answer === value ? chosen : notChosen}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {answer === "yes" && <p className="text-sm text-ink-muted">We&rsquo;ll check it when you confirm your details, before you book.</p>}
+      {answer === "no" &&
+        (patchService ? (
+          <>
+            <p className="text-sm text-ink">
+              Color needs a patch test at least {hours} hours before. Book a quick patch test first ({patchService.name}, {formatDuration(patchService.minutes)}), and we&rsquo;ll take you to book your color for {hours} hours or more after it.
+            </p>
+            <button type="button" className={`${primaryButton} self-start`} onClick={onBookTest}>
+              Book a patch test first
+            </button>
+          </>
+        ) : (
+          <p className="text-sm text-ink">
+            Color needs a patch test at least {hours} hours before. {site.location.phone ? `Call us on ${site.location.phone}` : "Call the salon"} to book one, then book your color online.
+          </p>
+        ))}
     </div>
   );
 }
@@ -577,6 +664,8 @@ function TimeStep({
   stylists,
   slot,
   onPick,
+  notBefore,
+  timezone,
 }: {
   slug: string;
   today: LocalDate;
@@ -585,6 +674,9 @@ function TimeStep({
   stylists: SiteStylist[];
   slot: { date: LocalDate; minute: number } | null;
   onPick: (slot: Slot) => void;
+  // No times before this (48 hours after a patch test they've booked).
+  notBefore: string | null;
+  timezone: string;
 }) {
   const [days, setDays] = useState<DayTimes[] | null>(null);
   const [lastDay, setLastDay] = useState<LocalDate | null>(null);
@@ -594,7 +686,7 @@ function TimeStep({
 
   const load = (from: LocalDate) =>
     startLoading(async () => {
-      const result = await findTimes(slug, serviceIds, staffId, from);
+      const result = await findTimes(slug, serviceIds, staffId, from, undefined, notBefore ?? undefined);
       if (!result.ok) {
         setError(result.message);
         return;
@@ -610,7 +702,8 @@ function TimeStep({
     });
 
   useEffect(() => {
-    load(today);
+    const first = notBefore ? toLocal(new Date(notBefore), timezone).date : today;
+    load(first > today ? first : today);
     // Loads once for these services and stylist (the step remounts when they change).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

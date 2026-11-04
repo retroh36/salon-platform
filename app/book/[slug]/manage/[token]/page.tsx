@@ -31,6 +31,19 @@ async function Manage({ params, searchParams }: { params: Promise<{ slug: string
   if (!booking) notFound();
   const tz = site.location.timezone;
   const start = toLocal(booking.start, tz);
+  // Just booked a patch test with color to follow (?then=): the color, from
+  // the salon's patch test hours after it.
+  const thenIds = typeof query.then === "string" ? query.then.split(",").filter((id) => site.services.some((s) => s.id === id && s.mode === "bookable")) : [];
+  const patchFirst = thenIds.length && site.patchTest.serviceId && booking.items.some((i) => i.serviceId === site.patchTest.serviceId) && booking.status !== "canceled";
+  const colorFrom = new Date(booking.start.getTime() + site.patchTest.minHours * 3_600_000);
+  const next = patchFirst
+    ? {
+        services: thenIds.map((id) => site.services.find((s) => s.id === id)!.name),
+        hours: site.patchTest.minHours,
+        from: toLocal(colorFrom, tz),
+        href: `/book/${slug}?${new URLSearchParams({ services: thenIds.join(","), after: colorFrom.toISOString() })}#book`,
+      }
+    : null;
   const [policy, offer] = await Promise.all([cancelTerms(admin, site, booking), heldOffer(admin, site.business.id, booking.promotionId, booking.items)]);
 
   return (
@@ -39,6 +52,7 @@ async function Manage({ params, searchParams }: { params: Promise<{ slug: string
         slug={slug}
         token={token}
         justBooked={query.booked === "1"}
+        next={next}
         today={todayIn(tz)}
         booking={{
           firstName: booking.clientFirstName,

@@ -23,12 +23,13 @@ export async function saveBookingSettings(_prev: BookingSettingsState, formData:
   if (!parsed.ok) return { ok: false, message: "Fix the highlighted fields.", errors: parsed.errors };
   const { slug, ...settings } = parsed.value;
   if (settings.consultation_service_id && !isUuid(settings.consultation_service_id)) return { ok: false, message: "Choose a consultation service." };
+  if (settings.patch_test_service_id && !isUuid(settings.patch_test_service_id)) return { ok: false, message: "Choose the service patch tests are done at." };
 
   const { error: slugError } = await s.supabase.from("businesses").update({ slug }).eq("id", s.me.business_id);
   if (slugError?.code === "23505") return { ok: false, message: "Fix the highlighted fields.", errors: { slug: "Another salon has this address. Try another." } };
   if (slugError) throw slugError;
   const { error } = await s.supabase.from("online_booking_settings").upsert({ business_id: s.me.business_id, ...settings });
-  if (error?.code === "23503") return { ok: false, message: "That consultation service no longer exists." };
+  if (error?.code === "23503") return { ok: false, message: "That service no longer exists." };
   if (error) throw error;
   revalidatePath("/settings/booking");
   return { ok: true, message: settings.enabled ? "Saved. Online booking is on." : "Saved. Online booking is off." };

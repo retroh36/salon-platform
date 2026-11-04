@@ -388,23 +388,22 @@ test("a client reschedules, then cancels, with their private link", async ({ pag
   expect(log!.map((l) => l.action)).toEqual(["booked", "rescheduled", "canceled"]);
 });
 
-test("color needs a patch test on file: a new client is told how to get one", async ({ page }) => {
-  await open(page);
-  await expect(flow(page).getByRole("button", { name: /^Root Touch-Up/ })).toContainText("Needs a patch test on file");
-  await chooseServices(page, ["Root Touch-Up"]);
-  await chooseStylist(page, "No preference");
-  await chooseFirstTime(page);
-  await verify(page, newPhone());
-  await flow(page).getByLabel("First name").fill(`Ob${RUN}Color`);
-  await flow(page).getByLabel("Email").fill(`ob-color-${RUN}@example.com`);
-  await cont(page).click();
-  await bookIt(page);
-  await expect(flow(page).getByRole("alert")).toContainText("need a patch test at least 48 hours before your visit");
-  await expect(flow(page).getByRole("alert")).toContainText("(555) 010-0100");
-  await expect(flow(page).getByRole("heading", { name: "Choose your services" })).toBeVisible();
-  const { data } = await admin.from("clients").select("id").eq("business_id", B).eq("first_name", `Ob${RUN}Color`);
-  created.push(...data!.map((c) => c.id));
-  expect((await admin.from("appointments").select("id").in("client_id", data!.map((c) => c.id))).data).toEqual([]);
+test("color needs a patch test: with no patch test service set up, a new client is told to call at the service step", async ({ page }) => {
+  const { data: was } = await admin.from("online_booking_settings").select("patch_test_service_id").eq("business_id", B).single();
+  await admin.from("online_booking_settings").update({ patch_test_service_id: null }).eq("business_id", B);
+  try {
+    await open(page);
+    const color = flow(page).getByRole("button", { name: /^Root Touch-Up/ });
+    await expect(color).toContainText("New clients need a patch test 48 hours before color.");
+    await color.click();
+    const ask = flow(page).getByRole("group", { name: "Patch test" });
+    await ask.getByRole("button", { name: "No, not yet" }).click();
+    await expect(ask).toContainText("Call us on (555) 010-0100 to book one, then book your color online.");
+    await expect(ask.getByRole("button", { name: "Book a patch test first" })).toHaveCount(0);
+    await expect(cont(page)).toBeDisabled();
+  } finally {
+    await admin.from("online_booking_settings").update({ patch_test_service_id: was!.patch_test_service_id }).eq("business_id", B);
+  }
 });
 
 test("services that need a consultation offer one instead, with deposits shown", async ({ page }) => {

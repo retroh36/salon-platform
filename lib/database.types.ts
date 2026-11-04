@@ -2079,14 +2079,14 @@ isOneToOne: false
                   ]
                 },"online_booking_settings": {
                   Row: {
-                    "accent_color": string | null,"allow_new_clients": boolean,"business_id": string,"cancel_cutoff_hours": number,"cancellation_policy": string,"consultation_service_id": string | null,"cover_path": string | null,"enabled": boolean,"notice_minutes": number,"updated_at": string,"welcome": string | null,"window_days": number
+                    "accent_color": string | null,"allow_new_clients": boolean,"business_id": string,"cancel_cutoff_hours": number,"cancellation_policy": string,"consultation_service_id": string | null,"cover_path": string | null,"enabled": boolean,"notice_minutes": number,"patch_test_service_id": string | null,"updated_at": string,"welcome": string | null,"window_days": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "accent_color"?: string | null,"allow_new_clients"?: boolean,"business_id": string,"cancel_cutoff_hours"?: number,"cancellation_policy"?: string,"consultation_service_id"?: string | null,"cover_path"?: string | null,"enabled"?: boolean,"notice_minutes"?: number,"updated_at"?: string,"welcome"?: string | null,"window_days"?: number
+                    "accent_color"?: string | null,"allow_new_clients"?: boolean,"business_id": string,"cancel_cutoff_hours"?: number,"cancellation_policy"?: string,"consultation_service_id"?: string | null,"cover_path"?: string | null,"enabled"?: boolean,"notice_minutes"?: number,"patch_test_service_id"?: string | null,"updated_at"?: string,"welcome"?: string | null,"window_days"?: number
                   }
                   Update: {
-                    "accent_color"?: string | null,"allow_new_clients"?: boolean,"business_id"?: string,"cancel_cutoff_hours"?: number,"cancellation_policy"?: string,"consultation_service_id"?: string | null,"cover_path"?: string | null,"enabled"?: boolean,"notice_minutes"?: number,"updated_at"?: string,"welcome"?: string | null,"window_days"?: number
+                    "accent_color"?: string | null,"allow_new_clients"?: boolean,"business_id"?: string,"cancel_cutoff_hours"?: number,"cancellation_policy"?: string,"consultation_service_id"?: string | null,"cover_path"?: string | null,"enabled"?: boolean,"notice_minutes"?: number,"patch_test_service_id"?: string | null,"updated_at"?: string,"welcome"?: string | null,"window_days"?: number
                   }
                   Relationships: [
                     {
@@ -2098,6 +2098,12 @@ isOneToOne: true
     },{
       foreignKeyName: "online_booking_settings_consultation_service_id_business_i_fkey"
       columns: ["consultation_service_id","business_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "online_booking_settings_patch_test_service_id_business_id_fkey"
+      columns: ["patch_test_service_id","business_id"]
 isOneToOne: false
       referencedRelation: "services"
       referencedColumns: ["id","business_id"]

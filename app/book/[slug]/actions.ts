@@ -17,7 +17,7 @@ import { normalEmail, phoneDigits, formatPhone } from "@/lib/online-booking/cont
 import { sendCode, sessionContact, verifyCode, type Channel } from "@/lib/online-booking/codes";
 import { hashKey, isAttemptKey, manageSecretFor, newSecret, requestInfo, sha256, withinLimits } from "@/lib/online-booking/security";
 import { loadSite, stylistsFor, type BookingSite } from "@/lib/online-booking/site";
-import { bookOnline, cancelOnline } from "@/lib/scheduling/online-book";
+import { bookOnline, cancelOnline, patchTestProblems } from "@/lib/scheduling/online-book";
 import { loadBookingContext } from "@/lib/scheduling/load";
 import { visitTimes, type VisitRequest } from "@/lib/scheduling/online";
 import { addDays, fromLocal, isLocalDate, todayIn, toLocal, type LocalDate } from "@/lib/scheduling/time";
@@ -76,8 +76,9 @@ export type DaySlot = { minute: number; staffIds: string[]; items: SlotItem[]; c
 export type DayTimes = { date: LocalDate; times: DaySlot[] };
 export type TimesResult = { ok: true; days: DayTimes[]; lastDay: LocalDate } | { ok: false; message: string };
 
-// Free times for the visit over two weeks from `from`.
-export async function findTimes(slug: string, serviceIds: string[], staffId: string | null, from: string, rescheduleToken?: string): Promise<TimesResult> {
+// Free times for the visit over two weeks from `from` (none before
+// `notBefore`, an ISO time: 48 hours after a patch test they've booked).
+export async function findTimes(slug: string, serviceIds: string[], staffId: string | null, from: string, rescheduleToken?: string, notBefore?: string): Promise<TimesResult> {
   const site = await openSite(slug);
   if (!site) return { ok: false, message: "Online booking isn't available right now." };
   const admin = createAdminClient();
@@ -99,6 +100,8 @@ export async function findTimes(slug: string, serviceIds: string[], staffId: str
   if (!request) return { ok: false, message: "Those services can't be booked together online." };
 
   const window = bookingWindow(site);
+  const after = notBefore ? new Date(notBefore) : null;
+  if (after && !Number.isNaN(after.getTime()) && after > window.notBefore) window.notBefore = after;
   const start = isLocalDate(from) && from > window.today ? from : window.today;
   if (start > window.lastDay) return { ok: true, days: [], lastDay: window.lastDay };
   const end = addDays(start, DAYS_PER_PAGE - 1) < window.lastDay ? addDays(start, DAYS_PER_PAGE - 1) : window.lastDay;
@@ -564,6 +567,23 @@ async function cardFor(
   if (terms.cardOnFile) return { ok: true, charge: { provider: terms.cardOnFile.provider, ref: terms.cardOnFile.ref } };
   if (terms.cardNeeded) return { ok: false, message: "Add a card to hold your booking." };
   return { ok: true };
+}
+
+export type PatchCheck = { ok: true } | { ok: false; message: string };
+
+// Whether the client (known once their code is confirmed) can have color
+// at this time, checked before Review so they're never stopped at the end.
+export async function patchCheck(slug: string, session: string, serviceIds: string[], date: string, minute: number): Promise<PatchCheck> {
+  const site = await openSite(slug);
+  if (!site) return { ok: false, message: "Online booking isn't available right now." };
+  const start = isLocalDate(date) && Number.isInteger(minute) ? fromLocal(date, minute, site.location.timezone) : null;
+  if (!start || !Array.isArray(serviceIds)) return { ok: true };
+  const admin = createAdminClient();
+  const who = await whoIsBooking(admin, site, session);
+  if (!who) return { ok: true };
+  const ids = serviceIds.map(String).filter((id) => site.services.some((s) => s.id === id));
+  const problem = await patchTestProblems(admin, { id: site.location.id, timezone: site.location.timezone }, who.clientId, ids, start);
+  return problem ? { ok: false, message: patchExplanation(site, problem.state) } : { ok: true };
 }
 
 export type ManageResult = { ok: true } | { ok: false; message: string };

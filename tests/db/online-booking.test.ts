@@ -174,6 +174,29 @@ describe("booking online", () => {
     expect(data!.deposit_cents).toBe(Math.round(data!.appointment_items[0].price_cents * 0.25));
   });
 
+  it("counts a patch test the client has booked at the salon's patch test service, unless it's too close or they reacted before", async () => {
+    const { data: c } = await admin.from("clients").insert({ business_id: B, first_name: `${RUN}Patch` }).select("id").single();
+    const { data: consult } = await admin.from("services").select("id").eq("business_id", B).eq("name", "Color Consultation").single();
+    expect(await patchTestProblems(admin, location, c!.id, [balayage], at(10))).toMatchObject({ state: "missing" });
+    // The patch test, booked three days before (the seed does them at the Color Consultation).
+    const patchAt = fromLocal(addDays(DAY, -3), 10 * 60, TZ)!;
+    const booked = await bookOnline(admin, location, {
+      clientId: c!.id,
+      notes: `${RUN} patch`,
+      request: { serviceIds: [consult!.id], staffId: null, stylistIds: [SEED.staff.bridget, SEED.staff.gil, SEED.staff.sandra] },
+      start: patchAt,
+      manageTokenHash: hash("patch"),
+    });
+    expect(booked.ok).toBe(true);
+    expect(await patchTestProblems(admin, location, c!.id, [balayage], at(10))).toBeNull();
+    // Less than 48 hours after it is too soon.
+    expect(await patchTestProblems(admin, location, c!.id, [balayage], fromLocal(addDays(DAY, -2), 9 * 60, TZ)!)).toMatchObject({ state: "too_recent" });
+    // A reaction on file isn't undone by booking another test.
+    await admin.from("client_patch_tests").insert({ business_id: B, client_id: c!.id, tested_at: new Date(Date.now() - 86_400_000).toISOString(), result: "reaction", products: "Test", performed_by: SEED.staff.sandra });
+    expect(await patchTestProblems(admin, location, c!.id, [balayage], at(10))).toMatchObject({ state: "reaction" });
+    await admin.from("appointments").delete().eq("client_id", c!.id);
+  });
+
   it("never lets two people book the same time", async () => {
     const attempts = await Promise.all(
       [1, 2, 3].map((n) => bookOnline(admin, location, { clientId, notes: `${RUN} race ${n}`, request: visit(SEED.staff.nola), start: at(14), manageTokenHash: hash(`race${n}`) })),

@@ -7,7 +7,10 @@
 // plans again, so two people can never get the same time: the second gets
 // "taken" (or, with no preference, another free stylist at that time).
 //
-// Patch tests always block online, whatever the salon does at the desk.
+// Patch tests always block online, whatever the salon does at the desk. A
+// patch test the client has booked (at the service the salon does them at,
+// Settings → Online booking) counts as if done then, so the color can be
+// booked for 48+ hours after it; checking in still needs the result.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
@@ -72,7 +75,8 @@ export async function bookOnline(admin: Supabase, location: Location, input: Onl
 }
 
 // The services of the visit that need a patch test the client doesn't have
-// (or it's expired, too recent, or showed a reaction), by the salon's rules.
+// (or it's expired, too recent, or showed a reaction), by the salon's rules,
+// counting a patch test visit they have booked.
 export async function patchTestProblems(
   admin: Supabase,
   location: Location,
@@ -81,7 +85,7 @@ export async function patchTestProblems(
   start: Date,
 ): Promise<{ serviceIds: string[]; state: Exclude<PatchState, "ok"> } | null> {
   const [{ data: loc, error }, { data: services, error: serviceError }] = await Promise.all([
-    admin.from("locations").select("business:businesses(patch_test_valid_days, patch_test_min_hours)").eq("id", location.id).single(),
+    admin.from("locations").select("business:businesses(patch_test_valid_days, patch_test_min_hours, online_booking_settings(patch_test_service_id))").eq("id", location.id).single(),
     admin.from("services").select("id").in("id", [...serviceIds]).eq("requires_patch_test", true),
   ]);
   if (error) throw error;
@@ -89,13 +93,28 @@ export async function patchTestProblems(
   if (services.length === 0) return null;
 
   let history: { testedAt: Date; result: "no_reaction" | "reaction" }[] = [];
+  let recordedCount = 0;
   if (clientId) {
     const { data: tests, error: testError } = await admin.from("client_patch_tests").select("tested_at, result").eq("client_id", clientId);
     if (testError) throw testError;
     history = tests.map((t) => ({ testedAt: new Date(t.tested_at), result: t.result }));
+    recordedCount = history.length;
+    const patchService = loc.business.online_booking_settings?.patch_test_service_id;
+    if (patchService) {
+      const { data: booked, error: bookedError } = await admin
+        .from("appointment_items")
+        .select("starts_at, appointment:appointments!inner(client_id, status)")
+        .eq("service_id", patchService)
+        .eq("appointment.client_id", clientId)
+        .in("appointment.status", ["booked", "confirmed", "checked_in"]);
+      if (bookedError) throw bookedError;
+      history.push(...booked.map((b) => ({ testedAt: new Date(b.starts_at), result: "no_reaction" as const })));
+    }
   }
   const settings: PatchSettings = { validDays: loc.business.patch_test_valid_days, minHours: loc.business.patch_test_min_hours, enforcement: "block" };
-  const state = patchTestState(history, start, settings);
+  // A reaction on file isn't undone by booking another test.
+  const recorded = patchTestState(history.slice(0, recordedCount), start, settings);
+  const state = recorded === "reaction" ? recorded : patchTestState(history, start, settings);
   return state === "ok" ? null : { serviceIds: services.map((s) => s.id), state };
 }
 

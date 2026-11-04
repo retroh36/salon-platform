@@ -1,6 +1,6 @@
 ---
 title: Explain online booking to a client
-keywords: how do clients book online, card to book online, deposit online, client booking steps, booking site, booking code, verification code, one time code, didn't get code, no preference stylist, book online help, client can't book online, promo code online, special badge
+keywords: patch test online, book color online, how do clients book online, card to book online, deposit online, client booking steps, booking site, booking code, verification code, one time code, didn't get code, no preference stylist, book online help, client can't book online, promo code online, special badge
 who: owner, manager, front_desk, stylist, assistant
 ---
 
@@ -24,6 +24,7 @@ What a client sees on your booking site, so you can walk them through it on the 
 - If the special can't apply to them (say it's for first visits only), **Review and book** says so before they book, like "Last-minute 15% off doesn't apply: it's for a client's first visit only."
 - With **No preference**, if the stylist free at their time changes before they book and the price with them is different, they're asked to pick a time again, so the confirmation always matches what they saw.
 - On **Review and book**, they can tap **Have a promo code?** to add a code; it takes the special's place, and comes off when they pay at the visit.
+- Color that needs a patch test says so on the service. They're asked whether they've had one in the last 6 months; if not, **Book a patch test first** books a quick patch test visit, and the confirmation has **Book your …** to book the color for 48 hours or more after it.
 - New clients can book only if the salon allows it; otherwise they're asked to call.
 - If their connection drops as they book, they're told to tap **Book** again: they're never booked (or charged) twice.
 - Deposits are paid online when they book, with test cards for now (no real money moves yet).

@@ -64,6 +64,7 @@ async function BookingSettings() {
               cancel_cutoff_hours: String(s?.cancel_cutoff_hours ?? 24),
               cancellation_policy: s?.cancellation_policy ?? "",
               consultation_service_id: s?.consultation_service_id ?? "",
+              patch_test_service_id: s?.patch_test_service_id ?? "",
               accent_color: s?.accent_color ?? DEFAULT_ACCENT,
             }}
             services={sorted.map((x) => ({ id: x.id, name: x.name }))}

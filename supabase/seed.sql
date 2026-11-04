@@ -870,6 +870,12 @@ where id = 'b0000000-0000-4000-8000-000000000001';
 update public.online_booking_settings set cover_path = '/demo/covers/maple-and-ash.jpg'
 where business_id = 'b0000000-0000-4000-8000-000000000001';
 
+-- Patch tests are done at the Color Consultation, so a new color client can
+-- book one online first, then the color 48 hours after it.
+update public.online_booking_settings
+set patch_test_service_id = (select id from public.services where business_id = 'b0000000-0000-4000-8000-000000000001' and name = 'Color Consultation')
+where business_id = 'b0000000-0000-4000-8000-000000000001';
+
 insert into public.service_category_photos (business_id, category, photo_path)
 select 'b0000000-0000-4000-8000-000000000001', c.category, c.path
 from (values

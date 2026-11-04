@@ -59,8 +59,9 @@ export type BookingSite = {
     accent: string;
     welcome: string | null;
   };
-  // The salon's patch test rules (see lib/scheduling/patch-tests.ts).
-  patchTest: { validDays: number; minHours: number };
+  // The salon's patch test rules (see lib/scheduling/patch-tests.ts), and
+  // the service a patch test is done at, if it can be booked online.
+  patchTest: { validDays: number; minHours: number; serviceId: string | null };
   services: SiteService[];
   // A photo for each category that has one.
   categoryPhotos: Record<string, string>;
@@ -176,7 +177,11 @@ export async function loadSite(admin: Admin, slug: string): Promise<SiteLookup> 
         accent: settings.accent_color ?? DEFAULT_ACCENT,
         welcome: settings.welcome,
       },
-      patchTest: { validDays: business.patch_test_valid_days, minHours: business.patch_test_min_hours },
+      patchTest: {
+        validDays: business.patch_test_valid_days,
+        minHours: business.patch_test_min_hours,
+        serviceId: siteServices.find((s) => s.id === settings.patch_test_service_id && s.mode === "bookable")?.id ?? null,
+      },
       services: siteServices,
       categoryPhotos: Object.fromEntries(photos.filter((p) => siteServices.some((x) => x.category === p.category)).map((p) => [p.category, salonLogoUrl(p.photo_path)!])),
       stylists,

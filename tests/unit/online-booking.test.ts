@@ -20,6 +20,7 @@ const valid = {
   cancel_cutoff_hours: "24",
   cancellation_policy: "Please give us 24 hours.",
   consultation_service_id: "",
+  patch_test_service_id: "",
   accent_color: "#6B3F2A",
 };
 
@@ -69,6 +70,7 @@ describe("booking site settings", () => {
         cancel_cutoff_hours: 24,
         cancellation_policy: "Please give us 24 hours.",
         consultation_service_id: null,
+        patch_test_service_id: null,
         accent_color: "#6b3f2a",
       },
     });

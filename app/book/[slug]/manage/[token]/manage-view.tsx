@@ -31,7 +31,27 @@ type Salon = { name: string; location: string; address: string | null; phone: st
 
 // The client's booking: what, when, with whom, and (until the salon's
 // cutoff) cancel or move it. Nothing internal is shown.
-export function ManageView({ slug, token, justBooked, today, booking, salon }: { slug: string; token: string; justBooked: boolean; today: LocalDate; booking: Booking; salon: Salon }) {
+// next: after booking a patch test, the color to book from the salon's
+// patch test hours after it.
+type Next = { services: string[]; hours: number; from: { date: LocalDate; minute: number }; href: string };
+
+export function ManageView({
+  slug,
+  token,
+  justBooked,
+  next,
+  today,
+  booking,
+  salon,
+}: {
+  slug: string;
+  token: string;
+  justBooked: boolean;
+  next: Next | null;
+  today: LocalDate;
+  booking: Booking;
+  salon: Salon;
+}) {
   const router = useRouter();
   const [mode, setMode] = useState<"view" | "cancel" | "move">("view");
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
@@ -110,6 +130,18 @@ export function ManageView({ slug, token, justBooked, today, booking, salon }: {
           </p>
         )}
       </div>
+
+      {next && (
+        <section className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4" data-testid="book-color-next">
+          <h2 className={sectionTitle}>Next: your {next.services.join(" and ")}</h2>
+          <p className="text-sm text-ink-muted">
+            Your color needs to be at least {next.hours} hours after your patch test, so it can be booked from {longDate(next.from.date)} at {formatMinute(next.from.minute)}.
+          </p>
+          <Link href={next.href} className={`${primaryButton} self-start`}>
+            Book your {next.services.join(" and ")}
+          </Link>
+        </section>
+      )}
 
       {salon.address && (
         <p className="text-sm text-ink-muted">

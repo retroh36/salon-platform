@@ -71,6 +71,7 @@ type RulesFields = {
   cancel_cutoff_hours: string;
   cancellation_policy: string;
   consultation_service_id: string;
+  patch_test_service_id: string;
   accent_color: string;
 };
 
@@ -131,6 +132,20 @@ export function BookingRulesForm({ initial, services }: { initial: RulesFields; 
               </option>
             ))}
           </select>
+        </label>
+        <label className={labelClass}>
+          Patch tests are done at
+          <select name="patch_test_service_id" defaultValue={initial.patch_test_service_id} className={selectClass} aria-describedby="patch-service-hint">
+            <option value="">Nothing (clients call instead)</option>
+            {services.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <span id="patch-service-hint" className="font-normal text-ink-muted">
+            Clients without a patch test can book this first, then their color online once it&rsquo;s far enough ahead.
+          </span>
         </label>
       </div>
 

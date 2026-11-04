@@ -57,6 +57,7 @@ export type BookingSettingsInput = {
   cancel_cutoff_hours: number;
   cancellation_policy: string;
   consultation_service_id: string | null;
+  patch_test_service_id: string | null;
   accent_color: string | null;
 };
 
@@ -73,7 +74,8 @@ function wholeNumber(value: string, min: number, max: number): number | null {
 
 // Fields: enabled (checkbox), slug, window_days, notice_hours,
 // allow_new_clients (checkbox), cancel_cutoff_hours, cancellation_policy,
-// consultation_service_id ("" = none), accent_color ("" = default). The
+// consultation_service_id and patch_test_service_id ("" = none),
+// accent_color ("" = default). The
 // welcome line is the booking page's description (Settings → Booking page).
 export function parseBookingSettings(
   form: FormLike,
@@ -110,6 +112,7 @@ export function parseBookingSettings(
       cancel_cutoff_hours: cutoff!,
       cancellation_policy: policy,
       consultation_service_id: text(form, "consultation_service_id") || null,
+      patch_test_service_id: text(form, "patch_test_service_id") || null,
       accent_color: accent || null,
     },
   };

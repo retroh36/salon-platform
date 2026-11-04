@@ -78,6 +78,8 @@ async function Booking({ params, searchParams }: { params: Promise<{ slug: strin
   // "Book this again" from their account: ?services=a,b&staff=x.
   const services = typeof query.services === "string" ? query.services.split(",").filter((id) => /^[0-9a-f-]{36}$/.test(id)) : [];
   const staff = typeof query.staff === "string" && /^[0-9a-f-]{36}$/.test(query.staff) ? query.staff : null;
+  // Color after a patch test they've booked: no times before ?after= (ISO).
+  const after = typeof query.after === "string" && !Number.isNaN(Date.parse(query.after)) ? new Date(query.after).toISOString() : null;
   // A signed-in client's last visit, at the top, when it can still be booked online.
   const last = account && !services.length ? await loadRebook(admin, account) : null;
   const rebook =
@@ -111,7 +113,7 @@ async function Booking({ params, searchParams }: { params: Promise<{ slug: strin
             source={source}
             referral={referral}
             signedIn={account ? { firstName: account.firstName } : null}
-            start={services.length ? { serviceIds: services, staffId: staff } : null}
+            start={services.length ? { serviceIds: services, staffId: staff, after } : null}
           />
           </LevelsProvider>
         </section>
