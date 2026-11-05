@@ -1,10 +1,14 @@
 import { siteUrl } from "@/lib/branding";
+import { liveGate } from "@/lib/live";
 import { handleInboundText, inboundDigits, replyXml, validSignature } from "@/lib/messaging/inbound";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // Texts clients send to Maestra's numbers (the text provider's webhook).
 // Only requests signed with TWILIO_AUTH_TOKEN are read; until texts are
 // connected (no token) it's off. STOP, START and HELP are honored at once.
+// Live, Twilio's own opt-out handling has already answered them (and won't
+// deliver a text to a number that's stopped), so we only record them; off
+// the production site our fixed reply goes back, into the outbox flow.
 // Never logs the number or the text.
 export async function POST(request: Request) {
   const token = process.env.TWILIO_AUTH_TOKEN;
@@ -16,5 +20,5 @@ export async function POST(request: Request) {
   }
   const digits = inboundDigits(params.From ?? "");
   const reply = digits ? await handleInboundText(createAdminClient(), digits, params.Body ?? "") : null;
-  return new Response(replyXml(reply), { headers: { "content-type": "text/xml" } });
+  return new Response(replyXml(liveGate().open ? null : reply), { headers: { "content-type": "text/xml" } });
 }

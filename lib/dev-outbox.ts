@@ -1,4 +1,5 @@
 import { isDemo } from "./demo";
+import { isLocalDatabase } from "./live";
 
 type Env = Record<string, string | undefined>;
 
@@ -12,10 +13,3 @@ export function outboxOpen(env: Env = process.env): boolean {
   return env.MAESTRA_TEST_SERVER === "true" && isLocalDatabase(env.NEXT_PUBLIC_SUPABASE_URL);
 }
 
-function isLocalDatabase(url: string | undefined): boolean {
-  try {
-    return ["127.0.0.1", "localhost"].includes(new URL(url ?? "").hostname);
-  } catch {
-    return false;
-  }
-}

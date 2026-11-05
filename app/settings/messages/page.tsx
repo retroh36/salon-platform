@@ -4,8 +4,10 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Card, PageHeader } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
+import { messagingStatus } from "@/lib/messaging/status";
 import { can } from "@/lib/permissions";
 import { SettingsNav } from "../settings-nav";
+import { MessagesConnection } from "./connection";
 import { FreeTextRoles } from "./free-text-roles";
 import { MoveMessageDefault } from "./move-default";
 
@@ -26,12 +28,19 @@ async function MessagesSettings() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
   if (!can(me, "settings")) redirect("/dashboard");
-  const { data: b, error } = await supabase.from("businesses").select("free_text_roles, move_message_default").eq("id", me.business_id).single();
+  const { data: b, error } = await supabase.from("businesses").select("free_text_roles, move_message_default, messages_live").eq("id", me.business_id).single();
   if (error) throw error;
   return (
     <AppShell section="settings" me={me}>
       <PageHeader title="Messages" description="What your team can send clients from booking details. Clients only get messages they've agreed to, and a text STOP is always honored." />
       <SettingsNav current="messages" me={me} />
+      <Card
+        title="Texts and email"
+        titleId="messages-connection-heading"
+        description="Until you go live, every text and email waits in the outbox and nothing reaches a client. Going live needs texts or email connected first, which the Maestra team does."
+      >
+        <MessagesConnection status={messagingStatus({ messages_live: b.messages_live })} canChange={can(me, "billing")} />
+      </Card>
       <Card
         title="Writing their own messages"
         titleId="free-text-heading"
