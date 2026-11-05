@@ -17,6 +17,7 @@ const ILLUSTRATION_PLACES = [
   "app/design/page.tsx", // the style guide, which shows it
   "components/ui/page.tsx", // EmptyState
   "components/denise.tsx",
+  "app/settings/denise/page.tsx", // Meet Denise, the page about her
 ];
 
 describe("Denise's art", () => {
@@ -25,8 +26,8 @@ describe("Denise's art", () => {
     expect(outside).toEqual([]);
   });
 
-  it("never shows the thinking or pointing drawings in the app", () => {
-    const using = files.filter((f) => /brand\/denise\/(think|point)/.test(readFileSync(f, "utf8")));
-    expect(using).toEqual([]);
+  it("shows the thinking and pointing drawings only on Meet Denise", () => {
+    const using = files.filter((f) => /brand\/denise\/(think|point)|<DenisePose[^>]*pose="(think|point)"/.test(readFileSync(f, "utf8")));
+    expect(using.sort()).toEqual(["app/settings/denise/page.tsx", "components/denise.tsx"]);
   });
 });

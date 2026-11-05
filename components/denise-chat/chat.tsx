@@ -16,7 +16,7 @@ import { reach } from "@/lib/reach";
 import { formatLongDay } from "@/lib/schedule-format";
 import { formatMinute } from "@/lib/scheduling/time";
 import { BookingCardView, FormLink } from "./booking-card";
-import { appendDenise, askDenise, useDenise, type DeniseRun } from "./store";
+import { appendDenise, askDenise, clearPrefill, useDenise, type DeniseRun } from "./store";
 import { setUnsaved } from "@/lib/unsaved-work";
 
 // The input's id, so the keyboard shortcut and "Ask Denise" can put the
@@ -135,7 +135,15 @@ function AskForm({
   placeholder?: string;
   pinned?: boolean;
 }) {
-  const [question, setQuestion] = useState("");
+  // A sample question from Meet Denise, typed in for them to send: on
+  // opening, or straight away when the box is already showing.
+  const { prefill } = useDenise();
+  const [question, setQuestion] = useState(() => (prefill && prefill.at === focus ? prefill.text : ""));
+  const [seenFocus, setSeenFocus] = useState(focus);
+  if (focus !== seenFocus) {
+    setSeenFocus(focus);
+    if (prefill && prefill.at === focus) setQuestion(prefill.text);
+  }
   // Typed and not yet sent: a stalled page won't reload over it.
   useEffect(() => {
     setUnsaved("denise-box", question.trim() !== "");
@@ -152,6 +160,9 @@ function AskForm({
     let frame = 0;
     const put = () => {
       input.current?.focus();
+      // After a typed-in question, the cursor goes at its end.
+      const end = input.current?.value.length ?? 0;
+      input.current?.setSelectionRange(end, end);
       if (document.activeElement !== input.current && tries++ < 20) frame = requestAnimationFrame(put);
     };
     put();
@@ -167,6 +178,7 @@ function AskForm({
           if (!question.trim() || disabled) return;
           onAsk(question.trim());
           setQuestion("");
+          clearPrefill();
         }}
       >
         <DeniseFace size={24} />

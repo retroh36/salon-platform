@@ -206,6 +206,32 @@ for (const size of WIDTHS) {
       }
     });
 
+    // Meet Denise, for an owner and a stylist, and with her open beside it
+    // after a sample question.
+    test("Meet Denise", async ({ page, browser }) => {
+      const settle = (p: Page) => p.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished)));
+      await page.goto("/settings/denise");
+      await expect(ui(page).getByTestId("meet-denise-intro")).toBeVisible();
+      await waitForHydration(page, "[data-testid=meet-denise-try]");
+      await settle(page);
+      await expectTidyLayout(page, "on Meet Denise");
+      await ui(page).getByTestId("try-denise").first().click();
+      await expect(page.getByRole("textbox", { name: "Message Denise" })).not.toHaveValue("");
+      await settle(page);
+      await expectTidyLayout(page, "on Meet Denise with Denise open");
+
+      const stylist = await browser.newContext({ viewport: size, hasTouch: size.width < 1440, isMobile: size.width < 500, storageState: AUTH.stylist });
+      try {
+        const own = await stylist.newPage();
+        await own.goto("/settings/denise");
+        await expect(ui(own).getByTestId("meet-denise-intro")).toBeVisible();
+        await settle(own);
+        await expectTidyLayout(own, "on Meet Denise, as a stylist");
+      } finally {
+        await stylist.close();
+      }
+    });
+
     // The list, the long-named client's profile (with an allergy and their
     // visit), their details form, and Maria's profile as her stylist.
     test("Clients and the client profile", async ({ page, browser }) => {

@@ -6,17 +6,30 @@
 // and the follow-ups ("anything later?") are tested with Claude mocked in
 // tests/unit/denise-booking.test.ts.
 import type { Locator, Page } from "@playwright/test";
-import { addDays, startOfWeek, todayIn } from "@/lib/scheduling/time";
+import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { AUTH, expect, test, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
 const TZ = "America/Chicago";
-// A Tuesday past the seeded nine days ahead, so Bridget's afternoon is
-// clear (she works 2–6), and the Sunday that week (the salon is closed).
+// A Tuesday past the seeded nine days ahead whose afternoon Bridget has
+// clear (she works 2–6; the demo's rebooked visits reach weeks ahead, so
+// the first such Tuesday from five weeks out), and the Sunday that week
+// (the salon is closed). Set in beforeAll.
 const MONDAY = startOfWeek(todayIn(TZ));
-const DAY = addDays(MONDAY, 36);
-const SUNDAY = addDays(MONDAY, 41);
+let DAY = addDays(MONDAY, 36);
+let SUNDAY = addDays(MONDAY, 41);
+
+async function clearAfternoon(day: string): Promise<boolean> {
+  const { count } = await admin
+    .from("appointment_items")
+    .select("id", { count: "exact", head: true })
+    .eq("staff_id", SEED.staff.bridget)
+    .eq("holds_time", true)
+    .lt("starts_at", fromLocal(day, 18 * 60, TZ)!.toISOString())
+    .gt("ends_at", fromLocal(day, 12 * 60, TZ)!.toISOString());
+  return count === 0;
+}
 // Letters only: a client's name has no digits.
 const PREFIX = `Db${Date.now().toString(36).replace(/\d/g, (d) => "abcdefghij"[Number(d)])}`;
 const PAT = `${PREFIX}Pat`;
@@ -30,6 +43,14 @@ let learnedCut: { business_id: string; kind: string; key: string; data: unknown 
 const serviceId = async (name: string) => (await admin.from("services").select("id").eq("business_id", B).eq("name", name).single()).data!.id;
 
 test.beforeAll(async () => {
+  for (const weeks of [5, 6, 7, 8, 9, 10]) {
+    const tuesday = addDays(MONDAY, weeks * 7 + 1);
+    if (await clearAfternoon(tuesday)) {
+      DAY = tuesday;
+      SUNDAY = addDays(MONDAY, weeks * 7 + 6);
+      break;
+    }
+  }
   const { data } = await admin
     .from("clients")
     .insert([

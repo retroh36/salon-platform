@@ -41,6 +41,9 @@ type State = {
   // Her compact card shrunk to a small bar (Scheduling; components/denise-chat/card.tsx).
   min: boolean;
   adjust: Adjust | null;
+  // A question put in her message box for staff to send (Meet Denise's
+  // samples), with the focus it came with.
+  prefill: { text: string; at: number } | null;
 };
 
 const IDLE: DeniseRun = { working: false, status: null, text: "", slow: false };
@@ -58,7 +61,7 @@ const TOO_SLOW_REPORT = "That's taking me too long, so I stopped looking. What y
 const KEEP = 40;
 const PREFIX = "maestra:denise:";
 
-const EMPTY: State = { staffId: null, chat: [], run: IDLE, open: false, focus: 0, min: false, adjust: null };
+const EMPTY: State = { staffId: null, chat: [], run: IDLE, open: false, focus: 0, min: false, adjust: null, prefill: null };
 let state: State = EMPTY;
 const listeners = new Set<() => void>();
 
@@ -112,6 +115,9 @@ export const setDeniseOpen = (open: boolean) => set(open ? { open } : { open, mi
 export const setDeniseMin = (min: boolean) => set({ min });
 // Opens her with the cursor in her message box (the keyboard shortcut).
 export const focusDenise = () => set({ open: true, min: false, focus: state.focus + 1 });
+// Opens her with a question typed in her box, not sent: staff send it.
+export const askDeniseAbout = (question: string) => set({ open: true, min: false, focus: state.focus + 1, prefill: { text: question, at: state.focus + 1 } });
+export const clearPrefill = () => set({ prefill: null });
 export const appendDenise = (message: ChatMessage) => set({ chat: [...state.chat, message].slice(-KEEP) });
 export const updateDenise = (index: number, patch: Partial<ChatMessage>) => set({ chat: state.chat.map((m, i) => (i === index ? { ...m, ...patch } : m)) });
 export const requestAdjust = (adjust: Adjust) => set({ adjust });

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { DeniseFace } from "@/components/denise";
 import { IconButton } from "@/components/ui/button";
 import { CloseIcon } from "@/components/ui/icons";
-import { MinimizedBar, MinimizeButton, rememberCard, rememberedCard } from "./card";
+import { AboutDeniseLink, MinimizedBar, MinimizeButton, rememberCard, rememberedCard } from "./card";
 import { DeniseAskBox, DeniseChat } from "./chat";
 import { focusDenise, hydrateDenise, setDeniseMin, setDeniseOpen, useDenise } from "./store";
 
@@ -101,6 +101,7 @@ export function DeniseBubble({ me, launcher = "corner", overlay = false }: { me:
           <div className="flex shrink-0 items-center gap-2.5 border-b border-denise-100 bg-denise-50 py-2.5 pr-2.5 pl-4">
             <DeniseFace />
             <h2 className="flex-1 text-base font-semibold text-denise-900">Denise</h2>
+            <AboutDeniseLink />
             {overlay && <MinimizeButton onMinimize={() => setDeniseMin(true)} />}
             <IconButton label="Close Denise" onClick={() => setDeniseOpen(false)}>
               <CloseIcon />

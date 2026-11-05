@@ -10,8 +10,8 @@ const files = ["app", "components"].flatMap((dir) =>
     .map((f) => `${dir}/${f}`),
 );
 // Client pages (their frame is app/book/[slug]/frame.tsx) and signing in,
-// and the style guide, which shows it.
-const SERIF_PLACES = /^app\/(book|card|pay|event|unsubscribe|login|design)\//;
+// the style guide, which shows it, and Meet Denise's headline.
+const SERIF_PLACES = /^app\/(book|card|pay|event|unsubscribe|login|design|settings\/denise)\//;
 
 describe("type", () => {
   it("uses only sizes on the scale", () => {
@@ -21,7 +21,7 @@ describe("type", () => {
     expect(off).toEqual([]);
   });
 
-  it("sets the serif only on client pages and signing in", () => {
+  it("sets the serif only on client pages, signing in and Meet Denise", () => {
     const outside = files.filter((f) => !SERIF_PLACES.test(f) && f !== "app/serif.ts" && /\bfont-serif\b|serif\.variable/.test(readFileSync(f, "utf8")));
     expect(outside).toEqual([]);
   });

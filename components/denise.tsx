@@ -1,14 +1,16 @@
 import Image from "next/image";
 import face from "@/public/brand/denise/face.png";
+import point from "@/public/brand/denise/point.png";
+import think from "@/public/brand/denise/think.png";
 import wave from "@/public/brand/denise/wave.png";
 
 // Denise, the AI assistant (short for DNIS, Digital Navigator of Issues and
 // Scheduling). While she works she's one small avatar, her face, the same
 // everywhere (`DeniseAvatar`, `DeniseFace`); her full illustration (waving)
 // is kept for the moments that are about her: signing in, the welcome, and
-// empty states (`DenisePose`). The thinking and pointing drawings are brand
-// art (`public/brand/denise/`) for those moments to come, not shown while
-// she works.
+// empty states (`DenisePose`). The thinking and pointing drawings are only
+// on Meet Denise (Settings → Denise), the page about her, never while she
+// works.
 export type Pose = "wave" | "think" | "point";
 
 const POSE_LABELS: Record<Pose, string> = {
@@ -47,12 +49,14 @@ export function DeniseAvatar({ pose, className = "" }: { pose: Pose; className?:
   );
 }
 
+const DRAWINGS = { wave, think, point };
+
 // The full illustration, waving, for signing in, the welcome and empty
-// states only.
-export function DenisePose({ className = "w-24" }: { className?: string }) {
+// states; thinking and pointing only on Meet Denise.
+export function DenisePose({ pose = "wave", className = "w-24" }: { pose?: Pose; className?: string }) {
   return (
-    <div role="img" aria-label={POSE_LABELS.wave} data-pose="wave" className={`relative aspect-[1211/1299] shrink-0 ${className}`}>
-      <Image src={wave} alt="" sizes="128px" priority className="absolute inset-0 size-full object-contain" />
+    <div role="img" aria-label={POSE_LABELS[pose]} data-pose={pose} className={`relative aspect-[1211/1299] shrink-0 ${className}`}>
+      <Image src={DRAWINGS[pose]} alt="" sizes="160px" priority={pose === "wave"} className="absolute inset-0 size-full object-contain" />
     </div>
   );
 }

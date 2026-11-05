@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { can, type Permission } from "@/lib/permissions";
 
-type Page = "salon" | "levels" | "stations" | "time-off" | "booking" | "booking-page" | "policies" | "checkout" | "gift-cards" | "packages" | "events" | "memberships" | "rewards" | "automations" | "messages" | "devices" | "payroll" | "commission" | "data" | "billing";
+type Page = "salon" | "levels" | "stations" | "time-off" | "booking" | "booking-page" | "policies" | "checkout" | "gift-cards" | "packages" | "events" | "memberships" | "rewards" | "automations" | "messages" | "devices" | "payroll" | "commission" | "data" | "billing" | "denise";
 
-// Each settings page and the permission it needs (lib/permissions.ts).
-const LINKS: [Page, string, string, Permission][] = [
+// Each settings page and the permission it needs (lib/permissions.ts);
+// null is everyone on the team.
+const LINKS: [Page, string, string, Permission | null][] = [
   ["salon", "/settings", "Your salon", "settings"],
   ["levels", "/settings/levels", "Levels", "settings"],
   ["stations", "/settings/stations", "Stations", "settings"],
@@ -25,18 +26,23 @@ const LINKS: [Page, string, string, Permission][] = [
   ["commission", "/settings/commission", "Commission", "payroll"],
   ["data", "/settings/data", "Your data", "export_data"],
   ["billing", "/settings/billing", "Billing", "billing"],
+  ["denise", "/settings/denise", "Denise", null],
 ];
 
-// The first settings page someone can open, for the sidebar.
+const open = (me: { permissions: readonly string[] }, p: Permission | null) => p === null || can(me, p);
+
+// The first settings page someone can open, for the sidebar: only the
+// salon's own settings (Meet Denise is reached from her header and the
+// help guide).
 export function firstSettingsPage(me: { permissions: readonly string[] }): string | null {
-  return LINKS.find(([, , , p]) => can(me, p))?.[1] ?? null;
+  return LINKS.find(([, , , p]) => p !== null && can(me, p))?.[1] ?? null;
 }
 
 // Moves between the settings pages someone can open.
 export function SettingsNav({ current, me }: { current: Page; me: { permissions: readonly string[] } }) {
   return (
     <nav aria-label="Settings" className="mb-8 flex flex-wrap gap-x-1 gap-y-1 border-b border-line pb-3">
-      {LINKS.filter(([, , , p]) => can(me, p)).map(([key, href, label]) => (
+      {LINKS.filter(([, , , p]) => open(me, p)).map(([key, href, label]) => (
         <Link
           key={key}
           href={href}

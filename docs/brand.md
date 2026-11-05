@@ -247,8 +247,9 @@ or one-off hex values.
   as `font-serif`) only on client-facing pages (the booking site and its
   manage, account, event, pay, card and unsubscribe pages) and on signing
   in, and there only for the salon's name and big headlines (page and step
-  titles, the sign-in headline). Body text, labels, buttons and prices on
-  those pages stay Geist.
+  titles, the sign-in headline), plus the one headline on Meet Denise
+  (Settings → Denise). Body text, labels, buttons and prices on those
+  pages stay Geist.
 - **Geist Mono** only where characters must line up as code (gift card
   codes, a formula's amounts). Money and counts use Geist with tabular
   figures (`tabular-nums`), so columns line up.
@@ -488,8 +489,17 @@ Maestra's AI assistant, and the reason for the tagline's second half.
 - **Full illustrations only for her moments:** signing in (waving, on a
   light tile, since her outline is the panel's navy), the welcome for a new
   salon, and empty states (`EmptyState`, and her calendar tab when the day
-  is all clear) (`DenisePose`, waving). `think` and `point` are kept for
-  onboarding and marketing, not shown in the app.
+  is all clear) (`DenisePose`, waving), and Meet Denise (Settings →
+  Denise, the page about her), the only screen with `think` and `point`
+  (`DenisePose pose=`); otherwise they're kept for onboarding and
+  marketing.
+- **Meet Denise** (`/settings/denise`, every role, "What can Denise do?"
+  in her header): a periwinkle intro with her serif headline, then a
+  section per thing she does, the words on the left and an example of her
+  card on the right (stacked on a phone), drawn from her real cards with
+  the demo's names (the buttons in them are drawings), the guardrails, what's
+  coming soon, and sample questions that open her with the question typed
+  in. Only what's built goes on it.
 - **Out of the way of the team:** on the Calendar (from `lg` up) and
   Scheduling she opens as a compact card over the bottom right corner,
   420px wide (less on a narrow window) with 20px inside, and only as tall

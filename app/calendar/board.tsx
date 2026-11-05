@@ -38,7 +38,7 @@ import type { OutWhen } from "@/lib/rescue";
 import { approveDeniseFix, bookFromWaitlist, dismissDeniseItem, rejectDeniseFix, scanDenise, undoDeniseFix } from "./denise-actions";
 import { appendDenise, askDenise, focusDenise, hydrateDenise, startDenise, takeAdjust, useDenise } from "@/components/denise-chat/store";
 import { useDeniseShortcut } from "@/components/denise-chat/bubble";
-import { MinimizedBar, MinimizeButton } from "@/components/denise-chat/card";
+import { AboutDeniseLink, MinimizedBar, MinimizeButton } from "@/components/denise-chat/card";
 import { DeniseAskBox, DeniseChat } from "@/components/denise-chat/chat";
 import { DenisePanel, type Outcome, type Preview } from "./denise-panel";
 import { BookingPanel, type BookingDraft, type BookingStart } from "./booking-panel";
@@ -1716,6 +1716,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           <div className="flex shrink-0 items-center gap-2.5 border-b border-denise-100 bg-denise-50 py-2.5 pr-2.5 pl-4">
             <DeniseFace />
             <h2 className="flex-1 text-base font-semibold text-denise-900">Denise</h2>
+            <AboutDeniseLink />
             <span className="hidden lg:contents">
               <MinimizeButton
                 onMinimize={() => {

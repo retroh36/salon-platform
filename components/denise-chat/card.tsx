@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { DeniseFace } from "@/components/denise";
 import { IconButton } from "@/components/ui/button";
 import { ChevronUpIcon, CloseIcon, MinimizeIcon } from "@/components/ui/icons";
@@ -28,6 +30,23 @@ export function rememberCard(staffId: string, page: string, value: CardState) {
   } catch {
     // Storage blocked: nothing to remember.
   }
+}
+
+// In her header, by the buttons: Meet Denise, the page on what she does
+// (Settings → Denise), left out on that page itself.
+export const MEET_DENISE = "/settings/denise";
+
+export function AboutDeniseLink() {
+  if (usePathname() === MEET_DENISE) return null;
+  return (
+    <Link
+      href={MEET_DENISE}
+      data-testid="about-denise"
+      className="touch-target inline-flex h-8 shrink-0 items-center rounded-md px-1.5 text-13 font-medium text-denise-700 underline-offset-2 hover:text-denise-900 hover:underline focus-visible:outline-2 focus-visible:outline-focus"
+    >
+      What can Denise do?
+    </Link>
+  );
 }
 
 // Her minimize button, in the card's header beside Close.

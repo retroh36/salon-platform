@@ -21,5 +21,6 @@ Ask Denise about the day, availability, clients or the salon, in your own words,
 - Denise knows which page you're on: on a client's profile, at checkout or with a visit open, "When's their next visit?" means that client.
 - Denise can find openings, look up a client's habits, who's overdue, how long stylists take, the day's schedule, stock, events and (for owners and managers) sales. The numbers come from the salon's own records.
 - Nothing changes until someone approves it. Stylists see only their own figures and no money.
+- **What can Denise do?** in her header (or **Settings** → **Denise**) opens Meet Denise, a page on everything she does, with sample questions to try.
 - If Denise isn't connected, or the salon's daily limit is reached, the chat says so and the rest of the app works as usual.
 - After 8 seconds Denise shows **Still thinking…**. If a question takes over 25 seconds, Denise stops and says so: tap **Try again**, or ask it a shorter way.
