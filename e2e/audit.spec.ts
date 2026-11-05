@@ -44,3 +44,24 @@ test("the front desk can't open it", async ({ browser }) => {
   await expect(page.locator("aside").first().getByRole("link", { name: "Audit trail" })).toHaveCount(0);
   await page.close();
 });
+
+test("an alert shows on the owner's Dashboard until Got it", async ({ browser }) => {
+  const body = `Sam Rivera voided sale #9${Date.now().toString().slice(-5)} ($85): Rang up twice.`;
+  // Got it marks every unread notice read: the owner's others are put back.
+  const { data: unread } = await admin.from("notifications").select("id").eq("staff_id", SEED.staff.owner).eq("channel", "app").is("read_at", null);
+  await admin.from("notifications").insert({ business_id: SEED.business, location_id: SEED.location, staff_id: SEED.staff.owner, channel: "app", status: "sent", template: "alert_sale_voided", body });
+  const page = await browser.newPage({ storageState: AUTH.owner });
+  try {
+    await page.goto("/dashboard");
+    const card = ui(page).getByTestId("for-you");
+    await expect(card).toContainText(body);
+    await card.getByRole("button", { name: "Got it" }).click();
+    await expect(card).toHaveCount(0);
+    const { data } = await admin.from("notifications").select("read_at").eq("body", body).single();
+    expect(data?.read_at).not.toBeNull();
+  } finally {
+    await admin.from("notifications").delete().eq("body", body);
+    if (unread?.length) await admin.from("notifications").update({ read_at: null }).in("id", unread.map((n) => n.id));
+    await page.close();
+  }
+});
