@@ -7,12 +7,14 @@ import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { buttonClass } from "@/components/ui/button";
 import { ChevronRightIcon, PlusIcon } from "@/components/ui/icons";
 import {
+  Alert,
   Badge,
   EmptyState,
   nameLinkClass,
   PageHeader,
   pillClass,
   Section,
+  textLinkClass,
   type Tone,
 } from "@/components/ui/page";
 import {
@@ -97,6 +99,11 @@ async function Sales({
     .gte("created_at", startOfLocalDay(date, tz).toISOString())
     .lt("created_at", startOfLocalDay(addDays(date, 1), tz).toISOString());
   if (paidError) throw paidError;
+  // Whether today's drawer has been counted (or closed out) yet.
+  const opened =
+    date !== today ||
+    (await supabase.from("drawer_counts").select("id", { count: "exact", head: true }).eq("location_id", me.location.id).eq("day", today)).count! > 0 ||
+    (await supabase.from("cash_closeouts").select("id", { count: "exact", head: true }).eq("location_id", me.location.id).eq("day", today)).count! > 0;
   const byTender = new Map<PaymentMethod, number>();
   for (const p of paid)
     byTender.set(p.method, (byTender.get(p.method) ?? 0) + p.amount_cents);
@@ -108,17 +115,29 @@ async function Sales({
         title="Sales"
         description={formatLongDay(date)}
         actions={
-          // A plain link: /checkout/new is a route handler that opens the checkout.
-          // eslint-disable-next-line @next/next/no-html-link-for-pages
-          <a
-            href="/checkout/new?from=/sales"
-            className={buttonClass("primary", "md")}
-          >
-            <PlusIcon className="size-4" />
-            New sale
-          </a>
+          <>
+            <Link href="/sales/drawer" className={buttonClass("secondary", "md")}>
+              Cash drawer
+            </Link>
+            {/* A plain link: /checkout/new is a route handler that opens the checkout. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+            <a href="/checkout/new?from=/sales" className={buttonClass("primary", "md")}>
+              <PlusIcon className="size-4" />
+              New sale
+            </a>
+          </>
         }
       />
+      {date === today && !opened && (
+        <div className="mb-4" data-testid="drawer-reminder">
+          <Alert tone="warning">
+            The cash drawer hasn&rsquo;t been counted today.{" "}
+            <Link href="/sales/drawer" className={textLinkClass}>
+              Count it now
+            </Link>
+          </Alert>
+        </div>
+      )}
       {pastDays && (
         <nav aria-label="Day" className="mb-4 flex flex-wrap gap-2">
           <Link

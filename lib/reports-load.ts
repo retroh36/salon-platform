@@ -87,13 +87,17 @@ export async function loadCloseout(supabase: Supabase, businessId: string, locat
         .order("id")
         .range(from, to),
     ),
-    supabase.from("cash_closeouts").select("expected_cents, counted_cents, float_cents, note, closed_at, staff:staff(first_name)").eq("location_id", location.id).eq("day", day).maybeSingle(),
+    supabase.from("cash_closeouts").select("expected_cents, counted_cents, float_cents, deposit_cents, note, closed_at, staff:staff(first_name)").eq("location_id", location.id).eq("day", day).maybeSingle(),
   ]);
   if (error) throw error;
-  // The day's float as counted, else the salon's usual one.
-  const { data: b, error: bError } = await supabase.from("businesses").select("cash_float_cents").eq("id", businessId).single();
+  // The day's float as counted, else the opening count, else the salon's
+  // usual one.
+  const [{ data: b, error: bError }, { data: opening }] = await Promise.all([
+    supabase.from("businesses").select("cash_float_cents").eq("id", businessId).single(),
+    supabase.from("drawer_counts").select("counted_cents").eq("location_id", location.id).eq("day", day).eq("kind", "open").maybeSingle(),
+  ]);
   if (bError) throw bError;
-  return { ...closeout(payments, saved?.float_cents ?? b.cash_float_cents), usualFloatCents: b.cash_float_cents, saved };
+  return { ...closeout(payments, saved?.float_cents ?? opening?.counted_cents ?? b.cash_float_cents), usualFloatCents: b.cash_float_cents, openingCents: opening?.counted_cents ?? null, saved };
 }
 
 // Visits checked out in a period (not voided) and whether the client left

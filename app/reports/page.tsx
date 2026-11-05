@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
-import { EmptyState, PageHeader, Section, nameLinkClass } from "@/components/ui/page";
+import { Badge, EmptyState, PageHeader, Section, nameLinkClass } from "@/components/ui/page";
 import { buttonClass } from "@/components/ui/button";
 import { TableCard, numClass, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
@@ -11,10 +11,12 @@ import { TENDER_LABELS } from "@/lib/reports";
 import { membershipReport } from "@/lib/memberships";
 import { loadMembershipRows } from "@/lib/memberships-load";
 import { loadBookingSources, loadPromotionResults, loadCloseout, loadGiftCardActivity, loadGiftCardLiability, loadRebooking, loadUnusedPackages } from "@/lib/reports-load";
-import { formatLongDay } from "@/lib/schedule-format";
+import { formatDay, formatLongDay } from "@/lib/schedule-format";
 import { addDays, isLocalDate, todayIn } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { CloseoutForm } from "./closeout-form";
+import { COUNT_LABELS, differenceText } from "@/lib/drawer";
+import { loadDrawerHistory } from "@/lib/drawer-load";
 import { eventReport } from "@/lib/events/report";
 import { loadEventReportRows } from "@/lib/events/report-load";
 import { can } from "@/lib/permissions";
@@ -79,7 +81,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
   const period: Period = typeof params.period === "string" && params.period in PERIODS ? (params.period as Period) : "this_month";
   const day = typeof params.day === "string" && isLocalDate(params.day) && params.day <= today ? params.day : today;
   const range = rangeOf(period, today);
-  const [liability, packages, activity, close, rebooking, staff, membershipRows, sources, promotions, eventRows, rewards] = await Promise.all([
+  const [liability, packages, activity, close, rebooking, staff, membershipRows, sources, promotions, eventRows, rewards, drawerHistory] = await Promise.all([
     loadGiftCardLiability(supabase, me.business_id),
     loadUnusedPackages(supabase, me.business_id),
     loadGiftCardActivity(supabase, me.business_id, range.from, range.to, tz),
@@ -91,6 +93,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
     loadPromotionResults(supabase, me.business_id, range.from, range.to, tz),
     loadEventReportRows(supabase, me.business_id, tz),
     loadRewardsOverview(supabase, me.business_id, startOfLocalDay(range.from, tz), startOfLocalDay(addDays(range.to, 1), tz)),
+    loadDrawerHistory(supabase, me.business_id, me.location.id, today),
   ]);
   const events = eventReport(eventRows, range.from, range.to);
   // By month: six months back to six ahead, whatever the period.
@@ -542,7 +545,58 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
             {close.saved.staff ? ` (${close.saved.staff.first_name})` : ""}
           </p>
         )}
-        <CloseoutForm key={day} day={day} cashNetCents={close.cashNetCents} floatCents={close.floatCents} counted={close.saved?.counted_cents ?? null} note={close.saved?.note ?? ""} />
+        <CloseoutForm key={day} day={day} cashNetCents={close.cashNetCents} floatCents={close.floatCents} counted={close.saved?.counted_cents ?? null} note={close.saved?.note ?? ""} deposit={close.saved?.deposit_cents ?? null} />
+      </Section>
+
+      <Section title="Cash drawer counts" titleId="drawer-history-heading" description="Every count in the last 30 days: opening, during the day and close-out, against what the drawer should have held.">
+        {(() => {
+          const off = drawerHistory.filter((c) => c.countedCents !== c.expectedCents);
+          const short = off.filter((c) => c.countedCents < c.expectedCents).reduce((n, c) => n + c.expectedCents - c.countedCents, 0);
+          const over = off.filter((c) => c.countedCents > c.expectedCents).reduce((n, c) => n + c.countedCents - c.expectedCents, 0);
+          return (
+            <p className="mb-3 text-13 text-ink-muted" data-testid="drawer-history-summary">
+              {drawerHistory.length === 0
+                ? "No counts in the last 30 days."
+                : off.length === 0
+                  ? `All ${drawerHistory.length} counts matched.`
+                  : `${off.length} of ${drawerHistory.length} counts were off: ${formatPrice(short)} short and ${formatPrice(over)} over in all.`}
+            </p>
+          );
+        })()}
+        {drawerHistory.length > 0 && (
+          <TableCard>
+            <table className={tableClass} data-testid="drawer-history">
+              <thead className={theadClass}>
+                <tr>
+                  <th className={th}>Day</th>
+                  <th className={th}>Count</th>
+                  <th className={th}>By</th>
+                  <th className={thNum}>Expected</th>
+                  <th className={thNum}>Counted</th>
+                  <th className={th}>Difference</th>
+                </tr>
+              </thead>
+              <tbody>
+                {drawerHistory.slice(0, 120).map((c) => (
+                  <tr key={`${c.kind}:${c.id}`} className={trClass}>
+                    <td className={`${td} whitespace-nowrap`}>{formatDay(c.day)}</td>
+                    <td className={td}>
+                      {COUNT_LABELS[c.kind]}
+                      {c.depositCents ? <span className="block text-13 text-ink-muted">Deposited {formatPrice(c.depositCents)}</span> : null}
+                      {c.note ? <span className="block text-13 text-ink-muted">{c.note}</span> : null}
+                    </td>
+                    <td className={td}>{c.by ?? "Maestra"}</td>
+                    <td className={tdNum}>{formatPrice(c.expectedCents)}</td>
+                    <td className={tdNum}>{formatPrice(c.countedCents)}</td>
+                    <td className={td}>
+                      <Badge tone={c.countedCents === c.expectedCents ? "success" : "danger"}>{differenceText(c.countedCents - c.expectedCents, formatPrice)}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableCard>
+        )}
       </Section>
     </AppShell>
   );

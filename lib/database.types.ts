@@ -477,14 +477,14 @@ isOneToOne: false
                   ]
                 },"cash_closeouts": {
                   Row: {
-                    "business_id": string,"closed_at": string,"closed_by": string | null,"counted_cents": number,"day": string,"expected_cents": number,"float_cents": number,"id": string,"location_id": string,"note": string | null
+                    "business_id": string,"closed_at": string,"closed_by": string | null,"counted_cents": number,"day": string,"deposit_cents": number,"expected_cents": number,"float_cents": number,"id": string,"location_id": string,"note": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"closed_at"?: string,"closed_by"?: string | null,"counted_cents": number,"day": string,"expected_cents": number,"float_cents"?: number,"id"?: string,"location_id": string,"note"?: string | null
+                    "business_id": string,"closed_at"?: string,"closed_by"?: string | null,"counted_cents": number,"day": string,"deposit_cents"?: number,"expected_cents": number,"float_cents"?: number,"id"?: string,"location_id": string,"note"?: string | null
                   }
                   Update: {
-                    "business_id"?: string,"closed_at"?: string,"closed_by"?: string | null,"counted_cents"?: number,"day"?: string,"expected_cents"?: number,"float_cents"?: number,"id"?: string,"location_id"?: string,"note"?: string | null
+                    "business_id"?: string,"closed_at"?: string,"closed_by"?: string | null,"counted_cents"?: number,"day"?: string,"deposit_cents"?: number,"expected_cents"?: number,"float_cents"?: number,"id"?: string,"location_id"?: string,"note"?: string | null
                   }
                   Relationships: [
                     {
@@ -1130,6 +1130,38 @@ isOneToOne: false
       columns: ["staff_id"]
 isOneToOne: false
       referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"drawer_counts": {
+                  Row: {
+                    "business_id": string,"counted_at": string,"counted_by": string | null,"counted_cents": number,"day": string,"expected_cents": number,"id": string,"kind": string,"location_id": string,"note": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"counted_at"?: string,"counted_by"?: string | null,"counted_cents": number,"day": string,"expected_cents": number,"id"?: string,"kind": string,"location_id": string,"note"?: string | null
+                  }
+                  Update: {
+                    "business_id"?: string,"counted_at"?: string,"counted_by"?: string | null,"counted_cents"?: number,"day"?: string,"expected_cents"?: number,"id"?: string,"kind"?: string,"location_id"?: string,"note"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "drawer_counts_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "drawer_counts_counted_by_business_id_fkey"
+      columns: ["counted_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "drawer_counts_location_id_fkey"
+      columns: ["location_id"]
+isOneToOne: false
+      referencedRelation: "locations"
       referencedColumns: ["id"]
     }
                   ]
@@ -4483,6 +4515,9 @@ isOneToOne: false
 "configure_scheduled_jobs":
 { Args: { "p_app_url": string,"p_secret": string }; Returns: undefined
                            },
+"count_drawer":
+{ Args: { "p_counted_cents": number,"p_kind": string,"p_location_id": string,"p_note"?: string }; Returns: number
+                           },
 "create_card_request":
 { Args: { "p_appointment_id": string,"p_channel": string,"p_client_id": string,"p_deposit_cents": number,"p_hours": number,"p_to": string,"p_token_hash": string }; Returns: string
                            },
@@ -4725,7 +4760,7 @@ isOneToOne: false
 { Args: { "p_location_id": string,"p_name": string,"p_shared": boolean,"p_staff_ids": (string)[],"p_view_id": string }; Returns: string
                            },
 "save_closeout":
-{ Args: { "p_counted_cents": number,"p_day": string,"p_float_cents"?: number,"p_location_id": string,"p_note": string }; Returns: number
+{ Args: { "p_counted_cents": number,"p_day": string,"p_deposit_cents"?: number,"p_float_cents"?: number,"p_location_id": string,"p_note": string }; Returns: number
                            },
 "save_commission_plan":
 { Args: { "p_business_id": string,"p_default": boolean,"p_name": string,"p_plan_id": string,"p_rules": Json }; Returns: string
