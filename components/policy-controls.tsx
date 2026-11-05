@@ -48,7 +48,7 @@ export function FeeControls({ fee, canWaive, canRetry }: { fee: FeeView; canWaiv
     <div className="flex flex-col gap-2" data-testid="policy-fee" data-fee-status={fee.status}>
       <p className="text-ink-muted">
         {flag && <>{flag} </>}
-        {feeText(fee)}
+        <FeeLine text={feeText(fee)} card={fee.cardLabel} />
       </p>
       {waiving ? (
         <form
@@ -85,7 +85,7 @@ export function FeeControls({ fee, canWaive, canRetry }: { fee: FeeView; canWaiv
               </Button>
             )}
             {waivable && (
-              <Button size="sm" variant="ghost" onClick={() => (setWaiving(true), setResult(null))}>
+              <Button size="sm" onClick={() => (setWaiving(true), setResult(null))}>
                 {fee.status === "charged" ? "Waive and refund…" : "Waive…"}
               </Button>
             )}
@@ -184,5 +184,18 @@ export function CardLinkButton({
       </div>
       {result && !result.ok && <p role="alert" className="text-sm text-danger">{result.message}</p>}
     </form>
+  );
+}
+
+// The fee's line, with the card ("Visa …4242") kept on one line.
+function FeeLine({ text, card }: { text: string; card: string | null }) {
+  const at = card ? text.indexOf(card) : -1;
+  if (!card || at < 0) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, at)}
+      <span className="whitespace-nowrap">{card}</span>
+      {text.slice(at + card.length)}
+    </>
   );
 }

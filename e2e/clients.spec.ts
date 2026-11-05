@@ -233,14 +233,14 @@ test.describe("front desk", () => {
       await expect(glance.locator("[data-stat=next]")).toContainText("Today");
       await expect(glance.getByTestId("last-visit")).toBeVisible();
 
-      // A card each, in order, 12px corners, with the action in the corner.
+      // A card each, in order, 8px corners like every card, with the action in the corner.
       const aside = ui(page).getByRole("complementary", { name: "About this client" });
       const order = ["client-glance", "client-details", "client-packages", "client-memberships", "client-rewards", "client-card", "client-policy", "client-messages"];
       const shown = await aside.locator(":scope > section").evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
       expect(shown.slice(0, 2)).toEqual(["client-glance", "client-details"]);
       expect(shown).toEqual(order.filter((t) => shown.includes(t)));
       expect(shown).toContain("client-messages");
-      for (const radius of await aside.locator(":scope > section").evaluateAll((els) => els.map((e) => getComputedStyle(e).borderRadius))) expect(radius).toBe("12px");
+      for (const radius of await aside.locator(":scope > section").evaluateAll((els) => els.map((e) => getComputedStyle(e).borderRadius))) expect(radius).toBe("8px");
       await expect(aside.getByTestId("client-details").getByRole("link", { name: /^Edit .*details$/ })).toHaveAttribute("href", `/clients/${c!.id}/edit`);
       // Messages as on/off rows.
       await expect(aside.getByRole("switch", { name: "Visit texts" })).toBeVisible();

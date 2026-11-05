@@ -16,6 +16,7 @@ Ask Denise about the day, availability, clients or the salon, in your own words,
 
 - The conversation stays when you go to another page, so you can carry on where you left off.
 - On the calendar and on Scheduling, Denise opens as a small card in the bottom right corner, so you still see the whole team. It grows as the conversation does, and the message box always stays at the bottom of the card. Tap **–** (Minimize Denise) to shrink it to a small bar showing how many things are waiting, and tap the bar to bring it back; **×** closes it. Either way the conversation stays, and each page remembers how you left it. On other pages the chat opens beside the page.
+- Denise never opens by herself: she starts closed on every page and after every sign-in, and her badge shows when she has something. Once you've opened her, each page remembers open or closed until you sign out.
 - On the calendar, Denise and booking details are separate. Clicking a visit opens its booking details on the right, and Denise shrinks to her small bar until you close them. Open her while booking details are open and her card sits just to their left.
 - Denise knows which page you're on: on a client's profile, at checkout or with a visit open, "When's their next visit?" means that client.
 - Denise can find openings, look up a client's habits, who's overdue, how long stylists take, the day's schedule, stock, events and (for owners and managers) sales. The numbers come from the salon's own records.

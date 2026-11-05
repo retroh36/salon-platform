@@ -149,7 +149,7 @@ test("with Denise open, the calendar keeps its width: she's a compact card under
   const arrow = (await page.getByRole("button", { name: "More stylists to the right" }).boundingBox())!;
   expect(arrow.x + arrow.width).toBeLessThanOrEqual(box.x);
   await expectScrollsWithArrows(page, grid, "More stylists");
-  expect(Math.abs(box.width - 380)).toBeLessThan(1);
+  expect(Math.abs(box.width - 420)).toBeLessThan(1);
   // Her header at the top and her message box at the bottom, whatever
   // scrolls between them.
   const ask = page.getByTestId("denise-ask-box");
@@ -201,11 +201,11 @@ test("with Denise open, Scheduling keeps its full width: she's a compact card ov
   await expect(card).toHaveAttribute("data-overlay", "true");
   expect(Math.abs((await grid.boundingBox())!.width - before)).toBeLessThan(1);
   for (const day of await grid.locator("[role=columnheader][data-day]").all()) expect((await day.boundingBox())!.width).toBeGreaterThanOrEqual(91);
-  // About 380px wide, and only as tall as what's in it: a short card with
-  // just her greeting.
+  // About 420px wide, and only as tall as what's in it: a short card with
+  // just her greeting (up to 70% of the screen with more).
   const box = (await card.boundingBox())!;
-  expect(Math.abs(box.width - 380)).toBeLessThan(1);
-  expect(box.height).toBeLessThan(320);
+  expect(Math.abs(box.width - 420)).toBeLessThan(1);
+  expect(box.height).toBeLessThan(340);
 
   // Minimized to a small bar, kept on a reload, and opened again with the
   // conversation as it was.

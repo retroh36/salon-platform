@@ -5,7 +5,8 @@ import { useId } from "react";
 // Tabs with arrow-key movement. The selected panel's content animates in
 // when it changes (keyed by `panelKey`). `trailing` sits at the end of the
 // tab row (e.g. the panel's close button), so a panel has one header.
-// `quiet` tabs are underlined words, for a section inside a panel.
+// `quiet` tabs are underlined words, for a section inside a panel; `fill`
+// lets the panel grow into the room left (booking details' notes box).
 export function Tabs<T extends string>({
   label,
   tabs,
@@ -14,6 +15,7 @@ export function Tabs<T extends string>({
   panelKey,
   trailing,
   quiet = false,
+  fill = false,
   children,
 }: {
   label: string;
@@ -28,6 +30,7 @@ export function Tabs<T extends string>({
   panelKey?: string;
   trailing?: React.ReactNode;
   quiet?: boolean;
+  fill?: boolean;
   children: React.ReactNode;
 }) {
   const id = useId();
@@ -94,7 +97,7 @@ export function Tabs<T extends string>({
         aria-labelledby={`${id}-tab-${current.value}`}
         // Quiet tabs sit inside a scrolling panel: they fade in rather than
         // slide, which would push past its edge for a moment.
-        className={quiet ? "animate-fade-in pt-4" : "min-h-0 flex-1 animate-panel-in overflow-y-auto"}
+        className={quiet ? `animate-fade-in pt-4 ${fill ? "flex flex-1 flex-col" : ""}` : "min-h-0 flex-1 animate-panel-in overflow-y-auto"}
       >
         {children}
       </div>

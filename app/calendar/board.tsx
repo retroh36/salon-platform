@@ -222,8 +222,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // her (`autoMin`, and she comes back when it closes), and opened on
   // purpose while it's open, she sits just left of it.
   const sideOpen = selection.kind !== "none";
-  // A link asking for her opens her; otherwise she's as last left on the
-  // calendar (open, minimized or closed).
+  // A link asking for her opens her; otherwise she starts closed, just her
+  // face, unless she was opened earlier this session (a session cookie,
+  // written only once someone has opened her; signing in clears it).
   const askedDenise = Boolean(data.focus.denise || data.focus.ask);
   const [deniseOpen, setDeniseCard] = useState(askedDenise || me.card === "open" || me.card === "min");
   const [minimized, setMinimized] = useState(!askedDenise && (me.card === "min" || (sideOpen && me.card === "open")));
@@ -240,8 +241,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     }
   }
   const deniseShown = deniseOpen && !minimized;
-  // Opened on purpose (her face, the bar, a question, something she spotted).
+  // Opened on purpose (her face, the bar, a question, a report to her).
+  const [openedOnce, setOpenedOnce] = useState(askedDenise || me.card !== null);
   const openDenise = () => {
+    setOpenedOnce(true);
     setDeniseCard(true);
     setMinimized(false);
     setAutoMin(false);
@@ -251,12 +254,14 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     setMinimized(false);
     setAutoMin(false);
   };
-  // Remembered as it changes (a cookie per person, like the view); a card
-  // minimized only to make room is remembered as open.
+  // Remembered for the session as it changes, once she's been opened (a
+  // session cookie per person); a card minimized only to make room is
+  // remembered as open.
   useEffect(() => {
+    if (!openedOnce) return;
     const value = !deniseOpen ? "closed" : minimized && !autoMin ? "min" : "open";
-    document.cookie = `${deniseCardCookie(me.staffId)}=${value}; path=/; max-age=${COOKIE_AGE}; samesite=lax`;
-  }, [deniseOpen, minimized, autoMin, me.staffId]);
+    document.cookie = `${deniseCardCookie(me.staffId)}=${value}; path=/; samesite=lax`;
+  }, [openedOnce, deniseOpen, minimized, autoMin, me.staffId]);
   // What Denise has that hasn't been looked at in her panel yet.
   const [unseen, setUnseen] = useState<ReadonlySet<string>>(new Set());
 
@@ -445,34 +450,16 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const show = (next: Selection) => setSelection(next);
   const select = (next: Selection) => leave(() => show(next));
 
-  // Shows Denise's latest view. A conflict or reorder she hasn't shown
-  // before opens her panel at it; anything else new makes her badge bounce.
-  // Reorders and waitlist openings already there when the calendar opens
-  // just make her badge bounce; new ones while it's open open her panel.
+  // Shows Denise's latest view; anything new makes her badge bounce.
   const seen = useRef(new Set<string>());
-  const looked = useRef(false);
-  // Someone using the side panel (a booking, the walk-ins, a visit's
-  // details): Denise's badge calls rather than taking the panel over.
-  const busyWith = useRef<Selection["kind"]>("none");
-  useEffect(() => {
-    busyWith.current = selection.kind;
-  });
   const showDenise = useCallback((state: DeniseState, forData: BoardData) => {
     setDenise({ state, for: forData });
     const keys = deniseKeys(state);
     const fresh = keys.filter((k) => !seen.current.has(k));
     for (const k of keys) seen.current.add(k);
-    const first = !looked.current;
-    looked.current = true;
     if (fresh.length) setUnseen((all) => new Set([...all, ...fresh]));
-    // Risks she expects (likely overruns) wait in her badge and brief: they
-    // aren't urgent enough to take over the panel.
-    const urgent = (k: string) => k.startsWith("conflict:") && !k.includes(":likely:");
-    if (fresh.some((k) => urgent(k) || (!first && (k.startsWith("reorder:") || k.startsWith("opening:")))) && busyWith.current === "none") {
-      setDeniseCard(true);
-      setMinimized(false);
-      setAutoMin(false);
-    }
+    // What she finds waits in her badge, which bounces for anything new:
+    // she never opens by herself.
   }, []);
 
   // Denise looks again whenever the calendar changes. A look that fails,
@@ -585,10 +572,11 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   }, [adjust, data.date]);
 
   // Something that triggers Denise (a report, a cancellation): she shows
-  // she's thinking at once, then always replies. Her panel opens, unless
-  // someone is in the middle of a booking, when her badge calls instead.
+  // she's thinking at once, then always replies. A report made to her
+  // (running late, marked out) opens her panel, unless someone is in the
+  // middle of a booking; a cancellation only calls with her badge.
   async function trigger(request: DeniseRequest, firstStatus: string) {
-    const midTask = selection.kind === "book" || selection.kind === "edit" || selection.kind === "new-block" || selection.kind === "group";
+    const midTask = request.action === "canceled" || selection.kind === "book" || selection.kind === "edit" || selection.kind === "new-block" || selection.kind === "group";
     if (!midTask) openDenise();
     setOutcome(null);
     const done = await startDenise(request, firstStatus);
@@ -841,15 +829,25 @@ export function CalendarBoard({ data }: { data: BoardData }) {
 
   // Puts the dragged block where the pointer holds it: its top the grab
   // below the pointer, on the nearest 15-minute line of the column under it.
+  // A stylist who doesn't do the service is passed over (their column is
+  // dimmed): it stays with the last stylist who does.
   function dragTo(d: Drag) {
     const origin = dragOrigin.current;
     if (!origin) return;
     const { x, y: pointerY } = lastPointer.current;
     const minute = range.start + (pointerY - d.grab - origin.getBoundingClientRect().top) / PX_PER_MINUTE;
     const start = Math.min(Math.max(Math.round(minute / SLOT_STEP) * SLOT_STEP, range.start), range.end - d.length);
-    const next = { ...d, moved: true, start, staffId: columnAt(x) ?? d.staffId };
+    const over = columnAt(x);
+    const next = { ...d, moved: true, start, staffId: over && offersDragged(d.itemId, over) ? over : d.staffId };
     dragRef.current = next;
     setDrag(next);
+  }
+
+  // Whether a stylist does the service on the visit being dragged.
+  function offersDragged(itemId: string, staffId: string) {
+    const b = blocks.find((x) => x.itemId === itemId);
+    const serviceId = b && data.appointments[b.appointmentId]?.items.find((i) => i.id === itemId)?.serviceId;
+    return !serviceId || serviceId in (data.menu.offers[staffId] ?? {});
   }
 
   function onPointerUp(e: React.PointerEvent, b: BlockData) {
@@ -1147,7 +1145,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
             more stylists says so. */}
         {/* With Denise's compact card open (lg up), its footprint over the
             grid's right side (--denise-card) moves the right arrow clear of it. */}
-        <div className={`relative flex min-h-0 flex-col lg:flex-1 ${deniseShown ? "lg:[--denise-card:23.75rem]" : ""}`}>
+        <div className={`relative flex min-h-0 flex-col lg:flex-1 ${deniseShown ? "lg:[--denise-card:min(26.25rem,calc(100vw-2rem))]" : ""}`}>
         <ViewTransition key={data.date} enter={DAY_SLIDE} exit={DAY_SLIDE} default="none">
           <div
             ref={gridRef}
@@ -1284,6 +1282,16 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                           backgroundSize: `100% ${60 * PX_PER_MINUTE}px, 100% ${15 * PX_PER_MINUTE}px`,
                         }}
                       >
+                        {/* Mid-drag, a stylist who doesn't do the service is dimmed
+                            and won't take the visit. */}
+                        {drag?.moved && !offersDragged(drag.itemId, c.staffId) && (
+                          <div
+                            aria-hidden
+                            data-drag-dimmed
+                            title={`${c.firstName} doesn't do this service`}
+                            className="pointer-events-none absolute inset-0 z-[35] bg-canvas/75"
+                          />
+                        )}
                         {c.offHours.map((o) => (
                           <div
                             key={o.start}
@@ -1551,6 +1559,15 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                     if (moved) setMovePrompt(moved);
                   }}
                   onUndoFix={undo}
+                  // Their next visit: the same services and stylists at the
+                  // same time six weeks on, in the booking form to check.
+                  onRebook={() => {
+                    const a = detailOf(selection.appointmentId);
+                    if (!a.client || !a.items.length) return;
+                    const client = { id: a.client.id, name: a.client.name, phone: a.client.phone, allergies: a.client.allergies };
+                    const lines = a.items.map((i) => ({ serviceId: i.serviceId, staffId: i.staffId, startMinute: i.start }));
+                    show({ kind: "book", start: { staffId: lines[0].staffId, startMinute: lines[0].startMinute }, client, draft: { date: addDays(data.date, 42), lines } });
+                  }}
                   team={data.columns.map((c) => ({ id: c.staffId, name: c.name, color: c.color, photoUrl: c.photoUrl }))}
                   products={data.menu.products}
                 />
@@ -1629,7 +1646,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
         <aside
           aria-label="Denise"
           data-testid="denise-card"
-          className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col border-l border-line bg-surface shadow-panel transition-[transform,visibility] duration-(--motion-slow) ease-out sm:w-96 lg:top-auto lg:bottom-4 lg:h-auto lg:max-h-[min(32rem,calc(100dvh-20rem-var(--demo-bar)))] lg:w-[23.75rem] lg:overflow-hidden lg:rounded-xl lg:border ${
+          className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col border-l border-line bg-surface shadow-panel transition-[transform,visibility] duration-(--motion-slow) ease-out sm:w-[26.25rem] sm:max-w-[calc(100vw-2rem)] lg:top-auto lg:bottom-4 lg:h-auto lg:max-h-[calc(min(70dvh,100dvh-20rem)-var(--demo-bar))] lg:w-[min(26.25rem,calc(100vw-2rem))] lg:max-w-none lg:overflow-hidden lg:rounded-xl lg:border ${
             sideOpen ? "lg:right-[25rem]" : "lg:right-4"
           } ${deniseShown ? "visible translate-x-0" : "invisible translate-x-[calc(100%+1rem)]"}`}
         >
@@ -1649,7 +1666,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               <CloseIcon />
             </IconButton>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 lg:flex-initial">
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-1 lg:flex-initial">
             <DenisePanel
               data={data}
               state={deniseState && { ...deniseState, conflicts, notices }}

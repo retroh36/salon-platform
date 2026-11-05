@@ -24,7 +24,8 @@ import { loadBlocks, loadCalendarStamp, loadLocationSchedule, loadOffers, loadSt
 import { describeClient } from "@/lib/insights/describe";
 import { loadClientInsights, loadDurations } from "@/lib/insights/read";
 import { loadMembershipsByClient, type ClientMembership } from "@/lib/memberships-load";
-import { loadPackagesByClient, withPackages } from "@/lib/packages";
+import { loadPackagesByClient, packageTags, withPackages } from "@/lib/packages";
+import { METHOD_LABELS, type PaymentMethod } from "@/lib/checkout";
 import { addDays, formatMinute, fromLocal, isLocalDate, MINUTES_PER_DAY, parseTime, todayIn, toLocal, WEEKDAYS, type LocalDate } from "@/lib/scheduling/time";
 import { visitWarnings } from "@/lib/client-checks";
 import { fullName, sortForCalendar } from "@/lib/staff";
@@ -243,6 +244,8 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
       insight: null,
       warnings: null,
       saleId: null,
+      sale: null,
+      packages: [],
       patchOverride: null,
       pastVisits: [],
       pastFormulas: [],
@@ -340,7 +343,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
     policyVisits ? loadVisitPolicies(supabase, me.business_id, me.role, policyVisits) : Promise.resolve(null),
     // The sale each checked-out visit was paid on (front of house only: RLS).
     checkedOut.length
-      ? supabase.from("sales").select("id, appointment_id").in("appointment_id", checkedOut).neq("status", "voided").order("created_at")
+      ? supabase.from("sales").select("id, appointment_id, total_cents, sale_tips(amount_cents), payments(method, amount_cents)").in("appointment_id", checkedOut).neq("status", "voided").order("created_at")
       : Promise.resolve({ data: [], error: null }),
     // What's happened to each visit (front of house only: RLS): clients a
     // manager or owner checked in without the patch test the salon
@@ -412,7 +415,15 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
   for (const [id, w] of warnings) appointments[id].warnings = w;
   if (policies) for (const [id, p] of policies) appointments[id].policy = p;
   if (salesResult.error) throw salesResult.error;
-  for (const s of salesResult.data) if (s.appointment_id) appointments[s.appointment_id].saleId = s.id;
+  for (const s of salesResult.data) {
+    if (!s.appointment_id) continue;
+    appointments[s.appointment_id].saleId = s.id;
+    appointments[s.appointment_id].sale = {
+      totalCents: s.total_cents,
+      tipCents: s.sale_tips.reduce((sum, t) => sum + t.amount_cents, 0),
+      methods: [...new Set(s.payments.filter((p) => p.amount_cents > 0).map((p) => METHOD_LABELS[p.method as PaymentMethod]))].join(" + "),
+    };
+  }
   if (eventsLog.error) throw eventsLog.error;
   for (const e of eventsLog.data) {
     const who = staffName(e.staff_id) ?? "A former team member";
@@ -465,6 +476,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
     if (known) a.insight = describeClient(known.habits, known.spend, { staff: (id) => staffById.get(id)?.first_name ?? null, dayOf }, new Date());
     // What's left on their packages, too.
     if (a.client) a.insight = withPackages(a.insight, packages.get(a.client.id));
+    if (a.client) a.packages = packageTags(packages.get(a.client.id) ?? []).map((t) => t.label);
     if (a.client) {
       a.pastVisits = [...(pastByClient.get(a.client.id)?.values() ?? [])].map((v) => ({ date: v.date, services: v.services.join(", "), staff: [...v.staff].join(" and ") }));
       a.pastFormulas = formulasByClient.get(a.client.id) ?? [];

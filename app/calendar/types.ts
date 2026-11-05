@@ -151,6 +151,11 @@ export type AppointmentDetail = {
   // The sale a checked-out visit was paid on (reversing it means voiding
   // that sale), when the viewer can see sales.
   saleId: string | null;
+  // That sale in short, for checked-out visits: what was paid (tips
+  // included), the tips, and how ("Card", "Cash + Gift card").
+  sale: { totalCents: number; tipCents: number; methods: string } | null;
+  // What's left on the client's packages ("Package: 3 Blowouts left").
+  packages: string[];
   // Checked in without the patch test the salon requires: by whom, why and
   // when ("Fri, Oct 23, 10:02am").
   patchOverride: { by: string; reason: string; at: string } | null;

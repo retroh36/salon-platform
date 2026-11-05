@@ -107,7 +107,7 @@ export function DeniseAskBox({ canBook, date, appointmentId = null, placeholder 
   const { run, focus } = useDenise();
   const path = usePathname();
   return (
-    <div className="shrink-0 border-t border-line px-4 pt-3" data-testid="denise-ask-box">
+    <div className="shrink-0 border-t border-line px-5 pt-3" data-testid="denise-ask-box">
       <AskForm
         pinned
         onAsk={(question) => askDenise(question, { date, page: { path, appointmentId } })}

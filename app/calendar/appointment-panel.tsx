@@ -3,6 +3,7 @@
 import type { Moved } from "@/lib/move-notices";
 import { MessageClientForm } from "./message-client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, buttonClass } from "@/components/ui/button";
@@ -51,6 +52,7 @@ export function AppointmentPanel({
   onNoShow,
   onMoved,
   onUndoFix,
+  onRebook,
   team,
   products,
 }: {
@@ -80,10 +82,13 @@ export function AppointmentPanel({
   onMoved: (date: LocalDate, appointmentId: string, message: string, moved?: Moved | null) => void;
   // Undo one of Denise's fixes from the History tab (her card says how it went).
   onUndoFix: (actionId: string, told: string[]) => void;
+  // Checked out: book their next visit (the booking form, filled in).
+  onRebook?: () => void;
   // Who can be named as doing a patch test.
   team: { id: string; name: string; color?: string | null; photoUrl?: string | null }[];
 }) {
   const { client, items, status } = appointment;
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [canceling, setCanceling] = useState(false);
@@ -200,37 +205,89 @@ export function AppointmentPanel({
     actions.includes("no_show") && { key: "no_show", label: ACTION_LABELS.no_show, onSelect: () => setConfirmingNoShow(true) },
     status === "no_show" && me.canBook && { key: "undo_no_show", label: "Undo no-show", onSelect: undoNoShow },
     actions.includes("cancel") && { key: "cancel", label: ACTION_LABELS.cancel, danger: true, onSelect: () => setCanceling(true) },
+    // Checked out: there's no undo here; a manager or owner voids the sale.
+    status === "completed" && me.canBook && {
+      key: "reverse",
+      label: "Reverse checkout…",
+      onSelect: () => (appointment.saleId ? router.push(`/sales/${appointment.saleId}`) : setMessage("To reverse checkout, a manager or owner voids the sale.")),
+    },
   ].filter((a): a is MenuAction => Boolean(a));
-  const checkedOutNote = status === "completed" && me.canBook;
-  const footer = Boolean(step || checkedOutNote || message || sentNote || confirmingCheckIn || moving || confirmingNoShow || (messaging && client) || reportingLate || canceling);
+  // The footer: the main step (Check in, Check out, or Rebook once checked
+  // out), and beside it the visit's everyday actions (taken out of "⋯").
+  const mainAction =
+    step ? { label: step.kind === "check_in" ? "Check in" : "Check out", run: primary }
+    : status === "completed" && me.canBook && client && onRebook ? { label: "Rebook", run: onRebook }
+    : null;
+  const FOOTER_KEYS = ["edit", "message"];
+  const footerActions = FOOTER_KEYS.flatMap((k) => menuActions.filter((a) => a.key === k)).slice(0, mainAction ? 1 : 2);
+  const shownInMenu = menuActions.filter((a) => !footerActions.includes(a));
+  // Key facts, one labeled row each.
+  const keyRows = ([
+    appointment.membership && [
+      "Membership",
+      <>
+        {appointment.membership.status === "past_due" && (
+          <>
+            <Badge tone="warning">Payment failed</Badge>{" "}
+          </>
+        )}
+        {appointment.membership.text}
+      </>,
+      "membership-info",
+    ],
+    appointment.packages.length > 0 && ["Package", appointment.packages.map((p) => p.replace(/^Package: /, "")).join(", "), "package-info"],
+    appointment.series && ["Repeats", `Visit ${appointment.series.index} of ${appointment.series.count} · every ${appointment.series.intervalWeeks === 1 ? "week" : `${appointment.series.intervalWeeks} weeks`}`, "series-info"],
+    appointment.group && [
+      "Group",
+      <div key="group" data-testid="group-info" className="flex flex-col gap-0.5">
+        <span className="text-ink-muted">
+          {appointment.group.label} · {appointment.group.members.length} guest{appointment.group.members.length === 1 ? "" : "s"}
+        </span>
+        <ul className="flex flex-col gap-0.5" aria-label="Guests in this group">
+          {appointment.group.members.map((m) => (
+            <li key={m.appointmentId}>
+              {m.appointmentId === appointment.id ? (
+                <span className="text-ink">
+                  {m.clientName} · {m.staffName} · {formatMinute(m.start)} (this visit)
+                </span>
+              ) : (
+                <button type="button" className={`text-left ${nameLinkClass}`} onClick={() => onOpenVisit(m.appointmentId)}>
+                  {m.clientName} · {m.staffName} · {formatMinute(m.start)}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>,
+      "group-row",
+    ],
+  ] as (false | null | [string, React.ReactNode, string])[]).filter((r): r is [string, React.ReactNode, string] => Boolean(r));
+  const footer = Boolean(mainAction || footerActions.length || message || sentNote || confirmingCheckIn || moving || confirmingNoShow || (messaging && client) || reportingLate || canceling);
 
   return (
     <div className="flex min-h-full flex-col text-sm">
-      <div className="flex flex-col gap-6 pt-3 pb-6">
-        {/* Who, and where the visit's at. */}
-        <header className="flex items-start gap-3.5">
-          <Avatar name={client?.name ?? appointment.group?.label ?? "Walk in"} size="lg" />
-          <div className="min-w-0 flex-1 pt-0.5">
-            <div className="flex items-center gap-1">
-              <h3 className="min-w-0 text-2xl leading-8 font-semibold tracking-tight text-pretty wrap-anywhere" data-testid="client-name">
-                {client ? (
-                  <Link href={`/clients/${client.id}`} className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-focus">
-                    {client.name}
-                  </Link>
-                ) : appointment.group ? (
-                  `${appointment.group.label} guest`
-                ) : (
-                  "Walk-in"
-                )}
-              </h3>
+      <div className="flex flex-1 flex-col gap-5 pt-3 pb-6">
+        {/* Who: the name, their number, where the visit's at, and "⋯". */}
+        <header className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-2xl leading-8 font-semibold tracking-tight text-pretty wrap-anywhere" data-testid="client-name">
+              {client ? (
+                <Link href={`/clients/${client.id}`} className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-focus">
+                  {client.name}
+                </Link>
+              ) : appointment.group ? (
+                `${appointment.group.label} guest`
+              ) : (
+                "Walk-in"
+              )}
+            </h3>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
               {client?.phone && (
-                <a href={`tel:${client.phone}`} aria-label={`Call ${firstName}`} title={client.phone} className={buttonClass("ghost", "sm", "text-ink-muted hover:text-ink", { square: true })}>
-                  <PhoneIcon className="size-4" />
+                <a href={`tel:${client.phone}`} aria-label={`Call ${firstName}, ${client.phone}`} className="inline-flex items-center gap-1.5 rounded-sm text-ink-muted tabular-nums hover:text-ink focus-visible:outline-2 focus-visible:outline-focus" data-testid="client-phone">
+                  <PhoneIcon className="size-3.5" />
+                  {client.phone}
                 </a>
               )}
-            </div>
-            {/* One status line: where the visit's at, as a tag (and no texts, if so). */}
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <span data-testid="visit-status" data-status={status} className="inline-flex min-w-0">
                 <Badge tone={STATUS_TONES[status]}>{visitStatusText(status, STATUS_LABELS, appointment, timeZone)}</Badge>
               </span>
@@ -241,40 +298,39 @@ export function AppointmentPanel({
               )}
             </div>
           </div>
-          {/* The visit's other actions, by its name; the footer keeps the one main step. */}
-          {menuActions.length > 0 && <ActionsMenu actions={menuActions} disabled={pending} />}
+          {shownInMenu.length > 0 && <ActionsMenu actions={shownInMenu} disabled={pending} />}
         </header>
 
         {client?.allergies && (
-          <p className="-mt-3 flex items-start gap-2">
-            <Badge tone="danger" className="mt-px">
-              Allergy
-            </Badge>
-            <span className="min-w-0 text-ink wrap-anywhere">{client.allergies}</span>
+          <p className="-mt-1 flex items-start gap-2 rounded-lg bg-danger-soft px-3 py-2 text-danger" data-testid="visit-allergy">
+            <span className="shrink-0 font-semibold">Allergy</span>
+            <span className="min-w-0 wrap-anywhere">{client.allergies}</span>
           </p>
         )}
 
-        {/* The visit: a line a service, with its stylist, time, chair and price. */}
-        <section aria-label="Visit" className="flex flex-col gap-3">
-          {date !== today && (
-            <p className="font-medium text-ink" data-testid="visit-date">
-              {formatLongDay(date, false)}
-            </p>
-          )}
-          <ul className="flex flex-col gap-3">
+        {/* The visit, as one block: the day and time, then a line a service
+            with its stylist, chair and price. */}
+        <section aria-label="Visit" className="flex flex-col gap-3 rounded-lg border border-line p-3.5" data-testid="visit-block">
+          <p className="flex flex-wrap items-baseline justify-between gap-x-3 font-medium text-ink">
+            <span data-testid="visit-date">{date === today ? "Today" : formatLongDay(date, false)}</span>
+            <span className="text-ink-muted tabular-nums">
+              {formatMinute(Math.min(...items.map((i) => i.start)))}–{formatMinute(Math.max(...items.map((i) => i.end)))}
+            </span>
+          </p>
+          <ul className="flex flex-col gap-3 border-t border-line pt-3">
             {items.map((i) => {
               const state = timerState(i.times);
               return (
-                <li key={i.id} data-item-id={i.id} data-testid="service-timer" data-state={state} className="flex items-baseline justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="text-ink">
-                      <span className="font-medium">{i.serviceName}</span>{" "}
-                      <span className="whitespace-nowrap text-ink-muted">
-                        with <StylistFace person={team.find((t) => t.id === i.staffId)} name={i.staffName} />{i.staffName.split(" ")[0]}
-                      </span>
+                <li key={i.id} data-item-id={i.id} data-testid="service-timer" data-state={state} className="flex items-start gap-3">
+                  <Avatar name={i.staffName} color={team.find((t) => t.id === i.staffId)?.color} photoUrl={team.find((t) => t.id === i.staffId)?.photoUrl} size="sm" halo={false} />
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-baseline justify-between gap-3">
+                      <span className="min-w-0 font-medium text-ink">{i.serviceName}</span>
+                      <span className="shrink-0 text-ink tabular-nums">{formatPrice(i.priceCents)}</span>
                     </p>
                     <p className="text-ink-muted">
-                      <span className="whitespace-nowrap">
+                      {i.staffName.split(" ")[0]} ·{" "}
+                      <span className="whitespace-nowrap tabular-nums">
                         {formatMinute(i.start)}–{formatMinute(i.end)}
                       </span>
                       {i.resourceName && (
@@ -291,74 +347,57 @@ export function AppointmentPanel({
                       </p>
                     )}
                   </div>
-                  <span className="shrink-0 tabular-nums">{formatPrice(i.priceCents)}</span>
                 </li>
               );
             })}
           </ul>
           {several && (
-            <p className="flex justify-between pt-1 font-semibold text-ink">
+            <p className="flex justify-between border-t border-line pt-2.5 font-semibold text-ink">
               <span>Total</span>
               <span className="tabular-nums">{formatPrice(total)}</span>
             </p>
           )}
-          {appointment.membership && (
-            <p className="flex items-start gap-1.5 text-ink-muted" data-testid="membership-info">
-              <svg aria-hidden viewBox="0 0 24 24" className="mt-0.5 size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.75}>
-                <path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z" strokeLinejoin="round" />
-              </svg>
-              <span className="min-w-0">
-                {appointment.membership.status === "past_due" && (
-                  <>
-                    <Badge tone="warning">Payment failed</Badge>{" "}
-                  </>
-                )}
-                {appointment.membership.text}
-              </span>
-            </p>
-          )}
-          {appointment.policy && client && <PolicyInfo appointment={appointment} firstName={firstName} />}
-          {appointment.series && (
-            <p className="flex items-center gap-1.5 text-ink-muted" data-testid="series-info">
-              <svg aria-hidden viewBox="0 0 24 24" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.75}>
-                <path d="M4 12a8 8 0 0 1 13.7-5.6L20 8M20 4v4h-4M20 12a8 8 0 0 1-13.7 5.6L4 16M4 20v-4h4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Visit {appointment.series.index} of {appointment.series.count} · every {appointment.series.intervalWeeks === 1 ? "week" : `${appointment.series.intervalWeeks} weeks`}
-            </p>
-          )}
-          {appointment.group && (
-            <div data-testid="group-info" className="flex flex-col gap-1">
-              <p className="text-ink-muted">
-                {appointment.group.label} · {appointment.group.members.length} guest{appointment.group.members.length === 1 ? "" : "s"}
-              </p>
-              <ul className="flex flex-col gap-0.5" aria-label="Guests in this group">
-                {appointment.group.members.map((m) => (
-                  <li key={m.appointmentId}>
-                    {m.appointmentId === appointment.id ? (
-                      <span className="text-ink">
-                        {m.clientName} · {m.staffName} · {formatMinute(m.start)} (this visit)
-                      </span>
-                    ) : (
-                      <button type="button" className={`text-left ${nameLinkClass}`} onClick={() => onOpenVisit(m.appointmentId)}>
-                        {m.clientName} · {m.staffName} · {formatMinute(m.start)}
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {/* Checked out: the sale in short. */}
+          {status === "completed" && appointment.sale && (
+            <dl className="grid grid-cols-3 gap-2 border-t border-line pt-2.5" data-testid="visit-receipt">
+              <div>
+                <dt className="text-xs text-ink-muted">Paid</dt>
+                <dd className="font-semibold text-ink tabular-nums">{formatPrice(appointment.sale.totalCents)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-ink-muted">Tip</dt>
+                <dd className="text-ink tabular-nums">{appointment.sale.tipCents ? formatPrice(appointment.sale.tipCents) : "None"}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-xs text-ink-muted">Paid by</dt>
+                <dd className="text-ink">{appointment.sale.methods || "—"}</dd>
+              </div>
+            </dl>
           )}
         </section>
+
+        {/* What to know, as small labeled rows. */}
+        {(keyRows.length > 0 || (appointment.policy && client)) && (
+          <dl className="flex flex-col gap-2" data-testid="visit-facts">
+            {keyRows.map(([label, value, testId]) => (
+              <FactRow key={label} label={label} testId={testId}>
+                {value}
+              </FactRow>
+            ))}
+            {appointment.policy && client && <PolicyInfo appointment={appointment} firstName={firstName} />}
+          </dl>
+        )}
 
         {/* Only while something's outstanding: one row that opens the checklist. */}
         {client && outstanding.length > 0 && <VisitChecklist items={checklist} override={appointment.patchOverride} clientId={client.id} date={date} today={today} timeZone={timeZone} me={me} team={team} />}
 
         {appointment.insight && <ClientInsightLine insight={appointment.insight} />}
 
-        <div className="flex flex-col">
+        <div className="flex flex-1 flex-col">
           <Tabs
             label="Visit"
             quiet
+            fill
             value={tab}
             onChange={setTab}
             tabs={[
@@ -369,7 +408,7 @@ export function AppointmentPanel({
             ]}
           >
             {tab === "notes" ? (
-              <div className="flex flex-col gap-5">
+              <div className="flex flex-1 flex-col gap-5">
                 {client?.preferences && (
                   <section aria-label="Preferences" className="flex flex-col gap-1">
                     <SectionLabel>Client preferences</SectionLabel>
@@ -389,13 +428,12 @@ export function AppointmentPanel({
         </div>
       </div>
 
-      {/* One main button for the next step, the panel's full width; everything
-          else is under "⋯" by the name. No rule above it: the visit fades
-          out under it as it scrolls. */}
+      {/* Pinned to the bottom: the main step, full width, with the visit's
+          everyday actions beside it; the rest is under "⋯" by the name. */}
       {footer && (
         <footer
           aria-label="Actions"
-          className="sticky bottom-0 mt-auto flex flex-col gap-3 bg-surface pt-3 before:pointer-events-none before:absolute before:inset-x-0 before:-top-6 before:h-6 before:bg-linear-to-t before:from-surface before:to-transparent"
+          className="sticky bottom-0 mt-auto flex flex-col gap-3 border-t border-line bg-surface pt-3 pb-1"
         >
           {message && <Alert>{message}</Alert>}
           {sentNote && !messaging && (
@@ -484,28 +522,16 @@ export function AppointmentPanel({
             />
           ) : (
             <div className="flex items-center gap-2">
-              {step ? (
-                <Button variant="primary" size="lg" disabled={pending} onClick={primary} data-testid="primary-action" className="h-11 min-w-0 flex-1">
-                  {step.kind === "check_in" ? "Check in" : "Check out"}
+              {mainAction && (
+                <Button variant="primary" size="lg" disabled={pending} onClick={mainAction.run} data-testid="primary-action" className="h-11 min-w-0 flex-1">
+                  {mainAction.label}
                 </Button>
-              ) : checkedOutNote ? (
-                // Checked out: there's no undo here; the sale is voided instead.
-                <p data-testid="checked-out-note" className="min-w-0 flex-1 text-ink-muted">
-                  To reverse checkout, a manager or owner voids the sale
-                  {appointment.saleId ? (
-                    <>
-                      {" "}
-                      (
-                      <Link href={`/sales/${appointment.saleId}`} className={textLinkClass}>
-                        view the sale
-                      </Link>
-                      ).
-                    </>
-                  ) : (
-                    "."
-                  )}
-                </p>
-              ) : null}
+              )}
+              {footerActions.map((a) => (
+                <Button key={a.key} size="lg" disabled={pending} onClick={a.onSelect} className={`h-11 ${mainAction ? "shrink-0" : "flex-1"}`} data-testid={`footer-${a.key}`}>
+                  {a.label}
+                </Button>
+              ))}
             </div>
           )}
         </footer>
@@ -696,7 +722,7 @@ function NotesForm({ appointmentId, initial, editable }: { appointmentId: string
   }
 
   return (
-    <form aria-label="Notes" className="flex flex-col gap-1.5" onSubmit={(e) => e.preventDefault()}>
+    <form aria-label="Notes" className="flex flex-1 flex-col gap-1.5" onSubmit={(e) => e.preventDefault()}>
       <div className="flex items-baseline justify-between gap-3">
         <label htmlFor="appointment-notes" className="text-13 font-medium text-ink-muted">
           Visit notes
@@ -725,7 +751,7 @@ function NotesForm({ appointmentId, initial, editable }: { appointmentId: string
         maxLength={MAX_NOTES}
         rows={4}
         placeholder="Anything the stylist should know"
-        className={fieldClass}
+        className={`${fieldClass} min-h-28 flex-1 resize-none`}
       />
       {state.kind === "error" && (
         <p role="alert" className="text-13 text-danger">
@@ -1277,44 +1303,55 @@ function CheckInWarning({
 function PolicyInfo({ appointment, firstName }: { appointment: AppointmentDetail; firstName: string }) {
   const p = appointment.policy!;
   const client = appointment.client!;
-  const strikes = p.strikes > 0 && `${p.strikes} late cancellation${p.strikes === 1 ? "" : "s"} or no-show${p.strikes === 1 ? "" : "s"} in the last ${p.months} months`;
-  if (p.fee)
-    return (
-      <div data-testid="policy-info">
-        <FeeControls fee={p.fee} canWaive={p.canWaive} canRetry />
-      </div>
-    );
-  if (!p.cardNeeded && !p.depositNeededCents)
-    return p.cardLabel || strikes ? (
-      <p className="text-ink-muted" data-testid="policy-info">
-        {[p.cardLabel && `${p.cardLabel} on file`, strikes].filter(Boolean).join(" · ")}
-      </p>
-    ) : null;
+  const strikes = p.strikes > 0 && `${p.strikes} late cancel${p.strikes === 1 ? "" : "s"} or no-show${p.strikes === 1 ? "" : "s"} in ${p.months} months`;
+  const needed = p.cardNeeded || p.depositNeededCents > 0;
   return (
-    <div className="flex flex-col gap-2" data-testid="policy-info">
-      <p className="flex flex-wrap items-center gap-1.5">
-        <span data-testid="card-needed" className="inline-flex">
-          <Badge tone="warning">{p.depositNeededCents > 0 ? `Deposit needed: ${formatPrice(p.depositNeededCents)}` : "Card needed to hold this booking"}</Badge>
-        </span>
-        {p.linkOut && <span className="text-13 text-ink-muted">Link sent</span>}
-      </p>
-      {(strikes || p.depositNeededCents > 0) && (
-        <p className="text-ink-muted">
-          {strikes ? `${firstName} has ${strikes}` : `${firstName}'s visit needs a deposit`}
-          {p.repeatAction === "prepay" ? ", so the salon asks for the whole visit up front." : p.repeatAction === "deposit" ? ", so the salon asks for a deposit." : "."}
-        </p>
+    <div className="contents" data-testid="policy-info">
+      <FactRow label="Card on file">
+        {needed ? (
+          <span className="flex flex-col items-start gap-2">
+            <span className="flex flex-wrap items-center gap-1.5">
+              <span data-testid="card-needed" className="inline-flex">
+                <Badge tone="warning">{p.depositNeededCents > 0 ? `Deposit needed: ${formatPrice(p.depositNeededCents)}` : "Card needed to hold this booking"}</Badge>
+              </span>
+              {p.linkOut && <span className="text-13 text-ink-muted">Link sent</span>}
+            </span>
+            <CardLinkButton clientId={client.id} appointmentId={appointment.id} phone={client.phone} email={client.email} depositCents={p.depositNeededCents} sent={p.linkOut} />
+          </span>
+        ) : p.cardLabel ? (
+          `${p.cardLabel} on file`
+        ) : (
+          <span className="text-ink-muted">None</span>
+        )}
+      </FactRow>
+      {(strikes || (needed && p.repeatAction)) && (
+        <FactRow label="Late cancels">
+          {strikes || "None"}
+          {needed && p.repeatAction && (
+            <span className="block text-13 text-ink-muted">
+              {p.repeatAction === "prepay" ? `So the salon asks ${firstName} for the whole visit up front.` : `So the salon asks ${firstName} for a deposit.`}
+            </span>
+          )}
+        </FactRow>
       )}
-      <CardLinkButton clientId={client.id} appointmentId={appointment.id} phone={client.phone} email={client.email} depositCents={p.depositNeededCents} sent={p.linkOut} />
+      {p.fee && (
+        <FactRow label="Fee">
+          <FeeControls fee={p.fee} canWaive={p.canWaive} canRetry />
+        </FactRow>
+      )}
     </div>
   );
 }
 
-// The stylist's portrait beside their name in a line of text (initials
-// without one).
-function StylistFace({ person, name }: { person?: { color?: string | null; photoUrl?: string | null }; name: string }) {
+// One labeled row of what to know about the visit.
+function FactRow({ label, testId, children }: { label: string; testId?: string; children: React.ReactNode }) {
   return (
-    <span className="mr-1 inline-flex translate-y-[3px]">
-      <Avatar name={name} color={person?.color} photoUrl={person?.photoUrl} size="xs" halo={false} />
-    </span>
+    <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-baseline gap-3">
+      <dt className="text-13 text-ink-muted">{label}</dt>
+      <dd className="min-w-0 text-ink wrap-anywhere" data-testid={testId}>
+        {children}
+      </dd>
+    </div>
   );
 }
+

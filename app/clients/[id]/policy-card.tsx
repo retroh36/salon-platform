@@ -46,8 +46,8 @@ export async function PolicyCards({ supabase, businessId, role, client, tz }: { 
                   {card.data.label}
                 </span>
               </Row>
-              <Row label="Agreed to the policy">
-                {card.data.consent.channel === "online" ? "Online" : "By link"}, {day(card.data.consent.agreed_at)}
+              <Row label="Agreed">
+                {card.data.consent.channel === "online" ? "Online" : "By link"} · {day(card.data.consent.agreed_at)}
               </Row>
             </dl>
             <div className="-ml-3">

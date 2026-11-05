@@ -136,8 +136,14 @@ export async function checkIn(panel: Locator) {
 
 // Booking details' other actions (Running late, Edit booking, Undo
 // check-in, Mark no-show, Cancel booking) are in the "⋯" menu by the client's name.
+// Booking details' everyday actions (Edit booking, Message client) may sit
+// in its footer instead.
 export async function moreAction(panel: Locator, name: string) {
   const more = panel.getByRole("button", { name: "More actions" });
+  // The footer is drawn with the menu's button.
+  await more.waitFor();
+  const inFooter = panel.locator("footer").getByRole("button", { name, exact: true });
+  if (await inFooter.isVisible()) return inFooter.click();
   if ((await more.getAttribute("aria-expanded")) !== "true") await more.click();
   await panel.getByRole("menu", { name: "More actions" }).getByRole("menuitem", { name, exact: true }).click();
 }

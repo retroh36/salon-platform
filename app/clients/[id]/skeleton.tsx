@@ -51,7 +51,7 @@ export function ProfileSkeleton() {
           </div>
           <div className="flex flex-col gap-4">
             {[0, 1, 2].map((card) => (
-              <div key={card} className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-5">
+              <div key={card} className="flex flex-col gap-4 rounded-lg border border-line bg-surface p-5">
                 <Skeleton className="h-5 w-28" style={delay(card)} />
                 {card === 0 ? (
                   <div className="grid grid-cols-2 gap-3">

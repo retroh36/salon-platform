@@ -102,7 +102,8 @@ test("when a visit is canceled, Denise suggests who on the waitlist fits, and st
   await cancel.getByLabel("Reason").selectOption("Client canceled");
   await cancel.getByRole("button", { name: "Cancel booking" }).click();
 
-  // Denise opens her panel with the opening and who fits, best first.
+  // Denise's badge calls; opened, her panel has the opening and who fits, best first.
+  await page.getByTestId("denise-launcher").click();
   const opening = page.getByTestId("denise-opening");
   // Her reply streams in after the cancel saves, slower when the machine is busy.
   await expect(opening).toContainText("A 1 hr 30 min opening with Nola at 12:30pm fits 2 people on your waitlist.", { timeout: 15_000 });

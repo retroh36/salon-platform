@@ -8,8 +8,8 @@ open: /calendar | Open calendar
 Drag a visit on the calendar to a new time or another stylist's column.
 
 1. Go to **Calendar** and find the visit.
-2. Press and drag the block up or down to change the time (it moves in 5-minute steps). On the iPad, hold your finger still on it for a moment until it lifts, then drag.
-3. To give it to another stylist, drag it sideways into their column.
+2. Press on the block and drag it up or down to change the time (no need to click it first; it moves in 15-minute steps). On the iPad, hold your finger still on it for a moment until it lifts, then drag. While you drag, the block shows its new time and stylist.
+3. To give it to another stylist, drag it sideways into their column. Stylists who don't do that service are dimmed and won't take it.
 4. Let go. The visit moves straight away.
 5. At the top of the calendar, **Let … know about the new time?** shows the message. Tap **Send** to send it, or **Don't send**.
 6. If it's a repeating visit or part of a group, choose what to move: **This visit only**, **The whole group**, **This and following visits** or **All visits in the series** (or **Cancel**).
@@ -17,6 +17,7 @@ Drag a visit on the calendar to a new time or another stylist's column.
 ## Good to know
 
 - Only visits that are booked, confirmed or checked in can be moved.
+- A simple click (without dragging) opens booking details as usual.
 - On the iPad, a quick swipe scrolls the calendar, even if it starts on a visit. Only a press held still picks a visit up.
 - Dragging stays on the same day. To move to another day, see Move an appointment to another day.
 - The stylists get a notice. Nothing goes to the client unless you tap **Send** (messages wait in the outbox until texts are connected). A client who takes no messages shows **No messages: call** instead.

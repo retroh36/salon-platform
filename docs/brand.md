@@ -412,7 +412,24 @@ the one main action, one layer of containers.
   (`CardFold`). Action buttons that wrap on a phone become a 2-across
   grid, so none is left alone on a row. A checkbox with a date reads as
   one line ("Consent form signed on [date]"), not a field label floating
-  over its neighbor. "Canceled", one L, everywhere.
+  over its neighbor. "Canceled", one L, everywhere. The profile's side
+  cards are ordinary cards (8px corners), each with its title over a thin
+  rule, rows with a short label on the left and the value on the right,
+  kept short enough to stay on one line ("Agreed · Online · Mon, Jun 1",
+  a card's "Visa …4242" never split), and their buttons outlined at the
+  card's edge.
+- **Booking details.** Top to bottom: the client's name, big, with their
+  number, the status tag and "⋯" under it; the visit as one bordered block
+  (the day and time, then a line per service with the stylist's photo,
+  chair and price, and for a checked-out visit what was paid, the tip and
+  how); what to know as short labeled rows (card on file, membership,
+  package, late cancels); Denise's line; then the tabs, filling the rest,
+  the notes box growing into the room left. The footer is pinned with a
+  rule above: the main step (Check in, Check out, or Rebook once checked
+  out) with the everyday action beside it (Edit booking); the rest under
+  "⋯" ("Reverse checkout…" too). Dragging a visit picks it up at once with
+  the mouse (a long press on touch); stylists who don't do its service are
+  dimmed while it's held, and won't take it.
 
 Every component, in each of its states, is on the owners' style guide at
 `/design` (not in the sidebar).
@@ -457,11 +474,14 @@ Maestra's AI assistant, and the reason for the tagline's second half.
   onboarding and marketing, not shown in the app.
 - **Out of the way of the team:** on the Calendar (from `lg` up) and
   Scheduling she opens as a compact card over the bottom right corner,
-  380px wide and only as tall as what's in it (an empty chat is a short
-  card; it grows to a set height, then scrolls), below the stylists' header
-  row, so the whole team stays in view. It minimizes to a small bar
-  ("Denise · 8") without losing the conversation, and each page remembers
-  whether it was open, minimized or closed. On other pages she docks beside
+  420px wide (less on a narrow window) with 20px inside, and only as tall
+  as what's in it (an empty chat is a short card; it grows to 70% of the
+  screen's height, then scrolls), below the stylists' header row, so the
+  whole team stays in view. She never opens by herself: closed on every
+  page and after every sign-in until someone taps her or types to her
+  (new things bounce her badge). It minimizes to a small bar ("Denise · 8")
+  without losing the conversation, and once opened, each page remembers
+  for the session whether it was open, minimized or closed. On other pages she docks beside
   the page, and on a phone she fills the screen. Her card is only her (no
   tabs): her header stays at the top and her message box at the bottom,
   with what she has and the conversation scrolling between. On the

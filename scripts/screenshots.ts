@@ -186,12 +186,45 @@ async function capture(browser: Browser, first: boolean) {
   await shot("01-calendar", owner, async (page) => {
     await page.goto("/calendar");
     await waitForReact(page, "section[data-staff-id]");
-    // The calendar itself: Denise's card closed once her look over the day
-    // has opened it (on a phone it covers the screen).
-    const close = page.getByTestId("denise-card").getByRole("button", { name: "Close Denise" });
-    await close.waitFor({ timeout: 8000 }).catch(() => {});
-    if (await close.isVisible()) await close.click();
+    // Just signed in: Denise starts closed (her face and badge only).
+    await page.waitForTimeout(1500);
   });
+
+  // Denise's card, opened from her face.
+  await shot("80-denise-open", front, async (page) => {
+    await page.goto("/calendar");
+    await waitForReact(page, "section[data-staff-id]");
+    await page.getByTestId("denise-launcher").click();
+    await page.getByTestId("denise-card").waitFor();
+    await page.waitForTimeout(1500);
+  });
+
+  // Mid-drag sideways: a color visit held over the next column, the
+  // stylists who don't do color dimmed.
+  await shot("81-drag-dimmed", front, async (page) => {
+    await page.goto("/calendar");
+    await waitForReact(page, "section[data-staff-id]");
+    const block = main(page).locator("[data-block][data-visit=upcoming][data-family=color]").first();
+    await block.scrollIntoViewIfNeeded();
+    const box = (await block.boundingBox())!;
+    await page.mouse.move(box.x + 24, box.y + 12);
+    await page.mouse.down();
+    for (let i = 1; i <= 6; i++) await page.mouse.move(box.x + 24 + (i * box.width) / 6, box.y + 12 + i * 4);
+    await main(page).locator("[data-drag-dimmed]").first().waitFor();
+    return { keepMouse: true };
+  });
+
+  // Booking details: a booked visit, then one checked out.
+  for (const [name, visit] of [["82-details-booked", "upcoming"], ["83-details-checked-out", "done"]] as const)
+    await shot(name, front, async (page) => {
+      await page.goto("/calendar");
+      await waitForReact(page, "[data-block]");
+      const block = main(page).locator(`[data-block][data-visit=${visit}]`).first();
+      await block.scrollIntoViewIfNeeded();
+      await block.click({ position: { x: 10, y: 5 } });
+      await page.getByTestId("visit-status").waitFor();
+      await page.waitForTimeout(600);
+    });
 
   // Mid-drag: a booked visit picked up and held half an hour later.
   await shot("30-calendar-drag", front, async (page) => {

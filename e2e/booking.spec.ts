@@ -226,7 +226,11 @@ test.describe("front desk", () => {
     await waitForHydration(page, "section[data-staff-id]");
     await column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`${PREFIX}Cara Test`) }).click();
     await expect(detail.locator("[data-status]")).toHaveText(/^Checked out/);
-    await expect(detail.getByRole("button", { name: "More actions" })).toHaveCount(0);
+    // Checked out: Rebook, and ⋯ holds only how to reverse it.
+    await expect(detail.getByTestId("primary-action")).toHaveText("Rebook");
+    await detail.getByRole("button", { name: "More actions" }).click();
+    await expect(detail.getByRole("menu", { name: "More actions" }).getByRole("menuitem")).toHaveText(["Reverse checkout…"]);
+    await page.keyboard.press("Escape");
     await visitTab(detail, "History");
     await expect(detail).toContainText("Last changed by Sam Rivera");
     expect(await appointment(id)).toMatchObject({ status: "completed", updated_by: FRONT_DESK });
@@ -264,7 +268,9 @@ test.describe("front desk", () => {
     await form.getByLabel("Details").fill("Will call to rebook");
     await form.getByRole("button", { name: "Cancel booking" }).click();
 
-    // Denise says what the cancellation freed.
+    // Denise says what the cancellation freed (her badge calls; she opens when tapped).
+    await expect(page.getByTestId("denise-card")).toBeHidden();
+    await page.getByTestId("denise-launcher").click();
     await expect(page.getByRole("complementary", { name: "Denise" })).toContainText("That frees 10am–11am with Bridget.");
     await expect(block).toHaveCount(0);
     // Saved behind the screen.
@@ -376,9 +382,19 @@ test.describe("front desk", () => {
     await openDay(page);
     const hal = (stylist: string) => column(page, stylist).getByRole("button", { name: new RegExp(`${PREFIX}Hal Test`) });
 
-    // Nola doesn't do blowouts.
-    await drag(page, hal("Shae Morgan"), "Nola Brennan", 0);
-    await expect(ui(page).getByRole("alert")).toHaveText(`Couldn't move ${PREFIX}Hal Test's Blowout: The stylist doesn't offer this service.×`);
+    // Nola doesn't do blowouts: her column is dimmed while it's held, and
+    // the visit stays with Shae.
+    await hal("Shae Morgan").scrollIntoViewIfNeeded();
+    const from = (await hal("Shae Morgan").boundingBox())!;
+    const nola = (await column(page, "Nola Brennan").boundingBox())!;
+    await page.mouse.move(from.x + 15, from.y + 8);
+    await page.mouse.down();
+    await page.mouse.move(nola.x + 30, from.y + 8, { steps: 10 });
+    await expect(column(page, "Nola Brennan").locator("[data-drag-dimmed]")).toHaveCount(1);
+    await expect(column(page, "Shae Morgan").locator("[data-drag-dimmed]")).toHaveCount(0);
+    await page.mouse.up();
+    await expect(ui(page).locator("[data-drag-dimmed]")).toHaveCount(0);
+    await expect(ui(page).getByRole("alert")).toHaveCount(0);
     await expect(hal("Shae Morgan")).toHaveAccessibleName(new RegExp("^10am–10:45am"));
 
     // Onto Ivy's cut.

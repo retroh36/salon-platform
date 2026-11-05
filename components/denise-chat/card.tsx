@@ -6,15 +6,16 @@ import { ChevronUpIcon, CloseIcon, MinimizeIcon } from "@/components/ui/icons";
 
 // Denise's compact card (the calendar's Denise tab from lg up, and her
 // bubble on Scheduling's pages): open, minimized to a small bar, or closed,
-// remembered per person, per page, on this device. Only a convenience: if
-// the browser keeps nothing, the page opens as it always did.
+// remembered per person, per page, for this session (signing in starts her
+// closed again). Only a convenience: if the browser keeps nothing, she
+// starts closed.
 export type CardState = "open" | "min" | "closed";
 
 const key = (staffId: string, page: string) => `maestra:denise-card:${staffId}:${page}`;
 
 export function rememberedCard(staffId: string, page: string): CardState | null {
   try {
-    const value = localStorage.getItem(key(staffId, page));
+    const value = sessionStorage.getItem(key(staffId, page));
     return value === "open" || value === "min" || value === "closed" ? value : null;
   } catch {
     return null;
@@ -23,7 +24,7 @@ export function rememberedCard(staffId: string, page: string): CardState | null 
 
 export function rememberCard(staffId: string, page: string, value: CardState) {
   try {
-    localStorage.setItem(key(staffId, page), value);
+    sessionStorage.setItem(key(staffId, page), value);
   } catch {
     // Storage blocked: nothing to remember.
   }

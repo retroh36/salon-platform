@@ -7,7 +7,8 @@ import { useEffect, useState, useTransition } from "react";
 import { ClientPicker } from "@/app/calendar/booking-panel";
 import type { ClientOption } from "@/app/calendar/actions";
 import { addChatClient, bookFromChat, bookingPolicy, bookingTimes, waitlistFromChat, type BookingPolicy } from "@/app/denise/booking-actions";
-import { Button, buttonClass } from "@/components/ui/button";
+import { Button, buttonClass, IconButton } from "@/components/ui/button";
+import { CloseIcon } from "@/components/ui/icons";
 import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { Alert, Badge, textLinkClass } from "@/components/ui/page";
 import { Segmented } from "@/components/ui/segmented";
@@ -19,7 +20,7 @@ import { type StaffLevel } from "@/lib/schedule-forms";
 import type { PartOfDay } from "@/lib/scheduling/phone";
 import { addDays, formatMinute } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
-import { appendDenise, requestAdjust, updateDenise } from "./store";
+import { appendDenise, focusDenise, requestAdjust, updateDenise } from "./store";
 
 const firstOf = (name: string) => name.split(" ")[0];
 const optionOf = (c: ClientMatch): ClientOption => ({ id: c.id, name: c.name, phone: c.phone, allergies: c.allergies });
@@ -56,6 +57,13 @@ export function BookingCardView({
 }
 
 function Outcome({ outcome }: { outcome: NonNullable<ChatMessage["outcome"]> }) {
+  // A form closed unused: one quiet line, the conversation carries on.
+  if (outcome.closed)
+    return (
+      <p className="text-xs text-ink-subtle" data-testid="booking-outcome">
+        {outcome.text}
+      </p>
+    );
   return (
     <div className="flex flex-col items-start gap-2 rounded-lg border border-denise-200 bg-surface p-4" data-testid="booking-outcome">
       <p className="font-medium text-ink">{outcome.text}</p>
@@ -377,8 +385,30 @@ function BookingForm({ card, index, today }: { card: Extract<BookingCard, { kind
   const { pending, error, setError, next } = useNext(index);
   const change = (patch: Partial<PhoneRequest>) => setRequest((r) => ({ ...r, ...patch }));
   const who = request.staffId ?? (request.level ? `level:${request.level}` : "anyone");
+  // ✕, Cancel or Escape: the form goes, the chat stays, and the cursor is
+  // back in her message box.
+  const close = () => {
+    updateDenise(index, { outcome: { text: "Form closed.", closed: true } });
+    focusDenise();
+  };
   return (
-    <section aria-label="Booking form" className={cardClass} data-testid="booking-form">
+    <section
+      aria-label="Booking form"
+      className={cardClass}
+      data-testid="booking-form"
+      onKeyDown={(e) => {
+        if (e.key !== "Escape" || e.defaultPrevented) return;
+        if ((e.target as HTMLElement).closest("[role=listbox], [role=dialog]")) return;
+        e.preventDefault();
+        close();
+      }}
+    >
+      <div className="-mt-1 -mr-2 flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-ink">Book with the form</h3>
+        <IconButton label="Close the form" size="sm" onClick={close}>
+          <CloseIcon />
+        </IconButton>
+      </div>
       <form
         className="flex flex-col gap-3"
         onSubmit={(e) => {
@@ -450,9 +480,14 @@ function BookingForm({ card, index, today }: { card: Extract<BookingCard, { kind
           />
         </div>
         {error && <Alert>{error}</Alert>}
-        <Button type="submit" variant="primary" size="sm" className="self-start" disabled={pending}>
-          {pending ? "Looking…" : "Find times"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" variant="primary" size="sm" disabled={pending}>
+            {pending ? "Looking…" : "Find times"}
+          </Button>
+          <Button variant="quiet" size="sm" onClick={close}>
+            Cancel
+          </Button>
+        </div>
       </form>
     </section>
   );

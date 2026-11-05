@@ -107,14 +107,15 @@ export type HelpLink = { path: string; label: string };
 
 // A booking card in the chat (./booking-chat.ts): the best times, a
 // question about the client, or the form.
-// `outcome`: what came of the card (booked, on the waitlist), kept with it.
+// `outcome`: what came of the card (booked, on the waitlist, or closed
+// unused: `closed`), kept with it.
 export type ChatMessage = {
   role: "user" | "denise";
   text: string;
   suggestions?: BookingSuggestion[];
   links?: HelpLink[];
   booking?: BookingCard;
-  outcome?: { text: string; appointmentId?: string; date?: string };
+  outcome?: { text: string; appointmentId?: string; date?: string; closed?: boolean };
   // The question to ask again, when she stopped because it took too long.
   retry?: string;
 };

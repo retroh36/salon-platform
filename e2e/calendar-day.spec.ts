@@ -152,27 +152,28 @@ test.describe("front desk", () => {
     await ui(page).getByRole("button", { name: new RegExp(`${PREFIX}Calm`) }).click();
     const panel = details(page);
 
-    // The name opens the profile; the phone is a call button, not text.
+    // The name opens the profile; the phone under it calls them.
     await expect(panel.getByTestId("client-name").getByRole("link")).toHaveAttribute("href", `/clients/${calm}`);
     await expect(panel.getByRole("link", { name: `Call ${PREFIX}Calm` })).toHaveAttribute("href", "tel:+15555550123");
-    await expect(panel).not.toContainText("+15555550123");
+    await expect(panel.getByTestId("client-phone")).toHaveText("+15555550123");
     await expect(panel.getByTestId("visit-status")).toHaveText("Booked");
     // Not today: the date. One service: no total, and no "Not started".
     await expect(panel.getByTestId("visit-date")).toBeVisible();
-    await expect(panel.getByRole("region", { name: "Visit", exact: true })).toContainText(/Blowout with Lois/);
+    await expect(panel.getByRole("region", { name: "Visit", exact: true })).toContainText(/Blowout.*Lois/);
     await expect(panel).not.toContainText("Total");
     await expect(panel).not.toContainText("Not started");
 
-    // One primary button, the panel's full width, pinned at the bottom; the rest under ⋯ by the name.
+    // One primary button, pinned at the bottom with Edit booking beside it; the rest under ⋯ by the name.
     await expect(panel.locator("button.bg-navy-900:visible")).toHaveCount(1);
     await expect(panel.getByTestId("primary-action")).toHaveText("Check in");
+    await expect(panel.getByTestId("footer-edit")).toHaveText("Edit booking");
     const footer = panel.locator("footer");
     const [foot, box] = await Promise.all([footer.boundingBox(), panel.boundingBox()]);
     // At the panel's inner edge (inside its padding).
     const pad = await panel.evaluate((el) => parseFloat(getComputedStyle(el).paddingBottom));
     expect(Math.abs(foot!.y + foot!.height - (box!.y + box!.height - pad))).toBeLessThan(2);
     await panel.getByRole("button", { name: "More actions" }).click();
-    await expect(panel.getByRole("menu", { name: "More actions" }).getByRole("menuitem")).toHaveText(["Running late", "Message client", "Edit booking", "Move to another day", "Mark no-show", "Cancel booking"]);
+    await expect(panel.getByRole("menu", { name: "More actions" }).getByRole("menuitem")).toHaveText(["Running late", "Message client", "Move to another day", "Mark no-show", "Cancel booking"]);
     await page.keyboard.press("Escape");
     await expect(panel.getByRole("menu")).toHaveCount(0);
     await expect(panel).toBeVisible();
@@ -186,7 +187,7 @@ test.describe("front desk", () => {
     await expect(panel.getByRole("region", { name: "Changes" })).toContainText(/^Booking and changes/);
   });
 
-  test("a checked-out visit points to voiding its sale instead", async ({ page }) => {
+  test("a checked-out visit shows Rebook, and points to voiding its sale from ⋯", async ({ page }) => {
     // The last day before today with a checked-out visit (yesterday may be a closed day).
     const { data: last } = await admin
       .from("appointments")
@@ -199,11 +200,17 @@ test.describe("front desk", () => {
       .single();
     await openDay(page, toLocal(new Date(last!.starts_at), TZ).date);
     await ui(page).locator("[data-block][data-visit=done]").first().click({ position: { x: 10, y: 5 } });
-    const note = details(page).getByTestId("checked-out-note");
-    await expect(note).toContainText("To reverse checkout, a manager or owner voids the sale");
-    // An earlier day's sale is a report: the front desk sees today's sales only.
-    await expect(note.getByRole("link", { name: "view the sale" })).toHaveCount(0);
-    await expect(details(page).getByRole("button", { name: "Undo check-in" })).toHaveCount(0);
+    const panel = details(page);
+    await expect(panel.getByTestId("primary-action")).toHaveText("Rebook");
+    await expect(panel.getByRole("button", { name: "Undo check-in" })).toHaveCount(0);
+    // An earlier day's sale is a report: the front desk sees today's sales
+    // only, so ⋯ says who reverses it.
+    await panel.getByRole("button", { name: "More actions" }).click();
+    await panel.getByRole("menuitem", { name: "Reverse checkout…" }).click();
+    await expect(panel).toContainText("To reverse checkout, a manager or owner voids the sale.");
+    // Rebook opens the booking form for the same client.
+    await panel.getByTestId("primary-action").click();
+    await expect(ui(page).getByRole("complementary", { name: "Booking details" }).or(ui(page).locator("[data-testid=side-panel]"))).toContainText(/New booking|Book/);
   });
 
   test("lists what the visit needs in one collapsed row under the visit, warns once at check-in, and ticks things off", async ({ page }) => {

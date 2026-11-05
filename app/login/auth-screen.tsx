@@ -1,4 +1,5 @@
 import { DenisePose } from "@/components/denise";
+import { ForgetDenise } from "@/components/denise-chat/forget";
 import { TAGLINE } from "@/lib/branding";
 import { serif } from "@/app/serif";
 
@@ -8,6 +9,7 @@ import { serif } from "@/app/serif";
 export function AuthScreen({ title, subtitle, children, footer }: { title: string; subtitle: string; children: React.ReactNode; footer?: React.ReactNode }) {
   return (
     <main className={`${serif.variable} flex flex-1 bg-canvas`}>
+      <ForgetDenise />
       <section
         aria-label="Maestra"
         className="relative hidden w-[44%] max-w-2xl shrink-0 flex-col justify-between overflow-hidden bg-navy-900 px-14 py-12 text-white lg:flex"

@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { ChevronDownIcon } from "@/components/ui/icons";
 
 // The profile's side column is a stack of cards, one per subject: a white
-// card (1px border, 12px corners, 20px in), its title with a small icon,
+// card like every other (1px border, 8px corners, 20px in), its title with
+// a small icon over a thin rule,
 // and its one action in the top right corner. An action that opens a form
 // (Adjust points, Send card link) opens it at the top of the card's body;
 // the form closes itself through `useCloseCardAction`, optionally leaving a
@@ -39,8 +40,8 @@ export function SideCard({
   const [message, setMessage] = useState<string | null>(null);
   const id = `card-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
   return (
-    <section aria-labelledby={id} className="animate-fade-in rounded-xl border border-line bg-surface p-5" data-testid={testId}>
-      <div className="flex min-h-8 items-center justify-between gap-3">
+    <section aria-labelledby={id} className="animate-fade-in rounded-lg border border-line bg-surface p-5" data-testid={testId}>
+      <div className="-mx-5 -mt-1 flex min-h-8 items-center justify-between gap-3 border-b border-line px-5 pb-3">
         <h2 id={id} className="flex min-w-0 items-center gap-2 text-base font-semibold text-ink">
           <span aria-hidden className="shrink-0 text-ink-muted [&_svg]:size-4">
             {icon}
@@ -73,12 +74,13 @@ export function SideCard({
   );
 }
 
-// Label and value side by side: one line of a card.
+// Label and value side by side: one line of a card, the label on the left
+// and the value right-aligned (labels are kept short so it fits on a line).
 export function Row({ label, children, testId }: { label: React.ReactNode; children: React.ReactNode; testId?: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-4" data-testid={testId}>
+    <div className="flex min-h-6 items-baseline justify-between gap-4" data-testid={testId}>
       <dt className="shrink-0 text-13 text-ink-muted">{label}</dt>
-      <dd className="min-w-0 text-right text-ink wrap-anywhere">{children}</dd>
+      <dd className="min-w-0 text-right text-balance text-ink">{children}</dd>
     </div>
   );
 }

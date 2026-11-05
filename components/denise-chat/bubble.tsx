@@ -91,8 +91,8 @@ export function DeniseBubble({ me, launcher = "corner", overlay = false }: { me:
           data-overlay={overlay || undefined}
           className={`fixed inset-0 z-50 flex animate-fade-in flex-col border-line bg-surface ${
             overlay
-              ? `md:inset-auto md:right-4 md:bottom-4 md:max-h-[min(34rem,calc(100dvh-2rem-var(--demo-bar)))] md:w-[23.75rem] md:overflow-hidden md:rounded-xl md:border md:shadow-panel ${minimized ? "md:hidden" : ""}`
-              : `md:z-auto md:w-[22rem] md:shrink-0 md:border-l ${
+              ? `md:inset-auto md:right-4 md:bottom-4 md:max-h-[calc(70dvh-var(--demo-bar))] md:w-[min(26.25rem,calc(100vw-2rem))] md:overflow-hidden md:rounded-xl md:border md:shadow-panel ${minimized ? "md:hidden" : ""}`
+              : `md:z-auto md:w-[22rem] md:shrink-0 xl:w-[26.25rem] md:border-l ${
                   // The checkout's row is already the screen's height.
                   launcher === "header" ? "md:static" : "md:sticky md:top-0 md:h-[calc(100dvh-var(--demo-bar))] md:self-start lg:h-auto lg:self-stretch"
                 }`
@@ -108,7 +108,7 @@ export function DeniseBubble({ me, launcher = "corner", overlay = false }: { me:
           </div>
           {/* The header stays at the top and her message box at the bottom;
               the conversation scrolls between them. */}
-          <div className={`min-h-0 overflow-y-auto px-4 pt-3 pb-3 text-sm ${overlay ? "flex-1 md:flex-initial" : "flex-1"}`}>
+          <div className={`min-h-0 overflow-y-auto px-5 pt-4 pb-3 text-sm ${overlay ? "flex-1 md:flex-initial" : "flex-1"}`}>
             <DeniseChat
               box={false}
               canBook={me.canBook}
