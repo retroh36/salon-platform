@@ -82,7 +82,8 @@ from public.staff_working_hours
 where staff_id = 'd0000000-0000-4000-8000-000000000010' and cycle_week = 0 and weekday <> 6;
 
 -- ---------------------------------------------------------------------------
--- Appointments: 16 weeks back to nine days ahead, about 60% of the
+-- Appointments: 16 weeks back to nine days ahead (and the next visits
+-- booked at checkout, further out: see "Rebooked at checkout"), about 60% of the
 -- stylists' bookable time (clients come on their own cycles).
 -- Deterministic for a given reset date.
 --
@@ -745,19 +746,107 @@ select 'b0000000-0000-4000-8000-000000000001', r.promotion_id, r.sale_id, s.appo
        r.last_minute, 'd0000000-0000-4000-8000-000000000003', s.at
 from seed_redemptions r join seed_sales s on s.sale_id = r.sale_id;
 
--- Rebooked at checkout: most visits whose client already has their next
--- one within ten weeks (some stylists rebook more than others).
-update public.sales x set rebook_appointment_id = n.id
+-- Rebooked at checkout: 55 to 65% of each stylist's checkouts leave with
+-- their next visit booked before paying, as a real book would, so the
+-- "Rebooked at checkout" goal and Reports show a believable share on any
+-- day. A client whose next visit is already on the calendar had it booked
+-- then, at the desk. Recent
+-- checkouts with nothing booked get their next visit now: on their usual
+-- cycle with the same stylist and service, the nearest day and time the
+-- rules allow, so the calendar runs up to about eleven weeks ahead for
+-- these. (Without them, a visit's next one is only there when it falls in
+-- the seeded nine days, and this month's checkouts would show 0%.)
+create temp table rebook_pick as
+select s.sale_id, s.client_id, s.at, f.staff_id, f.service_id,
+       (a1.starts_at at time zone 'America/Chicago')::date as visit_day,
+       (select a2.id from public.appointments a2
+        where a2.client_id = s.client_id and a2.starts_at > a1.starts_at and a2.starts_at < a1.starts_at + interval '70 days'
+          and a2.status <> 'canceled'
+        order by a2.starts_at limit 1) as next_id
 from seed_sales s
+join public.appointments a1 on a1.id = s.appointment_id
 cross join lateral (
-  select a2.id from public.appointments a2
-  join public.appointments a1 on a1.id = s.appointment_id
-  where a2.client_id = s.client_id and a2.starts_at > a1.starts_at and a2.starts_at < a1.starts_at + interval '70 days'
-    and a2.status <> 'canceled'
-  order by a2.starts_at limit 1
-) n
-where x.id = s.sale_id
-  and abs(hashtext(s.sale_id::text)) % 100 < 45 + 5 * (abs(hashtext((select i.staff_id::text from public.appointment_items i where i.appointment_id = s.appointment_id order by i.starts_at limit 1))) % 8);
+  select i.staff_id, i.service_id from public.appointment_items i where i.appointment_id = s.appointment_id order by i.starts_at limit 1
+) f
+where s.client_id is not null
+  and pg_temp.rnd(s.sale_id::text || ':rebook') % 100 < 55 + pg_temp.rnd(f.staff_id::text || ':rebook-rate') % 11;
+
+do $$
+declare
+  v_today date := (now() at time zone 'America/Chicago')::date;
+  v_spares uuid[] := array['f0000000-0000-4000-8000-000000000006', 'f0000000-0000-4000-8000-000000000007']::uuid[];
+  v_room uuid := 'f0000000-0000-4000-8000-000000000009';
+  r record;
+  svc record;
+  hrs record;
+  d date;
+  m int;
+  step int;
+  v_start timestamptz;
+  v_resource uuid;
+  v_appointment uuid;
+begin
+  for r in
+    select p.*, rh.cycle_days, rh.mornings, st.home_resource_id as home
+    from rebook_pick p
+    join rhythm rh on rh.id = p.client_id
+    join public.staff st on st.id = p.staff_id
+    where p.next_id is null and p.visit_day + rh.cycle_days > v_today + 1
+    order by p.at
+  loop
+    continue when exists (select 1 from public.appointments a where a.client_id = r.client_id and a.starts_at > now() and a.status <> 'canceled');
+    select sv.id, sv.name, sv.active_minutes, sv.processing_minutes, sv.finishing_minutes, sv.duration_minutes into svc
+    from public.services sv where sv.id = r.service_id;
+    v_appointment := null;
+    -- Their usual gap, then a day either side, out to a week.
+    for step in 0..14 loop
+      d := r.visit_day + r.cycle_days + case when step % 2 = 0 then step / 2 else -(step + 1) / 2 end;
+      -- Not the Okafor wedding's Saturday (below): Nola takes it off and the team is at the event.
+      continue when d <= v_today + 1 or d = v_today + 22 + (13 - extract(isodow from v_today + 22)::int) % 7;
+      for hrs in
+        select (h ->> 'start')::int as start_minute, (h ->> 'end')::int as end_minute
+        from jsonb_array_elements(private.live_hours(r.staff_id, d)) h
+        order by case when r.mornings then (h ->> 'start')::int else -(h ->> 'start')::int end
+      loop
+        m := hrs.start_minute;
+        while m + svc.duration_minutes <= hrs.end_minute loop
+          v_start := pg_temp.at_local(d, m);
+          if pg_temp.staff_free(r.staff_id, d, m, m + svc.duration_minutes)
+             and not pg_temp.staff_clash(r.staff_id, v_start, svc.active_minutes, svc.processing_minutes, svc.finishing_minutes) then
+            v_resource := pg_temp.pick_resource(
+              case when svc.name in ('Keratin Smoothing', 'Brazilian Blowout') then array[v_room] else array[r.home] || v_spares end,
+              v_start, v_start + make_interval(mins => svc.duration_minutes));
+            if v_resource is not null then
+              insert into public.appointments (business_id, location_id, client_id, starts_at, ends_at, status, source, created_by, updated_by, created_at, updated_at)
+              values ('b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', r.client_id, v_start,
+                      v_start + make_interval(mins => svc.duration_minutes),
+                      case when pg_temp.rnd(r.sale_id::text || ':confirm') % 100 < 40 then 'confirmed' else 'booked' end::public.appointment_status,
+                      'front_desk', 'd0000000-0000-4000-8000-000000000003', 'd0000000-0000-4000-8000-000000000003', r.at, r.at)
+              returning id into v_appointment;
+              perform pg_temp.add_item(v_appointment, r.staff_id, svc.id, v_resource, v_start);
+              exit;
+            end if;
+          end if;
+          m := m + 15;
+        end loop;
+        exit when v_appointment is not null;
+      end loop;
+      exit when v_appointment is not null;
+    end loop;
+    update rebook_pick set next_id = v_appointment where sale_id = r.sale_id;
+  end loop;
+end;
+$$;
+
+-- The next visit was booked then, at the desk.
+update public.appointments a set source = 'front_desk', created_by = 'd0000000-0000-4000-8000-000000000003',
+  created_at = least(a.created_at, p.at), updated_at = greatest(a.updated_at, least(a.created_at, p.at))
+from rebook_pick p
+where a.id = p.next_id;
+
+update public.sales x set rebook_appointment_id = p.next_id
+from rebook_pick p
+where x.id = p.sale_id and p.next_id is not null;
 
 update public.stock_movements m set note = 'Sale #' || s.number
 from seed_sales s where m.appointment_id = s.appointment_id and m.reason = 'sale';
@@ -982,7 +1071,7 @@ from (values
 insert into public.time_block_skips (block_id, business_id, on_date)
 select b.id, b.business_id, d::date
 from public.time_blocks b
-cross join generate_series(b.starts_on, b.starts_on + 70, interval '1 day') d
+cross join generate_series(b.starts_on, b.starts_on + 140, interval '1 day') d
 where b.repeat_weekdays is not null
   and extract(isodow from d)::smallint = any (b.repeat_weekdays)
   and exists (

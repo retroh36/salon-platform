@@ -54,7 +54,7 @@ export function visitsSummary(visits: ProfileVisit[], parts: { today: number; up
     [parts.today, "today", "today"],
     [parts.upcoming, "upcoming", "upcoming"],
     [count("no_show"), "no-show", "no-shows"],
-    [count("canceled"), "cancelled", "cancelled"],
+    [count("canceled"), "canceled", "canceled"],
   ];
   const shown = bits.filter(([n]) => n > 0).map(([n, one, many]) => `${n} ${n === 1 ? one : many}`);
   return `${visits.length} ${visits.length === 1 ? "visit" : "visits"}${shown.length ? `: ${shown.join(", ")}` : ""}`;

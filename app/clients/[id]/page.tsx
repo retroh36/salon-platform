@@ -419,9 +419,9 @@ async function ClientRecords({ id }: { id: string }) {
 
           <aside aria-label="About this client" className="flex min-w-0 flex-col gap-4">
             <SideCard title="At a glance" icon={<ChartIcon />} testId="client-glance">
-              <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line" data-testid="client-stats">
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-4 border-b border-line pb-4" data-testid="client-stats">
                 {stats.map(([label, value, key]) => (
-                  <div key={label} className="flex flex-col gap-1 bg-surface p-3" data-stat={key}>
+                  <div key={label} className="flex min-w-0 flex-col gap-0.5" data-stat={key}>
                     <dt className="text-xs text-ink-muted">{label}</dt>
                     <dd className="text-base font-semibold text-ink tabular-nums">{value}</dd>
                   </div>
@@ -505,7 +505,7 @@ function Empty({ children = "—" }: { children?: string }) {
 const STATUS_TAGS: Record<string, { label: string; tone: "info" | "success" | "warning" | "danger" | "neutral" }> = {
   checked_in: { label: "Here now", tone: "info" },
   no_show: { label: "No-show", tone: "danger" },
-  canceled: { label: "Cancelled", tone: "neutral" },
+  canceled: { label: "Canceled", tone: "neutral" },
 };
 
 // Visits as rows: the day and time (opening it on the calendar), each

@@ -91,15 +91,17 @@ describe("closing out the day", () => {
 
 describe("the morning brief", () => {
   it("suggests reminder calls only for visits still to come: none once the day's done", async () => {
-    // The first day with visits still booked: today's may all be checked
-    // out already when the demo was loaded late in the day.
-    const { data: next, error } = await admin.from("appointments").select("starts_at").eq("location_id", L).in("status", ["booked", "confirmed"]).gt("starts_at", new Date().toISOString()).order("starts_at").limit(1).single();
+    // The first day with visits still booked whose morning has someone who
+    // might not show: late in the day, today's last few may be clients who
+    // always come.
+    const { data: upcoming, error } = await admin.from("appointments").select("starts_at").eq("location_id", L).in("status", ["booked", "confirmed"]).gt("starts_at", new Date().toISOString()).order("starts_at").limit(400);
     if (error) throw error;
-    const date = toLocal(new Date(next.starts_at), TZ).date;
-    const at = (minute: number) => briefFacts(frontDesk, { businessId: B, location: { id: L, timezone: TZ } }, date, { conflicts: [], openings: [] }, fromLocal(date, minute, TZ)!);
-    const morning = await at(6 * 60);
-    expect(morning.likelyNoShows.length).toBeGreaterThan(0);
-    const evening = await at(23 * 60);
+    const dates = [...new Set(upcoming.map((a) => toLocal(new Date(a.starts_at), TZ).date))].slice(0, 5);
+    const at = (date: string, minute: number) => briefFacts(frontDesk, { businessId: B, location: { id: L, timezone: TZ } }, date, { conflicts: [], openings: [] }, fromLocal(date, minute, TZ)!);
+    let date: string | undefined;
+    for (const d of dates) if ((await at(d, 6 * 60)).likelyNoShows.length > 0) { date = d; break; }
+    expect(date, "a day in the next few with a likely no-show booked").toBeDefined();
+    const evening = await at(date!, 23 * 60);
     expect(evening.likelyNoShows).toEqual([]);
   });
 

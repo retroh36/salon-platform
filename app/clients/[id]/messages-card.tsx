@@ -7,7 +7,7 @@ import { CONSENT_COLUMNS } from "@/lib/messaging/send";
 import { formatDay } from "@/lib/schedule-format";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { templateLabel } from "@/lib/messaging/templates";
-import { Row, SideCard } from "./side-card";
+import { CardFold, Row, SideCard } from "./side-card";
 import { VisitMessageSwitches } from "./visit-message-switches";
 
 // Messages (front of house): on/off rows for texts and emails about visits
@@ -56,8 +56,7 @@ export async function MessagesCard({ supabase, clientId, firstName, tz }: { supa
       {(Boolean(events?.length) || Boolean(sent?.length)) && (
         <div className="flex flex-col gap-3 border-t border-line pt-3">
           {Boolean(events?.length) && (
-            <details>
-              <summary className="cursor-pointer text-13 font-medium text-ink">Consent history</summary>
+            <CardFold label="Consent history">
               <ul className="mt-2 flex flex-col gap-1.5 text-13" data-testid="consent-history">
                 {events!.map((e) => (
                   <li key={e.id}>
@@ -70,11 +69,10 @@ export async function MessagesCard({ supabase, clientId, firstName, tz }: { supa
                   </li>
                 ))}
               </ul>
-            </details>
+            </CardFold>
           )}
           {Boolean(sent?.length) && (
-            <details>
-              <summary className="cursor-pointer text-13 font-medium text-ink">Sent by staff ({sent!.length})</summary>
+            <CardFold label={`Sent by staff (${sent!.length})`}>
               <ul className="mt-2 flex flex-col gap-3 text-13" data-testid="sent-messages">
                 {sent!.map((m) => (
                   <li key={m.id}>
@@ -86,7 +84,7 @@ export async function MessagesCard({ supabase, clientId, firstName, tz }: { supa
                   </li>
                 ))}
               </ul>
-            </details>
+            </CardFold>
           )}
         </div>
       )}

@@ -402,6 +402,17 @@ the one main action, one layer of containers.
   "None", never "0 · 0". Denise says a thing once: her alert sums goals up
   in a line, each goal's own line is in its card. On a phone the front
   desk's Dashboard folds what's below Right now into tappable headers.
+- **Clients and the profile.** A table that can't fit on a phone folds
+  into its first column: on Clients each row is the name over one quiet
+  line ("Next Wed, Nov 11 · 9:45am", else the last visit), never a table
+  scrolling sideways with half a date showing. A card holds one layer:
+  At a glance's figures sit in a plain grid with a rule under them, never
+  bordered tiles inside the card. A fold inside a card (Consent history,
+  What they agreed to, History) is a quiet label with a chevron
+  (`CardFold`). Action buttons that wrap on a phone become a 2-across
+  grid, so none is left alone on a row. A checkbox with a date reads as
+  one line ("Consent form signed on [date]"), not a field label floating
+  over its neighbor. "Canceled", one L, everywhere.
 
 Every component, in each of its states, is on the owners' style guide at
 `/design` (not in the sidebar).

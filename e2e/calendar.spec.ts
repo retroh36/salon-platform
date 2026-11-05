@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, openAllDay, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, setAsideDay, test, ui, waitForHydration } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -92,7 +92,12 @@ async function openDay(page: Page, date: string) {
   await expect(ui(page).getByTestId("calendar-date")).toContainText(formatLongDay(date));
 }
 
+// The quiet Tuesday is quiet: demo clients rebooked weeks ahead are set
+// aside for the file (Denise would flag them against ours).
+let putBackDay = async () => {};
+
 test.beforeAll(async () => {
+  putBackDay = await setAsideDay(Object.values(SEED.staff), QUIET_TUESDAY, TZ);
   const [ava, ben, cara] = await Promise.all([client("Ava"), client("Ben"), client("Cara")]);
   // Ava: color with Bridget, then a blowout with Shae.
   await book(ava, [
@@ -108,6 +113,8 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   if (appointmentIds.length) await admin.from("appointments").delete().in("id", appointmentIds);
   await admin.from("clients").delete().like("first_name", `${PREFIX}%`);
+  // Once ours are gone, the demo's visits come back.
+  await putBackDay();
 });
 
 test.describe("front desk", () => {

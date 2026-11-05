@@ -2,10 +2,11 @@ import type { Page } from "@playwright/test";
 import { formatDay } from "@/lib/schedule-format";
 import { addDays, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, setAsideDay, test, ui, waitForHydration } from "./fixtures";
 
 const L = SEED.location;
-const today = todayIn("America/Chicago");
+const TZ = "America/Chicago";
+const today = todayIn(TZ);
 // Three weeks out: past the demo's bookings, so nothing here moves a client.
 const week = addDays(startOfWeek(today), 21);
 const wednesday = addDays(week, 2); // Gil works 10–7 on Wednesdays
@@ -23,6 +24,14 @@ async function putBack() {
   await admin.from("schedule_publishes").delete().eq("location_id", L).gte("published_at", started);
   await admin.from("notifications").delete().eq("staff_id", SEED.staff.gil).in("template", ["schedule_changed"]).gte("created_at", started);
 }
+
+// Gil's Wednesday starts empty: demo clients rebooked weeks ahead may be
+// booked then, and the new hours would leave them outside.
+let putBackGil = async () => {};
+test.beforeAll(async () => {
+  putBackGil = await setAsideDay([SEED.staff.gil], wednesday, TZ);
+});
+test.afterAll(() => putBackGil());
 
 test.describe("owners and managers", () => {
   test.use({ storageState: AUTH.owner });

@@ -372,6 +372,56 @@ async function capture(browser: Browser, first: boolean) {
     await assistant.close();
   }
 
+  // Clients and the profile, whole pages: the list for the front desk and a
+  // stylist (their own book), a search, and Maria Lopez (an allergy, a card
+  // on file, Bridget's regular) for each role, with her Formulas tab.
+  await shot("70-clients", front, async (page) => {
+    await page.goto("/clients");
+    await waitForReact(page, "main h1");
+    await whole(page);
+  });
+  await shot("71-clients-stylist", stylist, async (page) => {
+    await page.goto("/clients");
+    await waitForReact(page, "main h1");
+    await whole(page);
+  });
+  await shot("72-clients-search", front, async (page) => {
+    await page.goto("/clients?q=park");
+    await waitForReact(page, "main h1");
+  });
+  const { data: maria } = await admin.from("clients").select("id").eq("business_id", BUSINESS).eq("first_name", "Maria").eq("last_name", "Lopez").maybeSingle();
+  if (aurora) await shot("73-client-profile", front, async (page) => {
+    await page.goto(`/clients/${aurora.id}`);
+    await waitForReact(page, "main h1");
+    await whole(page);
+  });
+  if (maria) {
+    for (const [name, who] of [["74-client-maria", front], ["75-client-maria-owner", owner], ["76-client-maria-stylist", stylist]] as const)
+      await shot(name, who, async (page) => {
+        await page.goto(`/clients/${maria.id}`);
+        await waitForReact(page, "main h1");
+        // The Visits tab, whatever was left open last.
+        await main(page).getByRole("tab", { name: /^Visits/ }).click();
+        await whole(page);
+      });
+    await shot("77-client-formulas", front, async (page) => {
+      await page.goto(`/clients/${maria.id}`);
+      await waitForReact(page, "main h1");
+      await main(page).getByRole("tab", { name: /^Formulas/ }).click();
+      await whole(page);
+    });
+    await shot("78-client-edit", front, async (page) => {
+      await page.goto(`/clients/${maria.id}/edit`);
+      await waitForReact(page, "main h1");
+      await whole(page);
+    });
+  }
+  await shot("79-client-new", front, async (page) => {
+    await page.goto("/clients/new");
+    await waitForReact(page, "main h1");
+    await whole(page);
+  });
+
   await shot("06-policies", owner, async (page) => {
     await page.goto("/policy");
     await main(page).getByRole("heading", { level: 1 }).waitFor();

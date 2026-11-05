@@ -53,7 +53,7 @@ export function Tabs<T extends string>({
         <div
           role="tablist"
           aria-label={label}
-          className={quiet ? "flex min-w-0 flex-1 gap-5 border-b border-line" : "flex min-w-0 flex-1 gap-1 rounded-lg bg-sunken p-1"}
+          className={quiet ? "flex min-w-0 flex-1 gap-3 border-b border-line sm:gap-5" : "flex min-w-0 flex-1 gap-1 rounded-lg bg-sunken p-1"}
           onKeyDown={onKeyDown}
         >
           {tabs.map((t) => {
@@ -70,7 +70,7 @@ export function Tabs<T extends string>({
                 onClick={() => onChange(t.value)}
                 className={
                   quiet
-                    ? `-mb-px flex h-9 items-center gap-1.5 border-b-2 text-sm font-medium whitespace-nowrap transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-focus ${
+                    ? `-mb-px flex h-9 shrink-0 items-center gap-1.5 border-b-2 text-sm font-medium whitespace-nowrap transition-colors duration-(--motion-fast) focus-visible:outline-2 focus-visible:outline-focus ${
                         selected ? "border-ink text-ink" : "border-transparent text-ink-muted hover:text-ink"
                       }`
                     : `flex h-9 flex-1 items-center justify-center gap-2 rounded-md text-sm font-medium transition-[background-color,color,box-shadow,transform] duration-(--motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-focus ${

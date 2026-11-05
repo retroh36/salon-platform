@@ -225,7 +225,7 @@ test.describe("front desk", () => {
       const visits = ui(page).getByTestId("client-visits");
       expect(await visits.locator("section").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))).toEqual(["Today visits", "Past visits"]);
       await expect(visits.getByRole("region", { name: "Today visits" })).toContainText("Here now");
-      await expect(visits.getByTestId("visits-summary")).toHaveText("4 visits: 2 completed, 1 today, 1 cancelled");
+      await expect(visits.getByTestId("visits-summary")).toHaveText("4 visits: 2 completed, 1 today, 1 canceled");
       await expect(ui(page).getByRole("tab", { name: /^Visits/ })).toContainText("4");
       // At a glance counts completed visits, and says so.
       const glance = ui(page).getByTestId("client-glance");

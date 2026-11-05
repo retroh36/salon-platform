@@ -34,7 +34,7 @@ export function ClientForm({
   const [consent, setConsent] = useState(initial.consent_signed);
 
   return (
-    <form action={action} onSubmit={submitWithoutReset(action)} className="flex flex-col gap-6" noValidate>
+    <form action={action} onSubmit={submitWithoutReset(action)} className="flex max-w-3xl flex-col gap-6" noValidate>
       {clientId && <input type="hidden" name="client_id" value={clientId} />}
       {state?.message && (
         <Alert>{state.message}</Alert>
@@ -115,27 +115,33 @@ export function ClientForm({
               <textarea name="notes" defaultValue={fields.notes} rows={3} className={inputClass} />
             </Field>
           )}
-          <div className="flex flex-wrap items-end gap-4 sm:col-span-2">
-            <label className={`${checkLabel} py-2.5 font-medium`}>
-              <input
-                type="checkbox"
-                name="consent_signed"
-                defaultChecked={fields.consent_signed}
-                onChange={(e) => setConsent(e.target.checked)}
-                className={checkboxClass}
-              />
-              Consent form signed
-            </label>
-            <Field label="Signed on" error={errors.consent_signed_on}>
+          {/* One line: "Consent form signed on [date]". */}
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <label className={`${checkLabel} font-medium`}>
+                <input
+                  type="checkbox"
+                  name="consent_signed"
+                  defaultChecked={fields.consent_signed}
+                  onChange={(e) => setConsent(e.target.checked)}
+                  className={checkboxClass}
+                />
+                Consent form signed
+              </label>
+              <span aria-hidden className={`text-sm ${consent ? "text-ink-muted" : "text-ink-subtle"}`}>
+                on
+              </span>
               <input
                 name="consent_signed_on"
                 type="date"
+                aria-label="Signed on"
                 max={today}
                 defaultValue={fields.consent_signed_on || today}
                 disabled={!consent}
-                className={inputClass}
+                className={`${inputClass} w-44!`}
               />
-            </Field>
+            </div>
+            {errors.consent_signed_on && <p className="text-13 text-danger">{errors.consent_signed_on}</p>}
           </div>
         </section>
       </fieldset>

@@ -8,7 +8,7 @@ open: /clients | Open Clients
 The Clients list shows each client's last visit, next visit, usual stylist and spend, and sorts by any of them.
 
 1. Go to **Clients**.
-2. Type a name or part of a phone number in the search box. The list narrows as you type.
+2. Type a name or part of a phone number in the search box. The list narrows as you type. On a phone, each name has their next visit (or last visit) under it.
 3. Tap a column heading (**Name**, **Last visit**, **Next visit**, **Usual stylist** or **Spend**) to sort by it.
 4. Tap the same heading again to sort the other way. The arrow shows which way.
 5. Tap a client's name to open their profile.

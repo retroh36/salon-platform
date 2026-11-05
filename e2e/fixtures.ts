@@ -1,5 +1,5 @@
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
-import { daysBetween, todayIn } from "@/lib/scheduling/time";
+import { addDays, daysBetween, fromLocal, todayIn } from "@/lib/scheduling/time";
 import { admin, busyDay, SEED } from "../tests/db/helpers";
 import { shiftBusiness } from "../e2e-week/time-machine";
 import { freshAuth } from "./fresh-auth";
@@ -299,4 +299,32 @@ export async function showDenise(page: Page) {
   if (await bar.isVisible()) await bar.getByRole("button", { name: /^Open Denise/ }).click();
   else if (await launcher.isVisible()) await launcher.click();
   await expect(panel).toBeVisible();
+}
+
+// A day a test needs empty for some seeded stylists: the demo's own visits
+// then (clients rebooked weeks ahead land on any day) are set aside as
+// canceled, and the function returned puts each back as it was. Call it
+// after deleting the test's own visits, so nothing clashes.
+export async function setAsideDay(staffIds: string[], date: string, timeZone = "America/Chicago"): Promise<() => Promise<void>> {
+  const { data: items, error } = await admin
+    .from("appointment_items")
+    .select("appointment_id")
+    .in("staff_id", staffIds)
+    .gte("starts_at", fromLocal(date, 0, timeZone)!.toISOString())
+    .lt("starts_at", fromLocal(addDays(date, 1), 0, timeZone)!.toISOString());
+  if (error) throw error;
+  const ids = [...new Set(items.map((i) => i.appointment_id))];
+  if (!ids.length) return async () => {};
+  const { data: visits, error: readError } = await admin.from("appointments").select("id, status, deposit_outcome").in("id", ids).in("status", ["booked", "confirmed"]);
+  if (readError) throw readError;
+  if (visits.length) {
+    const { error: e } = await admin.from("appointments").update({ status: "canceled", canceled_at: new Date().toISOString() }).in("id", visits.map((v) => v.id));
+    if (e) throw e;
+  }
+  return async () => {
+    for (const v of visits) {
+      const { error: e } = await admin.from("appointments").update({ status: v.status, canceled_at: null, deposit_outcome: v.deposit_outcome }).eq("id", v.id);
+      if (e) throw e;
+    }
+  };
 }

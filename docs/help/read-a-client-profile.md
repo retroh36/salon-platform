@@ -20,7 +20,7 @@ A client's profile shows what matters first: allergies, who they are, their note
 - The tab you used last opens next time, on this device.
 - Tap a visit's date to open it on the calendar.
 - A visit today, even one in the chair past its booked time, is under **Today**.
-- The **Visits** tab counts every visit, upcoming and cancelled ones too, and says how they add up ("9 visits: 4 completed, 3 no-shows, …"). **At a glance** counts only **Completed visits**.
+- The **Visits** tab counts every visit, upcoming and canceled ones too, and says how they add up ("9 visits: 4 completed, 3 no-shows, …"). **At a glance** counts only **Completed visits**.
 - The cards are in the same order for everyone; a card you can't see is left out.
 - Stylists and assistants see the same page for their own clients, without money or editing.
 - **Message** is about their next visit, so it works once they have one booked.

@@ -205,5 +205,38 @@ for (const size of WIDTHS) {
         await stylist.close();
       }
     });
+
+    // The list, the long-named client's profile (with an allergy and their
+    // visit), their details form, and Maria's profile as her stylist.
+    test("Clients and the client profile", async ({ page, browser }) => {
+      const settle = (p: Page) => p.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished)));
+      await page.goto("/clients");
+      await expect(ui(page).getByRole("table", { name: "Clients" })).toBeVisible();
+      await settle(page);
+      await expectTidyLayout(page, "on Clients");
+
+      await admin.from("clients").update({ allergies: "Latex and some hair dyes: patch test first, nitrile gloves only." }).eq("id", clientId);
+      await page.goto(`/clients/${clientId}`);
+      await expect(ui(page).getByRole("heading", { level: 1 })).toHaveText(`${LONG_NAME.first} ${LONG_NAME.last}`);
+      await expect(ui(page).getByTestId("allergy-alert")).toBeVisible();
+      await settle(page);
+      await expectTidyLayout(page, "on a client's profile");
+
+      await page.goto(`/clients/${clientId}/edit`);
+      await expect(ui(page).getByLabel("Signed on")).toBeVisible();
+      await expectTidyLayout(page, "editing a client's details");
+
+      const { data: maria } = await admin.from("clients").select("id").eq("business_id", B).eq("first_name", "Maria").eq("last_name", "Lopez").single();
+      const stylist = await browser.newContext({ viewport: size, hasTouch: size.width < 1440, isMobile: size.width < 500, storageState: AUTH.stylist });
+      try {
+        const own = await stylist.newPage();
+        await own.goto(`/clients/${maria!.id}`);
+        await expect(ui(own).getByRole("heading", { level: 1 })).toHaveText("Maria Lopez");
+        await settle(own);
+        await expectTidyLayout(own, "on a client's profile, as their stylist");
+      } finally {
+        await stylist.close();
+      }
+    });
   });
 }

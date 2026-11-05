@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ChevronDownIcon } from "@/components/ui/icons";
 
 // The profile's side column is a stack of cards, one per subject: a white
 // card (1px border, 12px corners, 20px in), its title with a small icon,
@@ -79,5 +80,20 @@ export function Row({ label, children, testId }: { label: React.ReactNode; child
       <dt className="shrink-0 text-13 text-ink-muted">{label}</dt>
       <dd className="min-w-0 text-right text-ink wrap-anywhere">{children}</dd>
     </div>
+  );
+}
+
+// A fold inside a card (Consent history, What they agreed to, History): a
+// quiet label with a chevron that turns as it opens, like the rest of the
+// app's folds, never the browser's triangle.
+export function CardFold({ label, className = "", children }: { label: React.ReactNode; className?: string; children: React.ReactNode }) {
+  return (
+    <details className={`group ${className}`}>
+      <summary className="flex w-fit cursor-pointer list-none items-center gap-1 rounded-sm text-13 font-medium text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-focus [&::-webkit-details-marker]:hidden">
+        {label}
+        <ChevronDownIcon aria-hidden className="size-4 group-open:rotate-180" />
+      </summary>
+      {children}
+    </details>
   );
 }

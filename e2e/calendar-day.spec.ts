@@ -460,7 +460,12 @@ for (const viewport of [
           const wide = [...el.querySelectorAll("*")].filter((e) => e.getBoundingClientRect().right > box.right + 0.5).map((e) => e.outerHTML.slice(0, 120));
           return { scroll: el.scrollWidth - el.clientWidth, wide: wide.slice(0, 3) };
         });
-      const expectNone = async (state: string) => expect(await overflow(), state).toEqual({ scroll: 0, wide: [] });
+      // Measured once the panel has finished coming in (its content slides as it fades).
+      const settled = () => page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished)));
+      const expectNone = async (state: string) => {
+        await settled();
+        expect(await overflow(), state).toEqual({ scroll: 0, wide: [] });
+      };
 
       // Visits in every state the demo day has: booked, here, done.
       for (const visit of ["upcoming", "here", "done"]) {

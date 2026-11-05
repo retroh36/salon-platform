@@ -46,7 +46,7 @@ describe("splitVisits", () => {
 
   it("sums the tab's visits up so they agree with completed visits", () => {
     const visits = [visit("a", "2026-08-01T15:00:00Z"), visit("b", "2026-09-01T15:00:00Z"), visit("c", "2026-09-08T15:00:00Z", "no_show"), visit("d", "2026-09-09T15:00:00Z", "canceled"), visit("e", "2026-11-02T15:00:00Z", "booked")];
-    expect(visitsSummary(visits, { today: 0, upcoming: 1 })).toBe("5 visits: 2 completed, 1 upcoming, 1 no-show, 1 cancelled");
+    expect(visitsSummary(visits, { today: 0, upcoming: 1 })).toBe("5 visits: 2 completed, 1 upcoming, 1 no-show, 1 canceled");
     expect(visitsSummary([visits[0]], { today: 0, upcoming: 0 })).toBe("1 visit: 1 completed");
   });
 });

@@ -29,7 +29,7 @@ export function QuickActions({
   const [sent, setSent] = useState<string | null>(null);
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Client actions">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap" role="group" aria-label="Client actions">
         {bookHref && (
           <Link href={bookHref} className={buttonClass("primary", "md")}>
             Book

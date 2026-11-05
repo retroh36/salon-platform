@@ -73,10 +73,10 @@ async function Clients({ searchParams }: Pick<PageProps<"/clients">, "searchPara
                 <th scope="col" className={`${thClass} hidden md:table-cell`}>
                   Phone
                 </th>
-                {header("last_visit", "Last visit")}
-                {header("next_visit", "Next visit")}
+                {header("last_visit", "Last visit", "hidden sm:table-cell")}
+                {header("next_visit", "Next visit", "hidden sm:table-cell")}
                 {header("stylist", "Usual stylist", "hidden xl:table-cell")}
-                {spend && header("spend", "Spend", "text-right")}
+                {spend && header("spend", "Spend", "hidden text-right sm:table-cell")}
               </tr>
             </thead>
             <tbody>
@@ -85,16 +85,28 @@ async function Clients({ searchParams }: Pick<PageProps<"/clients">, "searchPara
                   <td className={tdClass}>
                     <span className="flex min-w-0 items-center gap-3">
                       <Avatar name={fullName(client)} size="sm" />
-                      <Link href={`/clients/${client.id}`} className={`${nameLinkClass} truncate`}>
-                        {fullName(client)}
-                      </Link>
-                      {client.allergies && <Badge tone="danger">Allergy</Badge>}
+                      <span className="flex min-w-0 flex-col">
+                        <span className="flex min-w-0 items-center gap-3">
+                          <Link href={`/clients/${client.id}`} className={`${nameLinkClass} truncate`}>
+                            {fullName(client)}
+                          </Link>
+                          {client.allergies && <Badge tone="danger">Allergy</Badge>}
+                        </span>
+                        {/* On a phone the visit columns fold into one line here. */}
+                        <span className="text-13 text-ink-muted tabular-nums sm:hidden" data-testid="client-row-visit">
+                          {client.next_visit_at
+                            ? `Next ${day(client.next_visit_at, tz, false)} · ${formatMinute(toLocal(new Date(client.next_visit_at), tz).minute)}`
+                            : client.last_visit_at
+                              ? `Last visit ${day(client.last_visit_at, tz)}`
+                              : "No visits yet"}
+                        </span>
+                      </span>
                     </span>
                   </td>
                   <td className={`${tdClass} hidden whitespace-nowrap text-ink-muted tabular-nums md:table-cell`}>{client.phone}</td>
-                  <td className={`${tdClass} whitespace-nowrap text-ink-muted tabular-nums`}>{client.last_visit_at ? day(client.last_visit_at, tz) : "—"}</td>
+                  <td className={`${tdClass} hidden whitespace-nowrap text-ink-muted tabular-nums sm:table-cell`}>{client.last_visit_at ? day(client.last_visit_at, tz) : "—"}</td>
                   {/* Wraps between the day and the time when it's narrow, so Spend stays on screen. */}
-                  <td className={`${tdClass} tabular-nums ${client.next_visit_at ? "text-ink" : "text-ink-muted"}`}>
+                  <td className={`${tdClass} hidden tabular-nums sm:table-cell ${client.next_visit_at ? "text-ink" : "text-ink-muted"}`}>
                     {client.next_visit_at ? (
                       <>
                         <span className="whitespace-nowrap">{day(client.next_visit_at, tz, false)}</span> ·{" "}
@@ -105,7 +117,7 @@ async function Clients({ searchParams }: Pick<PageProps<"/clients">, "searchPara
                     )}
                   </td>
                   <td className={`${tdClass} hidden max-w-48 truncate text-ink-muted xl:table-cell`}>{client.usual_staff_name ?? "—"}</td>
-                  {spend && <td className={`${tdClass} ${numClass}`}>{client.spend_cents ? formatPrice(client.spend_cents) : "—"}</td>}
+                  {spend && <td className={`${tdClass} hidden sm:table-cell ${numClass}`}>{client.spend_cents ? formatPrice(client.spend_cents) : "—"}</td>}
                 </tr>
               ))}
             </tbody>

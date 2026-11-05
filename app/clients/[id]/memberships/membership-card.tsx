@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { Badge } from "@/components/ui/page";
+import { CardFold } from "../side-card";
 import { formatDate } from "@/lib/clients";
 import { earliestEnd, periodName, priceText, STATUS_LABELS, type MembershipStatus } from "@/lib/memberships";
 import type { ClientMembership } from "@/lib/memberships-load";
@@ -64,8 +65,7 @@ export function MembershipList({
           )}
           {canChange && m.status !== "canceled" && <MembershipActions m={m} today={today} canEndNow={canEndNow} testCards={testCards} />}
           {(history[m.id]?.length ?? 0) > 0 && (
-            <details className="mt-3">
-              <summary className="cursor-pointer text-13 font-medium text-ink-muted hover:text-ink">History</summary>
+            <CardFold label="History" className="mt-3">
               <ol className="mt-2 flex flex-col gap-1 text-13" aria-label={`${m.name} history`}>
                 {history[m.id].map((h) => (
                   <li key={h.id} className="flex gap-3">
@@ -74,7 +74,7 @@ export function MembershipList({
                   </li>
                 ))}
               </ol>
-            </details>
+            </CardFold>
           )}
         </li>
       ))}

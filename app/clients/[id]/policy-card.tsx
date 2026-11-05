@@ -8,7 +8,7 @@ import { formatDay } from "@/lib/schedule-format";
 import { toLocal } from "@/lib/scheduling/time";
 import { CardLinkForm } from "./card-link-form";
 import { RemoveCardButton } from "./remove-card";
-import { Row, SideCard } from "./side-card";
+import { CardFold, Row, SideCard } from "./side-card";
 
 // The client and the cancellation policy (front of house), as two cards:
 // the card on file (when they agreed to the policy, Remove card; or Send
@@ -66,14 +66,13 @@ export async function PolicyCards({ supabase, businessId, role, client, tz }: { 
           {strikes ?? "Late cancellation and no-show fees are charged to the card on file."}
         </p>
         {card.data && (
-          <details className="text-13 text-ink-muted">
-            <summary className="cursor-pointer hover:text-ink">What {client.first_name} agreed to</summary>
+          <CardFold label={`What ${client.first_name} agreed to`} className="text-13 text-ink-muted">
             <div className="mt-2 flex flex-col gap-1 border-l-2 border-line pl-3">
               {card.data.consent.policy_text.split("\n").map((line) => (
                 <p key={line}>{line}</p>
               ))}
             </div>
-          </details>
+          </CardFold>
         )}
         {fees.data.length > 0 && (
           <ul className="flex flex-col divide-y divide-line border-t border-line" aria-label="Fees">
