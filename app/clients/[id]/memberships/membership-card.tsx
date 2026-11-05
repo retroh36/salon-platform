@@ -209,7 +209,13 @@ function MembershipActions({ m, today, canEndNow, testCards }: { m: ClientMember
         </form>
       )}
 
-      {open === "card" && (
+      {open === "card" && testCards.length === 0 && (
+        <p className="rounded-lg bg-sunken p-3 text-13 text-ink-muted" data-testid="membership-needs-card">
+          No card on file to renew on. Send a card link from Card on file, then choose it here.
+        </p>
+      )}
+
+      {open === "card" && testCards.length > 0 && (
         <form
           aria-label={`Card for ${m.name}`}
           className="flex flex-wrap items-end gap-3 rounded-lg bg-sunken p-3"
@@ -231,7 +237,10 @@ function MembershipActions({ m, today, canEndNow, testCards }: { m: ClientMember
           <Button type="submit" size="sm" variant="primary" disabled={pending}>
             Save card
           </Button>
-          <p className="basis-full text-xs text-ink-muted">Test mode: no real card is saved or charged.{m.status === "past_due" ? " The payment is tried again on the new card straight away." : ""}</p>
+          <p className="basis-full text-xs text-ink-muted">
+            {testCards.some((c) => c.outcome !== "On file") ? "Test mode: no real card is saved or charged." : "The client's card on file."}
+            {m.status === "past_due" ? " The payment is tried again on the new card straight away." : ""}
+          </p>
         </form>
       )}
 

@@ -5,7 +5,7 @@ import { chargeDuePayments, runEventBilling } from "@/lib/events/billing";
 import { releaseBusyTeam } from "@/lib/events/clashes";
 import { loadEventLink } from "@/lib/events/links";
 import { requestInfo } from "@/lib/online-booking/security";
-import { currentProvider } from "@/lib/payments";
+import { salonProvider } from "@/lib/payments";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type EventLinkResult = { ok: true; message: string } | { ok: false; message: string };
@@ -35,7 +35,7 @@ export async function acceptProposal(token: string, input: { typedName: string; 
   if (link.status !== "open" || link.expired) return { ok: false, message: `This link is no longer active. Ask ${link.salon.name} for a new one.` };
   if (link.totals.totalCents !== input.shownTotalCents) return { ok: false, message: CHANGED };
 
-  const provider = currentProvider();
+  const provider = await salonProvider(admin, link.businessId);
   const saved = await provider.saveCard(input.cardRef);
   if (!saved.ok) return { ok: false, message: `${saved.reason}.` };
   const deposit = link.totals.depositCents;
@@ -78,7 +78,7 @@ export async function payShare(token: string, input: { cardRef: string; shownCen
   if (link.status !== "open" || link.expired) return { ok: false, message: `This link is no longer active. Ask ${link.salon.name} for a new one.` };
   if (link.member.shareCents !== input.shownCents) return { ok: false, message: "Your share changed since you opened the page. Reload it to see it again." };
 
-  const provider = currentProvider();
+  const provider = await salonProvider(admin, link.businessId);
   const saved = await provider.saveCard(input.cardRef);
   if (!saved.ok) return { ok: false, message: `${saved.reason}.` };
   const result = await provider.charge({ amountCents: link.member.shareCents, paymentMethodRef: saved.card.ref, description: `Your share for ${link.title}`, idempotencyKey: `event-share:${link.id}:${saved.card.ref}` });
@@ -104,7 +104,7 @@ export async function updateCard(token: string, cardRef: string): Promise<EventL
   const link = await loadEventLink(admin, token);
   if (!link || link.kind !== "card") return { ok: false, message: "This link doesn't work." };
   if (link.status !== "open" || link.expired) return { ok: false, message: `This link is no longer active. Ask ${link.salon.name} for a new one.` };
-  const provider = currentProvider();
+  const provider = await salonProvider(admin, link.businessId);
   const saved = await provider.saveCard(cardRef);
   if (!saved.ok) return { ok: false, message: `${saved.reason}.` };
   const { error } = await admin.rpc("update_event_card", { p_link_id: link.id, p_card: { provider: provider.id, ref: saved.card.ref, label: saved.card.label } });

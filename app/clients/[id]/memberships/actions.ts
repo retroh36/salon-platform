@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentStaff } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
 import { runMembershipBilling } from "@/lib/memberships-billing";
-import { currentProvider } from "@/lib/payments";
+import { cardOnFile, salonProvider, staffCards } from "@/lib/payments";
 import { canTakePayments } from "@/lib/sales";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -71,12 +71,13 @@ export async function keepMembership(membershipId: string): Promise<MembershipRe
   return done(s.membership.client_id, "Kept. It renews as usual.");
 }
 
-// The card it renews on (in test mode, one of the provider's test cards).
+// The card it renews on: the client's card on file, or in test mode one of
+// the test cards.
 export async function updateMembershipCard(membershipId: string, cardRef: string): Promise<MembershipResult> {
   const s = await session(membershipId);
   if (!s) return { ok: false, message: NOT_ALLOWED };
-  const provider = currentProvider();
-  const card = provider.testCards.find((c) => c.ref === cardRef);
+  const [provider, onFile] = await Promise.all([salonProvider(s.supabase, s.membership.business_id), cardOnFile(s.supabase, s.membership.client_id)]);
+  const card = staffCards(provider, onFile).find((c) => c.ref === cardRef);
   if (!card) return { ok: false, message: "Choose a card." };
   const { error } = await s.supabase.rpc("update_membership_card", { p_membership_id: membershipId, p_provider: provider.id, p_ref: card.ref, p_label: card.label });
   if (error) return failed(error);

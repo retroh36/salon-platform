@@ -17,6 +17,14 @@ export type ChargeResult = { ok: true; reference: string } | { ok: false; reason
 
 export type SavedCard = { ref: string; label: string };
 
+// What the client types their card into: the test cards to pick from, or
+// Stripe's own card form for the salon's account (a SetupIntent's secret),
+// or why neither can be shown.
+export type CardForm =
+  | { kind: "test"; cards: { ref: string; label: string; outcome: string }[] }
+  | { kind: "stripe"; publishableKey: string; account: string; clientSecret: string; testMode: boolean }
+  | { kind: "unavailable"; reason: string };
+
 export interface PaymentProvider {
   id: string;
   // Shown to staff: "Test mode" until a real provider is connected.
@@ -30,6 +38,8 @@ export interface PaymentProvider {
   // Saves a card the client entered on the provider's own form, for
   // charging later under the salon's policy: its token and label.
   saveCard(ref: string): Promise<{ ok: true; card: SavedCard } | { ok: false; reason: string }>;
+  // The card form for a client to save a card (and pay) with.
+  cardForm(): Promise<CardForm>;
   // Cards staff can choose in test mode (a real provider saves the card
   // on its own reader or page instead).
   testCards: readonly (SavedCard & { outcome: string })[];

@@ -299,8 +299,9 @@ function SellPackage({ data, onAddLine, onClose }: Props) {
   );
 }
 
-// A membership: the plan, and the card it renews on. In test mode staff
-// pick a test card; a real provider saves the client's card on its reader.
+// A membership: the plan, and the card it renews on: the client's card on
+// file, or in test mode a test card. With Stripe and no card on file, the
+// client saves one through a card link first.
 function SellMembership({ data, ticket, onAddLine, onClose }: Props) {
   const taken = new Set([...data.memberships.map((m) => m.planId), ...ticket.lines.flatMap((l) => (l.kind === "membership" ? [l.planId] : []))]);
   const [planId, setPlanId] = useState(data.plans.find((p) => !taken.has(p.id))?.id ?? "");
@@ -342,7 +343,13 @@ function SellMembership({ data, ticket, onAddLine, onClose }: Props) {
             </option>
           ))}
         </select>
-        {data.provider.testMode && <span className="text-xs font-normal text-ink-muted">Test mode: no real card is saved or charged. With Stripe, the client&apos;s card is saved on the reader.</span>}
+        {data.provider.testCards.length === 0 ? (
+          <span className="text-xs font-normal text-ink-muted" data-testid="membership-needs-card">
+            {data.client.firstName} has no card on file. Send a card link from their profile, then sell the membership.
+          </span>
+        ) : (
+          data.provider.testMode && <span className="text-xs font-normal text-ink-muted">Test mode: no real card is saved or charged.</span>
+        )}
       </label>
       <p className="text-sm text-ink-muted">Today&apos;s payment covers the first {plan ? periodName(plan.intervalUnit, plan.intervalCount) : "period"}; it renews automatically after that.</p>
       <Button type="submit" variant="primary" size="lg" disabled={!plan || taken.has(planId) || !card}>

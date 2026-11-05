@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { CardField, type CardFieldHandle } from "@/components/card-field";
+import type { CardForm } from "@/lib/payments/provider";
 import type { LinkSnapshot } from "@/lib/payment-links";
 import { linkTotal, tipChoices } from "@/lib/payment-links";
 import { parseDollars } from "@/lib/checkout";
@@ -16,9 +18,9 @@ const centsOf = (t: Tip) => (t.kind === "percent" ? t.cents : t.kind === "custom
 
 // The receipt, a tip for each stylist (the usual percents, a custom
 // amount, or none), the card, and pay. Big targets, for a phone.
-export function PayForm({ token, salon, snapshot, testMode, cards }: { token: string; salon: string; snapshot: LinkSnapshot; testMode: boolean; cards: { ref: string; label: string; outcome: string }[] }) {
+export function PayForm({ token, salon, snapshot, cardForm }: { token: string; salon: string; snapshot: LinkSnapshot; cardForm: CardForm }) {
   const [tips, setTips] = useState<Record<string, Tip>>({});
-  const [card, setCard] = useState(cards[0]?.ref ?? "");
+  const card = useRef<CardFieldHandle>(null);
   const [result, setResult] = useState<PayResult | null>(null);
   const [pending, start] = useTransition();
   const chosen = Object.entries(tips).map(([staff_id, t]) => ({ staff_id, amount_cents: centsOf(t) }));
@@ -42,7 +44,11 @@ export function PayForm({ token, salon, snapshot, testMode, cards }: { token: st
       className="flex flex-col gap-6"
       onSubmit={(e) => {
         e.preventDefault();
-        start(async () => setResult(await reach(payLink(token, Object.fromEntries(chosen.map((t) => [t.staff_id, t.amount_cents])), card), CLIENT_NO_CONNECTION)));
+        start(async () => {
+          const picked = await card.current!.cardRef();
+          if (!picked.ok) return setResult(picked);
+          setResult(await reach(payLink(token, Object.fromEntries(chosen.map((t) => [t.staff_id, t.amount_cents])), picked.ref), CLIENT_NO_CONNECTION));
+        });
       }}
     >
       <div>
@@ -133,18 +139,7 @@ export function PayForm({ token, salon, snapshot, testMode, cards }: { token: st
       )}
 
       <section aria-label="Pay" className="flex flex-col gap-3">
-        {testMode && (
-          <label className="flex flex-col gap-1.5 text-sm font-medium">
-            Card (test mode: nothing is charged)
-            <select value={card} onChange={(e) => setCard(e.target.value)} className={inputClass}>
-              {cards.map((c) => (
-                <option key={c.ref} value={c.ref}>
-                  {c.label} ({c.outcome.toLowerCase()})
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+        <CardField ref={card} form={cardForm} selectClassName={inputClass} />
         <div className="flex items-baseline justify-between border-t border-line pt-3">
           <span className="text-base font-semibold">Total{tipTotal > 0 ? ` (with ${formatPrice(tipTotal)} tip)` : ""}</span>
           <span className="text-2xl font-semibold tabular-nums" data-testid="link-total">

@@ -9,7 +9,7 @@ import { loadClientInsights } from "@/lib/insights/read";
 import { memberPrices, type MemberPrices } from "@/lib/memberships";
 import { creditFor, loadClientMemberships, loadPlans, type ClientMembership, type MembershipPlan } from "@/lib/memberships-load";
 import { isUsable, loadClientPackages, loadTemplates, packageFor, withPackages, type ClientPackage, type PackageTemplate } from "@/lib/packages";
-import { currentProvider } from "@/lib/payments";
+import { cardOnFile, salonProvider, staffCards } from "@/lib/payments";
 import { DEPOSIT_REFERENCE } from "@/lib/policy";
 import { suggestRebook, weeksUntilNext, type RebookSuggestion } from "@/lib/rebook";
 import { loadCheckoutSettings, loadRetailProducts, type CheckoutProduct, type CheckoutSettings } from "@/lib/sales";
@@ -182,7 +182,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
   const tz = me.location.timezone;
   const today = todayIn(tz, now);
 
-  const [staffRows, settings, products, templates, servicesRows, clientRow, overrides, plans, promo, rewards] = await Promise.all([
+  const [staffRows, settings, products, templates, servicesRows, clientRow, overrides, plans, promo, rewards, provider, onFile] = await Promise.all([
     supabase.from("staff").select("id, first_name, last_name, role, level, color, photo_path, is_active, location_id").eq("location_id", me.location.id).eq("is_active", true),
     loadCheckoutSettings(supabase, me.business_id),
     loadRetailProducts(supabase, me.business_id, me.location.id),
@@ -193,6 +193,8 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     loadPlans(supabase, me.business_id),
     promoRatesFor(supabase, { businessId: me.business_id, timezone: tz, today, clientId: draft.client_id, appointmentId: draft.appointment_id }),
     rewardRatesFor(supabase, me.business_id, draft.client_id),
+    salonProvider(supabase, me.business_id),
+    draft.client_id ? cardOnFile(supabase, draft.client_id) : Promise.resolve(null),
   ]);
   if (staffRows.error) throw staffRows.error;
   if (servicesRows.error) throw servicesRows.error;
@@ -328,7 +330,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
           )
         : null,
     plans,
-    provider: (({ id, label, testMode, testCards }) => ({ id, label, testMode, testCards: testCards.map((c) => ({ ...c })) }))(currentProvider()),
+    provider: (({ id, label, testMode }) => ({ id, label, testMode, testCards: staffCards(provider, onFile) }))(provider),
     giftCards,
     staff,
     services,

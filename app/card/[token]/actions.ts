@@ -2,7 +2,7 @@
 
 import { loadCardLink } from "@/lib/policy-link";
 import { requestInfo } from "@/lib/online-booking/security";
-import { currentProvider } from "@/lib/payments";
+import { salonProvider } from "@/lib/payments";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type CardLinkResult = { ok: true; label: string; depositCents: number } | { ok: false; message: string };
@@ -19,7 +19,7 @@ export async function completeCardLink(token: string, cardRef: string, agreed: b
   if (link.status === "done") return { ok: false, message: "Your card is already saved. Thank you." };
   if (link.status !== "open" || link.expired) return { ok: false, message: `This link is no longer active. Ask ${link.salon.name} for a new one.` };
 
-  const provider = currentProvider();
+  const provider = await salonProvider(admin, link.businessId);
   const saved = await provider.saveCard(cardRef);
   if (!saved.ok) return { ok: false, message: `${saved.reason}.` };
   let deposit: { amount_cents: number; provider: string; reference: string } | null = null;

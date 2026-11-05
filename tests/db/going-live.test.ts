@@ -150,3 +150,30 @@ describe("the outbox", () => {
     expect(error).not.toBeNull();
   });
 });
+
+describe("Stripe's webhook", () => {
+  const SECRET = "whsec_test_going_live";
+  const post = async (event: unknown, sign = true) => {
+    const { POST } = await import("@/app/api/payments/stripe/webhook/route");
+    const body = JSON.stringify(event);
+    const { stripeSignatureHeader } = await import("@/lib/webhooks");
+    return POST(new Request("http://localhost/api/payments/stripe/webhook", { method: "POST", body, headers: sign ? { "stripe-signature": stripeSignatureHeader(SECRET, body) } : {} }));
+  };
+
+  it("keeps a salon's account status, and disconnects it when the salon removes Maestra", async () => {
+    process.env.STRIPE_WEBHOOK_SECRET = SECRET;
+    try {
+      expect((await admin.rpc("set_stripe_account", { p_business_id: B, p_account_id: "acct_GoLiveTest", p_charges_enabled: false, p_details_submitted: false })).error).toBeNull();
+      const updated = { type: "account.updated", data: { object: { id: "acct_GoLiveTest", charges_enabled: true, details_submitted: true } } };
+      expect((await post(updated, false)).status).toBe(403);
+      expect((await post(updated)).status).toBe(204);
+      const { data } = await admin.from("businesses").select("stripe_account_id, stripe_charges_enabled").eq("id", B).single();
+      expect(data).toEqual({ stripe_account_id: "acct_GoLiveTest", stripe_charges_enabled: true });
+      expect((await post({ type: "account.application.deauthorized", account: "acct_GoLiveTest" })).status).toBe(204);
+      const { data: after } = await admin.from("businesses").select("stripe_account_id, stripe_charges_enabled, payments_live").eq("id", B).single();
+      expect(after).toEqual({ stripe_account_id: null, stripe_charges_enabled: false, payments_live: false });
+    } finally {
+      delete process.env.STRIPE_WEBHOOK_SECRET;
+    }
+  });
+});

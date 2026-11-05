@@ -7,7 +7,7 @@ import { currentAccount } from "@/lib/online-booking/account";
 import { loadAccount } from "@/lib/online-booking/account-data";
 import { PENDING_COOKIE } from "@/lib/online-booking/account-signin";
 import { loadSite } from "@/lib/online-booking/site";
-import { currentProvider } from "@/lib/payments";
+import { salonProvider } from "@/lib/payments";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { BookingFrame } from "../frame";
 import { AccountView, NewAccountForm, SignInForm } from "./account-view";
@@ -54,7 +54,7 @@ async function Account({ params, searchParams }: { params: Promise<{ slug: strin
       data={data}
       timezone={site.location.timezone}
       salon={{ name: site.business.name, phone: site.location.phone, cutoffHours: site.settings.cancelCutoffHours }}
-      testMode={currentProvider().testMode}
+      testMode={(await salonProvider(admin, site.business.id)).testMode}
     />,
   );
 }

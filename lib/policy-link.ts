@@ -13,6 +13,7 @@ type Admin = SupabaseClient<Database>;
 
 export type CardLink = {
   id: string;
+  businessId: string;
   status: "open" | "done" | "canceled";
   expired: boolean;
   salon: { name: string; logoPath: string | null; accent: string | null };
@@ -44,6 +45,7 @@ export async function loadCardLink(admin: Admin, token: string): Promise<CardLin
   const local = r.appointment ? toLocal(new Date(r.appointment.starts_at), r.location.timezone) : null;
   return {
     id: r.id,
+    businessId: r.business_id,
     status: r.status as CardLink["status"],
     expired: Date.parse(r.expires_at) <= Date.now(),
     salon: { name: r.business.name, logoPath: r.business.logo_path, accent: r.business.online_booking_settings?.accent_color ?? null },

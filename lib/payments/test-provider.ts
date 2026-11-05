@@ -37,5 +37,6 @@ export const testProvider: PaymentProvider = {
     const card = TEST_CARDS.find((c) => c.ref === ref);
     return card ? { ok: true, card: { ref: card.ref, label: card.label } } : { ok: false, reason: "Choose a card" };
   },
+  cardForm: async () => ({ kind: "test", cards: TEST_CARDS.map((c) => ({ ...c })) }),
   testCards: TEST_CARDS,
 };

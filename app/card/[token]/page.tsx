@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { BookingFrame } from "@/app/book/[slug]/frame";
 import { salonLogoUrl } from "@/lib/branding";
 import { DEFAULT_ACCENT } from "@/lib/online-booking/settings";
-import { currentProvider } from "@/lib/payments";
+import { salonProvider } from "@/lib/payments";
 import { loadCardLink } from "@/lib/policy-link";
 import { formatLongDay } from "@/lib/schedule-format";
 import { formatMinute } from "@/lib/scheduling/time";
@@ -30,9 +30,11 @@ export default function CardPage({ params }: PageProps<"/card/[token]">) {
 async function Card({ params }: { params: Promise<{ token: string }> }) {
   await connection();
   const { token } = await params;
-  const link = await loadCardLink(createAdminClient(), token);
+  const admin = createAdminClient();
+  const link = await loadCardLink(admin, token);
   if (!link) notFound();
-  const provider = currentProvider();
+  const open = link.status === "open" && !link.expired;
+  const cardForm = open ? await (await salonProvider(admin, link.businessId)).cardForm() : null;
   return (
     <BookingFrame name={link.salon.name} logoUrl={salonLogoUrl(link.salon.logoPath)} accent={link.salon.accent ?? DEFAULT_ACCENT}>
       {link.status === "done" ? (
@@ -45,7 +47,7 @@ async function Card({ params }: { params: Promise<{ token: string }> }) {
           <h1 className={pageTitle}>{link.expired ? "This link has expired" : "This link is no longer active"}</h1>
           <p className={pageLead}>Ask {link.salon.name} for a new one.</p>
         </div>
-      ) : (
+      ) : cardForm ? (
         <div className="flex flex-col gap-6">
           <div>
             <h1 className={pageTitle}>Hi {link.clientFirstName}</h1>
@@ -61,15 +63,9 @@ async function Card({ params }: { params: Promise<{ token: string }> }) {
               </p>
             </div>
           )}
-          <CardForm
-            token={token}
-            lines={link.lines}
-            depositCents={link.depositCents}
-            testMode={provider.testMode}
-            cards={provider.testCards.map((c) => ({ ref: c.ref, label: c.label, outcome: c.outcome }))}
-          />
+          <CardForm token={token} lines={link.lines} depositCents={link.depositCents} cardForm={cardForm} />
         </div>
-      )}
+      ) : null}
       <p className="mt-8 text-center text-xs text-ink-subtle">Card details go to the payment provider; {link.salon.name} never sees or stores them.</p>
     </BookingFrame>
   );

@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { after } from "next/server";
 import { recomputeForVisit } from "@/lib/insights/compute";
 import { linkTotal, parseTips, type LinkSnapshot } from "@/lib/payment-links";
-import { currentProvider } from "@/lib/payments";
+import { salonProvider } from "@/lib/payments";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type PayResult = { ok: true; totalCents: number; tipCents: number } | { ok: false; message: string };
@@ -16,7 +16,7 @@ export type PayResult = { ok: true; totalCents: number; tipCents: number } | { o
 export async function payLink(token: string, tips: Record<string, number>, cardRef: string): Promise<PayResult> {
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) return { ok: false, message: "This link doesn't work." };
   const admin = createAdminClient();
-  const { data: link } = await admin.from("payment_links").select("id, status, expires_at, snapshot").eq("token_hash", createHash("sha256").update(token).digest("hex")).maybeSingle();
+  const { data: link } = await admin.from("payment_links").select("id, business_id, status, expires_at, snapshot").eq("token_hash", createHash("sha256").update(token).digest("hex")).maybeSingle();
   if (!link) return { ok: false, message: "This link doesn't work." };
   if (link.status !== "open") return { ok: false, message: link.status === "paid" ? "This has already been paid. Thank you." : "This link is no longer active. Ask the salon for a new one." };
   if (Date.parse(link.expires_at) <= Date.now()) return { ok: false, message: "This link has expired. Ask the salon for a new one." };
@@ -24,10 +24,12 @@ export async function payLink(token: string, tips: Record<string, number>, cardR
   const chosen = parseTips(tips, snapshot);
   if (!chosen) return { ok: false, message: "Check the tip amounts." };
   const total = linkTotal(snapshot, chosen);
-  const provider = currentProvider();
-  if (provider.testMode && !provider.testCards.some((c) => c.ref === cardRef)) return { ok: false, message: "Choose a card." };
+  const provider = await salonProvider(admin, link.business_id);
+  // The card they chose (test mode) or entered on Stripe's form.
+  const saved = await provider.saveCard(cardRef);
+  if (!saved.ok) return { ok: false, message: `${saved.reason}.` };
 
-  const charge = await provider.charge({ amountCents: total, paymentMethodRef: cardRef, description: "Salon visit", idempotencyKey: `link:${link.id}:${total}:${cardRef}` });
+  const charge = await provider.charge({ amountCents: total, paymentMethodRef: saved.card.ref, description: "Salon visit", idempotencyKey: `link:${link.id}:${total}:${cardRef}` });
   if (!charge.ok) return { ok: false, message: `${charge.reason}. You haven't been charged; try another card.` };
   const { error } = await admin.rpc("complete_payment_link", { p_link_id: link.id, p_tips: chosen as never, p_total_cents: total, p_provider: provider.id, p_reference: charge.reference });
   if (error) {

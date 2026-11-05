@@ -1,6 +1,7 @@
 "use client";
 
 import { levelTitle } from "@/lib/levels";
+import { CardField, type CardFieldHandle } from "@/components/card-field";
 import { DemoCode } from "@/components/demo-bar";
 import { APPOINTMENT_TEXTS_CONSENT, MARKETING_CONSENT } from "@/lib/messaging/consent";
 import { useRouter } from "next/navigation";
@@ -87,7 +88,7 @@ export function BookingFlow({
   const [agreed, setAgreed] = useState(false);
   // The policy for this visit (from the server), and the card entered.
   const [loaded, setLoaded] = useState<{ key: string; terms: TermsResult } | null>(null);
-  const [cardRef, setCardRef] = useState("");
+  const cardField = useRef<CardFieldHandle>(null);
   // The promotion for the visit, as the server checked it for this client:
   // a code they applied, or the special picked with the time.
   const [promo, setPromo] = useState<{ key: string; code: string | null; result: PromotionResult } | null>(null);
@@ -198,7 +199,6 @@ export function BookingFlow({
     reviewTerms(site.business.slug, identity.session, serviceIds, staffId ?? null, slot.date, slot.minute).then((t) => {
       if (!live) return;
       setLoaded({ key: review, terms: t });
-      if (t.ok) setCardRef(t.cards[0]?.ref ?? "");
     });
     reviewPromotion(site.business.slug, identity.session, serviceIds, staffId ?? null, slot.date, slot.minute, null, slot.special?.id ?? null).then(
       (result) => live && setPromo({ key: review, code: null, result }),
@@ -258,6 +258,13 @@ export function BookingFlow({
   const submit = () => {
     if (identity.phase !== "done" || !slot) return;
     startTransition(async () => {
+      // The card they chose (test mode) or entered on Stripe's form, first.
+      let cardRef: string | undefined;
+      if (needsCard) {
+        const chosen = await cardField.current?.cardRef();
+        if (!chosen?.ok) return setNotice(chosen?.message ?? "Add a card to hold your booking.");
+        cardRef = chosen.ref;
+      }
       const sent = await book(site.business.slug, {
         session: identity.session,
         serviceIds,
@@ -270,7 +277,7 @@ export function BookingFlow({
         honeypot: honeypot.current?.value ?? "",
         source,
         referral: referral ?? undefined,
-        cardRef: needsCard ? cardRef : undefined,
+        cardRef,
         remember: !signedIn && remember,
         appointmentTexts,
         offers,
@@ -414,8 +421,7 @@ export function BookingFlow({
             slot={slot}
             noPreference={staffId === null}
             terms={terms}
-            cardRef={cardRef}
-            setCardRef={setCardRef}
+            cardField={cardField}
             agreed={agreed}
             appointmentTexts={appointmentTexts}
             setAppointmentTexts={setAppointmentTexts}
@@ -1012,8 +1018,7 @@ function ConfirmStep({
   slot,
   noPreference,
   terms,
-  cardRef,
-  setCardRef,
+  cardField,
   agreed,
   setAgreed,
   appointmentTexts,
@@ -1027,8 +1032,7 @@ function ConfirmStep({
   slot: Slot;
   noPreference: boolean;
   terms: TermsResult | null;
-  cardRef: string;
-  setCardRef: (v: string) => void;
+  cardField: React.RefObject<CardFieldHandle | null>;
   agreed: boolean;
   appointmentTexts: boolean;
   setAppointmentTexts: (on: boolean) => void;
@@ -1135,18 +1139,11 @@ function ConfirmStep({
               </h2>
               {terms.cardOnFile ? (
                 <p className="mt-3 text-sm text-ink">{terms.cardOnFile}</p>
-              ) : terms.testMode ? (
-                <label className="mt-3 flex flex-col gap-1.5 text-sm font-medium text-ink">
-                  Card (test mode: nothing is charged)
-                  <select value={cardRef} onChange={(e) => setCardRef(e.target.value)} className={inputClass}>
-                    {terms.cards.map((c) => (
-                      <option key={c.ref} value={c.ref}>
-                        {c.label} ({c.outcome.toLowerCase()})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
+              ) : (
+                <div className="mt-3">
+                  <CardField ref={cardField} form={terms.cardForm} selectClassName={inputClass} />
+                </div>
+              )}
               <p className="mt-2 text-xs text-ink-subtle">Card details go to the payment provider; {site.business.name} never sees or stores them.</p>
             </section>
           )}

@@ -7,7 +7,7 @@ import { salonLogoUrl } from "@/lib/branding";
 import { loadEventLink, type EventLink } from "@/lib/events/links";
 import { SCHEDULED_LABELS } from "@/lib/events/pricing";
 import { DEFAULT_ACCENT } from "@/lib/online-booking/settings";
-import { currentProvider } from "@/lib/payments";
+import { salonProvider, type CardForm } from "@/lib/payments";
 import { formatLongDay } from "@/lib/schedule-format";
 import { formatPrice } from "@/lib/services";
 import { formatMinute } from "@/lib/scheduling/time";
@@ -45,11 +45,11 @@ const box = "flex flex-col gap-2";
 async function EventPage({ params }: { params: Promise<{ token: string }> }) {
   await connection();
   const { token } = await params;
-  const link = await loadEventLink(createAdminClient(), token);
+  const admin = createAdminClient();
+  const link = await loadEventLink(admin, token);
   if (!link) notFound();
-  const provider = currentProvider();
-  const cards = provider.testCards.map((c) => ({ ref: c.ref, label: c.label, outcome: c.outcome }));
   const closed = link.status === "canceled" || (link.status === "open" && link.expired);
+  const cardForm: CardForm = link.status === "open" && !closed ? await (await salonProvider(admin, link.businessId)).cardForm() : { kind: "unavailable", reason: "This link is no longer active" };
   return (
     <BookingFrame name={link.salon.name} logoUrl={salonLogoUrl(link.salon.logoPath)} accent={link.salon.accent ?? DEFAULT_ACCENT}>
       {closed ? (
@@ -76,7 +76,7 @@ async function EventPage({ params }: { params: Promise<{ token: string }> }) {
                 </p>
                 <Row label="Left to pay in all" cents={Math.max(0, link.owed.leftCents)} strong />
               </section>
-              <NewCardForm token={token} dueCents={link.owed.failedCents} testMode={provider.testMode} cards={cards} />
+              <NewCardForm token={token} dueCents={link.owed.failedCents} cardForm={cardForm} />
             </>
           ) : link.kind === "member" && link.member ? (
             <>
@@ -91,11 +91,11 @@ async function EventPage({ params }: { params: Promise<{ token: string }> }) {
                   <Alert tone="success">Your share is paid. Thank you.</Alert>
                 </div>
               ) : (
-                <ShareForm token={token} shareCents={link.member.shareCents} testMode={provider.testMode} cards={cards} />
+                <ShareForm token={token} shareCents={link.member.shareCents} cardForm={cardForm} />
               )}
             </>
           ) : (
-            <Proposal link={link} token={token} testMode={provider.testMode} cards={cards} />
+            <Proposal link={link} token={token} cardForm={cardForm} />
           )}
         </div>
       )}
@@ -118,7 +118,7 @@ function Day({ link }: { link: EventLink }) {
   );
 }
 
-function Proposal({ link, token, testMode, cards }: { link: EventLink; token: string; testMode: boolean; cards: { ref: string; label: string; outcome: string }[] }) {
+function Proposal({ link, token, cardForm }: { link: EventLink; token: string; cardForm: CardForm }) {
   const t = link.totals;
   const own = t.totalCents - t.mainCents;
   return (
@@ -177,7 +177,7 @@ function Proposal({ link, token, testMode, cards }: { link: EventLink; token: st
               </div>
             </section>
           )}
-          <AgreeForm token={token} totalCents={t.totalCents} depositCents={t.depositCents} testMode={testMode} cards={cards} />
+          <AgreeForm token={token} totalCents={t.totalCents} depositCents={t.depositCents} cardForm={cardForm} />
         </>
       )}
     </>

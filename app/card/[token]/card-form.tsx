@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { CardField, type CardFieldHandle } from "@/components/card-field";
 import { inputClass, pageLead, primaryButton, sectionTitle } from "@/app/book/[slug]/styles";
 import { Alert } from "@/components/ui/page";
+import type { CardForm as CardFormData } from "@/lib/payments/provider";
 import { formatPrice } from "@/lib/services";
 import { completeCardLink, type CardLinkResult } from "./actions";
 import { CLIENT_NO_CONNECTION, reach } from "@/lib/reach";
 
 // The policy to agree to, the card, and save (paying the deposit first,
 // when there is one). Big targets, for a phone.
-export function CardForm({ token, lines, depositCents, testMode, cards }: { token: string; lines: string[]; depositCents: number; testMode: boolean; cards: { ref: string; label: string; outcome: string }[] }) {
-  const [card, setCard] = useState(cards[0]?.ref ?? "");
+export function CardForm({ token, lines, depositCents, cardForm }: { token: string; lines: string[]; depositCents: number; cardForm: CardFormData }) {
+  const card = useRef<CardFieldHandle>(null);
   const [agreed, setAgreed] = useState(false);
   const [result, setResult] = useState<CardLinkResult | null>(null);
   const [pending, start] = useTransition();
@@ -30,7 +32,11 @@ export function CardForm({ token, lines, depositCents, testMode, cards }: { toke
       className="flex flex-col gap-5"
       onSubmit={(e) => {
         e.preventDefault();
-        start(async () => setResult(await reach(completeCardLink(token, card, agreed), CLIENT_NO_CONNECTION)));
+        start(async () => {
+          const chosen = await card.current!.cardRef();
+          if (!chosen.ok) return setResult(chosen);
+          setResult(await reach(completeCardLink(token, chosen.ref, agreed), CLIENT_NO_CONNECTION));
+        });
       }}
     >
       <section aria-labelledby="policy-heading" data-testid="policy">
@@ -49,18 +55,7 @@ export function CardForm({ token, lines, depositCents, testMode, cards }: { toke
           <span className="tabular-nums">{formatPrice(depositCents)}</span>
         </p>
       )}
-      {testMode && (
-        <label className="flex flex-col gap-1.5 text-sm font-medium">
-          Card (test mode: nothing is charged)
-          <select value={card} onChange={(e) => setCard(e.target.value)} className={inputClass}>
-            {cards.map((c) => (
-              <option key={c.ref} value={c.ref}>
-                {c.label} ({c.outcome.toLowerCase()})
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
+      <CardField ref={card} form={cardForm} selectClassName={inputClass} />
       <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-ink">
         <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="size-5 shrink-0 accent-(--accent)" />
         I agree to the cancellation policy and to my card being saved for it

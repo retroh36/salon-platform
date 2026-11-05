@@ -26,7 +26,7 @@ import { historyText } from "@/lib/memberships";
 import { loadClientMemberships } from "@/lib/memberships-load";
 import { allowedChannels, consentOf, noTextsFlag } from "@/lib/messaging/consent";
 import { loadClientPackages, withPackages } from "@/lib/packages";
-import { currentProvider } from "@/lib/payments";
+import { cardOnFile, salonProvider, staffCards } from "@/lib/payments";
 import { loadPhotos } from "@/lib/photos-load";
 import { canTakePayments } from "@/lib/sales";
 import { formatDay } from "@/lib/schedule-format";
@@ -477,7 +477,7 @@ async function ClientRecords({ id }: { id: string }) {
                   today={today}
                   canChange={canTakePayments(me.role)}
                   canEndNow={me.role === "owner" || me.role === "manager"}
-                  testCards={currentProvider().testCards.map((c) => ({ ...c }))}
+                  testCards={staffCards(await salonProvider(supabase, me.business_id), await cardOnFile(supabase, client.id))}
                 />
               </SideCard>
             )}

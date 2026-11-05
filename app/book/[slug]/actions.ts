@@ -29,7 +29,7 @@ import { canceledMessage, rescheduledMessage } from "@/lib/online-booking/messag
 import { onlineTerms, type OnlineTerms } from "@/lib/online-booking/terms";
 import { onlinePromotion, onlineSpecials, plannedItems, specialAt, type OnlinePromotion, type OnlinePromo } from "@/lib/online-booking/promotions";
 import { loadPromotions } from "@/lib/promotions-load";
-import { currentProvider, providerFor } from "@/lib/payments";
+import { providerFor, salonProvider, type CardForm, type PaymentProvider } from "@/lib/payments";
 import { ACCOUNT_SESSION, accountContact, currentAccount, startAccountSession } from "@/lib/online-booking/account";
 
 const MAX_SERVICES = 4;
@@ -248,7 +248,7 @@ export async function reviewPromotion(
 }
 
 export type TermsResult =
-  | { ok: true; lines: string[]; cardNeeded: boolean; depositCents: number; cardOnFile: string | null; testMode: boolean; cards: { ref: string; label: string; outcome: string }[] }
+  | { ok: true; lines: string[]; cardNeeded: boolean; depositCents: number; cardOnFile: string | null; cardForm: CardForm }
   | { ok: false; message: string };
 
 // The policy for this visit, before the client agrees: its text with this
@@ -264,15 +264,15 @@ export async function reviewTerms(slug: string, session: string, serviceIds: str
   if (!who) return { ok: false, message: "Your code has expired. Please confirm your details again." };
   const terms = await onlineTerms(admin, site, who.clientId, request, start);
   if (!terms) return { ok: false, message: "Sorry, that time was just taken. Please pick another." };
-  const provider = currentProvider();
+  // Stripe's card form only when a card is needed and none is on file.
+  const cardForm: CardForm = terms.cardNeeded && !terms.cardOnFile ? await (await salonProvider(admin, site.business.id)).cardForm() : { kind: "unavailable", reason: "No card needed" };
   return {
     ok: true,
     lines: terms.lines,
     cardNeeded: terms.cardNeeded,
     depositCents: terms.depositCents,
     cardOnFile: terms.cardOnFile?.label ?? null,
-    testMode: provider.testMode,
-    cards: provider.testCards.map((c) => ({ ref: c.ref, label: c.label, outcome: c.outcome })),
+    cardForm,
   };
 }
 
@@ -399,7 +399,7 @@ async function bookAttempt(
   const promotion = await onlinePromotion(admin, site, clientId!, items, start, { code: input.promoCode ?? null, specialId: input.specialId ?? null });
   if (!promotion.ok) return { ok: false, reason: "promotion", message: promotion.message };
   if (promotion.lost) return { ok: false, reason: "promotion", lost: true, message: `${promotion.lost} Check the total, then book.` };
-  const card = await cardFor(terms, input.cardRef);
+  const card = await cardFor(await salonProvider(admin, site.business.id), terms, input.cardRef);
   if (!card.ok) return { ok: false, reason: "card", message: card.message };
   let deposit: { amount_cents: number; provider: string; reference: string } | null = null;
   if (terms.depositCents > 0 && card.charge) {
@@ -568,11 +568,11 @@ async function sendToClient(admin: ReturnType<typeof createAdminClient>, site: B
 // The card for a booking that needs one: one entered now (saved with the
 // provider), or the one on file. A deposit is charged to it.
 async function cardFor(
+  provider: PaymentProvider,
   terms: OnlineTerms,
   cardRef: string | undefined,
 ): Promise<{ ok: true; save?: { provider: string; ref: string; label: string }; charge?: { provider: string; ref: string } } | { ok: false; message: string }> {
   if (cardRef) {
-    const provider = currentProvider();
     const saved = await provider.saveCard(cardRef);
     if (!saved.ok) return { ok: false, message: `${saved.reason}.` };
     return { ok: true, save: { provider: provider.id, ref: saved.card.ref, label: saved.card.label }, charge: { provider: provider.id, ref: saved.card.ref } };

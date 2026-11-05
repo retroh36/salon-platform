@@ -7,7 +7,7 @@ import { BookingFrame } from "@/app/book/[slug]/frame";
 import { salonLogoUrl } from "@/lib/branding";
 import { DEFAULT_ACCENT } from "@/lib/online-booking/settings";
 import type { LinkSnapshot } from "@/lib/payment-links";
-import { currentProvider } from "@/lib/payments";
+import { salonProvider } from "@/lib/payments";
 import { formatPrice } from "@/lib/services";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { pageLead, pageTitle } from "@/app/book/[slug]/styles";
@@ -32,16 +32,17 @@ async function Pay({ params }: { params: Promise<{ token: string }> }) {
   await connection();
   const { token } = await params;
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) notFound();
-  const { data: link } = await createAdminClient()
+  const admin = createAdminClient();
+  const { data: link } = await admin
     .from("payment_links")
-    .select("status, expires_at, snapshot, amount_cents, tip_cents, business:businesses(name, logo_path, online_booking_settings(accent_color))")
+    .select("business_id, status, expires_at, snapshot, amount_cents, tip_cents, business:businesses(name, logo_path, online_booking_settings(accent_color))")
     .eq("token_hash", createHash("sha256").update(token).digest("hex"))
     .maybeSingle();
   if (!link) notFound();
   const snapshot = link.snapshot as unknown as LinkSnapshot;
   const salon = link.business.name;
   const expired = link.status === "open" && hasPassed(link.expires_at);
-  const provider = currentProvider();
+  const cardForm = link.status === "open" && !expired ? await (await salonProvider(admin, link.business_id)).cardForm() : null;
   return (
     <BookingFrame name={salon} logoUrl={salonLogoUrl(link.business.logo_path)} accent={link.business.online_booking_settings?.accent_color ?? DEFAULT_ACCENT}>
       {link.status === "paid" ? (
@@ -51,15 +52,9 @@ async function Pay({ params }: { params: Promise<{ token: string }> }) {
           <h1 className={pageTitle}>{expired ? "This link has expired" : "This link is no longer active"}</h1>
           <p className={pageLead}>Ask {salon} for a new one, or pay at the desk.</p>
         </div>
-      ) : (
-        <PayForm
-          token={token}
-          salon={salon}
-          snapshot={snapshot}
-          testMode={provider.testMode}
-          cards={provider.testCards.map((c) => ({ ref: c.ref, label: c.label, outcome: c.outcome }))}
-        />
-      )}
+      ) : cardForm ? (
+        <PayForm token={token} salon={salon} snapshot={snapshot} cardForm={cardForm} />
+      ) : null}
       <p className="mt-8 text-center text-xs text-ink-subtle">Card details go to the payment provider; {salon} never sees or stores them.</p>
     </BookingFrame>
   );

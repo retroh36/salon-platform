@@ -7,7 +7,7 @@ import { buttonClass } from "@/components/ui/button";
 import { getCurrentStaff } from "@/lib/auth";
 import { benefitsText, periodName, priceText } from "@/lib/memberships";
 import { loadPlans } from "@/lib/memberships-load";
-import { currentProvider } from "@/lib/payments";
+import { salonProvider } from "@/lib/payments";
 import { SettingsNav } from "../settings-nav";
 import { PlanForm, RunRenewals } from "./plan-form";
 import { can } from "@/lib/permissions";
@@ -34,14 +34,14 @@ async function MembershipsSettings() {
   if (error) throw error;
   const count = new Map<string, number>();
   for (const m of members.data ?? []) if (m.plan_id) count.set(m.plan_id, (count.get(m.plan_id) ?? 0) + 1);
-  const provider = currentProvider();
+  const provider = await salonProvider(supabase, me.business_id);
   return (
     <AppShell section="settings" me={me}>
       <PageHeader title="Memberships" description="Clients pay every week or month for included services and member prices. Sold at checkout; benefits apply there automatically." />
       <SettingsNav current="memberships" me={me} />
       {provider.testMode && (
         <Alert tone="info" className="mb-6">
-          Payments are in test mode: renewals go through the test provider and no real card is charged. Stripe plugs in here when it&apos;s connected.
+          Payments are in test mode: renewals go through the test provider and no real card is charged. Connect Stripe on Settings → Payments to take real payments.
         </Alert>
       )}
       <Card title="Renewals" titleId="renewals-heading" description="Every night, memberships due renew on their card; failed payments are tried again after 1, 3 and 4 more days, with a notice to owners and managers, then the membership ends.">

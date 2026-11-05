@@ -191,10 +191,12 @@ describe("the plan form", () => {
 });
 
 describe("the payment provider layer", () => {
-  it("uses the test provider until Stripe is connected", () => {
-    expect(currentProvider({}).id).toBe("test");
-    expect(currentProvider({}).testMode).toBe(true);
-    expect(currentProvider({ STRIPE_SECRET_KEY: "sk_test_x" }).id).toBe("stripe");
+  it("uses the test provider until the salon's Stripe account is connected", () => {
+    const none = { payments_live: false, stripe_account_id: null, stripe_charges_enabled: false };
+    expect(currentProvider(none, {}).id).toBe("test");
+    expect(currentProvider(none, {}).testMode).toBe(true);
+    expect(currentProvider(none, { STRIPE_SECRET_KEY: "sk_test_x", NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_y" }).id).toBe("test");
+    expect(currentProvider({ ...none, stripe_account_id: "acct_1", stripe_charges_enabled: true }, { STRIPE_SECRET_KEY: "sk_test_x", NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_y" }).id).toBe("stripe");
     expect(providerFor("unknown").id).toBe("test");
   });
 

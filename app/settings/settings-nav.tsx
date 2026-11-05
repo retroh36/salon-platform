@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { can, type Permission } from "@/lib/permissions";
 
-type Page = "salon" | "levels" | "stations" | "time-off" | "booking" | "booking-page" | "policies" | "checkout" | "gift-cards" | "packages" | "events" | "memberships" | "rewards" | "automations" | "messages" | "devices" | "payroll" | "commission" | "data" | "billing" | "denise";
+type Page = "salon" | "levels" | "stations" | "time-off" | "booking" | "booking-page" | "policies" | "checkout" | "gift-cards" | "packages" | "events" | "memberships" | "rewards" | "automations" | "messages" | "payments" | "devices" | "payroll" | "commission" | "data" | "billing" | "denise";
 
 // Each settings page and the permission it needs (lib/permissions.ts);
 // null is everyone on the team.
@@ -21,6 +21,7 @@ const LINKS: [Page, string, string, Permission | null][] = [
   ["rewards", "/settings/rewards", "Rewards", "settings"],
   ["automations", "/settings/automations", "Automations", "settings"],
   ["messages", "/settings/messages", "Messages", "settings"],
+  ["payments", "/settings/payments", "Payments", "settings"],
   ["devices", "/settings/devices", "Shared devices", "settings"],
   ["payroll", "/settings/payroll", "Payroll", "payroll"],
   ["commission", "/settings/commission", "Commission", "payroll"],
