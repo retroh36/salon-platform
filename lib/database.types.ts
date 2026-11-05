@@ -4145,6 +4145,38 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"visit_changes": {
+                  Row: {
+                    "after": NonNullable<Json>,"appointment_id": string,"before": NonNullable<Json>,"business_id": string,"by_kind": string,"by_staff_id": string | null,"created_at": string,"id": string,"item_id": string | null,"kind": string,"location_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "after"?: NonNullable<Json>,"appointment_id": string,"before"?: NonNullable<Json>,"business_id": string,"by_kind": string,"by_staff_id"?: string | null,"created_at"?: string,"id"?: string,"item_id"?: string | null,"kind": string,"location_id": string
+                  }
+                  Update: {
+                    "after"?: NonNullable<Json>,"appointment_id"?: string,"before"?: NonNullable<Json>,"business_id"?: string,"by_kind"?: string,"by_staff_id"?: string | null,"created_at"?: string,"id"?: string,"item_id"?: string | null,"kind"?: string,"location_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "visit_changes_appointment_id_fkey"
+      columns: ["appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "visit_changes_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "visit_changes_by_staff_id_business_id_fkey"
+      columns: ["by_staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"visit_photos": {
                   Row: {
                     "appointment_id": string,"business_id": string,"client_id": string,"created_at": string,"created_by": string | null,"id": string,"kind": string,"marketing_marked_at": string | null,"marketing_marked_by": string | null,"marketing_ok": boolean,"staff_id": string | null,"storage_path": string

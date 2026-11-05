@@ -14,7 +14,7 @@ import { canTakePayments } from "@/lib/sales";
 import { can, type Permission } from "@/lib/permissions";
 import { isFrontOfHouse, roleLabel, type StaffRole } from "@/lib/staff";
 
-export type Section = "account" | "dashboard" | "my-day" | "calendar" | "events" | "sales" | "gift-cards" | "reports" | "payroll" | "policy" | "promotions" | "clients" | "team" | "scheduling" | "services" | "durations" | "inventory" | "forms" | "settings";
+export type Section = "account" | "dashboard" | "my-day" | "calendar" | "events" | "sales" | "gift-cards" | "reports" | "payroll" | "policy" | "audit" | "promotions" | "clients" | "team" | "scheduling" | "services" | "durations" | "inventory" | "forms" | "settings";
 
 type NavItem = {
   section: Section;
@@ -53,6 +53,7 @@ const GROUPS: { label: string; items: NavItem[] }[] = [
       { section: "reports", href: "/reports", label: "Reports", Icon: ChartIcon, needs: "reports" },
       { section: "payroll", href: "/payroll", label: "Payroll", Icon: WalletIcon, needs: "payroll" },
       { section: "policy", href: "/policy", label: "Policy", Icon: ShieldIcon, needs: "reports" },
+      { section: "audit", href: "/audit", label: "Audit trail", Icon: ClipboardIcon, needs: "audit" },
     ],
   },
   {

@@ -12,6 +12,10 @@
 --   frontdesk@harborvine.test   front desk
 -- The stylists have no logins.
 
+-- Made-up history, not anyone's change: the visit log skips it
+-- (migration …_visit_changes.sql).
+set maestra.seeding = on;
+
 -- ---------------------------------------------------------------------------
 -- Auth users, business, location
 -- ---------------------------------------------------------------------------

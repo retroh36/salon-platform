@@ -14,6 +14,7 @@ export const PERMISSIONS = [
   { key: "big_discounts", label: "Give discounts over the limit", hint: "Discounts above the front desk's limit on Settings → Tax and receipts." },
   { key: "see_team_numbers", label: "See other stylists' numbers", hint: "How long each stylist takes, and the team's goals." },
   { key: "adjust_points", label: "Adjust rewards points", hint: "Add or take off a client's points, with a reason." },
+  { key: "audit", label: "See the audit trail", hint: "Who changed what: every visit change, sale, refund, void and discount." },
 ] as const;
 
 export type Toggle = (typeof PERMISSIONS)[number]["key"];

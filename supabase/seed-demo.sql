@@ -5,6 +5,10 @@
 -- browser tests (npm run test:db, npm run test:e2e) expect this data.
 -- All people are made up.
 
+-- Made-up history, not anyone's change: the visit log skips it
+-- (migration …_visit_changes.sql).
+set maestra.seeding = on;
+
 -- Time off and one-off changes, relative to the reset date so they're always
 -- current. next_monday is the Monday after today (local time).
 with d as (

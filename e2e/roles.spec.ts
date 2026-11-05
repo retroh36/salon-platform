@@ -17,7 +17,7 @@ test.describe("the front desk", () => {
     await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Calendar" })).toBeVisible();
     const links = await navLinks(page);
     expect(links).toEqual(expect.arrayContaining(["Calendar", "Clients", "Sales", "Gift cards"]));
-    for (const hidden of ["Reports", "Payroll", "Policy", "Settings"]) expect(links).not.toContain(hidden);
+    for (const hidden of ["Reports", "Payroll", "Policy", "Audit trail", "Settings"]) expect(links).not.toContain(hidden);
 
     for (const path of ["/reports", "/payroll", "/settings", "/settings/devices"]) {
       await page.goto(path);

@@ -1,3 +1,4 @@
+import { changeLine, type ChangeNames, type VisitChange } from "@/lib/visit-changes";
 import { lateChoice } from "@/lib/running-late";
 import { allowedChannels, consentOf, noTextsFlag } from "@/lib/messaging/consent";
 import type { Metadata } from "next";
@@ -338,7 +339,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
   const checkedOut = Object.values(appointments).filter((a) => a.status === "completed").map((a) => a.id);
   const visitIds = Object.keys(appointments);
   const clientIds = [...new Set(Object.values(appointments).flatMap((a) => (a.client ? [a.client.id] : [])))];
-  const [warnings, policies, salesResult, eventsLog, insights, packages, past, pastFormulas, memberships, fixesResult] = await Promise.all([
+  const [warnings, policies, salesResult, eventsLog, changesLog, insights, packages, past, pastFormulas, memberships, fixesResult] = await Promise.all([
     visitWarnings(supabase, me.business_id, toCheck, tz),
     policyVisits ? loadVisitPolicies(supabase, me.business_id, me.role, policyVisits) : Promise.resolve(null),
     // The sale each checked-out visit was paid on (front of house only: RLS).
@@ -350,6 +351,11 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
     // requires, and why; check-ins taken back.
     visitIds.length
       ? supabase.from("appointment_events").select("appointment_id, kind, staff_id, detail, created_at").in("appointment_id", visitIds).order("created_at")
+      : Promise.resolve({ data: [], error: null }),
+    // Every change since it was booked, as the database logged it (front
+    // of house: RLS).
+    visitIds.length
+      ? supabase.from("visit_changes").select("appointment_id, kind, before, after, by_staff_id, by_kind, created_at").in("appointment_id", visitIds).neq("kind", "booked").order("created_at")
       : Promise.resolve({ data: [], error: null }),
     // What Denise knows about each client.
     loadClientInsights(supabase, me.business_id, clientIds),
@@ -431,9 +437,21 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
       const detail = e.detail as { reason?: string };
       appointments[e.appointment_id].patchOverride = { by: who, reason: detail.reason ?? "", at: when(e.created_at) };
       appointments[e.appointment_id].log.push(`Checked in without the patch test by ${who} · ${when(e.created_at)}`);
-    } else if (e.kind === "check_in_undone") {
-      appointments[e.appointment_id].log.push(`Check-in undone by ${who} · ${when(e.created_at)}`);
     }
+  }
+  if (changesLog.error) throw changesLog.error;
+  const serviceNames = new Map(servicesResult.data.map((s) => [s.id, s.name]));
+  for (const c of changesLog.data) {
+    const visit = appointments[c.appointment_id];
+    const names: ChangeNames = {
+      staff: (id) => staffName(id ?? null),
+      service: (id) => (id ? (serviceNames.get(id) ?? null) : null),
+      client: (id) => (id && id === visit.client?.id ? visit.client.name : id ? "another client" : null),
+      timeZone: tz,
+    };
+    visit.log.push(changeLine(c as VisitChange, names));
+    // The full log says who changed it, so "Last changed by" isn't needed.
+    visit.changedBy = null;
   }
   if (past.error) throw past.error;
   if (pastFormulas.error) throw pastFormulas.error;
