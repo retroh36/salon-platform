@@ -3,7 +3,7 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, fromLocal, startOfWeek, toLocal, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { shortRange } from "@/lib/calendar";
-import { AUTH, expect, openDisplayMenu, pxPerMinute, test, ui, waitForHydration } from "./fixtures";
+import { allowOfflineLogs, AUTH, expect, openDisplayMenu, pxPerMinute, test, ui, waitForHydration } from "./fixtures";
 
 // Dragging a visit on the calendar: it moves exactly where it's dropped,
 // on the 5-minute marks, at every zoom and however the day is scrolled,
@@ -154,6 +154,26 @@ test("booking details shows the new time while the move is still saving", async 
   release();
   await expect.poll(savedStart).toBe(10 * 60);
   await expect(details(page)).toContainText(detailRange(10 * 60));
+});
+
+test("a move that can't reach the server goes back and says so, and the message goes after 3 seconds", async ({ page, pageErrors }) => {
+  await newVisit(9 * 60 + 30);
+  await openDay(page);
+  await block(page).evaluate((el) => el.setAttribute("data-dragtest", ""));
+  await page.context().setOffline(true);
+  await drag(page, 30);
+  const notice = ui(page).getByTestId("calendar-notice");
+  await expect(notice).toContainText("We couldn't reach the server");
+  await expect(block(page)).toContainText(range(9 * 60 + 30));
+  await page.context().setOffline(false);
+  expect(await savedStart()).toBe(9 * 60 + 30);
+  // Held while the pointer is over it, then gone 3 seconds after it leaves.
+  await notice.hover();
+  await page.waitForTimeout(3500);
+  await expect(notice).toBeVisible();
+  await page.mouse.move(5, 5);
+  await expect(notice).toBeHidden({ timeout: 4500 });
+  allowOfflineLogs(pageErrors);
 });
 
 test("a drop outside the stylist's hours asks first, and Cancel puts it back", async ({ page }) => {

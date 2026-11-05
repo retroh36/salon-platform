@@ -814,8 +814,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     startTransition(async () => {
       setSavedOrder(next);
       const result = currentView
-        ? await saveCalendarView({ id: currentView.id, name: currentView.name, staffIds: next, shared: currentView.shared })
-        : await setCalendarOrder(next);
+        ? await reach(saveCalendarView({ id: currentView.id, name: currentView.name, staffIds: next, shared: currentView.shared }))
+        : await reach(setCalendarOrder(next));
       if (!result.ok) setNotice(`Couldn't save the new order: ${"message" in result ? result.message : ""}`);
     });
   }
@@ -946,7 +946,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     startTransition(async () => {
       addMove(move);
       const input = { itemId: move.itemId, staffId: move.staffId, date: data.date, startMinute: move.start };
-      const result = scope === "this" ? await moveVisitItem(input, anyway) : scope === "group" ? await moveGroupVisit(input) : await moveVisitItemScoped(input, scope);
+      // A dropped connection says so, and the block goes back.
+      const result = await reach(scope === "this" ? moveVisitItem(input, anyway) : scope === "group" ? moveGroupVisit(input) : moveVisitItemScoped(input, scope));
       // The calendar changed under the drag: ask now, as on drop.
       if (!result.ok && "confirm" in result && result.confirm) setAnywayAsk({ move, block: b, scope: "this", question: result.confirm });
       else if (!result.ok) setNotice(`Couldn't move ${b.clientName}'s ${b.service}: ${result.message}`);
@@ -1025,7 +1026,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     setNotice(null);
     setBlockMoves((all) => ({ ...all, [d.key]: { start: d.start, end: d.end } }));
     startTransition(async () => {
-      const result = await moveBlock({ blockId: d.block.blockId, staffId: d.block.staffId, date: data.date, startMinute: d.start, endMinute: d.end });
+      const result = await reach(moveBlock({ blockId: d.block.blockId, staffId: d.block.staffId, date: data.date, startMinute: d.start, endMinute: d.end }));
       if (!result.ok) {
         setNotice(`Couldn't move ${BLOCK_LABELS[d.block.kind].toLowerCase()}: ${result.message}`);
         setBlockMoves((all) => Object.fromEntries(Object.entries(all).filter(([k]) => k !== d.key)));

@@ -290,15 +290,15 @@ export function AppointmentPanel({
                 "Walk-in"
               )}
             </h3>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span data-testid="visit-status" data-status={status} className="inline-flex min-w-0">
+            {/* Each item brings its own "·"; the one that starts a line is
+                clipped off, so a wrapped phone never leaves a dot behind. */}
+            <div className="mt-1 overflow-hidden py-0.5">
+            <div className="-ml-4 flex flex-wrap items-center gap-y-1">
+              <span data-testid="visit-status" data-status={status} className={`inline-flex min-w-0 ${DOT}`}>
                 <Badge tone={STATUS_TONES[status]}>{visitStatusText(status, STATUS_LABELS, appointment, timeZone)}</Badge>
               </span>
               {client?.phone && (
-                <>
-                  <span aria-hidden className="text-ink-subtle">
-                    ·
-                  </span>
+                <span className={`inline-flex ${DOT}`}>
                   <a
                     href={`tel:${client.phone}`}
                     aria-label={`Call ${firstName}, ${client.phone}`}
@@ -308,13 +308,14 @@ export function AppointmentPanel({
                     <PhoneIcon className="size-3.5" />
                     {client.phone}
                   </a>
-                </>
+                </span>
               )}
               {client?.messages.noTexts && (
-                <span data-testid="no-texts" className="inline-flex">
+                <span data-testid="no-texts" className={`inline-flex ${DOT}`}>
                   <Badge tone="warning">{client.messages.noTexts}</Badge>
                 </span>
               )}
+            </div>
             </div>
           </div>
           {shownInMenu.length > 0 && <ActionsMenu actions={shownInMenu} disabled={pending} />}
@@ -1371,6 +1372,9 @@ function PolicyInfo({ appointment, firstName, part }: { appointment: Appointment
 
 // One labeled row of what to know about the visit.
 // Muted label on the left, the value on the right (red for an allergy).
+// The header line's separator: a "·" before each item, 16px in.
+const DOT = "relative pl-4 before:absolute before:left-[0.4rem] before:text-ink-subtle before:content-['·']";
+
 function FactRow({ label, testId, danger = false, children }: { label: string; testId?: string; danger?: boolean; children: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-4">

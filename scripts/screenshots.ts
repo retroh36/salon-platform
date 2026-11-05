@@ -209,27 +209,35 @@ async function capture(browser: Browser, first: boolean) {
 
   // A calendar message (a check-in that couldn't save, offline), then the
   // calendar once it has gone by itself (3 seconds).
-  const failedCheckIn = async (page: Page) => {
+  // A move that can't save (the connection drops as it's dropped) puts the
+  // block back and says so at the top of the calendar.
+  const failedMove = async (page: Page) => {
     await page.goto("/calendar");
     await waitForReact(page, "[data-block]");
     const block = main(page).locator("[data-block][data-visit=upcoming]").first();
     await block.scrollIntoViewIfNeeded();
-    await block.click({ position: { x: 10, y: 5 } });
-    await page.getByTestId("primary-action").waitFor();
+    const box = (await block.boundingBox())!;
     await page.context().setOffline(true);
-    await page.getByTestId("primary-action").click();
-    const anyway = page.getByRole("button", { name: "Check in anyway" });
-    if (await anyway.isVisible().catch(() => false)) await anyway.click();
-    await main(page).getByTestId("calendar-notice").waitFor();
-    await page.context().setOffline(false);
+    try {
+      await page.mouse.move(box.x + 12, box.y + 6);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 12, box.y + 26, { steps: 6 });
+      await page.mouse.move(box.x + 12, box.y + 46, { steps: 6 });
+      await page.mouse.up();
+      const anyway = page.getByTestId("move-anyway");
+      if (await anyway.isVisible().catch(() => false)) await anyway.getByRole("button").last().click();
+      await main(page).getByTestId("calendar-notice").waitFor({ timeout: 15_000 });
+    } finally {
+      await page.context().setOffline(false);
+    }
   };
   await shot("84-calendar-notice", front, async (page) => {
-    await failedCheckIn(page);
+    await failedMove(page);
     // Held under the pointer, so it stays for the picture.
     await main(page).getByTestId("calendar-notice").hover();
   });
   await shot("85-calendar-notice-gone", front, async (page) => {
-    await failedCheckIn(page);
+    await failedMove(page);
     await page.keyboard.press("Escape");
     await page.mouse.move(5, 5);
     await main(page).getByTestId("calendar-notice").waitFor({ state: "detached", timeout: 10_000 });
