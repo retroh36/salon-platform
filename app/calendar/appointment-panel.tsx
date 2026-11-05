@@ -235,6 +235,7 @@ export function AppointmentPanel({
         {appointment.membership.text}
       </>,
       "membership-info",
+      appointment.membership.text.length > STACK_AT,
     ],
     appointment.packages.length > 0 && ["Package", appointment.packages.map((p) => p.replace(/^Package: /, "")).join(", "), "package-info"],
     appointment.series && ["Repeats", `Visit ${appointment.series.index} of ${appointment.series.count} · every ${appointment.series.intervalWeeks === 1 ? "week" : `${appointment.series.intervalWeeks} weeks`}`, "series-info"],
@@ -252,7 +253,7 @@ export function AppointmentPanel({
                   {m.clientName} · {m.staffName} · {formatMinute(m.start)} (this visit)
                 </span>
               ) : (
-                <button type="button" className={`text-right ${nameLinkClass}`} onClick={() => onOpenVisit(m.appointmentId)}>
+                <button type="button" className={`text-left ${nameLinkClass}`} onClick={() => onOpenVisit(m.appointmentId)}>
                   {m.clientName} · {m.staffName} · {formatMinute(m.start)}
                 </button>
               )}
@@ -261,8 +262,9 @@ export function AppointmentPanel({
         </ul>
       </div>,
       "group-row",
+      true,
     ],
-  ] as (false | null | [string, React.ReactNode, string])[]).filter((r): r is [string, React.ReactNode, string] => Boolean(r));
+  ] as (false | null | FactTuple)[]).filter((r): r is FactTuple => Boolean(r));
   const footer = Boolean(mainAction || footerActions.length || message || sentNote || confirmingCheckIn || moving || confirmingNoShow || (messaging && client) || reportingLate || canceling);
 
   const first = Math.min(...items.map((i) => i.start));
@@ -379,8 +381,8 @@ export function AppointmentPanel({
             {(client?.allergies || keyRows.length > 0 || (appointment.policy && client)) && (
               <dl className="flex flex-col gap-2" data-testid="visit-facts">
                 {appointment.policy && client && <PolicyInfo appointment={appointment} firstName={firstName} part="card" />}
-                {keyRows.map(([label, value, testId]) => (
-                  <FactRow key={label} label={label} testId={testId}>
+                {keyRows.map(([label, value, testId, stack]) => (
+                  <FactRow key={label} label={label} testId={testId} stack={stack}>
                     {value}
                   </FactRow>
                 ))}
@@ -395,7 +397,9 @@ export function AppointmentPanel({
             {/* Only while something's outstanding: one row that opens the checklist. */}
             {client && outstanding.length > 0 && <VisitChecklist items={checklist} override={appointment.patchOverride} clientId={client.id} date={date} today={today} timeZone={timeZone} me={me} team={team} />}
             {appointment.insight && (
-              <div className="-mx-1.5">
+              // Pulled left so her face lines up with the rows; never past the
+              // right edge (the panel never scrolls sideways).
+              <div className="-ml-1.5">
                 <ClientInsightLine insight={appointment.insight} />
               </div>
             )}
@@ -435,7 +439,7 @@ export function AppointmentPanel({
                 {latestFormula && (
                   <section aria-label="Latest formula" className="flex flex-col gap-1" data-testid="latest-formula">
                     <SectionLabel>Latest formula</SectionLabel>
-                    <p className="text-ink">{latestFormula.products || latestFormula.text}</p>
+                    <p className="text-pretty wrap-anywhere text-ink">{latestFormula.products || latestFormula.text}</p>
                     <p className="text-13 text-ink-muted">
                       {latestFormula.date} · {latestFormula.author}
                     </p>
@@ -616,7 +620,7 @@ function ActionsMenu({ actions, disabled }: { actions: MenuAction[]; disabled: b
 
   return (
     <div ref={root} className="relative" onKeyDown={onKeyDown}>
-      <Button ref={button} aria-label="More actions" title="More actions" variant="ghost" size="md" square className="-mr-1.5 text-ink-muted hover:text-ink" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={(e) => {
+      <Button ref={button} aria-label="More actions" title="More actions" variant="ghost" size="md" square className="text-ink-muted hover:text-ink" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={(e) => {
           byKeys.current = e.detail === 0;
           setOpen(!open);
         }}>
@@ -1375,11 +1379,21 @@ function PolicyInfo({ appointment, firstName, part }: { appointment: Appointment
 // The header line's separator: a "·" before each item, 16px in.
 const DOT = "relative pl-4 before:absolute before:left-[0.4rem] before:text-ink-subtle before:content-['·']";
 
-function FactRow({ label, testId, danger = false, children }: { label: string; testId?: string; danger?: boolean; children: React.ReactNode }) {
+// A value longer than this goes on its own line under its label, left-
+// aligned, rather than wrapping on the right ("Color Club member · Root
+// Touch-Up: 0 left · 10% off services, 15% off retail").
+const STACK_AT = 28;
+
+// A row of what to know: label, value, test id, and whether it stacks
+// (left out, a long string value does).
+type FactTuple = [string, React.ReactNode, string, boolean?];
+
+function FactRow({ label, testId, danger = false, stack, children }: { label: string; testId?: string; danger?: boolean; stack?: boolean; children: React.ReactNode }) {
+  const stacked = stack ?? (typeof children === "string" && children.length > STACK_AT);
   return (
-    <div className="flex items-baseline justify-between gap-4">
+    <div className={stacked ? "flex flex-col gap-0.5" : "flex items-baseline justify-between gap-4"} data-stacked={stacked || undefined}>
       <dt className={`shrink-0 text-13 ${danger ? "font-medium text-danger" : "text-ink-muted"}`}>{label}</dt>
-      <dd className={`min-w-0 text-right text-pretty wrap-anywhere ${danger ? "text-danger" : "text-ink"}`} data-testid={testId}>
+      <dd className={`min-w-0 text-pretty wrap-anywhere ${stacked ? "" : "text-right"} ${danger ? "text-danger" : "text-ink"}`} data-testid={testId}>
         {children}
       </dd>
     </div>

@@ -8,7 +8,7 @@ import type { Page } from "@playwright/test";
 import { linkSnapshot, type LinkSnapshot } from "@/lib/payment-links";
 import { EMPTY_TICKET, type Ticket } from "@/lib/ticket";
 import { formatLongDay } from "@/lib/schedule-format";
-import { fromLocal } from "@/lib/scheduling/time";
+import { addDays, fromLocal } from "@/lib/scheduling/time";
 import { admin, busyDay, makeRoom, SEED, signIn } from "../tests/db/helpers";
 import { AUTH, expect, putBackSales, test, ui, waitForHydration } from "./fixtures";
 import { expectTidyLayout, expectWholeHeaders } from "./layout";
@@ -31,6 +31,10 @@ let appointmentId: string;
 let serviceId: string;
 let clientId: string;
 let putBack: () => Promise<void>;
+// The latest visit so far for the demo's member with the longest membership line, with the
+// demo's longest formula as their latest (booking details never scrolls
+// sideways).
+let member: { date: string; appointmentId: string; formulaId: string };
 
 // The checkout is opened (a draft), never completed.
 putBackSales();
@@ -47,7 +51,37 @@ test.beforeAll(async () => {
   expect(error).toBeNull();
 });
 
+test.beforeAll(async () => {
+  const { data: memberships } = await admin
+    .from("client_memberships")
+    .select("client_id, service_discount_pct, retail_discount_pct, plan:membership_plans(membership_plan_services(id))")
+    .eq("business_id", B)
+    .eq("status", "active");
+  const score = (m: NonNullable<typeof memberships>[number]) => (m.service_discount_pct > 0 ? 1000 : 0) + (m.retail_discount_pct > 0 ? 1000 : 0) + (m.plan?.membership_plan_services.length ?? 0);
+  const longest = [...memberships!].sort((a, b) => score(b) - score(a));
+  let visit: { id: string; starts_at: string; client_id: string | null } | null = null;
+  for (const m of longest) {
+    const { data } = await admin.from("appointments").select("id, starts_at, client_id").eq("client_id", m.client_id).in("status", ["booked", "confirmed", "completed"]).lte("starts_at", new Date().toISOString()).order("starts_at", { ascending: false }).limit(1);
+    if (data?.length) {
+      visit = data[0];
+      break;
+    }
+  }
+  expect(visit, "a member with a visit in the demo data").not.toBeNull();
+  const visitDate = new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date(visit!.starts_at));
+  const { data: formulas } = await admin.from("client_formulas").select("formula").eq("business_id", B);
+  const text = [...formulas!].sort((a, b) => b.formula.length - a.formula.length)[0].formula;
+  const { data: formula, error } = await admin
+    .from("client_formulas")
+    .insert({ business_id: B, client_id: visit!.client_id!, staff_id: SEED.staff.bridget, visit_date: addDays(visitDate, -1), formula: text })
+    .select("id")
+    .single();
+  expect(error).toBeNull();
+  member = { date: visitDate, appointmentId: visit!.id, formulaId: formula!.id };
+});
+
 test.afterAll(async () => {
+  if (member) await admin.from("client_formulas").delete().eq("id", member.formulaId);
   await admin.from("sale_drafts").delete().eq("client_id", clientId);
   await admin.from("card_requests").delete().eq("client_id", clientId);
   await admin.from("appointments").delete().eq("id", appointmentId);
@@ -204,6 +238,23 @@ for (const size of WIDTHS) {
       } finally {
         await stylist.close();
       }
+    });
+
+    // Booking details never scrolls sideways, with the longest membership
+    // line and formula in the demo; a long value sits under its label.
+    test("booking details with a long membership and formula", async ({ page }) => {
+      await page.goto(`/calendar?date=${member.date}&open=${member.appointmentId}`);
+      await waitForHydration(page, "section[data-staff-id]");
+      const panel = ui(page).getByTestId("side-panel");
+      await expect(panel.getByTestId("membership-info")).toBeVisible();
+      await expect(panel.getByTestId("latest-formula")).toBeVisible();
+      await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished)));
+      const sideways = await panel.evaluate((p) =>
+        [p, ...p.querySelectorAll("*")].filter((e) => getComputedStyle(e).overflowX !== "visible" && e.scrollWidth > e.clientWidth).map((e) => `${e.tagName} ${e.scrollWidth}/${e.clientWidth}`),
+      );
+      expect(sideways, "booking details scrolls sideways").toEqual([]);
+      await expect(panel.locator("[data-stacked]").filter({ has: page.getByTestId("membership-info") })).toHaveCount(1);
+      await expectTidyLayout(page, "in booking details with a long membership and formula");
     });
 
     // Meet Denise, for an owner and a stylist, and with her open beside it
