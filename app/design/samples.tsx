@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { CalendarNotice } from "@/app/calendar/notice";
+import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { Tabs } from "@/components/ui/tabs";
 
@@ -57,5 +59,18 @@ export function TabSamples() {
         />
       </div>
     </div>
+  );
+}
+
+// The calendar's message line: it goes after 3 seconds (held while the
+// pointer is over it), so the guide can bring it back.
+export function NoticeSample() {
+  const [shown, setShown] = useState(true);
+  return shown ? (
+    <CalendarNotice tone="danger" text="Couldn't save that change. Check the connection and try again." onClose={() => setShown(false)} />
+  ) : (
+    <Button size="xs" variant="secondary" onClick={() => setShown(true)}>
+      Show the calendar message again
+    </Button>
   );
 }

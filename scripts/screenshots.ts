@@ -190,6 +190,52 @@ async function capture(browser: Browser, first: boolean) {
     await page.waitForTimeout(1500);
   });
 
+
+  // Mid-drag onto another stylist's column: the preview there, with the
+  // exact landing time and stylist ("6:05–6:35pm · Gil"), amber with the
+  // reason when someone's in the way.
+  await shot("81-drag-other-stylist", front, async (page) => {
+    await page.goto("/calendar");
+    await waitForReact(page, "section[data-staff-id]");
+    const block = main(page).locator("[data-block][data-visit=upcoming]").first();
+    await block.scrollIntoViewIfNeeded();
+    const box = (await block.boundingBox())!;
+    await page.mouse.move(box.x + 24, box.y + 12);
+    await page.mouse.down();
+    for (let i = 1; i <= 6; i++) await page.mouse.move(box.x + 24 + (i * box.width) / 6, box.y + 12 + i * 4);
+    await main(page).locator("[data-drag-ghost]").first().waitFor();
+    return { keepMouse: true };
+  });
+
+  // A calendar message (a check-in that couldn't save, offline), then the
+  // calendar once it has gone by itself (3 seconds).
+  const failedCheckIn = async (page: Page) => {
+    await page.goto("/calendar");
+    await waitForReact(page, "[data-block]");
+    const block = main(page).locator("[data-block][data-visit=upcoming]").first();
+    await block.scrollIntoViewIfNeeded();
+    await block.click({ position: { x: 10, y: 5 } });
+    await page.getByTestId("primary-action").waitFor();
+    await page.context().setOffline(true);
+    await page.getByTestId("primary-action").click();
+    const anyway = page.getByRole("button", { name: "Check in anyway" });
+    if (await anyway.isVisible().catch(() => false)) await anyway.click();
+    await main(page).getByTestId("calendar-notice").waitFor();
+    await page.context().setOffline(false);
+  };
+  await shot("84-calendar-notice", front, async (page) => {
+    await failedCheckIn(page);
+    // Held under the pointer, so it stays for the picture.
+    await main(page).getByTestId("calendar-notice").hover();
+  });
+  await shot("85-calendar-notice-gone", front, async (page) => {
+    await failedCheckIn(page);
+    await page.keyboard.press("Escape");
+    await page.mouse.move(5, 5);
+    await main(page).getByTestId("calendar-notice").waitFor({ state: "detached", timeout: 10_000 });
+    await page.waitForTimeout(400);
+  });
+  // Last of the calendar shots: once opened, Denise stays open in this session.
   // Denise's card, opened from her face.
   await shot("80-denise-open", front, async (page) => {
     await page.goto("/calendar");
@@ -197,21 +243,6 @@ async function capture(browser: Browser, first: boolean) {
     await page.getByTestId("denise-launcher").click();
     await page.getByTestId("denise-card").waitFor();
     await page.waitForTimeout(1500);
-  });
-
-  // Mid-drag sideways: a color visit held over the next column, the
-  // stylists who don't do color dimmed.
-  await shot("81-drag-dimmed", front, async (page) => {
-    await page.goto("/calendar");
-    await waitForReact(page, "section[data-staff-id]");
-    const block = main(page).locator("[data-block][data-visit=upcoming][data-family=color]").first();
-    await block.scrollIntoViewIfNeeded();
-    const box = (await block.boundingBox())!;
-    await page.mouse.move(box.x + 24, box.y + 12);
-    await page.mouse.down();
-    for (let i = 1; i <= 6; i++) await page.mouse.move(box.x + 24 + (i * box.width) / 6, box.y + 12 + i * 4);
-    await main(page).locator("[data-drag-dimmed]").first().waitFor();
-    return { keepMouse: true };
   });
 
   // Booking details: a booked visit, then one checked out.

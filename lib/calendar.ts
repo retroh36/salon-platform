@@ -144,6 +144,12 @@ export function timeRangeVariants(start: number, end: number): string[] {
   return [...new Set([full, shorter, `${bare(start)}–${bare(end)}`])];
 }
 
+// A range said once, with am/pm only where it changes: "6:05–6:35pm",
+// "11:30am–12:15pm" (a dragged visit's label).
+export function shortRange(start: number, end: number): string {
+  return timeRangeVariants(start, end).find((v) => /[ap]m$/.test(v) && !/[ap]m–/.test(v)) ?? `${formatMinute(start)}–${formatMinute(end)}`;
+}
+
 export function summaryVariants(summary: string): string[] {
   const short = summary.replace(/ booked$/, "");
   // Then the visits alone ("6 visits"): never a bare number without its label.

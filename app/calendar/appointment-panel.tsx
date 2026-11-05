@@ -23,6 +23,7 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { LATE_MINUTES } from "@/lib/scheduling/disruptions";
 import { addDays, formatMinute, minuteToTime, parseTime, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
+import { shortRange } from "@/lib/calendar";
 import { UsageLinesEditor, toUsageJson, type DraftLine } from "@/components/usage-lines";
 import type { PickerProduct } from "@/lib/inventory-load";
 import { addVisitFormula, changeGroupVisitStatus, changeVisitStatus, changeVisitStatusScoped, checkInWithPatchOverride, moveVisitToDay, saveVisitNotes, undoVisitCheckIn, undoVisitNoShow } from "./actions";
@@ -251,7 +252,7 @@ export function AppointmentPanel({
                   {m.clientName} · {m.staffName} · {formatMinute(m.start)} (this visit)
                 </span>
               ) : (
-                <button type="button" className={`text-left ${nameLinkClass}`} onClick={() => onOpenVisit(m.appointmentId)}>
+                <button type="button" className={`text-right ${nameLinkClass}`} onClick={() => onOpenVisit(m.appointmentId)}>
                   {m.clientName} · {m.staffName} · {formatMinute(m.start)}
                 </button>
               )}
@@ -264,13 +265,21 @@ export function AppointmentPanel({
   ] as (false | null | [string, React.ReactNode, string])[]).filter((r): r is [string, React.ReactNode, string] => Boolean(r));
   const footer = Boolean(mainAction || footerActions.length || message || sentNote || confirmingCheckIn || moving || confirmingNoShow || (messaging && client) || reportingLate || canceling);
 
+  const first = Math.min(...items.map((i) => i.start));
+  const last = Math.max(...items.map((i) => i.end));
+  const lastVisit = appointment.pastVisits[0];
+  const latestFormula = appointment.pastFormulas[0];
+
   return (
     <div className="flex min-h-full flex-col text-sm">
-      <div className="flex flex-1 flex-col gap-5 pt-3 pb-6">
-        {/* Who: the name, their number, where the visit's at, and "⋯". */}
+      {/* One grid, top to bottom: who, the visit, what to know, then the
+          tabs; 16px between sections, a thin rule between each. */}
+      <div className="flex flex-1 flex-col gap-4 pt-3 pb-6">
+        {/* Who: their initials and name, "⋯", then the status and their number. */}
         <header className="flex items-start gap-3">
+          <Avatar name={client?.name ?? "Walk-in"} size="md" halo={false} />
           <div className="min-w-0 flex-1">
-            <h3 className="text-2xl leading-8 font-semibold tracking-tight text-pretty wrap-anywhere" data-testid="client-name">
+            <h3 className="text-xl leading-7 font-semibold text-pretty wrap-anywhere text-ink" data-testid="client-name">
               {client ? (
                 <Link href={`/clients/${client.id}`} className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-focus">
                   {client.name}
@@ -281,16 +290,26 @@ export function AppointmentPanel({
                 "Walk-in"
               )}
             </h3>
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              {client?.phone && (
-                <a href={`tel:${client.phone}`} aria-label={`Call ${firstName}, ${client.phone}`} className="inline-flex items-center gap-1.5 rounded-sm text-ink-muted tabular-nums hover:text-ink focus-visible:outline-2 focus-visible:outline-focus" data-testid="client-phone">
-                  <PhoneIcon className="size-3.5" />
-                  {client.phone}
-                </a>
-              )}
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span data-testid="visit-status" data-status={status} className="inline-flex min-w-0">
                 <Badge tone={STATUS_TONES[status]}>{visitStatusText(status, STATUS_LABELS, appointment, timeZone)}</Badge>
               </span>
+              {client?.phone && (
+                <>
+                  <span aria-hidden className="text-ink-subtle">
+                    ·
+                  </span>
+                  <a
+                    href={`tel:${client.phone}`}
+                    aria-label={`Call ${firstName}, ${client.phone}`}
+                    className="inline-flex items-center gap-1 rounded-sm text-ink-muted tabular-nums hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
+                    data-testid="client-phone"
+                  >
+                    <PhoneIcon className="size-3.5" />
+                    {client.phone}
+                  </a>
+                </>
+              )}
               {client?.messages.noTexts && (
                 <span data-testid="no-texts" className="inline-flex">
                   <Badge tone="warning">{client.messages.noTexts}</Badge>
@@ -301,103 +320,91 @@ export function AppointmentPanel({
           {shownInMenu.length > 0 && <ActionsMenu actions={shownInMenu} disabled={pending} />}
         </header>
 
-        {client?.allergies && (
-          <p className="-mt-1 flex items-start gap-2 rounded-lg bg-danger-soft px-3 py-2 text-danger" data-testid="visit-allergy">
-            <span className="shrink-0 font-semibold">Allergy</span>
-            <span className="min-w-0 wrap-anywhere">{client.allergies}</span>
+        {/* The visit: the day and time once, then a row a service. */}
+        <section aria-label="Visit" className="flex flex-col gap-3 border-t border-line pt-4" data-testid="visit-block">
+          <p className="text-base font-semibold text-ink tabular-nums" data-testid="visit-when">
+            <span data-testid="visit-date">{date === today ? "Today" : formatLongDay(date, false)}</span> · {shortRange(first, last)}
           </p>
-        )}
-
-        {/* The visit, as one block: the day and time, then a line a service
-            with its stylist, chair and price. */}
-        <section aria-label="Visit" className="flex flex-col gap-3 rounded-lg border border-line p-3.5" data-testid="visit-block">
-          <p className="flex flex-wrap items-baseline justify-between gap-x-3 font-medium text-ink">
-            <span data-testid="visit-date">{date === today ? "Today" : formatLongDay(date, false)}</span>
-            <span className="text-ink-muted tabular-nums">
-              {formatMinute(Math.min(...items.map((i) => i.start)))}–{formatMinute(Math.max(...items.map((i) => i.end)))}
-            </span>
-          </p>
-          <ul className="flex flex-col gap-3 border-t border-line pt-3">
+          <ul className="flex flex-col gap-2.5">
             {items.map((i) => {
               const state = timerState(i.times);
+              const stylist = team.find((t) => t.id === i.staffId);
               return (
-                <li key={i.id} data-item-id={i.id} data-testid="service-timer" data-state={state} className="flex items-start gap-3">
-                  <Avatar name={i.staffName} color={team.find((t) => t.id === i.staffId)?.color} photoUrl={team.find((t) => t.id === i.staffId)?.photoUrl} size="sm" halo={false} />
-                  <div className="min-w-0 flex-1">
-                    <p className="flex items-baseline justify-between gap-3">
-                      <span className="min-w-0 font-medium text-ink">{i.serviceName}</span>
-                      <span className="shrink-0 text-ink tabular-nums">{formatPrice(i.priceCents)}</span>
+                <li key={i.id} data-item-id={i.id} data-testid="service-timer" data-state={state} className="flex flex-col gap-0.5">
+                  <p className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 font-medium text-ink">{i.serviceName}</span>
+                    <span className="shrink-0 text-ink tabular-nums">{formatPrice(i.priceCents)}</span>
+                  </p>
+                  <p className="flex flex-wrap items-center gap-x-1.5 text-ink-muted">
+                    with
+                    <Avatar name={i.staffName} color={stylist?.color} photoUrl={stylist?.photoUrl} size="xs" halo={false} />
+                    {i.staffName.split(" ")[0]}
+                    {i.resourceName && <span className="whitespace-nowrap">· {i.resourceName}</span>}
+                    {/* Several services: each one's own time (the visit's is above). */}
+                    {several && <span className="whitespace-nowrap tabular-nums">· {shortRange(i.start, i.end)}</span>}
+                  </p>
+                  {several && state !== "waiting" && (
+                    <p className="text-xs text-ink-muted" aria-live="polite">
+                      {timerStatus(i.times, i.bookedMinutes, timeZone)}
                     </p>
-                    <p className="text-ink-muted">
-                      {i.staffName.split(" ")[0]} ·{" "}
-                      <span className="whitespace-nowrap tabular-nums">
-                        {formatMinute(i.start)}–{formatMinute(i.end)}
-                      </span>
-                      {i.resourceName && (
-                        <>
-                          {" "}
-                          · <span className="whitespace-nowrap">{i.resourceName}</span>
-                        </>
-                      )}
-                    </p>
-                    {/* With several services, how each one's going (the header says the current one). */}
-                    {several && state !== "waiting" && (
-                      <p className="text-xs text-ink-muted" aria-live="polite">
-                        {timerStatus(i.times, i.bookedMinutes, timeZone)}
-                      </p>
-                    )}
-                  </div>
+                  )}
                 </li>
               );
             })}
           </ul>
           {several && (
-            <p className="flex justify-between border-t border-line pt-2.5 font-semibold text-ink">
+            <p className="flex justify-between font-semibold text-ink">
               <span>Total</span>
               <span className="tabular-nums">{formatPrice(total)}</span>
             </p>
           )}
           {/* Checked out: the sale in short. */}
           {status === "completed" && appointment.sale && (
-            <dl className="grid grid-cols-3 gap-2 border-t border-line pt-2.5" data-testid="visit-receipt">
-              <div>
-                <dt className="text-xs text-ink-muted">Paid</dt>
-                <dd className="font-semibold text-ink tabular-nums">{formatPrice(appointment.sale.totalCents)}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-ink-muted">Tip</dt>
-                <dd className="text-ink tabular-nums">{appointment.sale.tipCents ? formatPrice(appointment.sale.tipCents) : "None"}</dd>
-              </div>
-              <div className="min-w-0">
-                <dt className="text-xs text-ink-muted">Paid by</dt>
-                <dd className="text-ink">{appointment.sale.methods || "—"}</dd>
-              </div>
+            <dl className="flex flex-col gap-2 border-t border-line pt-3" data-testid="visit-receipt">
+              <FactRow label="Paid">
+                <span className="font-semibold tabular-nums">{formatPrice(appointment.sale.totalCents)}</span>
+              </FactRow>
+              <FactRow label="Tip">
+                <span className="tabular-nums">{appointment.sale.tipCents ? formatPrice(appointment.sale.tipCents) : "None"}</span>
+              </FactRow>
+              <FactRow label="Paid by">{appointment.sale.methods || "—"}</FactRow>
             </dl>
           )}
         </section>
 
-        {/* What to know, as small labeled rows. */}
-        {(keyRows.length > 0 || (appointment.policy && client)) && (
-          <dl className="flex flex-col gap-2" data-testid="visit-facts">
-            {keyRows.map(([label, value, testId]) => (
-              <FactRow key={label} label={label} testId={testId}>
-                {value}
-              </FactRow>
-            ))}
-            {appointment.policy && client && <PolicyInfo appointment={appointment} firstName={firstName} />}
-          </dl>
+        {/* What to know about the client, only what applies, then Denise's line. */}
+        {(client?.allergies || keyRows.length > 0 || (appointment.policy && client) || appointment.insight || (client && outstanding.length > 0)) && (
+          <section aria-label="Client" className="flex flex-col gap-3 border-t border-line pt-4">
+            {(client?.allergies || keyRows.length > 0 || (appointment.policy && client)) && (
+              <dl className="flex flex-col gap-2" data-testid="visit-facts">
+                {appointment.policy && client && <PolicyInfo appointment={appointment} firstName={firstName} part="card" />}
+                {keyRows.map(([label, value, testId]) => (
+                  <FactRow key={label} label={label} testId={testId}>
+                    {value}
+                  </FactRow>
+                ))}
+                {appointment.policy && client && <PolicyInfo appointment={appointment} firstName={firstName} part="standing" />}
+                {client?.allergies && (
+                  <FactRow label="Allergy" testId="visit-allergy" danger>
+                    {client.allergies}
+                  </FactRow>
+                )}
+              </dl>
+            )}
+            {/* Only while something's outstanding: one row that opens the checklist. */}
+            {client && outstanding.length > 0 && <VisitChecklist items={checklist} override={appointment.patchOverride} clientId={client.id} date={date} today={today} timeZone={timeZone} me={me} team={team} />}
+            {appointment.insight && (
+              <div className="-mx-1.5">
+                <ClientInsightLine insight={appointment.insight} />
+              </div>
+            )}
+          </section>
         )}
 
-        {/* Only while something's outstanding: one row that opens the checklist. */}
-        {client && outstanding.length > 0 && <VisitChecklist items={checklist} override={appointment.patchOverride} clientId={client.id} date={date} today={today} timeZone={timeZone} me={me} team={team} />}
-
-        {appointment.insight && <ClientInsightLine insight={appointment.insight} />}
-
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col border-t border-line pt-1">
           <Tabs
             label="Visit"
             quiet
-            fill
             value={tab}
             onChange={setTab}
             tabs={[
@@ -408,7 +415,7 @@ export function AppointmentPanel({
             ]}
           >
             {tab === "notes" ? (
-              <div className="flex flex-1 flex-col gap-5">
+              <div className="flex flex-col gap-4">
                 {client?.preferences && (
                   <section aria-label="Preferences" className="flex flex-col gap-1">
                     <SectionLabel>Client preferences</SectionLabel>
@@ -416,6 +423,23 @@ export function AppointmentPanel({
                   </section>
                 )}
                 <NotesForm key={appointment.id} appointmentId={appointment.id} initial={appointment.notes} editable={notesEditable} />
+                {lastVisit && (
+                  <section aria-label="Last visit" className="flex flex-col gap-1" data-testid="last-visit">
+                    <SectionLabel>Last visit</SectionLabel>
+                    <p className="text-ink">
+                      <span className="tabular-nums">{lastVisit.date}</span> · {lastVisit.services} <span className="text-ink-muted">with {lastVisit.staff}</span>
+                    </p>
+                  </section>
+                )}
+                {latestFormula && (
+                  <section aria-label="Latest formula" className="flex flex-col gap-1" data-testid="latest-formula">
+                    <SectionLabel>Latest formula</SectionLabel>
+                    <p className="text-ink">{latestFormula.products || latestFormula.text}</p>
+                    <p className="text-13 text-ink-muted">
+                      {latestFormula.date} · {latestFormula.author}
+                    </p>
+                  </section>
+                )}
               </div>
             ) : tab === "formula" ? (
               <FormulaSection appointment={appointment} date={date} products={products} canRecord={canRecordFormula && Boolean(client)} />
@@ -722,7 +746,7 @@ function NotesForm({ appointmentId, initial, editable }: { appointmentId: string
   }
 
   return (
-    <form aria-label="Notes" className="flex flex-1 flex-col gap-1.5" onSubmit={(e) => e.preventDefault()}>
+    <form aria-label="Notes" className="flex flex-col gap-1.5" onSubmit={(e) => e.preventDefault()}>
       <div className="flex items-baseline justify-between gap-3">
         <label htmlFor="appointment-notes" className="text-13 font-medium text-ink-muted">
           Visit notes
@@ -751,7 +775,7 @@ function NotesForm({ appointmentId, initial, editable }: { appointmentId: string
         maxLength={MAX_NOTES}
         rows={4}
         placeholder="Anything the stylist should know"
-        className={`${fieldClass} min-h-28 flex-1 resize-none`}
+        className={`${fieldClass} min-h-[6.5rem] max-h-80 resize-none field-sizing-content`}
       />
       {state.kind === "error" && (
         <p role="alert" className="text-13 text-danger">
@@ -1300,17 +1324,19 @@ function CheckInWarning({
 // The cancellation policy on the visit (front of house): a card or deposit
 // still needed, with a secure link to send; the client's strikes; a
 // no-show's fee and what happened to it.
-function PolicyInfo({ appointment, firstName }: { appointment: AppointmentDetail; firstName: string }) {
+// `part`: the card (first of the rows), or their standing and any fee
+// (after the package and membership).
+function PolicyInfo({ appointment, firstName, part }: { appointment: AppointmentDetail; firstName: string; part: "card" | "standing" }) {
   const p = appointment.policy!;
   const client = appointment.client!;
   const strikes = p.strikes > 0 && `${p.strikes} late cancel${p.strikes === 1 ? "" : "s"} or no-show${p.strikes === 1 ? "" : "s"} in ${p.months} months`;
   const needed = p.cardNeeded || p.depositNeededCents > 0;
   return (
-    <div className="contents" data-testid="policy-info">
-      <FactRow label="Card on file">
+    <div className="contents" data-testid={part === "card" ? "policy-info" : undefined}>
+      {part === "card" && <FactRow label="Card on file">
         {needed ? (
-          <span className="flex flex-col items-start gap-2">
-            <span className="flex flex-wrap items-center gap-1.5">
+          <span className="flex flex-col items-end gap-2">
+            <span className="flex flex-wrap items-center justify-end gap-1.5">
               <span data-testid="card-needed" className="inline-flex">
                 <Badge tone="warning">{p.depositNeededCents > 0 ? `Deposit needed: ${formatPrice(p.depositNeededCents)}` : "Card needed to hold this booking"}</Badge>
               </span>
@@ -1323,8 +1349,8 @@ function PolicyInfo({ appointment, firstName }: { appointment: AppointmentDetail
         ) : (
           <span className="text-ink-muted">None</span>
         )}
-      </FactRow>
-      {(strikes || (needed && p.repeatAction)) && (
+      </FactRow>}
+      {part === "standing" && (strikes || (needed && p.repeatAction)) && (
         <FactRow label="Late cancels">
           {strikes || "None"}
           {needed && p.repeatAction && (
@@ -1334,7 +1360,7 @@ function PolicyInfo({ appointment, firstName }: { appointment: AppointmentDetail
           )}
         </FactRow>
       )}
-      {p.fee && (
+      {part === "standing" && p.fee && (
         <FactRow label="Fee">
           <FeeControls fee={p.fee} canWaive={p.canWaive} canRetry />
         </FactRow>
@@ -1344,11 +1370,12 @@ function PolicyInfo({ appointment, firstName }: { appointment: AppointmentDetail
 }
 
 // One labeled row of what to know about the visit.
-function FactRow({ label, testId, children }: { label: string; testId?: string; children: React.ReactNode }) {
+// Muted label on the left, the value on the right (red for an allergy).
+function FactRow({ label, testId, danger = false, children }: { label: string; testId?: string; danger?: boolean; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-baseline gap-3">
-      <dt className="text-13 text-ink-muted">{label}</dt>
-      <dd className="min-w-0 text-ink wrap-anywhere" data-testid={testId}>
+    <div className="flex items-baseline justify-between gap-4">
+      <dt className={`shrink-0 text-13 ${danger ? "font-medium text-danger" : "text-ink-muted"}`}>{label}</dt>
+      <dd className={`min-w-0 text-right text-pretty wrap-anywhere ${danger ? "text-danger" : "text-ink"}`} data-testid={testId}>
         {children}
       </dd>
     </div>

@@ -21,7 +21,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { isEditable, STATUS_LABELS, type AppointmentStatus } from "@/lib/appointments";
 import { reach } from "@/lib/reach";
 import type { DeniseRequest, DeniseState, FixMove, FixResult, FixView } from "@/lib/denise/types";
-import { FAMILIES, FAMILY_LABELS, laneBox, layoutColumn, minutesLate, NOT_ARRIVED_MINUTES, quarterMarks, summaryVariants, timeRangeVariants, ZOOM_LABELS, ZOOM_PX_PER_MINUTE, ZOOMS, type CalendarZoom, type ServiceFamily } from "@/lib/calendar";
+import { FAMILIES, FAMILY_LABELS, laneBox, layoutColumn, minutesLate, NOT_ARRIVED_MINUTES, quarterMarks, shortRange, summaryVariants, timeRangeVariants, ZOOM_LABELS, ZOOM_PX_PER_MINUTE, ZOOMS, type CalendarZoom, type ServiceFamily } from "@/lib/calendar";
 import { BLOCK_LABELS } from "@/lib/scheduling/blocks";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, toLocal } from "@/lib/scheduling/time";
@@ -54,6 +54,8 @@ import { useKeepOnScreen } from "@/components/ui/keep-on-screen";
 import { SideScrollEdges } from "@/components/ui/side-scroll";
 import type { Moved } from "@/lib/move-notices";
 import { MovePrompt } from "./move-prompt";
+import { CalendarNotice } from "./notice";
+import { anywayQuestion, dropIssues, issueText, type DropIssue } from "@/lib/move-anyway";
 
 // How tall time is drawn (px per minute), from the zoom; blocks read it.
 const ScaleContext = createContext(ZOOM_PX_PER_MINUTE.comfortable);
@@ -80,9 +82,11 @@ const DRAG_THRESHOLD = 5;
 const LONG_PRESS_MS = 350;
 // While a touch drag is on, the page doesn't scroll under the finger.
 const stopScroll = (e: TouchEvent) => e.preventDefault();
-// Dragging near the grid's left or right edge scrolls it sideways (many
-// columns): how close, in px, and how far each move scrolls at most.
+// Dragging near the grid's edge scrolls it: sideways (many columns), and
+// up or down through the day. How close, in px, and how far each step
+// scrolls at most (steps repeat while the pointer stays there).
 const EDGE_ZONE = 72;
+const EDGE_Y_ZONE = 40;
 const EDGE_STEP = 24;
 // A column's narrowest before the grid scrolls sideways, and with Fit all.
 const COLUMN_MIN = "9.5rem";
@@ -289,6 +293,8 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const [savedOrder, setSavedOrder] = useOptimistic<string[] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
+  const clearNotice = useCallback(() => setNotice(null), []);
+  const clearDone = useCallback(() => setDoneMessage(null), []);
   // Clients a staff move changed, until staff choose whether to tell them.
   const [movePrompt, setMovePrompt] = useState<Moved | null>(null);
   const closeMovePrompt = useCallback((message: string | null) => {
@@ -359,6 +365,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const [hint, setHint] = useState<{ id: string; details: string[]; rect: DOMRect } | null>(null);
   // A drag of a repeating visit, waiting for "this / following / all".
   const [pendingMove, setPendingMove] = useState<{ move: Move; block: BlockData } | null>(null);
+  // A drop onto something in the way, waiting for "Move anyway?" (the
+  // preview stays where it was dropped meanwhile).
+  const [anywayAsk, setAnywayAsk] = useState<{ move: Move; block: BlockData; scope: "this"; question: { text: string; action: string } } | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   // Blocked time being dragged or resized, and where moved blocks now are
   // until the calendar reloads.
@@ -700,13 +709,52 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const headerRefs = useRef(new Map<string, HTMLElement>());
 
   // Scrolls the grid sideways while something is dragged near its edge.
-  function edgeScroll(clientX: number) {
+  function edgeScroll(clientX: number, clientY?: number, fromY?: number) {
     const el = gridRef.current;
-    if (!el) return;
+    if (!el) return false;
     const r = el.getBoundingClientRect();
     const left = r.left + 64;
+    const before = { x: el.scrollLeft, y: el.scrollTop, page: window.scrollY };
     if (clientX > r.right - EDGE_ZONE) el.scrollLeft += Math.ceil((EDGE_STEP * (clientX - (r.right - EDGE_ZONE))) / EDGE_ZONE);
     else if (clientX < left + EDGE_ZONE) el.scrollLeft -= Math.ceil((EDGE_STEP * (left + EDGE_ZONE - clientX)) / EDGE_ZONE);
+    if (clientY !== undefined) {
+      // The grid scrolls the day where it has its own height (a laptop);
+      // otherwise the page does. Below the sticky header row, not over it.
+      const ownScroll = el.scrollHeight > el.clientHeight + 1;
+      const top = (ownScroll ? r.top : 0) + headerHeight(el);
+      const bottom = ownScroll ? r.bottom : window.innerHeight;
+      // A narrower band than sideways (a fifth of the view at most), so a
+      // drop low in a short day doesn't scroll it.
+      const zone = Math.min(EDGE_Y_ZONE, (bottom - top) / 5);
+      // Only toward the edge it was dragged to: a visit picked up near the
+      // top and dragged down doesn't scroll the day up first.
+      const down = fromY === undefined || clientY > fromY;
+      const up = fromY === undefined || clientY < fromY;
+      const step =
+        down && clientY > bottom - zone ? Math.ceil((EDGE_STEP * Math.min(zone, clientY - (bottom - zone))) / zone)
+        : up && clientY < top + zone ? -Math.ceil((EDGE_STEP * Math.min(zone, top + zone - clientY)) / zone)
+        : 0;
+      if (step && ownScroll) el.scrollTop += step;
+      else if (step) window.scrollBy(0, step);
+    }
+    return el.scrollLeft !== before.x || el.scrollTop !== before.y || window.scrollY !== before.page;
+  }
+
+  // While a visit is held near an edge, the grid keeps scrolling under it
+  // (a frame at a time) and the visit goes with it.
+  const edgeTimer = useRef<number | null>(null);
+  function keepEdgeScrolling() {
+    if (edgeTimer.current !== null) return;
+    const step = () => {
+      const d = dragRef.current;
+      if (!d?.moved || !edgeScroll(lastPointer.current.x, lastPointer.current.y, d.y)) {
+        edgeTimer.current = null;
+        return;
+      }
+      dragTo(dragRef.current!);
+      edgeTimer.current = requestAnimationFrame(step);
+    };
+    edgeTimer.current = requestAnimationFrame(step);
   }
 
   // Dragging a header by its grip: the columns make room as it goes, and
@@ -822,25 +870,45 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     const dx = e.clientX - d.x;
     const dy = e.clientY - d.y;
     if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
-    edgeScroll(e.clientX);
     lastPointer.current = { x: e.clientX, y: e.clientY };
     dragTo(d);
+    keepEdgeScrolling();
   }
 
   // Puts the dragged block where the pointer holds it: its top the grab
-  // below the pointer, on the nearest 15-minute line of the column under it.
-  // A stylist who doesn't do the service is passed over (their column is
-  // dimmed): it stays with the last stylist who does.
+  // below the pointer (so it never jumps or drifts from where it was
+  // picked up), on the nearest 5-minute mark of the column under it. Any
+  // stylist takes it; what's in the way shows on the preview and is asked
+  // about on drop.
   function dragTo(d: Drag) {
     const origin = dragOrigin.current;
     if (!origin) return;
     const { x, y: pointerY } = lastPointer.current;
     const minute = range.start + (pointerY - d.grab - origin.getBoundingClientRect().top) / PX_PER_MINUTE;
-    const start = Math.min(Math.max(Math.round(minute / SLOT_STEP) * SLOT_STEP, range.start), range.end - d.length);
-    const over = columnAt(x);
-    const next = { ...d, moved: true, start, staffId: over && offersDragged(d.itemId, over) ? over : d.staffId };
+    const start = Math.min(Math.max(Math.round(minute / MOVE_STEP) * MOVE_STEP, range.start), range.end - d.length);
+    const next = { ...d, moved: true, start, staffId: columnAt(x) ?? d.staffId };
     dragRef.current = next;
     setDrag(next);
+  }
+
+  // What a visit moved there would run into, from what the calendar shows.
+  function issuesAt(move: Move): DropIssue[] {
+    const b = blocks.find((x) => x.itemId === move.itemId);
+    const column = data.columns.find((c) => c.staffId === move.staffId);
+    if (!b || !column) return [];
+    const item = data.appointments[b.appointmentId]?.items.find((i) => i.id === move.itemId);
+    return dropIssues({
+      stylist: column.firstName,
+      offersService: offersDragged(move.itemId, move.staffId),
+      service: item?.serviceName ?? b.service,
+      segments: b.segments,
+      shift: move.start - b.start,
+      others: blocks
+        .filter((o) => o.staffId === move.staffId && o.itemId !== move.itemId && o.status !== "canceled" && o.status !== "no_show")
+        .map((o) => ({ client: o.clientName.split(" ")[0], segments: o.segments })),
+      blocks: timeBlocks.filter((t) => t.staffId === move.staffId),
+      unavailable: [...column.offHours, ...column.timeOff],
+    });
   }
 
   // Whether a stylist does the service on the visit being dragged.
@@ -861,17 +929,27 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     const move = { itemId: d.itemId, staffId: d.staffId, start: d.start };
     // A repeating or group visit asks which visits to move first.
     if (b.series || b.group) return setPendingMove({ move, block: b });
-    runMove(move, b, "this");
+    dropOne(move, b);
   }
 
-  function runMove(move: Move, b: BlockData, scope: Scope | "group") {
+  // One visit dropped: at once when nothing's in the way, else "Move
+  // anyway?" first.
+  function dropOne(move: Move, b: BlockData) {
+    const question = anywayQuestion(issuesAt(move));
+    if (question) setAnywayAsk({ move, block: b, scope: "this", question });
+    else runMove(move, b, "this");
+  }
+
+  function runMove(move: Move, b: BlockData, scope: Scope | "group", anyway = false) {
     setNotice(null);
     setSettling(move.itemId);
     startTransition(async () => {
       addMove(move);
       const input = { itemId: move.itemId, staffId: move.staffId, date: data.date, startMinute: move.start };
-      const result = scope === "this" ? await moveVisitItem(input) : scope === "group" ? await moveGroupVisit(input) : await moveVisitItemScoped(input, scope);
-      if (!result.ok) setNotice(`Couldn't move ${b.clientName}'s ${b.service}: ${result.message}`);
+      const result = scope === "this" ? await moveVisitItem(input, anyway) : scope === "group" ? await moveGroupVisit(input) : await moveVisitItemScoped(input, scope);
+      // The calendar changed under the drag: ask now, as on drop.
+      if (!result.ok && "confirm" in result && result.confirm) setAnywayAsk({ move, block: b, scope: "this", question: result.confirm });
+      else if (!result.ok) setNotice(`Couldn't move ${b.clientName}'s ${b.service}: ${result.message}`);
       else {
         if ((result as { message?: string }).message) setDoneMessage((result as { message?: string }).message!);
         if (result.moved) setMovePrompt(result.moved);
@@ -898,6 +976,11 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   // Event holds change only with their event.
   const canEditBlock = (b: TimeBlockData) => b.kind !== "event" && blockStaff.includes(b.staffId);
   const timeBlocks = data.timeBlocks.map((b) => ({ ...b, ...blockMoves[`${b.blockId}:${b.start}`] }));
+  // Where the dragged visit would land (or was dropped, while "Move
+  // anyway?" waits), and what's in the way there.
+  const ghostAt: Move | null = drag?.moved ? { itemId: drag.itemId, staffId: drag.staffId, start: drag.start } : (anywayAsk?.move ?? null);
+  const ghostIssues = ghostAt ? issuesAt(ghostAt) : [];
+  const ghostIssue = ghostIssues.length ? ghostIssues.map(issueText).join(" · ") : null;
 
   function onBlockPointerDown(e: React.PointerEvent, b: TimeBlockData, mode: "move" | "resize") {
     if (e.button !== 0 || !canEditBlock(b)) return;
@@ -1120,25 +1203,11 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           </button>
         )}
 
-        {doneMessage && (
-          <div role="status" className="flex animate-fade-in items-start justify-between gap-4 rounded-md border border-status-confirmed-ink/25 bg-status-confirmed-bg px-3 py-2 text-sm text-status-confirmed-ink">
-            <span>{doneMessage}</span>
-            <button type="button" onClick={() => setDoneMessage(null)} className="font-semibold" aria-label="Dismiss">
-              ×
-            </button>
-          </div>
-        )}
+        {doneMessage && <CalendarNotice tone="success" text={doneMessage} onClose={clearDone} />}
 
         {movePrompt && <MovePrompt moved={movePrompt} staffId={me.staffId} today={data.today} onDone={closeMovePrompt} />}
 
-        {notice && (
-          <div role="alert" className="flex animate-fade-in items-start justify-between gap-4 rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">
-            <span>{notice}</span>
-            <button type="button" onClick={() => setNotice(null)} className="font-semibold" aria-label="Dismiss">
-              ×
-            </button>
-          </div>
-        )}
+        {notice && <CalendarNotice tone="danger" text={notice} onClose={clearNotice} />}
 
         {/* With less room (Denise's panel or booking details open), the
             stylists scroll sideways under the time column, and the side with
@@ -1282,16 +1351,6 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                           backgroundSize: `100% ${60 * PX_PER_MINUTE}px, 100% ${15 * PX_PER_MINUTE}px`,
                         }}
                       >
-                        {/* Mid-drag, a stylist who doesn't do the service is dimmed
-                            and won't take the visit. */}
-                        {drag?.moved && !offersDragged(drag.itemId, c.staffId) && (
-                          <div
-                            aria-hidden
-                            data-drag-dimmed
-                            title={`${c.firstName} doesn't do this service`}
-                            className="pointer-events-none absolute inset-0 z-[35] bg-canvas/75"
-                          />
-                        )}
                         {c.offHours.map((o) => (
                           <div
                             key={o.start}
@@ -1357,7 +1416,9 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                             );
                           })}
 
-                        {drag?.moved && drag.staffId === c.staffId && <DragGhost block={blocks.find((b) => b.itemId === drag.itemId)!} start={drag.start} stylist={c.firstName} y={y} />}
+                        {ghostAt?.staffId === c.staffId && (
+                          <DragGhost block={blocks.find((b) => b.itemId === ghostAt.itemId)!} start={ghostAt.start} stylist={c.firstName} y={y} issue={ghostIssue} />
+                        )}
 
 
                         <ul aria-label={`${c.name}'s appointments`}>
@@ -1735,9 +1796,22 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           onPick={(scope) => {
             const p = pendingMove;
             setPendingMove(null);
-            runMove(p.move, p.block, scope);
+            if (scope === "this") dropOne(p.move, p.block);
+            else runMove(p.move, p.block, scope);
           }}
           onCancel={() => setPendingMove(null)}
+        />
+      )}
+      {anywayAsk && (
+        <AnywayDialog
+          title={`Move ${anywayAsk.block.clientName}?`}
+          question={anywayAsk.question}
+          onConfirm={() => {
+            const a = anywayAsk;
+            setAnywayAsk(null);
+            runMove(a.move, a.block, a.scope, true);
+          }}
+          onCancel={() => setAnywayAsk(null)}
         />
       )}
       {guard.dialog}
@@ -1882,6 +1956,36 @@ function askExample({ columns, menu }: BoardData): string {
   const cutsHair = (c: ColumnData) => Object.keys(menu.offers[c.staffId] ?? {}).some((id) => cuts.has(id));
   const who = columns.find((c) => c.working && cutsHair(c)) ?? columns.find(cutsHair);
   return who ? `Find a haircut with ${who.firstName} after 1 PM` : "Who's free for a haircut after 1 PM?";
+}
+
+// "Gil has Lillian then. Double-book anyway?" after a drop onto something
+// in the way. Cancel (or Escape, or a click outside) leaves the visit where
+// it was.
+function AnywayDialog({ title, question, onConfirm, onCancel }: { title: string; question: { text: string; action: string }; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/30 p-4" onClick={onCancel}>
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={title}
+        data-testid="move-anyway"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.key === "Escape" && onCancel()}
+        className="flex w-full max-w-sm animate-pop-in flex-col gap-3 rounded-lg border border-line bg-surface p-5 shadow-lift"
+      >
+        <h2 className="text-xl font-semibold text-ink">{title}</h2>
+        <p className="text-sm text-ink-muted">{question.text}</p>
+        <div className="flex flex-wrap justify-end gap-2 pt-1">
+          <Button variant="secondary" autoFocus onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={onConfirm}>
+            {question.action}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // "This visit, the whole group, this and following, or all?" for a change
@@ -2369,23 +2473,33 @@ function TimeBlockBox({
 }
 
 // Where the dragged block will land: a copy on the grid lines (no scaling,
-// so its edges sit exactly on them), with the new time and stylist.
-function DragGhost({ block, start, stylist, y }: { block: BlockData; start: number; stylist: string; y: (minute: number) => number }) {
+// so its edges sit exactly on them), with the exact time and stylist
+// ("6:05–6:35pm · Gil"). Amber, with the reason, when something's in the
+// way there (asked about on drop).
+function DragGhost({ block, start, stylist, y, issue }: { block: BlockData; start: number; stylist: string; y: (minute: number) => number; issue: string | null }) {
   const PX_PER_MINUTE = usePpm();
   const length = block.end - block.start;
   return (
     <div
       data-drag-ghost
       data-family={block.family}
+      data-warning={issue ? "" : undefined}
       aria-hidden
-      className="pointer-events-none absolute inset-x-1 z-40 overflow-hidden rounded-block bg-(--fam-fill) py-1.5 pr-2 pl-3 text-sm text-(--fam-ink) shadow-lift ring-2 ring-link"
+      className={`pointer-events-none absolute inset-x-1 z-40 overflow-hidden rounded-block py-1.5 pr-2 pl-3 text-sm shadow-lift ring-2 ${
+        issue ? "bg-warning-soft text-ink ring-warning-dot" : "bg-(--fam-fill) text-(--fam-ink) ring-link"
+      }`}
       style={{ top: y(start), height: length * PX_PER_MINUTE }}
     >
-      <span className="absolute top-1 bottom-1 left-1 w-[3px] rounded-full bg-(--fam-accent)" />
-      <div className="truncate font-semibold">{block.clientName}</div>
-      <div className="truncate text-13 font-medium">
-        {formatMinute(start)}–{formatMinute(start + length)} · {stylist}
+      <span className={`absolute top-1 bottom-1 left-1 w-[3px] rounded-full ${issue ? "bg-warning-dot" : "bg-(--fam-accent)"}`} />
+      <div className="truncate text-13 font-semibold tabular-nums" data-testid="drag-label">
+        {shortRange(start, start + length)} · {stylist}
       </div>
+      <div className="truncate text-13">{block.clientName}</div>
+      {issue && (
+        <div className="truncate text-xs font-medium text-warning" data-testid="drag-issue">
+          {issue}
+        </div>
+      )}
     </div>
   );
 }

@@ -272,6 +272,9 @@ test.describe("on the calendar", () => {
     await seed(await newClient("Ann"), BRIDGET, at(10), undefined, "booked", true);
     await seed(await newClient("Bea"), BRIDGET, at(10, 30), undefined, "booked", true);
     await openDay(page);
+    // A new conflict only bounces her badge; she opens when asked.
+    await expect(page.getByTestId("denise-launcher-badge")).toBeVisible();
+    await page.getByTestId("denise-launcher").click();
     const panel = denisePanel(page);
     await expect(panel).toContainText("Bridget is double-booked");
     await expect(panel.getByRole("button", { name: "Apply fix" })).toBeVisible();
@@ -299,6 +302,9 @@ test.describe("cancellations", () => {
     const cancel = details(page).getByRole("form", { name: "Cancel booking" });
     await cancel.getByLabel("Reason").selectOption("Client canceled");
     await cancel.getByRole("button", { name: "Cancel booking" }).click();
+    // A cancellation only bounces her badge; her reply is there once she's opened.
+    await expect(page.getByTestId("denise-launcher-badge")).toBeVisible();
+    await page.getByTestId("denise-launcher").click();
     await expect(denisePanel(page)).toContainText(/That frees 10am–11am with Shae\. No one on the waitlist fits it/);
   });
 
@@ -313,6 +319,9 @@ test.describe("cancellations", () => {
     const cancel = details(page).getByRole("form", { name: "Cancel booking" });
     await cancel.getByLabel("Reason").selectOption("Client canceled");
     await cancel.getByRole("button", { name: "Cancel booking" }).click();
+    // A cancellation only bounces her badge; her reply is there once she's opened.
+    await expect(page.getByTestId("denise-launcher-badge")).toBeVisible();
+    await page.getByTestId("denise-launcher").click();
     const opening = page.getByTestId("denise-opening");
     await expect(opening).toContainText(`${PREFIX}Eli Lewis`);
     await expect(opening.getByRole("button", { name: "Book" })).toBeVisible();

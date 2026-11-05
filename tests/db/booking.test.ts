@@ -9,7 +9,7 @@ import { admin, createOtherSalon, SEED, signIn, type Client } from "./helpers";
 const B = SEED.business;
 const TZ = "America/Chicago";
 const location = { id: SEED.location, timezone: TZ };
-const { bridget: BRIDGET, shae: SHAE, gil: GIL, frontDesk: FRONT_DESK, manager: MANAGER } = SEED.staff;
+const { bridget: BRIDGET, shae: SHAE, gil: GIL, nola: NOLA, frontDesk: FRONT_DESK, manager: MANAGER } = SEED.staff;
 const CHAIR = (n: number) => `f0000000-0000-4000-8000-00000000000${n}`;
 // A Tuesday far from the seeded month. Bridget works 9-1 and 2-6, Shae 9-1
 // and 1:30-5:30.
@@ -106,6 +106,51 @@ describe("booking", () => {
 
     const clash = await book(frontDesk, [item("Women's Cut & Style", BRIDGET, at(10, 30))]);
     expect(clash).toEqual({ ok: false, error: "invalid", problems: [[expect.objectContaining({ code: "staff_double_booked" })]] });
+  });
+
+  it("moves a visit anyway once staff confirm: over a client, onto a service the stylist doesn't do", async () => {
+    const first = await book(frontDesk, [item("Women's Cut & Style", BRIDGET, at(10))]);
+    const second = await book(frontDesk, [item("Blowout", SHAE, at(15))]);
+    const moving = await appointment(second.ok ? second.appointmentId : "");
+    const itemId = moving.appointment_items[0].id;
+
+    // Without saying so, the rules refuse it.
+    expect(await moveItem(frontDesk, location, { itemId, staffId: BRIDGET, start: at(10) })).toMatchObject({ ok: false, error: "invalid", problems: [[{ code: "staff_double_booked" }]] });
+    // Said so: it's saved over the other client, marked overbooked.
+    expect(await moveItem(frontDesk, location, { itemId, staffId: BRIDGET, start: at(10), anyway: true })).toMatchObject({ ok: true });
+    const { data: moved } = await admin.from("appointment_items").select("staff_id, overbooked").eq("id", itemId).single();
+    expect(moved).toEqual({ staff_id: BRIDGET, overbooked: true });
+    expect(first.ok).toBe(true);
+
+    // Moved again without saying so, it counts again (and is free now).
+    expect(await moveItem(frontDesk, location, { itemId, staffId: BRIDGET, start: at(11) })).toMatchObject({ ok: true });
+    expect((await admin.from("appointment_items").select("overbooked").eq("id", itemId).single()).data!.overbooked).toBe(false);
+
+    // A blowout moved to Nola, who doesn't do blowouts: her level's price, else the menu's.
+    const blowout = await book(frontDesk, [item("Blowout", SHAE, at(9))]);
+    expect(blowout.ok).toBe(true);
+    const blowoutItem = (await appointment(blowout.ok ? blowout.appointmentId : "")).appointment_items[0].id;
+    expect(await moveItem(frontDesk, location, { itemId: blowoutItem, staffId: NOLA, start: at(9) })).toMatchObject({ ok: false, problems: [[{ code: "service_not_offered" }]] });
+    expect(await moveItem(frontDesk, location, { itemId: blowoutItem, staffId: NOLA, start: at(9), anyway: true })).toMatchObject({ ok: true });
+    const { data: price } = await admin.from("appointment_items").select("staff_id, price_cents").eq("id", blowoutItem).single();
+    expect(price!.staff_id).toBe(NOLA);
+    expect(price!.price_cents).toBeGreaterThan(0);
+  });
+
+  it("still refuses a double-booking written without saying so", async () => {
+    const first = await book(frontDesk, [item("Women's Cut & Style", BRIDGET, at(10))]);
+    const id = (await appointment(first.ok ? first.appointmentId : "")).appointment_items[0];
+    // Straight to the database, as a stale save would: the guard catches it.
+    const { data: v } = await admin.from("locations").select("calendar_version").eq("id", SEED.location).single();
+    const { error } = await frontDesk.rpc("save_appointment", {
+      p_location_id: SEED.location,
+      p_appointment_id: null!,
+      p_client_id: clientId,
+      p_notes: "",
+      p_items: [{ id: null, service_id: id.service_id, staff_id: BRIDGET, resource_id: null, starts_at: at(10).toISOString(), timing: null }],
+      p_expected_version: v!.calendar_version,
+    });
+    expect(error?.code).toBe("23P01");
   });
 
   it("reports problems for each service in the visit", async () => {

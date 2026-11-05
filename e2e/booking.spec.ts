@@ -376,31 +376,36 @@ test.describe("front desk", () => {
     expect(moved.updated_by).toBe(FRONT_DESK);
   });
 
-  test("snaps a move back and says why when it breaks a rule", async ({ page }) => {
-    await seedVisit(await newClient("Hal"), [{ service: "Blowout", staff: SHAE, start: at(10) }]);
+  test("asks before a move onto a stylist who doesn't do it, or over another client", async ({ page }) => {
+    const halId = await seedVisit(await newClient("Hal"), [{ service: "Blowout", staff: SHAE, start: at(10) }]);
     await seedVisit(await newClient("Ivy"), [{ service: "Men's Cut", staff: SHAE, start: at(11) }]);
     await openDay(page);
     const hal = (stylist: string) => column(page, stylist).getByRole("button", { name: new RegExp(`${PREFIX}Hal Test`) });
 
-    // Nola doesn't do blowouts: her column is dimmed while it's held, and
-    // the visit stays with Shae.
+    // Nola doesn't do blowouts: the preview turns amber and says so, and
+    // dropping there asks first. Cancel leaves it with Shae.
     await hal("Shae Morgan").scrollIntoViewIfNeeded();
     const from = (await hal("Shae Morgan").boundingBox())!;
     const nola = (await column(page, "Nola Brennan").boundingBox())!;
     await page.mouse.move(from.x + 15, from.y + 8);
     await page.mouse.down();
     await page.mouse.move(nola.x + 30, from.y + 8, { steps: 10 });
-    await expect(column(page, "Nola Brennan").locator("[data-drag-dimmed]")).toHaveCount(1);
-    await expect(column(page, "Shae Morgan").locator("[data-drag-dimmed]")).toHaveCount(0);
+    const ghost = column(page, "Nola Brennan").locator("[data-drag-ghost]");
+    await expect(ghost).toHaveAttribute("data-warning", "");
+    await expect(ghost.getByTestId("drag-issue")).toHaveText("Nola doesn't usually do Blowout");
     await page.mouse.up();
-    await expect(ui(page).locator("[data-drag-dimmed]")).toHaveCount(0);
-    await expect(ui(page).getByRole("alert")).toHaveCount(0);
+    const ask = ui(page).getByTestId("move-anyway");
+    await expect(ask).toContainText("Nola doesn't usually do Blowout. Move anyway?");
+    await page.keyboard.press("Escape");
+    await expect(ask).toHaveCount(0);
     await expect(hal("Shae Morgan")).toHaveAccessibleName(new RegExp("^10am–10:45am"));
 
-    // Onto Ivy's cut.
+    // Onto Ivy's cut: "Double-book anyway?", and it goes there.
     await drag(page, hal("Shae Morgan"), "Shae Morgan", 45);
-    await expect(ui(page).getByRole("alert")).toContainText("The stylist already has a client then.");
-    await expect(hal("Shae Morgan")).toHaveAccessibleName(new RegExp("^10am–10:45am"));
+    await expect(ask).toContainText(`Shae has ${PREFIX}Ivy then. Double-book anyway?`);
+    await ask.getByRole("button", { name: "Double-book anyway" }).click();
+    await expect.poll(async () => (await appointment(halId)).appointment_items[0].starts_at).toBe(at(10, 45).toISOString().replace(".000Z", "+00:00"));
+    await expect(ui(page).getByRole("alert")).toHaveCount(0);
   });
 });
 

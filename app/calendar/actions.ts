@@ -15,7 +15,7 @@ import { isUuid } from "@/lib/ids";
 import { isZoom, type CalendarZoom } from "@/lib/calendar";
 import { isUsable, loadClientPackages, type ClientPackage } from "@/lib/packages";
 import { loadBackBarProducts } from "@/lib/inventory-load";
-import { changeStatus, checkInPatchOverride, moveItem, saveBooking, saveNotes, undoCheckIn, undoNoShow, type BookingItemInput, type SaveResult, type VisitSeen } from "@/lib/scheduling/book";
+import { changeStatus, checkInPatchOverride, MOVE_ANYWAY, moveItem, saveBooking, saveNotes, undoCheckIn, undoNoShow, type BookingItemInput, type SaveResult, type VisitSeen } from "@/lib/scheduling/book";
 import { describeProblem, type BookingProblem } from "@/lib/scheduling/booking";
 import { bookingIdeas, type BookingIdeas } from "@/lib/denise/ideas";
 import { loadBookingContext, loadCalendarStamp } from "@/lib/scheduling/load";
@@ -30,6 +30,7 @@ import { addDays, daysBetween, formatMinute, fromLocal, isLocalDate, MINUTES_PER
 import { fullName } from "@/lib/staff";
 import type { TimeEvent } from "@/lib/visit-times";
 import { repeatOffenderNote } from "@/lib/policy";
+import { anywayQuestion, type DropIssue } from "@/lib/move-anyway";
 import { clientStanding, loadPolicy } from "@/lib/policy-load";
 
 export type ClientOption = { id: string; name: string; phone: string | null; allergies: string | null };
@@ -196,13 +197,16 @@ async function ideasFor(supabase: Awaited<ReturnType<typeof getCurrentStaff>>["s
   }
 }
 
-export type MoveResult = { ok: true; moved?: Moved | null } | { ok: false; message: string };
+// A move the rules refuse only for reasons staff may override comes back
+// with `confirm`: the question to ask ("Gil has Lillian then. Double-book
+// anyway?"), then the same move again with `anyway`.
+export type MoveResult = { ok: true; moved?: Moved | null } | { ok: false; message: string; confirm?: { text: string; action: string } };
 
 type Supabase = Awaited<ReturnType<typeof getCurrentStaff>>["supabase"];
 
 const visitOfItem = async (supabase: Supabase, itemId: string) => (await supabase.from("appointment_items").select("appointment_id").eq("id", itemId).maybeSingle()).data?.appointment_id ?? null;
 
-export async function moveVisitItem(input: { itemId: string; staffId: string; date: LocalDate; startMinute: number }): Promise<MoveResult> {
+export async function moveVisitItem(input: { itemId: string; staffId: string; date: LocalDate; startMinute: number }, anyway = false): Promise<MoveResult> {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
   if (!isUuid(input.itemId) || !isUuid(input.staffId) || !isLocalDate(input.date)) return { ok: false, message: "That move isn't possible." };
@@ -210,14 +214,39 @@ export async function moveVisitItem(input: { itemId: string; staffId: string; da
   if (!start) return { ok: false, message: "That time doesn't exist." };
 
   const { result, moved } = await withMoveNotices(supabase, me.location, await visitOfItem(supabase, input.itemId), () =>
-    moveItem(supabase, me.location, { itemId: input.itemId, staffId: input.staffId, start }),
+    moveItem(supabase, me.location, { itemId: input.itemId, staffId: input.staffId, start, anyway: anyway === true }),
   );
   if (!result.ok) {
-    if (result.error === "invalid") return { ok: false, message: [...new Set(result.problems.flat().map(describeProblem))].join(" ") };
+    if (result.error === "invalid") {
+      const problems = result.problems.flat();
+      const message = [...new Set(problems.map(describeProblem))].join(" ");
+      const confirm = !anyway && problems.every((p) => MOVE_ANYWAY.has(p.code)) ? anywayQuestion(await issuesOf(supabase, input, problems)) : null;
+      return confirm ? { ok: false, message, confirm } : { ok: false, message };
+    }
     return { ok: false, message: saveErrorMessage(result) };
   }
   refresh();
   return { ok: true, moved };
+}
+
+// The refused move's problems in the board's words, with names.
+async function issuesOf(supabase: Supabase, input: { itemId: string; staffId: string }, problems: BookingProblem[]): Promise<DropIssue[]> {
+  const [{ data: staff }, { data: item }] = await Promise.all([
+    supabase.from("staff").select("first_name").eq("id", input.staffId).maybeSingle(),
+    supabase.from("appointment_items").select("services(name)").eq("id", input.itemId).maybeSingle(),
+  ]);
+  const stylist = staff?.first_name ?? "The stylist";
+  const issues: DropIssue[] = [];
+  for (const p of problems) {
+    if (p.code === "service_not_offered") issues.push({ kind: "not_offered", stylist, service: item?.services?.name ?? "this service" });
+    else if (p.code === "staff_double_booked") {
+      const { data } = p.conflictWith ? await supabase.from("appointment_items").select("appointments(clients(first_name))").eq("id", p.conflictWith).maybeSingle() : { data: null };
+      issues.push({ kind: "overlap", stylist, client: data?.appointments?.clients?.first_name ?? "another client" });
+    } else if (p.code === "staff_blocked") issues.push({ kind: "blocked", stylist, block: p.kind });
+    else if (p.code === "staff_unavailable") issues.push({ kind: "hours", stylist });
+    else issues.push({ kind: "chair" });
+  }
+  return issues.filter((i, n) => issues.findIndex((j) => j.kind === i.kind) === n);
 }
 
 export type MoveDayResult = { ok: true; message: string; moved?: Moved | null } | { ok: false; message: string; ideas?: BookingIdeas | null };

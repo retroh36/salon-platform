@@ -93,16 +93,17 @@ test("holding a visit still picks it up: dragging moves it, and the day doesn't 
   expect((await admin.from("appointments").select("id").eq("id", visitId)).data).toHaveLength(1);
 });
 
-test("a held visit lands on the 15-minute line under the finger, however the day is scrolled", async ({ page }) => {
+test("a held visit lands on the 5-minute mark under the finger, however the day is scrolled", async ({ page }) => {
   await openDay(page);
   const block = ui(page).locator("[data-block]").filter({ hasText: `${PREFIX}Ava` });
   const cdp = await page.context().newCDPSession(page);
   const ppm = Number(await grid(page).getAttribute("data-px-per-minute"));
-  // Each from 10:00 (put back between): the drop goes to the nearest line.
+  // Each from 10:00 (put back between): the drop goes to the nearest 5-minute mark.
   for (const { scroll, minutes, to } of [
-    { scroll: 0, minutes: 38, to: 10 * 60 + 45 },
-    { scroll: 60, minutes: 22, to: 10 * 60 + 15 },
-    { scroll: 120, minutes: -23, to: 9 * 60 + 30 },
+    { scroll: 0, minutes: 39, to: 10 * 60 + 40 },
+    { scroll: 60, minutes: 21, to: 10 * 60 + 20 },
+    // (Not so high it reaches the top edge, which scrolls the day.)
+    { scroll: 30, minutes: -24, to: 9 * 60 + 35 },
   ]) {
     await admin.from("appointment_items").update({ starts_at: at(10).toISOString(), ends_at: at(10, 45).toISOString() }).eq("id", itemId);
     await admin.from("appointments").update({ starts_at: at(10).toISOString(), ends_at: at(10, 45).toISOString() }).eq("id", visitId);

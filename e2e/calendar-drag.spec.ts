@@ -2,10 +2,11 @@ import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, fromLocal, startOfWeek, toLocal, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
+import { shortRange } from "@/lib/calendar";
 import { AUTH, expect, openDisplayMenu, pxPerMinute, test, ui, waitForHydration } from "./fixtures";
 
 // Dragging a visit on the calendar: it moves exactly where it's dropped,
-// on the 15-minute lines, at every zoom and however the day is scrolled,
+// on the 5-minute marks, at every zoom and however the day is scrolled,
 // and every view then shows the saved time.
 
 const B = SEED.business;
@@ -69,6 +70,8 @@ async function settled(page: Page) {
     .toBe(true);
 }
 const range = (start: number) => `${formatMinute(start)}–${formatMinute(start + 45)}`;
+// Booking details says the time once, shortened: "10–10:45am".
+const detailRange = (start: number) => shortRange(start, start + 45);
 
 // Scrolls the day so the visit's top is `offset` px below the stylists'
 // header row (as far as the day scrolls), then drags it from `grab` px into the block by `minutes`,
@@ -107,31 +110,31 @@ test("a dragged visit shows its new time everywhere, and after a reload", async 
   await expect(block(page)).toContainText(range(10 * 60));
   await block(page).click();
   await expect(details(page).getByTestId("client-name")).toHaveText(NAME);
-  await expect(details(page)).toContainText(range(10 * 60));
-  await expect(details(page)).not.toContainText(range(9 * 60 + 30));
+  await expect(details(page)).toContainText(detailRange(10 * 60));
+  await expect(details(page)).not.toContainText(detailRange(9 * 60 + 30));
   // Saved: the same after a reload.
   await page.reload();
   await waitForHydration(page, "section[data-staff-id]");
   await expect(block(page)).toContainText(range(10 * 60));
   await block(page).click();
-  await expect(details(page)).toContainText(range(10 * 60));
+  await expect(details(page)).toContainText(detailRange(10 * 60));
 });
 
 test("booking details open while the visit is dragged shows the new time", async ({ page }) => {
   await newVisit(9 * 60 + 30);
   await openDay(page);
   await block(page).click();
-  await expect(details(page)).toContainText(range(9 * 60 + 30));
+  await expect(details(page)).toContainText(detailRange(9 * 60 + 30));
   await block(page).evaluate((el) => el.setAttribute("data-dragtest", ""));
   await drag(page, 45);
   await expect.poll(savedStart).toBe(10 * 60 + 15);
   await expect(block(page)).toContainText(range(10 * 60 + 15));
-  await expect(details(page)).toContainText(range(10 * 60 + 15));
-  await expect(details(page)).not.toContainText(range(9 * 60 + 30));
+  await expect(details(page)).toContainText(detailRange(10 * 60 + 15));
+  await expect(details(page)).not.toContainText(detailRange(9 * 60 + 30));
   await page.reload();
   await waitForHydration(page, "section[data-staff-id]");
   await block(page).click();
-  await expect(details(page)).toContainText(range(10 * 60 + 15));
+  await expect(details(page)).toContainText(detailRange(10 * 60 + 15));
 });
 
 test("booking details shows the new time while the move is still saving", async ({ page }) => {
@@ -147,25 +150,34 @@ test("booking details shows the new time while the move is still saving", async 
   });
   await drag(page, 30);
   await block(page).click();
-  await expect(details(page)).toContainText(range(10 * 60), { timeout: 1500 });
+  await expect(details(page)).toContainText(detailRange(10 * 60), { timeout: 1500 });
   release();
   await expect.poll(savedStart).toBe(10 * 60);
-  await expect(details(page)).toContainText(range(10 * 60));
+  await expect(details(page)).toContainText(detailRange(10 * 60));
 });
 
-test("a move the rules refuse puts the block back and says why", async ({ page }) => {
+test("a drop outside the stylist's hours asks first, and Cancel puts it back", async ({ page }) => {
   await newVisit(9 * 60 + 30);
   await openDay(page);
   await block(page).evaluate((el) => el.setAttribute("data-dragtest", ""));
   // 12:30 runs into Bridget's 1-2 break.
   await drag(page, 3 * 60);
-  await expect(ui(page).getByRole("alert")).toContainText(`Couldn't move ${NAME}'s Blowout`);
+  const ask = ui(page).getByTestId("move-anyway");
+  await expect(ask).toContainText("Outside Bridget's hours. Move anyway?");
+  await ask.getByRole("button", { name: "Cancel" }).click();
+  await expect(ask).toHaveCount(0);
   await expect(block(page)).toContainText(range(9 * 60 + 30));
   expect(await savedStart()).toBe(9 * 60 + 30);
+  // Asked again, and moved anyway: into the break (the day may have
+  // scrolled a little under it near the edge).
+  await drag(page, 3 * 60);
+  await ask.getByRole("button", { name: "Move anyway" }).click();
+  await expect.poll(savedStart).toBeGreaterThan(12 * 60 + 15);
+  expect(await savedStart()).toBeLessThan(14 * 60);
 });
 
 for (const zoom of ["Compact", "Comfortable", "Detailed"] as const) {
-  test(`${zoom}: drops on the 15-minute line under the pointer, however the day is scrolled`, async ({ page }) => {
+  test(`${zoom}: drops on the 5-minute mark under the pointer, however the day is scrolled`, async ({ page }) => {
     await newVisit(9 * 60 + 30);
     await openDay(page);
     const menu = await openDisplayMenu(page);
@@ -174,17 +186,19 @@ for (const zoom of ["Compact", "Comfortable", "Detailed"] as const) {
     await block(page).evaluate((el) => el.setAttribute("data-dragtest", ""));
     // From near the top of the view, the middle, and lower down; grabbed
     // at the top or the middle of the block; each drop goes to the nearest
-    // line (10:00 less 22 minutes is 9:38, so 9:45; 7 minutes is no move).
+    // 5-minute mark (10:00 less 21 minutes is 9:39, so 9:40).
     const cases = [
       { offset: 10, grab: 6, minutes: 30, to: 10 * 60 },
-      { offset: 200, grab: 20, minutes: -22, to: 9 * 60 + 45 },
-      { offset: 380, grab: 30, minutes: 38, to: 10 * 60 + 30 },
-      { offset: 100, grab: 10, minutes: 7, to: 10 * 60 + 30 },
+      { offset: 200, grab: 20, minutes: -21, to: 9 * 60 + 40 },
+      { offset: 380, grab: 30, minutes: 39, to: 10 * 60 + 20 },
+      { offset: 100, grab: 10, minutes: 6, to: 10 * 60 + 25 },
     ];
     for (const c of cases) {
       await drag(page, c.minutes, c);
       await expect.poll(savedStart, { message: JSON.stringify(c) }).toBe(c.to);
       await expect(block(page)).toContainText(range(c.to));
+      // "Let Ava know?" closed, so the day has its full height again.
+      await ui(page).getByTestId("move-prompt").getByRole("button", { name: "Done" }).click();
     }
   });
 }
@@ -206,11 +220,31 @@ test("a time label follows the drag and the preview sits on the grid lines", asy
   await page.mouse.down();
   await page.mouse.move(from.x + 20, from.y + 10 + 31 * ppm, { steps: 6 });
   const ghost = ui(page).locator("[data-drag-ghost]");
-  await expect(ghost).toContainText(`${range(10 * 60)} · Bridget`);
+  await expect(ghost.getByTestId("drag-label")).toHaveText(`${shortRange(10 * 60, 10 * 60 + 45)} · Bridget`);
+  await expect(ghost).not.toHaveAttribute("data-warning");
   // Exactly half an hour below where it was: on the 10:00 line.
   const box = (await ghost.boundingBox())!;
   expect(Math.abs(box.y - (from.y + 30 * ppm))).toBeLessThan(1);
   expect(Math.abs(box.height - from.height)).toBeLessThan(1);
   await page.mouse.up();
   await expect.poll(savedStart).toBe(10 * 60);
+});
+
+test("holding a visit near the bottom edge scrolls the day under it", async ({ page }) => {
+  await newVisit(9 * 60 + 30);
+  await openDay(page);
+  await block(page).evaluate((el) => el.setAttribute("data-dragtest", ""));
+  await settled(page);
+  await grid(page).evaluate((el) => (el.scrollTop = 0));
+  const from = (await block(page).boundingBox())!;
+  const box = (await grid(page).boundingBox())!;
+  await page.mouse.move(from.x + 20, from.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 20, box.y + box.height - 20, { steps: 8 });
+  const before = await grid(page).evaluate((el) => el.scrollTop);
+  // Held still there, the day keeps scrolling, and the preview with it.
+  await expect.poll(() => grid(page).evaluate((el) => el.scrollTop)).toBeGreaterThan(before + 100);
+  await expect(ui(page).locator("[data-drag-ghost]")).toBeVisible();
+  await page.mouse.move(from.x + 20, from.y + 10);
+  await page.mouse.up();
 });

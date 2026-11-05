@@ -11,7 +11,7 @@ Move between days, zoom in or out, and filter the calendar.
 2. Use the arrows (**Previous day**, **Next day**), **Today**, or tap the date to pick any day.
 3. Open the display menu in the toolbar (named after the zoom it's on; on an iPad it's just its icon) and choose a **Zoom**: **Compact**, **Comfortable** or **Detailed**. On an iPad you can also pinch the calendar. Your choice is remembered.
 4. To see only one kind of service, pick a department (for example **Color**, **Cuts** or **Nails**) instead of **All departments**, or one of your saved views.
-5. Tap a visit to open booking details: the client and their number, the visit (services, stylists, time, chair, price), what to know (card on file, membership or package, late cancels, Denise's note), then Notes, Formula, Photos and History. The main step (**Check in**, **Check out**, or **Rebook** once checked out) is at the bottom; other actions are under **⋯** (More actions) next to the client's name. Tap **Close panel** (×), press Escape, or tap empty space to close it.
+5. Tap a visit to open booking details: the client's name with their status and number (tap it to call), the visit (the day and time once, then each service with its price, stylist and chair), what to know (card on file, package, membership, late cancels, an allergy in red, Denise's note), then Notes (preferences, the visit notes, their last visit and latest formula), Formula, Photos and History. The main step (**Check in**, **Check out**, or **Rebook** once checked out) is at the bottom; other actions are under **⋯** (More actions) next to the client's name. Tap **Close panel** (×), press Escape, or tap empty space to close it.
 
 ## Good to know
 
@@ -22,4 +22,5 @@ Move between days, zoom in or out, and filter the calendar.
 - With many stylists, scroll sideways, or use **Fit all** in Compact zoom. See See every stylist on the calendar at once.
 - To pick who shows and in what order, see Choose who shows on the calendar with a saved view.
 - The calendar refreshes by itself when someone else, or an online booking, changes it.
+- Messages at the top of the calendar (a change that couldn't be saved, say) go by themselves after 3 seconds. They wait while the pointer is over them; × closes one at once.
 - To learn what the colors mean, see Read the calendar colors.

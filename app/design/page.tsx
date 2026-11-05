@@ -15,7 +15,7 @@ import { Alert, Badge, Card, EmptyState, nameLinkClass, PageHeader, pillClass, S
 import { StatusChip } from "@/components/ui/status-chip";
 import { actionsClass, numClass, TableCard, tableClass, tdClass, theadClass, thClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
-import { TabSamples } from "./samples";
+import { NoticeSample, TabSamples } from "./samples";
 import { serif } from "@/app/serif";
 import { CalendarSkeleton } from "@/app/calendar/skeleton";
 import { ProfileSkeleton } from "@/app/clients/[id]/skeleton";
@@ -413,6 +413,7 @@ async function Design() {
             <Alert tone="warning">Card needed to hold this booking.</Alert>
             <Alert tone="success">Saved. The new prices apply to new bookings.</Alert>
             <Alert tone="info">Texts aren&apos;t connected yet: they go to the outbox.</Alert>
+            <NoticeSample />
             <p className="text-sm">
               <span className={textLinkClass}>A text link</span> <span className="text-ink-muted">and</span> <span className={nameLinkClass}>a name</span>
             </p>

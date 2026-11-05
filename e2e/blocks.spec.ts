@@ -94,7 +94,9 @@ test.describe("front desk", () => {
     await expect(meeting).toBeVisible();
     const appointment = column(page, "Shae Morgan").locator("[data-block]");
     await dragBy(page, appointment, 60);
-    await expect(ui(page).getByRole("alert")).toContainText("The stylist is in a meeting then.");
+    const ask = ui(page).getByTestId("move-anyway");
+    await expect(ask).toContainText("Shae has a meeting then. Move anyway?");
+    await ask.getByRole("button", { name: "Cancel" }).click();
 
     // Clicking the meeting shows it, with ways to change it.
     await meeting.click();

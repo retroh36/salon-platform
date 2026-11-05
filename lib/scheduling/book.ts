@@ -34,7 +34,16 @@ export type BookingItemInput = {
   // new service takes the stylist's length and a kept one keeps its own.
   timing?: ServiceTiming;
   minutes?: number;
+  // Staff said to go ahead although the rules would refuse it (a drag
+  // onto a stylist who doesn't usually do the service, over another
+  // client, outside their hours): the problems in MOVE_ANYWAY are let
+  // through, and a chair that isn't free is left off.
+  anyway?: boolean;
 };
+
+// What staff may override by saying so; anything else (a room service
+// without a room, a patch test, an unknown service) still refuses.
+export const MOVE_ANYWAY = new Set<BookingProblem["code"]>(["service_not_offered", "staff_unavailable", "staff_double_booked", "staff_blocked", "resource_in_use", "no_free_resource"]);
 
 export type BookingInput = {
   // Set to change an existing visit; its items become exactly `items`.
@@ -161,13 +170,23 @@ function planVisit(calendar: BookingContext, input: BookingInput, existing: Exis
       const draft: BookedItem = { ...t, id: item.id, serviceId: item.serviceId, staffId: item.staffId, start: item.start };
       resourceId = pickResource(calendar, draft, item.resource.prefer ?? null, accepted);
       // A room service without a free room is reported by checkItem.
-      if (!resourceId && !service?.needsRoom) problems[n].push({ code: "no_free_resource" });
+      if (!resourceId && !service?.needsRoom && !item.anyway) problems[n].push({ code: "no_free_resource" });
+    }
+
+    const request = { id: item.id, serviceId: item.serviceId, staffId: item.staffId, resourceId, start: item.start, timing };
+    let check = checkItem(calendar, request, accepted);
+    // Moved anyway: a chair someone else has then is left off.
+    if (!check.valid && item.anyway && resourceId && check.problems.some((p) => p.code === "resource_in_use")) {
+      resourceId = null;
+      check = checkItem(calendar, { ...request, resourceId }, accepted);
     }
     resources[n] = resourceId;
-
-    const check = checkItem(calendar, { id: item.id, serviceId: item.serviceId, staffId: item.staffId, resourceId, start: item.start, timing }, accepted);
     if (check.valid) accepted.push(check.item);
-    else problems[n].push(...check.problems);
+    else {
+      const left = item.anyway ? check.problems.filter((p) => !MOVE_ANYWAY.has(p.code)) : check.problems;
+      problems[n].push(...left);
+      if (!left.length && service) accepted.push({ ...(timing ?? timingFor(calendar, item.staffId, item.serviceId)!), id: item.id, serviceId: item.serviceId, staffId: item.staffId, resourceId, start: item.start });
+    }
   });
 
   return {
@@ -178,6 +197,8 @@ function planVisit(calendar: BookingContext, input: BookingInput, existing: Exis
       staff_id: item.staffId,
       resource_id: resources[n],
       starts_at: item.start.toISOString(),
+      // Said for every changed item, so one moved again without it counts again.
+      ...(changed[n] ? { anyway: item.anyway === true } : {}),
       timing: own[n] ? { active: own[n]!.activeMinutes, processing: own[n]!.processingMinutes, finishing: own[n]!.finishingMinutes } : null,
     })),
   };
@@ -298,7 +319,7 @@ export async function saveBookings(
 export async function moveItem(
   supabase: Supabase,
   location: Location,
-  move: { itemId: string; staffId: string; start: Date },
+  move: { itemId: string; staffId: string; start: Date; anyway?: boolean },
 ): Promise<SaveResult> {
   const { data, error } = await supabase.from("appointment_items").select("appointment_id").eq("id", move.itemId).maybeSingle();
   if (error) throw error;
@@ -312,7 +333,7 @@ export async function moveItem(
     notes: appointment.notes,
     items: appointment.items.map((i) =>
       i.id === move.itemId
-        ? { id: i.id, serviceId: i.serviceId, staffId: move.staffId, start: move.start, resource: { kind: "any", prefer: i.resourceId } }
+        ? { id: i.id, serviceId: i.serviceId, staffId: move.staffId, start: move.start, resource: { kind: "any", prefer: i.resourceId }, anyway: move.anyway }
         : { id: i.id, serviceId: i.serviceId, staffId: i.staffId, start: i.start, resource: i.resourceId ? { kind: "exact", id: i.resourceId } : { kind: "none" } },
     ),
   });

@@ -418,18 +418,36 @@ the one main action, one layer of containers.
   kept short enough to stay on one line ("Agreed · Online · Mon, Jun 1",
   a card's "Visa …4242" never split), and their buttons outlined at the
   card's edge.
-- **Booking details.** Top to bottom: the client's name, big, with their
-  number, the status tag and "⋯" under it; the visit as one bordered block
-  (the day and time, then a line per service with the stylist's photo,
-  chair and price, and for a checked-out visit what was paid, the tip and
-  how); what to know as short labeled rows (card on file, membership,
-  package, late cancels); Denise's line; then the tabs, filling the rest,
-  the notes box growing into the room left. The footer is pinned with a
-  rule above: the main step (Check in, Check out, or Rebook once checked
-  out) with the everyday action beside it (Edit booking); the rest under
-  "⋯" ("Reverse checkout…" too). Dragging a visit picks it up at once with
-  the mouse (a long press on touch); stylists who don't do its service are
-  dimmed while it's held, and won't take it.
+- **Booking details.** One grid, everything left-aligned, 16px between
+  sections with a thin rule between them, no box inside a box. Top to
+  bottom: the client's initials (40px) and name (20px semibold), "⋯" at
+  the right, and under the name one line, the status tag · their number
+  (tap to call); the visit, with the day and time said once as its own
+  line ("Today · 6:20–6:50pm"), then a row per service, name and price on
+  one line and "with [photo] Gil · Chair 2" muted under it (a time per
+  service only when there are several), and for a checked-out visit what
+  was paid, the tip and how, as rows; what to know as rows with muted
+  labels on the left and values on the right, only those that apply (card
+  on file, package, membership, late cancels, an allergy in red), then
+  Denise's one muted line with her face; then the tabs. Notes holds the
+  client's preferences, the visit notes box (about four lines, growing only
+  as you type), their last visit and their latest formula, so the space
+  says something. The footer is pinned with a rule above: the main step
+  full width (Check in, Check out, or Rebook once checked out) with Edit
+  booking beside it; the rest under "⋯" ("Reverse checkout…" too). Booked,
+  checked-in and checked-out visits share the layout; only the status tag,
+  the receipt rows and the main step change.
+- **Dragging a visit.** Picked up at once with the mouse (a long press on
+  touch), it stays exactly under the pointer where it was grabbed and
+  snaps to 5 minutes. The preview sits where it will land, labeled with
+  the exact time and stylist ("6:05–6:35pm · Gil"); any column takes it.
+  When something's in the way it turns amber (`warning-soft`, the warning
+  dot's ring) with the reason in a line under the name, and letting go
+  asks first ("Gil has Lillian then. Double-book anyway?"); a processing
+  gap never counts. Held near an edge, the day scrolls under it.
+- **Calendar messages.** The line at the top of the calendar (a change that
+  couldn't save, a series moved) goes by itself after 3 seconds, waiting
+  while the pointer is over it or it has focus; × closes it at once.
 
 Every component, in each of its states, is on the owners' style guide at
 `/design` (not in the sidebar).

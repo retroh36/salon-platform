@@ -12,13 +12,15 @@ const L = SEED.location;
 const NOLA = SEED.staff.nola;
 const TZ = "America/Chicago";
 const today = todayIn(TZ);
-// Two weeks out: clear of the demo's bookings (and of scheduling.spec's
-// week, three out). Nola works 9–5 on Wednesdays.
-const week = addDays(startOfWeek(today), 14);
-const wednesday = addDays(week, 2);
+// The first Wednesday from two weeks out that Nola has clear (the demo's
+// rebooked visits reach about seven weeks ahead), skipping scheduling.spec's
+// week, three out. Nola works 9–5 on Wednesdays. Chosen in beforeAll.
+let week = addDays(startOfWeek(today), 14);
+let wednesday = addDays(week, 2);
 const started = new Date().toISOString();
 // "Wednesday, November 11", as the booking site's date strip names it.
-const longDate = new Date(`${wednesday}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+const dateName = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+let longDate = dateName(wednesday);
 // "Live" means within a few seconds, without a reload.
 const LIVE = { timeout: 5_000 };
 
@@ -47,17 +49,32 @@ async function onlineTimes(browser: Browser, serviceId: string): Promise<string[
 
 const columnHours = (page: Page) => ui(page).locator("[data-column-header]").filter({ hasText: "Nola" }).getByTestId("column-hours");
 
-test.beforeAll(async () => {
-  await putBack();
-  const { count } = await admin
+const nolaVisits = async (date: string) => {
+  const { count, error } = await admin
     .from("appointment_items")
     .select("id", { count: "exact", head: true })
     .eq("staff_id", NOLA)
     .eq("holds_time", true)
-    .gte("starts_at", fromLocal(wednesday, 0, TZ)!.toISOString())
-    .lt("starts_at", fromLocal(addDays(wednesday, 1), 0, TZ)!.toISOString());
-  expect(count, "Nola needs a clear Wednesday two weeks out").toBe(0);
+    .gte("starts_at", fromLocal(date, 0, TZ)!.toISOString())
+    .lt("starts_at", fromLocal(addDays(date, 1), 0, TZ)!.toISOString());
+  if (error) throw error;
+  return count ?? 0;
+};
+
+test.beforeAll(async () => {
+  for (const weeks of [2, 4, 5, 6, 7, 8]) {
+    const start = addDays(startOfWeek(today), weeks * 7);
+    if ((await nolaVisits(addDays(start, 2))) === 0) {
+      week = start;
+      wednesday = addDays(start, 2);
+      longDate = dateName(wednesday);
+      break;
+    }
+  }
+  await putBack();
+  expect(await nolaVisits(wednesday), "Nola needs a clear Wednesday").toBe(0);
 });
+
 test.afterAll(putBack);
 
 test("a published week reaches the front desk's calendar, the stylist's My day and online booking, and a draft reaches nobody", async ({ browser }) => {
