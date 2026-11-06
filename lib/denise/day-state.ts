@@ -12,7 +12,7 @@ import type { StaffRole } from "@/lib/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { freedOn, loadWaitlist, waitlistOpenings } from "@/lib/waitlist-load";
 import { briefFacts, withoutDismissed, type BriefFacts } from "./brief";
-import { claudeClient, explainFixes, isConnected, type ClaudeClient } from "./claude";
+import { claudeClient, explainFixes, isConnected, type ClaudeClient, type OnAttempt } from "./claude";
 import { suggestReorders } from "./reorder";
 import { scanDay, type Viewer } from "./scan";
 import type { DeniseState, WaitlistOpening } from "./types";
@@ -30,8 +30,8 @@ export type DeniseAsker = {
 
 // Claude, metered for this salon (tokens logged, daily limit), or null when
 // Denise isn't connected.
-export function claudeFor(businessId: string, feature: string): ClaudeClient | null {
-  const client = claudeClient();
+export function claudeFor(businessId: string, feature: string, onAttempt?: OnAttempt): ClaudeClient | null {
+  const client = claudeClient(onAttempt);
   return client ? metered(client, createAdminClient(), businessId, feature) : null;
 }
 

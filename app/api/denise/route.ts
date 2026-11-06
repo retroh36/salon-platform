@@ -258,7 +258,8 @@ async function run(s: DeniseSession, body: DeniseRequest, send: Send, timer: Ste
         timer.mark("booking");
         if (booked) return send({ t: "done", reply: { text: booked.text, kind: "fixes" }, booking: booked.card });
       }
-      const client = claudeFor(s.me.business_id, "ask_denise");
+      // Each try at her AI service, as "api:<status>:<ms>" (0 for a timeout).
+      const client = claudeFor(s.me.business_id, "ask_denise", (ms, code) => timer.mark(`api:${code}:${ms}`));
       if (!client) return send(reply(NOT_CONNECTED, "nothing"));
       status("Reading your question…");
       const context = await assistantContext(

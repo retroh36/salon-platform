@@ -59,9 +59,27 @@ export function isConnected(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
 }
 
+// Each try at the API (the SDK retries once): how long it took and its
+// status, or 0 when it never answered (a timeout). For the timing log only.
+export type OnAttempt = (ms: number, status: number) => void;
+
 // A client, or null when Denise isn't connected.
-export function claudeClient(): ClaudeClient | null {
-  return isConnected() ? new Anthropic() : null;
+export function claudeClient(onAttempt?: OnAttempt): ClaudeClient | null {
+  if (!isConnected()) return null;
+  if (!onAttempt) return new Anthropic();
+  return new Anthropic({
+    fetch: async (input, init) => {
+      const start = performance.now();
+      try {
+        const res = await fetch(input, init);
+        onAttempt(Math.round(performance.now() - start), res.status);
+        return res;
+      } catch (error) {
+        onAttempt(Math.round(performance.now() - start), 0);
+        throw error;
+      }
+    },
+  });
 }
 
 // Keeps the calendar responsive if the API is slow.
