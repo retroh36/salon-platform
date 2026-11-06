@@ -63,7 +63,7 @@ test.describe("as the manager", () => {
 test.describe("at the front desk", () => {
   test.use({ storageState: AUTH.frontDesk });
 
-  test("a team purchase pays the employee price, and a scan of the other barcode finds it", async ({ page }) => {
+  test("a team purchase pays the employee price, and a scan of the other barcode finds it", async ({ page, browser }) => {
     await admin.from("products").update({ employee_price_cents: 1800, tax_rate_bp: 500, other_barcodes: [OTHER_CODE] }).eq("id", productId);
     await page.goto("/sales");
     await ui(page).getByRole("link", { name: "New sale" }).click();
@@ -84,5 +84,16 @@ test.describe("at the front desk", () => {
     expect((await admin.from("sales").select("employee_id, total_cents").eq("id", item!.sale_id).single()).data).toEqual({ employee_id: SEED.staff.jordan, total_cents: 1890 });
     await page.goto(`/sales/${item!.sale_id}`);
     await expect(ui(page).getByTestId("receipt")).toContainText("Team purchase · Jordan Pike");
+
+    // A manager sees it in the Audit trail as a team purchase.
+    const { data: sale } = await admin.from("sales").select("number").eq("id", item!.sale_id).single();
+    const managerContext = await browser.newContext({ storageState: AUTH.manager });
+    try {
+      const audit = await managerContext.newPage();
+      await audit.goto("/audit?type=team");
+      await expect(ui(audit).getByTestId("audit-table").getByRole("row").filter({ hasText: `Sale #${sale!.number}, team purchase for Jordan Pike` })).toContainText("$18.90");
+    } finally {
+      await managerContext.close();
+    }
   });
 });

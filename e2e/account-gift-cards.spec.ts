@@ -4,7 +4,7 @@ import { admin, SEED } from "../tests/db/helpers";
 // A client's gift cards in their own account, on a phone: adding one by
 // its code (not one in someone else's account), and reloading it with a
 // card (test cards: a declined one first, then one that works), recorded
-// as a sale paid by card online.
+// as a sale paid by card online; and no Reload while the salon has it off.
 
 const SLUG = "maple-and-ash";
 const B = SEED.business;
@@ -94,4 +94,17 @@ test("adds a gift card by its code and reloads it with a card", async ({ page })
 
   await page.getByRole("link", { name: "Back to your account" }).click();
   await expect(page.getByTestId("balances")).toContainText("$125");
+
+  // With reloads online turned off, the card shows without Reload, and its
+  // reload page sends them back to the account.
+  await admin.from("businesses").update({ gift_card_online_reload: false }).eq("id", B);
+  try {
+    await page.reload();
+    await expect(page.getByTestId("balances")).toContainText("$125");
+    await expect(page.getByTestId("balances").getByRole("link", { name: /Reload/ })).toHaveCount(0);
+    await page.goto(`/book/${SLUG}/account/reload/${cards[0]}`);
+    await expect(page).toHaveURL(new RegExp(`/book/${SLUG}/account$`));
+  } finally {
+    await admin.from("businesses").update({ gift_card_online_reload: true }).eq("id", B);
+  }
 });

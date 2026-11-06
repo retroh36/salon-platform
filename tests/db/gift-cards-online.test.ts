@@ -1,6 +1,7 @@
 // Gift cards in a client's online account: adding one by code (refused for
 // unknown, voided, expired and empty cards alike, and for one in someone
-// else's account) and reloading one they hold, recorded once per charge.
+// else's account) and reloading one they hold, recorded once per charge,
+// while the salon takes reloads online.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { admin, signIn, SEED } from "./helpers";
 
@@ -102,5 +103,20 @@ describe("reloading a card online", () => {
     await add(code("promo"));
     expect((await reload(cards.promo, `test_${PREFIX}_3`)).error?.hint).toBe("not_reloadable");
     expect((await reload(cards.loose, `test_${PREFIX}_4`, me, 400)).error).not.toBeNull();
+  });
+
+  it("is refused while the salon has reloads online off, except a repeat of one already recorded", async () => {
+    const frontDesk = await signIn("frontdesk@mapleandash.test");
+    const manager = await signIn("manager@mapleandash.test");
+    expect((await frontDesk.rpc("set_gift_card_online_reload", { p_business_id: B, p_on: false })).error?.code).toBe("42501");
+    expect((await manager.rpc("set_gift_card_online_reload", { p_business_id: B, p_on: false })).error).toBeNull();
+    try {
+      expect((await reload(cards.loose, `test_${PREFIX}_5`)).error?.hint).toBe("reloads_off");
+      // The charge from the first test, recorded before: still its sale.
+      expect((await reload(cards.loose, `test_${PREFIX}_1`)).data).toBe(sales[0]);
+    } finally {
+      await manager.rpc("set_gift_card_online_reload", { p_business_id: B, p_on: true });
+    }
+    expect((await admin.from("businesses").select("gift_card_online_reload").eq("id", B).single()).data!.gift_card_online_reload).toBe(true);
   });
 });

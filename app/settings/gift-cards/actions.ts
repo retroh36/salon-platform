@@ -7,7 +7,7 @@ import { can } from "@/lib/permissions";
 
 export type SettingsResult = { ok: true; message: string } | { ok: false; message: string };
 
-export async function saveGiftCardSettings(input: { presets: string; expiryMonths: string; promoDays: string }): Promise<SettingsResult> {
+export async function saveGiftCardSettings(input: { presets: string; expiryMonths: string; promoDays: string; onlineReload: boolean }): Promise<SettingsResult> {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!can(me, "settings")) return { ok: false, message: "Only owners and managers can change gift card settings." };
   const presets = input.presets
@@ -20,7 +20,12 @@ export async function saveGiftCardSettings(input: { presets: string; expiryMonth
   if (months !== null && (!Number.isInteger(months) || months < 1 || months > 120)) return { ok: false, message: "Enter how many months cards last (1 to 120), or leave it empty for no expiry." };
   const days = Number(input.promoDays);
   if (!Number.isInteger(days) || days < 1 || days > 3650) return { ok: false, message: "Enter how many days promotional cards last (1 to 3650)." };
-  const { error } = await supabase.rpc("set_gift_card_settings", { p_business_id: me.business_id, p_presets: presets as number[], p_expiry_months: months!, p_promo_days: days });
+  const [{ error }, { error: reloadError }] = await Promise.all([
+    supabase.rpc("set_gift_card_settings", { p_business_id: me.business_id, p_presets: presets as number[], p_expiry_months: months!, p_promo_days: days }),
+    supabase.rpc("set_gift_card_online_reload", { p_business_id: me.business_id, p_on: input.onlineReload }),
+  ]);
+  if (reloadError?.code === "42501") return { ok: false, message: "Only owners and managers can change gift card settings." };
+  if (reloadError) throw reloadError;
   if (error?.code === "42501") return { ok: false, message: "Only owners and managers can change gift card settings." };
   if (error) throw error;
   revalidatePath("/settings/gift-cards");

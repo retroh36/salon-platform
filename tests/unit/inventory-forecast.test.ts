@@ -38,6 +38,20 @@ describe("the outlook for a product", () => {
     expect(o.appointments).toBe(1);
   });
 
+  it("counts an order from the day it's expected, and says when it runs out only because of that", () => {
+    const uses = [use("a", "7n", 30, on("2026-10-22")), use("b", "7n", 30, on("2026-10-23")), use("c", "7n", 30, on("2026-10-28"))];
+    const late = outlook([stock({ productId: "7n", onHand: 40, onOrder: 60, arrivals: [{ at: on("2026-10-26", 0), amount: 60 }] })], uses).get("7n")!;
+    expect(late.runsOutAt).toEqual(on("2026-10-23"));
+    expect(late.waitsFor).toEqual(on("2026-10-26", 0));
+    // In time: it covers the week.
+    const early = outlook([stock({ productId: "7n", onHand: 40, onOrder: 60, arrivals: [{ at: on("2026-10-22", 0), amount: 60 }] })], uses).get("7n")!;
+    expect(early.runsOutAt).toBeNull();
+    // Not enough even once it's in: a real shortfall, not the timing.
+    const short = outlook([stock({ productId: "7n", onHand: 10, onOrder: 60, arrivals: [{ at: on("2026-10-26", 0), amount: 60 }] })], uses).get("7n")!;
+    expect(short.runsOutAt).toEqual(on("2026-10-22"));
+    expect(short.waitsFor).toBeNull();
+  });
+
   it("notices stock below the reorder point now or by the end of the window", () => {
     const [now, later, fine] = [
       stock({ productId: "a", onHand: 50, reorderPoint: 60 }),

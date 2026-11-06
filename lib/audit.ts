@@ -3,12 +3,13 @@ import { addDays, isLocalDate, type LocalDate } from "@/lib/scheduling/time";
 // The Audit page (`/audit`, the `audit` permission): who changed what,
 // from the logs the database keeps (visit changes, sale events, gift card
 // and fee events, points adjustments, pay rates, going live, data
-// downloads, payments taken as "Other", drawer counts that were off and skipped ones), newest first, by type, person and dates. Pure.
+// downloads, team purchases, payments taken as "Other", drawer counts that were off and skipped ones), newest first, by type, person and dates. Pure.
 
 export const AUDIT_TYPES = [
   { key: "visits", label: "Visits" },
   { key: "sales", label: "Sales, voids and refunds" },
   { key: "discounts", label: "Discounts and $0 sales" },
+  { key: "team", label: "Team purchases" },
   { key: "other", label: "Paid by other" },
   { key: "drawer", label: "Cash drawer" },
   { key: "gift_cards", label: "Gift cards" },

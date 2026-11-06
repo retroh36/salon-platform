@@ -1,6 +1,6 @@
 ---
 title: See who changed what
-keywords: audit, audit trail, who moved, who canceled, who voided, who refunded, discounts, zero dollar sale, $0 sale, history, log, changes, who did it, accountability, gift card adjusted, fee waived, points adjusted, pay rates
+keywords: audit, audit trail, who moved, who canceled, who voided, who refunded, discounts, zero dollar sale, $0 sale, history, log, changes, who did it, accountability, gift card adjusted, fee waived, points adjusted, pay rates, team purchase, employee purchase
 who: owner, manager
 open: /audit | Open the audit trail
 ---
@@ -19,6 +19,7 @@ The audit trail lists every change with who made it. That includes every move, c
 - Nothing in it can be edited or deleted. The database writes every visit change itself, whether it was made on the calendar, online by the client, or by one of Denise's fixes.
 - A visit's own changes are also in booking details, under **History**.
 - **Discounts and $0 sales** lists completed sales with a staff discount or a total of $0.
+- **Team purchases** lists every sale to someone on the team at the employee price, with who it was for and who rang it up.
 - **Paid by other** lists every payment taken as **Other**, with the note staff gave.
 - **Cash drawer** lists opening counts a manager skipped, with the reason, and counts that were over or short.
 - It shows up to 92 days at a time, and the latest 300 lines.

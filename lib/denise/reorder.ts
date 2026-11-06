@@ -55,6 +55,8 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 function lineReason(row: StockRow, l: ReorderDraft["lines"][number], now: Date, tz: string): string {
   const o = l.outlook;
   const who = o.colorAppointments === o.appointments && o.appointments > 0 ? "color appointment" : "appointment";
+  if (o.runsOutAt && o.waitsFor)
+    return `Runs out ${dayWord(o.runsOutAt, now, tz) === "the end of today" ? "today" : `by ${dayWord(o.runsOutAt, now, tz)}`}, before the order already placed arrives (expected ${dayWord(o.waitsFor, now, tz)}).`;
   if (o.runsOutAt) return `Runs out ${dayWord(o.runsOutAt, now, tz) === "the end of today" ? "today" : `by ${dayWord(o.runsOutAt, now, tz)}`}: ${plural(o.appointments, who)} in the next two weeks need ${formatAmount(o.needed, row.unit)}.`;
   if (o.lowNow) return "Below its reorder point now.";
   return `${plural(o.appointments, who)} in the next two weeks take it below its reorder point.`;
@@ -158,14 +160,20 @@ export async function suggestReorders(
     supabase.from("service_products").select("service_id, product_id, amount"),
     supabase
       .from("purchase_orders")
-      .select("status, purchase_order_lines(product_id, quantity, received_quantity)")
+      .select("status, expected_on, purchase_order_lines(product_id, quantity, received_quantity)")
       .eq("location_id", viewer.location.id)
       .in("status", ["draft", "sent", "partly_received"]),
     supabase.from("suppliers").select("id, name, lead_time_days"),
   ]);
   if (recipeResult.error) throw recipeResult.error;
   // The front desk can see orders; stylists can't, and that's fine here.
-  const openLines = ordersResult.error ? [] : ordersResult.data.flatMap((o) => o.purchase_order_lines);
+  // A sent order expected on a later day counts from that day; drafts,
+  // orders without a date and late ones count now.
+  const openLines = ordersResult.error
+    ? []
+    : ordersResult.data.flatMap((o) =>
+        o.purchase_order_lines.map((l) => ({ ...l, arrives: o.status !== "draft" && o.expected_on && o.expected_on > today ? startOfLocalDay(o.expected_on, tz) : null })),
+      );
   if (suppliersResult.error) throw suppliersResult.error;
 
   const recipes = new Map<string, { productId: string; amount: number }[]>();
@@ -175,13 +183,19 @@ export async function suggestReorders(
 
   const rowById = new Map(rows.map((r) => [r.id, r]));
   const onOrder = new Map<string, number>();
-  for (const l of openLines) onOrder.set(l.product_id, (onOrder.get(l.product_id) ?? 0) + (l.quantity - l.received_quantity) * (rowById.get(l.product_id)?.size ?? 0));
+  const arrivals = new Map<string, { at: Date; amount: number }[]>();
+  for (const l of openLines) {
+    const amount = (l.quantity - l.received_quantity) * (rowById.get(l.product_id)?.size ?? 0);
+    onOrder.set(l.product_id, (onOrder.get(l.product_id) ?? 0) + amount);
+    if (l.arrives) arrivals.set(l.product_id, [...(arrivals.get(l.product_id) ?? []), { at: l.arrives, amount }]);
+  }
 
   const stock: StockInfo[] = rows.map((r) => ({
     productId: r.id,
     supplierId: r.supplier?.id ?? null,
     onHand: r.on_hand,
     onOrder: onOrder.get(r.id) ?? 0,
+    arrivals: arrivals.get(r.id),
     reorderPoint: r.reorder_point,
     reorderQuantity: r.reorder_quantity,
     size: r.size,

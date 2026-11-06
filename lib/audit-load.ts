@@ -62,12 +62,12 @@ export async function loadAudit(supabase: Supabase, businessId: string, timeZone
     );
   }
 
-  if (want("sales") || want("discounts")) {
+  if (want("sales") || want("discounts") || want("team")) {
     tasks.push(
       (async () => {
         let q = supabase
           .from("sale_events")
-          .select("id, sale_id, kind, amount_cents, detail, staff_id, created_at, sale:sales(number, total_cents, discount_cents, discount_reason, void_reason, client:clients(first_name, last_name), sale_items(line_discount_cents, line_discount_reason, promo_discount_cents))")
+          .select("id, sale_id, kind, amount_cents, detail, staff_id, created_at, sale:sales(number, total_cents, discount_cents, discount_reason, void_reason, client:clients(first_name, last_name), employee:staff!sales_employee_id_fkey(first_name, last_name), sale_items(line_discount_cents, line_discount_reason, promo_discount_cents))")
           .eq("business_id", businessId)
           .in("kind", ["completed", "voided", "refunded", "card_refunded", "card_refund_failed"])
           .gte("created_at", fromIso)
@@ -85,11 +85,15 @@ export async function loadAudit(supabase: Supabase, businessId: string, timeZone
           const staffOff = (s?.discount_cents ?? 0) + lineOff;
           const reasons = [s?.discount_reason, ...(s?.sale_items.map((i) => (i.line_discount_cents > 0 ? i.line_discount_reason : null)) ?? [])].filter(Boolean);
           const isDiscount = e.kind === "completed" && s !== null && (staffOff > 0 || s.total_cents === 0);
-          const type: AuditType = isDiscount ? "discounts" : "sales";
+          // A team purchase is its own type, whatever its discount.
+          const isTeam = e.kind === "completed" && !!s?.employee;
+          const type: AuditType = isTeam ? "team" : isDiscount ? "discounts" : "sales";
           if (!want(type)) continue;
           let what: string;
           if (e.kind === "completed") {
-            what = `${number} for ${client(s?.client ?? null)}, ${formatPrice(s?.total_cents ?? 0)}`;
+            what = isTeam && s?.employee
+              ? `${number}, team purchase for ${s.employee.first_name} ${s.employee.last_name} at the employee price, ${formatPrice(s.total_cents)}`
+              : `${number} for ${client(s?.client ?? null)}, ${formatPrice(s?.total_cents ?? 0)}`;
             if (s && s.total_cents === 0) what += " ($0 sale)";
             if (staffOff > 0) what += `, ${formatPrice(staffOff)} discount${reasons.length ? ` (${[...new Set(reasons)].join("; ")})` : ""}`;
           } else if (e.kind === "voided") what = `${number} voided${s?.void_reason ? `: ${s.void_reason}` : ""}`;

@@ -107,7 +107,7 @@ export function usageRows(products: readonly UsageProduct[], current: readonly U
       changePct: before > 0 ? Math.round(((out - before) / before) * 100) : null,
       suggested:
         out > 0 && (lowAfter || runsShort)
-          ? containersToOrder(p, { productId: p.productId, needed: out, runsOutAt: null, appointments: 0, colorAppointments: 0, lowNow: false, lowLater: false })
+          ? containersToOrder(p, { productId: p.productId, needed: out, runsOutAt: null, waitsFor: null, appointments: 0, colorAppointments: 0, lowNow: false, lowLater: false })
           : 0,
     });
   }

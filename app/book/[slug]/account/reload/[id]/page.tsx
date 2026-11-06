@@ -24,7 +24,8 @@ export default function ReloadPage({ params }: PageProps<"/book/[slug]/account/r
 
 // Reloading a gift card in the client's own account: an amount (the
 // salon's presets, or their own) and a card, through the salon's payment
-// provider. Only a purchased, active card in this account.
+// provider. Only a purchased, active card in this account, while the salon
+// takes reloads online.
 async function Reload({ params }: { params: Promise<{ slug: string; id: string }> }) {
   await connection();
   const { slug, id } = await params;
@@ -37,11 +38,11 @@ async function Reload({ params }: { params: Promise<{ slug: string; id: string }
   if (!account) redirect(`/book/${slug}/account`);
   const [{ data: card }, { data: business }, provider] = await Promise.all([
     admin.from("gift_cards").select("id, code, kind, status, balance_cents, expires_at, owner_client_id").eq("id", id).eq("business_id", site.business.id).maybeSingle(),
-    admin.from("businesses").select("gift_card_presets_cents").eq("id", site.business.id).single(),
+    admin.from("businesses").select("gift_card_presets_cents, gift_card_online_reload").eq("id", site.business.id).single(),
     salonProvider(admin, site.business.id),
   ]);
   if (!card || card.owner_client_id !== account.clientId) notFound();
-  const reloadable = card.kind === "purchased" && card.status === "active" && !(card.expires_at && hasPassed(card.expires_at));
+  const reloadable = business?.gift_card_online_reload !== false && card.kind === "purchased" && card.status === "active" && !(card.expires_at && hasPassed(card.expires_at));
   if (!reloadable) redirect(`/book/${slug}/account`);
   return (
     <BookingFrame name={site.business.name} logoUrl={site.business.logoUrl} accent={site.settings.accent} cover={site.business.coverUrl}>

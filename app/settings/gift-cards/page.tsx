@@ -23,7 +23,7 @@ async function GiftCardSettings() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
   if (!can(me, "settings")) redirect("/dashboard");
-  const { data: b, error } = await supabase.from("businesses").select("gift_card_presets_cents, gift_card_expiry_months, promo_card_expiry_days").eq("id", me.business_id).single();
+  const { data: b, error } = await supabase.from("businesses").select("gift_card_presets_cents, gift_card_expiry_months, promo_card_expiry_days, gift_card_online_reload").eq("id", me.business_id).single();
   if (error) throw error;
   return (
     <AppShell section="settings" me={me}>
@@ -39,6 +39,7 @@ async function GiftCardSettings() {
             presets: b.gift_card_presets_cents.map(centsToInput).join(", "),
             expiryMonths: b.gift_card_expiry_months ? String(b.gift_card_expiry_months) : "",
             promoDays: String(b.promo_card_expiry_days),
+            onlineReload: b.gift_card_online_reload,
           }}
         />
       </Card>

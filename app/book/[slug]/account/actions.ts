@@ -217,7 +217,11 @@ export async function reloadGiftCard(slug: string, cardId: string, amountCents: 
   const allowed = await withinLimits(s.admin, [{ key: `giftreload:client:${s.account.clientId}`, limit: 10, windowSeconds: HOUR }]);
   if (!allowed) return { ok: false, message: "Too many tries. Please wait a while, or call the salon." };
   const business = s.site.business.id;
-  const { data: card } = await s.admin.from("gift_cards").select("kind, status, expires_at, owner_client_id").eq("id", cardId).eq("business_id", business).maybeSingle();
+  const [{ data: card }, { data: salon }] = await Promise.all([
+    s.admin.from("gift_cards").select("kind, status, expires_at, owner_client_id").eq("id", cardId).eq("business_id", business).maybeSingle(),
+    s.admin.from("businesses").select("gift_card_online_reload").eq("id", business).single(),
+  ]);
+  if (salon?.gift_card_online_reload === false) return { ok: false, message: "The salon doesn't take gift card reloads online. Ask at the front desk." };
   if (!card || card.owner_client_id !== s.account.clientId) return { ok: false, message: "This card isn't in your account." };
   if (card.kind !== "purchased" || card.status !== "active" || (card.expires_at && Date.parse(card.expires_at) <= Date.now())) return { ok: false, message: "This card can't be reloaded online. Ask the salon." };
 

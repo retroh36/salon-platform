@@ -4,7 +4,8 @@
 //
 // Each upcoming service is expected to use what its client's formula says
 // (or the service's recipe). Walking the appointments in time order from
-// what's on hand (plus anything already ordered), a product runs out at the
+// what's on hand (plus anything already ordered: from its expected date when
+// the order has one still to come, else straight away), a product runs out at the
 // first appointment that needs more than is left. A supplier gets a draft
 // order when any of its products will run out in the window, drop below
 // its reorder point, or is below it already. Each line orders enough
@@ -26,6 +27,9 @@ export type StockInfo = {
   onHand: number;
   // Already ordered and not yet received, in the product's unit.
   onOrder: number;
+  // The part of onOrder on orders expected on a later day: it only counts
+  // from then.
+  arrivals?: { at: Date; amount: number }[];
   reorderPoint: number;
   reorderQuantity: number;
   size: number;
@@ -38,6 +42,8 @@ export type Outlook = {
   needed: number;
   // The first appointment that can't be covered.
   runsOutAt: Date | null;
+  // When it runs out only because its order comes after: the order's day.
+  waitsFor: Date | null;
   // Appointments in the window that use it.
   appointments: number;
   colorAppointments: number;
@@ -53,12 +59,21 @@ export function outlook(stock: readonly StockInfo[], uses: readonly PlannedUse[]
   const result = new Map<string, Outlook>();
   for (const s of stock) {
     const planned = (byProduct.get(s.productId) ?? []).sort((a, b) => a.at.getTime() - b.at.getTime());
-    let left = s.onHand + s.onOrder;
+    const arrivals = [...(s.arrivals ?? [])].sort((a, b) => a.at.getTime() - b.at.getTime());
+    let left = s.onHand + s.onOrder - arrivals.reduce((n, a) => n + a.amount, 0);
+    let next = 0;
     let runsOutAt: Date | null = null;
+    let waitsFor: Date | null = null;
     for (const u of planned) {
+      while (next < arrivals.length && arrivals[next].at.getTime() <= u.at.getTime()) left += arrivals[next++].amount;
       left -= u.amount;
-      if (left < -0.005 && !runsOutAt) runsOutAt = u.at;
+      if (left < -0.005 && !runsOutAt) {
+        runsOutAt = u.at;
+        waitsFor = arrivals[next]?.at ?? null;
+      }
     }
+    // waitsFor only when everything ordered covers it: then it's the timing.
+    if (s.onHand + s.onOrder - planned.reduce((sum, u) => sum + u.amount, 0) < -0.005) waitsFor = null;
     const visits = new Set(planned.map((u) => u.appointmentId));
     const colorVisits = new Set(planned.filter((u) => u.color).map((u) => u.appointmentId));
     const needed = planned.reduce((sum, u) => sum + u.amount, 0);
@@ -66,6 +81,7 @@ export function outlook(stock: readonly StockInfo[], uses: readonly PlannedUse[]
       productId: s.productId,
       needed: Math.round(needed * 100) / 100,
       runsOutAt,
+      waitsFor,
       appointments: visits.size,
       colorAppointments: colorVisits.size,
       lowNow: s.reorderPoint > 0 && s.onHand + s.onOrder < s.reorderPoint,

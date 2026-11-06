@@ -16,5 +16,6 @@ Denise checks stock against the next two weeks of bookings and suggests an order
 ## Good to know
 
 - Nothing is ordered automatically. A draft is only a list until you send it.
+- Stock already on order counts from its order's **Expected** date. If a product will run out before an order already placed arrives, its line says so, so you can ask the supplier to hurry it or order a little more elsewhere. Drafts, orders with no expected date and late orders count as if they're already in.
 - Changed your mind? Tap **Undo**, or **Undo Denise's draft** on the order, before it's sent.
 - Front desk and stylists see the suggestions, but only owners and managers can draft them.

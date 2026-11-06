@@ -16,5 +16,5 @@ Ring up products for someone on the team at their employee price.
 
 - Products with an **Employee price** sell at it; the rest sell at their retail price. Set it on the product: see "Add a product to inventory".
 - A team purchase earns no commission and has no client, so no points, packages or memberships. To sell to a client instead, choose **Not a team purchase** or find the client.
-- The sale shows on **Sales** and its receipt as **Team purchase** with the person's name.
+- The sale shows on **Sales** and its receipt as **Team purchase** with the person's name. Owners and managers see every team purchase in the **Audit trail**, under **Team purchases**.
 - A sale for a visit can't be a team purchase.

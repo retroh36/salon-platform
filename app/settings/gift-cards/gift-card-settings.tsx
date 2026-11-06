@@ -2,11 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { fieldClass, labelClass } from "@/components/ui/field";
+import { checkboxClass, fieldClass, labelClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
 import { saveGiftCardSettings, type SettingsResult } from "./actions";
 
-export function GiftCardSettingsForm({ initial }: { initial: { presets: string; expiryMonths: string; promoDays: string } }) {
+export function GiftCardSettingsForm({ initial }: { initial: { presets: string; expiryMonths: string; promoDays: string; onlineReload: boolean } }) {
   const [s, setS] = useState(initial);
   const [result, setResult] = useState<SettingsResult | null>(null);
   const [pending, start] = useTransition();
@@ -31,6 +31,13 @@ export function GiftCardSettingsForm({ initial }: { initial: { presets: string; 
       <label className={labelClass}>
         Promotional cards last (days)
         <input inputMode="numeric" value={s.promoDays} onChange={(e) => setS({ ...s, promoDays: e.target.value })} className={fieldClass} />
+      </label>
+      <label className="flex items-start gap-2 text-sm text-ink">
+        <input type="checkbox" checked={s.onlineReload} onChange={(e) => setS({ ...s, onlineReload: e.target.checked })} className={`${checkboxClass} mt-0.5`} />
+        <span>
+          Clients can reload their gift cards online
+          <span className="block text-13 text-ink-muted">From their account on your booking site, paying by card. Off, they reload at the front desk.</span>
+        </span>
       </label>
       <Button type="submit" variant="primary" disabled={pending} className="self-start">
         Save
