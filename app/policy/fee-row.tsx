@@ -19,7 +19,8 @@ import { useKeepOnScreen } from "@/components/ui/keep-on-screen";
 
 export type FeeRowData = {
   id: string;
-  clientId: string;
+  // null when the client isn't the reader's to see (a bookkeeper).
+  clientId: string | null;
   clientName: string;
   day: string;
   kind: "late_cancel" | "no_show";
@@ -52,12 +53,13 @@ function statusOf(f: FeeRowData): { tone: Tone; label: string; detail: string | 
   }
 }
 
-export function FeeRow({ fee, canWaive }: { fee: FeeRowData; canWaive: boolean }) {
+// `canRetry`: the front of house; a bookkeeper reads only, without names.
+export function FeeRow({ fee, canWaive, canRetry }: { fee: FeeRowData; canWaive: boolean; canRetry: boolean }) {
   const [waiving, setWaiving] = useState(false);
   const [reason, setReason] = useState("");
   const [result, setResult] = useState<PolicyActionResult | null>(null);
   const [pending, start] = useTransition();
-  const retryable = fee.status === "failed" || fee.status === "no_card";
+  const retryable = canRetry && (fee.status === "failed" || fee.status === "no_card");
   const waivable = canWaive && ["pending", "charged", "failed", "no_card"].includes(fee.status);
   const waiveLabel = fee.status === "charged" ? "Waive and refund…" : "Waive…";
   const status = statusOf(fee);
@@ -67,9 +69,13 @@ export function FeeRow({ fee, canWaive }: { fee: FeeRowData; canWaive: boolean }
     <Fragment>
       <tr className={trClass} data-testid="policy-row" data-fee-status={fee.status}>
         <td className={tdClass}>
-          <Link href={`/clients/${fee.clientId}`} className={nameLinkClass}>
-            {fee.clientName}
-          </Link>
+          {fee.clientId ? (
+            <Link href={`/clients/${fee.clientId}`} className={nameLinkClass}>
+              {fee.clientName}
+            </Link>
+          ) : (
+            <span className="text-ink-muted">{fee.clientName}</span>
+          )}
         </td>
         <td className={`${tdClass} whitespace-nowrap text-ink-muted`}>{fee.day}</td>
         <td className={`${tdClass} whitespace-nowrap text-ink-muted`}>{KIND[fee.kind]}</td>

@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { buttonClass } from "@/components/ui/button";
 import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
-import { EmptyState, PageHeader, Section, nameLinkClass } from "@/components/ui/page";
+import { EmptyState, PageHeader, Section, nameLinkClass, textLinkClass } from "@/components/ui/page";
 import { TableCard, numClass, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
 import { type FeeStatus } from "@/lib/policy";
@@ -17,6 +17,7 @@ import { ChargeNowButton } from "./charge-now";
 import { FeeRow } from "./fee-row";
 import { cents } from "./money";
 import { can } from "@/lib/permissions";
+import { canBook } from "@/lib/appointments";
 
 export const metadata: Metadata = { title: "Policy" };
 
@@ -73,7 +74,7 @@ async function Policy({ searchParams }: Pick<PageProps<"/policy">, "searchParams
     supabase.from("client_cards").select("client_id").eq("business_id", me.business_id).is("removed_at", null),
   ]);
   for (const r of [monthFees, recentFees, upcoming, cards]) if (r.error) throw r.error;
-  const asReport = (f: { id: string; kind: string; fee_cents: number; from_deposit_cents: number; status: string; created_at: string; client_id: string; client: { first_name: string; last_name: string } }): ReportFee => ({
+  const asReport = (f: { id: string; kind: string; fee_cents: number; from_deposit_cents: number; status: string; created_at: string; client_id: string; client: { first_name: string; last_name: string } | null }): ReportFee => ({
     id: f.id,
     kind: f.kind as ReportFee["kind"],
     feeCents: f.fee_cents,
@@ -81,7 +82,7 @@ async function Policy({ searchParams }: Pick<PageProps<"/policy">, "searchParams
     status: f.status,
     createdAt: f.created_at,
     clientId: f.client_id,
-    clientName: `${f.client.first_name} ${f.client.last_name}`.trim(),
+    clientName: f.client ? `${f.client.first_name} ${f.client.last_name}`.trim() : "A client",
   });
   const summary = policySummary(monthFees.data!.map(asReport));
   const offenders = repeatOffenders(recentFees.data!.map(asReport), policy.settings.repeatCount);
@@ -90,6 +91,7 @@ async function Policy({ searchParams }: Pick<PageProps<"/policy">, "searchParams
   const canWaive = policy.waiveRoles.includes(me.role);
 
   const lastMonth = month >= today.slice(0, 7);
+  const lastDay = lastMonth ? today : addDays(`${shiftMonth(month, 1)}-01`, -1);
   const repeatRule = `${policy.settings.repeatCount} or more late cancellations or no-shows in the last ${policy.settings.repeatMonths} months (waived ones don't count)${policy.settings.repeatAction === "off" ? "." : policy.settings.repeatAction === "prepay" ? ": they pay for the whole visit up front." : `: they pay a ${policy.settings.repeatDepositPercent}% deposit.`}`;
 
   return (
@@ -136,6 +138,10 @@ async function Policy({ searchParams }: Pick<PageProps<"/policy">, "searchParams
       <p className="mt-3 mb-8 text-13 text-ink-muted">
         {summary.lateCancels} late cancellation{summary.lateCancels === 1 ? "" : "s"} and {summary.noShows} no-show{summary.noShows === 1 ? "" : "s"} this month
         {summary.waiting.count ? ` · ${summary.waiting.count} fee${summary.waiting.count === 1 ? "" : "s"} waiting to be charged (${cents(summary.waiting.cents)})` : ""}
+        {" · "}
+        <Link href={`/policy/not-charged?from=${month}-01&to=${lastDay}`} className={textLinkClass} data-testid="policy-not-charged-link">
+          Not charged, and why
+        </Link>
       </p>
 
       <Section title="Late cancellations and no-shows" titleId="fees" count={monthFees.data!.length} description="Fees are charged to the card on file 10 minutes after. Waive one with a reason, before or after.">
@@ -163,11 +169,12 @@ async function Policy({ searchParams }: Pick<PageProps<"/policy">, "searchParams
                   <FeeRow
                     key={f.id}
                     canWaive={canWaive}
+                    canRetry={canBook(me.role)}
                     fee={{
                       id: f.id,
-                      clientId: f.client_id,
-                      clientName: `${f.client.first_name} ${f.client.last_name}`.trim(),
-                      day: dayOf(f.appointment.starts_at),
+                      clientId: f.client ? f.client_id : null,
+                      clientName: f.client ? `${f.client.first_name} ${f.client.last_name}`.trim() : "A client",
+                      day: dayOf(f.appointment?.starts_at ?? f.created_at),
                       kind: f.kind as "late_cancel" | "no_show",
                       feeCents: f.fee_cents,
                       fromDepositCents: f.from_deposit_cents,
@@ -184,6 +191,8 @@ async function Policy({ searchParams }: Pick<PageProps<"/policy">, "searchParams
         )}
       </Section>
 
+      {/* A list of clients: not for a bookkeeper. */}
+      {me.role !== "bookkeeper" && (
       <Section title="Repeat offenders" titleId="offenders" description={repeatRule} count={offenders.length}>
         <TableCard>
           {offenders.length === 0 ? (
@@ -214,6 +223,7 @@ async function Policy({ searchParams }: Pick<PageProps<"/policy">, "searchParams
           )}
         </TableCard>
       </Section>
+      )}
     </AppShell>
   );
 }

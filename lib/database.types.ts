@@ -4653,6 +4653,11 @@ isOneToOne: false
 "payroll_sales":
 { Args: { "p_business_id": string,"p_from": string,"p_staff_id"?: string,"p_to": string }; Returns: Json
                            },
+"policy_not_charged":
+{ Args: { "p_business_id": string,"p_from": string,"p_to": string }; Returns: {
+              "collected_cents": number,"failure_reason": string,"fee_cents": number,"kind": string,"status": string,"visit_cents": number,"waive_reason": string
+            }[]
+                           },
 "product_costs":
 { Args: Record<PropertyKey, never>; Returns: {
               "cost_cents": number,"product_id": string
