@@ -20,6 +20,7 @@ The audit trail lists every change with who made it. That includes every move, c
 - A visit's own changes are also in booking details, under **History**.
 - **Discounts and $0 sales** lists completed sales with a staff discount or a total of $0.
 - **Paid by other** lists every payment taken as **Other**, with the note staff gave.
+- **Cash drawer** lists opening counts a manager skipped, with the reason, and counts that were over or short.
 - It shows up to 92 days at a time, and the latest 300 lines.
 
 ## If it doesn't work

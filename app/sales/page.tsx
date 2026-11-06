@@ -106,6 +106,8 @@ async function Sales({
     date !== today ||
     (await supabase.from("drawer_counts").select("id", { count: "exact", head: true }).eq("location_id", me.location.id).eq("day", today)).count! > 0 ||
     (await supabase.from("cash_closeouts").select("id", { count: "exact", head: true }).eq("location_id", me.location.id).eq("day", today)).count! > 0;
+  // A manager let today's cash go ahead without the count.
+  const skipped = !opened && (await supabase.from("drawer_skips").select("id", { count: "exact", head: true }).eq("location_id", me.location.id).eq("day", today)).count! > 0;
   const byTender = new Map<PaymentMethod, number>();
   for (const p of paid)
     byTender.set(p.method, (byTender.get(p.method) ?? 0) + p.amount_cents);
@@ -133,7 +135,7 @@ async function Sales({
       {desk && date === today && !opened && (
         <div className="mb-4" data-testid="drawer-reminder">
           <Alert tone="warning">
-            The cash drawer hasn&rsquo;t been counted today.{" "}
+            The cash drawer hasn&rsquo;t been counted today.{skipped ? " A manager let cash be taken without it." : " Cash can’t be taken until it is."}{" "}
             <Link href="/sales/drawer" className={textLinkClass}>
               Count it now
             </Link>

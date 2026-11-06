@@ -2,7 +2,14 @@
 // partial redemption, reloads, promotional cards, refunds and voids, lookups
 // (logged and rate-limited), and who may do what.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { admin, SEED, signIn, type Client } from "./helpers";
+import { admin, type Client, drawerReady, SEED, signIn } from "./helpers";
+
+// Cash needs today's drawer counted (or a manager's skip).
+let putBackDrawer: () => Promise<void>;
+beforeAll(async () => {
+  putBackDrawer = await drawerReady();
+});
+afterAll(() => putBackDrawer());
 
 const B = SEED.business;
 const L = SEED.location;

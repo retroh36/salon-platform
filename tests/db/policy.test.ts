@@ -10,7 +10,14 @@ import { createHash, randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runPolicyCharges } from "@/lib/policy-billing";
 import { cancelFee, DEFAULT_POLICY, visitTerms, type PolicySettings } from "@/lib/policy";
-import { admin, SEED, signIn, throwawayStylist, type Client } from "./helpers";
+import { admin, type Client, drawerReady, SEED, signIn, throwawayStylist } from "./helpers";
+
+// Cash needs today's drawer counted (or a manager's skip).
+let putBackDrawer: () => Promise<void>;
+beforeAll(async () => {
+  putBackDrawer = await drawerReady();
+});
+afterAll(() => putBackDrawer());
 
 const B = SEED.business;
 const L = SEED.location;

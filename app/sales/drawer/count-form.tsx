@@ -7,8 +7,8 @@ import { Alert } from "@/components/ui/page";
 import { countDrawer, type DrawerResult } from "./actions";
 
 // A blind count: what's in the drawer, without being told what it should
-// be first.
-export function CountForm({ kind }: { kind: "open" | "mid" }) {
+// be first. `onDone`: once it's saved (the checkout's Cash sheet goes on).
+export function CountForm({ kind, onDone }: { kind: "open" | "mid"; onDone?: (message: string) => void }) {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [result, setResult] = useState<DrawerResult | null>(null);
@@ -26,6 +26,7 @@ export function CountForm({ kind }: { kind: "open" | "mid" }) {
           if (r.ok) {
             setAmount("");
             setNote("");
+            onDone?.(r.message);
           }
         });
       }}

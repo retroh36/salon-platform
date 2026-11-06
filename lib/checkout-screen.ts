@@ -1,6 +1,7 @@
 // The full-screen checkout: starting one (a draft ticket from a visit, or a
 // new sale) and loading everything the screen needs. Server side.
 
+import { drawerReadyToday } from "@/lib/drawer-load";
 import { staffPhotoUrl } from "@/lib/branding";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
@@ -173,6 +174,8 @@ export type CheckoutScreenData = {
   overrides: string[];
   rebook: RebookSuggestion | null;
   nextClient: { appointmentId: string; name: string; time: string } | null;
+  // Today's drawer is counted (or a manager skipped it): cash can be taken.
+  drawerReady: boolean;
 };
 
 export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: string, now = new Date()): Promise<CheckoutScreenData | null> {
@@ -182,7 +185,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
   const tz = me.location.timezone;
   const today = todayIn(tz, now);
 
-  const [staffRows, settings, products, templates, servicesRows, clientRow, overrides, plans, promo, rewards, provider, onFile] = await Promise.all([
+  const [staffRows, settings, products, templates, servicesRows, clientRow, overrides, plans, promo, rewards, provider, onFile, drawerReady] = await Promise.all([
     supabase.from("staff").select("id, first_name, last_name, role, level, color, photo_path, is_active, location_id").eq("location_id", me.location.id).eq("is_active", true),
     loadCheckoutSettings(supabase, me.business_id),
     loadRetailProducts(supabase, me.business_id, me.location.id),
@@ -195,6 +198,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     rewardRatesFor(supabase, me.business_id, draft.client_id),
     salonProvider(supabase, me.business_id),
     draft.client_id ? cardOnFile(supabase, draft.client_id) : Promise.resolve(null),
+    drawerReadyToday(supabase, me.location.id, today),
   ]);
   if (staffRows.error) throw staffRows.error;
   if (servicesRows.error) throw servicesRows.error;
@@ -348,6 +352,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     canOverride: me.role === "owner" || me.role === "manager",
     overrides: (overrides.data ?? []).map((o) => o.product_id),
     rebook,
+    drawerReady,
     nextClient: next ? { appointmentId: next.id, name: next.client ? fullName(next.client) : "Walk-in", time: formatMinute(toLocal(new Date(next.starts_at), tz).minute) } : null,
   };
 }

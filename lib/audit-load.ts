@@ -136,6 +136,52 @@ export async function loadAudit(supabase: Supabase, businessId: string, timeZone
     );
   }
 
+  // The cash drawer: opening counts skipped by a manager, and counts that
+  // were off.
+  if (want("drawer")) {
+    tasks.push(
+      (async () => {
+        let skips = supabase.from("drawer_skips").select("id, reason, skipped_by, asked_by, created_at").eq("business_id", businessId).gte("created_at", fromIso).lt("created_at", toIso).order("created_at", { ascending: false }).limit(AUDIT_LIMIT + 1);
+        let counts = supabase.from("drawer_counts").select("id, kind, expected_cents, counted_cents, note, counted_by, counted_at").eq("business_id", businessId).gte("counted_at", fromIso).lt("counted_at", toIso).order("counted_at", { ascending: false }).limit(AUDIT_LIMIT + 1);
+        if (f.staffId) {
+          skips = skips.eq("skipped_by", f.staffId);
+          counts = counts.eq("counted_by", f.staffId);
+        }
+        const [s, c] = await Promise.all([skips, counts]);
+        if (s.error) throw s.error;
+        if (c.error) throw c.error;
+        return [
+          ...s.data.map(
+            (k) =>
+              ({
+                id: k.id,
+                at: k.created_at,
+                type: "drawer",
+                staffId: k.skipped_by,
+                who: who(k.skipped_by),
+                what: `Let cash be taken without the opening count${k.asked_by && k.asked_by !== k.skipped_by ? ` (asked by ${who(k.asked_by)})` : ""}: ${k.reason}`,
+                href: "/sales/drawer",
+              }) satisfies AuditRow,
+          ),
+          ...c.data
+            .filter((d) => d.counted_cents !== d.expected_cents)
+            .map((d) => {
+              const diff = d.counted_cents - d.expected_cents;
+              return {
+                id: d.id,
+                at: d.counted_at,
+                type: "drawer",
+                staffId: d.counted_by,
+                who: who(d.counted_by),
+                what: `${d.kind === "open" ? "Opening" : "Midday"} drawer count ${formatPrice(Math.abs(diff))} ${diff > 0 ? "over" : "short"}${d.note ? `: ${d.note}` : ""}`,
+                href: "/sales/drawer",
+              } satisfies AuditRow;
+            }),
+        ];
+      })(),
+    );
+  }
+
   if (want("gift_cards")) {
     tasks.push(
       (async () => {

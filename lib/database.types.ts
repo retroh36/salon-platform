@@ -1165,6 +1165,44 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"drawer_skips": {
+                  Row: {
+                    "asked_by": string | null,"business_id": string,"created_at": string,"day": string,"id": string,"location_id": string,"reason": string,"skipped_by": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "asked_by"?: string | null,"business_id": string,"created_at"?: string,"day": string,"id"?: string,"location_id": string,"reason": string,"skipped_by"?: string | null
+                  }
+                  Update: {
+                    "asked_by"?: string | null,"business_id"?: string,"created_at"?: string,"day"?: string,"id"?: string,"location_id"?: string,"reason"?: string,"skipped_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "drawer_skips_asked_by_business_id_fkey"
+      columns: ["asked_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "drawer_skips_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "drawer_skips_location_id_fkey"
+      columns: ["location_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "drawer_skips_skipped_by_business_id_fkey"
+      columns: ["skipped_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"email_suppressions": {
                   Row: {
                     "created_at": string,"email": string,"reason": string
@@ -4996,6 +5034,9 @@ isOneToOne: false
                            },
 "shared_device":
 { Args: { "p_token_hash": string }; Returns: Json
+                           },
+"skip_drawer_count":
+{ Args: { "p_asked_by"?: string,"p_location_id": string,"p_reason": string }; Returns: undefined
                            },
 "sms_keyword":
 { Args: { "p_body": string,"p_phone_digits": string }; Returns: string

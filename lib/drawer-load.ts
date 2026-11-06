@@ -11,7 +11,7 @@ type Supabase = SupabaseClient<Database>;
 // close-out left, else the usual float), the counts so far (and the
 // close-out once it's done), and every cash payment today with who took it.
 export async function loadDrawer(supabase: Supabase, businessId: string, location: { id: string; timezone: string }, day: LocalDate) {
-  const [lastClose, business, counts, close, cash, team] = await Promise.all([
+  const [lastClose, business, counts, close, cash, team, skip] = await Promise.all([
     supabase.from("cash_closeouts").select("counted_cents, deposit_cents").eq("location_id", location.id).lt("day", day).order("day", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("businesses").select("cash_float_cents").eq("id", businessId).single(),
     supabase.from("drawer_counts").select("id, kind, expected_cents, counted_cents, note, counted_by, counted_at").eq("location_id", location.id).eq("day", day).order("counted_at"),
@@ -25,8 +25,9 @@ export async function loadDrawer(supabase: Supabase, businessId: string, locatio
       .lt("created_at", startOfLocalDay(addDays(day, 1), location.timezone).toISOString())
       .order("created_at"),
     supabase.from("staff").select("id, first_name, last_name").eq("business_id", businessId),
+    supabase.from("drawer_skips").select("reason, skipped_by, asked_by, created_at").eq("location_id", location.id).eq("day", day).maybeSingle(),
   ]);
-  for (const r of [business, counts, cash, team]) if (r.error) throw r.error;
+  for (const r of [business, counts, cash, team, skip]) if (r.error) throw r.error;
   const name = new Map(team.data!.map((s) => [s.id, fullName(s)]));
   const who = (id: string | null) => (id ? (name.get(id) ?? "A former team member") : null);
   const list: DrawerCount[] = counts.data!.map((c) => ({ id: c.id, kind: c.kind as "open" | "mid", expectedCents: c.expected_cents, countedCents: c.counted_cents, at: c.counted_at, by: who(c.counted_by), note: c.note }));
@@ -38,6 +39,8 @@ export async function loadDrawer(supabase: Supabase, businessId: string, locatio
     opening: list.find((c) => c.kind === "open") ?? null,
     depositCents: close.data?.deposit_cents ?? null,
     moves,
+    // A manager let today's cash go ahead without the opening count.
+    skip: skip.data ? { reason: skip.data.reason, by: who(skip.data.skipped_by), askedBy: who(skip.data.asked_by), at: skip.data.created_at } : null,
   };
 }
 
@@ -58,4 +61,16 @@ export async function loadDrawerHistory(supabase: Supabase, businessId: string, 
     ...closes.data!.map((c) => ({ id: c.id, day: c.day, kind: "close" as const, expectedCents: c.expected_cents, countedCents: c.counted_cents, at: c.closed_at, by: who(c.closed_by), note: c.note, depositCents: c.deposit_cents })),
   ];
   return rows.sort((a, b) => b.day.localeCompare(a.day) || b.at.localeCompare(a.at));
+}
+
+// Whether cash can be taken today (complete_sale's rule): the drawer has
+// its opening count, or a manager skipped it.
+export async function drawerReadyToday(supabase: Supabase, locationId: string, day: LocalDate) {
+  const [counted, skipped] = await Promise.all([
+    supabase.from("drawer_counts").select("id", { count: "exact", head: true }).eq("location_id", locationId).eq("day", day).eq("kind", "open"),
+    supabase.from("drawer_skips").select("id", { count: "exact", head: true }).eq("location_id", locationId).eq("day", day),
+  ]);
+  if (counted.error) throw counted.error;
+  if (skipped.error) throw skipped.error;
+  return (counted.count ?? 0) + (skipped.count ?? 0) > 0;
 }

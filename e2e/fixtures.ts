@@ -1,6 +1,6 @@
 import { test as base, expect, type Locator, type Page } from "@playwright/test";
 import { addDays, daysBetween, fromLocal, todayIn } from "@/lib/scheduling/time";
-import { admin, busyDay, SEED } from "../tests/db/helpers";
+import { admin, busyDay, drawerReady, SEED } from "../tests/db/helpers";
 import { shiftBusiness } from "../e2e-week/time-machine";
 import { freshAuth } from "./fresh-auth";
 
@@ -205,11 +205,16 @@ export async function busyToday(): Promise<() => void> {
 // its own. Call it once at the top of the file.
 export function putBackSales() {
   let since = "";
-  test.beforeAll(() => {
+  // Cash needs today's drawer counted: a manager's skip unless it's counted
+  // (or skipped) already, taken away again after.
+  let putBackDrawer = async () => {};
+  test.beforeAll(async () => {
     since = new Date().toISOString();
+    putBackDrawer = await drawerReady();
   });
   test.afterAll(async () => {
     await undoSalesSince(since);
+    await putBackDrawer();
   });
 }
 

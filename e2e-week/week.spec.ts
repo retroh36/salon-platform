@@ -249,11 +249,25 @@ async function cardOnFile(appointmentId: string) {
   expect(error).toBeNull();
 }
 
-// The owner counts the drawer: the cash the ledger says came in today.
+// What the drawer holds overnight: the usual float before the first day,
+// then what each close-out counted (nothing is deposited).
+let drawerHeld: number | null = null;
+
+// The front desk counts the drawer when the salon opens (cash needs it):
+// what last night's close-out left.
+async function openDrawer() {
+  if (drawerHeld === null) drawerHeld = (await admin.from("businesses").select("cash_float_cents").eq("id", B).single()).data!.cash_float_cents;
+  const { data: diff, error } = await frontDesk.rpc("count_drawer", { p_location_id: L, p_kind: "open", p_counted_cents: drawerHeld });
+  expect(error, JSON.stringify(error)).toBeNull();
+  expect(diff, "the opening count matches").toBe(0);
+}
+
+// The owner counts the drawer at night: the opening plus the cash the
+// ledger says came in today.
 async function countDrawer() {
   const cash = ledger.money.filter((m) => m.day === day && m.method === "cash").reduce((n, m) => n + m.cents, 0);
-  const { data: float } = await admin.from("businesses").select("cash_float_cents").eq("id", B).single();
-  const { error } = await owner.rpc("save_closeout", { p_location_id: L, p_day: today(), p_counted_cents: float!.cash_float_cents + cash, p_note: "" as never });
+  drawerHeld = drawerHeld! + cash;
+  const { error } = await owner.rpc("save_closeout", { p_location_id: L, p_day: today(), p_counted_cents: drawerHeld, p_note: "" as never });
   expect(error, JSON.stringify(error)).toBeNull();
 }
 
@@ -351,6 +365,7 @@ test("a busy week at Maple & Ash, day by day", async ({ page }) => {
   let onlineTomorrow: Visit | null = null;
 
   await test.step("Tuesday: a full book, an online booking for tomorrow, a gift card and retail sold", async () => {
+    await openDrawer();
     const date = today();
     const visits = await fillDay(date, 3);
     expect(visits.length, refused.join("\n")).toBeGreaterThanOrEqual(9);
@@ -389,6 +404,7 @@ test("a busy week at Maple & Ash, day by day", async ({ page }) => {
   });
 
   await test.step("Wednesday: a color runs over and Denise moves the next client; a walk-in; a no-show", async () => {
+    await openDrawer();
     const date = today();
     // Bridget's color at 9 (back to back with her 11), then the usual book.
     const color = await book(BRIDGET, date, 9, "Women's Cut & Style");
@@ -420,6 +436,7 @@ test("a busy week at Maple & Ash, day by day", async ({ page }) => {
   });
 
   await test.step("Thursday: Gil goes home sick at noon and Denise moves his clients; a late cancel; the gift card spent", async () => {
+    await openDrawer();
     const date = today();
     const gils = [await book(GIL, date, 13), await book(GIL, date, 15)].filter((v): v is Visit => v !== null);
     expect(gils.length).toBe(2);
@@ -452,6 +469,7 @@ test("a busy week at Maple & Ash, day by day", async ({ page }) => {
   });
 
   await test.step("Friday: a code at checkout, a product returned, yesterday's visit refunded in full", async () => {
+    await openDrawer();
     const date = today();
     const visits = await fillDay(date, 2);
     await asDesk(page);
@@ -482,6 +500,7 @@ test("a busy week at Maple & Ash, day by day", async ({ page }) => {
   });
 
   await test.step("Saturday: a full book, and a sale rung up wrong is voided", async () => {
+    await openDrawer();
     const date = today();
     const visits = await fillDay(date, 3);
     const sold = await workTheDay(visits);

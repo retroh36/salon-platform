@@ -5,7 +5,7 @@ who: owner, manager
 open: /dashboard | Open the Dashboard
 ---
 
-Someone may void or refund a sale, complete a $0 sale, take a payment as **Other**, adjust or void a gift card, or waive a cancellation fee. When they do, owners and managers get an alert saying who did it, what and why. The person who did it doesn't get one.
+Someone may void or refund a sale, complete a $0 sale, take a payment as **Other**, skip the opening drawer count, adjust or void a gift card, or waive a cancellation fee. When they do, owners and managers get an alert saying who did it, what and why. The person who did it doesn't get one.
 
 1. In the sidebar, tap **Dashboard**.
 2. Read your alerts under **For you**.

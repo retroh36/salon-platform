@@ -209,6 +209,25 @@ export async function makeRoom(staffId: string, from: Date, to: Date) {
   };
 }
 
+// Cash needs today's opening drawer count (complete_sale, …_drawer_before_cash.sql).
+// A file that takes cash marks the drawer ready with a manager's skip,
+// unless it's counted or skipped already. Returns the undo: removes only
+// the skip it added.
+export async function drawerReady(location: string = SEED.location, timeZone = "America/Chicago") {
+  const day = todayIn(timeZone);
+  const [{ count: counted }, { count: skipped }] = await Promise.all([
+    admin.from("drawer_counts").select("id", { count: "exact", head: true }).eq("location_id", location).eq("day", day).eq("kind", "open"),
+    admin.from("drawer_skips").select("id", { count: "exact", head: true }).eq("location_id", location).eq("day", day),
+  ]);
+  if (counted || skipped) return async () => {};
+  const { data: loc } = await admin.from("locations").select("business_id").eq("id", location).single();
+  const { data, error } = await admin.from("drawer_skips").insert({ business_id: loc!.business_id, location_id: location, day, reason: "Tests take cash" }).select("id").single();
+  if (error) throw error;
+  return async () => {
+    await admin.from("drawer_skips").delete().eq("id", data.id);
+  };
+}
+
 // The default seed has a clear calendar; the tests need the demo month.
 export async function requireDemoData() {
   const { count, error } = await admin.from("appointments").select("id", { count: "exact", head: true }).eq("business_id", SEED.business);

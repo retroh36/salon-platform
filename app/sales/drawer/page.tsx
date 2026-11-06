@@ -15,6 +15,7 @@ import { formatMinute, toLocal, todayIn } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { isFrontOfHouse } from "@/lib/staff";
 import { CountForm } from "./count-form";
+import { SkipCountForm } from "./skip-form";
 
 export const metadata: Metadata = { title: "Cash drawer" };
 
@@ -54,12 +55,24 @@ async function Drawer() {
       />
       {!d.opening && !closed && (
         <div className="mb-6" data-testid="drawer-not-opened">
-          <Alert tone="warning">The drawer hasn&rsquo;t been counted today. Count it before taking cash.</Alert>
+          {d.skip ? (
+            <Alert tone="warning">
+              The drawer hasn&rsquo;t been counted today. {d.skip.by ?? "A manager"} let cash be taken without it at {time(d.skip.at)}
+              {d.skip.askedBy && d.skip.askedBy !== d.skip.by ? ` (asked by ${d.skip.askedBy})` : ""}: {d.skip.reason}
+            </Alert>
+          ) : (
+            <Alert tone="warning">The drawer hasn&rsquo;t been counted today. Cash can&rsquo;t be taken until it is; cards can.</Alert>
+          )}
         </div>
       )}
       {!closed && (
         <Section title={d.opening ? "Count the drawer" : "Opening count"} titleId="drawer-count-heading" description={d.opening ? "Count it whenever you like: at a shift change, or before a cash drop." : "Count the cash in the drawer before the first sale."}>
           <CountForm kind={d.opening ? "mid" : "open"} />
+        </Section>
+      )}
+      {!d.opening && !d.skip && !closed && (
+        <Section title="Can't count it yet?" titleId="drawer-skip-heading" description="A manager or owner can let today's cash go ahead without the opening count. Owners and managers are told, with the reason.">
+          <SkipCountForm signIn={me.role !== "owner" && me.role !== "manager"} />
         </Section>
       )}
       <Section title="Today" titleId="drawer-today-heading" description={`Cash today: ${formatPrice(netCash)} net${d.moves.length ? `, from ${d.moves.length} payment${d.moves.length === 1 ? "" : "s"} and refunds` : ""}.`}>

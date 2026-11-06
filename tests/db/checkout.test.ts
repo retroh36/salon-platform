@@ -5,7 +5,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { computeSale } from "@/lib/checkout";
 import { changeStatus, saveBooking } from "@/lib/scheduling/book";
 import { fromLocal } from "@/lib/scheduling/time";
-import { admin, createOtherSalon, SEED, signIn, type Client } from "./helpers";
+import { admin, type Client, createOtherSalon, drawerReady, SEED, signIn } from "./helpers";
+
+// Cash needs today's drawer counted (or a manager's skip).
+let putBackDrawer: () => Promise<void>;
+beforeAll(async () => {
+  putBackDrawer = await drawerReady();
+});
+afterAll(() => putBackDrawer());
 
 const B = SEED.business;
 const L = SEED.location;

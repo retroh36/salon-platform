@@ -37,10 +37,10 @@ test("the front desk opens the drawer, then counts it short during the day", asy
     await expect(main.getByTestId("drawer-not-opened")).toBeVisible();
 
     await waitForHydration(page, "form[aria-label='Opening count'] input");
-    const open = main.getByRole("form", { name: "Opening count" });
+    const open = main.getByRole("form", { name: "Opening count", exact: true });
     await open.getByLabel("Cash counted ($)").fill((opening / 100).toFixed(2));
     await open.getByRole("button", { name: "Save count" }).click();
-    await expect(open.getByRole("status")).toHaveText("Saved. The drawer matches.");
+    await expect(main.getByRole("status").filter({ hasText: "Saved. The drawer matches." })).toBeVisible();
 
     await page.reload();
     await waitForHydration(page, "form[aria-label='Count the drawer'] input");

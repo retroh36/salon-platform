@@ -1,8 +1,10 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button, buttonClass } from "@/components/ui/button";
 import { fieldClass, labelClass, selectClass } from "@/components/ui/field";
+import { Alert } from "@/components/ui/page";
 import { Sheet } from "@/components/ui/sheet";
 import { discountLimitWarning, parseDollars, quickCash } from "@/lib/checkout";
 import type { CheckoutScreenData } from "@/lib/checkout-screen";
@@ -14,6 +16,8 @@ import { formatPrice } from "@/lib/services";
 import { normalCode, promotionSummary, type PromoRule } from "@/lib/promotions";
 import { OTHER_NOTE_MIN, promotionProblems, type Rates, type Ticket, type TicketDiscount, type TicketLine, type TicketPayment, type totalsOf } from "@/lib/ticket";
 import { lookupGiftCard } from "@/app/sales/actions";
+import { CountForm } from "@/app/sales/drawer/count-form";
+import { SkipCountForm } from "@/app/sales/drawer/skip-form";
 import { approveOutOfStock } from "../actions";
 import { SendLink } from "./payment-link";
 import { newKey } from "./screen";
@@ -109,7 +113,7 @@ export function Dialogs(props: Props) {
     case "cash":
       return (
         <Sheet title="Cash payment" onClose={onClose}>
-          <CashPay {...props} />
+          <DrawerFirst {...props} />
         </Sheet>
       );
     case "other":
@@ -566,6 +570,40 @@ function OtherPay({ totals, onAddPayment, onClose }: Props) {
         Record {cents ? formatPrice(cents) : ""} other payment
       </Button>
     </form>
+  );
+}
+
+// Cash needs today's drawer counted first (complete_sale refuses it
+// otherwise): the opening count right here, or a manager's skip with a
+// reason. Then the cash pad.
+function DrawerFirst(props: Props) {
+  const [ready, setReady] = useState(props.data.drawerReady);
+  const [notice, setNotice] = useState<string | null>(null);
+  const router = useRouter();
+  const done = (message: string) => {
+    setNotice(message);
+    setReady(true);
+    router.refresh();
+  };
+  if (ready)
+    return (
+      <div className="flex flex-col gap-4">
+        {notice && <Alert tone="success">{notice}</Alert>}
+        <CashPay {...props} />
+      </div>
+    );
+  return (
+    <div className="flex flex-col gap-5" data-testid="drawer-first">
+      <p className="text-ink-muted">Count the cash drawer before taking cash today. Cards, gift cards and other payments aren&rsquo;t held up.</p>
+      <CountForm kind="open" onDone={done} />
+      <section className="flex flex-col gap-3 border-t border-line pt-4" aria-labelledby="drawer-skip-title">
+        <h3 id="drawer-skip-title" className="text-sm font-semibold text-ink">
+          Can&rsquo;t count it yet?
+        </h3>
+        <p className="text-13 text-ink-muted">A manager or owner can let today&rsquo;s cash go ahead without the count. Owners and managers are told, with the reason.</p>
+        <SkipCountForm signIn={props.data.role !== "owner" && props.data.role !== "manager"} onDone={() => done("Cash can be taken today. Owners and managers have been told.")} />
+      </section>
+    </div>
   );
 }
 
