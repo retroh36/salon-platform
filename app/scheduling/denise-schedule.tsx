@@ -34,7 +34,10 @@ function Lines({ items, label, testId }: { items: string[]; label: string; testI
 // Denise on the team schedule, for owners and managers: what she'd flag in
 // the week shown (our checks, lib/coverage.ts), and her draft of next
 // month, applied into the draft through the AI action log.
-export function DeniseSchedule({ flags, draft, monthName }: { flags: CoverageFlag[]; draft: MonthDraft | null; monthName: string }) {
+export function DeniseSchedule({ flags, draft, monthName, period = "week" }: { flags: CoverageFlag[]; draft: MonthDraft | null; monthName: string; period?: "week" | "month" }) {
+  const [allFlags, setAllFlags] = useState(false);
+  // A month can have many; the first few, then the rest on request.
+  const shownFlags = period === "month" && !allFlags ? flags.slice(0, SHOWN) : flags;
   const [notice, setNotice] = useState<DraftResult | null>(null);
   const [pending, start] = useTransition();
   const run = (action: () => Promise<DraftResult>) => start(async () => setNotice(await action()));
@@ -45,7 +48,7 @@ export function DeniseSchedule({ flags, draft, monthName }: { flags: CoverageFla
         <DeniseAvatar pose={flags.length || draft ? "point" : "wave"} />
         <div className="min-w-0 flex-1">
           <h2 id="denise-schedule-heading" className="text-base font-semibold text-denise-900">
-            {flags.length ? `I spotted ${flags.length === 1 ? "one thing" : `${flags.length} things`} this week` : "This week looks covered"}
+            {flags.length ? `I spotted ${flags.length === 1 ? "one thing" : `${flags.length} things`} this ${period}` : `This ${period} looks covered`}
           </h2>
           {!flags.length && <p className="text-sm text-ink-muted">Front desk, stylists, a Master each day, and nobody sharing a chair.</p>}
         </div>
@@ -57,12 +60,17 @@ export function DeniseSchedule({ flags, draft, monthName }: { flags: CoverageFla
       </div>
       {flags.length > 0 && (
         <ul className="flex flex-col gap-1 text-sm text-ink" data-testid="coverage-flags">
-          {flags.map((f) => (
-            <li key={`${f.kind}:${f.text}`} data-flag={f.kind}>
+          {shownFlags.map((f) => (
+            <li key={`${f.kind}:${f.date}:${f.text}`} data-flag={f.kind}>
               {f.text}
             </li>
           ))}
         </ul>
+      )}
+      {shownFlags.length < flags.length && (
+        <Button variant="quiet" size="sm" className="-mt-3 self-start" onClick={() => setAllFlags(true)}>
+          {flags.length - shownFlags.length} more
+        </Button>
       )}
       {draft && (
         <div className="flex flex-col gap-3 border-t border-denise-200 pt-4" data-testid="month-draft">

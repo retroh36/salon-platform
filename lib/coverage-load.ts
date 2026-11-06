@@ -39,7 +39,7 @@ export function coverageOf(grid: WeekGrid, requests: { staff_id: string; starts_
   return { people, days };
 }
 
-async function pendingRequests(supabase: Supabase, staffIds: string[], from: LocalDate, to: LocalDate) {
+export async function pendingRequests(supabase: Supabase, staffIds: string[], from: LocalDate, to: LocalDate) {
   const { data, error } = await supabase
     .from("staff_time_off")
     .select("staff_id, starts_on, ends_on, start_minute, end_minute")

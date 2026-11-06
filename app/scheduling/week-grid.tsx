@@ -36,20 +36,21 @@ import { discardWeek, publishWeek, saveDays } from "./actions";
 import { DayEditor } from "./day-editor";
 import { PatternEditor } from "./pattern-editor";
 import { PublishSheet } from "./publish-sheet";
+import { RangeSwitch } from "./scheduling-tabs";
 import { trackSave } from "@/lib/unsaved-work";
 
 // A shift's times, short enough for a pill but always both ends: "9–5",
 // "9:30–1".
-const short = (m: number) => {
+export const short = (m: number) => {
   const h = Math.floor(m / 60) % 12 || 12;
   return m % 60 ? `${h}:${String(m % 60).padStart(2, "0")}` : String(h);
 };
-const pillText = (s: Shift) => `${short(s.start)}–${short(s.end)}`;
+export const pillText = (s: Shift) => `${short(s.start)}–${short(s.end)}`;
 // A day's total, to the nearest hour: "54 hr".
-const hours = (m: number) => (m < 30 ? "0 hr" : formatDuration(Math.round(m / 60) * 60));
+export const hours = (m: number) => (m < 30 ? "0 hr" : formatDuration(Math.round(m / 60) * 60));
 // Approved time off in a day: "Time off" when it covers the day's hours,
 // else "Off 2–6".
-const offText = (t: Shift, day: Shift[]) => (day.length === 0 || day.every((d) => t.start <= d.start && t.end >= d.end) ? "Time off" : `Off ${pillText(t)}`);
+export const offText = (t: Shift, day: Shift[]) => (day.length === 0 || day.every((d) => t.start <= d.start && t.end >= d.end) ? "Time off" : `Off ${pillText(t)}`);
 
 // A shift being dragged to another day in its row.
 type Drag = {
@@ -209,6 +210,7 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
             <ChevronRightIcon className="size-4" />
           </Link>
           <h2 className="ml-1 text-base font-semibold text-ink">Week of {formatDay(grid.week, true)}</h2>
+          <RangeSwitch current="week" week={grid.week} />
           {editable ? status : grid.lastPublished && <Badge tone="success">Published</Badge>}
         </div>
         {editable && (

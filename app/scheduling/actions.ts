@@ -7,9 +7,13 @@ import { isUuid } from "@/lib/ids";
 import { formatDay } from "@/lib/schedule-format";
 import { patternHours } from "@/lib/scheduling/availability";
 import { loadStaffSchedules } from "@/lib/scheduling/load";
-import { addDays, isLocalDate, startOfWeek, todayIn, WEEKDAYS, type LocalDate, type Weekday } from "@/lib/scheduling/time";
+import { addDays, daysBetween, isLocalDate, startOfWeek, todayIn, WEEKDAYS, type LocalDate, type Weekday } from "@/lib/scheduling/time";
 import { outPanelHref, outside, sameShifts, shiftProblem, sortShifts, type DayEdit, type Shift } from "@/lib/team-schedule";
 import { loadWeekGrid } from "@/lib/team-schedule-load";
+import { copyForward, copyPerson, MAX_COPY_DAYS, MAX_COPY_WEEKS } from "@/lib/schedule-month";
+import { loadCells } from "@/lib/schedule-month-load";
+
+type Supabase = Awaited<ReturnType<typeof getCurrentStaff>>["supabase"];
 
 export type ScheduleResult = { ok: true; message?: string } | { ok: false; message: string };
 
@@ -33,14 +37,49 @@ export async function saveDays(days: DayEdit[]): Promise<ScheduleResult> {
     const problem = shiftProblem(d.shifts);
     if (problem) return { ok: false, message: problem };
   }
+  return saveDrafts(supabase, me.location.id, days);
+}
+
+async function saveDrafts(supabase: Supabase, locationId: string, days: DayEdit[], message?: string): Promise<ScheduleResult> {
   const { error } = await supabase.rpc("save_schedule_drafts", {
-    p_location_id: me.location.id,
+    p_location_id: locationId,
     p_days: days.map((d) => ({ staff_id: d.staffId, on_date: d.date, shifts: sortShifts(d.shifts) })) as unknown as Json,
   });
   if (error?.code === "42501") return { ok: false, message: NOT_ALLOWED };
   if (error?.code === "22023") return { ok: false, message: error.message };
   if (error) throw error;
-  return done();
+  return done(message);
+}
+
+const daysText = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
+
+// Copies a week's shifts onto the weeks after it, for everyone or one
+// person, into the draft.
+export async function copyWeekForward(sourceWeek: LocalDate, weeks: number, staffId: string | null): Promise<ScheduleResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canManage(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isLocalDate(sourceWeek) || !Number.isInteger(weeks) || weeks < 1 || weeks > MAX_COPY_WEEKS || (staffId !== null && !isUuid(staffId))) {
+    return { ok: false, message: "That copy isn't possible." };
+  }
+  const start = startOfWeek(sourceWeek);
+  const cells = await loadCells(supabase, me.location, start, addDays(start, 7 * weeks + 6));
+  const edits = copyForward(cells, start, weeks, todayIn(me.location.timezone), staffId);
+  if (!edits.length) return { ok: true, message: "Those weeks already match." };
+  return saveDrafts(supabase, me.location.id, edits, `Copied to ${daysText(edits.length)} in the draft. Publish to make it live.`);
+}
+
+// Gives one person another's shifts for a stretch of days, into the draft.
+export async function copyFromPerson(fromId: string, toId: string, from: LocalDate, to: LocalDate): Promise<ScheduleResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canManage(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(fromId) || !isUuid(toId) || fromId === toId || !isLocalDate(from) || !isLocalDate(to) || to < from || daysBetween(from, to) >= MAX_COPY_DAYS) {
+    return { ok: false, message: "Choose someone else and up to three months of days." };
+  }
+  const cells = await loadCells(supabase, me.location, from, to);
+  if (!cells.some((c) => c.staffId === fromId) || !cells.some((c) => c.staffId === toId)) return { ok: false, message: "They aren't on this team." };
+  const edits = copyPerson(cells, fromId, toId, from, to, todayIn(me.location.timezone));
+  if (!edits.length) return { ok: true, message: "Those days already match." };
+  return saveDrafts(supabase, me.location.id, edits, `Copied to ${daysText(edits.length)} in the draft. Publish to make it live.`);
 }
 
 export async function discardWeek(week: LocalDate): Promise<ScheduleResult> {
@@ -59,25 +98,36 @@ export type PublishResult = { ok: true; message: string; moves: { label: string;
 // gets a notice. Days that now leave clients outside someone's hours come
 // back as links to the Mark out panel, to move them.
 export async function publishWeek(week: LocalDate): Promise<PublishResult> {
+  return publishWeeks([week]);
+}
+
+// Publishes each of these weeks that has changes (the month view's
+// Publish month), as one publish a week.
+export async function publishWeeks(weeks: LocalDate[]): Promise<PublishResult> {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me || !canManage(me.role)) return { ok: false, message: NOT_ALLOWED };
-  if (!isLocalDate(week)) return { ok: false, message: "That week isn't on the schedule." };
-  const start = startOfWeek(week);
-  const grid = await loadWeekGrid(supabase, me.location, start, { drafts: true });
-  const { data, error } = await supabase.rpc("publish_schedule_week", { p_location_id: me.location.id, p_week_start: start });
-  if (error?.code === "42501") return { ok: false, message: NOT_ALLOWED };
-  if (error) throw error;
-  const result = data as { days_changed: number; people_notified: number };
+  if (!Array.isArray(weeks) || weeks.length < 1 || weeks.length > 6 || !weeks.every(isLocalDate)) return { ok: false, message: "That week isn't on the schedule." };
+  const starts = [...new Set(weeks.map(startOfWeek))];
+  const grids = await Promise.all(starts.map((w) => loadWeekGrid(supabase, me.location, w, { drafts: true })));
+  const changed = grids.flatMap((g) => g.cells).filter((c) => c.draft && !sameShifts(c.draft, c.live));
+  for (const g of grids) {
+    // A week with nothing changed is published too when it's the only one
+    // (it records who published it); in a month, only the changed weeks.
+    if (starts.length > 1 && !changed.some((c) => c.date >= g.week && c.date <= addDays(g.week, 6))) continue;
+    const { error } = await supabase.rpc("publish_schedule_week", { p_location_id: me.location.id, p_week_start: g.week });
+    if (error?.code === "42501") return { ok: false, message: NOT_ALLOWED };
+    if (error) throw error;
+  }
 
-  const names = new Map(grid.people.map((p) => [p.id, p.firstName]));
-  const moves = grid.cells
-    .filter((c) => c.draft && outside(c, c.draft).some((b) => !outside(c, c.live).includes(b)))
+  const names = new Map(grids[0].people.map((p) => [p.id, p.firstName]));
+  const moves = changed
+    .filter((c) => outside(c, c.draft!).some((b) => !outside(c, c.live).includes(b)))
     .map((c) => ({ label: `Move ${names.get(c.staffId)}'s clients on ${formatDay(c.date)}`, href: outPanelHref({ staffId: c.staffId, date: c.date, before: c.live, after: c.draft! }) }));
-  const people = result.people_notified;
+  const people = new Set(changed.map((c) => c.staffId)).size;
   done();
   return {
     ok: true,
-    message: result.days_changed ? `Published. ${people} ${people === 1 ? "person" : "people"} told about their new hours.` : "Published. Nothing had changed.",
+    message: changed.length ? `Published. ${people} ${people === 1 ? "person" : "people"} told about their new hours.` : "Published. Nothing had changed.",
     moves,
   };
 }

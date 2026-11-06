@@ -12,11 +12,11 @@ import type { GridPerson } from "@/lib/team-schedule-load";
 // new hours leave outside them. With clients in the way it never just
 // publishes: the choice is to publish and move them now (the Mark out
 // panel opens on the first day) or to publish and move them later.
-export function PublishSheet({ changes, people, pending, onClose, onPublish }: { changes: Change[]; people: GridPerson[]; pending: boolean; onClose: () => void; onPublish: (moveClients: boolean) => void }) {
+export function PublishSheet({ title = "Publish this week", changes, people, pending, onClose, onPublish }: { title?: string; changes: Change[]; people: GridPerson[]; pending: boolean; onClose: () => void; onPublish: (moveClients: boolean) => void }) {
   const byPerson = people.map((p) => ({ person: p, changes: changes.filter((c) => c.staffId === p.id) })).filter((g) => g.changes.length);
   const affected = changes.reduce((n, c) => n + c.affected.length, 0);
   return (
-    <Sheet title="Publish this week" onClose={onClose} wide>
+    <Sheet title={title} onClose={onClose} wide>
       <div className="flex flex-col gap-4">
         <p className="text-sm text-ink">
           {byPerson.length} {byPerson.length === 1 ? "person's" : "people's"} hours change. Each of them gets a notice, and the calendar and online booking use the new hours.

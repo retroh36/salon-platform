@@ -7,12 +7,13 @@ import { LiveRefresh } from "@/components/live-calendar";
 import { PageHeader } from "@/components/ui/page";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import { isLocalDate, startOfWeek, todayIn } from "@/lib/scheduling/time";
-import { coverageFlags, DRAFT_FEATURE, nextMonth } from "@/lib/coverage";
+import { coverageFlags, nextMonth } from "@/lib/coverage";
 import { coverageForGrid } from "@/lib/coverage-load";
 import { isFrontOfHouse } from "@/lib/staff";
 import { countPendingRequests } from "@/lib/time-off-requests-load";
 import { loadWeekGrid } from "@/lib/team-schedule-load";
-import { DeniseSchedule, type MonthDraft } from "./denise-schedule";
+import { DeniseSchedule } from "./denise-schedule";
+import { loadMonthDraft } from "./month-draft";
 import { SchedulingTabs } from "./scheduling-tabs";
 import { WeekGridView } from "./week-grid";
 
@@ -55,21 +56,4 @@ async function Scheduling({ searchParams }: Pick<PageProps<"/scheduling">, "sear
       <WeekGridView grid={grid} today={today} editable={editable} />
     </AppShell>
   );
-}
-
-// Denise's latest month draft: waiting, or applied in the last day (for Undo).
-async function loadMonthDraft(supabase: Awaited<ReturnType<typeof getCurrentStaff>>["supabase"], locationId: string): Promise<MonthDraft | null> {
-  const { data, error } = await supabase
-    .from("ai_actions")
-    .select("id, status, summary, reason, proposal, decided_at")
-    .eq("location_id", locationId)
-    .eq("feature", DRAFT_FEATURE)
-    .in("status", ["proposed", "approved"])
-    .order("created_at", { ascending: false })
-    .limit(1);
-  if (error) throw error;
-  const row = data[0];
-  if (!row || (row.status === "approved" && Date.parse(row.decided_at ?? "") < Date.now() - 86_400_000)) return null;
-  const proposal = row.proposal as { filled?: string[]; left?: string[] };
-  return { id: row.id, status: row.status as MonthDraft["status"], summary: row.summary, reason: row.reason, filled: proposal.filled ?? [], left: proposal.left ?? [] };
 }

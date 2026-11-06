@@ -27,3 +27,27 @@ export function SchedulingTabs({ current, pending }: { current: (typeof TABS)[nu
     </nav>
   );
 }
+
+// Week or Month of the team schedule, keeping the place: the month the week
+// starts in, or the month's first week.
+export function RangeSwitch({ current, week, month }: { current: "week" | "month"; week?: string; month?: string }) {
+  const options = [
+    { value: "week", label: "Week", href: week ? `/scheduling?week=${week}` : `/scheduling?week=${month}-01` },
+    { value: "month", label: "Month", href: month ? `/scheduling/month?month=${month}` : `/scheduling/month?month=${week!.slice(0, 7)}` },
+  ] as const;
+  return (
+    <nav aria-label="Show" className="inline-flex h-9 items-center rounded-md border border-line bg-surface p-0.5">
+      {options.map((o) =>
+        o.value === current ? (
+          <span key={o.value} aria-current="page" className="inline-flex h-full items-center rounded bg-active-soft px-3 text-sm font-medium text-active-ink">
+            {o.label}
+          </span>
+        ) : (
+          <Link key={o.value} href={o.href} className="inline-flex h-full items-center rounded px-3 text-sm font-medium text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-focus">
+            {o.label}
+          </Link>
+        ),
+      )}
+    </nav>
+  );
+}
