@@ -1,6 +1,6 @@
 ---
 title: Sell a gift card
-keywords: gift card, gift certificate, voucher, ring up a gift card, buy a gift card, e-gift, egift, digital gift card, physical gift card, plastic card, sell a voucher
+keywords: gift card, gift certificate, voucher, ring up a gift card, buy a gift card, e-gift, egift, digital gift card, physical gift card, plastic card, sell a voucher, this is a gift, gift for someone else, hide gift card, surprise, present
 who: owner, manager, front_desk
 open: /checkout/new?from=/sales | Open new sale
 ---
@@ -13,13 +13,15 @@ Sell a physical or digital gift card at checkout, on its own or with a visit.
 4. Tap a preset amount, or type it in **Amount ($)**.
 5. For a physical card, type or scan the code on the card into **Card code (type or scan)**.
 6. For a digital card, enter the **Recipient's name** (optional) and **Recipient's email**.
-7. Tap **Add to ticket**.
-8. Take payment under **Payment** (**Card** or **Cash**), then tap **Complete sale**.
+7. If it's a present for someone else, tick **This is a gift**.
+8. Tap **Add to ticket**.
+9. Take payment under **Payment** (**Card** or **Cash**), then tap **Complete sale**.
 
 ## Good to know
 
 - Gift cards are $5 to $1,000 and aren't taxed or discounted.
 - A gift card can't be paid for with another gift card.
+- **This is a gift** keeps the card out of the buyer's online account. Once it's used for a client, it shows in that client's account only. Staff always see it on **Gift cards**, with who it's from and who used it.
 - A digital card gets its own code and is emailed in your salon's colors. Email isn't connected yet, so for now it waits in the outbox instead of being sent.
 - Owners set the preset amounts and expiry on Settings, Gift cards. To top up a card someone already has, see Reload a gift card.
 

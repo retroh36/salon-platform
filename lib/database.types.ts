@@ -1687,14 +1687,14 @@ isOneToOne: false
                   ]
                 },"gift_cards": {
                   Row: {
-                    "balance_cents": number,"business_id": string,"client_id": string | null,"code": string,"created_at": string,"created_by": string | null,"expires_at": string | null,"id": string,"imported": boolean,"initial_cents": number,"kind": Database["public"]['Enums']["gift_card_kind"],"note": string | null,"physical": boolean,"recipient_email": string | null,"recipient_name": string | null,"sale_id": string | null,"status": Database["public"]['Enums']["gift_card_status"]
+                    "balance_cents": number,"business_id": string,"client_id": string | null,"code": string,"created_at": string,"created_by": string | null,"expires_at": string | null,"holder_client_id": string | null,"id": string,"imported": boolean,"initial_cents": number,"is_gift": boolean,"kind": Database["public"]['Enums']["gift_card_kind"],"note": string | null,"owner_client_id": string | null,"physical": boolean,"recipient_email": string | null,"recipient_name": string | null,"sale_id": string | null,"status": Database["public"]['Enums']["gift_card_status"]
                   }
                   ComputedFields: never
                   Insert: {
-                    "balance_cents": number,"business_id": string,"client_id"?: string | null,"code": string,"created_at"?: string,"created_by"?: string | null,"expires_at"?: string | null,"id"?: string,"imported"?: boolean,"initial_cents": number,"kind": Database["public"]['Enums']["gift_card_kind"],"note"?: string | null,"physical"?: boolean,"recipient_email"?: string | null,"recipient_name"?: string | null,"sale_id"?: string | null,"status"?: Database["public"]['Enums']["gift_card_status"]
+                    "balance_cents": number,"business_id": string,"client_id"?: string | null,"code": string,"created_at"?: string,"created_by"?: string | null,"expires_at"?: string | null,"holder_client_id"?: string | null,"id"?: string,"imported"?: boolean,"initial_cents": number,"is_gift"?: boolean,"kind": Database["public"]['Enums']["gift_card_kind"],"note"?: string | null,"owner_client_id"?: never,"physical"?: boolean,"recipient_email"?: string | null,"recipient_name"?: string | null,"sale_id"?: string | null,"status"?: Database["public"]['Enums']["gift_card_status"]
                   }
                   Update: {
-                    "balance_cents"?: number,"business_id"?: string,"client_id"?: string | null,"code"?: string,"created_at"?: string,"created_by"?: string | null,"expires_at"?: string | null,"id"?: string,"imported"?: boolean,"initial_cents"?: number,"kind"?: Database["public"]['Enums']["gift_card_kind"],"note"?: string | null,"physical"?: boolean,"recipient_email"?: string | null,"recipient_name"?: string | null,"sale_id"?: string | null,"status"?: Database["public"]['Enums']["gift_card_status"]
+                    "balance_cents"?: number,"business_id"?: string,"client_id"?: string | null,"code"?: string,"created_at"?: string,"created_by"?: string | null,"expires_at"?: string | null,"holder_client_id"?: string | null,"id"?: string,"imported"?: boolean,"initial_cents"?: number,"is_gift"?: boolean,"kind"?: Database["public"]['Enums']["gift_card_kind"],"note"?: string | null,"owner_client_id"?: never,"physical"?: boolean,"recipient_email"?: string | null,"recipient_name"?: string | null,"sale_id"?: string | null,"status"?: Database["public"]['Enums']["gift_card_status"]
                   }
                   Relationships: [
                     {
@@ -1715,6 +1715,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "staff"
       referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "gift_cards_holder_client_id_fkey"
+      columns: ["holder_client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id"]
     },{
       foreignKeyName: "gift_cards_sale_id_fkey"
       columns: ["sale_id"]

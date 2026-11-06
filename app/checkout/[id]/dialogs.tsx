@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button, buttonClass } from "@/components/ui/button";
-import { fieldClass, labelClass, selectClass } from "@/components/ui/field";
+import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
 import { Sheet } from "@/components/ui/sheet";
 import { discountLimitWarning, parseDollars, quickCash } from "@/lib/checkout";
@@ -218,6 +218,7 @@ function SellGiftCard({ data, onAddLine, onClose }: Props) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [reload, setReload] = useState(false);
+  const [gift, setGift] = useState(false);
   const cents = parseDollars(amount);
   return (
     <form
@@ -228,7 +229,16 @@ function SellGiftCard({ data, onAddLine, onClose }: Props) {
         onAddLine(
           reload
             ? { key: newKey(), kind: "gift_card_reload", code: code.trim(), amountCents: cents }
-            : { key: newKey(), kind: "gift_card", amountCents: cents, physical, code: physical ? code.trim() : "", recipientName: name.trim(), recipientEmail: physical ? "" : email.trim() },
+            : {
+                key: newKey(),
+                kind: "gift_card",
+                amountCents: cents,
+                physical,
+                code: physical ? code.trim() : "",
+                recipientName: name.trim(),
+                recipientEmail: physical ? "" : email.trim(),
+                isGift: gift,
+              },
         );
         onClose();
       }}
@@ -274,6 +284,15 @@ function SellGiftCard({ data, onAddLine, onClose }: Props) {
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={`${fieldClass} h-12`} required />
           </label>
         </>
+      )}
+      {!reload && (
+        <label className="flex items-start gap-3 text-sm text-ink">
+          <input type="checkbox" checked={gift} onChange={(e) => setGift(e.target.checked)} className={`${checkboxClass} mt-0.5`} />
+          <span>
+            <span className="block font-medium">This is a gift</span>
+            <span className="block text-ink-muted">It stays out of the buyer&apos;s online account. Once it&apos;s used, it shows in the account of the client who used it.</span>
+          </span>
+        </label>
       )}
       <Button type="submit" variant="primary" size="lg" disabled={!cents}>
         Add to ticket

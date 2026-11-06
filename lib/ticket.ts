@@ -49,7 +49,17 @@ export type ProductLine = {
   taxBp?: number | null;
 };
 
-export type GiftCardLine = { key: string; kind: "gift_card"; amountCents: number; physical: boolean; code: string; recipientName: string; recipientEmail: string };
+// isGift: "This is a gift", kept out of every client account until it's used.
+export type GiftCardLine = {
+  key: string;
+  kind: "gift_card";
+  amountCents: number;
+  physical: boolean;
+  code: string;
+  recipientName: string;
+  recipientEmail: string;
+  isGift?: boolean;
+};
 export type ReloadLine = { key: string; kind: "gift_card_reload"; code: string; amountCents: number };
 export type PackageLine = { key: string; kind: "package"; templateId: string; name: string; priceCents: number };
 // A membership sold, with the card it renews on (a token at the provider).
@@ -414,7 +424,14 @@ export function saleInput(ticket: Ticket, ids: { draftId: string; appointmentId:
         case "product":
           return { kind: "product", product_id: l.productId, staff_id: ticket.employeeId ? null : l.staffId, quantity: l.quantity, discount: l.discount && l.discount.value > 0 ? l.discount : null };
         case "gift_card":
-          return { kind: "gift_card", amount_cents: l.amountCents, code: l.physical ? l.code : null, recipient_name: l.recipientName || null, recipient_email: l.physical ? null : l.recipientEmail };
+          return {
+            kind: "gift_card",
+            amount_cents: l.amountCents,
+            code: l.physical ? l.code : null,
+            recipient_name: l.recipientName || null,
+            recipient_email: l.physical ? null : l.recipientEmail,
+            is_gift: l.isGift === true,
+          };
         case "gift_card_reload":
           return { kind: "gift_card_reload", code: l.code, amount_cents: l.amountCents };
         case "package":

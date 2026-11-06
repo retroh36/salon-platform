@@ -317,7 +317,7 @@ function lineTitle(line: TicketLine): string {
     case "product":
       return line.name;
     case "gift_card":
-      return line.physical ? "Gift card" : "Gift card (digital)";
+      return `${line.physical ? "Gift card" : "Gift card (digital)"}${line.isGift ? " · a gift" : ""}`;
     case "gift_card_reload":
       return "Gift card reload";
     case "package":

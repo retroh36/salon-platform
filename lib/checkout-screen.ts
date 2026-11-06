@@ -261,7 +261,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     const [insights, pkgs, cards, live] = await Promise.all([
       loadClientInsights(supabase, me.business_id, [client.id]),
       loadClientPackages(supabase, client.id, true),
-      supabase.from("gift_cards").select("code, balance_cents, kind, expires_at").eq("client_id", client.id).eq("status", "active").gt("balance_cents", 0),
+      supabase.from("gift_cards").select("code, balance_cents, kind, expires_at").eq("owner_client_id", client.id).eq("status", "active").gt("balance_cents", 0),
       loadClientMemberships(supabase, client.id, true),
     ]);
     packages = pkgs.filter((p) => isUsable(p, now));

@@ -119,7 +119,7 @@ export async function briefFacts(
     lowStockFor(supabase, where.location.id, serviceIds),
     loadPackagesByClient(supabase, clientIds),
     clientIds.length
-      ? supabase.from("gift_cards").select("client_id, balance_cents, expires_at").in("client_id", clientIds).eq("status", "active").gt("balance_cents", 0)
+      ? supabase.from("gift_cards").select("client_id:owner_client_id, balance_cents, expires_at").in("owner_client_id", clientIds).eq("status", "active").gt("balance_cents", 0)
       : Promise.resolve({ data: [], error: null }),
     scanned,
   ]);

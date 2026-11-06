@@ -32,7 +32,7 @@ async function GiftCards({ searchParams }: Pick<PageProps<"/gift-cards">, "searc
   const [{ data: cards, error }, { data: b }] = await Promise.all([
     supabase
       .from("gift_cards")
-      .select("id, code, kind, status, initial_cents, balance_cents, expires_at, recipient_name, physical, created_at, client:clients(first_name, last_name)")
+      .select("id, code, kind, status, initial_cents, balance_cents, expires_at, recipient_name, physical, created_at, client:clients!gift_cards_client_id_fkey(first_name, last_name)")
       .eq("business_id", me.business_id)
       .eq("kind", kind)
       .order("created_at", { ascending: false })

@@ -50,12 +50,15 @@ test.describe("front desk", () => {
     await co.dialog.getByRole("button", { name: "$50" }).click();
     await co.dialog.getByLabel("Recipient’s name").fill(`${PREFIX} Ava`);
     await co.dialog.getByLabel("Recipient’s email").fill("ava.gift@example.com");
+    await co.dialog.getByLabel("This is a gift").check();
     await co.dialog.getByRole("button", { name: "Add to ticket" }).click();
+    await expect(co.ticket).toContainText("Gift card (digital) · a gift");
     await expect(co.total).toHaveText("$50");
     await co.card();
     await expect(await co.complete()).toContainText("$50");
 
-    const { data: card } = await admin.from("gift_cards").select("code").eq("recipient_name", `${PREFIX} Ava`).single();
+    const { data: card } = await admin.from("gift_cards").select("code, is_gift").eq("recipient_name", `${PREFIX} Ava`).single();
+    expect(card!.is_gift).toBe(true);
     const code = formatCode(card!.code);
     const { data: email } = await admin.from("outbox_messages").select("subject, body, html").eq("to_address", "ava.gift@example.com").order("created_at", { ascending: false }).limit(1).single();
     expect(email!.subject).toBe(`${PREFIX} Ava, here's a $50 gift card for Maple & Ash Hair Studio`);
@@ -91,6 +94,8 @@ test.describe("front desk", () => {
     await expect(history.first()).toContainText("Sold on sale #");
     await expect(history.last()).toContainText("Used on sale #");
     await expect(history.last()).toContainText("−$40 → $10");
+    // A gift used by a walk-in is still in nobody's account.
+    await expect(ui(page).getByTestId("card-people")).toContainText("No client has used it yet, so it isn't in anyone's online account");
     // No adjusting for the front desk.
     await expect(ui(page).getByRole("form", { name: "Adjust balance" })).toHaveCount(0);
   });

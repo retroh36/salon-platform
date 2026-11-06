@@ -77,7 +77,7 @@ export async function loadAccount(admin: Admin, account: Account, now = new Date
       .eq("status", "completed")
       .order("starts_at", { ascending: false })
       .limit(PAST_SHOWN),
-    admin.from("gift_cards").select("code, balance_cents, expires_at").eq("client_id", clientId).eq("business_id", businessId).eq("status", "active").gt("balance_cents", 0),
+    admin.from("gift_cards").select("code, balance_cents, expires_at").eq("owner_client_id", clientId).eq("business_id", businessId).eq("status", "active").gt("balance_cents", 0),
     admin
       .from("client_packages")
       .select("name, expires_at, client_package_items(total, used, service:services(name))")

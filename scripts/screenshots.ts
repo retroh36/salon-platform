@@ -1061,7 +1061,8 @@ async function visitToCheckOut() {
 async function accountClient() {
   const { data: cards } = await admin
     .from("gift_cards")
-    .select("client_id, expires_at, client:clients!inner(email, phone)")
+    .select("client_id, expires_at, client:clients!gift_cards_client_id_fkey!inner(email, phone)")
+    .eq("is_gift", false)
     .eq("business_id", BUSINESS)
     .eq("kind", "purchased")
     .eq("status", "active")

@@ -32,7 +32,7 @@ async function GiftCard({ params }: Pick<PageProps<"/gift-cards/[id]">, "params"
   const { data: card, error } = await supabase
     .from("gift_cards")
     .select(
-      "id, code, kind, status, initial_cents, balance_cents, expires_at, recipient_name, recipient_email, physical, imported, note, created_at, client:clients(id, first_name, last_name, email), gift_card_events(kind, amount_cents, balance_after, reason, created_at, sale:sales(id, number), staff:staff(first_name))",
+      "id, code, kind, status, initial_cents, balance_cents, expires_at, recipient_name, recipient_email, physical, imported, note, created_at, is_gift, client:clients!gift_cards_client_id_fkey(id, first_name, last_name, email), holder:clients!gift_cards_holder_client_id_fkey(id, first_name, last_name), gift_card_events(kind, amount_cents, balance_after, reason, created_at, sale:sales(id, number), staff:staff(first_name))",
     )
     .eq("id", id)
     .maybeSingle();
@@ -75,17 +75,38 @@ async function GiftCard({ params }: Pick<PageProps<"/gift-cards/[id]">, "params"
               <dd className="mt-1 text-2xl font-semibold tracking-[-0.015em] text-ink">{card.expires_at ? formatDay(toLocal(new Date(card.expires_at), tz).date, true) : "Never"}</dd>
             </div>
           </dl>
-          {(card.recipient_name || card.client || card.note || card.kind === "promotional") && (
-            <dl className="mb-6 flex flex-col gap-2 text-sm">
-              {(card.recipient_name || card.client) && (
+          {(card.recipient_name || card.client || card.note || card.is_gift || card.kind === "promotional") && (
+            <dl className="mb-6 flex flex-col gap-2 text-sm" data-testid="card-people">
+              {(card.recipient_name || (card.client && !card.is_gift)) && (
                 <div className="flex gap-3">
-                  <dt className="w-16 shrink-0 text-ink-muted">For</dt>
+                  <dt className="w-20 shrink-0 text-ink-muted">For</dt>
                   <dd className="text-ink">{card.recipient_name ?? (card.client ? fullName(card.client) : "")}</dd>
                 </div>
               )}
+              {/* A gift stays out of every client account until it's used, then shows in the holder's. */}
+              {card.is_gift && (
+                <>
+                  <div className="flex gap-3">
+                    <dt className="w-20 shrink-0 text-ink-muted">A gift from</dt>
+                    <dd className="text-ink">{card.client ? fullName(card.client) : "A walk-in guest"}</dd>
+                  </div>
+                  <div className="flex gap-3">
+                    <dt className="w-20 shrink-0 text-ink-muted">Used by</dt>
+                    <dd className="text-ink">
+                      {card.holder ? (
+                        <Link href={`/clients/${card.holder.id}`} className={textLinkClass}>
+                          {fullName(card.holder)}
+                        </Link>
+                      ) : (
+                        "No client has used it yet, so it isn't in anyone's online account"
+                      )}
+                    </dd>
+                  </div>
+                </>
+              )}
               {card.note && (
                 <div className="flex gap-3">
-                  <dt className="w-16 shrink-0 text-ink-muted">Note</dt>
+                  <dt className="w-20 shrink-0 text-ink-muted">Note</dt>
                   <dd className="text-ink">{card.note}</dd>
                 </div>
               )}
