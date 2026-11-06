@@ -9,12 +9,18 @@ import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 const L = SEED.location;
 const today = todayIn("America/Chicago");
 const since = new Date().toISOString();
+// A usual float of $100, so the drawer holds cash before anyone takes any
+// today (just after midnight, the demo's float of $0 would match a $0 count).
+let floatBefore = 0;
 
 test.beforeAll(async () => {
   await admin.from("drawer_counts").delete().eq("location_id", L).eq("day", today);
+  floatBefore = (await admin.from("businesses").select("cash_float_cents").eq("id", SEED.business).single()).data!.cash_float_cents;
+  await admin.from("businesses").update({ cash_float_cents: 10000 }).eq("id", SEED.business);
 });
 
 test.afterAll(async () => {
+  await admin.from("businesses").update({ cash_float_cents: floatBefore }).eq("id", SEED.business);
   await admin.from("drawer_counts").delete().eq("location_id", L).eq("day", today);
   await admin.from("notifications").delete().eq("template", "alert_drawer_off").gte("created_at", since);
 });

@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { addDays, fromLocal, toLocal, todayIn } from "@/lib/scheduling/time";
-import { admin, busyDay, openAllDay, SEED, throwawayStylist } from "../tests/db/helpers";
+import { admin, busyDay, makeRoom, openAllDay, SEED, throwawayStylist } from "../tests/db/helpers";
 import { AUTH, checkIn, expect, moreAction, openChecklist, openDisplayMenu, pxPerMinute, settleAnimations, showDenise, test, ui, waitForHydration } from "./fixtures";
 
 // The calendar's day: undoing a check-in, the patch test notice in booking
@@ -14,6 +14,8 @@ const today = todayIn(TZ);
 const DAY = addDays(today, 40);
 const PREFIX = `Cd${Date.now().toString(36)}`;
 const clientIds: string[] = [];
+// Undoes makeRoom for each fixture, after its visits are deleted.
+const putBack: (() => Promise<void>)[] = [];
 // A signed form's signature (a 1×1 PNG).
 const SIGNATURE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
@@ -28,6 +30,8 @@ async function client(first: string) {
 async function book(clientId: string, service: string, start: Date, staffId = SEED.staff.lois) {
   const { data: s } = await admin.from("services").select("id, duration_minutes").eq("business_id", B).eq("name", service).single();
   const end = new Date(start.getTime() + s!.duration_minutes! * 60_000);
+  // The demo's rebooked visits reach weeks ahead: make room for this one.
+  putBack.push(await makeRoom(staffId, start, end));
   const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: clientId, starts_at: start.toISOString(), ends_at: end.toISOString() }).select("id").single();
   const { error } = await admin.from("appointment_items").insert({
     business_id: B,
@@ -55,6 +59,7 @@ const status = async (id: string) => (await admin.from("appointments").select("s
 test.afterAll(async () => {
   await admin.from("appointments").delete().in("client_id", clientIds);
   await admin.from("clients").delete().in("id", clientIds);
+  for (const undo of putBack) await undo();
   await admin.from("denise_dismissals").delete().eq("location_id", L).eq("day", today).like("item_key", "late:%");
 });
 

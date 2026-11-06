@@ -51,6 +51,6 @@ test.describe("a stylist", () => {
     await expect(page).toHaveURL(/\/settings\/denise$/);
     // Settings shows only this page to them.
     await expect(ui(page).getByRole("navigation", { name: "Settings" }).getByRole("link")).toHaveText(["Denise"]);
-    await expect(page.getByTestId("try-denise")).toHaveText(["Which of my regulars are due back?", "How long do I usually take for a balayage?", "How do I ask for time off?"]);
+    await expect(page.getByTestId("try-denise")).toHaveText(["Which of my regulars are due back?", "How long do I usually take for a balayage?", "How much PTO do I have?"]);
   });
 });
