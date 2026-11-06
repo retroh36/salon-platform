@@ -657,6 +657,59 @@ where u.used > 0;
 update public.stock_movements set created_at = now() - interval '113 days', created_by = 'd0000000-0000-4000-8000-000000000002'
 where reason = 'order_received' and note = 'Deliveries over the history';
 
+-- A year more of stock history before the visits begin (400 to 114 days
+-- back), so the usage report and Denise compare a period with the same
+-- dates last year. Only stock movements, one row per product per open day
+-- (no visits or sales, so the demo stays quick): each product's daily
+-- service use and retail sales from the 16 weeks above, about 12% lower a
+-- year ago, busier in November, December, May and June and quieter in
+-- January and February, with day-to-day noise. One delivery at its start
+-- covers it, so on hand ends where it was.
+create temp table seed_year_use as
+with recent as (
+  select m.product_id, m.reason, -sum(m.change) / 80.0 as per_day
+  from public.stock_movements m
+  where m.business_id = 'b0000000-0000-4000-8000-000000000001' and m.reason in ('service_use', 'sale')
+  group by m.product_id, m.reason
+),
+days as (
+  select d::date as d from generate_series(current_date - 400, current_date - 114, interval '1 day') d
+  where extract(isodow from d) between 2 and 6
+)
+select r.product_id, r.reason, (days.d + time '18:00') at time zone 'America/Chicago' as at,
+       case when p.unit = 'unit'
+         then floor(r.per_day * f.k + pg_temp.rnd('yr' || r.product_id || days.d) / 10000.0)
+         else round(r.per_day * f.k * (0.6 + pg_temp.rnd('yr' || r.product_id || days.d) / 12500.0))
+       end as used
+from recent r
+join public.products p on p.id = r.product_id
+cross join days
+cross join lateral (
+  select 0.88 * case extract(month from days.d)::int when 11 then 1.1 when 12 then 1.25 when 1 then 0.85 when 2 then 0.9 when 5 then 1.1 when 6 then 1.1 else 1.0 end as k
+) f;
+delete from seed_year_use where used <= 0;
+
+insert into public.stock_movements (business_id, location_id, product_id, change, on_hand_after, reason, note, created_by, created_at)
+select 'b0000000-0000-4000-8000-000000000001'::uuid, 'c0000000-0000-4000-8000-000000000001'::uuid, product_id, sum(used), 0, 'order_received'::public.stock_reason, 'Deliveries the year before',
+       'd0000000-0000-4000-8000-000000000002'::uuid, now() - interval '401 days'
+from seed_year_use group by product_id
+union all
+select 'b0000000-0000-4000-8000-000000000001'::uuid, 'c0000000-0000-4000-8000-000000000001'::uuid, product_id, -used, 0,
+       reason, null, 'd0000000-0000-4000-8000-000000000003'::uuid, at
+from seed_year_use;
+
+-- The amount after each movement, worked back from what's on hand now
+-- (the history above was recorded before its deliveries were moved back to
+-- its start, so its running amounts were off).
+update public.stock_movements m set on_hand_after = w.after
+from (
+  select m.id, l.on_hand - coalesce(sum(m.change) over (partition by m.product_id order by m.created_at desc, m.id desc rows between unbounded preceding and 1 preceding), 0) as after
+  from public.stock_movements m
+  join public.stock_levels l on l.product_id = m.product_id and l.location_id = m.location_id
+  where m.location_id = 'c0000000-0000-4000-8000-000000000001'
+) w
+where w.id = m.id;
+
 -- Checkout: retail is taxed (Chicago's 10.25%), services aren't. Every
 -- checked-out visit gets its sale: the services at their booked prices,
 -- the retail bought then, tips for about 60% of visits, and card or cash.
