@@ -114,6 +114,14 @@ async function Member({ params, searchParams }: { params: Promise<{ id: string }
               </Link>
             </Card>
           )}
+          {member.staff_services.length > 0 && (
+            <Card title="Service times" className="mb-0">
+              <p className="text-sm text-ink-muted">How long {member.first_name} takes for each service, set by hand or copied from another stylist.</p>
+              <Link href={`/team/${member.id}/times`} className={`${buttonClass("secondary", "sm")} mt-3`}>
+                Service times
+              </Link>
+            </Card>
+          )}
           {member.role === "assistant" && <AssistingCard staffId={member.id} current={member.assists_staff_id} stylists={(stylists ?? []).map((s) => ({ id: s.id, name: fullName(s) }))} />}
           {member.role !== "owner" && <PermissionsCard staffId={member.id} firstName={member.first_name} rows={permissions ?? []} canEdit={me.role === "owner" && !isMe} groups={groups ?? []} groupId={member.permission_group_id} />}
           {(member.role === "stylist" || member.event_roles.length > 0) && <EventWorkCard staffId={member.id} firstName={member.first_name} current={member.event_roles} />}

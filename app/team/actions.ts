@@ -7,6 +7,7 @@ import { DEMO_OFF, isDemo, isDemoAccount } from "@/lib/demo";
 import { isToggle } from "@/lib/permissions";
 import { isUuid } from "@/lib/ids";
 import type { StaffRole } from "@/lib/staff";
+import { timingProblem } from "@/lib/stylist-timings";
 import { canManageMember, parseMemberForm, rolesFor, type MemberErrors } from "@/lib/team";
 import { inviteMember, resetMemberPassword, type LoginResult } from "@/lib/team-logins";
 
@@ -137,4 +138,29 @@ export async function clearMemberPin(staffId: string): Promise<LoginResult> {
   if (error) throw error;
   refresh();
   return { ok: true, message: "PIN cleared. They can set a new one on Your account." };
+}
+
+export type TimingsResult = { ok: true; message: string } | { ok: false; message: string };
+
+// A stylist's own service times (set by hand, or copied from another
+// stylist): only what changed, all or nothing (set_staff_timings).
+export async function saveStaffTimings(staffId: string, changes: { service_id: string; active_minutes: number | null; processing_minutes: number | null; finishing_minutes: number | null }[]): Promise<TimingsResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !isUuid(staffId) || !canManageMember(me, null)) return { ok: false, message: NOT_ALLOWED };
+  for (const c of changes) {
+    if (!isUuid(c.service_id)) return { ok: false, message: "That service isn't on the menu." };
+    if (c.active_minutes !== null) {
+      const problem = timingProblem({ active: c.active_minutes, processing: c.processing_minutes ?? 0, finishing: c.finishing_minutes ?? 0 });
+      if (problem) return { ok: false, message: problem };
+    } else if (c.processing_minutes !== null || c.finishing_minutes !== null) return { ok: false, message: "Enter the active time too." };
+  }
+  if (changes.length === 0) return { ok: true, message: "Nothing to save." };
+  const { error } = await supabase.rpc("set_staff_timings", { p_staff_id: staffId, p_timings: changes });
+  if (error?.code === "42501") return { ok: false, message: NOT_ALLOWED };
+  if (error?.hint === "not_offered") return { ok: false, message: "They no longer do one of these services. Reload the page." };
+  if (error?.code === "23514") return { ok: false, message: "One of the times isn't valid. Check them and try again." };
+  if (error) throw error;
+  refresh();
+  revalidatePath("/durations");
+  return { ok: true, message: `Saved ${changes.length === 1 ? "1 time" : `${changes.length} times`}. New bookings use them; visits already booked keep theirs.` };
 }

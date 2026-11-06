@@ -5051,6 +5051,9 @@ isOneToOne: false
 "set_staff_permission_group":
 { Args: { "p_group_id": string,"p_staff_id": string }; Returns: undefined
                            },
+"set_staff_timings":
+{ Args: { "p_staff_id": string,"p_timings": Json }; Returns: number
+                           },
 "set_staff_weekly_hours":
 { Args: { "p_business_id": string,"p_hours": Json,"p_staff_id": string }; Returns: undefined
                            },
