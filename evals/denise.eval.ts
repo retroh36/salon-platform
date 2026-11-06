@@ -19,7 +19,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/database.types";
 import { assistantTools, systemPrompt, type AssistantContext } from "@/lib/denise/assistant";
-import { claudeClient, converse, modelFor } from "@/lib/denise/claude";
+import { claudeClient, converse, GENDERED, modelFor, withoutPronouns } from "@/lib/denise/claude";
 import { assistantContext } from "@/lib/denise/context";
 import { pageContext } from "@/lib/denise/page";
 import { howTo } from "@/lib/help/guide";
@@ -114,6 +114,12 @@ const howToCase = (question: string, as: Role, page: string | null, check: (a: s
 const says = (pattern: RegExp, why: string) => (a: string) => (pattern.test(a) ? null : why);
 
 // Helpers for the facts.
+// Bridget's own Blowout length (null: the menu's), for the copy case.
+async function setBridgetBlowout(minutes: number | null) {
+  const { data: s } = await admin.from("services").select("id").eq("business_id", B).eq("name", "Blowout").single();
+  await admin.from("staff_services").update({ active_minutes: minutes, processing_minutes: minutes === null ? null : 0, finishing_minutes: minutes === null ? null : 0 }).eq("staff_id", STAFF.bridget).eq("service_id", s!.id);
+}
+
 async function duration(staffId: string, service: string): Promise<DurationInsight> {
   const { data: s } = await admin.from("services").select("id").eq("business_id", B).eq("name", service).single();
   const { data } = await admin.from("insights").select("data").eq("business_id", B).eq("kind", "duration").eq("key", `${staffId}:${s!.id}`).single();
@@ -259,6 +265,37 @@ const CASES: Case[] = [
     checkTools: (outputs) => (outputs.some((o) => /"prepared":"Hannah's Blowout: 30 min"/.test(o)) ? null : "should prepare the change with prepare_task"),
     check: (a) => (/confirm/i.test(a) ? null : "should say it's ready to confirm below"),
   },
+  // Safe tasks, read from however it's put: a whole new length in other
+  // words, a copy, and a stylist (who can't) asking for their own.
+  {
+    question: "Hannah should get a full hour for blowouts from now on",
+    as: "owner",
+    tools: ["prepare_task"],
+    facts: async () => ({}),
+    checkTools: (outputs) => (outputs.some((o) => /"prepared":"Hannah's Blowout: 1 hr"/.test(o)) ? null : "should prepare Hannah's Blowout at 1 hr"),
+    check: (a) => (/confirm/i.test(a) ? null : "should say it's ready to confirm below"),
+  },
+  {
+    question: "Copy Bridget's service times over to Shae",
+    as: "owner",
+    tools: ["prepare_task"],
+    // The demo's stylists all use the menu's times, so Bridget gets her own
+    // Blowout length here, put back after the run (setBridgetBlowout).
+    facts: async () => {
+      await setBridgetBlowout(35);
+      return {};
+    },
+    checkTools: (outputs) => (outputs.some((o) => /"prepared":"Copy Bridget's service times to Shae"/.test(o)) ? null : "should prepare copying Bridget's times to Shae"),
+    check: (a) => (/confirm/i.test(a) ? null : "should say it's ready to confirm below"),
+  },
+  {
+    question: "Change my blowout to 30 minutes",
+    as: "stylist",
+    tools: [],
+    notTools: ["prepare_task"],
+    facts: async () => ({}),
+    check: (a) => (/owner|manager/i.test(a) ? null : "should say an owner or manager can change it"),
+  },
   {
     question: "How many clients are due back and not booked?",
     as: "front_desk",
@@ -385,6 +422,8 @@ const CASES: Case[] = [
     question: "What does Hannah usually take for a blowout, and should we change how long we book it?",
     as: "owner",
     tools: ["stylist_durations"],
+    // Advice, not a change: nothing is prepared unless they ask for it.
+    checkTools: (outputs) => (outputs.some((o) => /"prepared":/.test(o)) ? "shouldn't prepare a change when asked for advice" : null),
     facts: async () => {
       const d = await duration(STAFF.hannah, "Blowout");
       return { typical: d.medianMinutes, suggested: d.suggestedMinutes, basis: d.basis };
@@ -600,6 +639,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await admin.from("time_blocks").delete().eq("note", EVAL_NOTE);
+  await setBridgetBlowout(null);
   const passed = results.filter((r) => r.ok).length;
   const total: Record<string, Usage> = {};
   for (const r of results) {
@@ -674,7 +714,13 @@ describe("Ask Denise", () => {
           return out;
         },
       };
-      const answer = await converse(counting, systemPrompt(ctx), [{ role: "user", text: question }], watched, modelFor(question));
+      const said = await converse(counting, systemPrompt(ctx), [{ role: "user", text: question }], watched, modelFor(question));
+      // As in the app (assistant.ts): an answer guessing anyone's gender is
+      // reworded before staff see it. What's checked is what they'd see;
+      // the slip is still reported.
+      const slipped = GENDERED.test(said);
+      const answer = slipped ? await withoutPronouns(counting, said) : said;
+      if (slipped) console.log(`#${i + 1}: reworded an answer that used a gendered pronoun`);
 
       const problems: string[] = [];
       if (c.tools.length && !c.tools.some((t) => used.includes(t))) problems.push(`expected a call to ${c.tools.join(" or ")}`);
