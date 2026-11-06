@@ -4,14 +4,18 @@ const TABS = [
   { value: "directory", href: "/team", label: "Directory" },
   { value: "schedule", href: "/schedule", label: "Schedule" },
   { value: "goals", href: "/team/goals", label: "Goals" },
+  { value: "permissions", href: "/team/permissions", label: "Permissions" },
 ] as const;
 
 // The Team page's tabs, as links: the Directory (/team), the Schedule
-// (/schedule) and, for owners and managers, Goals (/team/goals).
-export function TeamTabs({ current, goals = false }: { current: (typeof TABS)[number]["value"]; goals?: boolean }) {
+// (/schedule), for owners and managers Goals (/team/goals), and for owners
+// Permissions (/team/permissions).
+export function TeamTabs({ current, goals = false, permissions = false }: { current: (typeof TABS)[number]["value"]; goals?: boolean; permissions?: boolean }) {
+  const tabs = TABS.filter((t) => (t.value !== "goals" || goals) && (t.value !== "permissions" || permissions));
+  const width = tabs.length >= 4 ? "max-w-md" : tabs.length === 3 ? "max-w-sm" : "max-w-xs";
   return (
-    <nav aria-label="Team pages" className={`mb-6 flex w-full ${goals ? "max-w-sm" : "max-w-xs"} gap-1 rounded-lg bg-sunken p-1`}>
-      {TABS.filter((t) => goals || t.value !== "goals").map((t) => (
+    <nav aria-label="Team pages" className={`mb-6 flex w-full ${width} gap-1 rounded-lg bg-sunken p-1`}>
+      {tabs.map((t) => (
         <Link
           key={t.value}
           href={t.href}

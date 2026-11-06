@@ -93,11 +93,11 @@ export async function resetTeamPassword(staffId: string): Promise<LoginResult> {
 }
 
 // Owners fine-tune what one person can do (lib/permissions.ts); back to
-// what their role allows when it matches the default.
-export async function setMemberPermission(staffId: string, permission: string, allowed: boolean): Promise<LoginResult> {
+// what their group or role gives them when it matches, or with null.
+export async function setMemberPermission(staffId: string, permission: string, allowed: boolean | null): Promise<LoginResult> {
   const { supabase, staff: me } = await getCurrentStaff();
   if (me?.role !== "owner" || !isUuid(staffId) || !isToggle(permission)) return { ok: false, message: "Only owners change what someone can do." };
-  const { error } = await supabase.rpc("set_staff_permission", { p_staff_id: staffId, p_permission: permission, p_allowed: allowed });
+  const { error } = await supabase.rpc("set_staff_permission", { p_staff_id: staffId, p_permission: permission, p_allowed: allowed as boolean });
   if (error?.code === "42501" || error?.code === "22023") return { ok: false, message: error.code === "22023" ? "That can't be changed for this role." : "Only owners change what someone can do." };
   if (error) throw error;
   refresh();

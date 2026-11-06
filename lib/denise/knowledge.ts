@@ -13,7 +13,6 @@ import { loadRewardsOverview } from "@/lib/rewards-load";
 import { can } from "@/lib/permissions";
 import { isFrontOfHouse } from "@/lib/staff";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { canManage } from "@/lib/auth";
 import type { Database } from "@/lib/database.types";
 import type { ClientInsight } from "@/lib/insights/clients";
 import type { ClientSpend } from "@/lib/insights/describe";
@@ -422,7 +421,7 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
           ]);
           if (inPeriod.error) throw inPeriod.error;
           if (recent.error) throw recent.error;
-          const money = canManage(me.role);
+          const money = can(me, "reports");
           const offenders = repeatOffenders(
             recent.data.map((f) => ({ id: f.id, kind: f.kind as "late_cancel" | "no_show", feeCents: f.fee_cents, fromDepositCents: f.from_deposit_cents, status: f.status, createdAt: f.created_at, clientId: f.client_id, clientName: f.client.first_name })),
             policy.settings.repeatCount,

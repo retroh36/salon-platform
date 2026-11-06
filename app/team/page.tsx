@@ -62,7 +62,7 @@ async function Directory() {
           ) : undefined
         }
       />
-      <TeamTabs current="directory" goals={manager} />
+      <TeamTabs current="directory" goals={manager} permissions={me.role === "owner"} />
       <Section
         titleId="directory-heading"
         title={

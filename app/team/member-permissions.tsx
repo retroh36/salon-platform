@@ -6,8 +6,9 @@ import { checkboxClass, labelClass, selectClass } from "@/components/ui/field";
 import { PERMISSIONS } from "@/lib/permissions";
 import type { LoginResult } from "@/lib/team-logins";
 import { clearMemberPin, setAssistantStylist, setEventRoles, setMemberPermission } from "./actions";
+import { setMemberGroup } from "./permissions/actions";
 
-export type PermissionRow = { permission: string; allowed: boolean; role_default: boolean; toggleable: boolean };
+export type PermissionRow = { permission: string; allowed: boolean; role_default: boolean; inherited: boolean; own: boolean; toggleable: boolean };
 
 function Status({ result }: { result: LoginResult | null }) {
   return result ? (
@@ -17,19 +18,60 @@ function Status({ result }: { result: LoginResult | null }) {
   ) : null;
 }
 
-// What this person can do beyond their role's basics: owners switch each
-// one; anyone else sees them read-only. Only what the role allows changing
-// is listed (an owner can always do everything).
-export function PermissionsCard({ staffId, firstName, rows, canEdit }: { staffId: string; firstName: string; rows: PermissionRow[]; canEdit: boolean }) {
+// What this person can do beyond their role's basics: their permission
+// group (owners choose it), then each switch, which owners can change for
+// just them; anyone else sees them read-only. Only what the role allows
+// changing is listed (an owner can always do everything).
+export function PermissionsCard({
+  staffId,
+  firstName,
+  rows,
+  canEdit,
+  groups,
+  groupId,
+}: {
+  staffId: string;
+  firstName: string;
+  rows: PermissionRow[];
+  canEdit: boolean;
+  groups: { id: string; name: string }[];
+  groupId: string | null;
+}) {
   const [allowed, setAllowed] = useState(() => new Map(rows.map((r) => [r.permission, r.allowed])));
   const [result, setResult] = useState<LoginResult | null>(null);
   const [pending, start] = useTransition();
   const shown = PERMISSIONS.filter((p) => rows.some((r) => r.permission === p.key && r.toggleable));
   if (!shown.length) return null;
+  const group = groups.find((g) => g.id === groupId) ?? null;
   return (
     <section aria-label="What they can do" className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
       <h2 className="text-base font-semibold text-ink">What {firstName} can do</h2>
-      <p className="text-sm text-ink-muted">{canEdit ? "Their role sets the starting point; switch anything here for just them." : "Set by their role and the owner."}</p>
+      <p className="text-sm text-ink-muted">{canEdit ? "Their role and group set the starting point; switch anything here for just them." : "Set by their role, their group and the owner."}</p>
+      {canEdit && (groups.length > 0 || groupId) ? (
+        <label className={`${labelClass} max-w-xs`}>
+          Permission group
+          <select
+            className={selectClass}
+            value={groupId ?? ""}
+            disabled={pending}
+            onChange={(e) => {
+              const next = e.target.value || null;
+              start(async () => setResult(await setMemberGroup(staffId, next)));
+            }}
+          >
+            <option value="">None: follow their role</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : group ? (
+        <p className="text-sm">
+          Group: <span className="font-medium">{group.name}</span>
+        </p>
+      ) : null}
       <ul className="flex flex-col gap-2" data-testid="permissions">
         {shown.map((p) => {
           const row = rows.find((r) => r.permission === p.key)!;
@@ -54,7 +96,27 @@ export function PermissionsCard({ staffId, firstName, rows, canEdit }: { staffId
                 />
                 <span>
                   <span className="font-medium">{p.label}</span>
-                  {on !== row.role_default && <span className="ml-1 text-ink-muted">(changed for {firstName})</span>}
+                  {row.own && on !== row.inherited ? (
+                    <>
+                      <span className="ml-1 text-ink-muted">(changed for {firstName})</span>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          className="ml-2 text-13 text-ink-muted underline underline-offset-2 hover:text-ink"
+                          disabled={pending}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setAllowed((m) => new Map(m).set(p.key, row.inherited));
+                            start(async () => setResult(await setMemberPermission(staffId, p.key, null)));
+                          }}
+                        >
+                          {group ? `Back to ${group.name}` : "Back to their role"}
+                        </button>
+                      )}
+                    </>
+                  ) : group && on === row.inherited && row.inherited !== row.role_default ? (
+                    <span className="ml-1 text-ink-muted">(from {group.name})</span>
+                  ) : null}
                   <span className="block text-ink-muted">{p.hint}</span>
                 </span>
               </label>

@@ -2399,6 +2399,32 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"permission_groups": {
+                  Row: {
+                    "business_id": string,"created_at": string,"id": string,"name": string,"permissions": NonNullable<Json>,"updated_at": string,"updated_by": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"id"?: string,"name": string,"permissions"?: NonNullable<Json>,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"id"?: string,"name"?: string,"permissions"?: NonNullable<Json>,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "permission_groups_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "permission_groups_updated_by_business_id_fkey"
+      columns: ["updated_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"policy_consents": {
                   Row: {
                     "agreed_at": string,"appointment_id": string | null,"business_id": string,"channel": string,"client_id": string,"id": string,"ip_hash": string | null,"policy_text": string,"terms": NonNullable<Json>
@@ -3447,14 +3473,14 @@ isOneToOne: false
                   ]
                 },"staff": {
                   Row: {
-                    "assists_staff_id": string | null,"bio": string | null,"business_id": string,"calendar_position": number | null,"calendar_zoom": string,"color": string | null,"created_at": string,"email": string | null,"event_roles": (string)[],"first_name": string,"goal_alert_seen_on": string | null,"goal_alerts": string,"home_resource_id": string | null,"hours_cycle_starts_on": string | null,"hours_cycle_weeks": number,"id": string,"is_active": boolean,"last_name": string,"level": string | null,"location_id": string,"phone": string | null,"photo_path": string | null,"portfolio_paths": (string)[],"role": Database["public"]['Enums']["staff_role"],"specialty": string | null,"updated_at": string,"user_id": string | null
+                    "assists_staff_id": string | null,"bio": string | null,"business_id": string,"calendar_position": number | null,"calendar_zoom": string,"color": string | null,"created_at": string,"email": string | null,"event_roles": (string)[],"first_name": string,"goal_alert_seen_on": string | null,"goal_alerts": string,"home_resource_id": string | null,"hours_cycle_starts_on": string | null,"hours_cycle_weeks": number,"id": string,"is_active": boolean,"last_name": string,"level": string | null,"location_id": string,"permission_group_id": string | null,"phone": string | null,"photo_path": string | null,"portfolio_paths": (string)[],"role": Database["public"]['Enums']["staff_role"],"specialty": string | null,"updated_at": string,"user_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "assists_staff_id"?: string | null,"bio"?: string | null,"business_id": string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"event_roles"?: (string)[],"first_name": string,"goal_alert_seen_on"?: string | null,"goal_alerts"?: string,"home_resource_id"?: string | null,"hours_cycle_starts_on"?: string | null,"hours_cycle_weeks"?: number,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: string | null,"location_id": string,"phone"?: string | null,"photo_path"?: string | null,"portfolio_paths"?: (string)[],"role"?: Database["public"]['Enums']["staff_role"],"specialty"?: string | null,"updated_at"?: string,"user_id"?: string | null
+                    "assists_staff_id"?: string | null,"bio"?: string | null,"business_id": string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"event_roles"?: (string)[],"first_name": string,"goal_alert_seen_on"?: string | null,"goal_alerts"?: string,"home_resource_id"?: string | null,"hours_cycle_starts_on"?: string | null,"hours_cycle_weeks"?: number,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: string | null,"location_id": string,"permission_group_id"?: string | null,"phone"?: string | null,"photo_path"?: string | null,"portfolio_paths"?: (string)[],"role"?: Database["public"]['Enums']["staff_role"],"specialty"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
                   Update: {
-                    "assists_staff_id"?: string | null,"bio"?: string | null,"business_id"?: string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"event_roles"?: (string)[],"first_name"?: string,"goal_alert_seen_on"?: string | null,"goal_alerts"?: string,"home_resource_id"?: string | null,"hours_cycle_starts_on"?: string | null,"hours_cycle_weeks"?: number,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: string | null,"location_id"?: string,"phone"?: string | null,"photo_path"?: string | null,"portfolio_paths"?: (string)[],"role"?: Database["public"]['Enums']["staff_role"],"specialty"?: string | null,"updated_at"?: string,"user_id"?: string | null
+                    "assists_staff_id"?: string | null,"bio"?: string | null,"business_id"?: string,"calendar_position"?: number | null,"calendar_zoom"?: string,"color"?: string | null,"created_at"?: string,"email"?: string | null,"event_roles"?: (string)[],"first_name"?: string,"goal_alert_seen_on"?: string | null,"goal_alerts"?: string,"home_resource_id"?: string | null,"hours_cycle_starts_on"?: string | null,"hours_cycle_weeks"?: number,"id"?: string,"is_active"?: boolean,"last_name"?: string,"level"?: string | null,"location_id"?: string,"permission_group_id"?: string | null,"phone"?: string | null,"photo_path"?: string | null,"portfolio_paths"?: (string)[],"role"?: Database["public"]['Enums']["staff_role"],"specialty"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -3486,6 +3512,12 @@ isOneToOne: false
       columns: ["location_id","business_id"]
 isOneToOne: false
       referencedRelation: "locations"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "staff_permission_group_fk"
+      columns: ["permission_group_id","business_id"]
+isOneToOne: false
+      referencedRelation: "permission_groups"
       referencedColumns: ["id","business_id"]
     }
                   ]
@@ -4533,6 +4565,9 @@ isOneToOne: false
 "delete_calendar_view":
 { Args: { "p_view_id": string }; Returns: undefined
                            },
+"delete_permission_group":
+{ Args: { "p_id": string }; Returns: undefined
+                           },
 "delete_purchase_order":
 { Args: { "p_order_id": string }; Returns: undefined
                            },
@@ -4789,6 +4824,9 @@ isOneToOne: false
 "save_package_template":
 { Args: { "p_input": Json,"p_template_id": string }; Returns: string
                            },
+"save_permission_group":
+{ Args: { "p_business_id": string,"p_id": string,"p_name": string,"p_permissions": Json }; Returns: string
+                           },
 "save_policy_settings":
 { Args: { "p": Json,"p_business_id": string }; Returns: undefined
                            },
@@ -4939,6 +4977,9 @@ isOneToOne: false
 "set_staff_permission":
 { Args: { "p_allowed": boolean,"p_permission": string,"p_staff_id": string }; Returns: undefined
                            },
+"set_staff_permission_group":
+{ Args: { "p_group_id": string,"p_staff_id": string }; Returns: undefined
+                           },
 "set_staff_weekly_hours":
 { Args: { "p_business_id": string,"p_hours": Json,"p_staff_id": string }; Returns: undefined
                            },
@@ -4956,7 +4997,7 @@ isOneToOne: false
                            },
 "staff_permission_list":
 { Args: { "p_staff_id": string }; Returns: {
-              "allowed": boolean,"permission": string,"role_default": boolean,"toggleable": boolean
+              "allowed": boolean,"inherited": boolean,"own": boolean,"permission": string,"role_default": boolean,"toggleable": boolean
             }[]
                            },
 "staff_with_pins":

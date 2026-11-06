@@ -41,7 +41,7 @@ async function TeamGoals() {
   return (
     <AppShell section="team" me={me}>
       <PageHeader title="Team" description="Each stylist's goals for this week, month, quarter or year, and how they're pacing. Stylists can set their own on My day." />
-      <TeamTabs current="goals" goals />
+      <TeamTabs current="goals" goals permissions={me.role === "owner"} />
       {owner && (
         <Card title="Set a goal" titleId="set-goal-heading" description="Service revenue, retail, rebooking %, new clients or average ticket, for each week, month, quarter or year. The same goal and period again changes the target.">
           <GoalForm staff={stylists.map((s) => ({ id: s.id, name: fullName(s) }))} />

@@ -143,7 +143,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
           </>
         }
       />
-      <TeamTabs current="schedule" goals={manager} />
+      <TeamTabs current="schedule" goals={manager} permissions={me.role === "owner"} />
       {isSelf && <Notices notices={(notices ?? []).map((n) => ({ id: n.id, body: n.body, when: formatDayAt(n.created_at, me.location.timezone) }))} />}
 
       {manager && pending.data.length > 0 && (
