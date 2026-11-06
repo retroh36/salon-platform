@@ -17,7 +17,8 @@ Reconcile lists each day's sales and the money taken, by type of payment, so you
 
 - **To the bank** is the cash deposited at the close-out plus cards, net of refunds. If there's no close-out yet, it uses the day's net cash.
 - **Credit used** covers gift cards, packages and memberships. That money was taken when they were sold, so it isn't money in that day.
-- **Check** flags a day with cash but no close-out, and a day whose cash was over or short.
+- **Check** flags a day with cash but no close-out, a day whose cash was over or short, and a day with a payment taken as **Other** (its note shows under the flag).
+- **Other** (a check, a transfer) counts as money in but isn't in **To the bank**: match it by its note.
 - A day's payments can differ from its sales when an event or a deposit was paid on another day. That's expected.
 - The CSV opens in a spreadsheet and imports into QuickBooks or Xero.
 - Card batches and payouts will show here once card payments are connected.

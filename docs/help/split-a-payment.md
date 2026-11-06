@@ -18,7 +18,7 @@ Take payment in more than one way, such as part cash and part card.
 
 - Each payment shows as a line under **Payment**. Tap its **×** to remove one you got wrong.
 - Cash shows the change to give, both on the cash screen and after the sale.
-- **Gift card** and **Package** can be mixed with card and cash too.
+- **Gift card**, **Package** and **Other** can be mixed with card and cash too.
 - Card payments are taken on the salon's own terminal; you only record them here.
 
 ## If it doesn't work

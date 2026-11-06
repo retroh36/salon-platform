@@ -12,7 +12,7 @@ import { creditFor } from "@/lib/memberships-load";
 import { packageFor, usesLeft } from "@/lib/packages";
 import { formatPrice } from "@/lib/services";
 import { normalCode, promotionSummary, type PromoRule } from "@/lib/promotions";
-import { promotionProblems, type Rates, type Ticket, type TicketDiscount, type TicketLine, type TicketPayment, type totalsOf } from "@/lib/ticket";
+import { OTHER_NOTE_MIN, promotionProblems, type Rates, type Ticket, type TicketDiscount, type TicketLine, type TicketPayment, type totalsOf } from "@/lib/ticket";
 import { lookupGiftCard } from "@/app/sales/actions";
 import { approveOutOfStock } from "../actions";
 import { SendLink } from "./payment-link";
@@ -31,6 +31,7 @@ export type DialogState =
   | { kind: "card" }
   | { kind: "cash" }
   | { kind: "gift-card" }
+  | { kind: "other" }
   | { kind: "package" }
   | { kind: "override"; productId: string; name: string };
 
@@ -109,6 +110,12 @@ export function Dialogs(props: Props) {
       return (
         <Sheet title="Cash payment" onClose={onClose}>
           <CashPay {...props} />
+        </Sheet>
+      );
+    case "other":
+      return (
+        <Sheet title="Other payment" onClose={onClose}>
+          <OtherPay {...props} />
         </Sheet>
       );
     case "gift-card":
@@ -527,6 +534,36 @@ function CardPay({ totals, onAddPayment, onClose }: Props) {
       </label>
       <Button type="submit" variant="primary" size="lg" disabled={!cents}>
         Record {cents ? formatPrice(cents) : ""} card payment
+      </Button>
+    </form>
+  );
+}
+
+// Anything else (a check, a transfer): always with what it was. Owners and
+// managers get an alert for each one (complete_sale, the payments trigger).
+function OtherPay({ totals, onAddPayment, onClose }: Props) {
+  const [amount, setAmount] = useState((due(totals) / 100).toFixed(2));
+  const [note, setNote] = useState("");
+  const cents = parseDollars(amount);
+  const ready = Boolean(cents) && note.trim().length >= OTHER_NOTE_MIN;
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!ready) return;
+        onAddPayment({ key: newKey(), method: "other", amountCents: cents!, note: note.trim() });
+        onClose();
+      }}
+    >
+      <p className="text-ink-muted">For money taken another way, such as a check or a bank transfer. Owners and managers are told about each one.</p>
+      <AmountField value={amount} onChange={setAmount} />
+      <label className={labelClass}>
+        What was it?
+        <input value={note} onChange={(e) => setNote(e.target.value.slice(0, 200))} placeholder="Check #1043" className={`${fieldClass} h-12`} required />
+      </label>
+      <Button type="submit" variant="primary" size="lg" disabled={!ready}>
+        Record {cents ? formatPrice(cents) : ""} other payment
       </Button>
     </form>
   );

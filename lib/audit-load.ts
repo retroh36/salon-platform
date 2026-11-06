@@ -103,6 +103,39 @@ export async function loadAudit(supabase: Supabase, businessId: string, timeZone
     );
   }
 
+  // Money taken as "Other" (a check, a transfer), with the note staff gave.
+  if (want("other")) {
+    tasks.push(
+      (async () => {
+        let q = supabase
+          .from("payments")
+          .select("id, sale_id, amount_cents, reference, created_by, created_at, sale:sales(number)")
+          .eq("business_id", businessId)
+          .eq("method", "other")
+          .gt("amount_cents", 0)
+          .gte("created_at", fromIso)
+          .lt("created_at", toIso)
+          .order("created_at", { ascending: false })
+          .limit(AUDIT_LIMIT + 1);
+        if (f.staffId) q = q.eq("created_by", f.staffId);
+        const { data, error } = await q;
+        if (error) throw error;
+        return data.map(
+          (p) =>
+            ({
+              id: p.id,
+              at: p.created_at,
+              type: "other",
+              staffId: p.created_by,
+              who: who(p.created_by),
+              what: `Took ${formatPrice(p.amount_cents)} as "Other" on sale #${p.sale?.number ?? "?"}: ${p.reference?.trim() || "no note"}`,
+              href: `/sales/${p.sale_id}`,
+            }) satisfies AuditRow,
+        );
+      })(),
+    );
+  }
+
   if (want("gift_cards")) {
     tasks.push(
       (async () => {

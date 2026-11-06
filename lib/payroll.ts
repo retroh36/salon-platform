@@ -76,7 +76,7 @@ export type PayrollSale = {
   lines: { id?: string; kind: "service" | "product"; staff_id: string; description: string; quantity: number; net_cents: number; commission_pct: number; commission_version_id?: string | null }[];
   tips: { staff_id: string; amount_cents: number }[];
   // The tenders that took money (card, cash, gift card), for itemized tips.
-  payments?: { method: "card" | "cash" | "gift_card"; online: boolean }[];
+  payments?: { method: "card" | "cash" | "other" | "gift_card"; online: boolean }[];
   // returned: what each refund gave back for (products, gift cards,
   // packages, memberships), and how much of its money was for each.
   refunds: { amount_cents: number; at: string; returned?: { sale_item_id: string; kind: string; quantity: number; amount_cents: number }[] }[];
@@ -101,11 +101,11 @@ export type Ticket = {
   lines: { description: string; kind: "service" | "product"; quantity: number; cents: number; pct: number; versionId: string | null; soldCents: number; pay?: LinePay }[];
 };
 
-const PAID_WITH = { card: "Card", card_online: "Card online", cash: "Cash", gift_card: "Gift card" } as const;
+const PAID_WITH = { card: "Card", card_online: "Card online", cash: "Cash", other: "Other", gift_card: "Gift card" } as const;
 
 export function paidWith(payments: PayrollSale["payments"]): string | null {
   const kinds = new Set((payments ?? []).map((p) => (p.method === "card" && p.online ? "card_online" : p.method)));
-  const order = ["card", "card_online", "cash", "gift_card"] as const;
+  const order = ["card", "card_online", "cash", "other", "gift_card"] as const;
   return order.filter((k) => kinds.has(k)).map((k) => PAID_WITH[k]).join(" + ") || null;
 }
 

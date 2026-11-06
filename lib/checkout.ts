@@ -3,9 +3,11 @@
 // private.price_sale / complete_sale (the tests check they agree); this is
 // for showing it as staff build the sale. Pure.
 
-export type PaymentMethod = "cash" | "card" | "gift_card" | "package" | "membership";
+// "other": a check, a transfer or the like, always with a note saying what
+// (complete_sale refuses it without), and an alert to owners and managers.
+export type PaymentMethod = "cash" | "card" | "other" | "gift_card" | "package" | "membership";
 
-export const METHOD_LABELS: Record<PaymentMethod, string> = { cash: "Cash", card: "Card", gift_card: "Gift card", package: "Package", membership: "Membership" };
+export const METHOD_LABELS: Record<PaymentMethod, string> = { cash: "Cash", card: "Card", other: "Other", gift_card: "Gift card", package: "Package", membership: "Membership" };
 
 export type SaleLine = {
   // Before discount and tax: unit price × quantity.

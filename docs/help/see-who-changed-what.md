@@ -19,6 +19,7 @@ The audit trail lists every change with who made it. That includes every move, c
 - Nothing in it can be edited or deleted. The database writes every visit change itself, whether it was made on the calendar, online by the client, or by one of Denise's fixes.
 - A visit's own changes are also in booking details, under **History**.
 - **Discounts and $0 sales** lists completed sales with a staff discount or a total of $0.
+- **Paid by other** lists every payment taken as **Other**, with the note staff gave.
 - It shows up to 92 days at a time, and the latest 300 lines.
 
 ## If it doesn't work

@@ -60,7 +60,7 @@ export function giftCardActivity(events: readonly CardEventRow[]) {
 export type PaymentRow = { method: PaymentMethod; amount_cents: number; processor?: string | null };
 
 export type Tender = PaymentMethod | "card_on_file";
-export const TENDERS: Tender[] = ["cash", "card", "card_on_file", "gift_card", "package", "membership"];
+export const TENDERS: Tender[] = ["cash", "card", "card_on_file", "other", "gift_card", "package", "membership"];
 export const TENDER_LABELS: Record<Tender, string> = { ...METHOD_LABELS, card: "Card at the desk", card_on_file: "Card online" };
 
 export const tenderOf = (p: PaymentRow): Tender => (p.method === "card" && p.processor ? "card_on_file" : p.method);

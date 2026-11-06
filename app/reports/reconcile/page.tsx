@@ -74,7 +74,7 @@ async function Reconcile({ searchParams }: Pick<PageProps<"/reports/reconcile">,
 
       <Section title={`${formatDay(range.from)} to ${formatDay(range.to)}`} titleId="reconcile-heading" description="Card payments are as recorded in Maestra. Card batches and payouts will appear here once card payments are connected.">
         <p className="mb-3 text-13 text-ink-muted" data-testid="reconcile-summary">
-          Sales {formatPrice(t.salesCents)}. To the bank {formatPrice(t.toBankCents)}: cash deposited {formatPrice(t.depositedCents)}, cards at the desk {money(t.deskCardCents)}, cards online {money(t.onlineCardCents)}.
+          Sales {formatPrice(t.salesCents)}. To the bank {formatPrice(t.toBankCents)}: cash deposited {formatPrice(t.depositedCents)}, cards at the desk {money(t.deskCardCents)}, cards online {money(t.onlineCardCents)}.{t.otherCents ? ` Paid by other ${money(t.otherCents)}, not in "To the bank": match it by its notes.` : ""}
           {" "}
           {t.issues === 0 ? "Every day checks out." : `${t.issues} day${t.issues === 1 ? "" : "s"} to look at.`}
         </p>
@@ -87,6 +87,7 @@ async function Reconcile({ searchParams }: Pick<PageProps<"/reports/reconcile">,
                 <th className={`${thClass} ${numClass}`}>Cash</th>
                 <th className={`${thClass} ${numClass}`}>Card at the desk</th>
                 <th className={`${thClass} ${numClass}`}>Card online</th>
+                <th className={`${thClass} ${numClass}`}>Other</th>
                 <th className={`${thClass} ${numClass}`}>Credit used</th>
                 <th className={`${thClass} ${numClass}`}>Refunds and voids</th>
                 <th className={`${thClass} ${numClass}`}>Cash deposited</th>
@@ -109,6 +110,9 @@ async function Reconcile({ searchParams }: Pick<PageProps<"/reports/reconcile">,
                     <td className={`${tdClass} ${numClass}`}>{money(d.tenders.cash.netCents)}</td>
                     <td className={`${tdClass} ${numClass}`}>{money(d.tenders.card.netCents)}</td>
                     <td className={`${tdClass} ${numClass}`}>{money(d.tenders.card_on_file.netCents)}</td>
+                    <td className={`${tdClass} ${numClass}`} title={d.otherNotes.join("; ") || undefined}>
+                      {d.tenders.other.netCents ? money(d.tenders.other.netCents) : "—"}
+                    </td>
                     <td className={`${tdClass} ${numClass}`}>{money(credit)}</td>
                     <td className={`${tdClass} ${numClass}`}>{refunds ? `−${formatPrice(refunds)}` : "—"}</td>
                     <td className={`${tdClass} ${numClass}`}>{d.close ? formatPrice(d.close.depositCents) : "—"}</td>
@@ -122,6 +126,11 @@ async function Reconcile({ searchParams }: Pick<PageProps<"/reports/reconcile">,
                             <Badge key={i} tone={i === "cash_off" ? "danger" : "warning"}>
                               {i === "cash_off" && d.close ? `Cash ${formatPrice(Math.abs(d.close.countedCents - d.close.expectedCents))} ${d.close.countedCents > d.close.expectedCents ? "over" : "short"}` : ISSUE_TEXT[i]}
                             </Badge>
+                          ))}
+                          {d.otherNotes.map((n, k) => (
+                            <span key={k} className="text-xs text-ink-muted" data-testid="other-note">
+                              {n}
+                            </span>
                           ))}
                         </div>
                       )}

@@ -54,7 +54,12 @@ export type TicketLine = ServiceLine | ProductLine | GiftCardLine | ReloadLine |
 export type TicketPayment =
   | { key: string; method: "card"; amountCents: number; reference: string }
   | { key: string; method: "cash"; amountCents: number; tenderedCents: number }
-  | { key: string; method: "gift_card"; amountCents: number; code: string; balanceCents: number };
+  | { key: string; method: "gift_card"; amountCents: number; code: string; balanceCents: number }
+  // A check, a transfer or the like: what it was is required (OTHER_NOTE_MIN).
+  | { key: string; method: "other"; amountCents: number; note: string };
+
+// The shortest note complete_sale takes for an "Other" payment.
+export const OTHER_NOTE_MIN = 3;
 
 export type Ticket = {
   lines: TicketLine[];
@@ -381,7 +386,9 @@ export function saleInput(ticket: Ticket, ids: { draftId: string; appointmentId:
         ? { method: "cash", amount_cents: p.amountCents, tendered_cents: p.tenderedCents }
         : p.method === "card"
           ? { method: "card", amount_cents: p.amountCents, reference: p.reference || null }
-          : { method: "gift_card", amount_cents: p.amountCents, code: p.code },
+          : p.method === "other"
+            ? { method: "other", amount_cents: p.amountCents, reference: p.note.trim() }
+            : { method: "gift_card", amount_cents: p.amountCents, code: p.code },
     ),
     receipt_email: ticket.receiptEmail.trim() || null,
   };

@@ -49,7 +49,7 @@ describe("reconciling sales to money", () => {
     expect(t).toMatchObject({ salesCents: 27000, cashCents: 10500, deskCardCents: 12000, onlineCardCents: 5000, creditCents: 3000, refundedCents: 2000, depositedCents: 8000, cashOffCents: -500, issues: 2 });
     const csv = reconcileCsv(days).split("\r\n");
     expect(csv[0].startsWith("Date,Sales,Sales total,Cash taken")).toBe(true);
-    expect(csv[1]).toBe("2026-11-02,1,230.00,80.00,0.00,80.00,280.00,280.00,0.00,80.00,120.00,0.00,30.00,0.00,0.00,0.00,200.00,200.00,Daniel Okafor,");
+    expect(csv[1]).toBe("2026-11-02,1,230.00,80.00,0.00,80.00,280.00,280.00,0.00,80.00,120.00,0.00,0.00,30.00,0.00,0.00,0.00,200.00,200.00,Daniel Okafor,,");
     expect(csv[3].endsWith(",No close-out")).toBe(true);
   });
 
@@ -57,5 +57,18 @@ describe("reconciling sales to money", () => {
     expect(parseReconcileRange({}, "2026-11-05")).toEqual({ from: "2026-11-01", to: "2026-11-05" });
     expect(parseReconcileRange({ from: "2026-01-01", to: "2026-12-31" }, "2026-11-05")).toEqual({ from: "2026-08-06", to: "2026-11-05" });
     expect(parseReconcileRange({ from: "2026-11-04", to: "2026-11-02" }, "2026-11-05")).toEqual({ from: "2026-11-02", to: "2026-11-02" });
+  });
+
+  it("counts money taken as Other as money in, flags the day with its notes, and leaves it out of To the bank", () => {
+    const [day] = reconcile({ from: "2026-11-05", to: "2026-11-05" }, [{ ...pay("2026-11-05", "other", 6000), reference: "Check #1043" }, pay("2026-11-05", "card", 4000)], [{ day: "2026-11-05", totalCents: 10000 }], []);
+    expect(day.tenders.other.netCents).toBe(6000);
+    expect(day.moneyInCents).toBe(10000);
+    expect(day.toBankCents).toBe(4000);
+    expect(day.otherNotes).toEqual(["Check #1043"]);
+    expect(day.issues).toEqual(["paid_other"]);
+    expect(reconcileTotals([day]).otherCents).toBe(6000);
+    const csv = reconcileCsv([day]);
+    expect(csv.split("\n")[0]).toContain("Other net");
+    expect(csv).toContain("Check #1043");
   });
 });

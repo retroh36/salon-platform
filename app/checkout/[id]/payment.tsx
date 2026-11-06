@@ -19,7 +19,7 @@ import type { DialogState } from "./dialogs";
 
 type Totals = ReturnType<typeof totalsOf>;
 
-const METHOD = { card: "Card", cash: "Cash", gift_card: "Gift card" } as const;
+const METHOD = { card: "Card", cash: "Cash", gift_card: "Gift card", other: "Other" } as const;
 
 export function PaymentPanel({
   data,
@@ -95,6 +95,7 @@ export function PaymentPanel({
             <PayButton label="Gift card" onClick={() => onDialog({ kind: "gift-card" })} />
             <PayButton label="Package" disabled={!packageUsable} onClick={() => onDialog({ kind: "package" })} />
             {data.memberships.length > 0 && <PayButton label="Membership" disabled={!membershipUsable} onClick={() => onDialog({ kind: "membership" })} />}
+            <PayButton label="Other" onClick={() => onDialog({ kind: "other" })} />
           </div>
           {packageWhy && (
             <p className="text-13 text-ink-muted" data-testid="package-why">
@@ -123,6 +124,7 @@ export function PaymentPanel({
                       {p.method === "cash" && p.tenderedCents > p.amountCents ? `${formatPrice(p.tenderedCents)} given · ${formatPrice(p.tenderedCents - p.amountCents)} change` : ""}
                       {p.method === "card" && p.reference ? (p.reference === DEPOSIT_REFERENCE ? "Card, taken online" : `…${p.reference}`) : ""}
                       {p.method === "gift_card" ? `…${p.code.slice(-4)} · ${formatPrice(p.balanceCents - p.amountCents)} left on it` : ""}
+                      {p.method === "other" ? p.note : ""}
                     </span>
                   </span>
                   <span className="font-semibold tabular-nums">{formatPrice(p.amountCents)}</span>

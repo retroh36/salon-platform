@@ -10,12 +10,14 @@ import { addDays, isLocalDate, type LocalDate } from "@/lib/scheduling/time";
 // are paid for already, so they're shown but never money in. Card batches
 // and payouts join this once Stripe is live. Pure.
 
-export type ReconcilePayment = PaymentRow & { day: LocalDate };
+export type ReconcilePayment = PaymentRow & { day: LocalDate; reference?: string | null };
 export type ReconcileSale = { day: LocalDate; totalCents: number };
 export type ReconcileClose = { day: LocalDate; expectedCents: number; countedCents: number; depositCents: number; by: string | null };
 
-// Money that reaches a bank account; the rest is credit used up.
-export const MONEY_TENDERS: readonly Tender[] = ["cash", "card", "card_on_file"];
+// Money in; the rest is credit used up. "Other" (a check, a transfer) is
+// money in that reaches the bank its own way, so it's flagged with its notes
+// to match by hand rather than counted in "To the bank".
+export const MONEY_TENDERS: readonly Tender[] = ["cash", "card", "card_on_file", "other"];
 
 export type ReconcileDay = {
   day: LocalDate;
@@ -32,7 +34,9 @@ export type ReconcileDay = {
   // What should reach the bank: the deposit, else the net cash (no close-out
   // yet), plus cards net.
   toBankCents: number;
-  issues: ("no_closeout" | "cash_off")[];
+  // What staff wrote for each "Other" payment taken that day.
+  otherNotes: string[];
+  issues: ("no_closeout" | "cash_off" | "paid_other")[];
 };
 
 export type ReconcileRange = { from: LocalDate; to: LocalDate };
@@ -72,6 +76,8 @@ export function reconcile(range: ReconcileRange, payments: readonly ReconcilePay
     const issues: ReconcileDay["issues"] = [];
     if (!close && tenders.cash.takenCents + tenders.cash.refundedCents > 0) issues.push("no_closeout");
     if (close && close.countedCents !== close.expectedCents) issues.push("cash_off");
+    const otherNotes = mine.filter((p) => p.method === "other" && p.amount_cents > 0).map((p) => p.reference?.trim() || "No note");
+    if (otherNotes.length) issues.push("paid_other");
     days.push({
       day,
       salesCents,
@@ -81,6 +87,7 @@ export function reconcile(range: ReconcileRange, payments: readonly ReconcilePay
       unmatchedCents: taken - salesCents,
       close,
       toBankCents: (close ? close.depositCents : tenders.cash.netCents) + cards,
+      otherNotes,
       issues,
     });
   }
@@ -95,6 +102,7 @@ export function reconcileTotals(days: readonly ReconcileDay[]) {
     cashCents: sum((d) => d.tenders.cash.netCents),
     deskCardCents: sum((d) => d.tenders.card.netCents),
     onlineCardCents: sum((d) => d.tenders.card_on_file.netCents),
+    otherCents: sum((d) => d.tenders.other.netCents),
     creditCents: sum((d) => d.tenders.gift_card.netCents + d.tenders.package.netCents + d.tenders.membership.netCents),
     refundedCents: sum((d) => TENDERS.reduce((n, t) => n + d.tenders[t].refundedCents, 0)),
     depositedCents: sum((d) => d.close?.depositCents ?? 0),
@@ -121,6 +129,7 @@ export function reconcileCsv(days: readonly ReconcileDay[]): string {
       "Cash deposited",
       "Card at the desk net",
       "Card online net",
+      "Other net",
       "Gift card used",
       "Package used",
       "Membership used",
@@ -128,6 +137,7 @@ export function reconcileCsv(days: readonly ReconcileDay[]): string {
       "Money in",
       "To the bank",
       "Closed out by",
+      "Other notes",
       "Check",
     ],
     [...days].reverse().map((d) => [
@@ -143,6 +153,7 @@ export function reconcileCsv(days: readonly ReconcileDay[]): string {
       d.close ? dollars(d.close.depositCents) : "",
       dollars(d.tenders.card.netCents),
       dollars(d.tenders.card_on_file.netCents),
+      dollars(d.tenders.other.netCents),
       dollars(d.tenders.gift_card.netCents),
       dollars(d.tenders.package.netCents),
       dollars(d.tenders.membership.netCents),
@@ -150,12 +161,13 @@ export function reconcileCsv(days: readonly ReconcileDay[]): string {
       dollars(d.moneyInCents),
       dollars(d.toBankCents),
       d.close?.by ?? "",
+      d.otherNotes.join("; "),
       d.issues.map((i) => ISSUE_TEXT[i]).join("; "),
     ]),
   );
 }
 
-export const ISSUE_TEXT: Record<ReconcileDay["issues"][number], string> = { no_closeout: "No close-out", cash_off: "Cash over or short" };
+export const ISSUE_TEXT: Record<ReconcileDay["issues"][number], string> = { no_closeout: "No close-out", cash_off: "Cash over or short", paid_other: "Paid by other" };
 
 export type PaymentLine = { at: string; day: LocalDate; saleNumber: number; tender: Tender; amountCents: number; reference: string | null };
 
