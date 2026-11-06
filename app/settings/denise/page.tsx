@@ -31,7 +31,7 @@ async function MeetDenise() {
   const frontOfHouse = isFrontOfHouse(me.role);
   const questions = frontOfHouse
     ? ["Who's cancelled late this month?", "How do I sell a gift card?", "Who's working this afternoon?"]
-    : ["Which of my regulars are due back?", "How long do I usually take for a balayage?", "How do I ask for time off?"];
+    : ["Which of my regulars are due back?", "How long do I usually take for a balayage?", "How much PTO do I have?"];
 
   return (
     <AppShell section="settings" me={me}>
@@ -125,7 +125,7 @@ async function MeetDenise() {
           eyebrow="Answers questions"
           title="Ask about the salon, or about Maestra"
           text="Ask Denise anything about your business, and she answers from your own data. Ask how to do something in Maestra, and she answers from the help guide with a button to the right screen."
-          points={["“Who's cancelled late this month?” “Who's working this afternoon?” “Who has unused packages?”", "“How do I sell a gift card?” “How do I ask for time off?”", "Each person only gets answers their role is allowed to see."]}
+          points={["“Who's cancelled late this month?” “Who's working this afternoon?” “Who has unused packages?”", "“How much PTO do I have?” “Who's off next week?” “How many sick days has Nola taken this year?”", "“How do I sell a gift card?” “How do I ask for time off?”", "Each person only gets answers their role is allowed to see: their own time off and PTO, or everyone's for owners and managers."]}
           example={<QuestionsExample />}
         />
 

@@ -26,6 +26,7 @@ import { loadPolicy } from "@/lib/policy-load";
 import { repeatOffenders } from "@/lib/policy-report";
 import { scanDay, type Viewer } from "./scan";
 import { eventKnowledge } from "./events";
+import { ptoKnowledge } from "./pto";
 import { teamKnowledge } from "./team";
 
 type Supabase = SupabaseClient<Database>;
@@ -64,6 +65,10 @@ export type Knowledge = {
   // giving someone a day off would leave (owners and managers).
   team: (date: string, part: string) => Promise<unknown>;
   dayOff: ((date: string, firstName: string) => Promise<unknown>) | null;
+  // Time off and PTO: the asker's own, or anyone's for owners and managers
+  // (team or payroll).
+  pto: (firstName: string | null) => Promise<unknown>;
+  timeOff: (from: string, to: string) => Promise<unknown>;
 };
 
 export type PolicyPeriod = "this_month" | "last_month" | "last_30_days";
@@ -128,6 +133,7 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
 
   const events = eventKnowledge(supabase, { businessId: me.businessId, timezone: tz, money: frontOfHouse, today: me.today }, (d) => sayDate(d, me.today));
   const team = teamKnowledge(supabase, me.location, (d) => sayDate(d, me.today), { manager: me.role === "owner" || me.role === "manager" });
+  const pto = ptoKnowledge(supabase, me, (d) => sayDate(d, me.today), { everyone: can(me, "team") || can(me, "payroll") });
 
   return {
     async clients(firstName) {
@@ -448,6 +454,8 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
     eventBalance: frontOfHouse ? (name) => events.balance(name) : null,
     team: (date, part) => team.working(date, part),
     dayOff: team.dayOff,
+    pto: (firstName) => pto.balance(firstName),
+    timeOff: (from, to) => pto.off(from, to),
 
     fixes: frontOfHouse
       ? async (date) => {

@@ -1745,10 +1745,12 @@ values
 insert into public.staff_time_off (business_id, staff_id, starts_on, ends_on, reason, note, status, requested_by, decided_by, decided_at, created_at)
 select 'b0000000-0000-4000-8000-000000000001', t.staff_id, t.starts_on, t.ends_on, t.reason::public.time_off_reason, t.note, 'approved',
        t.staff_id, 'd0000000-0000-4000-8000-000000000002', (t.starts_on - 20)::timestamptz, (t.starts_on - 21)::timestamptz
-from (select greatest(date_trunc('year', now() at time zone 'America/Chicago')::date + 60, (now() at time zone 'America/Chicago')::date - 200) as base) b,
+-- On a Tuesday, so each lands on days the person works (Nola Tuesday to
+-- Saturday, Lois Wednesday to Saturday).
+from (select date_trunc('week', greatest(date_trunc('year', now() at time zone 'America/Chicago')::date + 60, (now() at time zone 'America/Chicago')::date - 200))::date + 1 as base) b,
      lateral (values
        ('d0000000-0000-4000-8000-000000000009'::uuid, b.base, b.base + 6, 'vacation', 'Lake trip'),
        ('d0000000-0000-4000-8000-000000000007'::uuid, b.base + 21, b.base + 22, 'sick', null),
-       ('d0000000-0000-4000-8000-000000000010'::uuid, b.base + 35, b.base + 35, 'personal', 'Moving day')
+       ('d0000000-0000-4000-8000-000000000010'::uuid, b.base + 36, b.base + 36, 'personal', 'Moving day')
      ) as t (staff_id, starts_on, ends_on, reason, note)
 where b.base < (now() at time zone 'America/Chicago')::date - 120;

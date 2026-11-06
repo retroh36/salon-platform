@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { formatPto, minutesOff, periodEndsBetween, ptoStatement, yearStartOf, type PtoPolicy } from "@/lib/pto";
 import { addDays } from "@/lib/scheduling/time";
+import { offFacts, ptoFacts, takenByType } from "@/lib/denise/pto";
+import type { TimeOffStretch } from "@/lib/pto-load";
 
 const HR = 60;
 const policy = (more: Partial<PtoPolicy> = {}): PtoPolicy => ({
@@ -124,5 +126,45 @@ describe("hours a day of time off takes", () => {
     expect(formatPto(480)).toBe("8 hr");
     expect(formatPto(750)).toBe("12.5 hr");
     expect(formatPto(-240)).toBe("-4 hr");
+  });
+});
+
+describe("what Denise is told", () => {
+  const say = (d: string) => `day ${d}`;
+  const stretch = (more: Partial<TimeOffStretch>): TimeOffStretch => ({
+    staffId: "nola",
+    firstName: "Nola",
+    type: { id: "sick", name: "Sick", reason: "sick", usesPto: false, archived: false },
+    status: "approved",
+    startsOn: "2026-04-07",
+    endsOn: "2026-04-08",
+    startMinute: null,
+    endMinute: null,
+    days: [
+      { date: "2026-04-07", minutes: 8 * HR },
+      { date: "2026-04-08", minutes: 8 * HR },
+    ],
+    ...more,
+  });
+
+  it("counts whole days, part days and hours by type", () => {
+    const part = stretch({ startsOn: "2026-06-02", endsOn: "2026-06-02", startMinute: 9 * HR, endMinute: 12 * HR, days: [{ date: "2026-06-02", minutes: 3 * HR }] });
+    expect(takenByType([stretch({}), part])).toEqual([{ type: "Sick", uses_pto: false, days: 2, part_days: 1, hours: "19 hr" }]);
+  });
+
+  it("gives the balance when PTO is tracked, what's been taken this year, and what's coming up", () => {
+    const statement = ptoStatement(policy({ prorateFirstYear: false }), { ...none, startsOn: "2026-01-01" }, "2026-11-06");
+    const ahead = stretch({ type: { id: "v", name: "Vacation", reason: "vacation", usesPto: true, archived: false }, status: "requested", startsOn: "2026-12-01", endsOn: "2026-12-01", days: [{ date: "2026-12-01", minutes: 8 * HR }] });
+    const facts = ptoFacts({ firstName: "Nola" }, statement, [stretch({}), ahead], { since: "2026-01-01", today: "2026-11-06", say });
+    expect(facts.pto).toMatchObject({ balance: "80 hr", left_to_ask_for: "80 hr" });
+    expect(facts.taken_by_type).toEqual([{ type: "Sick", uses_pto: false, days: 2, part_days: 0, hours: "16 hr" }]);
+    expect(facts.coming_up).toEqual([{ type: "Vacation", when: "day 2026-12-01", status: "asked for, waiting" }]);
+    expect(ptoFacts({ firstName: "Nola" }, null, [], { since: "2026-01-01", today: "2026-11-06", say }).pto).toBe("The salon doesn't track PTO in Maestra.");
+  });
+
+  it("lists who's off, leaving out days nobody was working", () => {
+    const facts = offFacts([stretch({}), stretch({ firstName: "Lois", days: [] })], { from: "2026-04-06", to: "2026-04-12", say });
+    expect(facts.off).toEqual([{ first_name: "Nola", type: "Sick", when: "day 2026-04-07 to day 2026-04-08", working_days_off_in_range: 2, status: "approved" }]);
+    expect(offFacts([], { from: "2026-04-06", to: "2026-04-12", say }).note).toBe("Nobody has time off then.");
   });
 });

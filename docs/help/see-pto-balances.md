@@ -20,3 +20,4 @@ See what everyone has earned, used and has left, and adjust a balance.
 - Every adjustment is kept with who made it and why, in the Audit trail (PTO balances).
 - Only those who manage the team can adjust a balance, and a manager can't change an owner's.
 - Each person sees their own balance on their Time off page.
+- You can also ask Denise "How many sick days has Nola taken this year?" or "Who's off next week?". Owners and managers get anyone's answer; everyone else only their own.

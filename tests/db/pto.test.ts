@@ -4,7 +4,9 @@
 // team (always with a reason, never an owner's by a manager), and who reads
 // adjustments.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { admin, createOtherSalon, signIn, SEED, type Client } from "./helpers";
+import { knowledgeFor, type Asker } from "@/lib/denise/knowledge";
+import { addDays, todayIn } from "@/lib/scheduling/time";
+import { admin, createOtherSalon, DEFAULT_PERMISSIONS, signIn, SEED, type Client } from "./helpers";
 
 const B = SEED.business;
 const started = new Date().toISOString();
@@ -119,5 +121,37 @@ describe("adjustments", () => {
   it("can't be written directly", async () => {
     const { error } = await manager.from("pto_adjustments").insert({ business_id: B, staff_id: SEED.staff.gil, on_date: "2026-11-01", minutes: 60, reason: "Direct", by_staff_id: SEED.staff.manager });
     expect(error).not.toBeNull();
+  });
+});
+
+describe("Denise's answers", () => {
+  const TZ = "America/Chicago";
+  const today = todayIn(TZ);
+  const asker = (role: Asker["role"], staffId: string): Asker => ({ role, permissions: DEFAULT_PERMISSIONS[role], staffId, businessId: B, location: { id: SEED.location, timezone: TZ }, salon: "Maple & Ash", today });
+  type Balance = { first_name: string; pto: { balance: string } | string; taken_by_type: { type: string; days: number }[] };
+
+  it("tell anyone their own PTO, and only owners and managers someone else's", async () => {
+    const mine = (await knowledgeFor(gil, asker("stylist", SEED.staff.gil)).pto(null)) as Balance;
+    expect(mine.first_name).toBe("Gil");
+    expect(typeof mine.pto).toBe("object");
+    expect(await knowledgeFor(gil, asker("stylist", SEED.staff.gil)).pto("Nola")).toEqual({ error: "I can only tell you about your own time off and PTO. Owners and managers can see everyone's." });
+    expect(await knowledgeFor(frontDesk, asker("front_desk", SEED.staff.frontDesk)).pto("Nola")).toHaveProperty("error");
+
+    // The seed has Nola off sick in the spring.
+    const nola = (await knowledgeFor(manager, asker("manager", SEED.staff.manager)).pto("nola")) as Balance;
+    expect(nola.first_name).toBe("Nola");
+    expect(nola.taken_by_type.find((t) => t.type === "Sick")?.days).toBeGreaterThan(0);
+    expect(JSON.stringify(nola)).not.toMatch(/note|@/i);
+  });
+
+  it("say who's off: everyone's for managers, only your own for anyone else", async () => {
+    const to = addDays(today, 60);
+    const all = (await knowledgeFor(manager, asker("manager", SEED.staff.manager)).timeOff(today, to)) as { off: { first_name: string; status: string }[] };
+    expect(new Set(all.off.map((o) => o.first_name)).size).toBeGreaterThan(1);
+    expect(all.off.some((o) => o.status === "asked for, waiting")).toBe(true);
+    const own = (await knowledgeFor(gil, asker("stylist", SEED.staff.gil)).timeOff(today, to)) as { off: { first_name: string }[]; only_yours: string };
+    expect(own.off.every((o) => o.first_name === "Gil")).toBe(true);
+    expect(own.only_yours).toBeTruthy();
+    expect(await knowledgeFor(manager, asker("manager", SEED.staff.manager)).timeOff(today, addDays(today, 90))).toBe("Ask about 62 days or fewer at a time.");
   });
 });

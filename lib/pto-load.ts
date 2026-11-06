@@ -151,3 +151,61 @@ export async function ptoMinutesFor(
   const schedule = (await loadStaffSchedules(supabase, [staffId], span.startsOn, span.endsOn)).get(staffId)!;
   return datesBetween(span.startsOn, span.endsOn).reduce((n, d) => n + minutesOff(hoursOn(schedule, d), span, d), 0);
 }
+
+export type TimeOffStretch = {
+  staffId: string;
+  firstName: string;
+  type: TimeOffType | null;
+  status: "approved" | "requested";
+  startsOn: LocalDate;
+  endsOn: LocalDate;
+  // Null: whole days.
+  startMinute: number | null;
+  endMinute: number | null;
+  // The working days it takes between `from` and `to`, with the minutes of
+  // the person's hours each day (days they weren't working left out).
+  days: { date: LocalDate; minutes: number }[];
+};
+
+// Time off at a location (or one person's) touching `from`..`to`,
+// approved or also asked for, PTO or not, by the days it takes from each
+// person's hours. RLS decides what's readable.
+export async function loadTimeOffDays(
+  supabase: Supabase,
+  opts: { businessId: string; locationId: string; from: LocalDate; to: LocalDate; staffId?: string; pending?: boolean },
+): Promise<TimeOffStretch[]> {
+  let query = supabase
+    .from("staff_time_off")
+    .select("staff_id, type_id, status, starts_on, ends_on, start_minute, end_minute, staff!staff_time_off_staff_id_business_id_fkey!inner(first_name, location_id)")
+    .eq("business_id", opts.businessId)
+    .eq("staff.location_id", opts.locationId)
+    .in("status", opts.pending ? ["approved", "requested"] : ["approved"])
+    .lte("starts_on", opts.to)
+    .gte("ends_on", opts.from)
+    .order("starts_on");
+  if (opts.staffId) query = query.eq("staff_id", opts.staffId);
+  const [rows, types] = await Promise.all([query, loadTimeOffTypes(supabase, opts.businessId)]);
+  if (rows.error) throw rows.error;
+  if (!rows.data.length) return [];
+  const ids = [...new Set(rows.data.map((r) => r.staff_id))];
+  const schedules = await loadStaffSchedules(supabase, ids, opts.from, opts.to);
+  const typeOf = new Map(types.map((t) => [t.id, t]));
+  return rows.data.map((r) => {
+    const span = { startsOn: r.starts_on, endsOn: r.ends_on, startMinute: r.start_minute, endMinute: r.end_minute };
+    const schedule = schedules.get(r.staff_id)!;
+    const days = datesBetween(r.starts_on < opts.from ? opts.from : r.starts_on, r.ends_on > opts.to ? opts.to : r.ends_on)
+      .map((date) => ({ date, minutes: minutesOff(hoursOn(schedule, date), span, date) }))
+      .filter((d) => d.minutes > 0);
+    return {
+      staffId: r.staff_id,
+      firstName: r.staff.first_name,
+      type: r.type_id ? (typeOf.get(r.type_id) ?? null) : null,
+      status: r.status as TimeOffStretch["status"],
+      startsOn: r.starts_on,
+      endsOn: r.ends_on,
+      startMinute: r.start_minute,
+      endMinute: r.end_minute,
+      days,
+    };
+  });
+}

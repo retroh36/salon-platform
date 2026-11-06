@@ -149,7 +149,7 @@ const TOOLS: Anthropic.Tool[] = [
 const noInput = { type: "object" as const, properties: {}, required: [], additionalProperties: false as const };
 
 // Read-only lookups of what Denise has learned, and her fixes.
-const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes" | "giftCards" | "packages" | "rewards" | "policy" | "events" | "eventBalance" | "team" | "dayOff", Anthropic.Tool> = {
+const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes" | "giftCards" | "packages" | "rewards" | "policy" | "events" | "eventBalance" | "team" | "dayOff" | "pto" | "timeOff", Anthropic.Tool> = {
   team: {
     name: "who_is_working",
     description:
@@ -171,6 +171,30 @@ const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "s
       type: "object",
       properties: { date: { type: "string", description: "YYYY-MM-DD." }, first_name: { type: "string" } },
       required: ["date", "first_name"],
+      additionalProperties: false,
+    },
+  },
+  pto: {
+    name: "pto_balance",
+    description:
+      "One person's PTO and time off: their PTO balance, what's left to ask for, booked ahead, waiting for a decision, earned and used this PTO year and carried in (when the salon tracks PTO), time off taken this year by type (Vacation, Sick, Personal…: whole days, part days and hours) and what's coming up. Null first_name means the person asking (\"How much PTO do I have?\"). Anyone can ask about themselves; only owners and managers about someone else (\"How many sick days has Nola taken this year?\").",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: { first_name: { ...nullable("string"), description: "The team member's first name, or null for the person asking." } },
+      required: ["first_name"],
+      additionalProperties: false,
+    },
+  },
+  timeOff: {
+    name: "time_off_between",
+    description:
+      "Who's off between two days (up to 62), from the team's time off: each person's first name, the type, the days and how many working days it takes. Owners and managers see everyone's, approved and asked for; anyone else sees only their own. For who's working on a day, use who_is_working.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: { from: { type: "string", description: "First day, YYYY-MM-DD." }, to: { type: "string", description: "Last day, YYYY-MM-DD." } },
+      required: ["from", "to"],
       additionalProperties: false,
     },
   },
@@ -466,6 +490,8 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
         ...(k.eventBalance ? [KNOWLEDGE_TOOLS.eventBalance] : []),
         KNOWLEDGE_TOOLS.team,
         ...(k.dayOff ? [KNOWLEDGE_TOOLS.dayOff] : []),
+        KNOWLEDGE_TOOLS.pto,
+        KNOWLEDGE_TOOLS.timeOff,
       ]
     : [];
 
@@ -517,6 +543,10 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
       case "day_off_check":
         if (!k.dayOff) return "Checking a day off is for owners and managers.";
         return JSON.stringify(await k.dayOff(String(input.date ?? ""), String(input.first_name ?? "")));
+      case "pto_balance":
+        return JSON.stringify(await k.pto(str(input.first_name)));
+      case "time_off_between":
+        return JSON.stringify(await k.timeOff(String(input.from ?? ""), String(input.to ?? "")));
       case "propose_fixes": {
         if (!k.fixes) return "Only the front desk, managers and owners can approve fixes.";
         const date = dayOf(input.date);
@@ -602,6 +632,10 @@ export function toolStatus(name: string, input: unknown, c: Pick<AssistantContex
       return "Checking the team schedule…";
     case "day_off_check":
       return typeof i.first_name === "string" ? `Checking what ${i.first_name}'s day off would leave…` : "Checking the schedule…";
+    case "pto_balance":
+      return typeof i.first_name === "string" ? `Checking ${i.first_name}'s time off…` : "Checking your time off…";
+    case "time_off_between":
+      return "Checking who's off…";
     default:
       return "Looking that up…";
   }
