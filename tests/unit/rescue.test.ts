@@ -228,6 +228,14 @@ describe("the plan", () => {
     for (const o of lines[0].options) expect(o.start.getTime()).toBeGreaterThanOrEqual(at("10:20").getTime());
   });
 
+  // Marked out late in the day: a visit already over (never checked in) is
+  // left for "Never checked in", not given a new spot.
+  it("leaves out a visit that's already over", () => {
+    const c = ctx([item(CUT, "nola", "10:00", "a"), item(CUT, "nola", "14:00", "b")]);
+    const lines = planRescue(c, { ...input(c, [visit("a", [item(CUT, "nola", "10:00", "a")]), visit("b", [item(CUT, "nola", "14:00", "b")])]), now: at("12:00") });
+    expect(lines.map((l) => l.visit.appointmentId)).toEqual(["b"]);
+  });
+
   it("says when nothing fits", () => {
     const c = ctx([item(COLOR, "nola", "10:00", "a")], 0, ["nola"]);
     const v = visit("a", [item(COLOR, "nola", "10:00", "a")]);

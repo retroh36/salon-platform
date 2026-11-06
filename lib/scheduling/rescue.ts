@@ -258,7 +258,10 @@ const sameOption = (a: RescueOption, b: RescueOption) => a.staffId === b.staffId
 
 export function planRescue(ctx: BookingContext, input: RescueInput): RescueLine[] {
   let calendar = ctx;
-  return affectedVisits(input.visits, input.staffId, input.from, input.until ?? null).map((visit): RescueLine => {
+  // Only what isn't over yet: a visit whose time has passed (never checked
+  // in) can't be given a new spot; Denise's "Never checked in" card settles it.
+  const from = new Date(Math.max(input.from.getTime(), input.now.getTime()));
+  return affectedVisits(input.visits, input.staffId, from, input.until ?? null).map((visit): RescueLine => {
     if (!visit.movable) return { visit, options: [], choice: null, note: "in_chair" };
     // Options on the calendar as it is (so staff can swap clients around),
     // and those that fit around the clients placed before this one.
