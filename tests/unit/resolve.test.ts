@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AppointmentStatus } from "@/lib/appointments";
 import { checkMoves, fromLocal, itemEnd, parseTime, type BookedItem, type BookingContext, type BookingService, type BookingStaff } from "@/lib/scheduling";
 import {
+  ABSORB_MINUTES,
   activeDisruptions,
   effectiveCalendar,
   findConflicts,
@@ -185,6 +186,31 @@ describe("a stylist running over", () => {
     const long = findConflicts(day(booked, [{ id: "o", kind: "overrun", itemId: "now", minutes: STYLIST_CHANGE_MINUTES + 15 }], { statuses: checkedIn("now") }));
     expect(describe_(only(long).options[0])).toEqual(["grace: ethan 11:00"]);
     expect(only(long).options.map(describe_)).toContainEqual(["grace: priya 11:45"]);
+  });
+
+  it("absorbs a short delay first: the next client a little later with the same stylist, nobody else moved", () => {
+    const booked = [item("now", CUT, "priya", "10:00"), item("grace", CUT, "priya", "11:00")];
+    const short = findConflicts(day(booked, [{ id: "o", kind: "overrun", itemId: "now", minutes: 15 }], { statuses: checkedIn("now") }));
+    expect(describe_(only(short).options[0])).toEqual(["grace: priya 11:15"]);
+    expect(only(short).options[0]).toMatchObject({ absorbed: true, clientsMoved: 1, score: 15 });
+    // Another stylist at the same time is never absorbed.
+    expect(only(short).options.filter((o) => o.stylistChanges).every((o) => !o.absorbed)).toBe(true);
+
+    const long = findConflicts(day(booked, [{ id: "o", kind: "overrun", itemId: "now", minutes: ABSORB_MINUTES + 5 }], { statuses: checkedIn("now") }));
+    expect(only(long).options.every((o) => !o.absorbed)).toBe(true);
+  });
+
+  it("never hands a client who asked for their stylist to someone else", () => {
+    const booked = [item("now", CUT, "priya", "10:00"), item("grace", CUT, "priya", "11:00", { requested: true })];
+    const d = day(booked, [{ id: "o", kind: "overrun", itemId: "now", minutes: STYLIST_CHANGE_MINUTES + 15 }], { statuses: checkedIn("now") });
+    const conflicts = findConflicts(d);
+    expect(only(conflicts).options.map(describe_)).toEqual([["grace: priya 11:45"]]);
+    expectValid(d, conflicts);
+
+    // The rest of their visit with the same stylist stays with them too.
+    const visit = [item("now", CUT, "priya", "10:00"), item("g1", MENS_CUT, "priya", "11:00", { appointmentId: "appt-g" }), item("g2", BLOWOUT, "priya", "11:30", { appointmentId: "appt-g", requested: true })];
+    const both = findConflicts(day(visit, [{ id: "o", kind: "overrun", itemId: "now", minutes: 20 }], { statuses: checkedIn("now") }));
+    for (const option of only(both).options) for (const m of option.moves) expect(m.to.staffId).toBe("priya");
   });
 
   it("fits a short client into another client's processing gap", () => {

@@ -183,7 +183,7 @@ function AdjustButton({ slot, client }: { slot: BookingSlot; client: ClientOptio
       size="sm"
       variant="quiet"
       onClick={() => {
-        requestAdjust({ date: slot.date, lines: slot.lines.map((l) => ({ serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute, minutes: l.minutes })), client });
+        requestAdjust({ date: slot.date, lines: slot.lines.map((l) => ({ serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute, minutes: l.minutes, requested: l.requested })), client });
         if (path !== "/calendar") router.push(`/calendar?date=${slot.date}`);
       }}
     >

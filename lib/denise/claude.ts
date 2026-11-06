@@ -72,7 +72,7 @@ export const VOICE =
 
 const EXPLAIN_SYSTEM = `${VOICE}
 
-You'll get a list of schedule fixes the salon's scheduler has already worked out and checked. For each one, write one or two short sentences explaining to the front desk why it works, from the facts given: who moves where and why that's the least disruption. Don't invent facts, don't promise anything to clients, and don't repeat the problem word for word. Use names, never he, she, him, his, her or hers ("so Olivia keeps the same time", not "so she keeps her slot"). Return one explanation per fix, in order.`;
+You'll get a list of schedule fixes the salon's scheduler has already worked out and checked. For each one, write one or two short sentences explaining to the front desk why it works, from the facts given: who moves where and why that's the least disruption. Don't invent facts, don't promise anything to clients, and don't repeat the problem word for word. Use names, never he, she, him, his, her or hers ("so Olivia keeps the same time", not "so she keeps her slot"). A fix marked absorbed starts one client a little later with the same stylist: they still come at their booked time, the time after is free so the delay stops there, and no one else moves. Return one explanation per fix, in order.`;
 
 function textOf(content: Anthropic.ContentBlock[]): string {
   return content

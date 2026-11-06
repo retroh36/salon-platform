@@ -60,7 +60,13 @@ export async function bookOnline(admin: Supabase, location: Location, input: Onl
       p_appointment_id: input.appointmentId ?? null!,
       p_client_id: input.clientId,
       p_notes: input.notes ?? "",
-      p_items: items.map((i) => ({ id: null, service_id: i.serviceId, staff_id: i.staffId, resource_id: i.resourceId, starts_at: i.start.toISOString(), bundle_id: input.request.bundleId ?? null })),
+      p_items: items.map((i) => ({
+        id: null,
+        service_id: i.serviceId, staff_id: i.staffId, resource_id: i.resourceId, starts_at: i.start.toISOString(),
+        bundle_id: input.request.bundleId ?? null,
+        // A stylist the client chose is one they asked for.
+        requested: input.request.staffId !== null && i.staffId === input.request.staffId,
+      })),
       p_expected_version: version.data.calendar_version,
       p_manage_token_hash: input.manageTokenHash,
       p_source: input.source ?? (null as never),

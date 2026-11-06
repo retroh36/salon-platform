@@ -1,6 +1,6 @@
 // Denise's Claude features with a fake API client: no real API calls.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { answer, assistantTools, MAX_STRICT_TOOLS, systemPrompt, type AssistantContext } from "@/lib/denise/assistant";
+import { answer, assistantTools, everyTool, MAX_STRICT_TOOLS, MAX_STRICT_UNIONS, systemPrompt, unionParams, type AssistantContext } from "@/lib/denise/assistant";
 import { ANALYSIS_MODEL, CHAT_MODEL, claudeClient, converse, explainFixes, isConnected, modelFor, theyThem, type ClaudeClient } from "@/lib/denise/claude";
 import type { CoverageWeek } from "@/lib/coverage-load";
 import { sayDate, type Knowledge } from "@/lib/denise/knowledge";
@@ -84,8 +84,8 @@ describe("connecting", () => {
 
 describe("explaining fixes", () => {
   const facts = [
-    { problem: "Priya's running 20 minutes late.", changes: [{ client: "Grace", service: "Cut", from: "11:00 with Priya", to: "11:20 with Priya" }], clientsMoved: 1, couldNotPlace: [], breaksMoved: [], groupsKeptTogether: [] },
-    { problem: "Priya's running 20 minutes late.", changes: [{ client: "Grace", service: "Cut", from: "11:00 with Priya", to: "11:00 with Ethan" }], clientsMoved: 1, couldNotPlace: [], breaksMoved: [], groupsKeptTogether: [] },
+    { problem: "Priya's running 20 minutes late.", changes: [{ client: "Grace", service: "Cut", from: "11:00 with Priya", to: "11:20 with Priya" }], clientsMoved: 1, absorbed: true, couldNotPlace: [], breaksMoved: [], groupsKeptTogether: [] },
+    { problem: "Priya's running 20 minutes late.", changes: [{ client: "Grace", service: "Cut", from: "11:00 with Priya", to: "11:00 with Ethan" }], clientsMoved: 1, absorbed: false, couldNotPlace: [], breaksMoved: [], groupsKeptTogether: [] },
   ];
 
   it("asks the fast model for one explanation per fix, as JSON", async () => {
@@ -295,6 +295,10 @@ describe("Ask Denise's knowledge", () => {
     const most = assistantTools(context({ knowledge: knowledge(), help: [], page: { label: "a client's profile", client: { id: "c1", firstName: "Mia" } } })).tools;
     expect(most.map((t) => t.name)).toContain("this_client");
     expect(most.filter((t) => t.strict).length).toBeLessThanOrEqual(MAX_STRICT_TOOLS);
+    // And strict tools' optional parameters stay within the API's limit.
+    const unions = everyTool().filter((t) => t.strict).reduce((n, t) => n + unionParams(t.input_schema), 0);
+    expect(unions).toBeLessThanOrEqual(MAX_STRICT_UNIONS);
+    expect(unionParams({ type: "object", properties: { a: { type: ["string", "null"] }, b: { type: "array", items: { anyOf: [{ type: "string" }, { type: "null" }] } } } })).toBe(2);
     // Tools with nothing to fill in gain nothing from strict.
     for (const t of most) if (Object.keys(t.input_schema.properties ?? {}).length === 0) expect(t.strict, t.name).toBeFalsy();
   });

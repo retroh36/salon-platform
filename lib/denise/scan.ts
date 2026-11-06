@@ -6,7 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { NOT_ARRIVED_MINUTES } from "@/lib/calendar";
-import { blockNotifications, notificationsFor } from "@/lib/notifications";
+import { blockNotifications, headsUpText, notificationsFor } from "@/lib/notifications";
 import { recordProposals, type ProposalOption } from "@/lib/scheduling/ai-actions";
 import { durationMinutes } from "@/lib/scheduling/booking";
 import { loadDisruptions } from "@/lib/scheduling/disruptions";
@@ -16,7 +16,7 @@ import { activeDisruptions, effectiveCalendar, findConflicts, type Conflict, typ
 import { todayIn, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { fullName } from "@/lib/staff";
 import { logDeniseError } from "./errors";
-import { likelyOverruns, type LearnedTime } from "./risk";
+import { deskSees, HEADS_UP_MINUTES, likelyOverruns, type LearnedTime } from "./risk";
 import type { ConflictView, DeniseNotice, DeniseState } from "./types";
 import { clock, factsFor, headline, intro, moves, note, summary, templateReason, visitChanges, type Lookup, type Visit } from "./wording";
 
@@ -168,8 +168,19 @@ export async function scanDay(
   }
 
   const views: ConflictView[] = [];
+  // Likely overruns the stylist has just been told about: the front desk
+  // sees them once the heads-up has had its time.
+  const waiting = new Set<string>();
   for (const w of worded) {
     const subject = `${prefix}${w.conflict.subject}`;
+    // Today only: a risk on a later day has time enough for the desk to see.
+    if (w.conflict.kind === "likely_overrun" && w.options.length && todayIn(lookup.timeZone, now) === date) {
+      const notifiedAt = await headsUp(supabase, w.conflict, lookup, now);
+      if (viewer.canBook && !deskSees(notifiedAt, now)) {
+        waiting.add(subject);
+        continue;
+      }
+    }
     let ids: (string | null)[] = w.options.map(() => null);
     if (viewer.canBook) {
       const recorded = await recordProposals(
@@ -221,6 +232,7 @@ export async function scanDay(
         moves: moves(o.option, lookup),
         clientsMoved: o.option.clientsMoved,
         shiftMinutes: o.option.shiftMinutes,
+        ...(o.option.absorbed ? { absorbed: true } : {}),
         unresolved: [...new Set(o.option.unresolved.map((id) => lookup.visits.get(lookup.items.get(id)?.appointmentId ?? "")?.client?.fullName ?? "A walk-in"))],
       })),
       firstNames: { headline: headline(w.conflict, lookup, true), options: w.options.map((o) => summary(o.option, lookup, true)) },
@@ -229,12 +241,39 @@ export async function scanDay(
 
   // Close proposals for problems that have gone away.
   if (viewer.canBook) {
-    const current = new Set(views.map((v) => v.subject));
+    const current = new Set([...views.map((v) => v.subject), ...waiting]);
     const gone = new Set([...existing.keys()].map((k) => k.split("#")[0]).filter((s) => !current.has(s)));
     for (const subject of gone) await recordProposals(supabase, viewer.location.id, { feature: FEATURE, subject, options: [] }, { asSystem: options.system });
   }
 
   return { date, conflicts: views, notices: lateNotices(day, lookup, date, conflicts), reorders: [], openings: [], brief: null, connected: false };
+}
+
+// Tells the stylist first about a visit likely to run into their next
+// client (once per visit, record_overrun_heads_up), returning when they
+// were told; null if it couldn't be recorded, so the desk isn't kept
+// waiting on it.
+async function headsUp(supabase: Supabase, c: Conflict, l: Lookup, now: Date): Promise<Date | null> {
+  const item = l.items.get(c.causeItemIds[0]);
+  const next = l.items.get(c.displaced[0]);
+  if (!item?.id || !next || c.minutes == null) return null;
+  const name = (appointmentId?: string) => l.visits.get(appointmentId ?? "")?.client?.firstName ?? "the walk-in";
+  const body = headsUpText({
+    service: l.services.get(item.serviceId) ?? "this service",
+    client: name(item.appointmentId),
+    start: toLocal(item.start, l.timeZone).minute,
+    next: name(next.appointmentId),
+    nextStart: toLocal(next.start, l.timeZone).minute,
+    minutes: c.minutes,
+    estimated: Boolean(c.estimated),
+    deskMinutes: HEADS_UP_MINUTES,
+  });
+  const { data, error } = await supabase.rpc("record_overrun_heads_up", { p_item_id: item.id, p_body: body, p_at: now.toISOString() });
+  if (error) {
+    logDeniseError(error, { where: "heads_up" });
+    return null;
+  }
+  return data ? new Date(data) : null;
 }
 
 // Clients who haven't arrived 15 minutes after they were due, today only:

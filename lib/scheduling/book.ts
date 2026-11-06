@@ -44,6 +44,10 @@ export type BookingItemInput = {
   // The service bundle it's booked as part of (./bundles.ts); null takes
   // it out of its bundle, left out keeps what it had.
   bundleId?: string | null;
+  // The client asked for this stylist for it (online, the booking form's
+  // tick, or naming them to Denise): Denise's fixes never move it to
+  // someone else. Left out keeps what it had, for its stylist.
+  requested?: boolean;
 };
 
 // What staff may override by saying so; anything else (a room service
@@ -206,6 +210,7 @@ function planVisit(calendar: BookingContext, input: BookingInput, existing: Exis
       // Said for every changed item, so one moved again without it counts again.
       ...(changed[n] ? { anyway: item.anyway === true } : {}),
       ...(item.bundleId !== undefined ? { bundle_id: item.bundleId } : {}),
+      ...(item.requested !== undefined ? { requested: item.requested } : {}),
       timing: own[n] ? { active: own[n]!.activeMinutes, processing: own[n]!.processingMinutes, finishing: own[n]!.finishingMinutes } : null,
     })),
   };

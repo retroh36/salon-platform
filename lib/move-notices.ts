@@ -91,7 +91,11 @@ async function relatedVisits(supabase: Supabase, appointmentId: string): Promise
 
 // The clients' visits a staff change moved, for the calendar to ask about
 // (`at`: when, so a message sent since shows as sent).
-export type Moved = { appointmentIds: string[]; at: string };
+// runningBehind: one of Denise's fixes absorbed a delay (the client still
+// comes at their time and starts a little later), so the message to check
+// is "We're running about 15 minutes behind", worked out from that fix
+// (its AI action id), not "Your visit has moved".
+export type Moved = { appointmentIds: string[]; at: string; runningBehind?: string };
 
 // Makes a change staff asked for, then tells the stylists about every visit
 // whose day, time or stylist it changed, and hands back the clients' ones.

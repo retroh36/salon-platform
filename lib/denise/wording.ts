@@ -151,8 +151,20 @@ function unresolvedNames(option: FixOption, l: Lookup): string[] {
   return [...new Set(option.unresolved.map((id) => itemName(l, id)))];
 }
 
+// The client an absorbed fix starts later: who, with whom, by how much,
+// and the time they still come at.
+function absorbedVisit(option: FixOption, l: Lookup) {
+  if (!option.absorbed) return null;
+  const v = visitChanges(option, l)[0];
+  return v ? { who: v.client?.firstName ?? "The walk-in", stylist: v.to.staffFirstName, minutes: v.to.minute - v.from.minute, comes: clock(v.from.minute), starts: clock(v.to.minute) } : null;
+}
+
 // Denise presenting her best fix.
 export function intro(option: FixOption, l: Lookup): string {
+  const absorbed = absorbedVisit(option, l);
+  if (absorbed) {
+    return `I can absorb it: ${absorbed.who} still comes at ${absorbed.comes} and starts ${formatDuration(absorbed.minutes)} later with ${absorbed.stylist}, at ${absorbed.starts}. No one else moves. Want me to apply it?`;
+  }
   const what = summary(option, l);
   const lead =
     option.clientsMoved === 0
@@ -167,6 +179,10 @@ export function intro(option: FixOption, l: Lookup): string {
 
 // Why the fix works: the fallback explanation when Claude isn't connected.
 export function templateReason(c: Conflict, option: FixOption, l: Lookup): string {
+  const absorbed = absorbedVisit(option, l);
+  if (absorbed) {
+    return `${absorbed.who} starts ${formatDuration(absorbed.minutes)} later with ${absorbed.stylist}, and the time after is free, so the delay stops there. Nothing else on the calendar changes.`;
+  }
   const clauses = visitChanges(option, l).map((v) => {
     const who = v.client?.firstName ?? "The walk-in";
     const shift = v.to.minute - v.from.minute;
@@ -200,6 +216,9 @@ export function factsFor(c: Conflict, option: FixOption, l: Lookup) {
     groupsKeptTogether: groupsKept(option, l),
     breaksMoved: option.blockMoves.map((b) => `${staffName(l, b.staffId)}'s ${b.kind}: ${clock(minuteOf(l, b.from.start))} → ${clock(minuteOf(l, b.to.start))}`),
     clientsMoved: option.clientsMoved,
+    // One client starts a little later with the same stylist, and still
+    // comes at their booked time; nothing else changes.
+    absorbed: option.absorbed,
     couldNotPlace: option.unresolved.map((id) => firstName(l, l.items.get(id)?.appointmentId ?? "")),
   };
 }

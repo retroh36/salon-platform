@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { briefItemKey, creditText, withoutDismissed, type BriefFacts } from "@/lib/denise/brief";
-import { likelyOverruns } from "@/lib/denise/risk";
+import { deskSees, HEADS_UP_MINUTES, likelyOverruns } from "@/lib/denise/risk";
+import { headsUpText } from "@/lib/notifications";
 import { fromLocal, parseTime, type BookedItem, type BookingContext } from "@/lib/scheduling";
 import { findConflicts } from "@/lib/scheduling/resolve";
 import { headline } from "@/lib/denise/wording";
@@ -129,5 +130,26 @@ describe("the morning brief", () => {
 
   it("describes credit without the client's name", () => {
     expect(creditText(facts.credits[0])).toBe("3 Blowouts left on a package, $40 on a gift card");
+  });
+});
+
+// The stylist hears first; the desk sees the fix HEADS_UP_MINUTES later.
+describe("the stylist's heads-up", () => {
+  it("keeps the fix from the desk until the heads-up has had its time", () => {
+    const told = at("09:00");
+    expect(deskSees(told, at("09:09"))).toBe(false);
+    expect(deskSees(told, new Date(told.getTime() + HEADS_UP_MINUTES * 60_000))).toBe(true);
+    // No heads-up recorded: the desk isn't kept waiting on it.
+    expect(deskSees(null, at("09:00"))).toBe(true);
+  });
+
+  it("says what may happen, in our words, and how to say they're behind", () => {
+    const text = headsUpText({ service: "Balayage", client: "Mia", start: 14 * 60, next: "Grace", nextStart: 16 * 60 + 35, minutes: 25, estimated: false, deskMinutes: 10 });
+    expect(text).toBe(
+      `Heads up: you usually take about 25 min longer than booked for Balayage, so Mia's 2pm may run into Grace's 4:35pm. The front desk will see Denise's fix in 10 minutes. Already behind? Use "I'm running late" on your column.`,
+    );
+    expect(headsUpText({ service: "Balayage", client: "Mia", start: 14 * 60, next: "Grace", nextStart: 16 * 60 + 35, minutes: 70, estimated: true, deskMinutes: 10 })).toContain(
+      "about 1 hr 10 min longer than booked for Balayage (based on check-in to checkout times), so",
+    );
   });
 });

@@ -29,7 +29,9 @@ export type ClientAlerts = {
   last: LastVisit | null;
 };
 
-export type SlotLine = { serviceId: string; staffId: string; startMinute: number; minutes: number; usual: boolean; priceCents: number };
+// requested: the request named this stylist (or "same as last time" took
+// them), so the client asked for them.
+export type SlotLine = { serviceId: string; staffId: string; startMinute: number; minutes: number; usual: boolean; priceCents: number; requested?: boolean };
 export type BookingSlot = {
   date: LocalDate;
   // "Tue, Nov 3 · 2:15pm–5:05pm"

@@ -30,10 +30,10 @@ test.afterAll(async () => {
   await admin.from("clients").delete().like("first_name", `${PREFIX}%`);
 });
 
-async function newClient(firstName: string) {
+async function newClient(firstName: string, extra: { preferred_staff_id?: string } = {}) {
   const { data } = await admin
     .from("clients")
-    .insert({ business_id: B, first_name: `${PREFIX}${firstName}`, last_name: "Test", phone: "(312) 555-0199" })
+    .insert({ business_id: B, first_name: `${PREFIX}${firstName}`, last_name: "Test", phone: "(312) 555-0199", ...extra })
     .select("id")
     .single();
   return data!.id;
@@ -117,7 +117,8 @@ test.describe("front desk", () => {
   test.use({ storageState: AUTH.frontDesk });
 
   test("books a visit with two stylists from an empty slot", async ({ page }) => {
-    await newClient("Ava");
+    // Ava prefers Bridget, so her service with Bridget starts out asked for.
+    await newClient("Ava", { preferred_staff_id: BRIDGET });
     await openDay(page);
     await clickSlot(page, "Bridget Callahan", 10);
 
@@ -141,10 +142,14 @@ test.describe("front desk", () => {
     await second.getByLabel("Service").selectOption({ label: "Blowout" });
     await expect(second.getByTestId("line-summary")).toHaveText("11:45am–12:30pm · 45 min · $45");
     await expect(form.getByTestId("visit-total")).toHaveText("10am–12:30pm · 2 hr 30 min$195");
+    await expect(first.getByLabel("Client asked for Bridget")).toBeChecked();
+    await expect(second.getByLabel("Client asked for Shae")).not.toBeChecked();
 
     await form.getByRole("button", { name: "Create booking" }).click();
     // The panel moves on to the new booking.
     await expect(panel(page).getByTestId("client-name")).toHaveText(`${PREFIX}Ava Test`);
+    await expect(panel(page).getByTestId("requested")).toHaveCount(1);
+    await expect(panel(page).getByTestId("service-timer").first()).toContainText("Asked for");
 
     const color = column(page, "Bridget Callahan").getByRole("button", { name: new RegExp(`^10am–11:45am, ${PREFIX}Ava Test, All-Over Color, .*with Shae, Chair 1`) });
     await expect(color).toBeVisible();
@@ -152,6 +157,11 @@ test.describe("front desk", () => {
 
     const { data } = await admin.from("appointments").select("id, created_by, updated_by").eq("location_id", L).gte("starts_at", at(0).toISOString()).lt("starts_at", at(23).toISOString());
     expect(data).toEqual([expect.objectContaining({ created_by: FRONT_DESK, updated_by: FRONT_DESK })]);
+    const { data: items } = await admin.from("appointment_items").select("staff_id, requested_staff_id").eq("appointment_id", data![0].id).order("starts_at");
+    expect(items).toEqual([
+      { staff_id: BRIDGET, requested_staff_id: BRIDGET },
+      { staff_id: SHAE, requested_staff_id: null },
+    ]);
   });
 
   test("adds a new client while booking", async ({ page }) => {

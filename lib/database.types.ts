@@ -173,14 +173,14 @@ isOneToOne: false
                   ]
                 },"appointment_items": {
                   Row: {
-                    "active_minutes": number,"appointment_id": string,"bundle_id": string | null,"business_id": string,"created_at": string,"ends_at": string,"finished_at": string | null,"finishing_minutes": number,"holds_time": boolean,"id": string,"imported": boolean,"location_id": string,"overbooked": boolean,"price_cents": number,"processing_ended_at": string | null,"processing_minutes": number,"processing_started_at": string | null,"resource_held": unknown,"resource_id": string | null,"service_id": string,"staff_busy": unknown,"staff_id": string,"started_at": string | null,"starts_at": string,"steps": Json | null,"updated_at": string
+                    "active_minutes": number,"appointment_id": string,"bundle_id": string | null,"business_id": string,"created_at": string,"ends_at": string,"finished_at": string | null,"finishing_minutes": number,"holds_time": boolean,"id": string,"imported": boolean,"location_id": string,"overbooked": boolean,"price_cents": number,"processing_ended_at": string | null,"processing_minutes": number,"processing_started_at": string | null,"requested_staff_id": string | null,"resource_held": unknown,"resource_id": string | null,"service_id": string,"staff_busy": unknown,"staff_id": string,"started_at": string | null,"starts_at": string,"steps": Json | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "active_minutes": number,"appointment_id": string,"bundle_id"?: string | null,"business_id": string,"created_at"?: string,"ends_at": string,"finished_at"?: string | null,"finishing_minutes"?: number,"holds_time"?: boolean,"id"?: string,"imported"?: boolean,"location_id": string,"overbooked"?: boolean,"price_cents": number,"processing_ended_at"?: string | null,"processing_minutes"?: number,"processing_started_at"?: string | null,"resource_held"?: never,"resource_id"?: string | null,"service_id": string,"staff_busy"?: never,"staff_id": string,"started_at"?: string | null,"starts_at": string,"steps"?: Json | null,"updated_at"?: string
+                    "active_minutes": number,"appointment_id": string,"bundle_id"?: string | null,"business_id": string,"created_at"?: string,"ends_at": string,"finished_at"?: string | null,"finishing_minutes"?: number,"holds_time"?: boolean,"id"?: string,"imported"?: boolean,"location_id": string,"overbooked"?: boolean,"price_cents": number,"processing_ended_at"?: string | null,"processing_minutes"?: number,"processing_started_at"?: string | null,"requested_staff_id"?: string | null,"resource_held"?: never,"resource_id"?: string | null,"service_id": string,"staff_busy"?: never,"staff_id": string,"started_at"?: string | null,"starts_at": string,"steps"?: Json | null,"updated_at"?: string
                   }
                   Update: {
-                    "active_minutes"?: number,"appointment_id"?: string,"bundle_id"?: string | null,"business_id"?: string,"created_at"?: string,"ends_at"?: string,"finished_at"?: string | null,"finishing_minutes"?: number,"holds_time"?: boolean,"id"?: string,"imported"?: boolean,"location_id"?: string,"overbooked"?: boolean,"price_cents"?: number,"processing_ended_at"?: string | null,"processing_minutes"?: number,"processing_started_at"?: string | null,"resource_held"?: never,"resource_id"?: string | null,"service_id"?: string,"staff_busy"?: never,"staff_id"?: string,"started_at"?: string | null,"starts_at"?: string,"steps"?: Json | null,"updated_at"?: string
+                    "active_minutes"?: number,"appointment_id"?: string,"bundle_id"?: string | null,"business_id"?: string,"created_at"?: string,"ends_at"?: string,"finished_at"?: string | null,"finishing_minutes"?: number,"holds_time"?: boolean,"id"?: string,"imported"?: boolean,"location_id"?: string,"overbooked"?: boolean,"price_cents"?: number,"processing_ended_at"?: string | null,"processing_minutes"?: number,"processing_started_at"?: string | null,"requested_staff_id"?: string | null,"resource_held"?: never,"resource_id"?: string | null,"service_id"?: string,"staff_busy"?: never,"staff_id"?: string,"started_at"?: string | null,"starts_at"?: string,"steps"?: Json | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -2301,6 +2301,32 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "businesses"
       referencedColumns: ["id"]
+    }
+                  ]
+                },"overrun_heads_ups": {
+                  Row: {
+                    "appointment_id": string,"business_id": string,"item_id": string,"location_id": string,"notified_at": string,"staff_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "appointment_id": string,"business_id": string,"item_id": string,"location_id": string,"notified_at"?: string,"staff_id": string
+                  }
+                  Update: {
+                    "appointment_id"?: string,"business_id"?: string,"item_id"?: string,"location_id"?: string,"notified_at"?: string,"staff_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "overrun_heads_ups_appointment_id_fkey"
+      columns: ["appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "overrun_heads_ups_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
     }
                   ]
                 },"package_events": {
@@ -5112,6 +5138,9 @@ isOneToOne: false
                            },
 "record_outbox_result":
 { Args: { "p_error": string,"p_id": string,"p_provider": string,"p_provider_id": string,"p_status": string }; Returns: undefined
+                           },
+"record_overrun_heads_up":
+{ Args: { "p_at"?: string,"p_body": string,"p_item_id": string }; Returns: string
                            },
 "record_provider_refund":
 { Args: { "p_ok": boolean,"p_payment_id": string }; Returns: undefined

@@ -154,5 +154,14 @@ describe("walk-ins", () => {
     const { data: w } = await admin.from("walk_ins").select("status, client:clients(first_name, last_name, phone)").eq("id", queue[0].id).single();
     expect(w).toEqual({ status: "booked", client: { first_name: "Walky", last_name: "First", phone: "(999) 555-0111" } });
     expect((await walkInQueueFor(frontDesk, location, DAY, now)).map((x) => [x.name, x.estimate?.start])).toEqual([["Walky Second", 720]]);
+
+    // The time on the button tapped is booked while it still fits, even
+    // when the next free time has moved on since; one that's gone is
+    // booked at the next free time, with the client added once.
+    const second = (await walkInQueueFor(frontDesk, location, DAY, now))[0];
+    expect(await bookWalkIn(frontDesk, location, second.id, DAY, now, { staffId: BRIDGET, start: 660 })).toMatchObject({ ok: true, message: "Booked Walky Second with Bridget at noon." });
+    expect((await admin.from("clients").select("id").eq("business_id", B).eq("first_name", "Walky").eq("last_name", "Second")).data).toHaveLength(1);
+    const { data: third } = await admin.from("walk_ins").insert({ business_id: B, location_id: L, name: "Walky Third", service_id: cut, arrived_at: at(10, 2).toISOString() }).select("id").single();
+    expect(await bookWalkIn(frontDesk, location, third!.id, DAY, now, { staffId: BRIDGET, start: 845 })).toMatchObject({ ok: true, message: "Booked Walky Third with Bridget at 2:05pm." });
   });
 });

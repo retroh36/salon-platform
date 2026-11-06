@@ -137,13 +137,14 @@ test.describe("front desk", () => {
     const grace = await overrunMorning();
     await openDay(page);
 
-    // Report that Bridget's 10:00 is running 20 minutes over.
+    // Report that Bridget's 10:00 is running 30 minutes over.
     await block(page, "Mia").click();
     const details = page.getByRole("complementary", { name: "Booking details" });
     await moreAction(details, "Running late");
     const form = details.getByRole("form", { name: "Running late" });
     await expect(form.getByRole("group", { name: "How far over is this running?" })).toBeVisible();
-    await form.getByText("20 min").click();
+    // Longer than a delay the day can absorb (ABSORB_MINUTES).
+    await form.getByText("30 min").click();
     await form.getByRole("button", { name: "Tell Denise" }).click();
     // Off her panel, so hovering an option doesn't preview it instead.
     await page.mouse.move(5, 5);
@@ -154,14 +155,14 @@ test.describe("front desk", () => {
     await expect(details).toBeVisible();
     await expect(panel.locator("[data-pose]")).toHaveAttribute("data-pose", "point");
     await expect(panel.getByTestId("denise-message")).toHaveText(
-      `Bridget's running 20 min late. I found a fix that only moves one client: ${PREFIX}Grace Lewis 11:00 → 11:20. Want me to apply it?`,
+      `Bridget's running 30 min late. I found a fix that only moves one client: ${PREFIX}Grace Lewis 11:00 → 11:30. Want me to apply it?`,
     );
     await expect(panel).toContainText("Why it works:");
 
     // The calendar previews it: Mia's and Grace's blocks glow, and Grace's
     // new place shows dashed.
     await expect(ui(page).locator("[data-denise-highlight]")).toHaveCount(2);
-    await expect(ui(page).locator("[data-fix-ghost]")).toContainText("→ 11:20am");
+    await expect(ui(page).locator("[data-fix-ghost]")).toContainText("→ 11:30am");
     // Only while she's showing it: closing her card clears the calendar,
     // and her badge is all that's left, counting the fix and whatever else
     // is waiting (reorders, other tests' openings and not-arrived clients).
@@ -180,15 +181,15 @@ test.describe("front desk", () => {
     await expect(panel.getByRole("status")).toContainText(`Moved ${PREFIX}Grace. Message ready to send.`);
     const message = panel.getByTestId("moved-messages").getByTestId("client-message");
     await expect(message).toContainText(`${PREFIX}Grace Lewis`);
-    await expect(message.getByRole("textbox", { name: `Message to ${PREFIX}Grace Lewis` })).toHaveValue(/We've moved your visit to .+ at 11:20am with Bridget\./);
+    await expect(message.getByRole("textbox", { name: `Message to ${PREFIX}Grace Lewis` })).toHaveValue(/We've moved your visit to .+ at 11:30am with Bridget\./);
     const { data: graceItem } = await admin.from("appointment_items").select("appointment_id").eq("id", grace).single();
     const outbox = () => admin.from("client_messages").select("template, channel").eq("appointment_id", graceItem!.appointment_id).order("created_at");
     expect((await outbox()).data).toEqual([]);
     await message.getByRole("button", { name: "Send" }).click();
     await expect(message.getByText("Sent", { exact: true })).toBeVisible();
     expect((await outbox()).data).toEqual([{ template: "visit_moved", channel: "sms" }]);
-    expect(await startOf(grace)).toEqual({ start: at(11, 20).getTime(), staffId: BRIDGET });
-    await expect(block(page, "Grace")).toHaveAccessibleName(/^11:20am–12:20pm/);
+    expect(await startOf(grace)).toEqual({ start: at(11, 30).getTime(), staffId: BRIDGET });
+    await expect(block(page, "Grace")).toHaveAccessibleName(/^11:30am–12:30pm/);
     await expect(panel.getByTestId("denise-message")).toHaveCount(0);
     await expect(panel.locator("[data-pose]")).toHaveAttribute("data-pose", "wave");
     // Applied: nothing left glowing or dashed.
@@ -239,7 +240,7 @@ test.describe("front desk", () => {
     ]);
     await expect(panel.getByTestId("fixes-applied")).toHaveCount(0);
     // The problem is back, so Denise offers the fix again.
-    await expect(panel.getByTestId("denise-message")).toContainText("Bridget's running 20 min late.");
+    await expect(panel.getByTestId("denise-message")).toContainText("Bridget's running 30 min late.");
   });
 
   // Testers looked for "Gil is running late" on Gil, not in a client's
@@ -260,9 +261,23 @@ test.describe("front desk", () => {
     await expect(ui(page).locator("[data-fix-ghost]")).toContainText("→ 11:20am");
     expect(await startOf(grace)).toEqual({ start: at(11).getTime(), staffId: BRIDGET });
 
+    // Grace has the time after free, so the day absorbs it: she still
+    // comes at 11 and starts 20 minutes later with Bridget.
+    await expect(panel.getByTestId("denise-message")).toContainText(`I can absorb it: ${PREFIX}Grace still comes at 11:00 and starts 20 min later with Bridget, at 11:20.`);
     await panel.getByRole("button", { name: "Apply fix" }).click();
-    await expect(panel.getByRole("status")).toContainText(`Moved ${PREFIX}Grace. Message ready to send.`);
+    await expect(panel.getByRole("status")).toContainText(`Done. ${PREFIX}Grace still comes at 11:00 and starts a little later.`);
     expect(await startOf(grace)).toEqual({ start: at(11, 20).getTime(), staffId: BRIDGET });
+
+    // Staff are asked whether to tell her, with the message as it would go,
+    // saying the time she still comes at; Don't send sends nothing.
+    const behind = panel.getByTestId("running-behind");
+    await expect(behind).toContainText(`Let ${PREFIX}Grace know you’re running about 20 minutes behind?`);
+    await expect(behind.getByRole("textbox", { name: `Message to ${PREFIX}Grace Lewis` })).toHaveValue(/running about 20 minutes behind for your visit .+ at 11am\. Sorry for the wait\./);
+    await expect(panel.getByTestId("moved-messages")).toHaveCount(0);
+    await behind.getByRole("button", { name: "Don’t send" }).click();
+    await expect(panel).toContainText(`Not sent. ${PREFIX}Grace hasn’t been told.`);
+    const { data: graceItem } = await admin.from("appointment_items").select("appointment_id").eq("id", grace).single();
+    expect((await admin.from("client_messages").select("id").eq("appointment_id", graceItem!.appointment_id)).data).toEqual([]);
     await panel.getByRole("button", { name: "Undo" }).click();
     await expect(panel.getByRole("status")).toContainText(`Undone — ${PREFIX}Grace is back at 11:00.`);
     expect(await startOf(grace)).toEqual({ start: at(11).getTime(), staffId: BRIDGET });
@@ -336,7 +351,8 @@ test.describe("front desk", () => {
     await page.getByRole("button", { name: "Tell Denise" }).click();
 
     const panel = denisePanel(page);
-    await expect(panel.getByTestId("denise-message")).toContainText("11:00 → 11:20");
+    // The top fix absorbs it with Bridget; Shae is another option.
+    await expect(panel.getByTestId("denise-message")).toContainText("starts 20 min later with Bridget, at 11:20");
     // Shown under the top fix.
     await expect(panel.getByRole("button", { name: "Other options (1)" })).toHaveAttribute("aria-expanded", "true");
     const other = panel.getByRole("listitem").filter({ hasText: "→ Shae at 11:00" });

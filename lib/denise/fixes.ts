@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { applyAction, proposalFromJson, rejectAction, undoAction, type ActionResult, type Proposal } from "@/lib/scheduling/ai-actions";
 import { describeProblem } from "@/lib/scheduling/booking";
+import { ABSORB_MINUTES } from "@/lib/scheduling/resolve";
 import { toLocal } from "@/lib/scheduling/time";
 import { adjustFor, loadDay, type Viewer } from "./scan";
 import { clock, type Lookup } from "./wording";
@@ -34,6 +35,21 @@ export function movedVisits(proposal: Proposal): string[] {
     ids.add(c.appointmentId);
   }
   return [...ids];
+}
+
+// The delay a fix absorbed (resolve.ts, `absorbed`): one visit starting a
+// little later with the same stylist and nothing else changed. The client
+// still comes at their booked time; staff may tell them how far behind,
+// rounded to 5 minutes, when it's 5 minutes or more (`minutes`, else 0).
+export function absorbedDelay(proposal: Proposal): { appointmentId: string; from: { start: Date; staffId: string }; minutes: number } | null {
+  const visits = movedVisits(proposal);
+  if (visits.length !== 1 || proposal.blockMoves?.length || proposal.book) return null;
+  const changes = proposal.changes.filter((c) => c.appointmentId === visits[0]);
+  if (changes.some((c) => c.to.staffId !== c.from.staffId)) return null;
+  const first = changes.reduce((a, b) => (b.from.start < a.from.start ? b : a));
+  const shift = (first.to.start.getTime() - first.from.start.getTime()) / 60_000;
+  if (shift <= 0 || shift > ABSORB_MINUTES) return null;
+  return { appointmentId: visits[0], from: { start: first.from.start, staffId: first.from.staffId }, minutes: shift < 5 ? 0 : Math.round(shift / 5) * 5 };
 }
 
 // First names of the clients a proposal moves.
@@ -76,6 +92,15 @@ export async function approveFix(supabase: Supabase, viewer: Viewer, actionId: s
   if (proposal.book) return { ok: true, date, message: "Done — it's booked." };
   const names = movedNames(proposal, lookup);
   if (!names.length) return { ok: true, date, message: "Done — I've swapped the chair, so no one needs to move." };
+  // A delay absorbed: the client still comes at their time. Staff may let
+  // them know how far behind (5 minutes or more); nothing is sent unless
+  // they do.
+  const behind = absorbedDelay(proposal);
+  if (behind) {
+    const at = clock(toLocal(behind.from.start, viewer.location.timezone).minute);
+    const message = `Done. ${names[0]} still comes at ${at} and starts a little later.`;
+    return behind.minutes ? { ok: true, date, message, moved: { appointmentIds: [behind.appointmentId], at: new Date().toISOString(), runningBehind: actionId } } : { ok: true, date, message };
+  }
   // Applying sends nothing: each client's message waits for staff to check
   // and send it, so this never says anyone was told.
   const message = `Moved ${joinNames(names)}. ${names.length > 1 ? "Messages" : "Message"} ready to send.`;

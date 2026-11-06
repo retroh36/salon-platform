@@ -28,7 +28,7 @@ import { useUnsavedChanges } from "@/components/unsaved";
 export type BookingStart = { staffId: string; startMinute: number };
 // A new booking already filled in (a time from Denise's booking card, to change
 // before booking): its day and each service's stylist, start and length.
-export type BookingDraft = { date: string; lines: { serviceId: string; staffId: string; startMinute: number; minutes?: number }[] };
+export type BookingDraft = { date: string; lines: { serviceId: string; staffId: string; startMinute: number; minutes?: number; requested?: boolean }[] };
 
 type Line = {
   key: number;
@@ -42,6 +42,9 @@ type Line = {
   minutes?: number;
   // The service bundle it's part of.
   bundleId?: string | null;
+  // The client asked for this stylist for it; unset follows whether the
+  // stylist is their preferred one (`asked`).
+  requested?: boolean;
 };
 
 
@@ -80,15 +83,17 @@ export function BookingPanel({
   const nextKey = useRef(1);
 
   const [client, setClient] = useState<ClientOption | null>(
-    appointment?.client ? { id: appointment.client.id, name: appointment.client.name, phone: appointment.client.phone, allergies: appointment.client.allergies } : (initialClient ?? null),
+    appointment?.client
+      ? { id: appointment.client.id, name: appointment.client.name, phone: appointment.client.phone, allergies: appointment.client.allergies, preferredStaffId: appointment.client.preferredStaffId }
+      : (initialClient ?? null),
   );
   const [lines, setLines] = useState<Line[]>(() =>
     appointment
       ? [...appointment.items]
           .sort((a, b) => a.start - b.start)
-          .map((i, n) => ({ key: -1 - n, id: i.id, serviceId: i.serviceId, staffId: i.staffId, startMinute: i.start, resource: i.resourceId ?? "none", bundleId: i.bundleId }))
+          .map((i, n) => ({ key: -1 - n, id: i.id, serviceId: i.serviceId, staffId: i.staffId, startMinute: i.start, resource: i.resourceId ?? "none", bundleId: i.bundleId, requested: i.requested }))
       : draft
-        ? draft.lines.map((l, n) => ({ key: -1 - n, serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute, resource: "any", minutes: l.minutes }))
+        ? draft.lines.map((l, n) => ({ key: -1 - n, serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute, resource: "any", minutes: l.minutes, requested: l.requested }))
         : [{ key: 0, serviceId: "", staffId: start!.staffId, startMinute: start!.startMinute, resource: "any" }],
   );
   const [notes, setNotes] = useState(appointment?.notes ?? "");
@@ -115,7 +120,9 @@ export function BookingPanel({
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [scope, setScope] = useState<Scope>("this");
   // Changed since it opened: leaving asks first.
-  const snapshot = JSON.stringify([client?.id ?? null, lines.map((l) => [l.serviceId, l.staffId, l.startMinute, l.resource, l.minutes ?? null]), notes, date, repeat]);
+  // Asked for: as ticked, else whether it's the client's preferred stylist.
+  const asked = (l: Line) => l.requested ?? (!!client?.preferredStaffId && l.staffId === client.preferredStaffId);
+  const snapshot = JSON.stringify([client?.id ?? null, lines.map((l) => [l.serviceId, l.staffId, l.startMinute, l.resource, l.minutes ?? null, l.requested ?? null]), notes, date, repeat]);
   const [opened] = useState(snapshot);
   useUnsavedChanges(snapshot !== opened);
 
@@ -143,8 +150,9 @@ export function BookingPanel({
 
   const update = (key: number, change: Partial<Line>) => {
     setPreview(null);
-    // A different service or stylist starts from their length again.
-    const reset = "serviceId" in change || "staffId" in change ? { minutes: undefined } : {};
+    // A different service or stylist starts from their length again, and
+    // another stylist from whether they're the client's preferred one.
+    const reset = { ...("serviceId" in change || "staffId" in change ? { minutes: undefined } : {}), ...("staffId" in change ? { requested: undefined } : {}) };
     setLines((all) => all.map((l) => (l.key === key ? { ...l, ...reset, ...change } : l)));
   };
   const changeRepeat = (change: Partial<typeof repeat>) => {
@@ -208,7 +216,7 @@ export function BookingPanel({
       date,
       clientId: client?.id ?? null,
       notes,
-      lines: lines.map((l) => ({ id: l.id, serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute ?? -1, resource: l.resource, minutes: l.minutes, bundleId: l.bundleId ?? null })),
+      lines: lines.map((l) => ({ id: l.id, serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute ?? -1, resource: l.resource, minutes: l.minutes, bundleId: l.bundleId ?? null, requested: asked(l) })),
       seen,
     };
     startTransition(async () => {
@@ -427,6 +435,10 @@ export function BookingPanel({
                     ))}
                   </LabeledSelect>
                 </div>
+                <label className="mt-2 flex items-center gap-2 text-13 text-ink-muted">
+                  <input type="checkbox" checked={asked(l)} onChange={(e) => update(l.key, { requested: e.target.checked })} className={checkboxClass} />
+                  Client asked for {columns.find((c) => c.staffId === l.staffId)?.firstName ?? "this stylist"}
+                </label>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <label className={labelClass}>

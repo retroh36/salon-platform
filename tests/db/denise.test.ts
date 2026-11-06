@@ -4,6 +4,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { approveFix, rejectFix, undoFix } from "@/lib/denise/fixes";
 import { scanDay, type Viewer } from "@/lib/denise/scan";
+import { previewTemplate } from "@/lib/messaging/send";
 import { changeStatus, saveBooking, type BookingItemInput } from "@/lib/scheduling/book";
 import { reportCallOut, reportRunningLate } from "@/lib/scheduling/disruptions";
 import { fromLocal } from "@/lib/scheduling/time";
@@ -146,17 +147,17 @@ describe("reporting", () => {
 describe("Denise's fixes", () => {
   it("finds an overrun, proposes moving the next client, applies, notifies and undoes", async () => {
     const { current, next } = await overrunMorning();
-    await reportRunningLate(frontDesk, current.id, 20);
+    await reportRunningLate(frontDesk, current.id, 25);
 
     const state = await scanDay(frontDesk, desk, DAY, { now: NOW });
     expect(state.conflicts).toHaveLength(1);
     const [conflict] = state.conflicts;
-    expect(conflict.headline).toBe("Bridget's running 20 min late.");
+    expect(conflict.headline).toBe("Bridget's running 25 min late.");
     expect(conflict.itemIds).toEqual([current.id, next.id]);
     const [top] = conflict.options;
-    expect(top.summary).toBe(`${name(1)} 11:00 → 11:20`);
-    expect(top.intro).toBe(`I found a fix that only moves one client: ${name(1)} 11:00 → 11:20. Want me to apply it?`);
-    expect(top.reason).toBe(`${clients[1].first_name} starts 20 min later and stays with Bridget. Nothing else on the calendar changes.`);
+    expect(top.summary).toBe(`${name(1)} 11:00 → 11:25`);
+    expect(top.intro).toBe(`I found a fix that only moves one client: ${name(1)} 11:00 → 11:25. Want me to apply it?`);
+    expect(top.reason).toBe(`${clients[1].first_name} starts 25 min later and stays with Bridget. Nothing else on the calendar changes.`);
     expect(top.actionId).toBeTruthy();
 
     // Logged as a proposal, with what it would send.
@@ -175,12 +176,12 @@ describe("Denise's fixes", () => {
       message: `Moved ${clients[1].first_name}. Message ready to send.`,
       moved: { appointmentIds: [next.appointment_id], at: expect.any(String) },
     });
-    expect(await startOf(next.id)).toEqual({ start: at(11, 20), staffId: BRIDGET });
+    expect(await startOf(next.id)).toEqual({ start: at(11, 25), staffId: BRIDGET });
 
     // The stylist is told; the client isn't, until staff send their message.
     const { data: sent } = await admin.from("notifications").select("client_id, staff_id, template, body, status, appointment_id").eq("ai_action_id", top.actionId!);
     expect(sent).toEqual([
-      expect.objectContaining({ client_id: null, staff_id: BRIDGET, template: "staff_schedule_change", status: "pending", body: `${name(1)}'s Women's Cut & Style has moved from 11am to 11:20am.` }),
+      expect.objectContaining({ client_id: null, staff_id: BRIDGET, template: "staff_schedule_change", status: "pending", body: `${name(1)}'s Women's Cut & Style has moved from 11am to 11:25am.` }),
     ]);
 
     // All clear now.
@@ -194,6 +195,31 @@ describe("Denise's fixes", () => {
     const after = await scanDay(frontDesk, desk, DAY, { now: NOW });
     expect(after.conflicts).toHaveLength(1);
     expect(after.conflicts[0].options[0].actionId).not.toBe(top.actionId);
+  });
+
+  // A short delay the day can absorb: the next client still comes at their
+  // time and starts a little later, and staff are asked whether to tell
+  // them how far behind (never "Your visit has moved").
+  it("absorbs a short overrun: the next client starts a little later, and staff may tell them", async () => {
+    const { current, next } = await overrunMorning();
+    await reportRunningLate(frontDesk, current.id, 15);
+    const [top] = (await scanDay(frontDesk, desk, DAY, { now: NOW })).conflicts[0].options;
+    expect(top).toMatchObject({ absorbed: true, summary: `${name(1)} 11:00 → 11:15` });
+    expect(top.intro).toBe(`I can absorb it: ${clients[1].first_name} still comes at 11:00 and starts 15 min later with Bridget, at 11:15. No one else moves. Want me to apply it?`);
+    expect(await approveFix(frontDesk, desk, top.actionId!, { now: NOW })).toEqual({
+      ok: true,
+      date: DAY,
+      message: `Done. ${clients[1].first_name} still comes at 11:00 and starts a little later.`,
+      moved: { appointmentIds: [next.appointment_id], at: expect.any(String), runningBehind: top.actionId },
+    });
+    expect(await startOf(next.id)).toEqual({ start: at(11, 15), staffId: BRIDGET });
+    // Nothing for the client unless staff send it.
+    expect((await admin.from("client_messages").select("id").eq("appointment_id", next.appointment_id)).data).toEqual([]);
+    // The message says the time they still come at.
+    const preview = await previewTemplate(frontDesk, { appointmentId: next.appointment_id, template: "running_late", channel: "sms", minutes: 15 }, { start: at(11), staffId: BRIDGET });
+    expect(preview?.body).toContain("running about 15 minutes behind for your visit");
+    expect(preview?.body).toContain("at 11am.");
+    await undoFix(frontDesk, desk, top.actionId!, NOW);
   });
 
   // A client message goes out only when staff send it: applying or undoing

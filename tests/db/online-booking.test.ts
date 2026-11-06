@@ -153,10 +153,11 @@ describe("booking online", () => {
     const wednesday = fromLocal(addDays(DAY, 1), 11 * 60, TZ)!;
     const result = await bookOnline(admin, location, { clientId, notes: `${RUN} one`, request: visit(SEED.staff.gil), start: wednesday, manageTokenHash: hash("one") });
     expect(result.ok).toBe(true);
-    const { data } = await admin.from("appointments").select("source, created_by, appointment_manage_links(token_hash), appointment_items(staff_id, price_cents, resource_id)").eq("id", result.ok ? result.appointmentId : "").single();
+    const { data } = await admin.from("appointments").select("source, created_by, appointment_manage_links(token_hash), appointment_items(staff_id, price_cents, resource_id, requested_staff_id)").eq("id", result.ok ? result.appointmentId : "").single();
     // Gil is a Master: $45 menu price, $50 (rounded from 1.15 times) for Masters.
     expect(data).toMatchObject({ source: "online", created_by: null, appointment_manage_links: [{ token_hash: hash("one") }] });
-    expect(data!.appointment_items).toEqual([{ staff_id: SEED.staff.gil, price_cents: 5000, resource_id: expect.any(String) }]);
+    // Chosen by the client, so asked for.
+    expect(data!.appointment_items).toEqual([{ staff_id: SEED.staff.gil, price_cents: 5000, resource_id: expect.any(String), requested_staff_id: SEED.staff.gil }]);
   });
 
   it("works out a percentage deposit from the price booked", async () => {

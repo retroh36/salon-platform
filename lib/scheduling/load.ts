@@ -125,7 +125,7 @@ export function startOfLocalDay(date: LocalDate, timeZone: string): Date {
 export const FREE_STATUSES = ["canceled", "no_show"] as const;
 
 const ITEM_FIELDS =
-  "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, steps";
+  "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, steps, requested_staff_id";
 
 type ItemRow = {
   id: string;
@@ -138,9 +138,15 @@ type ItemRow = {
   processing_minutes: number;
   finishing_minutes: number;
   steps?: unknown;
+  requested_staff_id?: string | null;
+  // The visit's client, when loaded: one who only sees their preferred
+  // stylist has every service with them requested.
+  appointment?: { client?: { preferred_staff_id?: string | null; only_sees_preferred?: boolean } | null } | null;
 };
 
 export function toBookedItem(row: ItemRow): BookedItem {
+  const client = row.appointment?.client;
+  const requested = row.requested_staff_id === row.staff_id || (!!client?.only_sees_preferred && client.preferred_staff_id === row.staff_id);
   return {
     id: row.id,
     appointmentId: row.appointment_id,
@@ -152,6 +158,7 @@ export function toBookedItem(row: ItemRow): BookedItem {
     processingMinutes: row.processing_minutes,
     finishingMinutes: row.finishing_minutes,
     steps: parseSteps(row.steps),
+    ...(requested ? { requested } : {}),
   };
 }
 
@@ -170,7 +177,7 @@ export async function loadBookedItems(
   for (let offset = 0; ; offset += 1000) {
     const { data, error } = await supabase
       .from("appointment_items")
-      .select(`${ITEM_FIELDS}, appointment:appointments!inner(status)`)
+      .select(`${ITEM_FIELDS}, appointment:appointments!inner(status, client:clients(preferred_staff_id, only_sees_preferred))`)
       .eq("location_id", location.id)
       .lt("starts_at", end)
       .gt("ends_at", start)

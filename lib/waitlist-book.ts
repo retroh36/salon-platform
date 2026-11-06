@@ -64,6 +64,9 @@ export async function bookWaitlistEntry(supabase: Supabase, location: Location, 
   };
 }
 
+// How far past its time a walk-in's shown time can still be booked as shown.
+const SHOWN_GRACE_MINUTES = 5;
+
 export type WalkInRow = { id: string; name: string; phone: string | null; serviceId: string; arrivedAt: string; estimate: { staffId: string; start: number; wait: number } | null };
 
 // The queue for today, in arrival order, each with the next free stylist
@@ -89,14 +92,27 @@ export async function walkInQueueFor(supabase: Supabase, location: Location, tod
 
 // Books a walk-in with their suggested stylist and time: an existing client
 // with the same phone number, or a new client.
-export async function bookWalkIn(supabase: Supabase, location: Location & { businessId: string }, walkInId: string, today: LocalDate, now: Date): Promise<BookOutcome> {
+// `shown`: the stylist and time on the button staff tapped ("Book with
+// Shae at 11:40"), booked as shown while it still fits and is no more than
+// a few minutes past; otherwise the next free time now.
+export async function bookWalkIn(
+  supabase: Supabase,
+  location: Location & { businessId: string },
+  walkInId: string,
+  today: LocalDate,
+  now: Date,
+  shown?: { staffId: string; start: number },
+): Promise<BookOutcome> {
   const queue = await walkInQueueFor(supabase, location, today, now);
   const walkIn = queue.find((w) => w.id === walkInId);
   if (!walkIn) return { ok: false, message: "That walk-in isn't waiting any more." };
   if (!walkIn.estimate) return { ok: false, message: "No one who does that service is free today." };
   if (!(await claim(supabase, "walk_ins", walkInId))) return { ok: false, message: "That walk-in isn't waiting any more." };
   try {
-    const outcome = await bookClaimedWalkIn(supabase, location, { ...walkIn, estimate: walkIn.estimate }, today);
+    const nowMinute = toLocal(now, location.timezone).minute;
+    const times = [walkIn.estimate];
+    if (shown && shown.start >= nowMinute - SHOWN_GRACE_MINUTES) times.unshift({ ...walkIn.estimate, ...shown });
+    const outcome = await bookClaimedWalkIn(supabase, location, walkIn, times, today);
     if (!outcome.ok) await release(supabase, "walk_ins", walkInId);
     return outcome;
   } catch (e) {
@@ -105,10 +121,13 @@ export async function bookWalkIn(supabase: Supabase, location: Location & { busi
   }
 }
 
+// Finds or adds the client once, then books the first of `times` that
+// still fits.
 async function bookClaimedWalkIn(
   supabase: Supabase,
   location: Location & { businessId: string },
-  walkIn: WalkInRow & { estimate: NonNullable<WalkInRow["estimate"]> },
+  walkIn: WalkInRow,
+  times: NonNullable<WalkInRow["estimate"]>[],
   today: LocalDate,
 ): Promise<BookOutcome> {
   const walkInId = walkIn.id;
@@ -133,18 +152,25 @@ async function bookClaimedWalkIn(
   }
 
   const ctx = await loadBookingContext(supabase, location, today, today);
-  const lines = chainLines(ctx, [walkIn.serviceId], walkIn.estimate.staffId, walkIn.estimate.start);
-  const items = lines && itemsFor(lines, today, location.timezone);
-  if (!items) return { ok: false, message: "That service isn't offered any more." };
-  const saved = await saveBooking(supabase, location, { clientId, notes: "Walk-in", items });
-  if (!saved.ok) return { ok: false, message: failed(saved) };
-  const { error } = await supabase.from("walk_ins").update({ appointment_id: saved.appointmentId, client_id: clientId }).eq("id", walkInId);
-  if (error) throw error;
-  return {
-    ok: true,
-    appointmentId: saved.appointmentId,
-    message: `Booked ${walkIn.name} with ${await staffName(supabase, walkIn.estimate.staffId)} at ${formatMinute(walkIn.estimate.start)}.`,
-  };
+  let outcome: BookOutcome = { ok: false, message: "That service isn't offered any more." };
+  for (const time of times) {
+    const lines = chainLines(ctx, [walkIn.serviceId], time.staffId, time.start);
+    const items = lines && itemsFor(lines, today, location.timezone);
+    if (!items) continue;
+    const saved = await saveBooking(supabase, location, { clientId, notes: "Walk-in", items });
+    if (!saved.ok) {
+      outcome = { ok: false, message: failed(saved) };
+      continue;
+    }
+    const { error } = await supabase.from("walk_ins").update({ appointment_id: saved.appointmentId, client_id: clientId }).eq("id", walkInId);
+    if (error) throw error;
+    return {
+      ok: true,
+      appointmentId: saved.appointmentId,
+      message: `Booked ${walkIn.name} with ${await staffName(supabase, time.staffId)} at ${formatMinute(time.start)}.`,
+    };
+  }
+  return outcome;
 }
 
 // Takes a waiting walk-in or waitlist entry for booking, if it's still

@@ -9,7 +9,7 @@ export async function searchClients(supabase: SupabaseClient<Database>, business
   const search = parseClientSearch(query);
   let request = supabase
     .from("clients")
-    .select("id, first_name, last_name, phone, email, allergies", { count: "exact" })
+    .select("id, first_name, last_name, phone, email, allergies, preferred_staff_id", { count: "exact" })
     .eq("business_id", businessId);
   if (search.kind === "phone") request = request.like("phone_digits", `%${search.digits}%`);
   if (search.kind === "name") {

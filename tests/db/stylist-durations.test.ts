@@ -123,10 +123,24 @@ describe("the risk check", () => {
     const first = await book([{ serviceId: balayage, staffId: SEED.staff.bridget, start: at(14, 0, RISK_DAY), resource: { kind: "any" } }]);
     const next = await book([{ serviceId: cut, staffId: SEED.staff.bridget, start: at(16, 35, RISK_DAY), resource: { kind: "any" } }]);
     expect(first.ok && next.ok).toBe(true);
-    const state = await scanDay(frontDesk, { location, salon: "Maple & Ash", canBook: true }, RISK_DAY, { now: at(7, 0, RISK_DAY) });
+    // Bridget hears first, in the app: the front desk sees nothing yet.
+    const desk = { location, salon: "Maple & Ash", canBook: true };
+    const first7 = await scanDay(frontDesk, desk, RISK_DAY, { now: at(7, 0, RISK_DAY) });
+    expect(first7.conflicts.find((c) => c.kind === "likely_overrun")).toBeUndefined();
+    const { data: notices } = await admin.from("notifications").select("channel, template, body").eq("appointment_id", first.ok ? first.appointmentId : "").eq("staff_id", SEED.staff.bridget);
+    expect(notices).toEqual([expect.objectContaining({ channel: "app", template: "likely_overrun" })]);
+    expect(notices![0].body).toMatch(/^Heads up: you usually take about .+ longer than booked for Balayage.* so .+'s 2pm may run into .+'s 4:35pm\. The front desk will see Denise's fix in 10 minutes\./);
+    // Looking again doesn't tell her twice, or start the wait again.
+    await scanDay(frontDesk, desk, RISK_DAY, { now: at(7, 5, RISK_DAY) });
+    expect((await admin.from("notifications").select("id").eq("appointment_id", first.ok ? first.appointmentId : "").eq("template", "likely_overrun")).data).toHaveLength(1);
+    // Ten minutes after she was told, the desk sees the fix.
+    expect((await scanDay(frontDesk, desk, RISK_DAY, { now: at(7, 9, RISK_DAY) })).conflicts.find((c) => c.kind === "likely_overrun")).toBeUndefined();
+    const state = await scanDay(frontDesk, desk, RISK_DAY, { now: at(7, 10, RISK_DAY) });
     const risk = state.conflicts.find((c) => c.kind === "likely_overrun");
     expect(risk?.headline).toMatch(/^Bridget usually takes about (\d+ hr )?\d+ min longer than booked for Balayage/);
     expect(risk!.options.length).toBeGreaterThan(0);
     expect(risk!.options[0].actionId).toBeTruthy();
+    // Its notice isn't left on Bridget's My day.
+    await admin.from("notifications").delete().eq("template", "likely_overrun").in("appointment_id", [first.ok ? first.appointmentId : "", next.ok ? next.appointmentId : ""]);
   });
 });

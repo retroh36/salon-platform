@@ -6,6 +6,7 @@
 
 import type { NotificationDraft } from "@/lib/scheduling/ai-actions";
 import { formatDay } from "@/lib/schedule-format";
+import { formatDuration } from "@/lib/duration";
 import { formatMinute, type LocalDate } from "@/lib/scheduling/time";
 
 // One visit's change, from the client's point of view: their first
@@ -25,6 +26,14 @@ function staffMessage(c: VisitChange, staffId: string, undo: boolean): string {
   if (from.staffId === to.staffId) return `${name}'s ${c.service} has moved from ${formatMinute(from.minute)} to ${formatMinute(to.minute)}.`;
   if (staffId === to.staffId) return `${name}'s ${c.service} at ${formatMinute(to.minute)} is now with you (it was with ${from.staffFirstName}).`;
   return `${name}'s ${c.service} at ${formatMinute(from.minute)} has moved to ${to.staffFirstName} at ${formatMinute(to.minute)}.`;
+}
+
+// The stylist's heads-up when their visit is likely to run into the next
+// client (Denise's risk check), in the app on My day, before the front desk
+// sees a fix. Our wording, never Claude's.
+export function headsUpText(h: { service: string; client: string; start: number; next: string; nextStart: number; minutes: number; estimated: boolean; deskMinutes: number }): string {
+  const basis = h.estimated ? " (based on check-in to checkout times)" : "";
+  return `Heads up: you usually take about ${formatDuration(h.minutes)} longer than booked for ${h.service}${basis}, so ${h.client}'s ${formatMinute(h.start)} may run into ${h.next}'s ${formatMinute(h.nextStart)}. The front desk will see Denise's fix in ${h.deskMinutes} minutes. Already behind? Use "I'm running late" on your column.`;
 }
 
 // What to tell each stylist involved when one of Denise's fixes is applied,

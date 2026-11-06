@@ -348,6 +348,7 @@ export function AppointmentPanel({
                     with
                     <Avatar name={i.staffName} color={stylist?.color} photoUrl={stylist?.photoUrl} size="xs" halo={false} />
                     {i.staffName.split(" ")[0]}
+                    {i.requested && <span className="whitespace-nowrap" data-testid="requested">· Asked for</span>}
                     {i.resourceName && <span className="whitespace-nowrap">· {i.resourceName}</span>}
                     {/* Several services: each one's own time (the visit's is above). */}
                     {several && <span className="whitespace-nowrap tabular-nums">· {shortRange(i.start, i.end)}</span>}

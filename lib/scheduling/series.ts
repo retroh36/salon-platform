@@ -42,6 +42,8 @@ export type VisitLine = {
   minutes?: number;
   // The service bundle it's part of (./bundles.ts).
   bundleId?: string | null;
+  // The client asked for this stylist for it (BookingItemInput.requested).
+  requested?: boolean;
 };
 
 export type VisitCheck = {

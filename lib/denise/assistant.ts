@@ -61,6 +61,21 @@ export type AssistantContext = {
 // anyone gets stays within it.
 export const MAX_STRICT_TOOLS = 20;
 
+// It also refuses more than 16 parameters that can be null (or one of
+// several types) across the strict tools in a request, "too many
+// parameters with union types": that broke Ask Denise for everyone once
+// client_report was strict. A tool with many optional inputs that our
+// code checks anyway isn't strict.
+export const MAX_STRICT_UNIONS = 16;
+
+// How many such parameters a schema has, nested ones included.
+export function unionParams(schema: unknown): number {
+  if (!schema || typeof schema !== "object") return 0;
+  const s = schema as { type?: unknown; anyOf?: unknown; properties?: Record<string, unknown>; items?: unknown };
+  const own = Array.isArray(s.type) || s.anyOf ? 1 : 0;
+  return own + Object.values(s.properties ?? {}).reduce<number>((n, p) => n + unionParams(p), 0) + unionParams(s.items);
+}
+
 const THIS_CLIENT_TOOL: Anthropic.Tool = {
   name: "this_client",
   description:
@@ -158,7 +173,9 @@ const KNOWLEDGE_TOOLS: Record<"task" | "clients" | "overdue" | "durations" | "sa
     name: "client_report",
     description:
       "Build a list of clients from fixed filters: the visits counted (service categories or services, stylists, from and until when, at least or at most how many), their last visit of any kind (none since, or one since), whether a next visit is booked, and lifetime spend (owners, managers and the front desk). Returns how many clients match, the first few by first name, and the list in words; a button under your answer opens the whole list, to sort, save or download. Use it for any 'clients who…' or 'a list of clients' question, not for one client. A stylist only gets their own clients.",
-    strict: true,
+    // Not strict: its nine optional filters would take strict tools past
+    // the API's limit on optional parameters (MAX_STRICT_UNIONS), and
+    // readReport checks every one.
     input_schema: {
       type: "object",
       properties: {
@@ -330,7 +347,7 @@ const KNOWLEDGE_TOOLS: Record<"task" | "clients" | "overdue" | "durations" | "sa
     name: "prepare_task",
     description:
       "Prepare a change to a stylist's service times for the person asking to confirm: service_time makes one service (service_id) take minutes for that stylist (\"change Hannah's blowout to 30 minutes\"); copy_times gives them another stylist's (from_staff_id) times for every service both do (\"copy Bridget's times to Shae\"). Our code works out exactly what changes and puts it on screen with Confirm; nothing changes until they confirm, and they can undo it. Get ids from list_stylists and list_services.",
-    strict: true,
+    // Not strict, like client_report: prepareTask checks every input.
     input_schema: {
       type: "object",
       properties: {

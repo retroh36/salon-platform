@@ -14,6 +14,17 @@ import type { DurationBasis } from "@/lib/insights/durations";
 export const LIKELY_OVERRUN_MINUTES = 10;
 export const LIKELY_OVERRUN_ESTIMATED_MINUTES = 15;
 
+// The stylist hears first: the front desk sees Denise's fix for a likely
+// overrun this long after the stylist's heads-up (record_overrun_heads_up),
+// or at once if the stylist reports running late.
+export const HEADS_UP_MINUTES = 10;
+
+// Whether the front desk sees a likely overrun yet: once the stylist has had
+// their heads-up for HEADS_UP_MINUTES (or if it couldn't be recorded).
+export function deskSees(notifiedAt: Date | null, now: Date): boolean {
+  return !notifiedAt || now.getTime() - notifiedAt.getTime() >= HEADS_UP_MINUTES * 60_000;
+}
+
 export type LearnedTime = { medianMinutes: number; trusted: boolean; basis?: DurationBasis };
 
 export function likelyOverruns(

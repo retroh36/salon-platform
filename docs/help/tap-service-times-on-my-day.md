@@ -18,5 +18,6 @@ On your phone, tap when each service starts, goes into processing, comes back to
 
 - Tapping is optional. When you do, Denise learns how long you really take; otherwise Denise goes by check-in and checkout.
 - What Denise learns helps book your usual length for each service and spot visits that might run over.
+- When a visit today will likely run into your next client, you get a **Heads up** at the top of My day (under **Changes to your day**) before the front desk sees Denise's fix, 10 minutes later. Already behind? Use **I'm running late…** on your column of the calendar, and the desk sees it at once.
 - The front desk still checks clients out.
 - Your pay for the period is further down the page (see See my earnings).

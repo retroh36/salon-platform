@@ -93,11 +93,17 @@ export async function walkInLeft(walkInId: string): Promise<Result> {
   return { ok: true };
 }
 
-export async function bookWalkInNow(walkInId: string): Promise<Result & { appointmentId?: string }> {
+function shownTime(shown: unknown): { staffId: string; start: number } | undefined {
+  const t = shown as { staffId?: unknown; start?: unknown } | undefined;
+  return t && typeof t.staffId === "string" && isUuid(t.staffId) && Number.isInteger(t.start) && (t.start as number) >= 0 && (t.start as number) < 1440 ? { staffId: t.staffId, start: t.start as number } : undefined;
+}
+
+// `shown`: the stylist and start on the button tapped, kept when it still fits.
+export async function bookWalkInNow(walkInId: string, shown?: { staffId: string; start: number }): Promise<Result & { appointmentId?: string }> {
   const s = await frontOfHouse();
   if (!s) return { ok: false, message: NOT_ALLOWED };
   if (!isUuid(walkInId)) return { ok: false, message: "That walk-in doesn't exist." };
-  const result = await bookWalkIn(s.supabase, { ...s.me.location, businessId: s.me.business_id }, walkInId, todayIn(s.me.location.timezone), new Date());
+  const result = await bookWalkIn(s.supabase, { ...s.me.location, businessId: s.me.business_id }, walkInId, todayIn(s.me.location.timezone), new Date(), shownTime(shown));
   if (result.ok) revalidatePath("/calendar", "layout");
   return result;
 }

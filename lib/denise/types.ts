@@ -28,6 +28,8 @@ export type FixView = {
   moves: FixMove[];
   clientsMoved: number;
   shiftMinutes: number;
+  // One client starts a little later with the same stylist; nothing else changes.
+  absorbed?: boolean;
   // Clients it couldn't find a place for.
   unresolved: string[];
 };

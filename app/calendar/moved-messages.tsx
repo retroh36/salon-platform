@@ -12,15 +12,19 @@ import { movedMessages, sendMovedMessage, type MovedMessages as Loaded, type Mov
 // applied: each moved client's "Your visit has moved", filled in from the
 // visit as it is now, to check (and change, if their role may) and send.
 // Nothing reaches a client until it's sent here. After an undo, the same
-// for the correction to clients who were told (`template`).
-export function MovedMessages({ moved, template = "visit_moved" }: { moved: Moved; template?: MoveTemplate }) {
+// for the correction to clients who were told (`template`). After a delay
+// Denise absorbed (`moved.runningBehind`), it asks instead: "Let Grace know
+// you're running about 15 minutes behind?", with Send and Don't send.
+export function MovedMessages({ moved, template: asked = "visit_moved" }: { moved: Moved; template?: MoveTemplate }) {
+  const template: MoveTemplate = moved.runningBehind ? "running_late" : asked;
   const [loaded, setLoaded] = useState<Loaded | "failed" | null>(null);
   const [version, setVersion] = useState(0);
+  const [skipped, setSkipped] = useState(false);
   const [sending, startSending] = useTransition();
 
   useEffect(() => {
     let live = true;
-    reach(movedMessages(moved.appointmentIds, moved.at, template)).then((r) => live && setLoaded("messages" in r ? r : "failed"));
+    reach(movedMessages(moved.appointmentIds, moved.at, template, moved.runningBehind)).then((r) => live && setLoaded("messages" in r ? r : "failed"));
     return () => {
       live = false;
     };
@@ -30,7 +34,30 @@ export function MovedMessages({ moved, template = "visit_moved" }: { moved: Move
   if (loaded === "failed") return <Alert>The messages didn&rsquo;t load, so nobody has been told yet. Use Message client in each visit&rsquo;s booking details.</Alert>;
   if (!loaded.messages.length) return null;
   const unsent = loaded.messages.filter((m) => !m.sent && m.channel);
-  const send = (m: Loaded["messages"][number], edited: string | null) => sendMovedMessage({ appointmentId: m.appointmentId, channel: m.channel!, edited, subject: m.subject, template });
+  const send = (m: Loaded["messages"][number], edited: string | null) =>
+    sendMovedMessage({ appointmentId: m.appointmentId, channel: m.channel!, edited, subject: m.subject, template, actionId: moved.runningBehind });
+
+  if (template === "running_late") {
+    const m = loaded.messages[0];
+    if (skipped) return <p className="text-13 text-ink-muted">Not sent. {m.firstName} hasn&rsquo;t been told.</p>;
+    return (
+      <div className="flex flex-col gap-3" data-testid="running-behind">
+        <h3 className="text-13 font-medium text-ink">
+          Let {m.firstName} know you&rsquo;re running about {m.minutes} minutes behind?
+        </h3>
+        <ul className="flex flex-col gap-3">
+          <ClientMessageRow
+            key={`${m.appointmentId}:${m.sent}`}
+            message={m}
+            freeText={loaded.freeText}
+            send={(edited) => send(m, edited)}
+            onSent={() => setVersion((v) => v + 1)}
+            onSkip={m.sent ? undefined : () => setSkipped(true)}
+          />
+        </ul>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3" data-testid={template === "visit_moved" ? "moved-messages" : "correction-messages"}>

@@ -34,7 +34,9 @@ import { repeatOffenderNote } from "@/lib/policy";
 import { anywayQuestion, type DropIssue } from "@/lib/move-anyway";
 import { clientStanding, loadPolicy } from "@/lib/policy-load";
 
-export type ClientOption = { id: string; name: string; phone: string | null; allergies: string | null };
+// preferredStaffId: their preferred stylist, whose services start out
+// marked as asked for.
+export type ClientOption = { id: string; name: string; phone: string | null; allergies: string | null; preferredStaffId?: string | null };
 
 const NOT_ALLOWED = "Only owners, managers and front desk can book and change appointments.";
 
@@ -46,7 +48,7 @@ export async function findClients(query: string): Promise<ClientOption[]> {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me || !canBook(me.role) || query.trim().length < 2) return [];
   const { clients } = await searchClients(supabase, me.business_id, query.slice(0, 100), 8);
-  return clients.map((c) => ({ id: c.id, name: fullName(c), phone: c.phone, allergies: c.allergies }));
+  return clients.map((c) => ({ id: c.id, name: fullName(c), phone: c.phone, allergies: c.allergies, preferredStaffId: c.preferred_staff_id }));
 }
 
 export type QuickAddResult = { ok: true; client: ClientOption } | { ok: false; errors: { first_name?: string; phone?: string; form?: string } };
@@ -86,6 +88,8 @@ export type VisitLineInput = {
   minutes?: number;
   // The service bundle it's part of (null for none).
   bundleId?: string | null;
+  // The client asked for this stylist for it (the booking form's tick).
+  requested?: boolean;
 };
 
 export type VisitInput = {
@@ -147,7 +151,7 @@ export async function saveVisit(input: VisitInput): Promise<SaveVisitResult> {
     const minutes = line.minutes;
     if (minutes !== undefined && (!Number.isInteger(minutes) || minutes < 5 || minutes > 480 || minutes % 5 !== 0)) lineErrors[n].push("Choose a length in 5-minute steps.");
     if (line.bundleId && !isUuid(line.bundleId)) lineErrors[n].push("That bundle is no longer on the menu.");
-    if (start) items.push({ id: line.id, serviceId: line.serviceId, staffId: line.staffId, start, resource, minutes, bundleId: line.bundleId ?? null });
+    if (start) items.push({ id: line.id, serviceId: line.serviceId, staffId: line.staffId, start, resource, minutes, bundleId: line.bundleId ?? null, ...requestedOf(line) });
   });
   if (lineErrors.some((e) => e.length)) return { ok: false, message: "Fill in each service.", lineErrors };
 
@@ -504,7 +508,7 @@ function readRepeat(repeat: RepeatInput, first: LocalDate): string | null {
 
 // Each line with the item it was (on an edit) and its own length, if set.
 const toLines = (lines: VisitLineInput[]) =>
-  lines.map(({ id, serviceId, staffId, startMinute, resource, minutes, bundleId }) => ({
+  lines.map(({ id, serviceId, staffId, startMinute, resource, minutes, bundleId, requested }) => ({
     serviceId,
     staffId,
     startMinute,
@@ -512,7 +516,13 @@ const toLines = (lines: VisitLineInput[]) =>
     ...(id && isUuid(id) ? { itemId: id } : {}),
     ...(Number.isInteger(minutes) && minutes! > 0 ? { minutes } : {}),
     ...(bundleId === null || (bundleId && isUuid(bundleId)) ? { bundleId } : {}),
+    ...requestedOf({ requested }),
   }));
+
+// A line's request, when it says (left out keeps what the item had).
+function requestedOf(line: { requested?: unknown }): { requested?: boolean } {
+  return typeof line.requested === "boolean" ? { requested: line.requested } : {};
+}
 
 // Every visit of a series, checked against the booking rules, with
 // suggestions for the ones that don't fit. Nothing is saved.

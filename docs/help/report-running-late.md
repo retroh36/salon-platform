@@ -1,6 +1,6 @@
 ---
 title: Report running late
-keywords: running late, stylist running late, stylist is late, client is late, late client, running behind, running over, overrun, behind schedule, stylist behind, taking longer, delay, late arrival, minutes late
+keywords: absorb, running about minutes behind, let the client know, asked for, running late, stylist running late, stylist is late, client is late, late client, running behind, running over, overrun, behind schedule, stylist behind, taking longer, delay, late arrival, minutes late
 who: owner, manager, front_desk, stylist
 open: /calendar | Open calendar
 ---
@@ -22,3 +22,6 @@ For a single client who's late, or one visit running over: tap the visit, then *
 - It works for today and future days, not for days already over.
 - If nothing is affected, Denise says so and nothing changes.
 - Nothing moves until someone applies a fix, and no client is messaged until someone sends their message.
+- Denise tries to absorb a short delay first: the next client keeps their time and starts up to 20 minutes later with the same stylist, with no one else moved. Her card says "I can absorb it".
+- After applying a fix like that, Denise asks "Let Grace know you're running about 15 minutes behind?" with the message as it would go, and **Send** or **Don't send**. For under 5 minutes she doesn't ask. Nothing is sent unless you tap **Send**.
+- A client who asked for their stylist (**Asked for** in booking details) is never moved to someone else, only to a later time with the same stylist.

@@ -19,12 +19,15 @@ export function ClientMessageRow({
   freeText,
   send,
   onSent,
+  onSkip,
 }: {
   message: RowMessage;
   freeText: boolean;
   // Sends it: `edited` is their own words, or null for the template.
   send: (edited: string | null) => Promise<{ ok: boolean; message: string }>;
   onSent: () => void;
+  // Offers "Don't send" (a question staff may say no to).
+  onSkip?: () => void;
 }) {
   const [body, setBody] = useState(m.body);
   const [result, setResult] = useState<string | null>(null);
@@ -59,6 +62,11 @@ export function ClientMessageRow({
             <Button size="sm" onClick={go} disabled={pending || !body.trim()}>
               {pending ? "Sending…" : "Send"}
             </Button>
+            {onSkip && (
+              <Button size="sm" variant="secondary" onClick={onSkip} disabled={pending}>
+                Don&rsquo;t send
+              </Button>
+            )}
             {counter && <span className={`text-xs ${counter.warn ? "text-warning" : "text-ink-subtle"}`}>{counter.text}</span>}
             {!freeText && <span className="text-xs text-ink-subtle">Your role sends the template as it is.</span>}
           </div>

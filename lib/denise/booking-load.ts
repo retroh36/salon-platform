@@ -238,6 +238,7 @@ export async function findTimes(s: Booker, menu: PricedMenu, request: PhoneReque
       minutes: durationMinutes(l.timing),
       usual: usualFor(l.staffId, l.serviceId) !== null,
       priceCents: menu.price(l.staffId, l.serviceId),
+      ...(r.staffId && l.staffId === r.staffId ? { requested: true } : {}),
     }));
     return { date: c.date, when: `${formatDay(c.date)} · ${formatMinute(c.minute)}–${formatMinute(end)}`, what, reason: c.reason, priceCents: lines.reduce((n, l) => n + l.priceCents, 0), lines, bundleId: bundle?.id ?? null };
   };

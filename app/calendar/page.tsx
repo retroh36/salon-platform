@@ -88,7 +88,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
     supabase
       .from("appointment_items")
       .select(
-        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, steps, bundle_id, bundle:service_bundles!appointment_items_bundle(name), price_cents, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, checked_in_at, checked_out_at, created_at, updated_at, created_by, updated_by, deposit_cents, deposit_paid_cents, starts_at, series_id, series_index, series:appointment_series(interval_weeks), group:appointment_groups(id, label), client:clients(id, first_name, last_name, phone, email, allergies, preferences, appointment_sms_ok, appointment_email_ok, sms_opt_in, email_opt_in, sms_stopped_at))",
+        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, steps, bundle_id, requested_staff_id, bundle:service_bundles!appointment_items_bundle(name), price_cents, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, checked_in_at, checked_out_at, created_at, updated_at, created_by, updated_by, deposit_cents, deposit_paid_cents, starts_at, series_id, series_index, series:appointment_series(interval_weeks), group:appointment_groups(id, label), client:clients(id, first_name, last_name, phone, email, allergies, preferences, preferred_staff_id, only_sees_preferred, appointment_sms_ok, appointment_email_ok, sms_opt_in, email_opt_in, sms_stopped_at))",
       )
       .eq("location_id", me.location.id)
       // From a day before (no service lasts longer), so the index reads only
@@ -109,7 +109,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
     loadBlocks(supabase, me.location.id),
     // Who may write their own messages to clients (owners always).
     supabase.from("businesses").select("free_text_roles").eq("id", me.business_id).single(),
-    bookId ? supabase.from("clients").select("id, first_name, last_name, phone, allergies").eq("id", bookId).maybeSingle() : Promise.resolve({ data: null }),
+    bookId ? supabase.from("clients").select("id, first_name, last_name, phone, allergies, preferred_staff_id").eq("id", bookId).maybeSingle() : Promise.resolve({ data: null }),
     // Chairs lent for a shift today, for the column headers.
     supabase.from("station_assignments").select("resource_id, staff_id, on_date").eq("location_id", me.location.id).eq("on_date", date),
   ]);
@@ -235,6 +235,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
             email: client.email,
             allergies: client.allergies,
             preferences: client.preferences,
+            preferredStaffId: client.preferred_staff_id,
             messages: {
               appointment: allowedChannels(consentOf(client), "appointment"),
               marketing: allowedChannels(consentOf(client), "marketing"),
@@ -271,6 +272,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
       steps: item.steps ?? null,
       bundleId: row.bundle_id,
       bundleName: row.bundle?.name ?? null,
+      requested: row.requested_staff_id === row.staff_id,
       staffId: row.staff_id,
       staffName: staffMember ? fullName(staffMember) : "Former staff",
       resourceId: row.resource_id,
@@ -586,7 +588,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
   const book =
     bookRow && bookColumn && canBook(me.role)
       ? {
-          client: { id: bookRow.id, name: fullName(bookRow), phone: bookRow.phone, allergies: bookRow.allergies },
+          client: { id: bookRow.id, name: fullName(bookRow), phone: bookRow.phone, allergies: bookRow.allergies, preferredStaffId: bookRow.preferred_staff_id },
           start: { staffId: bookColumn.staffId, startMinute: Math.min(Math.max(Math.ceil(nowMinute / 15) * 15, range.start), range.end - 15) },
         }
       : null;

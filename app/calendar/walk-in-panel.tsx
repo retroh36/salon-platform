@@ -90,7 +90,7 @@ export function WalkInPanel({ data, onClose, onBooked }: { data: BoardData; onCl
                 )}
                 <div className="flex flex-wrap gap-2">
                   {w.estimate && (
-                    <Button size="sm" variant={i === 0 ? "primary" : "secondary"} disabled={pending} onClick={() => run(() => bookWalkInNow(w.id))}>
+                    <Button size="sm" variant={i === 0 ? "primary" : "secondary"} disabled={pending} onClick={() => run(() => bookWalkInNow(w.id, w.estimate ? { staffId: w.estimate.staffId, start: w.estimate.start } : undefined))}>
                       Book with {staffName(w.estimate.staffId)} at {formatMinute(w.estimate.start)}
                     </Button>
                   )}

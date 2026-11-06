@@ -247,7 +247,9 @@ const CASES: Case[] = [
     tools: ["client_report"],
     facts: async () => ({}),
     checkTools: (outputs) => (outputs.some((o) => /"clients":\d+/.test(o) && /"report":"Clients with/.test(o)) ? null : "should build the list with client_report"),
-    check: (a) => (/\d/.test(a) && /below|button|report/i.test(a) ? null : "should say how many match and point to the report below"),
+    // The demo's color clients all came back within 3 months, so "none"
+    // is a right answer; with matches, she points to the report.
+    check: (a) => ((/\d/.test(a) && /below|button|report/i.test(a)) || /\b(no|none|0)\b/i.test(a) ? null : "should say how many match and point to the report below"),
   },
   {
     question: "Change Hannah's blowout to 30 minutes",

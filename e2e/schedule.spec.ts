@@ -175,7 +175,7 @@ test.describe("stylists", () => {
   test("see only their own schedule, read-only, with their own commission", async ({ page }) => {
     await page.goto(`/schedule?staff=${SEED.staff.sandra}`);
     // Asking for someone else's schedule still shows their own.
-    await expect(ui(page).getByRole("heading", { level: 2 })).toHaveText("Bridget Callahan(you)");
+    await expect(ui(page).getByRole("heading", { level: 2, name: /Bridget Callahan/ })).toHaveText("Bridget Callahan(you)");
     await expect(ui(page).getByRole("navigation", { name: "Team", exact: true })).toHaveCount(0);
     await expect(ui(page).getByRole("button", { name: "Save hours" })).toHaveCount(0);
     await expect(ui(page).getByRole("region", { name: "Weekly hours" })).toContainText("Tuesday9am–1pm, 2pm–6pm");

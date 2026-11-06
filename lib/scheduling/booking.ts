@@ -42,6 +42,10 @@ export type BookedItem = ServiceTiming & {
   staffId: string;
   resourceId?: string | null;
   start: Date;
+  // The client asked for this stylist for it, or only sees them (their
+  // preferred stylist, clients.only_sees_preferred): Denise's fixes keep
+  // it with them.
+  requested?: boolean;
 };
 
 export type SegmentKind = "active" | "processing" | "finishing";

@@ -93,7 +93,7 @@ export async function bookFromChat(input: { date: LocalDate; clientId: string; l
     date: input.date,
     clientId: input.clientId,
     notes: "",
-    lines: input.lines.map((l) => ({ serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute, resource: "any", minutes: l.minutes, bundleId: input.bundleId ?? null })),
+    lines: input.lines.map((l) => ({ serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute, resource: "any", minutes: l.minutes, bundleId: input.bundleId ?? null, requested: l.requested === true })),
   });
   if (!saved.ok) return { ok: false, message: saved.message };
   let message = "Booked.";

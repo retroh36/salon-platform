@@ -35,6 +35,10 @@ export type MessageInput = {
   body?: string;
   minutes?: number;
   time?: string;
+  // The visit's time and stylist to say, when not as it is now: a delay
+  // Denise absorbed says the time the client still comes at. Worked out
+  // by our code, never taken from the browser.
+  at?: { start: Date; staffId: string };
 };
 
 export type SendResult = { ok: true; channel: Channel } | { ok: false; message: string };
@@ -95,7 +99,7 @@ export async function sendStaffMessage(supabase: Client, input: MessageInput): P
     if (!isStaffTemplate(input.template)) return { ok: false, message: "Choose a message." };
     const problem = templateProblem(input.template, input);
     if (problem) return { ok: false, message: problem };
-    const rendered = await previewTemplate(supabase, input);
+    const rendered = await previewTemplate(supabase, input, input.at);
     if (!rendered) return { ok: false, message: "We couldn't find this visit." };
     ({ subject, body } = rendered);
   } else if (!body) {

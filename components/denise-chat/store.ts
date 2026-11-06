@@ -28,7 +28,7 @@ export type DeniseRun = {
 export type Done = Extract<DeniseEvent, { t: "done" }> & { stopped?: boolean };
 
 // "Open in the booking form" from a booking card: picked up by the calendar.
-export type Adjust = { date: string; lines: { serviceId: string; staffId: string; startMinute: number; minutes?: number }[]; client: { id: string; name: string; phone: string | null; allergies: string | null } | null };
+export type Adjust = { date: string; lines: { serviceId: string; staffId: string; startMinute: number; minutes?: number; requested?: boolean }[]; client: { id: string; name: string; phone: string | null; allergies: string | null } | null };
 
 type State = {
   staffId: string | null;

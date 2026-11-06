@@ -67,6 +67,11 @@ export const BLOCK_MOVE_MINUTES = 10;
 // each guest but one).
 export const GROUP_SPLIT_MINUTES = 60;
 
+// A delay the day can absorb: one client starting up to this much later
+// with the same stylist, with no one else moved. It ranks before any other
+// fix, and the client still comes at their time (`absorbed`).
+export const ABSORB_MINUTES = 20;
+
 export type FixOption = {
   moves: ItemChange[];
   blockMoves: BlockMove[];
@@ -75,6 +80,9 @@ export type FixOption = {
   clientsMoved: number;
   shiftMinutes: number;
   stylistChanges: number;
+  // The delay is absorbed: one client starts a little later with the same
+  // stylist (ABSORB_MINUTES at most) and nothing else changes.
+  absorbed: boolean;
   score: number;
 };
 
@@ -430,7 +438,13 @@ function expand(s: Search, state: State): State[] {
       !!b.id && b.appointmentId === anchor.appointmentId && b.start.getTime() >= anchor.start.getTime() && !state.placed.has(b.id),
   );
   const groupIds = new Set(group.map((b) => b.id));
-  const stylists = [anchor.staffId, ...[...s.eff.staff.values()].filter((st) => st.id !== anchor.staffId && st.isActive && st.serviceIds.has(anchor.serviceId)).map((st) => st.id)];
+  // A client who asked for their stylist (or only sees them) stays with
+  // them: any service of theirs moving with this one keeps it there.
+  const stays = group.some((b) => b.requested && (b.id === anchor.id || b.staffId === anchor.staffId));
+  const stylists = [
+    anchor.staffId,
+    ...(stays ? [] : [...s.eff.staff.values()].filter((st) => st.id !== anchor.staffId && st.isActive && st.serviceIds.has(anchor.serviceId)).map((st) => st.id)),
+  ];
   const latest = first.earliest + MAX_SHIFT_MINUTES * MINUTE;
 
   const candidates: Candidate[] = [];
@@ -616,8 +630,11 @@ function measure(s: Search, state: State) {
   const shiftMinutes = [...shiftByVisit.values()].reduce((sum, m) => sum + m, 0);
   const clientsMoved = shiftByVisit.size;
   const blockMinutes = [...state.blockMoves.values()].reduce((sum, m) => sum + BLOCK_MOVE_MINUTES + Math.abs(m.to.start.getTime() - m.from.start.getTime()) / MINUTE, 0);
-  const score = state.unresolved.length * 100_000 + clientsMoved * 1000 + shiftMinutes + stylistChanges * STYLIST_CHANGE_MINUTES + blockMinutes + splitCost(s, state);
-  return { clientsMoved, shiftMinutes, stylistChanges, score };
+  const absorbed =
+    clientsMoved === 1 && stylistChanges === 0 && !state.blockMoves.size && !state.unresolved.length && !state.pending.length && shiftMinutes > 0 && shiftMinutes <= ABSORB_MINUTES;
+  // Absorbed, the client isn't counted as moved.
+  const score = state.unresolved.length * 100_000 + (absorbed ? 0 : clientsMoved * 1000) + shiftMinutes + stylistChanges * STYLIST_CHANGE_MINUTES + blockMinutes + splitCost(s, state);
+  return { clientsMoved, shiftMinutes, stylistChanges, absorbed, score };
 }
 
 // What splitting group bookings up costs: about what moving every guest an

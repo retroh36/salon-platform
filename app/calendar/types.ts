@@ -85,6 +85,8 @@ export type ItemDetail = Interval & {
   // The service bundle it was booked from.
   bundleId: string | null;
   bundleName: string | null;
+  // The client asked for this stylist for it (appointment_items.requested_staff_id).
+  requested: boolean;
   staffId: string;
   staffName: string;
   resourceId: string | null;
@@ -122,6 +124,7 @@ export type AppointmentDetail = {
     email: string | null;
     allergies: string | null;
     preferences: string | null;
+    preferredStaffId: string | null;
     // Where messages can reach them (lib/messaging/consent.ts), and "No texts — call or email".
     messages: { appointment: Channel[]; marketing: Channel[]; noTexts: string | null };
   } | null;
