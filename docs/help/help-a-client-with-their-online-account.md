@@ -1,6 +1,6 @@
 ---
 title: Help a client with their online account
-keywords: client account, my account, client login, client portal, sign in to book, forgot password client, client can't log in, see my appointments, manage my booking, client app, guest checkout, book without account
+keywords: client account, my account, client login, client portal, sign in to book, forgot password client, client can't log in, see my appointments, manage my booking, client app, guest checkout, book without account, add gift card to account, gift card code online, reload gift card online
 who: owner, manager, front_desk
 open: /clients | Open Clients
 ---
@@ -21,6 +21,7 @@ Clients can have their own account on the salon's booking site, to see and chang
 - A client's profile says "Has an online account" once they've made one.
 - Under **Messages** they choose texts and emails **About your visits** and **Offers and news** separately; every change shows in **Consent history** on their profile.
 - Codes go to the outbox for now, until texts and email are connected.
+- Under **Balances**, **Add a gift card** puts a card in their account by its code (on the card, or in the gift email), and **Reload** by a card they bought adds money to it by card. A card already in someone else's account can't be added, and tries are limited. Staff see who added a card on its page under **Gift cards**.
 - **Rewards** shows their points, tier and rewards (each one they can take says **Use at checkout**: they ask at the desk), and **Copy my referral link** gives them a link to share: both earn points once the friend's first visit is done.
 
 ## If it doesn't work

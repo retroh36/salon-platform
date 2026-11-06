@@ -4447,6 +4447,11 @@ isOneToOne: false
 "account_rewards":
 { Args: { "p_client_id": string }; Returns: Json
                            },
+"add_account_gift_card":
+{ Args: { "p_business_id": string,"p_client_id": string,"p_code": string }; Returns: {
+              "balance_cents": number,"card_id": string
+            }[]
+                           },
 "add_event_photo":
 { Args: { "p_event_id": string,"p_path": string }; Returns: string
                            },
@@ -4794,6 +4799,9 @@ isOneToOne: false
                            },
 "release_event_staff":
 { Args: { "p_event_id": string,"p_staff_ids": (string)[] }; Returns: undefined
+                           },
+"reload_gift_card_online":
+{ Args: { "p_amount_cents": number,"p_business_id": string,"p_card_id": string,"p_card_label": string,"p_client_id": string,"p_location_id": string,"p_provider": string,"p_reference": string }; Returns: string
                            },
 "remove_client_card":
 { Args: { "p_client_id": string }; Returns: undefined

@@ -1,6 +1,6 @@
 ---
 title: Reload a gift card
-keywords: reload gift card, top up gift card, add money to gift card, add funds, recharge voucher, add value, gift certificate
+keywords: reload gift card, top up gift card, add money to gift card, add funds, recharge voucher, add value, gift certificate, reload online, top up online
 who: owner, manager, front_desk
 open: /checkout/new?from=/sales | Open new sale
 ---
@@ -20,6 +20,7 @@ Add money to a gift card someone already has.
 - A reload is $5 to $1,000.
 - Only cards that were bought can be reloaded. Promotional cards can't.
 - A reload can't be paid for with a gift card.
+- Clients can reload a card themselves in their online account: under **Balances**, **Reload** by the card, choose an amount and pay by card. It shows on **Sales** as a sale paid **Card online**, and in the card's history. The card has to be in their account first (see Help a client with their online account).
 
 ## If it doesn't work
 

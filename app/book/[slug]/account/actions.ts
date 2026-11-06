@@ -16,6 +16,9 @@ import { sendCode, sessionContact, verifyCode, type Channel } from "@/lib/online
 import { formatPhone, normalEmail, phoneDigits } from "@/lib/online-booking/contact";
 import { hashKey, newSecret, requestInfo, sha256, withinLimits } from "@/lib/online-booking/security";
 import { loadSite, type BookingSite } from "@/lib/online-booking/site";
+import { isUuid } from "@/lib/ids";
+import { salonProvider } from "@/lib/payments";
+import { formatPrice } from "@/lib/services";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const HOUR = 3600;
@@ -177,4 +180,66 @@ export async function saveMessagePreferences(slug: string, prefs: { sms: boolean
   });
   if (error) throw error;
   return { ok: true, message: "Saved." };
+}
+
+// Adds a gift card to their account by its code (on a physical card or in a
+// gift email). Codes are the secret, so tries are limited per connection
+// and per client, and every refusal but one reads the same.
+export async function addGiftCard(slug: string, code: string): Promise<AccountResult> {
+  const s = await signedIn(slug);
+  if (!s) return { ok: false, message: "Please sign in again." };
+  const cleaned = code.replace(/[^A-Za-z0-9]/g, "");
+  if (cleaned.length < 8 || cleaned.length > 32) return { ok: false, message: "Enter the code from the card: 8 to 32 letters and numbers." };
+  const { ipHash } = await requestInfo();
+  const allowed = await withinLimits(s.admin, [
+    { key: `giftadd:ip:${ipHash}`, limit: 20, windowSeconds: HOUR },
+    { key: `giftadd:client:${s.account.clientId}`, limit: 10, windowSeconds: HOUR },
+  ]);
+  if (!allowed) return { ok: false, message: "Too many tries. Please wait a while, or ask the salon to add it." };
+  const { data, error } = await s.admin.rpc("add_account_gift_card", { p_business_id: s.site.business.id, p_client_id: s.account.clientId, p_code: cleaned }).single();
+  if (error?.hint === "not_found") return { ok: false, message: "We couldn't find a gift card with money on it for that code. Check the code, or ask the salon." };
+  if (error?.hint === "taken") return { ok: false, message: "That gift card is already in another account. Ask the salon if it should be in yours." };
+  if (error) throw error;
+  return { ok: true, message: `Added. It has ${formatPrice(data.balance_cents)} on it.` };
+}
+
+export type ReloadResult = { ok: true; amountCents: number; balanceCents: number } | { ok: false; message: string };
+
+// Reloads a card in their account: the card is charged through the
+// salon's payment provider, then the reload is recorded as a sale paid by
+// card online. If it can't be recorded, the charge is given back. One
+// attempt (attemptKey, kept while they try again) charges once.
+export async function reloadGiftCard(slug: string, cardId: string, amountCents: number, cardRef: string, attemptKey: string): Promise<ReloadResult> {
+  const s = await signedIn(slug);
+  if (!s) return { ok: false, message: "Please sign in again." };
+  if (!isUuid(cardId) || !/^[A-Za-z0-9_-]{16,64}$/.test(attemptKey)) return { ok: false, message: "This card can't be reloaded here." };
+  if (!Number.isInteger(amountCents) || amountCents < 500 || amountCents > 100000) return { ok: false, message: "Choose an amount from $5 to $1,000." };
+  const allowed = await withinLimits(s.admin, [{ key: `giftreload:client:${s.account.clientId}`, limit: 10, windowSeconds: HOUR }]);
+  if (!allowed) return { ok: false, message: "Too many tries. Please wait a while, or call the salon." };
+  const business = s.site.business.id;
+  const { data: card } = await s.admin.from("gift_cards").select("kind, status, expires_at, owner_client_id").eq("id", cardId).eq("business_id", business).maybeSingle();
+  if (!card || card.owner_client_id !== s.account.clientId) return { ok: false, message: "This card isn't in your account." };
+  if (card.kind !== "purchased" || card.status !== "active" || (card.expires_at && Date.parse(card.expires_at) <= Date.now())) return { ok: false, message: "This card can't be reloaded online. Ask the salon." };
+
+  const provider = await salonProvider(s.admin, business);
+  const saved = await provider.saveCard(cardRef);
+  if (!saved.ok) return { ok: false, message: `${saved.reason}.` };
+  const charge = await provider.charge({ amountCents, paymentMethodRef: saved.card.ref, description: "Gift card reload", idempotencyKey: `reload:${cardId}:${amountCents}:${attemptKey}:${cardRef}` });
+  if (!charge.ok) return { ok: false, message: `${charge.reason}. You haven't been charged; try another card.` };
+  const { error } = await s.admin.rpc("reload_gift_card_online", {
+    p_business_id: business,
+    p_location_id: s.site.location.id,
+    p_client_id: s.account.clientId,
+    p_card_id: cardId,
+    p_amount_cents: amountCents,
+    p_card_label: saved.card.label,
+    p_provider: provider.id,
+    p_reference: charge.reference,
+  });
+  if (error) {
+    await provider.refund(charge.reference);
+    return { ok: false, message: "We couldn't reload the card, and you haven't been charged. Please let the salon know." };
+  }
+  const { data: after } = await s.admin.from("gift_cards").select("balance_cents").eq("id", cardId).single();
+  return { ok: true, amountCents, balanceCents: after!.balance_cents };
 }

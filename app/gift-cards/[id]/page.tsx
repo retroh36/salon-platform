@@ -75,7 +75,7 @@ async function GiftCard({ params }: Pick<PageProps<"/gift-cards/[id]">, "params"
               <dd className="mt-1 text-2xl font-semibold tracking-[-0.015em] text-ink">{card.expires_at ? formatDay(toLocal(new Date(card.expires_at), tz).date, true) : "Never"}</dd>
             </div>
           </dl>
-          {(card.recipient_name || card.client || card.note || card.is_gift || card.kind === "promotional") && (
+          {(card.recipient_name || card.client || card.holder || card.note || card.is_gift || card.kind === "promotional") && (
             <dl className="mb-6 flex flex-col gap-2 text-sm" data-testid="card-people">
               {(card.recipient_name || (card.client && !card.is_gift)) && (
                 <div className="flex gap-3">
@@ -103,6 +103,17 @@ async function GiftCard({ params }: Pick<PageProps<"/gift-cards/[id]">, "params"
                     </dd>
                   </div>
                 </>
+              )}
+              {!card.is_gift && card.holder && (
+                <div className="flex gap-3">
+                  <dt className="w-20 shrink-0 text-ink-muted">Added by</dt>
+                  <dd className="text-ink">
+                    <Link href={`/clients/${card.holder.id}`} className={textLinkClass}>
+                      {fullName(card.holder)}
+                    </Link>{" "}
+                    to their online account
+                  </dd>
+                </div>
               )}
               {card.note && (
                 <div className="flex gap-3">

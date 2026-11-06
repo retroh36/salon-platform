@@ -11,7 +11,7 @@ import { Alert } from "@/components/ui/page";
 import { accentLink, inputClass, pageLead, pageTitle, primaryButton, smallButton } from "../styles";
 import { StylistPhoto } from "../stylist-photo";
 import { longDate } from "../times";
-import { addCard, confirmSignIn, createAccount, openVisit, removeCard, requestSignIn, saveMessagePreferences, signOut, type AccountResult } from "./actions";
+import { addCard, addGiftCard, confirmSignIn, createAccount, openVisit, removeCard, requestSignIn, saveMessagePreferences, signOut, type AccountResult } from "./actions";
 
 // Each section of the signed-in account is a card (a title, then its items).
 const sectionClass = "flex flex-col gap-3 rounded-lg border border-line bg-surface p-4 md:p-5";
@@ -288,16 +288,23 @@ export function AccountView({
       </div>
 
       <div className="contents lg:flex lg:flex-col lg:gap-6">
-      {(data.giftCards.length > 0 || data.packages.length > 0) && (
-        <section aria-labelledby="balances-heading" className={sectionClass}>
-          <h2 id="balances-heading" className={headingClass}>
-            Balances
-          </h2>
+      <section aria-labelledby="balances-heading" className={sectionClass}>
+        <h2 id="balances-heading" className={headingClass}>
+          Balances
+        </h2>
+        {data.giftCards.length > 0 || data.packages.length > 0 ? (
           <ul className="-my-1 flex flex-col divide-y divide-line text-sm" data-testid="balances">
             {data.giftCards.map((g) => (
-              <li key={g.last4} className="flex justify-between gap-3 py-3">
+              <li key={g.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-3">
                 <span className="text-ink">Gift card ending {g.last4}</span>
-                <span className="font-medium tabular-nums">{formatPrice(g.balanceCents)}</span>
+                <span className="flex items-center gap-4">
+                  {g.reloadable && (
+                    <Link href={`/book/${slug}/account/reload/${g.id}`} className={linkButton} aria-label={`Reload the gift card ending ${g.last4}`}>
+                      Reload
+                    </Link>
+                  )}
+                  <span className="font-medium tabular-nums">{formatPrice(g.balanceCents)}</span>
+                </span>
               </li>
             ))}
             {data.packages.map((p) => (
@@ -307,8 +314,11 @@ export function AccountView({
               </li>
             ))}
           </ul>
-        </section>
-      )}
+        ) : (
+          <p className="text-sm text-ink-muted">No gift cards or packages yet.</p>
+        )}
+        <AddGiftCard slug={slug} />
+      </section>
 
       {data.rewards && <RewardsSection slug={slug} rewards={data.rewards} timezone={timezone} />}
 
@@ -441,5 +451,56 @@ function RewardsSection({ slug, rewards, timezone }: { slug: string; rewards: Ac
         </details>
       )}
     </section>
+  );
+}
+
+// A gift card's code (on the card, or in the gift email) adds it to their
+// account, to see its balance and reload it.
+function AddGiftCard({ slug }: { slug: string }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState("");
+  const [result, setResult] = useState<AccountResult | null>(null);
+  const [pending, start] = useTransition();
+  if (!open)
+    return (
+      <div className="flex flex-col gap-2">
+        {result?.ok && <Alert tone="success">{result.message}</Alert>}
+        <button type="button" className={`self-start ${linkButton}`} onClick={() => (setOpen(true), setResult(null))}>
+          Add a gift card
+        </button>
+      </div>
+    );
+  return (
+    <form
+      aria-label="Add a gift card"
+      className="flex flex-col gap-3 border-t border-line pt-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        start(async () => {
+          const r = await addGiftCard(slug, code);
+          setResult(r);
+          if (r.ok) {
+            setOpen(false);
+            setCode("");
+            router.refresh();
+          }
+        });
+      }}
+    >
+      <label className="flex flex-col gap-1.5 text-sm font-medium">
+        Gift card code
+        <input className={`${inputClass} font-mono uppercase`} value={code} onChange={(e) => setCode(e.target.value)} autoComplete="off" autoCapitalize="characters" spellCheck={false} required />
+      </label>
+      {result && !result.ok && <Problem text={result.message} />}
+      <div className="flex flex-wrap items-center gap-4">
+        <button type="submit" className={smallButton} disabled={pending}>
+          {pending ? "Adding…" : "Add card"}
+        </button>
+        <button type="button" className={linkButton} onClick={() => (setOpen(false), setResult(null))}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }

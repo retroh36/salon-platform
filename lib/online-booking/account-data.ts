@@ -32,7 +32,8 @@ export type AccountData = {
   contact: { email: string | null; phone: string | null };
   upcoming: AccountVisit[];
   past: AccountVisit[];
-  giftCards: { last4: string; balanceCents: number; expiresAt: string | null }[];
+  // reloadable: a purchased card (promotional credit can't be topped up).
+  giftCards: { id: string; last4: string; balanceCents: number; expiresAt: string | null; reloadable: boolean }[];
   packages: { name: string; expiresAt: string | null; left: { service: string; uses: number }[] }[];
   card: { label: string; since: string } | null;
   // Offers (sms, email) and messages about their visits, and whether they replied STOP.
@@ -77,7 +78,7 @@ export async function loadAccount(admin: Admin, account: Account, now = new Date
       .eq("status", "completed")
       .order("starts_at", { ascending: false })
       .limit(PAST_SHOWN),
-    admin.from("gift_cards").select("code, balance_cents, expires_at").eq("owner_client_id", clientId).eq("business_id", businessId).eq("status", "active").gt("balance_cents", 0),
+    admin.from("gift_cards").select("id, kind, code, balance_cents, expires_at").eq("owner_client_id", clientId).eq("business_id", businessId).eq("status", "active").gt("balance_cents", 0),
     admin
       .from("client_packages")
       .select("name, expires_at, client_package_items(total, used, service:services(name))")
@@ -112,7 +113,7 @@ export async function loadAccount(admin: Admin, account: Account, now = new Date
     contact: { email: c.email, phone: c.phone },
     upcoming: upcomingVisits,
     past: pastVisits,
-    giftCards: cards.data!.map((g) => ({ last4: g.code.slice(-4), balanceCents: g.balance_cents, expiresAt: g.expires_at })).filter((g) => !g.expiresAt || new Date(g.expiresAt) > now),
+    giftCards: cards.data!.map((g) => ({ id: g.id, last4: g.code.slice(-4), balanceCents: g.balance_cents, expiresAt: g.expires_at, reloadable: g.kind === "purchased" })).filter((g) => !g.expiresAt || new Date(g.expiresAt) > now),
     packages: packages
       .data!.filter((p) => !p.expires_at || new Date(p.expires_at) > now)
       .map((p) => ({ name: p.name, expiresAt: p.expires_at, left: p.client_package_items.filter((i) => i.used < i.total).map((i) => ({ service: i.service.name, uses: i.total - i.used })) }))
