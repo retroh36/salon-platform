@@ -6,17 +6,18 @@ import { ClientPicker } from "@/app/calendar/booking-panel";
 import type { ClientOption } from "@/app/calendar/actions";
 import { approveDeniseFix, rejectDeniseFix } from "@/app/calendar/denise-actions";
 import { bookingForm } from "@/app/denise/booking-actions";
+import { confirmTask, dismissTask, undoTask } from "@/app/denise/task-actions";
 import { DeniseFace } from "@/components/denise";
 import { DeniseText } from "@/components/denise-text";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { SendIcon } from "@/components/ui/icons";
 import { Alert } from "@/components/ui/page";
-import type { BookingSuggestion } from "@/lib/denise/types";
+import type { BookingSuggestion, TaskCard } from "@/lib/denise/types";
 import { reach } from "@/lib/reach";
 import { formatLongDay } from "@/lib/schedule-format";
 import { formatMinute } from "@/lib/scheduling/time";
 import { BookingCardView, FormLink } from "./booking-card";
-import { appendDenise, askDenise, clearPrefill, useDenise, type DeniseRun } from "./store";
+import { appendDenise, askDenise, clearPrefill, updateDenise, useDenise, type DeniseRun } from "./store";
 import { setUnsaved } from "@/lib/unsaved-work";
 
 // The input's id, so the keyboard shortcut and "Ask Denise" can put the
@@ -83,6 +84,9 @@ export function DeniseChat({
                     </a>
                   ))}
                   {m.suggestions?.map((sg, j) => <SuggestionCard key={sg.actionId ?? j} suggestion={sg} today={today} canBook={canBook} />)}
+                  {m.tasks?.map((t, j) => (
+                    <TaskCardView key={t.actionId} task={t} onChange={(next) => updateDenise(i, { tasks: m.tasks!.map((x, k) => (k === j ? next : x)) })} />
+                  ))}
                   {m.booking && <BookingCardView card={m.booking} index={i} outcome={m.outcome} today={today} onBooked={onBooked} />}
                   {m.retry && i === chat.length - 1 && !run.working && (
                     <Button size="sm" className="self-start" onClick={() => ask(m.retry!)} data-testid="denise-try-again">
@@ -259,6 +263,54 @@ function SuggestionCard({ suggestion, today, canBook }: { suggestion: BookingSug
         </>
       ) : (
         <p className="text-xs text-ink-muted">The front desk can book this.</p>
+      )}
+    </section>
+  );
+}
+
+// A task Denise prepared ("Hannah's Blowout: 30 min"): each change before
+// and after, Confirm or Dismiss, then Undo once confirmed. What came of it
+// stays with the message.
+function TaskCardView({ task, onChange }: { task: TaskCard; onChange: (task: TaskCard) => void }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const act = (run: () => Promise<{ ok: boolean; message: string }>, status: TaskCard["status"]) =>
+    start(async () => {
+      setError(null);
+      const r = await reach(run());
+      if (!r.ok) return setError(r.message);
+      onChange({ ...task, status, message: r.message });
+      router.refresh();
+    });
+  return (
+    <section aria-label="Task to confirm" data-testid="denise-task" className="flex animate-fade-in flex-col gap-3 rounded-lg border border-denise-200 bg-surface p-4">
+      <div className="flex flex-col gap-1">
+        <p className="font-semibold text-ink">{task.summary}</p>
+        <ul className="flex flex-col gap-0.5 text-ink-muted">
+          {task.lines.map((l) => (
+            <li key={l}>{l}</li>
+          ))}
+        </ul>
+        <p className="text-xs text-ink-muted">{task.reason}</p>
+      </div>
+      {task.status && <p className="text-sm font-medium text-denise-700">{task.message}</p>}
+      {error && <Alert>{error}</Alert>}
+      {!task.status ? (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="primary" size="sm" disabled={pending} onClick={() => act(() => confirmTask(task.actionId), "confirmed")}>
+            Confirm
+          </Button>
+          <Button variant="ghost" size="sm" disabled={pending} onClick={() => act(() => dismissTask(task.actionId), "dismissed")}>
+            Dismiss
+          </Button>
+        </div>
+      ) : (
+        task.status === "confirmed" && (
+          <Button size="sm" className="self-start" disabled={pending} onClick={() => act(() => undoTask(task.actionId), "undone")}>
+            Undo
+          </Button>
+        )
       )}
     </section>
   );

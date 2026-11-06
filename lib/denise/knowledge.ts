@@ -24,6 +24,9 @@ import { loadGiftCardLiability, loadUnusedPackages } from "@/lib/reports-load";
 import { FEE_KIND_LABELS, FEE_STATUS_LABELS, type FeeStatus } from "@/lib/policy";
 import { loadPolicy } from "@/lib/policy-load";
 import { repeatOffenders } from "@/lib/policy-report";
+import { canManageMember } from "@/lib/team";
+import { prepareTask, type TaskInput } from "./tasks-load";
+import type { TaskCard } from "./types";
 import { describeReport, encodeReport, readReport, reportFacts, reportProblem } from "@/lib/client-reports";
 import { knownOf, loadReportMenu, namesOf, runClientReport } from "@/lib/client-reports-load";
 import { scanDay, type Viewer } from "./scan";
@@ -75,6 +78,9 @@ export type Knowledge = {
   // the asker: how many, the first few by first name, the list in words,
   // and the page that opens it.
   report: (input: Record<string, unknown>) => Promise<{ facts: unknown; path: string | null }>;
+  // A task prepared for someone to confirm (./tasks.ts): a stylist's
+  // service times. Owners, and managers with team.
+  task: ((input: TaskInput) => Promise<{ facts: unknown; card?: TaskCard }>) | null;
 };
 
 export type PolicyPeriod = "this_month" | "last_month" | "last_30_days";
@@ -497,6 +503,8 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
         path: `/clients/reports?r=${encodeReport(report)}`,
       };
     },
+
+    task: canManageMember(me, null) ? (input) => prepareTask(supabase, { role: me.role, permissions: me.permissions, locationId: me.location.id }, input) : null,
 
     fixes: frontOfHouse
       ? async (date) => {

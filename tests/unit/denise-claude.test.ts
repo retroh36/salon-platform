@@ -1,6 +1,6 @@
 // Denise's Claude features with a fake API client: no real API calls.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { answer, assistantTools, MAX_STRICT_TOOLS, type AssistantContext } from "@/lib/denise/assistant";
+import { answer, assistantTools, MAX_STRICT_TOOLS, systemPrompt, type AssistantContext } from "@/lib/denise/assistant";
 import { ANALYSIS_MODEL, CHAT_MODEL, claudeClient, converse, explainFixes, isConnected, modelFor, theyThem, type ClaudeClient } from "@/lib/denise/claude";
 import type { CoverageWeek } from "@/lib/coverage-load";
 import { sayDate, type Knowledge } from "@/lib/denise/knowledge";
@@ -257,6 +257,7 @@ function knowledge(overrides: Partial<Knowledge> = {}): Knowledge & Record<strin
     policy: vi.fn(async (period: string) => ({ period, late_cancellations: 2, incidents: [{ first_name: "Liam", what: "Late cancellation" }] })),
     team: vi.fn(async (date: string) => ({ date, working: [] })),
     dayOff: vi.fn(async (date: string) => ({ date })),
+    task: vi.fn(async () => ({ facts: { prepared: "Hannah's Blowout: 30 min" }, card: { actionId: "a1", summary: "Hannah's Blowout: 30 min", lines: ["Blowout: 45 min → 30 min"], reason: "New bookings with Hannah use this." } })),
     ...overrides,
   } as never;
 }
@@ -370,6 +371,22 @@ describe("Ask Denise's knowledge", () => {
     expect(JSON.parse(await runner.run("client_report", input))).toMatchObject({ clients: 14, report: "Clients with 3 or more Color visits since June 2024." });
     expect(report).toHaveBeenCalledWith(input);
     expect(runner.links).toEqual([{ path: "/clients/reports?r=abc", label: "Open the report" }]);
+  });
+
+  it("prepares a task to confirm, only for those who manage the team", async () => {
+    const k = knowledge();
+    const runner = assistantTools(context({ knowledge: k }));
+    const input = { task: "service_time", staff_id: "hannah", service_id: "blowout", minutes: 30, from_staff_id: null };
+    expect(JSON.parse(await runner.run("prepare_task", input))).toEqual({ prepared: "Hannah's Blowout: 30 min" });
+    expect(k.task).toHaveBeenCalledWith({ task: "service_time", staffId: "hannah", serviceId: "blowout", minutes: 30, fromStaffId: null });
+    expect(runner.tasks.map((t) => t.actionId)).toEqual(["a1"]);
+    expect(systemPrompt(context({ knowledge: k }))).toContain("prepare_task");
+
+    const desk = assistantTools(context({ knowledge: knowledge({ task: null }) }));
+    expect(desk.tools.map((t) => t.name)).not.toContain("prepare_task");
+    expect(await desk.run("prepare_task", input)).toBe("Changing someone's service times is for owners and managers who manage the team.");
+    expect(desk.tasks).toEqual([]);
+    expect(systemPrompt(context({ knowledge: knowledge({ task: null }) }))).not.toContain("prepare_task");
   });
 
   it("refuses sales to those who can't see them, even if asked for by name", async () => {

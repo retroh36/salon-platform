@@ -92,6 +92,7 @@ async function MeetDenise() {
             "Real service times per stylist, from the times they tap or from check-in to checkout, trusted once there are enough visits.",
             "How often each client comes in, who they see, what they book and when they're due back.",
             "When a service is usually booked too short, she suggests a better length, which owners and managers accept on Durations.",
+            "Ask her to change a stylist's times (“Change Hannah's blowout to 30 minutes”, “Copy Bridget's times to Shae”): she shows each change for an owner or manager to confirm, and it can be undone.",
           ]}
           example={<LearnExample />}
         />

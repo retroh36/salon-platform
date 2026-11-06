@@ -4815,6 +4815,9 @@ isOneToOne: false
 "apply_schedule_draft_action":
 { Args: { "p_action_id": string }; Returns: number
                            },
+"apply_task_action":
+{ Args: { "p_action_id": string }; Returns: undefined
+                           },
 "approve_stock_override":
 { Args: { "p_draft_id": string,"p_product_id": string }; Returns: undefined
                            },
@@ -5473,6 +5476,9 @@ isOneToOne: false
 { Args: { "p_action_id": string }; Returns: undefined
                            },
 "undo_schedule_draft_action":
+{ Args: { "p_action_id": string }; Returns: undefined
+                           },
+"undo_task_action":
 { Args: { "p_action_id": string }; Returns: undefined
                            },
 "update_event_card":

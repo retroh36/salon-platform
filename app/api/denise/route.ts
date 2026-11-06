@@ -288,7 +288,7 @@ async function run(s: DeniseSession, body: DeniseRequest, send: Send, timer: Ste
           status(toolStatus(name, input, context));
         },
       });
-      return send({ t: "done", reply: { text: result.text, kind: "fixes" }, suggestions: result.suggestions, links: result.links });
+      return send({ t: "done", reply: { text: result.text, kind: "fixes" }, suggestions: result.suggestions, links: result.links, tasks: result.tasks });
     }
   }
 }

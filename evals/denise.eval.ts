@@ -250,6 +250,14 @@ const CASES: Case[] = [
     check: (a) => (/\d/.test(a) && /below|button|report/i.test(a) ? null : "should say how many match and point to the report below"),
   },
   {
+    question: "Change Hannah's blowout to 30 minutes",
+    as: "owner",
+    tools: ["prepare_task"],
+    facts: async () => ({}),
+    checkTools: (outputs) => (outputs.some((o) => /"prepared":"Hannah's Blowout: 30 min"/.test(o)) ? null : "should prepare the change with prepare_task"),
+    check: (a) => (/confirm/i.test(a) ? null : "should say it's ready to confirm below"),
+  },
+  {
     question: "How many clients are due back and not booked?",
     as: "front_desk",
     tools: ["overdue_clients"],

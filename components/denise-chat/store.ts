@@ -187,6 +187,6 @@ export async function askDenise(question: string, where: { date: string; page: P
   // Only what the conversation needs goes back: the words.
   const words = history.slice(-12).map((m) => ({ role: m.role, text: m.text }));
   const done = await startDenise({ action: "ask", date: where.date, history: words, page: where.page, booking: card ? stateOf(card) : null }, "Reading your question…");
-  appendDenise({ role: "denise", text: done.reply.text, suggestions: done.suggestions, links: done.links, booking: done.booking, retry: done.stopped ? question : undefined });
+  appendDenise({ role: "denise", text: done.reply.text, suggestions: done.suggestions, links: done.links, booking: done.booking, tasks: done.tasks, retry: done.stopped ? question : undefined });
   return done;
 }

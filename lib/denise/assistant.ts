@@ -21,7 +21,7 @@ import { converse, GENDERED, modelFor, VOICE, withoutPronouns, type ClaudeClient
 import { POLICY_PERIODS, SALES_PERIODS, type Knowledge, type PolicyPeriod, type SalesPeriod } from "./knowledge";
 import { PARTS } from "./team";
 import type { StaffRole } from "@/lib/staff";
-import type { BookingSuggestion, HelpLink } from "./types";
+import type { BookingSuggestion, HelpLink, TaskCard } from "./types";
 import type { PageContext } from "./page";
 
 export type AssistantContext = {
@@ -153,7 +153,7 @@ const TOOLS: Anthropic.Tool[] = [
 const noInput = { type: "object" as const, properties: {}, required: [], additionalProperties: false as const };
 
 // Read-only lookups of what Denise has learned, and her fixes.
-const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes" | "giftCards" | "packages" | "rewards" | "policy" | "events" | "eventBalance" | "team" | "dayOff" | "pto" | "timeOff" | "report", Anthropic.Tool> = {
+const KNOWLEDGE_TOOLS: Record<"task" | "clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes" | "giftCards" | "packages" | "rewards" | "policy" | "events" | "eventBalance" | "team" | "dayOff" | "pto" | "timeOff" | "report", Anthropic.Tool> = {
   report: {
     name: "client_report",
     description:
@@ -326,6 +326,24 @@ const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "s
     strict: true,
     input_schema: { type: "object", properties: { period: { type: "string", enum: SALES_PERIODS } }, required: ["period"], additionalProperties: false },
   },
+  task: {
+    name: "prepare_task",
+    description:
+      "Prepare a change to a stylist's service times for the person asking to confirm: service_time makes one service (service_id) take minutes for that stylist (\"change Hannah's blowout to 30 minutes\"); copy_times gives them another stylist's (from_staff_id) times for every service both do (\"copy Bridget's times to Shae\"). Our code works out exactly what changes and puts it on screen with Confirm; nothing changes until they confirm, and they can undo it. Get ids from list_stylists and list_services.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: {
+        task: { type: "string", enum: ["service_time", "copy_times"] },
+        staff_id: { type: "string", description: "The stylist whose times change." },
+        service_id: { ...nullable("string"), description: "service_time: the service. Null for copy_times." },
+        minutes: { ...nullable("integer"), description: "service_time: the whole length in minutes. Null for copy_times." },
+        from_staff_id: { ...nullable("string"), description: "copy_times: whose times to copy. Null for service_time." },
+      },
+      required: ["task", "staff_id", "service_id", "minutes", "from_staff_id"],
+      additionalProperties: false,
+    },
+  },
   fixes: {
     name: "propose_fixes",
     description:
@@ -349,7 +367,13 @@ Availability: free times are checked with each stylist's usual time for the serv
 
 Actions: you can't book, move or cancel anything yourself. propose_booking and propose_fixes only put suggestions on screen for staff to approve; after proposing, say what you suggested in one sentence and that they can approve it below. If nothing fits, say so and offer the nearest options. You never contact clients or write messages to them; staff do that.
 
-Lists of clients ("clients who…", "a list of everyone who…"): build them with client_report, never from other lookups. Say how many match and the list in its words, name up to 3 by first name, and say the button below opens the whole list to sort, save or download. If something was left out (left_out, spend_left_out), say so.
+${
+    c.knowledge?.task
+      ? `Tasks: you can prepare a change to a stylist's service times with prepare_task ("change Hannah's blowout to 30 minutes", "copy Bridget's times to Shae"). It only puts the change on screen to confirm: say what you prepared in one sentence and that they can confirm it below (and undo it after). If it comes back with an error, say why in your own words. Nothing else can be changed this way yet.
+
+`
+      : ""
+  }Lists of clients ("clients who…", "a list of everyone who…"): build them with client_report, never from other lookups. Say how many match and the list in its words, name up to 3 by first name, and say the button below opens the whole list to sort, save or download. If something was left out (left_out, spend_left_out), say so.
 
 Style: keep it scannable. Two to four sentences unless they ask for more. For lists, give the top 3, each with a short reason, then offer the rest ("Want the rest?"). End with one useful next step (e.g. "Want me to look for a time?"). Clients by first name only. Times are the salon's local time; say them like "1:15pm".
 
@@ -377,8 +401,10 @@ export function everyTool(): Anthropic.Tool[] {
 }
 
 // A tool runner for one question; suggestions it makes are collected.
-export function assistantTools(c: AssistantContext): ToolRunner & { suggestions: BookingSuggestion[]; links: HelpLink[] } {
+export function assistantTools(c: AssistantContext): ToolRunner & { suggestions: BookingSuggestion[]; links: HelpLink[]; tasks: TaskCard[] } {
   const suggestions: BookingSuggestion[] = [];
+  // Tasks she prepared, each a card to confirm under her answer.
+  const tasks: TaskCard[] = [];
   // The button under her answer: the page from her last how_to.
   const links: HelpLink[] = [];
   const services = new Map(c.services.map((s) => [s.id, s]));
@@ -524,6 +550,7 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
         KNOWLEDGE_TOOLS.pto,
         KNOWLEDGE_TOOLS.timeOff,
         KNOWLEDGE_TOOLS.report,
+        ...(k.task ? [KNOWLEDGE_TOOLS.task] : []),
       ]
     : [];
 
@@ -586,6 +613,13 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
         if (result.path) links.push({ path: result.path, label: "Open the report" });
         return JSON.stringify(result.facts);
       }
+      case "prepare_task": {
+        if (!k.task) return "Changing someone's service times is for owners and managers who manage the team.";
+        const num = (v: unknown) => (typeof v === "number" ? v : null);
+        const result = await k.task({ task: String(input.task ?? ""), staffId: String(input.staff_id ?? ""), serviceId: str(input.service_id), minutes: num(input.minutes), fromStaffId: str(input.from_staff_id) });
+        if (result.card) tasks.push(result.card);
+        return JSON.stringify(result.facts);
+      }
       case "propose_fixes": {
         if (!k.fixes) return "Only the front desk, managers and owners can approve fixes.";
         const date = dayOf(input.date);
@@ -599,7 +633,7 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
   }
 
   const pageClient = k && c.page?.client ? [THIS_CLIENT_TOOL] : [];
-  return { tools: [...TOOLS, ...(c.help ? [HOW_TO_TOOL] : []), ...pageClient, ...extra], run: runAny, suggestions, links };
+  return { tools: [...TOOLS, ...(c.help ? [HOW_TO_TOOL] : []), ...pageClient, ...extra], run: runAny, suggestions, links, tasks };
 }
 
 // Answers a staff question, with any bookings Denise suggests.
@@ -608,7 +642,7 @@ export async function answer(
   c: AssistantContext,
   history: { role: "user" | "assistant"; text: string }[],
   hooks: ConverseHooks = {},
-): Promise<{ text: string; suggestions: BookingSuggestion[]; links: HelpLink[] }> {
+): Promise<{ text: string; suggestions: BookingSuggestion[]; links: HelpLink[]; tasks: TaskCard[] }> {
   const runner = assistantTools(c);
   const question = [...history].reverse().find((m) => m.role === "user")?.text ?? "";
   let text = await converse(client, systemPrompt(c), history, runner, modelFor(question), hooks);
@@ -618,7 +652,7 @@ export async function answer(
     hooks.onDiscard?.();
     text = await withoutPronouns(client, text);
   }
-  return { text, suggestions: runner.suggestions, links: runner.links };
+  return { text, suggestions: runner.suggestions, links: runner.links, tasks: runner.tasks };
 }
 
 // What Denise is doing while she uses a tool, for her "thinking" status
@@ -653,6 +687,8 @@ export function toolStatus(name: string, input: unknown, c: Pick<AssistantContex
       return "Adding up sales…";
     case "propose_fixes":
       return "Looking for fixes…";
+    case "prepare_task":
+      return stylist ? `Working out ${stylist}'s new times…` : "Working out the new times…";
     case "gift_card_balances":
       return "Adding up gift card balances…";
     case "unused_packages":

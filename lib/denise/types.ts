@@ -105,6 +105,17 @@ export type BookingSuggestion = {
 // help page starts on ("Open new sale").
 export type HelpLink = { path: string; label: string };
 
+// A task Denise prepared for someone to confirm (./tasks.ts): what it
+// does, a line per change, and what came of it, kept with the card.
+export type TaskCard = {
+  actionId: string;
+  summary: string;
+  lines: string[];
+  reason: string;
+  status?: "confirmed" | "dismissed" | "undone";
+  message?: string;
+};
+
 // A booking card in the chat (./booking-chat.ts): the best times, a
 // question about the client, or the form.
 // `outcome`: what came of the card (booked, on the waitlist, or closed
@@ -115,6 +126,7 @@ export type ChatMessage = {
   suggestions?: BookingSuggestion[];
   links?: HelpLink[];
   booking?: BookingCard;
+  tasks?: TaskCard[];
   outcome?: { text: string; appointmentId?: string; date?: string; closed?: boolean };
   // The question to ask again, when she stopped because it took too long.
   retry?: string;
@@ -138,4 +150,4 @@ export type DeniseEvent =
   | { t: "text"; text: string }
   | { t: "discard" }
   // Finished: what she says, and her view of the day after a report.
-  | { t: "done"; reply: { text: string; kind: "fixes" | "nothing" | "stuck" | "error" }; state?: DeniseState; suggestions?: BookingSuggestion[]; links?: HelpLink[]; booking?: BookingCard };
+  | { t: "done"; reply: { text: string; kind: "fixes" | "nothing" | "stuck" | "error" }; state?: DeniseState; suggestions?: BookingSuggestion[]; links?: HelpLink[]; booking?: BookingCard; tasks?: TaskCard[] };
