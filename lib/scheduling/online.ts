@@ -59,7 +59,7 @@ export function planVisitAt(ctx: BookingContext, request: VisitRequest, start: D
       const draft: BookedItem = { ...timingFor(ctx, staffId, serviceId)!, serviceId, staffId, start: at };
       const resourceId = pickResource(ctx, draft, null, accepted, options);
       if (!resourceId && hasChairs) continue;
-      const check = checkItem(ctx, { serviceId, staffId, resourceId, start: at }, accepted, options);
+      const check = checkItem(ctx, { serviceId, staffId, resourceId, start: at }, accepted, { ...options, online: true });
       if (check.valid) {
         placed = { item: check.item, resourceId };
         break;

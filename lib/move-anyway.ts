@@ -8,6 +8,7 @@ import type { TimeBlockKind } from "./scheduling/blocks.ts";
 
 export type DropIssue =
   | { kind: "not_offered"; stylist: string; service: string }
+  | { kind: "role"; stylist: string; role: string; service: string }
   | { kind: "overlap"; stylist: string; client: string }
   | { kind: "blocked"; stylist: string; block: TimeBlockKind }
   | { kind: "hours"; stylist: string }
@@ -27,6 +28,8 @@ export function issueText(issue: DropIssue): string {
   switch (issue.kind) {
     case "not_offered":
       return `${issue.stylist} doesn't usually do ${issue.service}`;
+    case "role":
+      return `${issue.stylist} is on ${issue.role} then, which doesn't include ${issue.service}`;
     case "overlap":
       return `${issue.stylist} has ${issue.client} then`;
     case "blocked":

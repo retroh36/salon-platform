@@ -22,6 +22,8 @@ A working role is what someone is doing in a stretch of their day, like Wash Hou
 - Without roles, everyone works as they always have: all their services, online, at their usual pay.
 - Only people who run payroll see and change **Pay**. Someone can have their own rate in a role, set by payroll.
 - An hourly role pays each hour at the rate and no commission on its services. A commission role pays its services at the percent and not its hours.
-- **Remove role** takes it out of use. Shifts that already had it keep it as history.
-- Roles on shifts don't change booking or pay yet: that's coming next.
+- While someone is on a shift in a role, only the role's services can be booked with them, at the desk, online and by Denise. A role that isn't online keeps that time off the booking site; the desk can still book it.
+- Dragging a visit onto someone in a role without that service asks first, like any other move that doesn't fit.
+- **Remove role** takes it out of use: shifts that had it book as if they had no role.
+- Pay by role isn't in Payroll yet: that's coming next.
 - Taking someone off a role takes it off their shifts still to come.

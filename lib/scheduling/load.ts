@@ -203,12 +203,14 @@ export async function loadBookingContext(
   // booking site reads with the service role.
   const business = await supabase.from("locations").select("business_id").eq("id", location.id).single();
   if (business.error) throw business.error;
-  const [staff, services, resources] = await Promise.all([
+  const [staff, services, resources, roles] = await Promise.all([
     supabase.from("staff").select("id, is_active, home_resource_id").eq("location_id", location.id),
     supabase.from("services").select("id, active_minutes, processing_minutes, finishing_minutes, steps, archived_at, needs_room").eq("business_id", business.data.business_id),
     supabase.from("resources").select("id, is_active, kind, sort_order").eq("location_id", location.id),
+    supabase.from("working_roles").select("id, name, online, working_role_services(service_id)").eq("business_id", business.data.business_id).is("archived_at", null),
   ]);
   if (staff.error) throw staff.error;
+  if (roles.error) throw roles.error;
   if (services.error) throw services.error;
   if (resources.error) throw resources.error;
 
@@ -258,6 +260,7 @@ export async function loadBookingContext(
       home: new Map(staff.data.filter((s) => s.is_active && s.home_resource_id).map((s) => [s.id, s.home_resource_id!])),
       lent,
     },
+    roles: new Map(roles.data.map((r) => [r.id, { name: r.name, online: r.online, serviceIds: new Set(r.working_role_services.map((x) => x.service_id)) }])),
   };
 }
 

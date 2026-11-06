@@ -21,7 +21,7 @@
 // A service built from steps (./steps.ts) has a processing gap after each
 // processing step; each is free time for the stylist, as above.
 
-import { isAvailable, type LocationSchedule, type StaffSchedule, type Unavailable } from "./availability.ts";
+import { isAvailable, roleAt, type LocationSchedule, type StaffSchedule, type Unavailable } from "./availability.ts";
 import type { TimeBlockKind } from "./blocks.ts";
 import type { PatchState } from "./patch-tests.ts";
 import { fitSteps, type Step } from "./steps.ts";
@@ -133,7 +133,14 @@ export type BookingContext = {
   // Whose chair is whose: each stylist's home chair, and chairs lent for a
   // shift. Booking puts a client in their stylist's chair when it's free.
   chairs?: ChairMap;
+  // The salon's working roles in use (archived ones aren't here, so a shift
+  // in one counts as no role): what can be booked while someone works it.
+  roles?: ReadonlyMap<string, RoleRule>;
 };
+
+// A working role's booking rules: its services (none: all the person's) and
+// whether its time shows on the booking site.
+export type RoleRule = { name: string; online: boolean; serviceIds: ReadonlySet<string> };
 
 export type ChairMap = {
   home: ReadonlyMap<string, string>;
@@ -160,6 +167,10 @@ export type BookingProblem =
   | { code: "unknown_staff" }
   | { code: "staff_inactive" }
   | { code: "service_not_offered" }
+  // The stylist's shift then is in a working role without this service.
+  | { code: "role_service"; role: string }
+  // The stylist's shift then is in a working role not booked online.
+  | { code: "role_not_online"; role: string }
   | { code: "invalid_start" }
   | { code: "staff_unavailable"; reason: Unavailable }
   | { code: "staff_double_booked"; conflictWith?: string }
@@ -179,6 +190,9 @@ export type ItemCheck = { valid: true; item: BookedItem } | { valid: false; prob
 export type CheckOptions = {
   // Items of this appointment are ignored: it's being rebooked as a whole.
   replacingAppointmentId?: string;
+  // Booked by the client on the booking site: a working role that isn't
+  // online keeps them out.
+  online?: boolean;
 };
 
 // Checks one item against the calendar, plus `alsoBooking` (other items
@@ -230,6 +244,10 @@ export function checkItem(
   if (staff) {
     const availability = isAvailable(staff.schedule, ctx.location, item.start, durationMinutes(item));
     if (!availability.available) problems.push({ code: "staff_unavailable", reason: availability.reason });
+    const roleId = ctx.roles?.size ? roleAt(staff.schedule, ctx.location, item.start) : null;
+    const role = roleId ? ctx.roles!.get(roleId) : undefined;
+    if (role && role.serviceIds.size && staff.serviceIds.has(service.id) && !role.serviceIds.has(service.id)) problems.push({ code: "role_service", role: role.name });
+    if (role && options.online && !role.online) problems.push({ code: "role_not_online", role: role.name });
   }
 
   const others = otherItems(ctx, request.id, alsoBooking, options);
@@ -441,6 +459,10 @@ export function describeProblem(problem: BookingProblem): string {
       return "That staff member is no longer active.";
     case "service_not_offered":
       return "The stylist doesn't offer this service.";
+    case "role_service":
+      return `The stylist is working ${problem.role} then, which doesn't include this service.`;
+    case "role_not_online":
+      return `The stylist is working ${problem.role} then, which isn't booked online.`;
     case "invalid_start":
       return "Appointments start on a 5-minute mark.";
     case "staff_unavailable":

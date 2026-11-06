@@ -126,6 +126,13 @@ export function dayView(staff: StaffSchedule, location: LocationSchedule, date: 
 // Whether the staff member can take a booking from `start` for
 // `durationMinutes`. The span must fit on one local day (salons aren't open
 // across midnight). Durations are counted in wall-clock minutes.
+// The working role of the shift a stylist is on at `start` (null: a shift
+// without one, or not on a shift then).
+export function roleAt(staff: StaffSchedule, location: LocationSchedule, start: Date): string | null {
+  const local = toLocal(start, location.timeZone);
+  return shiftsOn(staff, local.date).find((s) => s.start <= local.minute && local.minute < s.end)?.role ?? null;
+}
+
 export function isAvailable(
   staff: StaffSchedule,
   location: LocationSchedule,

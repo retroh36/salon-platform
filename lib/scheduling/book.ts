@@ -52,7 +52,7 @@ export type BookingItemInput = {
 
 // What staff may override by saying so; anything else (a room service
 // without a room, a patch test, an unknown service) still refuses.
-export const MOVE_ANYWAY = new Set<BookingProblem["code"]>(["service_not_offered", "staff_unavailable", "staff_double_booked", "staff_blocked", "resource_in_use", "no_free_resource"]);
+export const MOVE_ANYWAY = new Set<BookingProblem["code"]>(["service_not_offered", "role_service", "staff_unavailable", "staff_double_booked", "staff_blocked", "resource_in_use", "no_free_resource"]);
 
 export type BookingInput = {
   // Set to change an existing visit; its items become exactly `items`.

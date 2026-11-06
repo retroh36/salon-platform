@@ -264,6 +264,7 @@ async function issuesOf(supabase: Supabase, input: { itemId: string; staffId: st
   const issues: DropIssue[] = [];
   for (const p of problems) {
     if (p.code === "service_not_offered") issues.push({ kind: "not_offered", stylist, service: item?.services?.name ?? "this service" });
+    else if (p.code === "role_service") issues.push({ kind: "role", stylist, role: p.role, service: item?.services?.name ?? "this service" });
     else if (p.code === "staff_double_booked") {
       const { data } = p.conflictWith ? await supabase.from("appointment_items").select("appointments(clients(first_name))").eq("id", p.conflictWith).maybeSingle() : { data: null };
       issues.push({ kind: "overlap", stylist, client: data?.appointments?.clients?.first_name ?? "another client" });
