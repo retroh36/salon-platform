@@ -12,7 +12,7 @@ import { DeniseBubble, DeniseSidebarButton, type BubbleMe } from "@/components/d
 import { NewSaleLink } from "@/components/new-sale-link";
 import { canTakePayments } from "@/lib/sales";
 import { can, type Permission } from "@/lib/permissions";
-import { isFrontOfHouse, roleLabel, type StaffRole } from "@/lib/staff";
+import { BOOKKEEPER_SECTIONS, isFrontOfHouse, roleLabel, type StaffRole } from "@/lib/staff";
 
 export type Section = "account" | "dashboard" | "my-day" | "calendar" | "events" | "sales" | "gift-cards" | "reports" | "payroll" | "policy" | "audit" | "promotions" | "clients" | "team" | "scheduling" | "services" | "durations" | "inventory" | "forms" | "settings";
 
@@ -75,6 +75,9 @@ function settingsFor(user: User): NavItem | null {
 }
 
 function shown(item: NavItem, user: User): boolean {
+  // A bookkeeper: the money pages only (past sales come with Reports).
+  if (user.role === "bookkeeper")
+    return (BOOKKEEPER_SECTIONS as readonly string[]).includes(item.section) && (!item.needs || can(user, item.needs)) && (item.section !== "sales" || can(user, "reports"));
   return (
     (!item.needs || can(user, item.needs)) &&
     (!item.managersOnly || user.role === "owner" || user.role === "manager") &&
@@ -139,7 +142,7 @@ export function AppFrame({
   children: React.ReactNode;
 }) {
   const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => shown(n, user)) })).filter((g) => g.items.length > 0);
-  const settings = settingsFor(user);
+  const settings = user.role === "bookkeeper" ? null : settingsFor(user);
   const search = section === "calendar" || section === "clients";
   return (
     // One screen tall on large screens: the calendar and panels scroll inside.

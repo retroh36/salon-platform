@@ -19,6 +19,7 @@
 --   shae@mapleandash.test        stylist, Artisan
 --   hannah@mapleandash.test      stylist, Junior stylist
 --   ari@mapleandash.test         assistant (to Bridget)
+--   books@mapleandash.test       bookkeeper (the money only)
 --
 -- PINs for the shared front-desk iPad (Settings → Shared devices):
 -- owner 258014, manager 369147, front desk 4826, Bridget 5937, Ari 7193.
@@ -40,7 +41,8 @@ with seed_users (id, email) as (
     ('a0000000-0000-4000-8000-000000000009'::uuid, 'shae@mapleandash.test'),
     ('a0000000-0000-4000-8000-000000000010'::uuid, 'lois@mapleandash.test'),
     ('a0000000-0000-4000-8000-000000000011'::uuid, 'ari@mapleandash.test'),
-    ('a0000000-0000-4000-8000-000000000012'::uuid, 'jordan@mapleandash.test')
+    ('a0000000-0000-4000-8000-000000000012'::uuid, 'jordan@mapleandash.test'),
+    ('a0000000-0000-4000-8000-000000000013'::uuid, 'books@mapleandash.test')
 ),
 inserted_users as (
   insert into auth.users (
@@ -115,7 +117,11 @@ insert into public.staff (
    'a0000000-0000-4000-8000-000000000011', 'Ari', 'Delgado', 'ari@mapleandash.test', '(555) 010-0111', 'assistant', null, true),
   -- A second front desk, on the days Sam isn't (someone to swap shifts with).
   ('d0000000-0000-4000-8000-000000000012', 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001',
-   'a0000000-0000-4000-8000-000000000012', 'Jordan', 'Pike', 'jordan@mapleandash.test', '(555) 010-0112', 'front_desk', null, true);
+   'a0000000-0000-4000-8000-000000000012', 'Jordan', 'Pike', 'jordan@mapleandash.test', '(555) 010-0112', 'front_desk', null, true),
+  -- The salon's bookkeeper: Reports, Reconcile, past sales and the audit
+  -- trail; no calendar or clients.
+  ('d0000000-0000-4000-8000-000000000013', 'b0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001',
+   'a0000000-0000-4000-8000-000000000013', 'Priya', 'Nair', 'books@mapleandash.test', '(555) 010-0113', 'bookkeeper', null, true);
 
 update public.staff set assists_staff_id = 'd0000000-0000-4000-8000-000000000004'
 where id = 'd0000000-0000-4000-8000-000000000011';

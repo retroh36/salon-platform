@@ -121,6 +121,7 @@ describe("roles", () => {
     expect(whoText(["owner", "manager", "front_desk"])).toBe("owners, managers and the front desk");
     expect(whoText(["owner", "manager", "front_desk", "stylist"])).toBe("owners, managers, the front desk and stylists");
     expect(whoText(["owner", "manager", "front_desk", "stylist", "assistant"])).toBe("everyone");
+    expect(whoText(["owner", "manager", "bookkeeper"])).toBe("owners, managers and bookkeepers");
     expect(titled("Sell a gift card").who).not.toContain("stylist");
   });
 });

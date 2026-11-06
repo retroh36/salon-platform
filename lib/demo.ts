@@ -19,6 +19,7 @@ export const DEMO_LOGINS: DemoLogin[] = [
   { key: "manager", role: "Manager", name: "Daniel Okafor", salon: "Maple & Ash", email: "manager@mapleandash.test", goTo: "/calendar" },
   { key: "front-desk", role: "Front desk", name: "Sam Rivera", salon: "Maple & Ash", email: "frontdesk@mapleandash.test", goTo: "/calendar" },
   { key: "stylist", role: "Stylist", name: "Bridget Callahan", salon: "Maple & Ash", email: "bridget@mapleandash.test", goTo: "/my-day" },
+  { key: "bookkeeper", role: "Bookkeeper", name: "Priya Nair", salon: "Maple & Ash", email: "books@mapleandash.test", goTo: "/reports" },
   { key: "large-owner", role: "Owner", name: "Renata Albright", salon: "Harbor & Vine, 35 stylists", email: "owner@harborvine.test", goTo: "/calendar" },
 ];
 

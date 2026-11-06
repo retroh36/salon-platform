@@ -1,6 +1,6 @@
 ---
 title: Add a team member
-keywords: add staff, new staff member, new hire, add employee, add stylist, hire, new team member, add a stylist, add front desk, set up staff, onboard, add to team, invite staff
+keywords: add staff, new staff member, new hire, add employee, add stylist, hire, new team member, add a stylist, add front desk, add bookkeeper, add accountant, set up staff, onboard, add to team, invite staff
 who: owner, manager
 open: /team/new | Open Add team member
 ---
@@ -17,6 +17,7 @@ Add someone new, with their role, what they do and when they work, and invite th
 ## Good to know
 
 - Managers can add anyone but an owner; only owners make someone an owner.
+- A **Bookkeeper** sees the money only (Reports, past sales, Policy and the audit trail), so there are no services or working hours to fill in. See "See what each role can do".
 - They choose their own password from the invite email. Until they do, they show as **Invited**.
 - Pay rates, a photo, split shifts, one-off changes and time off are on **Schedule** (the member's page links there).
 - To change someone later, tap their name on the Team directory.

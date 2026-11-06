@@ -39,8 +39,9 @@ export const SEED = {
     lois: "d0000000-0000-4000-8000-000000000010",
     ari: "d0000000-0000-4000-8000-000000000011",
     jordan: "d0000000-0000-4000-8000-000000000012",
+    bookkeeper: "d0000000-0000-4000-8000-000000000013",
   },
-  staffCount: 12,
+  staffCount: 13,
   // The second, larger demo salon (supabase/seed-large.sql): 35 stylists.
   large: {
     business: "b1000000-0000-4000-8000-000000000001",
@@ -58,12 +59,13 @@ export const anon: Client = createClient<Database>(url, publishableKey, options)
 
 // What each role can do by default (private.role_default; owners can't be
 // limited). tests/db/permissions.test.ts checks the database agrees.
-export const DEFAULT_PERMISSIONS: Record<"owner" | "manager" | "front_desk" | "stylist" | "assistant", string[]> = {
+export const DEFAULT_PERMISSIONS: Record<"owner" | "manager" | "front_desk" | "stylist" | "assistant" | "bookkeeper", string[]> = {
   owner: ["adjust_points", "audit", "big_discounts", "billing", "delete_business", "export_data", "payroll", "reports", "see_team_numbers", "settings", "team", "void_refund", "waive_fees"],
   manager: ["adjust_points", "audit", "big_discounts", "export_data", "payroll", "reports", "see_team_numbers", "settings", "team", "void_refund", "waive_fees"],
   front_desk: [],
   stylist: [],
   assistant: [],
+  bookkeeper: ["audit", "reports"],
 };
 
 export async function signIn(email: string): Promise<Client> {

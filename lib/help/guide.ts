@@ -16,7 +16,7 @@
 
 import type { StaffRole } from "@/lib/staff";
 
-export const ROLES: StaffRole[] = ["owner", "manager", "front_desk", "stylist", "assistant"];
+export const ROLES: StaffRole[] = ["owner", "manager", "front_desk", "stylist", "assistant", "bookkeeper"];
 
 export type HelpPage = {
   slug: string;
@@ -158,12 +158,13 @@ export function searchHelp(pages: HelpPage[], query: string, limit = 3): HelpPag
     .map((r) => r.page);
 }
 
-const ROLE_PLURAL: Record<StaffRole, string> = { owner: "owners", manager: "managers", front_desk: "the front desk", stylist: "stylists", assistant: "assistants" };
+const ROLE_PLURAL: Record<StaffRole, string> = { owner: "owners", manager: "managers", front_desk: "the front desk", stylist: "stylists", assistant: "assistants", bookkeeper: "bookkeepers" };
 
 // "owners and managers", "owners, managers and the front desk".
 export function whoText(roles: StaffRole[]): string {
+  // Bookkeepers don't ask Denise, so the salon floor's five roles are "everyone".
+  if (ROLES.every((r) => r === "bookkeeper" || roles.includes(r))) return "everyone";
   const names = ROLES.filter((r) => roles.includes(r)).map((r) => ROLE_PLURAL[r]);
-  if (names.length === ROLES.length) return "everyone";
   return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0];
 }
 

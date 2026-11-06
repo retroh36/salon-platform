@@ -10,10 +10,11 @@ const ROLE_LABELS: Record<StaffRole, string> = {
   front_desk: "Front desk",
   stylist: "Stylist",
   assistant: "Assistant",
+  bookkeeper: "Bookkeeper",
 };
 
 // Display order on staff lists: leadership first, then desk, then stylists.
-const ROLE_ORDER: StaffRole[] = ["owner", "manager", "front_desk", "stylist", "assistant"];
+const ROLE_ORDER: StaffRole[] = ["owner", "manager", "front_desk", "stylist", "assistant", "bookkeeper"];
 
 // The front of house: everyone but stylists and assistants, who see only
 // their own (or their stylist's) book. The database draws the same line
@@ -23,10 +24,29 @@ export function isFrontOfHouse(role: StaffRole): boolean {
 }
 
 // Where someone lands after signing in (and from the logo, "/"): the
-// calendar, or My day for stylists and assistants, who see only their own
-// (or their stylist's) book.
+// calendar, My day for stylists and assistants, who see only their own (or
+// their stylist's) book, or Reports for a bookkeeper (`bookkeeperHome` once
+// their switches are known).
 export function homeFor(role: StaffRole): string {
-  return isFrontOfHouse(role) ? "/calendar" : "/my-day";
+  return isFrontOfHouse(role) ? "/calendar" : role === "bookkeeper" ? "/reports" : "/my-day";
+}
+
+// The bookkeeper sees the money and nothing of the calendar or clients
+// (migration …_bookkeeper_access.sql): these pages only.
+export const BOOKKEEPER_SECTIONS = ["sales", "reports", "payroll", "policy", "audit", "account"] as const;
+
+// Whether a bookkeeper may open this path: the money pages and their
+// account, but not a new sale or the cash drawer.
+export function bookkeeperMayOpen(path: string): boolean {
+  const under = (p: string) => path === p || path.startsWith(`${p}/`);
+  if (under("/sales/new") || under("/sales/drawer")) return false;
+  return ["/reports", "/payroll", "/policy", "/audit", "/account", "/sales"].some(under);
+}
+
+// A bookkeeper's first page they can open: Reports, else Payroll, else the
+// audit trail, else their account.
+export function bookkeeperHome(permissions: readonly string[]): string {
+  return permissions.includes("reports") ? "/reports" : permissions.includes("payroll") ? "/payroll" : permissions.includes("audit") ? "/audit" : "/account";
 }
 
 export function roleLabel(role: StaffRole): string {

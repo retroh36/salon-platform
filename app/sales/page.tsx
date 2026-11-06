@@ -67,7 +67,9 @@ async function Sales({
     getCurrentStaff(),
   ]);
   if (!me) return <NotLinked />;
-  if (!canTakePayments(me.role)) redirect("/dashboard");
+  // The front of house, or a bookkeeper with Reports, reading only.
+  const desk = canTakePayments(me.role);
+  if (!desk && !can(me, "reports")) redirect("/dashboard");
   const tz = me.location.timezone;
   const today = todayIn(tz);
   // The front desk sees today's sales; earlier days are reports (the
@@ -115,7 +117,7 @@ async function Sales({
         title="Sales"
         description={formatLongDay(date)}
         actions={
-          <>
+          desk && <>
             <Link href="/sales/drawer" className={buttonClass("secondary", "md")}>
               Cash drawer
             </Link>
@@ -128,7 +130,7 @@ async function Sales({
           </>
         }
       />
-      {date === today && !opened && (
+      {desk && date === today && !opened && (
         <div className="mb-4" data-testid="drawer-reminder">
           <Alert tone="warning">
             The cash drawer hasn&rsquo;t been counted today.{" "}

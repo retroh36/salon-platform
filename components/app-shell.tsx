@@ -8,7 +8,8 @@ import { salonLogoUrl } from "@/lib/branding";
 import { todayIn } from "@/lib/scheduling/time";
 import { deviceTokenHash } from "@/lib/shared-device";
 import { createClient } from "@/lib/supabase/server";
-import type { StaffRole } from "@/lib/staff";
+import { redirect } from "next/navigation";
+import { BOOKKEEPER_SECTIONS, bookkeeperHome, type StaffRole } from "@/lib/staff";
 
 type Me = {
   id: string;
@@ -47,6 +48,10 @@ export async function AppShell({
   denise?: boolean | "overlay";
   children: React.ReactNode;
 }) {
+  // A bookkeeper sees the money pages and nothing else (and no Denise, who
+  // works from the calendar and clients).
+  const bookkeeper = me.role === "bookkeeper";
+  if (bookkeeper && !(BOOKKEEPER_SECTIONS as readonly string[]).includes(section)) redirect(bookkeeperHome(me.permissions));
   // On the shared iPad: Switch user, and lock when idle.
   const shared = (await deviceTokenHash()) ? { autoLockMinutes: me.location.business?.auto_lock_minutes ?? 5 } : null;
   // The salon's locations, for the sidebar's salon card.
@@ -67,7 +72,7 @@ export async function AppShell({
       locations={locations ?? []}
       user={{ name: me.first_name, role: me.role, permissions: me.permissions, color: me.color, photoUrl: staffPhotoUrl(me.photo_path) }}
       deniseOverlay={denise === "overlay"}
-      denise={denise ? { staffId: me.id, firstName: me.first_name, canBook: canBook(me.role), today: todayIn(me.location.timezone) } : null}
+      denise={denise && !bookkeeper ? { staffId: me.id, firstName: me.first_name, canBook: canBook(me.role), today: todayIn(me.location.timezone) } : null}
     >
       {bleed ? children : <div className={`mx-auto w-full animate-fade-in px-4 pt-8 pb-24 sm:px-8 ${wide ? "max-w-6xl" : "max-w-5xl"}`}>{children}</div>}
     </AppFrame>

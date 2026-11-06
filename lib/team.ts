@@ -13,7 +13,7 @@ import type { Weekday } from "@/lib/scheduling/time";
 
 type FormLike = { get(name: string): FormDataEntryValue | null; getAll(name: string): FormDataEntryValue[] };
 
-export const ALL_ROLES: StaffRole[] = ["owner", "manager", "front_desk", "stylist", "assistant"];
+export const ALL_ROLES: StaffRole[] = ["owner", "manager", "front_desk", "stylist", "assistant", "bookkeeper"];
 
 type Me = { role: StaffRole; permissions: readonly string[] };
 
@@ -63,7 +63,7 @@ export function parseMemberForm(form: FormLike, allowed: readonly StaffRole[], l
   if (!allowed.includes(role)) errors.role = "Choose a role.";
   // A level is for stylists only.
   const level = role === "stylist" && levelKeys.includes(levelText) ? (levelText as StaffLevel) : null;
-  const service_ids = [...new Set(form.getAll("service_ids").map(String).filter(isUuid))];
+  const service_ids = role === "bookkeeper" ? [] : [...new Set(form.getAll("service_ids").map(String).filter(isUuid))];
   let hours: WeeklyHoursRow[] | undefined;
   if (form.get("hours_included")) {
     const parsed = parseWeeklyHoursForm(form);

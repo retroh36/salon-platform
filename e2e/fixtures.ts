@@ -96,9 +96,9 @@ export function ui(page: Page) {
   return page.locator("main").filter({ visible: true });
 }
 
-// Everyone lands on the calendar, stylists and assistants on My day
-// (homeFor in lib/staff.ts).
-export async function signIn(page: Page, email: string, landing: "/calendar" | "/my-day" = "/calendar") {
+// Everyone lands on the calendar, stylists and assistants on My day, a
+// bookkeeper on Reports (homeFor in lib/staff.ts).
+export async function signIn(page: Page, email: string, landing: "/calendar" | "/my-day" | "/reports" = "/calendar") {
   await page.goto("/login");
   await waitForHydration(page, "input[name=email]");
   await ui(page).getByLabel("Email").fill(email);

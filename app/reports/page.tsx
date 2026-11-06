@@ -20,6 +20,7 @@ import { loadDrawerHistory } from "@/lib/drawer-load";
 import { eventReport } from "@/lib/events/report";
 import { loadEventReportRows } from "@/lib/events/report-load";
 import { can } from "@/lib/permissions";
+import { isFrontOfHouse } from "@/lib/staff";
 import { points } from "@/lib/rewards";
 import { loadRewardsOverview } from "@/lib/rewards-load";
 import { startOfLocalDay } from "@/lib/scheduling/load";
@@ -78,6 +79,9 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
   if (!can(me, "reports")) redirect("/dashboard");
   const tz = me.location.timezone;
   const today = todayIn(tz);
+  // Visits, events and promotions are the front of house's: a bookkeeper
+  // sees the money (migration …_bookkeeper_access.sql).
+  const visits = isFrontOfHouse(me.role);
   const period: Period = typeof params.period === "string" && params.period in PERIODS ? (params.period as Period) : "this_month";
   const day = typeof params.day === "string" && isLocalDate(params.day) && params.day <= today ? params.day : today;
   const range = rangeOf(period, today);
@@ -241,6 +245,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
         )}
       </Section>
 
+      {visits && (
       <Section
         title="Promotions"
         titleId="promotions-heading"
@@ -279,6 +284,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
           </TableCard>
         )}
       </Section>
+      )}
 
       {rewards && (
         <Section
@@ -358,6 +364,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
         </Section>
       )}
 
+      {visits && (
       <Section
         title="Bridal and events"
         titleId="events-heading"
@@ -415,7 +422,9 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
           </TableCard>
         )}
       </Section>
+      )}
 
+      {visits && (
       <Section
         title="Where online bookings came from"
         titleId="sources-heading"
@@ -448,7 +457,9 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
           )}
         </TableCard>
       </Section>
+      )}
 
+      {visits && (
       <Section
         title="Rebooked at checkout"
         titleId="rebook-heading"
@@ -490,6 +501,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
           </>
         )}
       </Section>
+      )}
 
       <Section
         title="Close out the day"
@@ -548,7 +560,7 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
             {close.saved.staff ? ` (${close.saved.staff.first_name})` : ""}
           </p>
         )}
-        <CloseoutForm key={day} day={day} cashNetCents={close.cashNetCents} floatCents={close.floatCents} counted={close.saved?.counted_cents ?? null} note={close.saved?.note ?? ""} deposit={close.saved?.deposit_cents ?? null} />
+        {me.role !== "bookkeeper" && <CloseoutForm key={day} day={day} cashNetCents={close.cashNetCents} floatCents={close.floatCents} counted={close.saved?.counted_cents ?? null} note={close.saved?.note ?? ""} deposit={close.saved?.deposit_cents ?? null} />}
       </Section>
 
       <Section title="Cash drawer counts" titleId="drawer-history-heading" description="Every count in the last 30 days: opening, during the day and close-out, against what the drawer should have held.">

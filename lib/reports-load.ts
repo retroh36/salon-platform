@@ -30,7 +30,7 @@ export async function loadGiftCardLiability(supabase: Supabase, businessId: stri
 }
 
 async function packageRows(supabase: Supabase, businessId: string) {
-  return all<{ total: number; used: number; use_value_cents: number; service: { name: string }; client_package: { client_id: string; status: PackageItemRow["status"]; expires_at: string | null; name: string; client: { first_name: string; last_name: string } } }>(
+  return all<{ total: number; used: number; use_value_cents: number; service: { name: string }; client_package: { client_id: string; status: PackageItemRow["status"]; expires_at: string | null; name: string; client: { first_name: string; last_name: string } | null } }>(
     (from, to) =>
       supabase
         .from("client_package_items")
@@ -51,7 +51,8 @@ export async function loadUnusedPackages(supabase: Supabase, businessId: string,
   for (const r of rows) {
     const p = r.client_package;
     if (r.used >= r.total || (p.expires_at && new Date(p.expires_at) <= now)) continue;
-    const c = byClient.get(p.client_id) ?? { firstName: p.client.first_name, lastName: p.client.last_name, packages: new Set(), uses: [], cents: 0 };
+    // A bookkeeper reads the package, not the client's name.
+    const c = byClient.get(p.client_id) ?? { firstName: p.client?.first_name ?? "A client", lastName: p.client?.last_name ?? "", packages: new Set(), uses: [], cents: 0 };
     c.packages.add(p.name);
     c.uses.push(`${r.total - r.used} ${r.service.name}`);
     c.cents += (r.total - r.used) * r.use_value_cents;

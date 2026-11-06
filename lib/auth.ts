@@ -1,7 +1,9 @@
 import { loadLevels } from "@/lib/levels";
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import { homeFor, type StaffRole } from "@/lib/staff";
+import { headers } from "next/headers";
+import { bookkeeperHome, bookkeeperMayOpen, homeFor, type StaffRole } from "@/lib/staff";
+import { PATH_HEADER } from "@/lib/path-header";
 import { createClient } from "@/lib/supabase/server";
 
 // The signed-in user's staff record, with their location and business.
@@ -34,6 +36,12 @@ export const getCurrentStaff = cache(async () => {
     loadLevels(supabase, staff.business_id),
   ]);
   if (permError) throw permError;
+  // A bookkeeper sees the money and nothing of the calendar or clients:
+  // anywhere else goes to their first page (before the page loads anything).
+  if (staff.role === "bookkeeper") {
+    const path = (await headers()).get(PATH_HEADER);
+    if (path && !bookkeeperMayOpen(path)) redirect(bookkeeperHome(permissions ?? []));
+  }
   return { supabase, staff: { ...staff, location: staff.location, permissions: permissions ?? [], levels } };
 });
 

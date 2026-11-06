@@ -15,7 +15,8 @@ export type CoverageWeek = { people: CoveragePerson[]; days: (CoverageDay & { we
 // included when the grid has them), time off, clients, lent chairs, and
 // time off still waiting for an answer.
 export function coverageOf(grid: WeekGrid, requests: { staff_id: string; starts_on: string; ends_on: string; start_minute: number | null; end_minute: number | null }[]): CoverageWeek {
-  const people: CoveragePerson[] = grid.people.map((p) => ({ id: p.id, firstName: p.firstName, role: p.role, level: p.level, chair: p.chair }));
+  // A bookkeeper works no shifts on the floor.
+  const people: CoveragePerson[] = grid.people.flatMap((p) => (p.role === "bookkeeper" ? [] : [{ id: p.id, firstName: p.firstName, role: p.role, level: p.level, chair: p.chair }]));
   const days = grid.dates.map((date) => ({
     date,
     weekStart: grid.week,

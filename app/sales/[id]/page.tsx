@@ -43,7 +43,9 @@ export default function SalePage({ params, searchParams }: PageProps<"/sales/[id
 async function Sale({ params, searchParams }: Pick<PageProps<"/sales/[id]">, "params" | "searchParams">) {
   const [{ id }, query, { supabase, staff: me }] = await Promise.all([params, searchParams, getCurrentStaff()]);
   if (!me) return <NotLinked />;
-  if (!canTakePayments(me.role)) redirect("/dashboard");
+  // The front of house, or a bookkeeper with Reports, reading only.
+  const desk = canTakePayments(me.role);
+  if (!desk && !can(me, "reports")) redirect("/dashboard");
   if (!isUuid(id)) notFound();
   const [sale, salon] = await Promise.all([loadSale(supabase, id), receiptSalon(me.business_id, me.location.id)]);
   if (!sale) notFound();
@@ -106,7 +108,7 @@ async function Sale({ params, searchParams }: Pick<PageProps<"/sales/[id]">, "pa
           </Card>
         </div>
         <div>
-          {sale.status !== "voided" && (
+          {desk && sale.status !== "voided" && (
             <Card title="Receipt" titleId="send-heading" description="Print it, or email it to the client.">
               <EmailReceipt saleId={sale.id} email={sale.receiptEmail ?? sale.client?.email ?? ""} />
             </Card>
@@ -126,7 +128,7 @@ async function Sale({ params, searchParams }: Pick<PageProps<"/sales/[id]">, "pa
               <VoidForm saleId={sale.id} online={sale.payments.filter((p) => p.amountCents > 0 && p.online).map((p) => ({ label: p.reference && /…\d{4}$/.test(p.reference) ? p.reference : "the client's card", amountCents: p.amountCents }))} />
             </Card>
           )}
-          {!manager && <p className="text-sm text-ink-muted">Refunds and voids are for managers and owners.</p>}
+          {!manager && desk && <p className="text-sm text-ink-muted">Refunds and voids are for managers and owners.</p>}
         </div>
       </div>
     </AppShell>

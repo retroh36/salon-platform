@@ -28,8 +28,8 @@ describe("who manages whom", () => {
   });
 
   it("only owners make owners, or reset someone's password", () => {
-    expect(rolesFor(owner)).toEqual(["owner", "manager", "front_desk", "stylist", "assistant"]);
-    expect(rolesFor(manager)).toEqual(["manager", "front_desk", "stylist", "assistant"]);
+    expect(rolesFor(owner)).toEqual(["owner", "manager", "front_desk", "stylist", "assistant", "bookkeeper"]);
+    expect(rolesFor(manager)).toEqual(["manager", "front_desk", "stylist", "assistant", "bookkeeper"]);
     expect(rolesFor(of("front_desk"))).toEqual([]);
     expect(canResetPassword({ role: "owner" })).toBe(true);
     expect(canResetPassword({ role: "manager" })).toBe(false);

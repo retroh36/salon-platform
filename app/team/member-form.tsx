@@ -84,6 +84,8 @@ export function MemberForm({
           )}
         </section>
 
+        {/* A bookkeeper does no services and keeps no hours. */}
+        {role !== "bookkeeper" && (
         <section className={sectionClass} aria-label="Services they do">
           <div className="flex flex-wrap items-center justify-between gap-2 sm:col-span-2">
             <h2 className="text-base font-semibold text-ink">Services they do</h2>
@@ -109,8 +111,9 @@ export function MemberForm({
             </fieldset>
           ))}
         </section>
+        )}
 
-        {hours && (
+        {hours && role !== "bookkeeper" && (
           <section className={sectionClass} aria-label="Working hours">
             <h2 className={sectionTitle}>Working hours</h2>
             <p className="text-sm text-ink-muted sm:col-span-2">Starting from the salon&apos;s opening hours. Clear a day they don&apos;t work. Split shifts, one-off changes and time off are on Schedule.</p>

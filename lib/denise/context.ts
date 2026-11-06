@@ -32,7 +32,7 @@ export type Asking = {
   today: LocalDate;
 };
 
-const ROLE_NAMES = { owner: "owner", manager: "manager", front_desk: "front desk", stylist: "stylist", assistant: "assistant" } as const;
+const ROLE_NAMES = { owner: "owner", manager: "manager", front_desk: "front desk", stylist: "stylist", assistant: "assistant", bookkeeper: "bookkeeper" } as const;
 
 export async function assistantContext(supabase: Supabase, me: Asking, date: LocalDate, now = new Date(), page: PageContext | null = null): Promise<AssistantContext> {
   const [services, staff] = await Promise.all([

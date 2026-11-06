@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv } from "./env";
+import { PATH_HEADER } from "@/lib/path-header";
 
 const PUBLIC_PATHS = ["/login"];
 // Open to everyone, signed in or not: salons' booking sites, payment, card
@@ -20,7 +21,11 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
   if (OPEN_PATHS.some((p) => path === p || path.startsWith(`${p}/`))) return NextResponse.next({ request });
 
-  let response = NextResponse.next({ request });
+  // The path, for the server (getCurrentStaff keeps a bookkeeper to their
+  // pages); always ours, never a browser's.
+  const forwarded = new Headers(request.headers);
+  forwarded.set(PATH_HEADER, path);
+  let response = NextResponse.next({ request: { headers: forwarded } });
   const { url, publishableKey } = getSupabaseEnv();
 
   const supabase = createServerClient(url, publishableKey, {
@@ -30,7 +35,8 @@ export async function updateSession(request: NextRequest) {
       },
       setAll(cookiesToSet, headers) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
+        forwarded.set("cookie", request.headers.get("cookie") ?? "");
+        response = NextResponse.next({ request: { headers: forwarded } });
         cookiesToSet.forEach(({ name, value, options }) =>
           response.cookies.set(name, value, options),
         );
