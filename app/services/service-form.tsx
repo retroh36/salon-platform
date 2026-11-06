@@ -9,7 +9,9 @@ import { checkboxClass, fieldClass } from "@/components/ui/field";
 import { LEVEL_BG, useLevels } from "@/components/ui/level";
 import { Alert } from "@/components/ui/page";
 import { type StaffLevel } from "@/lib/schedule-forms";
+import { parseSteps, type Step } from "@/lib/scheduling/steps";
 import { saveService, type ServiceFormFields } from "./actions";
+import { startingSteps, StepsEditor } from "./steps-editor";
 
 export type StaffOption = { id: string; name: string; role: string; level: StaffLevel | null; color: string | null; photoUrl: string | null; isActive: boolean };
 
@@ -37,6 +39,22 @@ export function ServiceForm({
   // Mirrors the checkboxes, to enable price inputs and show the count. After
   // a failed save it still matches: the reset restores the submitted choices.
   const [offered, setOffered] = useState(() => new Set(Object.keys(initial.staff)));
+  // Built from steps, or three parts. Starts again from the fields after
+  // each save attempt, like the rest of the form.
+  // Switched on, the list starts from the times as typed.
+  const [stepped, setStepped] = useState<{ fields: typeof fields; on: boolean; start?: Step[] }>({ fields, on: fields.steps !== "" });
+  if (stepped.fields !== fields) setStepped({ fields, on: fields.steps !== "" });
+  const switchSteps = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const typed = (name: string) => (e.target.form?.elements.namedItem(name) as HTMLInputElement | null)?.value ?? "";
+    setStepped({ fields, on: e.target.checked, start: startingSteps(typed("active_minutes"), typed("processing_minutes"), typed("finishing_minutes")) });
+  };
+  const savedSteps = (() => {
+    try {
+      return fields.steps ? parseSteps(JSON.parse(fields.steps)) : null;
+    } catch {
+      return null;
+    }
+  })();
 
   // The default and level prices as typed, for the stylists' placeholders.
   // Starts again from the fields after each save attempt (the form resets).
@@ -134,6 +152,20 @@ export function ServiceForm({
           <p className="mb-4 text-sm text-ink-muted">
             The stylist is free during processing, so other clients can be booked into that gap. Use 5-minute steps.
           </p>
+          <label className="mb-4 flex items-start gap-3 text-sm">
+            <input type="checkbox" checked={stepped.on} onChange={switchSteps} className={`${checkboxClass} mt-0.5`} />
+            <span>
+              <span className="font-medium text-ink">Built from steps</span>
+              <span className="block text-ink-muted">For services with more than one processing gap, like highlights, processing, gloss, processing, then a cut. Each gap is free for other clients.</span>
+            </span>
+          </label>
+          {stepped.on ? (
+            <StepsEditor
+              key={fields.steps}
+              initial={stepped.start ?? savedSteps ?? startingSteps(fields.active_minutes, fields.processing_minutes, fields.finishing_minutes)}
+              error={errors.steps}
+            />
+          ) : (
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Service time (min)" hint="Stylist busy" error={errors.active_minutes}>
               <input name="active_minutes" type="number" min={5} step={5} defaultValue={fields.active_minutes} required className={inputClass} />
@@ -145,6 +177,7 @@ export function ServiceForm({
               <input name="finishing_minutes" type="number" min={0} step={5} defaultValue={fields.finishing_minutes} className={inputClass} />
             </Field>
           </div>
+          )}
         </section>
 
         <section className={`overflow-hidden ${cardClass}`}>

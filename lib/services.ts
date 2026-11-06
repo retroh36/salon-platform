@@ -104,7 +104,7 @@ export type ServiceInput = {
 };
 
 export type ServiceFormErrors = Partial<
-  Record<"name" | "category" | "active_minutes" | "processing_minutes" | "finishing_minutes" | "price_cents", string>
+  Record<"name" | "category" | "active_minutes" | "processing_minutes" | "finishing_minutes" | "steps" | "price_cents", string>
 > & { staff?: Record<string, string>; level_prices?: Partial<Record<StaffLevel, string>> };
 
 type FormLike = { get(name: string): FormDataEntryValue | null; getAll(name: string): FormDataEntryValue[] };

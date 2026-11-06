@@ -125,6 +125,43 @@ test.describe("owners", () => {
     await expect(serviceRow(page, name)).toContainText("$30–$90");
   });
 
+  test("build a service from steps, with each processing step free for the stylist", async ({ page }) => {
+    const name = `${PREFIX} Stepped color`;
+    await openNewServiceForm(page);
+    await fillService(page, { name, category: "Color", active: "60", processing: "30", finishing: "45", price: "180" });
+    await ui(page).getByRole("checkbox", { name: /Built from steps/ }).check();
+    // It starts from the three parts.
+    await expect(ui(page).getByTestId("steps-total")).toHaveText("2 hr 15 min in all, the stylist free for 30 min.");
+    const steps = ui(page).getByRole("list", { name: "Steps" });
+    await steps.getByLabel("Step 1 name").fill("Highlight");
+    // A gloss and a second processing step between the first and the cut.
+    await ui(page).getByRole("button", { name: "Add processing" }).click();
+    await steps.getByLabel("Step 3 name").fill("Gloss");
+    await steps.getByLabel("Step 3 minutes").fill("15");
+    await steps.getByRole("checkbox").nth(2).uncheck();
+    await ui(page).getByRole("button", { name: "Add processing" }).click();
+    await steps.getByLabel("Step 5 name").fill("Cut");
+    await expect(ui(page).getByTestId("steps-total")).toHaveText("2 hr 50 min in all, the stylist free for 50 min.");
+    await ui(page).getByRole("checkbox", { name: /Bridget Callahan/ }).check();
+    await ui(page).getByRole("button", { name: "Add service" }).click();
+    await expect(serviceRow(page, name)).toBeVisible();
+
+    const { data } = await admin.from("services").select("steps, active_minutes, processing_minutes, finishing_minutes").eq("name", name).single();
+    expect(data!.steps).toEqual([
+      { name: "Highlight", minutes: 60, processing: false },
+      { name: "Processing", minutes: 30, processing: true },
+      { name: "Gloss", minutes: 15, processing: false },
+      { name: "Processing", minutes: 20, processing: true },
+      { name: "Cut", minutes: 45, processing: false },
+    ]);
+    expect([data!.active_minutes, data!.processing_minutes, data!.finishing_minutes]).toEqual([60, 50, 60]);
+
+    // Opened again, it shows its steps.
+    await serviceRow(page, name).getByRole("link").click();
+    await waitForHydration(page, "input[name=staff]");
+    await expect(ui(page).getByRole("list", { name: "Steps" }).getByLabel("Step 3 name")).toHaveValue("Gloss");
+  });
+
   test("reject a duplicate name", async ({ page }) => {
     await openNewServiceForm(page);
     await fillService(page, { name: "blowout", category: "Blowouts & Styling", active: "45", processing: "0", finishing: "0", price: "55" });

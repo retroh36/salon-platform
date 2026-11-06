@@ -17,15 +17,22 @@
 //   6. the resource, if any, isn't used by another item at any point,
 //      processing included (the client is still in the chair), and
 //   7. a service done in a room (facials, treatments) is in a room.
+//
+// A service built from steps (./steps.ts) has a processing gap after each
+// processing step; each is free time for the stylist, as above.
 
 import { isAvailable, type LocationSchedule, type StaffSchedule, type Unavailable } from "./availability.ts";
 import type { TimeBlockKind } from "./blocks.ts";
 import type { PatchState } from "./patch-tests.ts";
+import { fitSteps, type Step } from "./steps.ts";
 import { toLocal } from "./time.ts";
 
 const MINUTE_MS = 60_000;
 
-export type ServiceTiming = { activeMinutes: number; processingMinutes: number; finishingMinutes: number };
+// The three totals, and for a service built from steps, the steps (their
+// totals are the same). Steps left out (undefined) are fitted from the
+// service's own; null is a plain three-part timing.
+export type ServiceTiming = { activeMinutes: number; processingMinutes: number; finishingMinutes: number; steps?: readonly Step[] | null };
 
 // An item on the calendar, with the timing it was booked with.
 export type BookedItem = ServiceTiming & {
@@ -38,7 +45,7 @@ export type BookedItem = ServiceTiming & {
 };
 
 export type SegmentKind = "active" | "processing" | "finishing";
-export type Segment = { kind: SegmentKind; start: Date; end: Date };
+export type Segment = { kind: SegmentKind; start: Date; end: Date; name?: string };
 
 export function durationMinutes(timing: ServiceTiming): number {
   return timing.activeMinutes + timing.processingMinutes + timing.finishingMinutes;
@@ -48,8 +55,20 @@ export function itemEnd(item: BookedItem): Date {
   return new Date(item.start.getTime() + durationMinutes(item) * MINUTE_MS);
 }
 
-// The item's parts in order, skipping empty ones.
+// The item's parts in order, skipping empty ones: its steps, or the three
+// parts. The stylist's steps before the first processing step are
+// "active", after it "finishing".
 export function itemSegments(item: BookedItem): Segment[] {
+  if (item.steps?.length) {
+    const first = item.steps.findIndex((s) => s.processing);
+    let at = item.start.getTime();
+    return item.steps.map((s, i) => {
+      const kind: SegmentKind = s.processing ? "processing" : first !== -1 && i > first ? "finishing" : "active";
+      const segment = { kind, start: new Date(at), end: new Date(at + s.minutes * MINUTE_MS), name: s.name };
+      at += s.minutes * MINUTE_MS;
+      return segment;
+    });
+  }
   const parts: [SegmentKind, number][] = [
     ["active", item.activeMinutes],
     ["processing", item.processingMinutes],
@@ -83,7 +102,7 @@ function overlaps(a: Span, b: Span): boolean {
   return a.start < b.end && b.start < a.end;
 }
 
-export type BookingService = ServiceTiming & { id: string; archived: boolean; needsRoom?: boolean };
+export type BookingService = ServiceTiming & { id: string; archived: boolean; needsRoom?: boolean; steps?: readonly Step[] | null };
 export type BookingStaff = {
   id: string;
   isActive: boolean;
@@ -191,7 +210,9 @@ export function checkItem(
   if (!service) return { valid: false, problems };
 
   const timing = request.timing ?? staff?.timings?.get(service.id) ?? service;
+  const steps = stepsOf(service, timing);
   const item: BookedItem = {
+    ...(steps ? { steps } : {}),
     id: request.id,
     serviceId: service.id,
     staffId: request.staffId,
@@ -235,12 +256,20 @@ export function timingFor(ctx: BookingContext, staffId: string, serviceId: strin
   if (!service) return undefined;
   const own = ctx.staff.get(staffId)?.timings?.get(serviceId);
   const t = own ?? service;
-  return { activeMinutes: t.activeMinutes, processingMinutes: t.processingMinutes, finishingMinutes: t.finishingMinutes };
+  const timing = { activeMinutes: t.activeMinutes, processingMinutes: t.processingMinutes, finishingMinutes: t.finishingMinutes };
+  const steps = stepsOf(service, own ?? service);
+  return steps ? { ...timing, steps } : timing;
+}
+
+// An item's steps: the timing's own, else the service's fitted to it.
+function stepsOf(service: BookingService, timing: ServiceTiming): readonly Step[] | null {
+  return timing.steps !== undefined ? timing.steps : fitSteps(service.steps, timing);
 }
 
 // The same service made `minutes` long, in 5-minute steps: longer adds to
 // the finishing part after a processing gap (or the service time without
-// one); shorter takes from finishing, then service time (at least 5).
+// one); shorter takes from finishing, then service time (at least 5). The
+// steps are fitted again from the service (left out).
 export function stretchTiming(timing: ServiceTiming, minutes: number): ServiceTiming {
   const target = Math.max(5, Math.round(minutes / 5) * 5);
   let { activeMinutes, finishingMinutes } = timing;

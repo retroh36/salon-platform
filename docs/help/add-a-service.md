@@ -18,6 +18,7 @@ Add a new service to the menu, with its price, timing and who offers it.
 ## Good to know
 
 - During the processing gap the stylist is free, so another client can be booked in then. The chair stays taken.
+- For more than one processing gap (a highlight, a gloss, then a cut), tick **Built from steps**. See "Build a service from steps".
 - Use 5-minute steps for times.
 - To add a product recipe, open the service again after saving. See "Set a service's product recipe".
 - Whether a missing patch test only warns or stops the booking is set on the **Forms** page. See "Set patch test rules".

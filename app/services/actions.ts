@@ -7,6 +7,7 @@ import { parseUsageLines } from "@/lib/color-usage";
 import { isUuid } from "@/lib/ids";
 import { loadBackBarProducts } from "@/lib/inventory-load";
 import { type StaffLevel } from "@/lib/schedule-forms";
+import { parseSteps, stepsProblem, STEPS_PROBLEM_TEXT, stepsTiming, type Step } from "@/lib/scheduling/steps";
 import { parseServiceForm, type ServiceFormErrors } from "@/lib/services";
 
 export type ServiceFormFields = {
@@ -16,6 +17,8 @@ export type ServiceFormFields = {
   active_minutes: string;
   processing_minutes: string;
   finishing_minutes: string;
+  // The steps as JSON for a service built from steps, else "".
+  steps: string;
   price: string;
   // Level -> price input ("" = default).
   level_prices: Record<StaffLevel, string>;
@@ -42,9 +45,30 @@ export async function saveService(_prev: SaveServiceState, formData: FormData): 
     return { errors: {}, message: "That service doesn't exist.", fields };
   }
 
+  // Built from steps: the steps set the three totals.
+  let steps: Step[] | null = null;
+  if (fields.steps) {
+    let json: unknown = null;
+    try {
+      json = JSON.parse(fields.steps);
+    } catch {}
+    steps = parseSteps(json);
+    const problem = steps ? stepsProblem(steps) : "count";
+    if (problem || !steps) return { errors: { steps: STEPS_PROBLEM_TEXT[problem ?? "count"] }, message: "Fix the highlighted fields.", fields };
+    const totals = stepsTiming(steps);
+    formData.set("active_minutes", String(totals.activeMinutes));
+    formData.set("processing_minutes", String(totals.processingMinutes));
+    formData.set("finishing_minutes", String(totals.finishingMinutes));
+  }
+
   const parsed = parseServiceForm(formData, me.levels.map((l) => l.key));
   if (!parsed.ok) {
     return { errors: parsed.errors, message: "Fix the highlighted fields.", fields };
+  }
+  // Back to three parts: the steps go first, or they'd keep the totals.
+  if (!steps && serviceId) {
+    const { error: clearError } = await supabase.from("services").update({ steps: null }).eq("id", serviceId);
+    if (clearError) throw clearError;
   }
 
   const input = parsed.value;
@@ -76,7 +100,7 @@ export async function saveService(_prev: SaveServiceState, formData: FormData): 
     throw error;
   }
   const [{ error: flagError }, { error: levelError }] = await Promise.all([
-    supabase.from("services").update({ requires_patch_test: fields.requires_patch_test, needs_room: fields.needs_room }).eq("id", savedId),
+    supabase.from("services").update({ requires_patch_test: fields.requires_patch_test, needs_room: fields.needs_room, ...(steps ? { steps } : {}) }).eq("id", savedId),
     supabase.rpc("set_service_level_prices", { p_service_id: savedId, p_prices: input.level_prices }),
   ]);
   if (flagError) throw flagError;
@@ -123,6 +147,7 @@ function readFields(formData: FormData): ServiceFormFields {
     active_minutes: get("active_minutes"),
     processing_minutes: get("processing_minutes"),
     finishing_minutes: get("finishing_minutes"),
+    steps: get("steps"),
     price: get("price"),
     level_prices: Object.fromEntries([...formData.keys()].filter((k) => k.startsWith("level_price_")).map((k) => [k.slice(12), get(k)])),
     requires_patch_test: formData.get("requires_patch_test") !== null,

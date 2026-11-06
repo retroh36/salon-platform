@@ -2569,7 +2569,8 @@ function AppointmentBlock({
 }) {
   const PX_PER_MINUTE = usePpm();
   const time = `${formatMinute(block.start)}–${formatMinute(block.end)}`;
-  const processing = block.segments.find((s) => s.kind === "processing");
+  // Every processing gap: a service built from steps can have several.
+  const processing = block.segments.filter((s) => s.kind === "processing");
   const height = (block.end - block.start) * PX_PER_MINUTE;
   const box = laneBox(block.lane, block.lanes);
   // A side lane (a client in another's processing gap) is narrow.
@@ -2633,7 +2634,7 @@ function AppointmentBlock({
     time,
     block.clientName,
     block.service,
-    processing && `processing ${formatMinute(processing.start)}–${formatMinute(processing.end)}`,
+    processing.length > 0 && `processing ${processing.map((p) => `${formatMinute(p.start)}–${formatMinute(p.end)}`).join(" and ")}`,
     others.length > 0 && `part of a visit with ${[...new Set(others.map((p) => p.staff))].join(" and ")}`,
     block.resource,
     block.series && "repeating",
@@ -2684,9 +2685,9 @@ function AppointmentBlock({
           zIndex: 10 + block.lane,
         }}
       >
-        {block.segments.map((s) => (
+        {block.segments.map((s, i) => (
           <span
-            key={s.kind}
+            key={i}
             aria-hidden
             data-segment={s.kind}
             className="absolute inset-x-0"

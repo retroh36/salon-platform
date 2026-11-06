@@ -3,6 +3,7 @@ import type { Database } from "@/lib/database.types";
 import type { LocationSchedule, StaffSchedule, TimeOff, WeeklyHours } from "./availability.ts";
 import { occurrences, occurrenceSpan, type BlockOccurrence, type TimeBlock } from "./blocks.ts";
 import type { BlockedTime, BookedItem, BookingContext, ServiceTiming } from "./booking.ts";
+import { parseSteps } from "./steps.ts";
 import type { Interval } from "./intervals.ts";
 import { addDays, fromLocal, MINUTES_PER_DAY, type LocalDate, type Weekday } from "./time.ts";
 
@@ -124,7 +125,7 @@ export function startOfLocalDay(date: LocalDate, timeZone: string): Date {
 export const FREE_STATUSES = ["canceled", "no_show"] as const;
 
 const ITEM_FIELDS =
-  "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes";
+  "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, steps";
 
 type ItemRow = {
   id: string;
@@ -136,6 +137,7 @@ type ItemRow = {
   active_minutes: number;
   processing_minutes: number;
   finishing_minutes: number;
+  steps?: unknown;
 };
 
 export function toBookedItem(row: ItemRow): BookedItem {
@@ -149,6 +151,7 @@ export function toBookedItem(row: ItemRow): BookedItem {
     activeMinutes: row.active_minutes,
     processingMinutes: row.processing_minutes,
     finishingMinutes: row.finishing_minutes,
+    steps: parseSteps(row.steps),
   };
 }
 
@@ -196,7 +199,7 @@ export async function loadBookingContext(
   if (business.error) throw business.error;
   const [staff, services, resources] = await Promise.all([
     supabase.from("staff").select("id, is_active, home_resource_id").eq("location_id", location.id),
-    supabase.from("services").select("id, active_minutes, processing_minutes, finishing_minutes, archived_at, needs_room").eq("business_id", business.data.business_id),
+    supabase.from("services").select("id, active_minutes, processing_minutes, finishing_minutes, steps, archived_at, needs_room").eq("business_id", business.data.business_id),
     supabase.from("resources").select("id, is_active, kind, sort_order").eq("location_id", location.id),
   ]);
   if (staff.error) throw staff.error;
@@ -226,6 +229,7 @@ export async function loadBookingContext(
           finishingMinutes: s.finishing_minutes,
           archived: s.archived_at !== null,
           needsRoom: s.needs_room,
+          steps: parseSteps(s.steps),
         },
       ]),
     ),

@@ -173,14 +173,14 @@ isOneToOne: false
                   ]
                 },"appointment_items": {
                   Row: {
-                    "active_minutes": number,"appointment_id": string,"business_id": string,"created_at": string,"ends_at": string,"finished_at": string | null,"finishing_minutes": number,"holds_time": boolean,"id": string,"imported": boolean,"location_id": string,"overbooked": boolean,"price_cents": number,"processing_ended_at": string | null,"processing_minutes": number,"processing_started_at": string | null,"resource_held": unknown,"resource_id": string | null,"service_id": string,"staff_busy": unknown,"staff_id": string,"started_at": string | null,"starts_at": string,"updated_at": string
+                    "active_minutes": number,"appointment_id": string,"business_id": string,"created_at": string,"ends_at": string,"finished_at": string | null,"finishing_minutes": number,"holds_time": boolean,"id": string,"imported": boolean,"location_id": string,"overbooked": boolean,"price_cents": number,"processing_ended_at": string | null,"processing_minutes": number,"processing_started_at": string | null,"resource_held": unknown,"resource_id": string | null,"service_id": string,"staff_busy": unknown,"staff_id": string,"started_at": string | null,"starts_at": string,"steps": Json | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "active_minutes": number,"appointment_id": string,"business_id": string,"created_at"?: string,"ends_at": string,"finished_at"?: string | null,"finishing_minutes"?: number,"holds_time"?: boolean,"id"?: string,"imported"?: boolean,"location_id": string,"overbooked"?: boolean,"price_cents": number,"processing_ended_at"?: string | null,"processing_minutes"?: number,"processing_started_at"?: string | null,"resource_held"?: never,"resource_id"?: string | null,"service_id": string,"staff_busy"?: never,"staff_id": string,"started_at"?: string | null,"starts_at": string,"updated_at"?: string
+                    "active_minutes": number,"appointment_id": string,"business_id": string,"created_at"?: string,"ends_at": string,"finished_at"?: string | null,"finishing_minutes"?: number,"holds_time"?: boolean,"id"?: string,"imported"?: boolean,"location_id": string,"overbooked"?: boolean,"price_cents": number,"processing_ended_at"?: string | null,"processing_minutes"?: number,"processing_started_at"?: string | null,"resource_held"?: never,"resource_id"?: string | null,"service_id": string,"staff_busy"?: never,"staff_id": string,"started_at"?: string | null,"starts_at": string,"steps"?: Json | null,"updated_at"?: string
                   }
                   Update: {
-                    "active_minutes"?: number,"appointment_id"?: string,"business_id"?: string,"created_at"?: string,"ends_at"?: string,"finished_at"?: string | null,"finishing_minutes"?: number,"holds_time"?: boolean,"id"?: string,"imported"?: boolean,"location_id"?: string,"overbooked"?: boolean,"price_cents"?: number,"processing_ended_at"?: string | null,"processing_minutes"?: number,"processing_started_at"?: string | null,"resource_held"?: never,"resource_id"?: string | null,"service_id"?: string,"staff_busy"?: never,"staff_id"?: string,"started_at"?: string | null,"starts_at"?: string,"updated_at"?: string
+                    "active_minutes"?: number,"appointment_id"?: string,"business_id"?: string,"created_at"?: string,"ends_at"?: string,"finished_at"?: string | null,"finishing_minutes"?: number,"holds_time"?: boolean,"id"?: string,"imported"?: boolean,"location_id"?: string,"overbooked"?: boolean,"price_cents"?: number,"processing_ended_at"?: string | null,"processing_minutes"?: number,"processing_started_at"?: string | null,"resource_held"?: never,"resource_id"?: string | null,"service_id"?: string,"staff_busy"?: never,"staff_id"?: string,"started_at"?: string | null,"starts_at"?: string,"steps"?: Json | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -3471,14 +3471,14 @@ isOneToOne: false
                   ]
                 },"services": {
                   Row: {
-                    "active_minutes": number,"archived_at": string | null,"business_id": string,"category": string,"created_at": string,"deposit_amount": number,"deposit_kind": Database["public"]['Enums']["deposit_kind"],"description": string | null,"duration_minutes": number | null,"finishing_minutes": number,"id": string,"name": string,"needs_room": boolean,"online_booking": Database["public"]['Enums']["online_service_mode"],"price_cents": number,"processing_minutes": number,"requires_patch_test": boolean,"updated_at": string
+                    "active_minutes": number,"archived_at": string | null,"business_id": string,"category": string,"created_at": string,"deposit_amount": number,"deposit_kind": Database["public"]['Enums']["deposit_kind"],"description": string | null,"duration_minutes": number | null,"finishing_minutes": number,"id": string,"name": string,"needs_room": boolean,"online_booking": Database["public"]['Enums']["online_service_mode"],"price_cents": number,"processing_minutes": number,"requires_patch_test": boolean,"steps": Json | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "active_minutes": number,"archived_at"?: string | null,"business_id": string,"category": string,"created_at"?: string,"deposit_amount"?: number,"deposit_kind"?: Database["public"]['Enums']["deposit_kind"],"description"?: string | null,"duration_minutes"?: never,"finishing_minutes"?: number,"id"?: string,"name": string,"needs_room"?: boolean,"online_booking"?: Database["public"]['Enums']["online_service_mode"],"price_cents": number,"processing_minutes"?: number,"requires_patch_test"?: boolean,"updated_at"?: string
+                    "active_minutes": number,"archived_at"?: string | null,"business_id": string,"category": string,"created_at"?: string,"deposit_amount"?: number,"deposit_kind"?: Database["public"]['Enums']["deposit_kind"],"description"?: string | null,"duration_minutes"?: never,"finishing_minutes"?: number,"id"?: string,"name": string,"needs_room"?: boolean,"online_booking"?: Database["public"]['Enums']["online_service_mode"],"price_cents": number,"processing_minutes"?: number,"requires_patch_test"?: boolean,"steps"?: Json | null,"updated_at"?: string
                   }
                   Update: {
-                    "active_minutes"?: number,"archived_at"?: string | null,"business_id"?: string,"category"?: string,"created_at"?: string,"deposit_amount"?: number,"deposit_kind"?: Database["public"]['Enums']["deposit_kind"],"description"?: string | null,"duration_minutes"?: never,"finishing_minutes"?: number,"id"?: string,"name"?: string,"needs_room"?: boolean,"online_booking"?: Database["public"]['Enums']["online_service_mode"],"price_cents"?: number,"processing_minutes"?: number,"requires_patch_test"?: boolean,"updated_at"?: string
+                    "active_minutes"?: number,"archived_at"?: string | null,"business_id"?: string,"category"?: string,"created_at"?: string,"deposit_amount"?: number,"deposit_kind"?: Database["public"]['Enums']["deposit_kind"],"description"?: string | null,"duration_minutes"?: never,"finishing_minutes"?: number,"id"?: string,"name"?: string,"needs_room"?: boolean,"online_booking"?: Database["public"]['Enums']["online_service_mode"],"price_cents"?: number,"processing_minutes"?: number,"requires_patch_test"?: boolean,"steps"?: Json | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -5229,6 +5229,9 @@ isOneToOne: false
                            },
 "set_home_station":
 { Args: { "p_resource_id"?: string,"p_staff_id": string }; Returns: undefined
+                           },
+"set_item_steps":
+{ Args: { "p_calendar_version": number,"p_item_id": string,"p_location_id": string,"p_steps": Json }; Returns: undefined
                            },
 "set_location_hours":
 { Args: { "p_business_id": string,"p_hours": Json,"p_location_id": string }; Returns: undefined
