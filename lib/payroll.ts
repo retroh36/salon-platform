@@ -238,13 +238,29 @@ export type RateHistory = { from: LocalDate | null; hourlyRateCents: number | nu
 
 export const rateOn = (history: RateHistory, date: LocalDate) => [...history].reverse().find((h) => h.from === null || h.from <= date)?.hourlyRateCents ?? null;
 
-export type Hours = { minutes: number; payCents: number; rates: number[] };
+// Which hours pay people paid by the hour (businesses.payroll_hours).
+export type HoursBasis = "scheduled" | "clocked";
 
-// Hourly pay between two dates: each day's scheduled minutes at the rate in
-// effect that day. Null for someone never paid by the hour in the period.
-export function hourlyPay(schedule: StaffSchedule, from: LocalDate, to: LocalDate, history: RateHistory): Hours | null {
+// Hours in a period: scheduled (their shifts less approved time off),
+// clocked (null without the time clock), and the minutes paid, from the
+// salon's choice.
+export type Hours = { minutes: number; scheduledMinutes: number; clockedMinutes: number | null; basis: HoursBasis; payCents: number; rates: number[] };
+
+// Hourly pay between two dates: each day's minutes (scheduled, or clocked
+// where the salon pays clocked hours) at the rate in effect that day. Null
+// for someone never paid by the hour in the period. `clocked` is minutes
+// clocked by day; without it, scheduled hours pay.
+export function hourlyPay(
+  schedule: StaffSchedule,
+  from: LocalDate,
+  to: LocalDate,
+  history: RateHistory,
+  { clocked, basis = "scheduled" }: { clocked?: ReadonlyMap<LocalDate, number> | null; basis?: HoursBasis } = {},
+): Hours | null {
   if (to < from) return null;
-  let minutes = 0;
+  const paidFrom: HoursBasis = basis === "clocked" && clocked ? "clocked" : "scheduled";
+  let scheduled = 0;
+  let clockedTotal = 0;
   let pay = 0;
   const rates = new Set<number>();
   let hourly = false;
@@ -253,11 +269,21 @@ export function hourlyPay(schedule: StaffSchedule, from: LocalDate, to: LocalDat
     if (rate === null) continue;
     hourly = true;
     rates.add(rate);
-    const m = minutesOn(schedule, date);
-    minutes += m;
-    pay += (m * rate) / 60;
+    const s = minutesOn(schedule, date);
+    const c = clocked?.get(date) ?? 0;
+    scheduled += s;
+    clockedTotal += c;
+    pay += ((paidFrom === "clocked" ? c : s) * rate) / 60;
   }
-  return hourly ? { minutes, payCents: Math.round(pay), rates: [...rates].sort((a, b) => a - b) } : null;
+  if (!hourly) return null;
+  return {
+    minutes: paidFrom === "clocked" ? clockedTotal : scheduled,
+    scheduledMinutes: scheduled,
+    clockedMinutes: clocked ? clockedTotal : null,
+    basis: paidFrom,
+    payCents: Math.round(pay),
+    rates: [...rates].sort((a, b) => a - b),
+  };
 }
 
 // The rates a pay line was worked out at (several if they changed), and
@@ -276,8 +302,12 @@ export type PayLine = {
   // Back-bar fees taken off services before commission.
   feeCents: number;
   tipCents: number;
-  // Scheduled minutes, for people paid by the hour (else null).
+  // For people paid by the hour (else null): the minutes paid, and both
+  // kinds (clocked null without the time clock).
   minutes: number | null;
+  scheduledMinutes: number | null;
+  clockedMinutes: number | null;
+  hoursBasis: HoursBasis | null;
   hourlyPayCents: number;
   totalCents: number;
   tickets: Ticket[];
@@ -369,6 +399,9 @@ export function payLine(person: { staffId: string; name: string; role: string },
     feeCents,
     tipCents,
     minutes: hours?.minutes ?? null,
+    scheduledMinutes: hours?.scheduledMinutes ?? null,
+    clockedMinutes: hours?.clockedMinutes ?? null,
+    hoursBasis: hours?.basis ?? null,
     hourlyPayCents: hourly,
     totalCents: serviceCommissionCents + retailCommissionCents + tipCents + hourly,
     tickets: priced,
@@ -395,7 +428,11 @@ export function payrollCsv(lines: readonly PayLine[], period: PayPeriod): string
     "Retail commission",
     "Tips",
     "Average tip %",
-    "Hours",
+    "Hours paid",
+    "Hours paid from",
+    "Scheduled hours",
+    "Clocked hours",
+    "Clocked less scheduled",
     "Hourly rate",
     "Hourly pay",
     "Back-bar fees",
@@ -416,6 +453,10 @@ export function payrollCsv(lines: readonly PayLine[], period: PayPeriod): string
     dollars(l.tipCents),
     averageTipPct(l.tickets) ?? "",
     l.minutes === null ? "" : formatHours(l.minutes),
+    l.hoursBasis ?? "",
+    l.scheduledMinutes === null ? "" : formatHours(l.scheduledMinutes),
+    l.clockedMinutes === null ? "" : formatHours(l.clockedMinutes),
+    l.clockedMinutes === null || l.scheduledMinutes === null ? "" : formatHours(l.clockedMinutes - l.scheduledMinutes),
     l.rates.hourly.map(dollars).join("/"),
     dollars(l.hourlyPayCents),
     dollars(l.feeCents),

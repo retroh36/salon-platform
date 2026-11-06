@@ -2,13 +2,15 @@
 // sales behind each person's pay through payroll_sales (each line with the
 // rate and plan version recorded when it was sold), from the start of any
 // tier window the period is part of, the plans' rules (commission_rules),
-// their pay history, and scheduled hours for anyone paid by the hour.
+// their pay history, and scheduled and clocked hours for anyone paid by
+// the hour (which pays is the salon's choice, businesses.payroll_hours).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { roleLabel } from "@/lib/staff";
 import { loadStaffSchedules, startOfLocalDay } from "@/lib/scheduling/load";
 import { addDays, toLocal, type LocalDate } from "@/lib/scheduling/time";
+import { entryDay, entryMinutes } from "@/lib/time-clock";
 import { parseRules } from "./commission";
 import {
   hourlyPay,
@@ -20,6 +22,7 @@ import {
   type PayLine,
   type PayPeriod,
   type PayPeriodKind,
+  type HoursBasis,
   type PayrollSale,
   type PlanVersion,
   type RateHistory,
@@ -27,10 +30,32 @@ import {
 
 type Supabase = SupabaseClient<Database>;
 
-export async function loadPaySettings(supabase: Supabase, businessId: string): Promise<{ kind: PayPeriodKind; anchor: LocalDate }> {
-  const { data, error } = await supabase.from("businesses").select("pay_period, pay_period_anchor").eq("id", businessId).single();
+export async function loadPaySettings(supabase: Supabase, businessId: string): Promise<{ kind: PayPeriodKind; anchor: LocalDate; hours: HoursBasis; timeClock: boolean }> {
+  const { data, error } = await supabase.from("businesses").select("pay_period, pay_period_anchor, payroll_hours, time_clock").eq("id", businessId).single();
   if (error) throw error;
-  return { kind: data.pay_period as PayPeriodKind, anchor: data.pay_period_anchor };
+  return { kind: data.pay_period as PayPeriodKind, anchor: data.pay_period_anchor, hours: data.payroll_hours as HoursBasis, timeClock: data.time_clock };
+}
+
+// Minutes clocked by person and local day, from `from` to `to`, for some
+// people (RLS: yourself, or the team's with team or payroll). A missed
+// clock-out counts nothing; a shift still open counts to now.
+async function clockedByDay(supabase: Supabase, staffIds: string[], from: LocalDate, to: LocalDate, timeZone: string, now: Date): Promise<Map<string, Map<LocalDate, number>>> {
+  const { data, error } = await supabase
+    .from("time_clock_entries")
+    .select("staff_id, clock_in, clock_out, missed_out")
+    .in("staff_id", staffIds)
+    .gte("clock_in", startOfLocalDay(from, timeZone).toISOString())
+    .lt("clock_in", startOfLocalDay(addDays(to, 1), timeZone).toISOString())
+    .limit(20000);
+  if (error) throw error;
+  const out = new Map<string, Map<LocalDate, number>>(staffIds.map((id) => [id, new Map()]));
+  for (const r of data) {
+    const e = { clockIn: new Date(r.clock_in), clockOut: r.clock_out ? new Date(r.clock_out) : null, missedOut: r.missed_out };
+    const days = out.get(r.staff_id)!;
+    const day = entryDay(e, timeZone);
+    days.set(day, (days.get(day) ?? 0) + entryMinutes(e, now));
+  }
+  return out;
 }
 
 // Pay for a period: everyone (owners and managers), or one person (staffId;
@@ -81,7 +106,10 @@ export async function loadPayroll(
 
   const hourly = [...histories.entries()].filter(([, h]) => h.some((x) => x.hourlyRateCents !== null)).map(([id]) => id);
   const through = period.to < today ? period.to : today;
-  const schedules = hourly.length ? await loadStaffSchedules(supabase, hourly, period.from, period.to) : new Map();
+  const [schedules, clocked] = await Promise.all([
+    hourly.length ? loadStaffSchedules(supabase, hourly, period.from, period.to) : new Map(),
+    hourly.length && settings.timeClock && period.from <= through ? clockedByDay(supabase, hourly, period.from, through, timeZone, new Date()) : null,
+  ]);
 
   return staff.data
     .map((s) => {
@@ -98,7 +126,7 @@ export async function loadPayroll(
         line: payLine(
           { staffId: s.id, name: `${s.first_name} ${s.last_name}`, role: roleLabel(s.role) },
           tickets,
-          schedule ? hourlyPay(schedule, period.from, through, histories.get(s.id)!) : null,
+          schedule ? hourlyPay(schedule, period.from, through, histories.get(s.id)!, { clocked: clocked?.get(s.id) ?? null, basis: settings.hours }) : null,
           context,
         ),
       };

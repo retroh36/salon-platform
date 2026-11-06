@@ -10,15 +10,16 @@ See what each person is owed for a pay period, check the tickets behind it, and 
 1. In the sidebar, under **Sales**, tap **Payroll**. It opens on the last pay period that's over.
 2. To pick another period, tap the arrows either side of the dates (‹ and ›), or enter dates under **From** and **To** and tap **Show**.
 3. Check the **Pay due** table: service and retail sales, commission, tips, hours and **Total pay** for each person, with **Everyone** at the bottom.
-4. Under **Tips**, see each person's tips, **Average tip** and top tipper.
-5. Tap a person's name to see every tip (date, client, services, tip %, how it was paid, with totals by week and day) and the **Tickets behind** their pay. Tap **Close** when you're done.
-6. Tap **Export CSV** for one row per person (including back-bar fees and plan), in dollars, for your payroll provider, or **Export tips CSV** for every tip.
+4. Under **Hours**, see scheduled hours, clocked hours and the difference for everyone paid by the hour, and which of them is paid.
+5. Under **Tips**, see each person's tips, **Average tip** and top tipper.
+6. Tap a person's name to see every tip (date, client, services, tip %, how it was paid, with totals by week and day) and the **Tickets behind** their pay. Tap **Close** when you're done.
+7. Tap **Export CSV** for one row per person (including scheduled and clocked hours, back-bar fees and plan), in dollars, for your payroll provider, or **Export tips CSV** for every tip.
 
 ## Good to know
 
 - Commission is on sales after discounts, before tax, at the rate or plan each person had when each sale was made. Under each commission you'll see the plan and any back-bar fees taken off.
 - Refunds and voids are taken back in the period they happen, at the same rate.
-- Hours come from each person's schedule, less approved time off. They aren't clocked hours.
+- Hours paid are scheduled hours (their schedule, less approved time off) unless an owner chose clocked hours. See "Choose which hours pay hourly staff".
 - A period that hasn't ended yet says "(still running)" and counts up to today.
 - The average tip is tips as a share of service sales, untipped visits included.
 - Maestra works out the numbers; paying people still happens through your payroll provider.

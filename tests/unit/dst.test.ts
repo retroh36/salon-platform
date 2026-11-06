@@ -66,7 +66,7 @@ describe("pay over the change", () => {
   it("pays the shift worked, not the length of the day", () => {
     expect(scheduledMinutes(schedule, "2026-11-01", "2026-11-01")).toBe(h(8));
     expect(scheduledMinutes(schedule, "2027-03-14", "2027-03-14")).toBe(h(8));
-    expect(hourlyPay(schedule, "2026-10-26", "2026-11-01", [{ from: null, hourlyRateCents: 2000 }])).toEqual({ minutes: 7 * h(8), payCents: 7 * 8 * 2000, rates: [2000] });
+    expect(hourlyPay(schedule, "2026-10-26", "2026-11-01", [{ from: null, hourlyRateCents: 2000 }])).toMatchObject({ minutes: 7 * h(8), payCents: 7 * 8 * 2000, rates: [2000] });
   });
 
   it("keeps a weekly pay period Monday to Sunday across the change", () => {

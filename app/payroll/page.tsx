@@ -47,6 +47,8 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
   const next = nextPeriod(settings.kind, settings.anchor, period);
   const sum = (f: (l: (typeof lines)[number]) => number) => lines.reduce((n, l) => n + f(l), 0);
   const running = period.to >= today;
+  const hourly = lines.filter((l) => l.minutes !== null);
+  const paidClocked = settings.hours === "clocked" && settings.timeClock;
   // People with services or tips: what they were tipped, on average and by whom.
   const tips = lines
     .filter((l) => l.serviceCents !== 0 || l.tipCents !== 0)
@@ -166,18 +168,68 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
         </TableCard>
         <p className="max-w-3xl text-13 text-ink-muted">
           Commission is on sales after discounts, before tax, at the rate each person had when each sale was made (changing a rate on Team → Schedule only affects sales
-          from then on). Refunds and voids are taken back at the same rate, in the period they happen. Hours come from their schedule, less approved time off
+          from then on). Refunds and voids are taken back at the same rate, in the period they happen. Hours paid are{" "}
+          {paidClocked ? "the hours they clocked" : "their scheduled hours, less approved time off"}
           {running ? ", up to today" : ""}, at the hourly rate in effect each day.
           {can(me, "payroll") && (
             <>
               {" "}
               <Link href="/settings/payroll" className={textLinkClass}>
-                Change the pay period
+                Change the pay period or which hours pay
               </Link>
             </>
           )}
         </p>
       </Section>
+
+      {hourly.length > 0 && (
+        <Section
+          title="Hours"
+          titleId="hours-heading"
+          description={
+            settings.timeClock
+              ? `Scheduled and clocked hours for everyone paid by the hour. ${paidClocked ? "Clocked" : "Scheduled"} hours pay, as set on Settings → Payroll.`
+              : "Scheduled hours for everyone paid by the hour. Turn on the time clock (Settings → Shared devices) to compare clocked hours."
+          }
+        >
+          <TableCard>
+            <table className={`${tableClass} tabular-nums`} aria-label="Hours by staff member">
+              <thead className={theadClass}>
+                <tr>
+                  <th className={thClass}>Staff</th>
+                  <th className={`${thClass} text-right`}>Scheduled</th>
+                  <th className={`${thClass} text-right`}>Clocked</th>
+                  <th className={`${thClass} text-right`}>Difference</th>
+                  <th className={`${thClass} text-right`}>Paid</th>
+                </tr>
+              </thead>
+              <tbody>
+                {hourly.map((l) => {
+                  const diff = l.clockedMinutes === null ? null : l.clockedMinutes - l.scheduledMinutes!;
+                  return (
+                    <tr key={l.staffId} className={trClass} data-testid="hours-line" data-staff-id={l.staffId}>
+                      <td className={tdClass}>{l.name}</td>
+                      <td className={`${tdClass} ${numClass}`} data-testid="hours-scheduled">
+                        {formatHours(l.scheduledMinutes!)} hr
+                      </td>
+                      <td className={`${tdClass} ${numClass}`} data-testid="hours-clocked">
+                        {l.clockedMinutes === null ? "—" : `${formatHours(l.clockedMinutes)} hr`}
+                      </td>
+                      <td className={`${tdClass} ${numClass}`} data-testid="hours-difference">
+                        {diff === null ? "—" : `${diff > 0 ? "+" : diff < 0 ? "−" : ""}${formatHours(Math.abs(diff))} hr`}
+                      </td>
+                      <td className={`${tdClass} ${numClass}`} data-testid="hours-paid">
+                        {formatHours(l.minutes!)} hr
+                        <span className="block text-xs text-ink-subtle">{l.hoursBasis === "clocked" ? "clocked" : "scheduled"}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </TableCard>
+        </Section>
+      )}
 
       <Section title="Tips" titleId="tips-heading" description="Each person's tips as a share of their service sales (untipped visits included), and who tipped them the most. Tap a name for every tip.">
         <TableCard>

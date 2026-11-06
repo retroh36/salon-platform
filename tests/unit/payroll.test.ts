@@ -149,7 +149,7 @@ describe("pay", () => {
     // The second sale was made after a raise to 50%.
     const raised = sale({ id: "s2", number: 1002, lines: sale().lines.map((l) => (l.kind === "service" ? { ...l, commission_pct: 50 } : l)) });
     const tickets = ticketsFor([sale(), raised], A, from, to);
-    const pay = payLine({ staffId: A, name: "Ana Test", role: "Stylist" }, tickets, { minutes: 600, payCents: 15000, rates: [1500] });
+    const pay = payLine({ staffId: A, name: "Ana Test", role: "Stylist" }, tickets, { minutes: 600, scheduledMinutes: 600, clockedMinutes: null, basis: "scheduled", payCents: 15000, rates: [1500] });
     expect(pay).toMatchObject({
       serviceCents: 16000,
       serviceCommissionCents: 3600 + 4000,
@@ -174,11 +174,33 @@ describe("pay", () => {
       { from: "2026-10-13", hourlyRateCents: 2000 },
     ];
     // Mon 5th, Tue 6th, Mon 12th at $18; Tue 13th at $20 (8h each).
-    expect(hourlyPay(schedule, "2026-10-05", "2026-10-13", history)).toEqual({ minutes: 4 * 480, payCents: 3 * 8 * 1800 + 8 * 2000, rates: [1800, 2000] });
+    expect(hourlyPay(schedule, "2026-10-05", "2026-10-13", history)).toEqual({ minutes: 4 * 480, scheduledMinutes: 4 * 480, clockedMinutes: null, basis: "scheduled", payCents: 3 * 8 * 1800 + 8 * 2000, rates: [1800, 2000] });
     expect(rateOn(history, "2026-10-12")).toBe(1800);
     // Moved to commission on the 13th: only the days before are hourly.
-    expect(hourlyPay(schedule, "2026-10-05", "2026-10-13", [history[0], { from: "2026-10-13", hourlyRateCents: null }])).toEqual({ minutes: 3 * 480, payCents: 3 * 8 * 1800, rates: [1800] });
+    expect(hourlyPay(schedule, "2026-10-05", "2026-10-13", [history[0], { from: "2026-10-13", hourlyRateCents: null }])).toMatchObject({ minutes: 3 * 480, payCents: 3 * 8 * 1800, rates: [1800] });
     expect(hourlyPay(schedule, "2026-10-05", "2026-10-13", [{ from: null, hourlyRateCents: null }])).toBeNull();
+  });
+
+  it("pays clocked hours where the salon chooses them, showing both", () => {
+    const schedule = { weekly: { 1: [{ start: 540, end: 1020 }], 2: [{ start: 540, end: 1020 }] }, overrides: {}, timeOff: [] };
+    const history = [{ from: null, hourlyRateCents: 1800 }];
+    // Clocked 8h 30m on Monday the 5th and 7h on Tuesday the 6th.
+    const clocked = new Map([
+      ["2026-10-05", 510],
+      ["2026-10-06", 420],
+    ]);
+    expect(hourlyPay(schedule, "2026-10-05", "2026-10-06", history, { clocked, basis: "clocked" })).toEqual({
+      minutes: 930,
+      scheduledMinutes: 960,
+      clockedMinutes: 930,
+      basis: "clocked",
+      payCents: (930 * 1800) / 60,
+      rates: [1800],
+    });
+    // Scheduled pays by default, with clocked hours shown beside them.
+    expect(hourlyPay(schedule, "2026-10-05", "2026-10-06", history, { clocked })).toMatchObject({ minutes: 960, clockedMinutes: 930, basis: "scheduled", payCents: 16 * 1800 });
+    // Clocked chosen but no time clock: scheduled hours pay.
+    expect(hourlyPay(schedule, "2026-10-05", "2026-10-06", history, { basis: "clocked" })).toMatchObject({ minutes: 960, clockedMinutes: null, basis: "scheduled" });
   });
 
   it("counts scheduled hours: one-off changes over weekly hours, less approved time off", () => {
@@ -198,13 +220,13 @@ describe("pay", () => {
   });
 
   it("exports a row per person in dollars, safe for spreadsheets", () => {
-    const pay = payLine({ staffId: A, name: '=Evil "Ana", Jr', role: "Stylist" }, ticketsFor([sale()], A, from, to), { minutes: 450, payCents: 13500, rates: [1800] });
+    const pay = payLine({ staffId: A, name: '=Evil "Ana", Jr', role: "Stylist" }, ticketsFor([sale()], A, from, to), { minutes: 450, scheduledMinutes: 480, clockedMinutes: 450, basis: "clocked", payCents: 13500, rates: [1800] });
     const csv = payrollCsv([pay], { from: "2026-10-05", to: "2026-10-18" });
     const [header, row] = csv.trimEnd().split("\r\n");
     expect(header).toBe(
-      "Period start,Period end,Staff,Role,Service sales,Service commission %,Service commission,Retail sales,Retail commission %,Retail commission,Tips,Average tip %,Hours,Hourly rate,Hourly pay,Back-bar fees,Plan,Total pay",
+      "Period start,Period end,Staff,Role,Service sales,Service commission %,Service commission,Retail sales,Retail commission %,Retail commission,Tips,Average tip %,Hours paid,Hours paid from,Scheduled hours,Clocked hours,Clocked less scheduled,Hourly rate,Hourly pay,Back-bar fees,Plan,Total pay",
     );
-    expect(row).toBe(`2026-10-05,2026-10-18,"'=Evil ""Ana"", Jr",Stylist,80.00,45,36.00,20.00,15,3.00,10.00,12.5,7.5,18.00,135.00,0.00,,184.00`);
+    expect(row).toBe(`2026-10-05,2026-10-18,"'=Evil ""Ana"", Jr",Stylist,80.00,45,36.00,20.00,15,3.00,10.00,12.5,7.5,clocked,8,7.5,-0.5,18.00,135.00,0.00,,184.00`);
   });
 });
 

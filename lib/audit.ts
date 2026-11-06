@@ -15,7 +15,7 @@ export const AUDIT_TYPES = [
   { key: "gift_cards", label: "Gift cards" },
   { key: "fees", label: "Cancellation fees" },
   { key: "points", label: "Rewards points" },
-  { key: "pay", label: "Pay rates" },
+  { key: "pay", label: "Pay rates and payroll hours" },
   { key: "clock", label: "Clocked hours" },
   { key: "pto", label: "PTO balances" },
   { key: "settings", label: "Going live and data downloads" },

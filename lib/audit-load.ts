@@ -287,6 +287,29 @@ export async function loadAudit(supabase: Supabase, businessId: string, timeZone
     );
   }
 
+  if (want("pay")) {
+    tasks.push(
+      (async () => {
+        let q = supabase
+          .from("payroll_hours_changes")
+          .select("id, from_basis, to_basis, by_staff_id, created_at")
+          .eq("business_id", businessId)
+          .gte("created_at", fromIso)
+          .lt("created_at", toIso)
+          .order("created_at", { ascending: false })
+          .limit(AUDIT_LIMIT + 1);
+        if (f.staffId) q = q.eq("by_staff_id", f.staffId);
+        const { data, error } = await q;
+        if (error) throw error;
+        const name = (b: string) => (b === "clocked" ? "clocked hours" : "scheduled hours");
+        return data.map(
+          (e) =>
+            ({ id: e.id, at: e.created_at, type: "pay", staffId: e.by_staff_id, who: who(e.by_staff_id), what: `Hourly pay changed from ${name(e.from_basis)} to ${name(e.to_basis)}`, href: `/settings/payroll` }) satisfies AuditRow,
+        );
+      })(),
+    );
+  }
+
   if (want("clock")) {
     tasks.push(
       (async () => {

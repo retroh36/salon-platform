@@ -22,3 +22,18 @@ export async function savePayrollSettings(input: { kind: string; anchor: string 
   revalidatePath("/payroll");
   return { ok: true, message: "Saved." };
 }
+
+// Which hours pay people paid by the hour: owners only, logged by the
+// database (set_payroll_hours).
+export async function savePayrollHours(basis: string): Promise<SettingsResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || me.role !== "owner") return { ok: false, message: "Only owners choose which hours pay." };
+  const { error } = await supabase.rpc("set_payroll_hours", { p_business_id: me.business_id, p_basis: basis });
+  if (error?.hint === "no_clock") return { ok: false, message: "Turn on the time clock first, on Settings → Shared devices." };
+  if (error?.hint === "basis") return { ok: false, message: "Choose scheduled or clocked hours." };
+  if (error?.code === "42501") return { ok: false, message: "Only owners choose which hours pay." };
+  if (error) throw error;
+  revalidatePath("/settings/payroll");
+  revalidatePath("/payroll");
+  return { ok: true, message: basis === "clocked" ? "Clocked hours pay from now on, for every period you open." : "Scheduled hours pay from now on, for every period you open." };
+}

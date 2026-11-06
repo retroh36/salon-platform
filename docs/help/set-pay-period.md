@@ -16,4 +16,5 @@ Choose how often you run payroll, so Payroll and each stylist's earnings show th
 
 - Owners and managers with payroll can change the pay period.
 - With **Custom**, pick the dates on the Payroll page each time.
+- Which hours pay hourly staff is on the same page, for owners. See "Choose which hours pay hourly staff".
 - Commission and hourly rates are set per person on Team → Schedule. See "Set someone's commission or hourly rate".
