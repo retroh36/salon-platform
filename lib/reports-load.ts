@@ -11,7 +11,7 @@ import { closeout, giftCardActivity, giftCardLiability, rebookingAtCheckout, unu
 type Supabase = SupabaseClient<Database>;
 
 // Every row of a query, a page at a time.
-async function all<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
+export async function all<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
   const rows: T[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await page(from, from + 999);

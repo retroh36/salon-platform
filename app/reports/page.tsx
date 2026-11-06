@@ -496,7 +496,10 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
         titleId="closeout-heading"
         description={formatLongDay(day)}
         actions={
-          <nav aria-label="Day" className="flex gap-2">
+          <nav aria-label="Day" className="flex flex-wrap gap-2">
+            <Link href={`/reports/reconcile?from=${day.slice(0, 8)}01&to=${day}`} className={buttonClass("secondary", "sm")}>
+              Reconcile
+            </Link>
             <Link href={link({ day: addDays(day, -1) })} className={buttonClass("secondary", "sm")}>
               ← Previous day
             </Link>
