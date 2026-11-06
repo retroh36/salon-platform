@@ -5,14 +5,32 @@ import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { PageHeader } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
-import { canManageInventory, productName } from "@/lib/inventory";
-import { PRODUCT_COLUMNS } from "@/lib/inventory-load";
+import { canManageInventory, productName, productTaxOf } from "@/lib/inventory";
+import { loadRetailTaxBp, PRODUCT_COLUMNS } from "@/lib/inventory-load";
 import { BackLink } from "@/components/ui/back-link";
 import { ProductForm, type ProductFormValues } from "../product-form";
 
 export const metadata: Metadata = { title: "Add product" };
 
-const BLANK: ProductFormValues = { brand: "", line: "", name: "", sku: "", barcode: "", type: "back_bar", unit: "g", size: "", cost: "", price: "", shelf: "", supplier_id: "", is_active: true };
+const BLANK: ProductFormValues = {
+  brand: "",
+  line: "",
+  name: "",
+  sku: "",
+  barcode: "",
+  other_barcodes: "",
+  type: "back_bar",
+  unit: "g",
+  size: "",
+  cost: "",
+  price: "",
+  employee_price: "",
+  tax: "salon",
+  tax_percent: "",
+  shelf: "",
+  supplier_id: "",
+  is_active: true,
+};
 
 export default function NewProductPage({ searchParams }: PageProps<"/inventory/new">) {
   return (
@@ -29,14 +47,15 @@ async function NewProduct({ searchParams }: Pick<PageProps<"/inventory/new">, "s
   if (!me) return <NotLinked />;
   if (!canManageInventory(me.role)) redirect("/inventory");
   const copyId = typeof copy === "string" && isUuid(copy) ? copy : null;
-  const [{ data: suppliers, error }, { data: from, error: fromError }] = await Promise.all([
+  const [{ data: suppliers, error }, { data: from, error: fromError }, retailTaxBp] = await Promise.all([
     supabase.from("suppliers").select("id, name").eq("is_active", true).order("name"),
     copyId ? supabase.from("products").select(PRODUCT_COLUMNS).eq("id", copyId).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    loadRetailTaxBp(supabase, me.business_id),
   ]);
   if (error) throw error;
   if (fromError) throw fromError;
   const initial: ProductFormValues = from
-    ? { ...BLANK, brand: from.brand, line: from.line ?? "", name: from.name, type: from.type, unit: from.unit, shelf: from.shelf ?? "", supplier_id: from.supplier_id ?? "" }
+    ? { ...BLANK, brand: from.brand, line: from.line ?? "", name: from.name, type: from.type, unit: from.unit, shelf: from.shelf ?? "", supplier_id: from.supplier_id ?? "", tax: productTaxOf(from.tax_rate_bp), tax_percent: from.tax_rate_bp ? String(from.tax_rate_bp / 100) : "" }
     : BLANK;
   return (
     <AppShell section="inventory" me={me}>
@@ -53,7 +72,7 @@ async function NewProduct({ searchParams }: Pick<PageProps<"/inventory/new">, "s
       />
       {/* A new form for each product copied: the same page with other defaults
           keeps the form's own state and its select's choice otherwise. */}
-      <ProductForm key={from?.id ?? "new"} suppliers={suppliers} initial={initial} />
+      <ProductForm key={from?.id ?? "new"} suppliers={suppliers} initial={initial} retailTaxBp={retailTaxBp} />
     </AppShell>
   );
 }

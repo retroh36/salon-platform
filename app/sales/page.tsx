@@ -83,7 +83,7 @@ async function Sales({
   const { data: sales, error } = await supabase
     .from("sales")
     .select(
-      "id, number, status, total_cents, created_at, client:clients(first_name, last_name), payments(method, amount_cents)",
+      "id, number, status, total_cents, created_at, client:clients(first_name, last_name), employee:staff!sales_employee_id_fkey(first_name, last_name), payments(method, amount_cents)",
     )
     .eq("location_id", me.location.id)
     .gte("created_at", startOfLocalDay(date, tz).toISOString())
@@ -240,7 +240,7 @@ async function Sales({
                       {formatMinute(toLocal(new Date(s.created_at), tz).minute)}
                     </td>
                     <td className={`${tdClass} text-ink`}>
-                      {s.client ? fullName(s.client) : "Walk-in sale"}
+                      {s.client ? fullName(s.client) : s.employee ? `Team purchase · ${fullName(s.employee)}` : "Walk-in sale"}
                     </td>
                     <td className={`${tdClass} text-ink-muted`}>
                       {[

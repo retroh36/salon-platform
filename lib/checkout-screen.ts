@@ -23,7 +23,7 @@ import { fullName, sortStaff, type StaffRole } from "@/lib/staff";
 import { promoRatesFor } from "@/lib/promotions-load";
 import { pointsLine, rewardProblem } from "@/lib/rewards";
 import { rewardRatesFor } from "@/lib/rewards-load";
-import { EMPTY_TICKET, parseTicket, promotionProblems, type PromoRates, type RewardRates, type ServiceLine, type Ticket } from "@/lib/ticket";
+import { EMPTY_TICKET, parseTicket, productLine, promotionProblems, type PromoRates, type RewardRates, type ServiceLine, type Ticket } from "@/lib/ticket";
 
 type Supabase = SupabaseClient<Database>;
 type Me = { id: string; business_id: string; role: StaffRole; permissions: readonly string[]; location: { id: string; timezone: string } };
@@ -97,8 +97,15 @@ export async function startCheckout(supabase: Supabase, me: Me, options: { appoi
 
   let ticket: Ticket = EMPTY_TICKET;
   if (options.productId) {
-    const { data: p } = await supabase.from("products").select("id, brand, line, name, price_cents, type").eq("id", options.productId).maybeSingle();
-    if (p?.type === "retail") ticket = { ...EMPTY_TICKET, lines: [{ key: key(), kind: "product", productId: p.id, name: [p.brand, p.line, p.name].filter(Boolean).join(" "), staffId: null, unitPriceCents: p.price_cents ?? 0, quantity: 1, discount: null }] };
+    const { data: p } = await supabase
+      .from("products")
+      .select("id, brand, line, name, price_cents, employee_price_cents, tax_rate_bp, type")
+      .eq("id", options.productId)
+      .maybeSingle();
+    if (p?.type === "retail") {
+      const product = { id: p.id, name: [p.brand, p.line, p.name].filter(Boolean).join(" "), priceCents: p.price_cents ?? 0, employeePriceCents: p.employee_price_cents, taxBp: p.tax_rate_bp };
+      ticket = { ...EMPTY_TICKET, lines: [productLine(key(), product, null, false)] };
+    }
   }
   // A client this person can see, or none.
   const client = options.clientId ? (await supabase.from("clients").select("id").eq("id", options.clientId).maybeSingle()).data : null;
@@ -166,6 +173,8 @@ export type CheckoutScreenData = {
   // to (the stylists, and whoever is signed in).
   defaultStaffId: string | null;
   creditStaff: ScreenStaff[];
+  // Everyone on the team here, for a team purchase.
+  team: { id: string; name: string }[];
   templates: PackageTemplate[];
   settings: CheckoutSettings;
   role: StaffRole;
@@ -345,6 +354,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     creditStaff: staff.some((s) => s.id === me.id)
       ? staff
       : [...staff, ...staffRows.data.filter((s) => s.id === me.id).map((s) => ({ id: s.id, firstName: s.first_name, name: fullName(s), level: s.level, color: s.color, photoUrl: staffPhotoUrl(s.photo_path) }))],
+    team: staffRows.data.map((s) => ({ id: s.id, name: fullName(s) })).sort((a, b) => a.name.localeCompare(b.name)),
     templates,
     settings,
     role: me.role,

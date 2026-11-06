@@ -148,6 +148,7 @@ function Receipt({ sale, salon, when }: { sale: SaleView; salon: ReceiptSalon; w
         <p className="text-ink-muted">
           Receipt #{sale.number} · {when}
           {sale.client ? ` · ${sale.client.name}` : ""}
+          {sale.employee ? ` · Team purchase · ${sale.employee}` : ""}
           {sale.soldBy ? ` · served by ${sale.soldBy}` : ""}
         </p>
       </div>

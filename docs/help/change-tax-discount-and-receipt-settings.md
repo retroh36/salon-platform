@@ -8,7 +8,7 @@ open: /settings/checkout | Open Tax and receipts
 Set the sales tax added at checkout, who can give discounts and how much, what receipts show, and the cash drawer's starting float.
 
 1. Go to **Settings** and tap **Tax and receipts**.
-2. Under **Sales tax**, enter the rates for **Services (%)** and **Retail products (%)**.
+2. Under **Sales tax**, enter the rates for **Services (%)** and **Retail products (%)**. (A product can have its own rate, or none: see "Add a product to inventory".)
 3. Under **Discounts**, tick **Managers can give discounts** and/or **The front desk can give discounts**.
 4. Set **Most the front desk can take off (%)**.
 5. Under **Receipts**, add **A note at the bottom (optional)** and tick **Show who did each service** if you want stylists' names on receipts.

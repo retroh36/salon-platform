@@ -17,6 +17,7 @@ Sell retail products, gift cards, packages or memberships to someone without a v
 
 ## Good to know
 
+- Selling to someone on the team? See "Sell to someone on the team".
 - Packages, memberships and rewards need a client; a walk-in guest can buy products and gift cards.
 - Products come out of stock when the sale completes, and the sale shows in Sales and Reports like any other.
 - If a product shows "Only 0 in stock", see Sell a product that's out of stock.

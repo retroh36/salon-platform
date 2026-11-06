@@ -31,8 +31,11 @@ export async function saveProduct(_prev: ProductFormState, formData: FormData): 
     ? await supabase.from("products").update(row).eq("id", productId).select("id").maybeSingle()
     : await supabase.from("products").insert({ ...row, business_id: me.business_id }).select("id").single();
   if (error?.code === "23505") {
-    const field = error.message.includes("barcode") ? "barcode" : "sku";
-    return { errors: { [field]: `Another product has this ${field === "sku" ? "SKU" : "barcode"}.` }, message: "Fix the highlighted fields.", fields };
+    // "Another product has barcode 0123…" names the code; the main one's index doesn't.
+    const taken = /barcode (\d+)/.exec(error.message)?.[1];
+    const field = taken && parsed.value.other_barcodes.includes(taken) ? "other_barcodes" : error.message.includes("barcode") ? "barcode" : "sku";
+    const what = field === "sku" ? "this SKU" : field === "barcode" ? "this barcode" : `barcode ${taken}`;
+    return { errors: { [field]: `Another product has ${what}.` }, message: "Fix the highlighted fields.", fields };
   }
   if (error?.code === "42501") return { errors: {}, message: MANAGERS_ONLY, fields };
   if (error) throw error;

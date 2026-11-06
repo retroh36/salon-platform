@@ -14,6 +14,8 @@ import {
   parseProductForm,
   productName,
   readFilter,
+  percentText,
+  productTaxOf,
   stockValueCents,
   type InventoryRow,
 } from "@/lib/inventory";
@@ -105,7 +107,7 @@ describe("the product form", () => {
   it("reads a back-bar color", () => {
     expect(parseProductForm(form({}))).toEqual({
       ok: true,
-      value: { supplier_id: null, brand: "Goldwell", line: "Topchic", name: "7N", sku: null, barcode: null, type: "back_bar", unit: "g", size: 60, cost_cents: 950, price_cents: null, shelf: null },
+      value: { supplier_id: null, brand: "Goldwell", line: "Topchic", name: "7N", sku: null, barcode: null, type: "back_bar", unit: "g", size: 60, cost_cents: 950, price_cents: null, shelf: null, employee_price_cents: null, tax_rate_bp: null, other_barcodes: [] },
     });
   });
 
@@ -120,6 +122,28 @@ describe("the product form", () => {
     expect(parseProductForm(form({ type: "retail", unit: "unit", price: "" }))).toEqual({ ok: false, errors: { price: "Enter the retail price." } });
     expect(parseProductForm(form({ type: "retail", unit: "ml", price: "30" }))).toMatchObject({ ok: false, errors: { unit: "Retail products are sold in units." } });
     expect(parseProductForm(form({ type: "retail", unit: "unit", price: "$30" }))).toMatchObject({ ok: true, value: { size: 1, price_cents: 3000 } });
+  });
+
+  it("reads a retail product's employee price, tax and other barcodes", () => {
+    const retail = (o: Record<string, string>) => parseProductForm(form({ type: "retail", unit: "unit", price: "30", ...o }));
+    expect(retail({ employee_price: "18", tax: "own", tax_percent: "8.25", barcode: "0123456789", other_barcodes: "111111, 2222222\n333333" })).toMatchObject({
+      ok: true,
+      value: { employee_price_cents: 1800, tax_rate_bp: 825, barcode: "0123456789", other_barcodes: ["111111", "2222222", "333333"] },
+    });
+    expect(retail({ tax: "none" })).toMatchObject({ ok: true, value: { employee_price_cents: null, tax_rate_bp: 0 } });
+    expect(retail({ tax: "salon" })).toMatchObject({ ok: true, value: { tax_rate_bp: null } });
+    expect(retail({ employee_price: "31" })).toMatchObject({ ok: false, errors: { employee_price: "Make it no more than the retail price." } });
+    expect(retail({ tax: "own", tax_percent: "" })).toMatchObject({ ok: false, errors: { tax: "Enter its tax rate, e.g. 8.25." } });
+    expect(retail({ tax: "own", tax_percent: "101" })).toMatchObject({ ok: false, errors: { tax: "Enter its tax rate, e.g. 8.25." } });
+    expect(retail({ barcode: "111111", other_barcodes: "111111" })).toMatchObject({ ok: false, errors: { other_barcodes: "Each barcode only once." } });
+    expect(retail({ other_barcodes: "12ab34" })).toMatchObject({ ok: false, errors: { other_barcodes: expect.stringContaining("6 to 14 digits") } });
+    // Back bar has neither, whatever the form sends.
+    expect(parseProductForm(form({ employee_price: "5", tax: "none" }))).toMatchObject({ ok: true, value: { employee_price_cents: null, tax_rate_bp: null } });
+    expect(productTaxOf(null)).toBe("salon");
+    expect(productTaxOf(0)).toBe("none");
+    expect(productTaxOf(825)).toBe("own");
+    expect(percentText(825)).toBe("8.25%");
+    expect(percentText(1000)).toBe("10%");
   });
 
   it("checks every field", () => {

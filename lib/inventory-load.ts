@@ -16,7 +16,15 @@ export type StockRow = InventoryRow & {
 };
 
 // Every column of a product staff can read (its cost is read with loadCosts).
-export const PRODUCT_COLUMNS = "id, business_id, supplier_id, brand, line, name, sku, barcode, type, unit, size, price_cents, shelf, is_active, created_at, updated_at";
+export const PRODUCT_COLUMNS =
+  "id, business_id, supplier_id, brand, line, name, sku, barcode, other_barcodes, type, unit, size, price_cents, employee_price_cents, tax_rate_bp, shelf, is_active, created_at, updated_at";
+
+// The salon's retail tax rate, for the product form ("The salon's rate (8.25%)").
+export async function loadRetailTaxBp(supabase: Supabase, businessId: string): Promise<number> {
+  const { data, error } = await supabase.from("businesses").select("tax_rate_retail_bp").eq("id", businessId).single();
+  if (error) throw error;
+  return data.tax_rate_retail_bp;
+}
 
 // What each product costs the salon. Only the front of house can read it
 // (product_costs): anyone else gets none, and costs show as $0.
@@ -31,7 +39,7 @@ export async function loadInventory(supabase: Supabase, locationId: string, { in
   let query = supabase
     .from("products")
     .select(
-      "id, brand, line, name, sku, barcode, type, unit, size, price_cents, shelf, is_active, supplier:suppliers(id, name), stock_levels(location_id, on_hand, reorder_point, reorder_quantity)",
+      "id, brand, line, name, sku, barcode, other_barcodes, type, unit, size, price_cents, shelf, is_active, supplier:suppliers(id, name), stock_levels(location_id, on_hand, reorder_point, reorder_quantity)",
     )
     .order("brand")
     .order("line", { nullsFirst: true })

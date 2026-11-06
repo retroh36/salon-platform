@@ -15,6 +15,7 @@ import {
   describeStock,
   formatAmount,
   isLow,
+  percentText,
   productName,
   REASON_LABELS,
   stockValueCents,
@@ -96,6 +97,11 @@ async function Product({ params }: Pick<PageProps<"/inventory/[id]">, "params">)
             {!product.is_active && <Badge>Not in use</Badge>}
             {low && <Badge tone="warning">Low stock</Badge>}
             <span>{[product.sku, product.supplier?.name, product.shelf].filter(Boolean).join(" · ")}</span>
+            {(product.barcode || product.other_barcodes.length > 0) && (
+              <span className="tabular-nums" data-testid="barcodes">
+                {[product.barcode, ...product.other_barcodes].filter(Boolean).join(", ")}
+              </span>
+            )}
           </span>
         }
         actions={
@@ -144,6 +150,14 @@ async function Product({ params }: Pick<PageProps<"/inventory/[id]">, "params">)
             <div className="px-4 py-3">
               <dt className="text-13 text-ink-muted">Retail price</dt>
               <dd className="mt-1 text-2xl font-semibold text-ink tabular-nums">{formatPrice(product.price_cents)}</dd>
+              <dd className="mt-0.5 text-xs text-ink-subtle" data-testid="retail-terms">
+                {[
+                  product.employee_price_cents !== null && `Team ${formatPrice(product.employee_price_cents)}`,
+                  product.tax_rate_bp === null ? "Salon's tax rate" : product.tax_rate_bp === 0 ? "Not taxed" : `Tax ${percentText(product.tax_rate_bp)}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </dd>
             </div>
           )}
         </dl>

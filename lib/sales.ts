@@ -19,7 +19,20 @@ export type CheckoutSettings = {
   giftCardPresetsCents: number[];
 };
 
-export type CheckoutProduct = { id: string; name: string; priceCents: number; onHand: number; sku: string | null; barcode: string | null };
+export type CheckoutProduct = {
+  id: string;
+  name: string;
+  priceCents: number;
+  // What the team pays (a team purchase), and its own tax rate (null: the
+  // salon's retail rate).
+  employeePriceCents: number | null;
+  taxBp: number | null;
+  onHand: number;
+  sku: string | null;
+  barcode: string | null;
+  otherBarcodes: string[];
+};
+
 
 export function canTakePayments(role: StaffRole): boolean {
   return role === "owner" || role === "manager" || role === "front_desk";
@@ -49,13 +62,23 @@ export async function loadCheckoutSettings(supabase: Supabase, businessId: strin
 
 export async function loadRetailProducts(supabase: Supabase, businessId: string, locationId: string): Promise<CheckoutProduct[]> {
   const [{ data, error }, { data: levels, error: levelError }] = await Promise.all([
-    supabase.from("products").select("id, brand, line, name, sku, barcode, price_cents").eq("business_id", businessId).eq("type", "retail").eq("is_active", true).order("brand").order("name"),
+    supabase.from("products").select("id, brand, line, name, sku, barcode, other_barcodes, price_cents, employee_price_cents, tax_rate_bp").eq("business_id", businessId).eq("type", "retail").eq("is_active", true).order("brand").order("name"),
     supabase.from("stock_levels").select("product_id, on_hand").eq("location_id", locationId),
   ]);
   if (error) throw error;
   if (levelError) throw levelError;
   const onHand = new Map(levels.map((l) => [l.product_id, Number(l.on_hand)]));
-  return data.map((p) => ({ id: p.id, name: productName(p), priceCents: p.price_cents ?? 0, onHand: onHand.get(p.id) ?? 0, sku: p.sku, barcode: p.barcode }));
+  return data.map((p) => ({
+    id: p.id,
+    name: productName(p),
+    priceCents: p.price_cents ?? 0,
+    employeePriceCents: p.employee_price_cents,
+    taxBp: p.tax_rate_bp,
+    onHand: onHand.get(p.id) ?? 0,
+    sku: p.sku,
+    barcode: p.barcode,
+    otherBarcodes: p.other_barcodes,
+  }));
 }
 
 
@@ -65,6 +88,8 @@ export type SaleView = {
   status: Database["public"]["Enums"]["sale_status"];
   createdAt: string;
   client: { id: string; name: string; email: string | null } | null;
+  // A team purchase: who on the team bought it.
+  employee: string | null;
   appointmentId: string | null;
   items: { id: string; kind: string; description: string; staffName: string | null; quantity: number; unitPriceCents: number; bookedPriceCents: number | null; priceReason: string | null; discountCents: number; lineDiscountCents: number; lineDiscountReason: string | null; taxCents: number; totalCents: number; returnedQuantity: number }[];
   tips: { staffName: string; amountCents: number }[];
@@ -89,7 +114,7 @@ export async function loadSale(supabase: Supabase, saleId: string): Promise<Sale
   const { data: s, error } = await supabase
     .from("sales")
     .select(
-      "id, number, status, created_at, appointment_id, subtotal_cents, discount_cents, discount_reason, tax_cents, tip_cents, total_cents, refunded_cents, void_reason, receipt_email, client:clients(id, first_name, last_name, email), seller:staff!sales_created_by_business_id_fkey(first_name), sale_items(id, position, kind, description, quantity, unit_price_cents, booked_price_cents, price_reason, discount_cents, line_discount_cents, line_discount_reason, tax_cents, total_cents, returned_quantity, staff:staff(first_name)), sale_tips(amount_cents, staff:staff(first_name)), payments(id, method, amount_cents, tendered_cents, change_cents, reference, reason, created_at, processor, provider_refund), sale_events(kind, amount_cents, detail, created_at, staff:staff(first_name))",
+      "id, number, status, created_at, appointment_id, subtotal_cents, discount_cents, discount_reason, tax_cents, tip_cents, total_cents, refunded_cents, void_reason, receipt_email, client:clients(id, first_name, last_name, email), seller:staff!sales_created_by_business_id_fkey(first_name), employee:staff!sales_employee_id_fkey(first_name, last_name), sale_items(id, position, kind, description, quantity, unit_price_cents, booked_price_cents, price_reason, discount_cents, line_discount_cents, line_discount_reason, tax_cents, total_cents, returned_quantity, staff:staff(first_name)), sale_tips(amount_cents, staff:staff(first_name)), payments(id, method, amount_cents, tendered_cents, change_cents, reference, reason, created_at, processor, provider_refund), sale_events(kind, amount_cents, detail, created_at, staff:staff(first_name))",
     )
     .eq("id", saleId)
     .maybeSingle();
@@ -101,6 +126,7 @@ export async function loadSale(supabase: Supabase, saleId: string): Promise<Sale
     status: s.status,
     createdAt: s.created_at,
     client: s.client ? { id: s.client.id, name: fullName(s.client), email: s.client.email } : null,
+    employee: s.employee ? fullName(s.employee) : null,
     appointmentId: s.appointment_id,
     items: [...s.sale_items]
       .sort((a, b) => a.position - b.position)

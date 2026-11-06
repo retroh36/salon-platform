@@ -16,6 +16,8 @@ import { ChevronLeftIcon, UndoIcon } from "@/components/ui/icons";
 import type { CheckoutScreenData } from "@/lib/checkout-screen";
 import { discountAllowed } from "@/lib/checkout";
 import {
+  asTeamPurchase,
+  productLine,
   saleLines,
   totalsOf,
   ticketProblems,
@@ -284,7 +286,13 @@ export function CheckoutScreen({ data, denise }: { data: CheckoutScreenData; den
           inert={Boolean(linkOut)}
         >
           <div className="shrink-0 space-y-4 border-b border-line bg-surface px-4 py-4 sm:px-6">
-            <ClientHeader data={data} walkIn={ticket.walkIn === true} onWalkIn={(walkIn) => change((t) => ({ ...t, walkIn }))} />
+            <ClientHeader
+              data={data}
+              walkIn={ticket.walkIn === true}
+              onWalkIn={(walkIn) => change((t) => ({ ...asTeamPurchase(t, null), walkIn }))}
+              employeeId={ticket.employeeId ?? null}
+              onEmployee={(employeeId) => change((t) => asTeamPurchase(t, employeeId))}
+            />
             <ProductPicker
               data={data}
               onAdd={(product, staffId) => {
@@ -292,22 +300,12 @@ export function CheckoutScreen({ data, denise }: { data: CheckoutScreenData; den
                   (l) =>
                     l.kind === "product" &&
                     l.productId === product.id &&
-                    l.staffId === staffId,
+                    l.staffId === (ticket.employeeId ? null : staffId),
                 );
                 if (existing && existing.kind === "product") {
                   updateLine(existing.key, { quantity: existing.quantity + 1 });
                   setArrived(existing.key);
-                } else
-                  addLine({
-                    key: newKey(),
-                    kind: "product",
-                    productId: product.id,
-                    name: product.name,
-                    staffId,
-                    unitPriceCents: product.priceCents,
-                    quantity: 1,
-                    discount: null,
-                  });
+                } else addLine(productLine(newKey(), product, staffId, Boolean(ticket.employeeId)));
               }}
             />
           </div>

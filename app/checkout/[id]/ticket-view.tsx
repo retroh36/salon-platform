@@ -37,12 +37,34 @@ import type { DialogState } from "./dialogs";
 
 // The client at the top of the ticket: who, their credit, and what Denise
 // knows (folded away until wanted).
-export function ClientHeader({ data, walkIn, onWalkIn }: { data: CheckoutScreenData; walkIn: boolean; onWalkIn: (walkIn: boolean) => void }) {
+export function ClientHeader({
+  data,
+  walkIn,
+  onWalkIn,
+  employeeId,
+  onEmployee,
+}: {
+  data: CheckoutScreenData;
+  walkIn: boolean;
+  onWalkIn: (walkIn: boolean) => void;
+  employeeId: string | null;
+  onEmployee: (employeeId: string | null) => void;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const usesLeftTotal = data.packages.reduce((n, p) => n + p.items.reduce((m, i) => m + (i.total - i.used), 0), 0);
   const giftCents = data.giftCards.reduce((n, g) => n + g.balanceCents, 0);
-  if (!data.client) return <ChooseClient draftId={data.draft.id} walkIn={walkIn} onWalkIn={onWalkIn} />;
+  if (!data.client)
+    return (
+      <ChooseClient
+        draftId={data.draft.id}
+        walkIn={walkIn}
+        onWalkIn={onWalkIn}
+        team={data.draft.appointmentId ? null : data.team}
+        employeeId={employeeId}
+        onEmployee={onEmployee}
+      />
+    );
   const packageItems = data.packages.flatMap((p) => p.items.filter((i) => i.used < i.total));
   return (
     // The name has its own line and is never cut off; the buttons sit beside
@@ -185,9 +207,24 @@ function RewardsPanel({ data, ticket, rates, onChange }: { data: CheckoutScreenD
 }
 
 // A sale without a visit: find the client (for packages, memberships,
-// rewards, their gift cards and receipt), or choose "Walk-in guest" (no
-// client needed, for retail and gift cards).
-function ChooseClient({ draftId, walkIn, onWalkIn }: { draftId: string; walkIn: boolean; onWalkIn: (walkIn: boolean) => void }) {
+// rewards, their gift cards and receipt), choose "Walk-in guest" (no
+// client needed, for retail and gift cards), or a team purchase (someone on
+// the team buying, at employee prices).
+function ChooseClient({
+  draftId,
+  walkIn,
+  onWalkIn,
+  team,
+  employeeId,
+  onEmployee,
+}: {
+  draftId: string;
+  walkIn: boolean;
+  onWalkIn: (walkIn: boolean) => void;
+  team: { id: string; name: string }[] | null;
+  employeeId: string | null;
+  onEmployee: (employeeId: string | null) => void;
+}) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<ClientOption[]>([]);
@@ -203,21 +240,48 @@ function ChooseClient({ draftId, walkIn, onWalkIn }: { draftId: string; walkIn: 
     };
   }, [query]);
   const shown = query.trim().length >= 2 ? matches : [];
+  const buyer = employeeId ? team?.find((m) => m.id === employeeId) : undefined;
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <Avatar name="Walk in" size="lg" />
+      <Avatar name={buyer ? buyer.name : "Walk in"} size="lg" />
       <div className="min-w-0">
-        <p className="text-xl font-semibold tracking-[-0.01em] text-ink" data-testid="checkout-client">
-          {walkIn ? "Walk-in guest" : "Who is this for?"}
+        <p className="text-xl font-semibold tracking-[-0.01em] break-words text-ink" data-testid="checkout-client">
+          {buyer ? `Team purchase · ${buyer.name}` : walkIn ? "Walk-in guest" : "Who is this for?"}
         </p>
-        <p className="text-sm text-ink-muted">{walkIn ? "No client needed. Find one instead for a package, membership or rewards." : "Find the client, or sell to a walk-in guest."}</p>
+        <p className="text-sm text-ink-muted">
+          {buyer
+            ? "Products at their employee price, with no commission."
+            : walkIn
+              ? "No client needed. Find one instead for a package, membership or rewards."
+              : "Find the client, or sell to a walk-in guest."}
+        </p>
       </div>
-      {!walkIn && (
-        <Button size="lg" className="ml-auto" onClick={() => onWalkIn(true)}>
-          Walk-in guest
-        </Button>
-      )}
-      <div className={`relative w-72 max-w-full ${walkIn ? "ml-auto" : ""}`}>
+      <div className="ml-auto flex flex-wrap items-center gap-2">
+        {!walkIn && !buyer && (
+          <Button size="lg" onClick={() => onWalkIn(true)}>
+            Walk-in guest
+          </Button>
+        )}
+        {team && (
+          <label className="contents">
+            <span className="sr-only">Team purchase</span>
+            <select
+              value={employeeId ?? ""}
+              onChange={(e) => onEmployee(e.target.value || null)}
+              className={`${selectClass} h-12 w-52 max-w-full`}
+              data-testid="team-purchase"
+            >
+              <option value="">{buyer ? "Not a team purchase" : "Team purchase…"}</option>
+              {team.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+      <div className="relative w-72 max-w-full">
         <input aria-label="Find a client" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find a client" className={`${fieldClass} h-12`} autoComplete="off" />
         {shown.length > 0 && (
           <ul aria-label="Matching clients" className="absolute inset-x-0 top-full z-40 mt-1 overflow-hidden rounded-lg border border-line bg-surface shadow-lift">

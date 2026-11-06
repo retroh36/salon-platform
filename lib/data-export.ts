@@ -194,7 +194,7 @@ export async function exportFiles(supabase: Supabase, businessId: string, timeZo
     },
     {
       name: "products.csv",
-      header: ["Product ID", "Brand", "Line", "Name", "SKU", "Barcode", "Type", "Unit", "Size", "Cost", "Retail price", "Supplier", "Shelf", "On hand", "Active"],
+      header: ["Product ID", "Brand", "Line", "Name", "SKU", "Barcode", "Other barcodes", "Type", "Unit", "Size", "Cost", "Retail price", "Employee price", "Tax rate", "Supplier", "Shelf", "On hand", "Active"],
       rows: products.map((p) => [
         s(p.id),
         s(p.brand),
@@ -202,11 +202,15 @@ export async function exportFiles(supabase: Supabase, businessId: string, timeZo
         s(p.name),
         s(p.sku),
         s(p.barcode),
+        ((p.other_barcodes as string[] | null) ?? []).join(" ") || null,
         s(p.type),
         s(p.unit),
         n(p.size),
         dollars(costs.get(p.id as string) ?? 0),
         dollars(n(p.price_cents)),
+        dollars(n(p.employee_price_cents)),
+        // Blank: the salon's retail rate; "0%": not taxed.
+        p.tax_rate_bp === null || p.tax_rate_bp === undefined ? null : `${n(p.tax_rate_bp)! / 100}%`,
         supplierName.get(p.supplier_id as string) ?? null,
         s(p.shelf),
         stockOf.get(p.id as string) ?? 0,

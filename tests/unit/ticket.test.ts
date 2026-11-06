@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { lineDiscountCents, quickCash, tipFor } from "@/lib/checkout";
-import { saleInput, servicesFor, stylistGroups, ticketProblems, totalsOf, EMPTY_TICKET, type ServiceLine, type Ticket, type TicketLine } from "@/lib/ticket";
+import { asTeamPurchase, productLine, saleInput, scansAs, servicesFor, stylistGroups, ticketProblems, totalsOf, EMPTY_TICKET, type ServiceLine, type Ticket, type TicketLine } from "@/lib/ticket";
 
 const RATES = { taxServicesBp: 0, taxRetailBp: 1000 };
 
@@ -89,6 +89,43 @@ describe("the ticket", () => {
     expect(input).toMatchObject({ draft_id: "d", appointment_id: "a", client_id: "c", rebook_appointment_id: "next", tips: [{ staff_id: "bridget", amount_cents: 1800 }] });
     expect(input.lines[1]).toMatchObject({ kind: "service", staff_id: "gil", discount: { kind: "percent", value: 10, reason: "Loyalty" } });
     expect(input.lines[2]).toEqual({ kind: "product", product_id: "p-spray", staff_id: "bridget", quantity: 2, discount: null });
+  });
+});
+
+describe("products' own prices and tax", () => {
+  const shampoo = { id: "shampoo", name: "Shampoo", priceCents: 3000, employeePriceCents: 1800, taxBp: null };
+  const gift = { id: "gift", name: "Gift box", priceCents: 4000, employeePriceCents: null, taxBp: 0 };
+  const oil = { id: "oil", name: "Oil", priceCents: 2000, employeePriceCents: 1200, taxBp: 500 };
+
+  it("taxes each product at its own rate, or the salon's", () => {
+    const t = ticket([productLine("a", shampoo, "bridget", false), productLine("b", gift, "bridget", false), productLine("c", oil, "bridget", false)]);
+    // 10% on $30, nothing on $40, 5% on $20.
+    expect(totalsOf(t, RATES).taxCents).toBe(300 + 0 + 100);
+  });
+
+  it("prices a team purchase at employee prices, credited to nobody, and back again", () => {
+    const t = asTeamPurchase(ticket([productLine("a", shampoo, "bridget", false), productLine("b", gift, "bridget", false)], { walkIn: true }), "jordan");
+    expect(t.walkIn).toBe(false);
+    expect(t.lines.map((l) => (l.kind === "product" ? [l.unitPriceCents, l.staffId] : null))).toEqual([
+      [1800, null],
+      [4000, null],
+    ]);
+    expect(saleInput(t, { draftId: "d", appointmentId: null, clientId: null })).toMatchObject({ employee_id: "jordan", lines: [{ staff_id: null }, { staff_id: null }] });
+    expect(ticketProblems(t, RATES, true)).toContain("A team purchase has no client. Remove the client first.");
+    expect(ticketProblems(t, RATES, false)).not.toContain("A team purchase has no client. Remove the client first.");
+    const back = asTeamPurchase(t, null);
+    expect(back.lines.map((l) => (l.kind === "product" ? l.unitPriceCents : null))).toEqual([3000, 4000]);
+    expect(productLine("c", oil, "bridget", true)).toMatchObject({ unitPriceCents: 1200, staffId: null });
+    // A line saved before prices were kept stays at its price.
+    expect(asTeamPurchase(ticket([product("old", null, 2500)]), "jordan").lines[0]).toMatchObject({ unitPriceCents: 2500 });
+  });
+
+  it("scans any of a product's barcodes", () => {
+    const p = { barcode: "0123456789", otherBarcodes: ["555555"] };
+    expect(scansAs(p, " 0123456789 ")).toBe(true);
+    expect(scansAs(p, "555555")).toBe(true);
+    expect(scansAs(p, "")).toBe(false);
+    expect(scansAs({ barcode: null, otherBarcodes: [] }, "555555")).toBe(false);
   });
 });
 

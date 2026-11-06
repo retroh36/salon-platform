@@ -86,6 +86,7 @@ export type InventoryRow = {
   name: string;
   sku: string | null;
   barcode: string | null;
+  other_barcodes?: string[];
   type: ProductType;
   unit: ProductUnit;
   size: number;
@@ -107,7 +108,7 @@ export function readFilter(params: Record<string, string | string[] | undefined>
   };
 }
 
-// Search by brand, line, name, SKU or barcode (every word must match), and
+// Search by brand, line, name, SKU or any barcode (every word must match), and
 // filter by brand, type and low stock.
 export function filterInventory<T extends InventoryRow>(rows: readonly T[], f: InventoryFilter): T[] {
   const words = f.q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -115,7 +116,7 @@ export function filterInventory<T extends InventoryRow>(rows: readonly T[], f: I
     if (f.brand && r.brand !== f.brand) return false;
     if (f.type && r.type !== f.type) return false;
     if (f.low && !isLow(r.on_hand, r.reorder_point)) return false;
-    const haystack = `${productName(r)} ${r.sku ?? ""} ${r.barcode ?? ""}`.toLowerCase();
+    const haystack = `${productName(r)} ${r.sku ?? ""} ${r.barcode ?? ""} ${(r.other_barcodes ?? []).join(" ")}`.toLowerCase();
     return words.every((w) => haystack.includes(w));
   });
 }
@@ -159,9 +160,55 @@ export type ProductInput = {
   cost_cents: number;
   price_cents: number | null;
   shelf: string | null;
+  // Retail only: what the team pays, and its own tax rate (null: the
+  // salon's retail rate; 0: not taxed).
+  employee_price_cents: number | null;
+  tax_rate_bp: number | null;
+  other_barcodes: string[];
 };
 
-export type ProductField = "brand" | "name" | "sku" | "barcode" | "type" | "unit" | "size" | "cost" | "price" | "shelf";
+export type ProductField =
+  | "brand"
+  | "name"
+  | "sku"
+  | "barcode"
+  | "other_barcodes"
+  | "type"
+  | "unit"
+  | "size"
+  | "cost"
+  | "price"
+  | "employee_price"
+  | "tax"
+  | "shelf";
+
+// How a retail product is taxed on the form: the salon's retail rate, not
+// at all, or a rate of its own.
+export type ProductTax = "salon" | "none" | "own";
+
+export function productTaxOf(taxRateBp: number | null): ProductTax {
+  return taxRateBp === null ? "salon" : taxRateBp === 0 ? "none" : "own";
+}
+
+// "8.25" → 825 basis points; up to two decimals, 0 to 100.
+export function parsePercentBp(raw: string): number | null {
+  const t = raw.trim().replace(/%$/, "").trim();
+  if (!/^\d{1,3}(\.\d{1,2})?$/.test(t)) return null;
+  const bp = Math.round(Number(t) * 100);
+  return bp <= 10_000 ? bp : null;
+}
+
+export function percentText(bp: number): string {
+  return `${Number((bp / 100).toFixed(2))}%`;
+}
+
+// Other barcodes, typed with spaces, commas or new lines between them.
+export function parseBarcodes(raw: string): string[] | null {
+  const codes = raw.split(/[\s,]+/).filter(Boolean);
+  return codes.every((c) => /^\d{6,14}$/.test(c)) ? codes : null;
+}
+
+export const MAX_OTHER_BARCODES = 10;
 export type ProductFormErrors = Partial<Record<ProductField, string>>;
 
 export function parseProductForm(form: FormData): { ok: true; value: ProductInput } | { ok: false; errors: ProductFormErrors } {
@@ -179,6 +226,10 @@ export function parseProductForm(form: FormData): { ok: true; value: ProductInpu
   if (sku && sku.length > 100) errors.sku = "Keep it under 100 characters.";
   const barcode = optional("barcode");
   if (barcode && !/^\d{6,14}$/.test(barcode)) errors.barcode = "Use the 6 to 14 digits under the barcode.";
+  const others = parseBarcodes(text("other_barcodes"));
+  if (others === null) errors.other_barcodes = "Use the 6 to 14 digits under each barcode, with a space between them.";
+  else if (others.length > MAX_OTHER_BARCODES) errors.other_barcodes = `Up to ${MAX_OTHER_BARCODES} other barcodes.`;
+  else if (new Set([...others, ...(barcode ? [barcode] : [])]).size !== others.length + (barcode ? 1 : 0)) errors.other_barcodes = "Each barcode only once.";
 
   const type = text("type");
   if (!isProductType(type)) errors.type = "Choose color, back bar or retail.";
@@ -190,9 +241,22 @@ export function parseProductForm(form: FormData): { ok: true; value: ProductInpu
   const cost = parseMoney(text("cost"));
   if (cost === null) errors.cost = "Enter the cost, e.g. 9.50.";
   let price: number | null = null;
+  let employeePrice: number | null = null;
+  let taxBp: number | null = null;
   if (type === "retail") {
     price = parseMoney(text("price"));
     if (price === null) errors.price = "Enter the retail price.";
+    if (text("employee_price")) {
+      employeePrice = parseMoney(text("employee_price"));
+      if (employeePrice === null) errors.employee_price = "Enter the employee price, e.g. 18.00, or leave it empty.";
+      else if (price !== null && employeePrice > price) errors.employee_price = "Make it no more than the retail price.";
+    }
+    const tax = text("tax") || "salon";
+    if (tax === "none") taxBp = 0;
+    else if (tax === "own") {
+      taxBp = parsePercentBp(text("tax_percent"));
+      if (taxBp === null || taxBp === 0) errors.tax = "Enter its tax rate, e.g. 8.25.";
+    } else if (tax !== "salon") errors.tax = "Choose how it's taxed.";
   }
   if (type === "retail" && unit !== "unit") errors.unit = "Retail products are sold in units.";
   if (type === "color" && unit === "unit") errors.unit = "Color is measured in grams or ml.";
@@ -216,6 +280,9 @@ export function parseProductForm(form: FormData): { ok: true; value: ProductInpu
       cost_cents: cost!,
       price_cents: price,
       shelf,
+      employee_price_cents: employeePrice,
+      tax_rate_bp: taxBp,
+      other_barcodes: others ?? [],
     },
   };
 }

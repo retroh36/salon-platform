@@ -5,6 +5,7 @@ import { selectClass } from "@/components/ui/field";
 import { SearchIcon } from "@/components/ui/icons";
 import { Badge } from "@/components/ui/page";
 import type { CheckoutScreenData } from "@/lib/checkout-screen";
+import { scansAs } from "@/lib/ticket";
 import { formatPrice } from "@/lib/services";
 import { SideScroll } from "@/components/ui/side-scroll";
 import { ProductThumb } from "@/components/product-thumb";
@@ -27,7 +28,7 @@ export function ProductPicker({ data, onAdd }: { data: CheckoutScreenData; onAdd
   const q = query.trim().toLowerCase();
   const results = q
     ? data.products
-        .filter((p) => p.barcode === query.trim() || p.sku?.toLowerCase() === q || `${p.name} ${p.brand} ${p.sku ?? ""}`.toLowerCase().includes(q))
+        .filter((p) => scansAs(p, query) || p.sku?.toLowerCase() === q || `${p.name} ${p.brand} ${p.sku ?? ""}`.toLowerCase().includes(q))
         .slice(0, 8)
     : [];
   const add = (p: Product) => {
@@ -57,7 +58,7 @@ export function ProductPicker({ data, onAdd }: { data: CheckoutScreenData; onAdd
               if (e.key === "Enter") {
                 e.preventDefault();
                 // A scan or an exact SKU adds at once; otherwise the only match.
-                const exact = data.products.find((p) => p.barcode === query.trim() || p.sku?.toLowerCase() === q);
+                const exact = data.products.find((p) => scansAs(p, query) || p.sku?.toLowerCase() === q);
                 if (exact) add(exact);
                 else if (results.length === 1) add(results[0]);
               }

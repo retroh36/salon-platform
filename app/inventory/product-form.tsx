@@ -6,6 +6,7 @@ import { Field, inputClass, submitWithoutReset } from "@/components/form";
 import { buttonClass } from "@/components/ui/button";
 import { checkboxClass, selectClass } from "@/components/ui/field";
 import { Alert, Card } from "@/components/ui/page";
+import { percentText } from "@/lib/inventory";
 import { saveProduct } from "./actions";
 
 export type ProductFormValues = {
@@ -15,23 +16,28 @@ export type ProductFormValues = {
   name: string;
   sku: string;
   barcode: string;
+  other_barcodes: string;
   type: string;
   unit: string;
   size: string;
   cost: string;
   price: string;
+  employee_price: string;
+  tax: string;
+  tax_percent: string;
   shelf: string;
   supplier_id: string;
   is_active: boolean;
 };
 
-export function ProductForm({ initial, suppliers }: { initial: ProductFormValues; suppliers: { id: string; name: string }[] }) {
+export function ProductForm({ initial, suppliers, retailTaxBp }: { initial: ProductFormValues; suppliers: { id: string; name: string }[]; retailTaxBp: number }) {
   const [state, action, pending] = useActionState(saveProduct, undefined);
   const fields = state?.fields;
   const value = (k: keyof ProductFormValues) => (fields ? (fields[k] ?? "") : String(initial[k] ?? ""));
   const errors = state?.errors ?? {};
   const [type, setType] = useState(value("type") || "back_bar");
   const [unit, setUnit] = useState(type === "retail" ? "unit" : value("unit") || "g");
+  const [tax, setTax] = useState(value("tax") || "salon");
 
   return (
     <form action={action} onSubmit={submitWithoutReset(action)} noValidate aria-label={initial.product_id ? "Edit product" : "New product"}>
@@ -87,6 +93,25 @@ export function ProductForm({ initial, suppliers }: { initial: ProductFormValues
               <input name="price" defaultValue={value("price")} inputMode="decimal" required className={inputClass} placeholder="30.00" />
             </Field>
           )}
+          {type === "retail" && (
+            <Field label="Employee price ($)" hint="optional" error={errors.employee_price}>
+              <input name="employee_price" defaultValue={value("employee_price")} inputMode="decimal" className={inputClass} placeholder="18.00" />
+            </Field>
+          )}
+          {type === "retail" && (
+            <Field label="Tax" error={tax === "own" ? undefined : errors.tax}>
+              <select name="tax" value={tax} onChange={(e) => setTax(e.target.value)} className={selectClass}>
+                <option value="salon">Salon&apos;s retail rate ({percentText(retailTaxBp)})</option>
+                <option value="own">Its own rate</option>
+                <option value="none">Not taxed</option>
+              </select>
+            </Field>
+          )}
+          {type === "retail" && tax === "own" && (
+            <Field label="Tax rate (%)" error={errors.tax}>
+              <input name="tax_percent" defaultValue={value("tax_percent")} inputMode="decimal" required className={inputClass} placeholder="8.25" />
+            </Field>
+          )}
           <Field label="Supplier">
             <select name="supplier_id" defaultValue={value("supplier_id")} className={selectClass}>
               <option value="">None</option>
@@ -102,6 +127,9 @@ export function ProductForm({ initial, suppliers }: { initial: ProductFormValues
           </Field>
           <Field label="Barcode" hint="optional" error={errors.barcode}>
             <input name="barcode" defaultValue={value("barcode")} inputMode="numeric" className={inputClass} />
+          </Field>
+          <Field label="Other barcodes" hint="optional, a space between each" error={errors.other_barcodes}>
+            <input name="other_barcodes" defaultValue={value("other_barcodes")} inputMode="numeric" className={inputClass} />
           </Field>
           <Field label="Shelf" hint="for counting" error={errors.shelf}>
             <input name="shelf" defaultValue={value("shelf")} className={inputClass} placeholder="Color bar A" />

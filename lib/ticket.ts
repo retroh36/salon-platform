@@ -41,6 +41,12 @@ export type ProductLine = {
   unitPriceCents: number;
   quantity: number;
   discount: TicketDiscount;
+  // The product's price and employee price (unitPriceCents is one of them,
+  // as complete_sale prices it), and its own tax rate (null or missing: the
+  // salon's retail rate). Missing on lines saved before they were kept.
+  listPriceCents?: number;
+  employeePriceCents?: number | null;
+  taxBp?: number | null;
 };
 
 export type GiftCardLine = { key: string; kind: "gift_card"; amountCents: number; physical: boolean; code: string; recipientName: string; recipientEmail: string };
@@ -79,7 +85,45 @@ export type Ticket = {
   tierPerk?: boolean;
   // A sale without a visit that staff marked "Walk-in guest": no client.
   walkIn?: boolean;
+  // A team purchase: who on the team is buying (no client or visit).
+  // Products are at their employee price, credited to nobody.
+  employeeId?: string | null;
 };
+
+type SellableProduct = { id: string; name: string; priceCents: number; employeePriceCents: number | null; taxBp: number | null };
+
+// A product line as complete_sale will price it: the employee price on a
+// team purchase (credited to nobody), else the price.
+export function productLine(key: string, p: SellableProduct, staffId: string | null, employee: boolean): ProductLine {
+  return {
+    key,
+    kind: "product",
+    productId: p.id,
+    name: p.name,
+    staffId: employee ? null : staffId,
+    unitPriceCents: employee ? (p.employeePriceCents ?? p.priceCents) : p.priceCents,
+    quantity: 1,
+    discount: null,
+    listPriceCents: p.priceCents,
+    employeePriceCents: p.employeePriceCents,
+    taxBp: p.taxBp,
+  };
+}
+
+// Makes the sale a team purchase for someone (or not, with null), pricing
+// its products to match.
+export function asTeamPurchase(ticket: Ticket, employeeId: string | null): Ticket {
+  return {
+    ...ticket,
+    employeeId,
+    walkIn: employeeId ? false : ticket.walkIn,
+    lines: ticket.lines.map((l) => {
+      if (l.kind !== "product") return l;
+      const list = l.listPriceCents ?? l.unitPriceCents;
+      return { ...l, staffId: employeeId ? null : l.staffId, unitPriceCents: employeeId ? (l.employeePriceCents ?? list) : list };
+    }),
+  };
+}
 
 export const EMPTY_TICKET: Ticket = { lines: [], saleDiscount: null, tips: {}, payments: [], receiptEmail: "", rebook: null, promotions: [], rewards: [] };
 
@@ -210,7 +254,7 @@ export function saleLines(ticket: Ticket, given: Rates): SaleLine[] {
           ? { grossCents: gross, taxBp: 0, discountable: false }
           : { grossCents: gross, taxBp: rates.taxServicesBp, discountable: true, lineDiscountCents: ownDiscountOf(l, rates) };
       case "product":
-        return { grossCents: gross, taxBp: rates.taxRetailBp, discountable: true, lineDiscountCents: ownDiscountOf(l, rates) };
+        return { grossCents: gross, taxBp: l.taxBp ?? rates.taxRetailBp, discountable: true, lineDiscountCents: ownDiscountOf(l, rates) };
       case "package":
         return { grossCents: gross, taxBp: rates.taxServicesBp, discountable: true };
       case "membership":
@@ -268,6 +312,7 @@ export function servicesFor(ticket: Ticket, staffId: string, given: Rates = NO_M
 export function ticketProblems(ticket: Ticket, rates: Rates, hasClient: boolean): string[] {
   const problems: string[] = [];
   if (!ticket.lines.length) problems.push("Add something to the ticket.");
+  if (ticket.employeeId && hasClient) problems.push("A team purchase has no client. Remove the client first.");
   for (const l of ticket.lines) {
     if ((l.kind === "service" || l.kind === "product") && l.unitPriceCents !== (l.kind === "service" ? l.basePriceCents : l.unitPriceCents)) {
       if (l.kind === "service" && !l.priceReason.trim()) problems.push(`Say why ${l.name}'s price changed.`);
@@ -347,6 +392,7 @@ export function saleInput(ticket: Ticket, ids: { draftId: string; appointmentId:
     appointment_id: ids.appointmentId,
     client_id: ids.clientId,
     rebook_appointment_id: ticket.rebook?.appointmentId ?? null,
+    employee_id: ticket.employeeId ?? null,
     promotion_ids: ticket.promotions,
     reward_ids: ticket.rewards ?? [],
     tier_perk: Boolean(ticket.tierPerk),
@@ -366,7 +412,7 @@ export function saleInput(ticket: Ticket, ids: { draftId: string; appointmentId:
             discount: l.discount && l.discount.value > 0 ? l.discount : null,
           };
         case "product":
-          return { kind: "product", product_id: l.productId, staff_id: l.staffId, quantity: l.quantity, discount: l.discount && l.discount.value > 0 ? l.discount : null };
+          return { kind: "product", product_id: l.productId, staff_id: ticket.employeeId ? null : l.staffId, quantity: l.quantity, discount: l.discount && l.discount.value > 0 ? l.discount : null };
         case "gift_card":
           return { kind: "gift_card", amount_cents: l.amountCents, code: l.physical ? l.code : null, recipient_name: l.recipientName || null, recipient_email: l.physical ? null : l.recipientEmail };
         case "gift_card_reload":
@@ -394,6 +440,12 @@ export function saleInput(ticket: Ticket, ids: { draftId: string; appointmentId:
   };
 }
 
+// A scan matches a product's barcode or one of its others.
+export function scansAs(p: { barcode: string | null; otherBarcodes: string[] }, code: string): boolean {
+  const c = code.trim();
+  return c !== "" && (p.barcode === c || p.otherBarcodes.includes(c));
+}
+
 // Parses a saved ticket (from sale_drafts), keeping only what fits.
 export function parseTicket(json: unknown): Ticket {
   const t = (json ?? {}) as Partial<Ticket>;
@@ -408,5 +460,6 @@ export function parseTicket(json: unknown): Ticket {
     rewards: Array.isArray(t.rewards) ? t.rewards.filter((p): p is string => typeof p === "string") : [],
     tierPerk: t.tierPerk === true,
     walkIn: t.walkIn === true,
+    employeeId: typeof t.employeeId === "string" ? t.employeeId : null,
   };
 }

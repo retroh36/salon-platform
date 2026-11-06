@@ -5,9 +5,9 @@ import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { BackLink } from "@/components/ui/back-link";
 import { PageHeader } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
-import { loadCosts, PRODUCT_COLUMNS } from "@/lib/inventory-load";
+import { loadCosts, loadRetailTaxBp, PRODUCT_COLUMNS } from "@/lib/inventory-load";
 import { isUuid } from "@/lib/ids";
-import { canManageInventory, productName } from "@/lib/inventory";
+import { canManageInventory, productName, productTaxOf } from "@/lib/inventory";
 import { ProductForm } from "../../product-form";
 
 export const metadata: Metadata = { title: "Edit product" };
@@ -27,10 +27,11 @@ async function EditProduct({ params }: Pick<PageProps<"/inventory/[id]/edit">, "
   if (!me) return <NotLinked />;
   if (!isUuid(id)) notFound();
   if (!canManageInventory(me.role)) redirect(`/inventory/${id}`);
-  const [{ data: product, error }, { data: suppliers, error: supplierError }, costs] = await Promise.all([
+  const [{ data: product, error }, { data: suppliers, error: supplierError }, costs, retailTaxBp] = await Promise.all([
     supabase.from("products").select(PRODUCT_COLUMNS).eq("id", id).maybeSingle(),
     supabase.from("suppliers").select("id, name").order("name"),
     loadCosts(supabase),
+    loadRetailTaxBp(supabase, me.business_id),
   ]);
   if (error) throw error;
   if (supplierError) throw supplierError;
@@ -41,6 +42,7 @@ async function EditProduct({ params }: Pick<PageProps<"/inventory/[id]/edit">, "
       <PageHeader title="Edit product" />
       <ProductForm
         suppliers={suppliers}
+        retailTaxBp={retailTaxBp}
         initial={{
           product_id: product.id,
           brand: product.brand,
@@ -48,11 +50,15 @@ async function EditProduct({ params }: Pick<PageProps<"/inventory/[id]/edit">, "
           name: product.name,
           sku: product.sku ?? "",
           barcode: product.barcode ?? "",
+          other_barcodes: product.other_barcodes.join(" "),
           type: product.type,
           unit: product.unit,
           size: String(product.size),
           cost: money(costs.get(product.id) ?? 0),
           price: money(product.price_cents),
+          employee_price: money(product.employee_price_cents),
+          tax: productTaxOf(product.tax_rate_bp),
+          tax_percent: product.tax_rate_bp ? String(product.tax_rate_bp / 100) : "",
           shelf: product.shelf ?? "",
           supplier_id: product.supplier_id ?? "",
           is_active: product.is_active,
