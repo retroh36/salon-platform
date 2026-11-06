@@ -50,9 +50,10 @@ export async function loadInventory(supabase: Supabase, locationId: string, { in
 
 export type PickerProduct = { id: string; brand: string; line: string | null; name: string; unit: "g" | "ml" | "unit" };
 
-// Back-bar products in use, for formula and recipe pickers, in natural order.
+// Color and back-bar products in use, for formula and recipe pickers, in
+// natural order.
 export async function loadBackBarProducts(supabase: Supabase): Promise<PickerProduct[]> {
-  const { data, error } = await supabase.from("products").select("id, brand, line, name, unit").eq("type", "back_bar").eq("is_active", true);
+  const { data, error } = await supabase.from("products").select("id, brand, line, name, unit").in("type", ["color", "back_bar"]).eq("is_active", true);
   if (error) throw error;
   const order = (p: PickerProduct) => [p.brand, p.line ?? "", p.name].join("\u0000");
   return data.sort((a, b) => order(a).localeCompare(order(b), "en", { numeric: true, sensitivity: "base" }));

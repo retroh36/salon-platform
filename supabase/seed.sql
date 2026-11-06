@@ -639,7 +639,7 @@ update public.services set needs_room = true
 where business_id = 'b0000000-0000-4000-8000-000000000001' and name in ('Keratin Smoothing', 'Brazilian Blowout');
 
 -- ---------------------------------------------------------------------------
--- Inventory: three suppliers, back-bar color (by weight or volume, so
+-- Inventory: three suppliers, color and back bar (by weight or volume, so
 -- partly used tubes count) and retail (by unit). Stock was last counted
 -- three weeks ago; a few things are already low.
 -- ---------------------------------------------------------------------------
@@ -654,27 +654,27 @@ insert into public.suppliers (id, business_id, name, email, phone, account_numbe
 
 with items (supplier, brand, line, name, type, unit, size, cost, price, shelf, sku, containers, reorder_containers, reorder_qty) as (values
   -- Permanent color: 60 g tubes.
-  (1, 'Goldwell', 'Topchic', '4N',  'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-4N',  3.5, 2, 4),
-  (1, 'Goldwell', 'Topchic', '5N',  'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-5N',  4.25, 2, 4),
-  (1, 'Goldwell', 'Topchic', '6N',  'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-6N',  5.5, 3, 6),
-  (1, 'Goldwell', 'Topchic', '6NN', 'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-6NN', 3.0, 2, 4),
-  (1, 'Goldwell', 'Topchic', '7N',  'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-7N',  2.4, 3, 6),
-  (1, 'Goldwell', 'Topchic', '7NN', 'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-7NN', 2.75, 2, 4),
-  (1, 'Goldwell', 'Topchic', '8N',  'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-8N',  4.0, 2, 4),
-  (1, 'Goldwell', 'Topchic', '9N',  'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-9N',  3.6, 2, 4),
-  (1, 'Goldwell', 'Topchic', '10N', 'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-10N', 2.0, 1, 3),
-  (1, 'Goldwell', 'Topchic', '6RR', 'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-6RR', 1.5, 1, 2),
-  (1, 'Goldwell', 'Topchic', '7G',  'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-7G',  2.2, 1, 3),
-  (1, 'Goldwell', 'Topchic', '8A',  'back_bar', 'g', 60, 950, null, 'Color bar A', 'GW-TC-8A',  1.8, 1, 3),
+  (1, 'Goldwell', 'Topchic', '4N',  'color', 'g', 60, 950, null, 'Color bar A', 'GW-TC-4N',  3.5, 2, 4),
+  (1, 'Goldwell', 'Topchic', '5N',  'color', 'g', 60, 950, null, 'Color bar A', 'GW-TC-5N',  4.25, 2, 4),
+  (1, 'Goldwell', 'Topchic', '6N',  'color', 'g', 60, 950, null, 'Color bar A', 'GW-TC-6N',  5.5, 3, 6),
+  (1, 'Goldwell', 'Topchic', '6NN', 'color', 'g', 60, 950, null, 'Color bar A', 'GW-TC-6NN', 3.0, 2, 4),
+  (1, 'Goldwell', 'Topchic', '7N',  'color', 'g', 60, 950, null, 'Color bar A', 'GW-TC-7N',  2.4, 3, 6),
+  (1, 'Goldwell', 'Topchic', '7NN', 'color', 'g', 60, 950, null, 'Color bar A', 'GW-TC-7NN', 2.75, 2, 4),
+  (1, 'Goldwell', 'Topchic', '8N',  'color', 'g', 60, 950, null, 'Color bar A', 'GW-TC-8N',  4.0, 2, 4),
+  (1, 'Goldwell', 'Topchic', '9N',  'color', 'g', 60, 950, null, 'Color bar A', 'GW-TC-9N',  3.6, 2, 4),
+  (1, 'Goldwell', 'Topchic', '10N', 'color', 'g', 60, 950, null, 'Color bar A', 'GW-TC-10N', 2.0, 1, 3),
+  (1, 'Goldwell', 'Topchic', '6RR', 'color', 'g', 60, 950, null, 'Color bar A', 'GW-TC-6RR', 1.5, 1, 2),
+  (1, 'Goldwell', 'Topchic', '7G',  'color', 'g', 60, 950, null, 'Color bar A', 'GW-TC-7G',  2.2, 1, 3),
+  (1, 'Goldwell', 'Topchic', '8A',  'color', 'g', 60, 950, null, 'Color bar A', 'GW-TC-8A',  1.8, 1, 3),
   -- Demi-permanent gloss: 60 ml bottles.
-  (1, 'Redken', 'Shades EQ', '06NB',  'back_bar', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-06NB', 3.0, 2, 4),
-  (1, 'Redken', 'Shades EQ', '07N',   'back_bar', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-07N',  2.5, 2, 4),
-  (1, 'Redken', 'Shades EQ', '08GI',  'back_bar', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-08GI', 3.4, 2, 4),
-  (1, 'Redken', 'Shades EQ', '09N',   'back_bar', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-09N',  2.8, 2, 4),
-  (1, 'Redken', 'Shades EQ', '09T',   'back_bar', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-09T',  1.6, 2, 4),
-  (1, 'Redken', 'Shades EQ', '09V',   'back_bar', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-09V',  4.5, 2, 4),
-  (1, 'Redken', 'Shades EQ', '010P',  'back_bar', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-010P', 2.3, 1, 3),
-  (1, 'Redken', 'Shades EQ', 'Clear', 'back_bar', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-CLR',  3.0, 2, 4),
+  (1, 'Redken', 'Shades EQ', '06NB',  'color', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-06NB', 3.0, 2, 4),
+  (1, 'Redken', 'Shades EQ', '07N',   'color', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-07N',  2.5, 2, 4),
+  (1, 'Redken', 'Shades EQ', '08GI',  'color', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-08GI', 3.4, 2, 4),
+  (1, 'Redken', 'Shades EQ', '09N',   'color', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-09N',  2.8, 2, 4),
+  (1, 'Redken', 'Shades EQ', '09T',   'color', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-09T',  1.6, 2, 4),
+  (1, 'Redken', 'Shades EQ', '09V',   'color', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-09V',  4.5, 2, 4),
+  (1, 'Redken', 'Shades EQ', '010P',  'color', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-010P', 2.3, 1, 3),
+  (1, 'Redken', 'Shades EQ', 'Clear', 'color', 'ml', 60, 1125, null, 'Color bar B', 'RK-EQ-CLR',  3.0, 2, 4),
   (1, 'Redken', 'Shades EQ', 'Processing Solution', 'back_bar', 'ml', 1000, 1600, null, 'Developer shelf', 'RK-EQ-PS', 1.4, 1, 2),
   -- Developers, one per volume: 1 liter bottles.
   (1, 'Goldwell', 'Topchic', '10 Vol Developer (3%)', 'back_bar', 'ml', 1000, 1400, null, 'Developer shelf', 'GW-DEV-10', 1.6, 1, 2),
@@ -685,9 +685,9 @@ with items (supplier, brand, line, name, type, unit, size, cost, price, shelf, s
   (1, 'Wella', 'Blondor', 'Multi Blonde Powder', 'back_bar', 'g', 800, 3800, null, 'Lightener shelf', 'WE-BLD-800', 1.3, 1, 2),
   (1, 'Redken', 'Flash Lift', 'Bonder Inside Lightener', 'back_bar', 'g', 500, 3400, null, 'Lightener shelf', 'RK-FL-500', 0.9, 1, 2),
   -- Toners: 42 ml bottles.
-  (3, 'Wella', 'Color Charm', 'T18 Lightest Ash Blonde', 'back_bar', 'ml', 42, 650, null, 'Color bar B', 'WE-CC-T18', 3.0, 2, 6),
-  (3, 'Wella', 'Color Charm', 'T14 Pale Ash Blonde',     'back_bar', 'ml', 42, 650, null, 'Color bar B', 'WE-CC-T14', 2.5, 2, 6),
-  (3, 'Wella', 'Color Charm', 'T11 Lightest Beige Blonde', 'back_bar', 'ml', 42, 650, null, 'Color bar B', 'WE-CC-T11', 1.0, 1, 4),
+  (3, 'Wella', 'Color Charm', 'T18 Lightest Ash Blonde', 'color', 'ml', 42, 650, null, 'Color bar B', 'WE-CC-T18', 3.0, 2, 6),
+  (3, 'Wella', 'Color Charm', 'T14 Pale Ash Blonde',     'color', 'ml', 42, 650, null, 'Color bar B', 'WE-CC-T14', 2.5, 2, 6),
+  (3, 'Wella', 'Color Charm', 'T11 Lightest Beige Blonde', 'color', 'ml', 42, 650, null, 'Color bar B', 'WE-CC-T11', 1.0, 1, 4),
   -- Back-bar treatments and wash.
   (2, 'Olaplex', null, 'No.1 Bond Multiplier', 'back_bar', 'ml', 525, 9500, null, 'Back bar', 'OLX-1-525', 0.7, 0.5, 1),
   (2, 'Olaplex', null, 'No.2 Bond Perfector', 'back_bar', 'ml', 2000, 16500, null, 'Back bar', 'OLX-2-2000', 0.6, 0.25, 1),

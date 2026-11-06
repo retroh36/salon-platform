@@ -55,9 +55,11 @@ export function ProductForm({ initial, suppliers }: { initial: ProductFormValues
               onChange={(e) => {
                 setType(e.target.value);
                 if (e.target.value === "retail") setUnit("unit");
+                if (e.target.value === "color" && unit === "unit") setUnit("g");
               }}
               className={selectClass}
             >
+              <option value="color">Color (shades for formulas)</option>
               <option value="back_bar">Back bar (used in services)</option>
               <option value="retail">Retail (sold to clients)</option>
             </select>
@@ -66,7 +68,7 @@ export function ProductForm({ initial, suppliers }: { initial: ProductFormValues
             <select name="unit" value={unit} onChange={(e) => setUnit(e.target.value)} className={selectClass} disabled={type === "retail"}>
               <option value="g">Grams</option>
               <option value="ml">ml</option>
-              <option value="unit">Units</option>
+              {type !== "color" && <option value="unit">Units</option>}
             </select>
           </Field>
           {type === "retail" && <input type="hidden" name="unit" value="unit" />}

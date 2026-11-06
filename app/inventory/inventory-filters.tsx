@@ -70,6 +70,7 @@ export function InventoryFilters({ filter, brands }: { filter: InventoryFilter; 
         onChange={(type) => go({ type: type === "all" ? null : type })}
         options={[
           { value: "all", label: "All" },
+          { value: "color", label: "Color" },
           { value: "back_bar", label: "Back bar" },
           { value: "retail", label: "Retail" },
         ]}

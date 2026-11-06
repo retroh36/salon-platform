@@ -1,8 +1,10 @@
 // Products and stock: amounts, values, low stock, filters, permissions and
 // the product form. Pure, so pages, server actions and tests share them.
 //
-// Amounts are in the product's unit: grams or ml for back-bar products used
-// by weight or volume (so partly used tubes count), units for retail.
+// Amounts are in the product's unit: grams or ml for color and back-bar
+// products used by weight or volume (so partly used tubes count), units for
+// retail. Color (shades: permanent, demi, toners) works like back bar, used
+// in formulas and recipes, but is its own type to filter and report on.
 // `size` is one container: a 60 g tube, a 1000 ml bottle, 1 unit.
 
 import type { Enums } from "@/lib/database.types";
@@ -12,7 +14,11 @@ export type ProductType = Enums<"product_type">;
 export type ProductUnit = Enums<"product_unit">;
 export type StockReason = Enums<"stock_reason">;
 
-export const TYPE_LABELS: Record<ProductType, string> = { retail: "Retail", back_bar: "Back bar" };
+export const TYPE_LABELS: Record<ProductType, string> = { color: "Color", back_bar: "Back bar", retail: "Retail" };
+
+export function isProductType(value: string): value is ProductType {
+  return Object.hasOwn(TYPE_LABELS, value);
+}
 export const UNIT_LABELS: Record<ProductUnit, string> = { g: "grams", ml: "ml", unit: "units" };
 export const REASON_LABELS: Record<StockReason, string> = {
   service_use: "Service use",
@@ -96,7 +102,7 @@ export function readFilter(params: Record<string, string | string[] | undefined>
   return {
     q: one("q").slice(0, 100),
     brand: one("brand") || null,
-    type: type === "retail" || type === "back_bar" ? type : null,
+    type: isProductType(type) ? type : null,
     low: one("low") === "1",
   };
 }
@@ -175,7 +181,7 @@ export function parseProductForm(form: FormData): { ok: true; value: ProductInpu
   if (barcode && !/^\d{6,14}$/.test(barcode)) errors.barcode = "Use the 6 to 14 digits under the barcode.";
 
   const type = text("type");
-  if (type !== "retail" && type !== "back_bar") errors.type = "Choose retail or back bar.";
+  if (!isProductType(type)) errors.type = "Choose color, back bar or retail.";
   const unit = text("unit");
   if (unit !== "g" && unit !== "ml" && unit !== "unit") errors.unit = "Choose grams, ml or units.";
 
@@ -189,6 +195,7 @@ export function parseProductForm(form: FormData): { ok: true; value: ProductInpu
     if (price === null) errors.price = "Enter the retail price.";
   }
   if (type === "retail" && unit !== "unit") errors.unit = "Retail products are sold in units.";
+  if (type === "color" && unit === "unit") errors.unit = "Color is measured in grams or ml.";
   const shelf = optional("shelf");
   if (shelf && shelf.length > 100) errors.shelf = "Keep it under 100 characters.";
   size ??= 1;

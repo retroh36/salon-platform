@@ -5,7 +5,7 @@ who: owner, manager
 open: /services | Open Services
 ---
 
-Set the back-bar products a service usually uses, so stock is taken off at checkout when no formula is recorded.
+Set the color and back-bar products a service usually uses, so stock is taken off at checkout when no formula is recorded.
 
 1. In the sidebar, tap **Services**.
 2. Tap the service.
@@ -16,6 +16,6 @@ Set the back-bar products a service usually uses, so stock is taken off at check
 
 ## Good to know
 
-- Only back-bar products can be in a recipe.
+- Only color and back-bar products can be in a recipe, not retail.
 - When the stylist records a formula with products for the visit, that's used instead of the recipe.
 - Denise also uses recipes to work out what upcoming visits will need when suggesting reorders.

@@ -117,11 +117,14 @@ describe("products and suppliers", () => {
     expect((await frontDesk.from("suppliers").insert({ business_id: B, name: `${run} Other` })).error?.code).toBe("42501");
   });
 
-  it("checks retail has a price and back bar doesn't, and SKUs are unique", async () => {
+  it("checks retail has a price and back bar and color don't, color isn't in units, and SKUs are unique", async () => {
     const base = { business_id: B, brand: run, name: "x", cost_cents: 100 };
     expect((await admin.from("products").insert({ ...base, type: "retail", unit: "unit", size: 1 })).error?.code).toBe("23514");
     expect((await admin.from("products").insert({ ...base, type: "back_bar", unit: "g", size: 60, price_cents: 100 })).error?.code).toBe("23514");
     expect((await admin.from("products").insert({ ...base, type: "back_bar", unit: "unit", size: 2 })).error?.code).toBe("23514");
+    expect((await admin.from("products").insert({ ...base, type: "color", unit: "g", size: 60, price_cents: 100 })).error?.code).toBe("23514");
+    expect((await admin.from("products").insert({ ...base, type: "color", unit: "unit", size: 1 })).error?.code).toBe("23514");
+    expect((await admin.from("products").insert({ ...base, type: "color", unit: "ml", size: 60 })).error).toBeNull();
     await admin.from("products").insert({ ...base, type: "back_bar", unit: "g", size: 60, sku: `${run}-1` });
     expect((await admin.from("products").insert({ ...base, type: "back_bar", unit: "g", size: 60, sku: `${run}-1`.toLowerCase() })).error?.code).toBe("23505");
   });

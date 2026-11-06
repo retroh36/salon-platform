@@ -109,6 +109,13 @@ describe("the product form", () => {
     });
   });
 
+  it("reads color, by weight or volume, never in units", () => {
+    expect(parseProductForm(form({ type: "color" }))).toMatchObject({ ok: true, value: { type: "color", unit: "g", price_cents: null } });
+    expect(parseProductForm(form({ type: "color", unit: "unit" }))).toEqual({ ok: false, errors: { unit: "Color is measured in grams or ml." } });
+    expect(readFilter({ type: "color" }).type).toBe("color");
+    expect(readFilter({ type: "toString" }).type).toBeNull();
+  });
+
   it("needs a price for retail, sold in units", () => {
     expect(parseProductForm(form({ type: "retail", unit: "unit", price: "" }))).toEqual({ ok: false, errors: { price: "Enter the retail price." } });
     expect(parseProductForm(form({ type: "retail", unit: "ml", price: "30" }))).toMatchObject({ ok: false, errors: { unit: "Retail products are sold in units." } });

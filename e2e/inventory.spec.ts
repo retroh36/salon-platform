@@ -61,6 +61,16 @@ test.describe("owner", () => {
     await expect(sevenN).toContainText("180 g");
     await expect(sevenN).toContainText("Low stock");
     await expect(sevenN).toContainText("$22.80");
+    await expect(sevenN).toContainText("Color");
+
+    // Color is its own type: the shades, not the developer.
+    await search.fill("topchic");
+    await ui(page).getByRole("radio", { name: "Color" }).click();
+    await expect(page).toHaveURL(/type=color/);
+    await expect(products(page).filter({ hasText: "7N" }).first()).toBeVisible();
+    await expect(products(page).filter({ hasText: "Developer" })).toHaveCount(0);
+    await ui(page).getByRole("radio", { name: "All" }).click();
+    await expect(page).not.toHaveURL(/type=/);
 
     await search.fill("");
     await ui(page).getByRole("button", { name: /Brand/ }).click();
