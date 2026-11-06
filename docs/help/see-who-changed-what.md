@@ -1,11 +1,11 @@
 ---
 title: See who changed what
-keywords: audit, audit trail, who moved, who canceled, who voided, who refunded, discounts, zero dollar sale, $0 sale, history, log, changes, who did it, accountability, gift card adjusted, fee waived, points adjusted, pay rates, team purchase, employee purchase, clocked hours, punch changed, time clock
+keywords: audit, audit trail, who moved, who canceled, who voided, who refunded, discounts, zero dollar sale, $0 sale, history, log, changes, who did it, accountability, gift card adjusted, fee waived, points adjusted, pay rates, team purchase, employee purchase, clocked hours, punch changed, time clock, PTO adjusted, PTO balance
 who: owner, manager
 open: /audit | Open the audit trail
 ---
 
-The audit trail lists every change with who made it. That includes every move, cancel, no-show and check-in on a visit, and every sale, void, refund and discount. It also lists gift card and fee changes, points adjustments, pay rate changes, changes to clocked hours and going live.
+The audit trail lists every change with who made it. That includes every move, cancel, no-show and check-in on a visit, and every sale, void, refund and discount. It also lists gift card and fee changes, points adjustments, pay rate changes, changes to clocked hours, PTO adjustments and going live.
 
 1. In the sidebar, under **Sales**, tap **Audit trail**.
 2. Under **What**, choose a type, or leave it on **Everything**.

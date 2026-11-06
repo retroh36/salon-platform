@@ -27,8 +27,9 @@ export function formatDay(date: LocalDate, withYear = false): string {
 }
 
 // "Vacation · Mon, Nov 2 – Sun, Nov 8" or "Personal · Thu, Oct 29, 2pm–4pm".
-export function describeTimeOff(t: TimeOff): string {
-  const reason = REASON_LABELS[t.reason as TimeOffReason] ?? "Time off";
+// The salon's name for its type when given ("Jury duty"), else the reason.
+export function describeTimeOff(t: TimeOff & { typeName?: string | null }): string {
+  const reason = t.typeName || (REASON_LABELS[t.reason as TimeOffReason] ?? "Time off");
   const when =
     t.startsOn === t.endsOn
       ? formatDay(t.startsOn) + (t.startMinute != null && t.endMinute != null ? `, ${formatMinute(t.startMinute)}–${formatMinute(t.endMinute)}` : "")

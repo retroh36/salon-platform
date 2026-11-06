@@ -4,14 +4,15 @@ const TABS = [
   { value: "team", href: "/scheduling", label: "Team schedule" },
   { value: "floor", href: "/scheduling/floor", label: "Floor today" },
   { value: "requests", href: "/scheduling/requests", label: "Requests" },
+  { value: "balances", href: "/scheduling/balances", label: "Balances" },
 ] as const;
 
-// Scheduling's pages, as links. Requests are for owners and managers, with
-// how many are waiting.
+// Scheduling's pages, as links. Requests (with how many are waiting) and
+// time off balances are for owners and managers.
 export function SchedulingTabs({ current, pending }: { current: (typeof TABS)[number]["value"]; pending?: number | null }) {
   return (
-    <nav aria-label="Scheduling pages" className="mb-6 flex w-full max-w-xl gap-1 rounded-lg bg-sunken p-1">
-      {TABS.filter((t) => t.value !== "requests" || pending != null).map((t) => (
+    <nav aria-label="Scheduling pages" className="mb-6 flex w-full max-w-2xl gap-1 rounded-lg bg-sunken p-1">
+      {TABS.filter((t) => (t.value !== "requests" && t.value !== "balances") || pending != null).map((t) => (
         <Link
           key={t.value}
           href={t.href}

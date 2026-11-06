@@ -1717,3 +1717,38 @@ where id = (
   where staff_id = 'd0000000-0000-4000-8000-000000000012' and clock_in < (now() at time zone 'America/Chicago')::date at time zone 'America/Chicago'
   order by clock_in desc limit 1
 );
+
+-- PTO: Maple & Ash grants 80 hours a year (January to December), carries
+-- up to 40 over and caps balances at 120, counted from the start of last
+-- year, so there's a year-end carry-over to see. The team has been here
+-- since before then. Bereavement is a type of its own, not using PTO.
+-- Bridget came with 12 hours from before, and Gil had 8 hours paid out.
+update public.staff set created_at = date_trunc('year', now() at time zone 'America/Chicago') - interval '2 years'
+where business_id = 'b0000000-0000-4000-8000-000000000001';
+
+insert into public.pto_policies (business_id, is_on, accrual, yearly_minutes, prorate_first_year, year_start_month, carry_over, carry_minutes, cap_minutes, tracking_from, updated_by)
+values ('b0000000-0000-4000-8000-000000000001', true, 'yearly', 80 * 60, true, 1, 'up_to', 40 * 60, 120 * 60,
+        (date_trunc('year', now() at time zone 'America/Chicago') - interval '1 year')::date, 'd0000000-0000-4000-8000-000000000001');
+
+insert into public.time_off_types (business_id, name, reason, uses_pto, position)
+values ('b0000000-0000-4000-8000-000000000001', 'Bereavement', 'other', false, 4);
+
+insert into public.pto_adjustments (business_id, staff_id, on_date, minutes, reason, by_staff_id, created_at)
+values
+  ('b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000004',
+   (date_trunc('year', now() at time zone 'America/Chicago') - interval '1 year')::date, 12 * 60, 'Starting balance from before Maestra', 'd0000000-0000-4000-8000-000000000001', now() - interval '20 days'),
+  ('b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000005',
+   (now() at time zone 'America/Chicago')::date - 10, -8 * 60, 'Paid out at their request', 'd0000000-0000-4000-8000-000000000002', now() - interval '10 days');
+
+-- Time off taken earlier this PTO year (before the busy months' visits):
+-- Shae's week of vacation, a sick day for Nola and a personal day for Lois.
+insert into public.staff_time_off (business_id, staff_id, starts_on, ends_on, reason, note, status, requested_by, decided_by, decided_at, created_at)
+select 'b0000000-0000-4000-8000-000000000001', t.staff_id, t.starts_on, t.ends_on, t.reason::public.time_off_reason, t.note, 'approved',
+       t.staff_id, 'd0000000-0000-4000-8000-000000000002', (t.starts_on - 20)::timestamptz, (t.starts_on - 21)::timestamptz
+from (select greatest(date_trunc('year', now() at time zone 'America/Chicago')::date + 60, (now() at time zone 'America/Chicago')::date - 200) as base) b,
+     lateral (values
+       ('d0000000-0000-4000-8000-000000000009'::uuid, b.base, b.base + 6, 'vacation', 'Lake trip'),
+       ('d0000000-0000-4000-8000-000000000007'::uuid, b.base + 21, b.base + 22, 'sick', null),
+       ('d0000000-0000-4000-8000-000000000010'::uuid, b.base + 35, b.base + 35, 'personal', 'Moving day')
+     ) as t (staff_id, starts_on, ends_on, reason, note)
+where b.base < (now() at time zone 'America/Chicago')::date - 120;

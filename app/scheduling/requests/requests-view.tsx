@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { fieldClass, labelClass } from "@/components/ui/field";
 import { Alert, Badge, EmptyState, Section, textLinkClass } from "@/components/ui/page";
 import { Sheet } from "@/components/ui/sheet";
+import { formatPto } from "@/lib/pto";
 import { describeTimeOff, formatDay, formatDayAt } from "@/lib/schedule-format";
 import { formatMinute, type LocalDate } from "@/lib/scheduling/time";
 import { outPanelHref, visitsByDay } from "@/lib/time-off-requests";
@@ -65,6 +66,15 @@ function PendingRequest({ request: r, noticeDays, timezone, onDecline }: { reque
         </div>
       </div>
       <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-[9rem_1fr]">
+        {r.pto && (
+          <>
+            <dt className="text-ink-muted">PTO</dt>
+            <dd data-testid="request-pto" className={r.pto.leaves < 0 ? "font-medium text-danger" : undefined}>
+              Uses {formatPto(r.pto.minutes)} · leaves {formatPto(r.pto.leaves)}
+              {r.pto.leaves < 0 ? ", more than they have" : ""}
+            </dd>
+          </>
+        )}
         <dt className="text-ink-muted">Clients booked</dt>
         <dd data-testid="request-clients">
           {days.length === 0

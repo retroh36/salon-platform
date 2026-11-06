@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { FREE_STATUSES, startOfLocalDay } from "@/lib/scheduling/load";
 import { addDays, toLocal, type LocalDate } from "@/lib/scheduling/time";
+import { loadBalances, ptoMinutesFor } from "@/lib/pto-load";
 import { fullName } from "@/lib/staff";
 import { blackoutsFor, othersOff, visitsDuring, type Blackout, type BookedVisit, type OtherOff, type Span } from "@/lib/time-off-requests";
 
@@ -13,6 +14,11 @@ export type TimeOffRequest = Span & {
   name: string;
   firstName: string;
   reason: string;
+  // The salon's name for its type ("Vacation", "Jury duty").
+  typeName: string | null;
+  // For a type that uses PTO, while the salon tracks it: the hours this
+  // takes, by their working hours, and what it would leave to ask for.
+  pto: { minutes: number; leaves: number } | null;
   note: string | null;
   status: "requested" | "approved" | "declined";
   shortNotice: boolean;
@@ -33,13 +39,13 @@ export type RequestsInbox = {
   noticeDays: number;
 };
 
-const FIELDS = "id, staff_id, starts_on, ends_on, start_minute, end_minute, reason, note, status, short_notice, in_blackout, decline_reason, created_at, decided_at, decided_by";
+const FIELDS = "id, staff_id, type_id, starts_on, ends_on, start_minute, end_minute, reason, note, status, short_notice, in_blackout, decline_reason, created_at, decided_at, decided_by";
 
 // Requests at a location: those waiting, and those decided lately, each
 // with the clients booked then and who else is off.
 export async function loadRequestsInbox(supabase: Supabase, location: { id: string; timezone: string; business_id?: string }, today: LocalDate): Promise<RequestsInbox> {
   const tz = location.timezone;
-  const [team, pending, decided, blackouts, business] = await Promise.all([
+  const [team, pending, decided, blackouts, business, types] = await Promise.all([
     supabase.from("staff").select("id, first_name, last_name, location_id").eq("location_id", location.id),
     supabase.from("staff_time_off").select(FIELDS).eq("status", "requested").gte("ends_on", today).order("starts_on"),
     supabase
@@ -51,9 +57,23 @@ export async function loadRequestsInbox(supabase: Supabase, location: { id: stri
       .order("decided_at", { ascending: false })
       .limit(30),
     supabase.from("time_off_blackouts").select("starts_on, ends_on, label").gte("ends_on", today).order("starts_on"),
-    supabase.from("businesses").select("time_off_notice_days").single(),
+    supabase.from("businesses").select("id, time_off_notice_days").single(),
+    supabase.from("time_off_types").select("id, name, uses_pto"),
   ]);
-  for (const r of [team, pending, decided, blackouts, business]) if (r.error) throw r.error;
+  for (const r of [team, pending, decided, blackouts, business, types]) if (r.error) throw r.error;
+  const typeOf = new Map(types.data!.map((t) => [t.id, t]));
+  // PTO for the waiting requests whose type uses it.
+  const ptoAsks = pending.data!.filter((r) => r.type_id && typeOf.get(r.type_id)?.uses_pto);
+  const balances = ptoAsks.length ? await loadBalances(supabase, { businessId: business.data!.id, location, today }) : null;
+  const ptoOf = new Map<string, { minutes: number; leaves: number }>();
+  if (balances) {
+    for (const r of ptoAsks) {
+      const person = balances.people.find((p) => p.staffId === r.staff_id);
+      if (!person) continue;
+      const minutes = await ptoMinutesFor(supabase, r.staff_id, { startsOn: r.starts_on, endsOn: r.ends_on, startMinute: r.start_minute, endMinute: r.end_minute });
+      ptoOf.set(r.id, { minutes, leaves: person.statement.available - minutes });
+    }
+  }
   const people = new Map(team.data!.map((s) => [s.id, s]));
   const here = (r: { staff_id: string }) => people.has(r.staff_id);
   const rows = [...pending.data!.filter(here), ...decided.data!.filter(here)];
@@ -115,6 +135,8 @@ export async function loadRequestsInbox(supabase: Supabase, location: { id: stri
       name: fullName(person),
       firstName: person.first_name,
       reason: r.reason,
+      typeName: r.type_id ? (typeOf.get(r.type_id)?.name ?? null) : null,
+      pto: ptoOf.get(r.id) ?? null,
       note: r.note,
       status: r.status,
       shortNotice: r.short_notice,

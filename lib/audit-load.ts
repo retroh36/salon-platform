@@ -3,6 +3,7 @@ import { AUDIT_LIMIT, mergeAudit, type AuditFilters, type AuditRow, type AuditTy
 import type { Database } from "@/lib/database.types";
 import { formatDay } from "@/lib/schedule-format";
 import { addDays, formatMinute, fromLocal, toLocal } from "@/lib/scheduling/time";
+import { formatPto } from "@/lib/pto";
 import { formatPrice } from "@/lib/services";
 import { fullName } from "@/lib/staff";
 import { changeWhat, changeWho, type VisitChange } from "@/lib/visit-changes";
@@ -322,6 +323,36 @@ export async function loadAudit(supabase: Supabase, businessId: string, timeZone
             href: `/scheduling/month?month=${toLocal(new Date(e.clock_in ?? e.was_in ?? e.created_at), timeZone).date.slice(0, 7)}&staff=${e.staff_id}`,
           } satisfies AuditRow;
         });
+      })(),
+    );
+  }
+
+  if (want("pto")) {
+    tasks.push(
+      (async () => {
+        let q = supabase
+          .from("pto_adjustments")
+          .select("id, staff_id, on_date, minutes, reason, by_staff_id, created_at")
+          .eq("business_id", businessId)
+          .gte("created_at", fromIso)
+          .lt("created_at", toIso)
+          .order("created_at", { ascending: false })
+          .limit(AUDIT_LIMIT + 1);
+        if (f.staffId) q = q.eq("by_staff_id", f.staffId);
+        const { data, error } = await q;
+        if (error) throw error;
+        return data.map(
+          (e) =>
+            ({
+              id: e.id,
+              at: e.created_at,
+              type: "pto",
+              staffId: e.by_staff_id,
+              who: who(e.by_staff_id),
+              what: `PTO ${e.minutes > 0 ? "added for" : "taken off"} ${staffName(e.staff_id) ?? "a former team member"}: ${formatPto(Math.abs(e.minutes))}, from ${formatDay(e.on_date)}. ${e.reason}`,
+              href: `/scheduling/balances?staff=${e.staff_id}`,
+            }) satisfies AuditRow,
+        );
       })(),
     );
   }

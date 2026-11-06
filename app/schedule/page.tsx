@@ -16,6 +16,7 @@ import { describeTimeOff, formatDay, formatDayAt, formatIntervals, STATUS_LABELS
 import { WEEKDAY_NAMES } from "@/lib/schedule-forms";
 import { dayView, type TimeOff } from "@/lib/scheduling/availability";
 import { loadLocationSchedule, loadStaffSchedules } from "@/lib/scheduling/load";
+import { loadTimeOffTypes } from "@/lib/pto-load";
 import { addDays, datesBetween, isLocalDate, minuteToTime, startOfWeek, todayIn, WEEKDAYS } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { fullName, roleLabel, sortStaff } from "@/lib/staff";
@@ -68,7 +69,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
   const isSelf = target.id === me.id;
 
   const historyFrom = addDays(today, -60);
-  const [location, schedules, history, compensation, pending] = await Promise.all([
+  const [location, schedules, history, compensation, pending, types] = await Promise.all([
     loadLocationSchedule(supabase, me.location),
     loadStaffSchedules(supabase, [target.id], week, weekEnd),
     loadStaffSchedules(supabase, [target.id], historyFrom, addDays(today, 366)),
@@ -85,6 +86,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
           .gte("ends_on", today)
           .order("starts_on")
       : Promise.resolve({ data: [], error: null }),
+    loadTimeOffTypes(supabase, me.business_id),
   ]);
   // Their own notices (a published change to their hours), on their own page.
   const { data: notices } = isSelf
@@ -326,7 +328,7 @@ async function Schedule({ searchParams }: Pick<PageProps<"/schedule">, "searchPa
         )}
         {(manager || isSelf) && (
           <div className="border-t border-line bg-sunken/40">
-            <TimeOffForm key={target.id} staffId={target.id} today={today} isRequest={!manager} />
+            <TimeOffForm key={target.id} staffId={target.id} today={today} isRequest={!manager} types={types.filter((t) => !t.archived)} />
           </div>
         )}
       </section>

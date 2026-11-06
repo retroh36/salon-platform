@@ -6,12 +6,14 @@ import { buttonClass } from "@/components/ui/button";
 import { checkboxClass, selectClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
 import { SavedNote } from "./saved-note";
-import { REASON_LABELS, TIME_OFF_REASONS, type TimeOffErrors } from "@/lib/schedule-forms";
+import type { TimeOffErrors } from "@/lib/schedule-forms";
 import { addTimeOff } from "./actions";
 
 // Managers add approved time off for anyone; everyone else requests it for
 // themselves (the server decides which).
-export function TimeOffForm({ staffId, today, isRequest }: { staffId: string; today: string; isRequest: boolean }) {
+// `types` are the salon's (those that use PTO say so); `balance` is what
+// this person has left to ask for, when the salon tracks PTO.
+export function TimeOffForm({ staffId, today, isRequest, types, balance }: { staffId: string; today: string; isRequest: boolean; types: { id: string; name: string; usesPto: boolean }[]; balance?: string | null }) {
   const [state, action, pending] = useActionState(addTimeOff.bind(null, staffId), undefined);
   const [partDay, setPartDay] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -61,11 +63,12 @@ export function TimeOffForm({ staffId, today, isRequest }: { staffId: string; to
           </div>
         )}
       </div>
-      <Field label="Reason" error={errors.reason}>
-        <select name="reason" defaultValue="vacation" className={selectClass}>
-          {TIME_OFF_REASONS.map((r) => (
-            <option key={r} value={r}>
-              {REASON_LABELS[r]}
+      <Field label="Type" error={errors.reason} hint={balance ? `PTO left: ${balance}` : undefined}>
+        <select name="type_id" defaultValue={types[0]?.id} className={selectClass}>
+          {types.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+              {balance != null && t.usesPto ? " (uses PTO)" : ""}
             </option>
           ))}
         </select>

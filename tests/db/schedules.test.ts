@@ -286,7 +286,8 @@ describe("time off requests", () => {
 describe("time off visibility", () => {
   it("the front of house sees approved time off; pending and declined only the requester and managers; stylists only their own", async () => {
     const statuses = async (client: Client, staffId: string) => {
-      const { data } = await client.from("staff_time_off").select("status").eq("staff_id", staffId);
+      // From today on: the demo's time off taken earlier in the year aside.
+      const { data } = await client.from("staff_time_off").select("status").eq("staff_id", staffId).gte("ends_on", futureDate(0));
       return data!.map((r) => r.status).sort();
     };
 

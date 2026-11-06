@@ -6,6 +6,8 @@ import { Badge, PageHeader, Section, type Tone } from "@/components/ui/page";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import { describeTimeOff, formatDay, STATUS_LABELS } from "@/lib/schedule-format";
 import { addDays, todayIn } from "@/lib/scheduling/time";
+import { formatPto } from "@/lib/pto";
+import { loadBalances, loadTimeOffTypes } from "@/lib/pto-load";
 import { deleteTimeOff } from "../schedule/actions";
 import { TimeOffForm } from "../schedule/time-off-form";
 
@@ -27,16 +29,20 @@ async function TimeOff() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
   const today = todayIn(me.location.timezone);
-  const [mine, blackouts, business] = await Promise.all([
+  const [mine, blackouts, business, types, pto] = await Promise.all([
     supabase
       .from("staff_time_off")
-      .select("id, starts_on, ends_on, start_minute, end_minute, reason, note, status, decline_reason")
+      .select("id, starts_on, ends_on, start_minute, end_minute, reason, type_id, note, status, decline_reason")
       .eq("staff_id", me.id)
       .gte("ends_on", addDays(today, -60))
       .order("starts_on", { ascending: false }),
     supabase.from("time_off_blackouts").select("id, starts_on, ends_on, label").gte("ends_on", today).order("starts_on").limit(10),
     supabase.from("businesses").select("time_off_notice_days").single(),
+    loadTimeOffTypes(supabase, me.business_id),
+    loadBalances(supabase, { businessId: me.business_id, location: me.location, today, staffId: me.id }),
   ]);
+  const balance = pto?.people[0]?.statement ?? null;
+  const typeName = new Map(types.map((t) => [t.id, t.name]));
   if (mine.error) throw mine.error;
   if (blackouts.error) throw blackouts.error;
   if (business.error) throw business.error;
@@ -49,7 +55,7 @@ async function TimeOff() {
       <div className="flex max-w-xl flex-col gap-8">
         <Section title={manager ? "Add time off" : "Ask for time off"} titleId="ask-heading">
           <div className="rounded-lg border border-line bg-surface">
-            <TimeOffForm staffId={me.id} today={today} isRequest={!manager} />
+            <TimeOffForm staffId={me.id} today={today} isRequest={!manager} types={types.filter((t) => !t.archived)} balance={balance ? formatPto(balance.available) : null} />
           </div>
           {!manager && (
             <ul className="mt-3 flex flex-col gap-1 text-13 text-ink-muted" data-testid="time-off-rules">
@@ -63,6 +69,26 @@ async function TimeOff() {
             </ul>
           )}
         </Section>
+        {balance && (
+          <Section title="My PTO" titleId="pto-heading">
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="my-pto">
+              {[
+                ["Left to ask for", balance.available],
+                ["Balance today", balance.balance],
+                ["Booked", balance.booked],
+                ["Waiting", balance.pending],
+              ].map(([label, minutes]) => (
+                <div key={label} className="rounded-lg border border-line bg-surface px-3 py-2">
+                  <dt className="text-13 text-ink-muted">{label}</dt>
+                  <dd className="text-base font-semibold text-ink tabular-nums">{formatPto(minutes as number)}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-2 text-13 text-ink-muted">
+              This PTO year: {formatPto(balance.earnedThisYear)} earned, {formatPto(balance.usedThisYear)} used{balance.carriedIn > 0 ? `, ${formatPto(balance.carriedIn)} carried over` : ""}.
+            </p>
+          </Section>
+        )}
         <Section title="My time off" titleId="mine-heading">
           {mine.data.length === 0 ? (
             <p className="text-sm text-ink-muted">Nothing in the last 60 days or coming up.</p>
@@ -71,7 +97,7 @@ async function TimeOff() {
               {mine.data.map((t) => (
                 <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
                   <span>
-                    {describeTimeOff({ startsOn: t.starts_on, endsOn: t.ends_on, startMinute: t.start_minute, endMinute: t.end_minute, status: t.status, reason: t.reason })}
+                    {describeTimeOff({ startsOn: t.starts_on, endsOn: t.ends_on, startMinute: t.start_minute, endMinute: t.end_minute, status: t.status, reason: t.reason, typeName: t.type_id ? typeName.get(t.type_id) : null })}
                     {t.decline_reason && <span className="block text-13 text-ink-muted">Declined: {t.decline_reason}</span>}
                   </span>
                   <span className="flex items-center gap-2">

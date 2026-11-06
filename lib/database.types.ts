@@ -2687,6 +2687,64 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"pto_adjustments": {
+                  Row: {
+                    "business_id": string,"by_staff_id": string,"created_at": string,"id": string,"minutes": number,"on_date": string,"reason": string,"staff_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"by_staff_id": string,"created_at"?: string,"id"?: string,"minutes": number,"on_date": string,"reason": string,"staff_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"by_staff_id"?: string,"created_at"?: string,"id"?: string,"minutes"?: number,"on_date"?: string,"reason"?: string,"staff_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "pto_adjustments_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "pto_adjustments_by_staff_id_business_id_fkey"
+      columns: ["by_staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "pto_adjustments_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"pto_policies": {
+                  Row: {
+                    "accrual": string,"business_id": string,"cap_minutes": number | null,"carry_minutes": number,"carry_over": string,"earn_minutes": number,"is_on": boolean,"per_hours": number,"period_minutes": number,"prorate_first_year": boolean,"roles": (Database["public"]['Enums']["staff_role"])[],"tracking_from": string,"updated_at": string,"updated_by": string | null,"year_start_month": number,"yearly_minutes": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "accrual"?: string,"business_id": string,"cap_minutes"?: number | null,"carry_minutes"?: number,"carry_over"?: string,"earn_minutes"?: number,"is_on"?: boolean,"per_hours"?: number,"period_minutes"?: number,"prorate_first_year"?: boolean,"roles"?: (Database["public"]['Enums']["staff_role"])[],"tracking_from"?: string,"updated_at"?: string,"updated_by"?: string | null,"year_start_month"?: number,"yearly_minutes"?: number
+                  }
+                  Update: {
+                    "accrual"?: string,"business_id"?: string,"cap_minutes"?: number | null,"carry_minutes"?: number,"carry_over"?: string,"earn_minutes"?: number,"is_on"?: boolean,"per_hours"?: number,"period_minutes"?: number,"prorate_first_year"?: boolean,"roles"?: (Database["public"]['Enums']["staff_role"])[],"tracking_from"?: string,"updated_at"?: string,"updated_by"?: string | null,"year_start_month"?: number,"yearly_minutes"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "pto_policies_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: true
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "pto_policies_updated_by_business_id_fkey"
+      columns: ["updated_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"purchase_order_lines": {
                   Row: {
                     "business_id": string,"id": string,"product_id": string,"purchase_order_id": string,"quantity": number,"reason": string | null,"received_quantity": number,"unit_cost_cents": number
@@ -3839,14 +3897,14 @@ isOneToOne: false
                   ]
                 },"staff_time_off": {
                   Row: {
-                    "business_id": string,"created_at": string,"decided_at": string | null,"decided_by": string | null,"decline_reason": string | null,"end_minute": number | null,"ends_on": string,"id": string,"in_blackout": boolean,"note": string | null,"reason": Database["public"]['Enums']["time_off_reason"],"requested_by": string,"short_notice": boolean,"staff_id": string,"start_minute": number | null,"starts_on": string,"status": Database["public"]['Enums']["time_off_status"],"updated_at": string
+                    "business_id": string,"created_at": string,"decided_at": string | null,"decided_by": string | null,"decline_reason": string | null,"end_minute": number | null,"ends_on": string,"id": string,"in_blackout": boolean,"note": string | null,"reason": Database["public"]['Enums']["time_off_reason"],"requested_by": string,"short_notice": boolean,"staff_id": string,"start_minute": number | null,"starts_on": string,"status": Database["public"]['Enums']["time_off_status"],"type_id": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"decline_reason"?: string | null,"end_minute"?: number | null,"ends_on": string,"id"?: string,"in_blackout"?: boolean,"note"?: string | null,"reason": Database["public"]['Enums']["time_off_reason"],"requested_by": string,"short_notice"?: boolean,"staff_id": string,"start_minute"?: number | null,"starts_on": string,"status"?: Database["public"]['Enums']["time_off_status"],"updated_at"?: string
+                    "business_id": string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"decline_reason"?: string | null,"end_minute"?: number | null,"ends_on": string,"id"?: string,"in_blackout"?: boolean,"note"?: string | null,"reason": Database["public"]['Enums']["time_off_reason"],"requested_by": string,"short_notice"?: boolean,"staff_id": string,"start_minute"?: number | null,"starts_on": string,"status"?: Database["public"]['Enums']["time_off_status"],"type_id"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "business_id"?: string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"decline_reason"?: string | null,"end_minute"?: number | null,"ends_on"?: string,"id"?: string,"in_blackout"?: boolean,"note"?: string | null,"reason"?: Database["public"]['Enums']["time_off_reason"],"requested_by"?: string,"short_notice"?: boolean,"staff_id"?: string,"start_minute"?: number | null,"starts_on"?: string,"status"?: Database["public"]['Enums']["time_off_status"],"updated_at"?: string
+                    "business_id"?: string,"created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"decline_reason"?: string | null,"end_minute"?: number | null,"ends_on"?: string,"id"?: string,"in_blackout"?: boolean,"note"?: string | null,"reason"?: Database["public"]['Enums']["time_off_reason"],"requested_by"?: string,"short_notice"?: boolean,"staff_id"?: string,"start_minute"?: number | null,"starts_on"?: string,"status"?: Database["public"]['Enums']["time_off_status"],"type_id"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -3866,6 +3924,12 @@ isOneToOne: false
       columns: ["staff_id","business_id"]
 isOneToOne: false
       referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "staff_time_off_type_fkey"
+      columns: ["type_id","business_id"]
+isOneToOne: false
+      referencedRelation: "time_off_types"
       referencedColumns: ["id","business_id"]
     }
                   ]
@@ -4349,6 +4413,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"time_off_types": {
+                  Row: {
+                    "archived_at": string | null,"business_id": string,"created_at": string,"id": string,"name": string,"position": number,"reason": Database["public"]['Enums']["time_off_reason"],"uses_pto": boolean
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "archived_at"?: string | null,"business_id": string,"created_at"?: string,"id"?: string,"name": string,"position"?: number,"reason": Database["public"]['Enums']["time_off_reason"],"uses_pto"?: boolean
+                  }
+                  Update: {
+                    "archived_at"?: string | null,"business_id"?: string,"created_at"?: string,"id"?: string,"name"?: string,"position"?: number,"reason"?: Database["public"]['Enums']["time_off_reason"],"uses_pto"?: boolean
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "time_off_types_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"visit_changes": {
                   Row: {
                     "after": NonNullable<Json>,"appointment_id": string,"before": NonNullable<Json>,"business_id": string,"by_kind": string,"by_staff_id": string | null,"created_at": string,"id": string,"item_id": string | null,"kind": string,"location_id": string
@@ -4559,6 +4643,9 @@ isOneToOne: false
                            },
 "adjust_gift_card":
 { Args: { "p_card_id": string,"p_change_cents": number,"p_reason": string }; Returns: number
+                           },
+"adjust_pto":
+{ Args: { "p_business_id": string,"p_minutes": number,"p_on_date": string,"p_reason": string,"p_staff_id": string }; Returns: string
                            },
 "adjust_reward_points":
 { Args: { "p_client_id": string,"p_delta": number,"p_reason": string }; Returns: number
@@ -4921,7 +5008,7 @@ isOneToOne: false
 { Args: { "p_give_date": string,"p_note"?: string,"p_take_date"?: string,"p_to_staff_id": string }; Returns: string
                            },
 "request_time_off":
-{ Args: { "p_end_minute"?: number,"p_ends_on": string,"p_note"?: string,"p_reason": Database["public"]['Enums']["time_off_reason"],"p_start_minute"?: number,"p_starts_on": string }; Returns: string
+{ Args: { "p_end_minute"?: number,"p_ends_on": string,"p_note"?: string,"p_reason": Database["public"]['Enums']["time_off_reason"],"p_start_minute"?: number,"p_starts_on": string,"p_type_id"?: string }; Returns: string
                            },
 "resume_membership":
 { Args: { "p_membership_id": string }; Returns: undefined
@@ -5003,6 +5090,9 @@ isOneToOne: false
 "save_promotion":
 { Args: { "p_business_id": string,"p_input": Json,"p_promotion_id": string }; Returns: string
                            },
+"save_pto_policy":
+{ Args: { "p_business_id": string,"p_policy": Json }; Returns: undefined
+                           },
 "save_purchase_order":
 { Args: { "p_lines": Json,"p_location_id": string,"p_notes": string,"p_order_id": string,"p_supplier_id": string }; Returns: string
                            },
@@ -5035,6 +5125,9 @@ isOneToOne: false
                            },
 "save_time_entry":
 { Args: { "p_business_id": string,"p_clock_in": string,"p_clock_out": string,"p_entry_id": string,"p_reason": string,"p_remove"?: boolean,"p_staff_id": string }; Returns: string
+                           },
+"save_time_off_types":
+{ Args: { "p_business_id": string,"p_types": Json }; Returns: undefined
                            },
 "scheduled_jobs_status":
 { Args: Record<PropertyKey, never>; Returns: Json

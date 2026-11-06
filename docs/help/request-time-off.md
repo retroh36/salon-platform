@@ -10,7 +10,7 @@ Ask for time off from your phone or the desk. Managers and owners can also add a
 1. On **My day**, tap **Ask for time off** next to **My week**. Or go to **Team**, then the **Schedule** tab, and scroll to **Time off**.
 2. Choose the **First day**. Set the **Last day**, or leave it blank for one day.
 3. For part of a day, tick **Part of the day** and set **From** and **To**.
-4. Choose a **Reason** and add a **Note (optional)**.
+4. Choose a **Type** (those marked "uses PTO" come out of your balance) and add a **Note (optional)**.
 5. Tap **Request time off** (or **Add time off** if you're a manager or owner).
 6. Check **My time off** for the answer: **Pending**, **Approved**, or **Declined** with the reason.
 
@@ -20,4 +20,5 @@ Ask for time off from your phone or the desk. Managers and owners can also add a
 - Requests during blackout dates (shown under the form) still go through, flagged for whoever decides.
 - Owners and managers get a notice in the app when you ask, and you get one when they decide.
 - You can **Withdraw** a request while it's still pending. Only approved time off blocks bookings.
+- Where the salon tracks PTO, **My PTO** on the Time off page shows what you have **Left to ask for**, your **Balance today**, what's **Booked** and what's **Waiting**. Your hours that day are what's used: a day you weren't working uses none.
 - Time off a manager adds is approved straight away. If a stylist is out unexpectedly today, see "Mark a stylist out".

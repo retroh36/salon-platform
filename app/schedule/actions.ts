@@ -79,6 +79,14 @@ export async function addTimeOff(
   const manager = canManage(me.role);
   if (!manager && staffId !== me.id) return { message: "You can only request time off for yourself." };
 
+  // The type sets the reason.
+  const typeId = String(formData.get("type_id") ?? "");
+  if (typeId) {
+    if (!isUuid(typeId)) return { errors: { reason: "Choose a type." }, message: "Fix the highlighted fields." };
+    const { data: type } = await supabase.from("time_off_types").select("reason").eq("id", typeId).is("archived_at", null).maybeSingle();
+    if (!type) return { errors: { reason: "Choose a type." }, message: "Fix the highlighted fields." };
+    formData.set("reason", type.reason);
+  }
   const parsed = parseTimeOffForm(formData, { today: todayIn(me.location.timezone), allowPast: manager });
   if (!parsed.ok) return { errors: parsed.errors, message: "Fix the highlighted fields." };
 
@@ -88,6 +96,7 @@ export async function addTimeOff(
     manager
       ? await supabase.from("staff_time_off").insert({
           ...parsed.value,
+          type_id: typeId || null,
           business_id: me.business_id,
           staff_id: staffId,
           requested_by: me.id,
@@ -102,6 +111,7 @@ export async function addTimeOff(
           p_end_minute: parsed.value.end_minute ?? undefined,
           p_reason: parsed.value.reason,
           p_note: parsed.value.note ?? undefined,
+          p_type_id: typeId || undefined,
         });
   if (error?.code === "42501") return { message: "You don't have permission to add this time off." };
   if (error?.code === "22023") return { message: error.message };

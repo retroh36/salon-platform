@@ -75,7 +75,7 @@ test.describe("owners and managers", () => {
       await page.goto("/settings/time-off");
       await waitForHydration(page, "form[aria-label='Add blackout dates'] button");
       await ui(page).getByLabel("Days ahead").fill("21");
-      await ui(page).getByRole("button", { name: "Save" }).click();
+      await ui(page).getByRole("button", { name: "Save notice" }).click();
       await expect(ui(page).getByText("Saved.")).toBeVisible();
       const form = ui(page).getByRole("form", { name: "Add blackout dates" });
       await form.getByLabel("First day").fill(addDays(today, 120));

@@ -101,7 +101,7 @@ test.describe("managers", () => {
       await form.getByLabel("Part of the day").check();
       await form.getByLabel("From").fill("10:00");
       await form.getByLabel("To").fill("12:00");
-      await form.getByLabel("Reason").selectOption("personal");
+      await form.getByLabel(/^Type/).selectOption({ label: "Personal" });
       await form.getByLabel("Note (optional)").fill("Parent-teacher meeting");
       await form.getByRole("button", { name: "Add time off" }).click();
       await expect(form.getByRole("status")).toHaveText("Time off added.");
@@ -191,7 +191,7 @@ test.describe("stylists", () => {
       await waitForHydration(page, "form[aria-label='Request time off'] select");
       const form = ui(page).getByRole("form", { name: "Request time off" });
       await form.getByLabel("First day").fill(date);
-      await form.getByLabel("Reason").selectOption("personal");
+      await form.getByLabel(/^Type/).selectOption({ label: "Personal" });
       await form.getByLabel("Note (optional)").fill("Moving house");
       await form.getByRole("button", { name: "Request time off" }).click();
       await expect(form.getByRole("status")).toHaveText("Request sent.");

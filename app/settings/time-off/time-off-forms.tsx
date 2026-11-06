@@ -15,7 +15,7 @@ export function NoticeForm({ days }: { days: number }) {
         <input name="notice_days" type="number" min={0} max={365} defaultValue={days} className={`${fieldClass} w-28`} />
       </label>
       <Button type="submit" variant="primary" disabled={pending}>
-        Save
+        Save notice
       </Button>
       {state?.message && <Alert tone={state.ok ? "success" : "error"} className="basis-full">{state.message}</Alert>}
     </form>

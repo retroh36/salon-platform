@@ -8,7 +8,7 @@ open: /settings/time-off | Open Time off settings
 Choose how far ahead the team should ask for time off, and dates the salon needs everyone in.
 
 1. Go to **Settings**, then **Time off**.
-2. Under **Notice**, enter the **Days ahead** and tap **Save**.
+2. Under **Notice**, enter the **Days ahead** and tap **Save notice**.
 3. Under **Blackout dates**, choose the **First day** and **Last day**, add a **Name (optional)** like "Holidays", and tap **Add blackout**.
 4. To take one away, tap **Remove** next to it.
 
