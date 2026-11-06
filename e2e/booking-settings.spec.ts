@@ -74,6 +74,8 @@ test.describe("the front desk", () => {
 
 test("a stylist's photo, added on the schedule page, shows on the booking site", async ({ page, browser }) => {
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+  // Shae's demo portrait, put back afterwards.
+  const before = (await admin.from("staff").select("photo_path").eq("id", SEED.staff.shae).single()).data!.photo_path;
   try {
     await page.goto("/schedule");
     await ui(page).getByRole("navigation", { name: "Team", exact: true }).getByRole("link", { name: "Shae" }).click();
@@ -94,7 +96,7 @@ test("a stylist's photo, added on the schedule page, shows on the booking site",
     await visitor.close();
   } finally {
     const { data } = await admin.from("staff").select("photo_path").eq("id", SEED.staff.shae).single();
-    if (data?.photo_path) await admin.storage.from("staff-photos").remove([data.photo_path]);
-    await admin.from("staff").update({ photo_path: null }).eq("id", SEED.staff.shae);
+    if (data?.photo_path && data.photo_path !== before && !data.photo_path.startsWith("/demo/")) await admin.storage.from("staff-photos").remove([data.photo_path]);
+    await admin.from("staff").update({ photo_path: before }).eq("id", SEED.staff.shae);
   }
 });

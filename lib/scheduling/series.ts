@@ -40,6 +40,8 @@ export type VisitLine = {
   // match it by its service), and a length chosen for this booking.
   itemId?: string;
   minutes?: number;
+  // The service bundle it's part of (./bundles.ts).
+  bundleId?: string | null;
 };
 
 export type VisitCheck = {

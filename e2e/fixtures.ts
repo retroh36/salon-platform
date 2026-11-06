@@ -19,10 +19,13 @@ export const AUTH = {
 
 // A test that takes the browser offline on purpose: Chrome logs each request
 // it couldn't send ("Failed to load resource: net::ERR_INTERNET_DISCONNECTED"),
-// which no page can stop. Only that line is let through; anything our code
+// which no page can stop, and the same for the live calendar's connection
+// trying again ("WebSocket connection to … failed: … ERR_INTERNET_DISCONNECTED").
+// Only those lines are let through; anything our code
 // throws (an uncaught "Failed to fetch") still fails the test.
 export function allowOfflineLogs(pageErrors: string[]) {
-  pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => e !== "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"));
+  const offline = (e: string) => e === "Failed to load resource: net::ERR_INTERNET_DISCONNECTED" || /^WebSocket connection to '.*' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED$/.test(e);
+  pageErrors.splice(0, pageErrors.length, ...pageErrors.filter((e) => !offline(e)));
 }
 
 // A test that opens a page that isn't there on purpose: on the production

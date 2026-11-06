@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { checkItem, fromLocal, itemSegments, parseTime, stretchTiming, timingFor, type BookedItem, type BookingContext, type BookingService, type BookingStaff } from "@/lib/scheduling";
+import { checkItem, checkMoves, findOpenings, fromLocal, itemSegments, parseTime, stretchTiming, timingFor, toLocal, type BookedItem, type BookingContext, type BookingService, type BookingStaff } from "@/lib/scheduling";
+import { planVisitAt, visitTimes } from "@/lib/scheduling/online";
 import { fitSteps, parseSteps, stepsProblem, stepsTiming, type Step } from "@/lib/scheduling/steps";
 
 const CHICAGO = "America/Chicago";
@@ -105,5 +106,49 @@ describe("booking a service built from steps", () => {
     const own = [busy("Highlight", 60), wait(45), busy("Cut", 45)];
     const moved = checkItem(context(), { id: "cc", serviceId: "color-cut", staffId: "nina", start: at("13:00"), timing: { ...stepsTiming(own), steps: own } });
     expect(moved.valid && moved.item.steps).toEqual(own);
+  });
+});
+
+// Online booking, Denise's openings and her fixes read the same steps, so
+// each processing step is a time they can offer.
+describe("finding times around a service built from steps", () => {
+  // 10:00 Highlight to 11:00, processing to 11:30, Gloss to 11:45, processing to 12:05, Cut to 12:50.
+  const day = () => context([colorCutAt10()]);
+  const minutes = (dates: Date[]) => dates.map((d) => toLocal(d, CHICAGO).minute).filter((m) => m >= h(10) && m < h(13));
+
+  it("online, offers a 15-minute gloss in either processing step, and nowhere else then", () => {
+    const times = visitTimes(day(), { serviceIds: ["gloss"], staffId: "nina", stylistIds: ["nina"] }, TUESDAY, { notBefore: at("00:00") });
+    expect(minutes(times.map((t) => t.start))).toEqual([h(11), h(11, 15), h(11, 45)]);
+  });
+
+  it("Denise's openings find the same", () => {
+    const openings = findOpenings(day(), { serviceId: "gloss", date: TUESDAY, staffIds: ["nina"], from: h(10), to: h(13), step: 15 });
+    expect(minutes(openings.map((o) => o.start))).toEqual([h(11), h(11, 15), h(11, 45)]);
+  });
+
+  it("a fix moving the visit keeps its steps, so it lands only where every step fits", () => {
+    const gloss = checkItem(day(), { serviceId: "gloss", staffId: "nina", start: at("11:45") });
+    if (!gloss.valid) throw new Error("should book");
+    const ctx = context([colorCutAt10(), { ...gloss.item, id: "g", appointmentId: "appt-g" }]);
+    // Fifteen minutes later puts the gloss step over the other client.
+    expect(checkMoves(ctx, [{ itemId: "cc", staffId: "nina", resourceId: null, start: at("10:15") }]).valid).toBe(false);
+    // An hour later, the highlight does; from noon, the gloss is before it.
+    expect(checkMoves(ctx, [{ itemId: "cc", staffId: "nina", resourceId: null, start: at("11:00") }]).valid).toBe(false);
+    expect(checkMoves(ctx, [{ itemId: "cc", staffId: "nina", resourceId: null, start: at("12:00") }]).valid).toBe(true);
+  });
+});
+
+describe("booking a bundle online", () => {
+  it("leaves each gap free between its services, and another client can be booked in it", () => {
+    // A gloss, a 30 minute gap, then a gloss again: 10:00, then 10:45.
+    const request = { serviceIds: ["gloss", "gloss"], staffId: "nina", stylistIds: ["nina"], bundleId: "b1", gaps: [0, 30] };
+    const planned = planVisitAt(context([]), request, at("10:00"));
+    expect(planned?.map((p) => toLocal(p.start, CHICAGO).minute)).toEqual([h(10), h(10, 45)]);
+    // With another client in the gap, it still fits.
+    const other = checkItem(context([]), { serviceId: "gloss", staffId: "nina", start: at("10:15") });
+    if (!other.valid) throw new Error("should book");
+    expect(planVisitAt(context([{ ...other.item, id: "o", appointmentId: "appt-o" }]), request, at("10:00"))).not.toBeNull();
+    // Back to back, it wouldn't.
+    expect(planVisitAt(context([{ ...other.item, id: "o", appointmentId: "appt-o" }]), { ...request, gaps: [0, 0] }, at("10:00"))).toBeNull();
   });
 });

@@ -33,12 +33,14 @@ export type PricedMenu = BookingMenu & {
 
 // The menu, the stylists who do something on it, and what each charges.
 export async function bookingMenu(s: Booker): Promise<PricedMenu> {
-  const [services, staff, offers, levels] = await Promise.all([
+  const [services, staff, offers, levels, bundles] = await Promise.all([
     s.supabase.from("services").select("id, name, category, price_cents, service_level_prices(level, price_cents)").eq("business_id", s.me.business_id).is("archived_at", null).order("category").order("name"),
     s.supabase.from("staff").select("id, first_name, level, calendar_position").eq("location_id", s.me.location.id).eq("is_active", true).order("calendar_position", { nullsFirst: false }).order("first_name"),
     s.supabase.from("staff_services").select("staff_id, service_id, price_cents"),
     loadLevels(s.supabase, s.me.business_id),
+    s.supabase.from("service_bundles").select("id, name, parts:service_bundle_parts(position, service_id, gap_minutes)").eq("business_id", s.me.business_id).is("archived_at", null).order("position"),
   ]);
+  if (bundles.error) throw bundles.error;
   if (services.error) throw services.error;
   if (staff.error) throw staff.error;
   if (offers.error) throw offers.error;
@@ -50,6 +52,10 @@ export async function bookingMenu(s: Booker): Promise<PricedMenu> {
     services: services.data.map((sv) => ({ id: sv.id, name: sv.name, category: sv.category })),
     stylists: staff.data.filter((m) => doesServices.has(m.id)).map((m) => ({ id: m.id, firstName: m.first_name, level: m.level })),
     levels: levels.map((l) => ({ key: l.key, name: l.name })),
+    bundles: bundles.data.map((b) => {
+      const parts = [...b.parts].sort((x, y) => x.position - y.position);
+      return { id: b.id, name: b.name, serviceIds: parts.map((p) => p.service_id), gaps: parts.map((p, n) => (n === 0 ? 0 : p.gap_minutes)) };
+    }),
     price: (staffId, serviceId) => {
       const service = byId.get(serviceId);
       return service ? stylistPrice(service, { level: level.get(staffId) ?? null, customCents: custom.get(`${staffId}:${serviceId}`) ?? null }) : 0;
@@ -99,7 +105,7 @@ export async function clientById(s: Booker, id: string): Promise<ClientMatch | n
 export async function lastVisit(s: Booker, clientId: string): Promise<LastVisit | null> {
   const { data, error } = await s.supabase
     .from("appointments")
-    .select("starts_at, appointment_items(service_id, staff_id, starts_at, services(name), staff(first_name))")
+    .select("starts_at, appointment_items(service_id, staff_id, starts_at, ends_at, bundle_id, services(name), staff(first_name))")
     .eq("client_id", clientId)
     .eq("status", "completed")
     .order("starts_at", { ascending: false })
@@ -110,6 +116,17 @@ export async function lastVisit(s: Booker, clientId: string): Promise<LastVisit 
   const items = [...data.appointment_items].sort((a, b) => a.starts_at.localeCompare(b.starts_at));
   const names = items.map((i) => i.services?.name ?? "a service").join(" + ");
   const day = formatDay(toLocal(new Date(data.starts_at), s.me.location.timezone).date);
+  // Booked as a bundle: the same services with the gaps they had.
+  const bundleId = items[0].bundle_id && items.every((i) => i.bundle_id === items[0].bundle_id) ? items[0].bundle_id : null;
+  if (bundleId) {
+    return {
+      serviceIds: items.map((i) => i.service_id),
+      bundleId,
+      gaps: items.map((i, n) => (n === 0 ? 0 : Math.max(0, Math.round((Date.parse(i.starts_at) - Date.parse(items[n - 1].ends_at)) / 60_000)))),
+      staffId: items[0].staff_id,
+      text: `${names} with ${items[0].staff?.first_name ?? "their stylist"}, ${day}`,
+    };
+  }
   return {
     serviceIds: [...new Set(items.map((i) => i.service_id))].slice(0, MAX_PHONE_SERVICES),
     staffId: items[0].staff_id,
@@ -135,7 +152,9 @@ export async function clientAlerts(s: Booker, clientId: string, policyNote: (cli
 // Why a request can't be searched, or null.
 export function requestProblem(r: PhoneRequest, today: LocalDate, menu: BookingMenu): string | null {
   if (!r || !Array.isArray(r.serviceIds) || !r.serviceIds.length) return "Choose at least one service.";
-  if (r.serviceIds.length > MAX_PHONE_SERVICES) return "Choose up to four services.";
+  if (r.bundleId) {
+    if (!menu.bundles?.some((b) => b.id === r.bundleId)) return "That bundle isn't on the menu any more.";
+  } else if (r.serviceIds.length > MAX_PHONE_SERVICES) return "Choose up to four services.";
   if (r.serviceIds.some((id) => !menu.services.some((sv) => sv.id === id))) return "One of those services isn't on the menu.";
   if (r.staffId !== null && !menu.stylists.some((m) => m.id === r.staffId)) return "Choose a stylist from the list.";
   if (r.level !== null && !(menu.levels ?? DEFAULT_LEVELS).some((l) => l.key === r.level)) return "Choose a level from the list.";
@@ -144,6 +163,16 @@ export function requestProblem(r: PhoneRequest, today: LocalDate, menu: BookingM
   if (daysBetween(r.from, r.to) > MAX_DAYS) return "Search up to a month at a time.";
   for (const m of [r.after, r.before]) if (m !== null && (!Number.isInteger(m) || m < 0 || m > 24 * 60)) return "Choose a time of day.";
   return null;
+}
+
+// A bundle's services and gaps as the menu has them (a request from the
+// browser says only which bundle). A visit booked as one keeps its gaps
+// for "same as last time".
+export function withMenuBundle(r: PhoneRequest, menu: BookingMenu): PhoneRequest {
+  const bundle = r.bundleId ? menu.bundles?.find((b) => b.id === r.bundleId) : null;
+  if (!bundle) return { ...r, bundleId: null, gaps: undefined };
+  const sameServices = r.serviceIds.join(",") === bundle.serviceIds.join(",");
+  return { ...r, serviceIds: bundle.serviceIds, gaps: sameServices && r.gaps?.length === bundle.serviceIds.length ? r.gaps : bundle.gaps };
 }
 
 // A request from the browser, with only the fields we know, or null.
@@ -158,6 +187,8 @@ export function cleanRequest(raw: unknown): PhoneRequest | null {
     clientText: str(r.clientText)?.slice(0, 100) ?? null,
     sameAsLast: r.sameAsLast === true,
     serviceIds: r.serviceIds as string[],
+    // Its services and gaps are the menu's (`withMenuBundle`).
+    bundleId: str(r.bundleId),
     staffId: str(r.staffId),
     level: typeof r.level === "string" && /^[a-z][a-z0-9_]{0,31}$/.test(r.level) ? r.level : null,
     from: str(r.from) ?? "",
@@ -194,8 +225,10 @@ export async function findTimes(s: Booker, menu: PricedMenu, request: PhoneReque
   const slot = (c: Ranked): BookingSlot => {
     const end = toLocal(c.end, tz).minute;
     const stylists = [...new Set(c.lines.map((l) => l.staffId))];
-    const what =
-      stylists.length === 1
+    const bundle = r.bundleId ? menu.bundles?.find((b) => b.id === r.bundleId) : null;
+    const what = bundle
+      ? `${bundle.name} with ${stylists.map((id) => names.get(id)).join(" and ")}`
+      : stylists.length === 1
         ? `${c.lines.map((l) => serviceName.get(l.serviceId)).join(", then ")} with ${names.get(stylists[0])}`
         : c.lines.map((l) => `${serviceName.get(l.serviceId)} with ${names.get(l.staffId)}`).join(", then ");
     const lines = c.lines.map((l) => ({
@@ -206,7 +239,7 @@ export async function findTimes(s: Booker, menu: PricedMenu, request: PhoneReque
       usual: usualFor(l.staffId, l.serviceId) !== null,
       priceCents: menu.price(l.staffId, l.serviceId),
     }));
-    return { date: c.date, when: `${formatDay(c.date)} · ${formatMinute(c.minute)}–${formatMinute(end)}`, what, reason: c.reason, priceCents: lines.reduce((n, l) => n + l.priceCents, 0), lines };
+    return { date: c.date, when: `${formatDay(c.date)} · ${formatMinute(c.minute)}–${formatMinute(end)}`, what, reason: c.reason, priceCents: lines.reduce((n, l) => n + l.priceCents, 0), lines, bundleId: bundle?.id ?? null };
   };
 
   // Which lengths came from what Denise has learned.
@@ -235,7 +268,7 @@ export function bookingDeps(s: Booker, menu: PricedMenu, read: BookingDeps["read
     times: async (request, clientId, later) => {
       const problem = requestProblem(request, todayIn(s.me.location.timezone), menu);
       if (problem) return { options: [], otherDays: [], sameLevel: [], searched: "", lengths: null, problem };
-      return findTimes(s, menu, request, clientId, later);
+      return findTimes(s, menu, withMenuBundle(request, menu), clientId, later);
     },
   };
 }

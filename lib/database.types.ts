@@ -173,14 +173,14 @@ isOneToOne: false
                   ]
                 },"appointment_items": {
                   Row: {
-                    "active_minutes": number,"appointment_id": string,"business_id": string,"created_at": string,"ends_at": string,"finished_at": string | null,"finishing_minutes": number,"holds_time": boolean,"id": string,"imported": boolean,"location_id": string,"overbooked": boolean,"price_cents": number,"processing_ended_at": string | null,"processing_minutes": number,"processing_started_at": string | null,"resource_held": unknown,"resource_id": string | null,"service_id": string,"staff_busy": unknown,"staff_id": string,"started_at": string | null,"starts_at": string,"steps": Json | null,"updated_at": string
+                    "active_minutes": number,"appointment_id": string,"bundle_id": string | null,"business_id": string,"created_at": string,"ends_at": string,"finished_at": string | null,"finishing_minutes": number,"holds_time": boolean,"id": string,"imported": boolean,"location_id": string,"overbooked": boolean,"price_cents": number,"processing_ended_at": string | null,"processing_minutes": number,"processing_started_at": string | null,"resource_held": unknown,"resource_id": string | null,"service_id": string,"staff_busy": unknown,"staff_id": string,"started_at": string | null,"starts_at": string,"steps": Json | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "active_minutes": number,"appointment_id": string,"business_id": string,"created_at"?: string,"ends_at": string,"finished_at"?: string | null,"finishing_minutes"?: number,"holds_time"?: boolean,"id"?: string,"imported"?: boolean,"location_id": string,"overbooked"?: boolean,"price_cents": number,"processing_ended_at"?: string | null,"processing_minutes"?: number,"processing_started_at"?: string | null,"resource_held"?: never,"resource_id"?: string | null,"service_id": string,"staff_busy"?: never,"staff_id": string,"started_at"?: string | null,"starts_at": string,"steps"?: Json | null,"updated_at"?: string
+                    "active_minutes": number,"appointment_id": string,"bundle_id"?: string | null,"business_id": string,"created_at"?: string,"ends_at": string,"finished_at"?: string | null,"finishing_minutes"?: number,"holds_time"?: boolean,"id"?: string,"imported"?: boolean,"location_id": string,"overbooked"?: boolean,"price_cents": number,"processing_ended_at"?: string | null,"processing_minutes"?: number,"processing_started_at"?: string | null,"resource_held"?: never,"resource_id"?: string | null,"service_id": string,"staff_busy"?: never,"staff_id": string,"started_at"?: string | null,"starts_at": string,"steps"?: Json | null,"updated_at"?: string
                   }
                   Update: {
-                    "active_minutes"?: number,"appointment_id"?: string,"business_id"?: string,"created_at"?: string,"ends_at"?: string,"finished_at"?: string | null,"finishing_minutes"?: number,"holds_time"?: boolean,"id"?: string,"imported"?: boolean,"location_id"?: string,"overbooked"?: boolean,"price_cents"?: number,"processing_ended_at"?: string | null,"processing_minutes"?: number,"processing_started_at"?: string | null,"resource_held"?: never,"resource_id"?: string | null,"service_id"?: string,"staff_busy"?: never,"staff_id"?: string,"started_at"?: string | null,"starts_at"?: string,"steps"?: Json | null,"updated_at"?: string
+                    "active_minutes"?: number,"appointment_id"?: string,"bundle_id"?: string | null,"business_id"?: string,"created_at"?: string,"ends_at"?: string,"finished_at"?: string | null,"finishing_minutes"?: number,"holds_time"?: boolean,"id"?: string,"imported"?: boolean,"location_id"?: string,"overbooked"?: boolean,"price_cents"?: number,"processing_ended_at"?: string | null,"processing_minutes"?: number,"processing_started_at"?: string | null,"resource_held"?: never,"resource_id"?: string | null,"service_id"?: string,"staff_busy"?: never,"staff_id"?: string,"started_at"?: string | null,"starts_at"?: string,"steps"?: Json | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -189,6 +189,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "appointments"
       referencedColumns: ["id","business_id","location_id"]
+    },{
+      foreignKeyName: "appointment_items_bundle"
+      columns: ["bundle_id","business_id"]
+isOneToOne: false
+      referencedRelation: "service_bundles"
+      referencedColumns: ["id","business_id"]
     },{
       foreignKeyName: "appointment_items_business_id_fkey"
       columns: ["business_id"]
@@ -3385,6 +3391,52 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"service_bundle_parts": {
+                  Row: {
+                    "bundle_id": string,"business_id": string,"gap_minutes": number,"position": number,"service_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "bundle_id": string,"business_id": string,"gap_minutes"?: number,"position": number,"service_id": string
+                  }
+                  Update: {
+                    "bundle_id"?: string,"business_id"?: string,"gap_minutes"?: number,"position"?: number,"service_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "service_bundle_parts_bundle_id_business_id_fkey"
+      columns: ["bundle_id","business_id"]
+isOneToOne: false
+      referencedRelation: "service_bundles"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "service_bundle_parts_service_id_business_id_fkey"
+      columns: ["service_id","business_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"service_bundles": {
+                  Row: {
+                    "archived_at": string | null,"business_id": string,"created_at": string,"description": string | null,"id": string,"name": string,"online": boolean,"position": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "archived_at"?: string | null,"business_id": string,"created_at"?: string,"description"?: string | null,"id"?: string,"name": string,"online"?: boolean,"position"?: number,"updated_at"?: string
+                  }
+                  Update: {
+                    "archived_at"?: string | null,"business_id"?: string,"created_at"?: string,"description"?: string | null,"id"?: string,"name"?: string,"online"?: boolean,"position"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "service_bundles_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"service_category_photos": {
                   Row: {
                     "business_id": string,"category": string,"photo_path": string,"updated_at": string
@@ -4714,6 +4766,9 @@ isOneToOne: false
 "archive_promotion":
 { Args: { "p_promotion_id": string }; Returns: undefined
                            },
+"archive_service_bundle":
+{ Args: { "p_archived": boolean,"p_bundle_id": string }; Returns: undefined
+                           },
 "assign_station":
 { Args: { "p_end"?: number,"p_note"?: string,"p_on_date": string,"p_resource_id": string,"p_staff_id": string,"p_start"?: number }; Returns: string
                            },
@@ -5136,6 +5191,9 @@ isOneToOne: false
                            },
 "save_service":
 { Args: { "p_active_minutes": number,"p_business_id": string,"p_category": string,"p_description": string,"p_finishing_minutes": number,"p_name": string,"p_price_cents": number,"p_processing_minutes": number,"p_service_id": string,"p_staff": Json }; Returns: string
+                           },
+"save_service_bundle":
+{ Args: { "p_bundle": Json,"p_business_id": string }; Returns: string
                            },
 "save_staff_goal":
 { Args: { "p_metric": string,"p_period": string,"p_staff_id": string,"p_target": number }; Returns: string

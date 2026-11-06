@@ -19,5 +19,5 @@ Set a service up as the steps it really takes (Highlight, Processing, Gloss, Pro
 - The stylist can be booked with someone else during each processing step. The chair stays taken the whole visit.
 - A service needs 2 to 12 steps of 5 to 600 minutes each, in 5-minute steps. It can't start or end with processing, or have two processing steps in a row.
 - A stylist's own length for the service (Team → their page → Service times) stretches or shortens the steps: the first step, the last processing step and the last step take the difference.
-- Visits already booked keep the steps they were booked with.
+- Visits already booked keep the steps they were booked with. To change one visit's steps, tap **Edit steps** in its booking details (see "Change a visit's steps").
 - Untick **Built from steps** to go back to a service time, a processing gap and a finishing time.

@@ -945,6 +945,13 @@ export function CalendarBoard({ data }: { data: BoardData }) {
     setSettling(move.itemId);
     startTransition(async () => {
       addMove(move);
+      // The rest of a bundle moves with it (moveWithBundle on the server).
+      if (b.bundleId) {
+        for (const o of blocks) {
+          if (o.itemId === b.itemId || o.appointmentId !== b.appointmentId || o.bundleId !== b.bundleId) continue;
+          addMove({ itemId: o.itemId, staffId: o.staffId === b.staffId ? move.staffId : o.staffId, start: o.start + move.start - b.start });
+        }
+      }
       const input = { itemId: move.itemId, staffId: move.staffId, date: data.date, startMinute: move.start };
       // A dropped connection says so, and the block goes back.
       const result = await reach(scope === "this" ? moveVisitItem(input, anyway) : scope === "group" ? moveGroupVisit(input) : moveVisitItemScoped(input, scope));
@@ -2612,6 +2619,7 @@ function AppointmentBlock({
   const names = timeOnName
     ? [...ranges.map((r) => `${first} · ${r}`), first]
     : [block.clientName, ...(rest.length ? [`${first} ${firstLetter(rest.at(-1)!)}.`, first] : [])];
+  const named = block.segments.filter((s) => s.name);
   // The visit's other services, when stylists share it.
   const others = block.parts.filter((p) => p.start !== block.start || p.service !== block.service);
   // Everything about the visit, for the tooltip.
@@ -2622,7 +2630,9 @@ function AppointmentBlock({
     [STATUS_LABELS[block.status], late && lateText, block.group && block.group.label, block.series && "repeating", block.online && "booked online", block.member]
       .filter(Boolean)
       .join(" · "),
-    ...(others.length ? ["Whole visit:", ...block.parts.map((p) => `${p.service} · ${p.staff}, ${formatMinute(p.start)}–${formatMinute(p.end)}`)] : []),
+    // A service built from steps: each one, processing free for the stylist.
+    ...(named.length ? [named.map((s) => `${s.name} ${formatMinute(s.start)}–${formatMinute(s.end)}`).join(" · ")] : []),
+    ...(others.length ? [block.bundle ? `${block.bundle}:` : "Whole visit:", ...block.parts.map((p) => `${p.service} · ${p.staff}, ${formatMinute(p.start)}–${formatMinute(p.end)}`)] : []),
     ...(block.allergies ? [`Allergies: ${block.allergies}`] : []),
   ];
   const plainService = block.service.replace(/\s*\([^)]*\)/g, "");
@@ -2636,6 +2646,7 @@ function AppointmentBlock({
     block.service,
     processing.length > 0 && `processing ${processing.map((p) => `${formatMinute(p.start)}–${formatMinute(p.end)}`).join(" and ")}`,
     others.length > 0 && `part of a visit with ${[...new Set(others.map((p) => p.staff))].join(" and ")}`,
+    block.bundle && `booked as ${block.bundle}`,
     block.resource,
     block.series && "repeating",
     block.group && `group: ${block.group.label}`,

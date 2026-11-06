@@ -4,7 +4,8 @@
 // a visit's own steps change only through set_item_steps.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fitSteps, type Step } from "@/lib/scheduling/steps";
-import { fromLocal } from "@/lib/scheduling/time";
+import { changeItemSteps } from "@/lib/scheduling/book";
+import { addDays, fromLocal } from "@/lib/scheduling/time";
 import { admin, signIn, SEED, type Client } from "./helpers";
 
 const B = SEED.business;
@@ -13,7 +14,8 @@ const TZ = "America/Chicago";
 const { bridget: BRIDGET } = SEED.staff;
 // A Tuesday far from the seeded month.
 const DAY = "2031-07-15";
-const at = (hour: number, minute = 0) => fromLocal(DAY, hour * 60 + minute, TZ)!;
+// `week` weeks after DAY, so each test has a clear morning.
+const at = (hour: number, minute = 0, week = 0) => fromLocal(addDays(DAY, 7 * week), hour * 60 + minute, TZ)!;
 const TAG = `St${Date.now().toString(36)}`;
 const busy = (name: string, minutes: number): Step => ({ name, minutes, processing: false });
 const wait = (minutes: number): Step => ({ name: "Processing", minutes, processing: true });
@@ -36,12 +38,14 @@ beforeAll(async () => {
     .single();
   if (error) throw error;
   serviceId = s.id;
+  await admin.from("staff_services").insert({ business_id: B, staff_id: BRIDGET, service_id: serviceId });
   blowoutId = (await admin.from("services").select("id").eq("business_id", B).eq("name", "Blowout").single()).data!.id;
 });
 
 afterAll(async () => {
   await admin.from("appointments").delete().eq("client_id", clientId);
   await admin.from("clients").delete().eq("id", clientId);
+  await admin.from("staff_services").delete().eq("service_id", serviceId);
   await admin.from("services").delete().eq("id", serviceId);
 });
 
@@ -99,5 +103,24 @@ describe("a visit's own steps", () => {
     // Moved, it keeps them.
     await admin.from("appointment_items").update({ starts_at: at(12, 30).toISOString() }).eq("id", item!.id);
     expect((await admin.from("appointment_items").select("steps").eq("id", item!.id).single()).data!.steps).toEqual(own);
+  });
+});
+
+describe("changing a visit's steps from the app", () => {
+  it("checks the new busy time against the calendar first, then saves", async () => {
+    const location = { id: L, timezone: TZ };
+    const { item } = await book(serviceId, at(9, 0, 1), [60, 50, 60]);
+    // Another client in the second processing step (a week on, 10:45 to 11:05).
+    expect((await book(blowoutId, at(10, 45, 1), [20, 0, 0])).error).toBeNull();
+    // Without that processing step, the cut would run over them.
+    const noGap = [busy("Highlight", 60), wait(30), busy("Gloss", 15), busy("Cut", 45)];
+    const refused = await changeItemSteps(frontDesk, location, item!.id, noGap);
+    expect(refused.ok).toBe(false);
+    expect(!refused.ok && refused.error === "invalid" && refused.problems.flat().map((p) => p.code)).toEqual(["staff_double_booked"]);
+    expect(await changeItemSteps(frontDesk, location, item!.id, [wait(10), busy("Cut", 10)])).toEqual({ ok: false, error: "steps", problem: "first_or_last" });
+    // A longer second processing step keeps them in it and ends the visit later.
+    const longer = [busy("Highlight", 60), wait(30), busy("Gloss", 15), wait(35), busy("Cut", 45)];
+    expect(await changeItemSteps(frontDesk, location, item!.id, longer)).toEqual({ ok: true, appointmentId: expect.any(String) });
+    expect((await admin.from("appointment_items").select("steps").eq("id", item!.id).single()).data!.steps).toEqual(longer);
   });
 });

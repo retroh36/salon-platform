@@ -1,7 +1,7 @@
 "use client";
 
 import type { Moved } from "@/lib/move-notices";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { Fragment, useEffect, useRef, useState, useTransition } from "react";
 import type { DurationBasis } from "@/lib/insights/durations";
 import { visitsText } from "@/lib/insights/describe";
 import { Avatar } from "@/components/ui/avatar";
@@ -12,6 +12,7 @@ import { PlusIcon } from "@/components/ui/icons";
 import { MAX_NOTES, priceFor, visitSummary } from "@/lib/appointments";
 import { parseClientSearch } from "@/lib/clients";
 import { formatLongDay } from "@/lib/schedule-format";
+import { bundleLines } from "@/lib/scheduling/bundles";
 import { formatMinute, minuteToTime, parseTime, toLocal } from "@/lib/scheduling/time";
 import { formatPrice, sortCategories } from "@/lib/services";
 import { formatDuration } from "@/lib/duration";
@@ -39,6 +40,8 @@ type Line = {
   resource: string;
   // This booking's own length (e.g. the stylist's usual time), if chosen.
   minutes?: number;
+  // The service bundle it's part of.
+  bundleId?: string | null;
 };
 
 
@@ -70,6 +73,9 @@ export function BookingPanel({
 }) {
   const { menu, columns } = data;
   const services = new Map(menu.services.map((s) => [s.id, s]));
+  const bundles = new Map(menu.bundles.map((b) => [b.id, b]));
+  // Bundles to book: on the menu, with every part still on it.
+  const bookable = menu.bundles.filter((b) => !b.archived && b.parts.every((p) => services.get(p.serviceId) && !services.get(p.serviceId)!.archived));
   const original = new Map((appointment?.items ?? []).map((i) => [i.id, i]));
   const nextKey = useRef(1);
 
@@ -80,7 +86,7 @@ export function BookingPanel({
     appointment
       ? [...appointment.items]
           .sort((a, b) => a.start - b.start)
-          .map((i, n) => ({ key: -1 - n, id: i.id, serviceId: i.serviceId, staffId: i.staffId, startMinute: i.start, resource: i.resourceId ?? "none" }))
+          .map((i, n) => ({ key: -1 - n, id: i.id, serviceId: i.serviceId, staffId: i.staffId, startMinute: i.start, resource: i.resourceId ?? "none", bundleId: i.bundleId }))
       : draft
         ? draft.lines.map((l, n) => ({ key: -1 - n, serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute, resource: "any", minutes: l.minutes }))
         : [{ key: 0, serviceId: "", staffId: start!.staffId, startMinute: start!.startMinute, resource: "any" }],
@@ -146,6 +152,31 @@ export function BookingPanel({
     setRepeat((r) => ({ ...r, ...change }));
   };
 
+  // A bundle chosen on a line: its parts take the line's place, one after
+  // another with their gaps, all with the line's stylist to start with.
+  function chooseBundle(key: number, bundleId: string) {
+    const bundle = bundles.get(bundleId);
+    const line = lines.find((l) => l.key === key);
+    if (!bundle || !line) return;
+    const parts = bundleLines(bundle, line.startMinute ?? 0, () => line.staffId, (staffId, serviceId) => menu.timings[staffId]?.[serviceId] ?? services.get(serviceId)?.minutes ?? 0);
+    setPreview(null);
+    setLines((all) =>
+      all.flatMap((l) =>
+        l.key === key
+          ? parts.map((p, n) => ({
+              key: n === 0 ? l.key : nextKey.current++,
+              ...(n === 0 && l.id ? { id: l.id } : {}),
+              serviceId: p.serviceId,
+              staffId: p.staffId,
+              startMinute: line.startMinute == null ? null : p.startMinute,
+              resource: l.resource,
+              bundleId: bundle.id,
+            }))
+          : [l],
+      ),
+    );
+  }
+
   function addLine() {
     const last = lines.at(-1)!;
     const info = lineInfo(last);
@@ -177,7 +208,7 @@ export function BookingPanel({
       date,
       clientId: client?.id ?? null,
       notes,
-      lines: lines.map((l) => ({ id: l.id, serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute ?? -1, resource: l.resource, minutes: l.minutes })),
+      lines: lines.map((l) => ({ id: l.id, serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute ?? -1, resource: l.resource, minutes: l.minutes, bundleId: l.bundleId ?? null })),
       seen,
     };
     startTransition(async () => {
@@ -336,15 +367,42 @@ export function BookingPanel({
           const offered = menu.offers[l.staffId] ?? {};
           const choices = menu.services.filter((s) => (s.id in offered && !s.archived) || s.id === l.serviceId);
           const errors = lineErrors[n] ?? [];
+          const bundle = l.bundleId ? bundles.get(l.bundleId) : undefined;
+          // Free time for the stylist between this and the service before.
+          const before = n > 0 ? lines[n - 1] : null;
+          const beforeInfo = before ? lineInfo(before) : null;
+          const gap = before && beforeInfo && before.startMinute != null && l.startMinute != null ? l.startMinute - (before.startMinute + beforeInfo.minutes) : 0;
           return (
+            <Fragment key={l.key}>
+            {gap > 0 && (
+              <p data-testid="line-gap" className="-my-1 text-center text-13 text-ink-muted">
+                {formatDuration(gap)} gap
+              </p>
+            )}
             <fieldset
               key={l.key}
               data-family={services.get(l.serviceId)?.family ?? "other"}
               className={`flex animate-fade-in flex-col gap-3 rounded-lg border border-l-4 border-l-(--fam-accent) bg-surface p-4 pt-3 ${errors.length ? "border-danger/50" : "border-line"}`}
             >
-              <legend className="px-1 text-13 font-medium text-ink">Service {n + 1}</legend>
-              <LabeledSelect label="Service" value={l.serviceId} onChange={(v) => update(l.key, { serviceId: v })}>
+              <legend className="px-1 text-13 font-medium text-ink">
+                Service {n + 1}
+                {bundle && <span className="font-normal text-ink-muted"> · {bundle.name}</span>}
+              </legend>
+              <LabeledSelect
+                label="Service"
+                value={l.serviceId}
+                onChange={(v) => (v.startsWith("bundle:") ? chooseBundle(l.key, v.slice(7)) : update(l.key, { serviceId: v }))}
+              >
                 <option value="">Choose a service</option>
+                {bookable.length > 0 && (
+                  <optgroup label="Bundles">
+                    {bookable.map((b) => (
+                      <option key={b.id} value={`bundle:${b.id}`}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
                 {sortCategories(new Set(choices.map((s) => s.category))).map((category) => (
                   <optgroup key={category} label={category}>
                     {choices
@@ -441,6 +499,7 @@ export function BookingPanel({
                 />
               )}
             </fieldset>
+            </Fragment>
           );
         })}
 

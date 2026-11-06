@@ -85,7 +85,7 @@ export type ChatBookResult = { ok: true; appointmentId: string; message: string 
 
 // Books a time from the chat, at the lengths it was found with, and sends
 // the card link when the policy needs one and staff left it ticked.
-export async function bookFromChat(input: { date: LocalDate; clientId: string; lines: SlotLine[]; cardLink: boolean }): Promise<ChatBookResult> {
+export async function bookFromChat(input: { date: LocalDate; clientId: string; lines: SlotLine[]; cardLink: boolean; bundleId?: string | null }): Promise<ChatBookResult> {
   const s = await booker();
   if (!s) return { ok: false, message: NOT_ALLOWED };
   if (!isLocalDate(input.date) || !isUuid(input.clientId) || !Array.isArray(input.lines) || !input.lines.length) return { ok: false, message: "Choose a time again." };
@@ -93,7 +93,7 @@ export async function bookFromChat(input: { date: LocalDate; clientId: string; l
     date: input.date,
     clientId: input.clientId,
     notes: "",
-    lines: input.lines.map((l) => ({ serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute, resource: "any", minutes: l.minutes })),
+    lines: input.lines.map((l) => ({ serviceId: l.serviceId, staffId: l.staffId, startMinute: l.startMinute, resource: "any", minutes: l.minutes, bundleId: input.bundleId ?? null })),
   });
   if (!saved.ok) return { ok: false, message: saved.message };
   let message = "Booked.";

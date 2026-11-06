@@ -82,13 +82,13 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
   // signed in, then what needs the day's visits and team, then what needs
   // the visits put together. (One query after another, each a trip to the
   // database, made the calendar slow to load and to reload.)
-  const [staffResult, itemsResult, servicesResult, resourcesResult, location, viewsResult, products, timeBlocks, { data: business }, { data: bookRow }, lentResult] = await Promise.all([
+  const [staffResult, itemsResult, servicesResult, bundlesResult, resourcesResult, location, viewsResult, products, timeBlocks, { data: business }, { data: bookRow }, lentResult] = await Promise.all([
     // Everyone in the business, for "booked by" names; columns are this location's.
     supabase.from("staff").select("id, first_name, last_name, role, level, color, photo_path, is_active, location_id, calendar_position, home_resource_id"),
     supabase
       .from("appointment_items")
       .select(
-        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, price_cents, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, checked_in_at, checked_out_at, created_at, updated_at, created_by, updated_by, deposit_cents, deposit_paid_cents, starts_at, series_id, series_index, series:appointment_series(interval_weeks), group:appointment_groups(id, label), client:clients(id, first_name, last_name, phone, email, allergies, preferences, appointment_sms_ok, appointment_email_ok, sms_opt_in, email_opt_in, sms_stopped_at))",
+        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, steps, bundle_id, bundle:service_bundles!appointment_items_bundle(name), price_cents, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, checked_in_at, checked_out_at, created_at, updated_at, created_by, updated_by, deposit_cents, deposit_paid_cents, starts_at, series_id, series_index, series:appointment_series(interval_weeks), group:appointment_groups(id, label), client:clients(id, first_name, last_name, phone, email, allergies, preferences, appointment_sms_ok, appointment_email_ok, sms_opt_in, email_opt_in, sms_stopped_at))",
       )
       .eq("location_id", me.location.id)
       // From a day before (no service lasts longer), so the index reads only
@@ -100,6 +100,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
       .neq("appointment.status", "canceled")
       .order("starts_at"),
     supabase.from("services").select("id, name, category, duration_minutes, price_cents, archived_at, service_level_prices(level, price_cents)").order("name"),
+    supabase.from("service_bundles").select("id, name, archived_at, parts:service_bundle_parts(position, service_id, gap_minutes)").order("position"),
     supabase.from("resources").select("id, name").eq("location_id", me.location.id).eq("is_active", true).order("sort_order"),
     loadLocationSchedule(supabase, me.location),
     // Shared views and this person's own (RLS).
@@ -117,6 +118,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
   if (viewsResult.error) throw viewsResult.error;
   if (itemsResult.error) throw itemsResult.error;
   if (servicesResult.error) throw servicesResult.error;
+  if (bundlesResult.error) throw bundlesResult.error;
   if (resourcesResult.error) throw resourcesResult.error;
 
   const items = itemsResult.data;
@@ -203,7 +205,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
       itemId: row.id,
       appointmentId: row.appointment_id,
       staffId: row.staff_id,
-      segments: itemSegments(item).map((s) => ({ kind: s.kind, start: toMinute(s.start), end: toMinute(s.end) })),
+      segments: itemSegments(item).map((s) => ({ kind: s.kind, start: toMinute(s.start), end: toMinute(s.end), ...(s.name ? { name: s.name } : {}) })),
       family: serviceFamily(row.service.category, row.service.name),
       clientName: client ? fullName(client) : a.group ? `${a.group.label} guest` : "Walk-in",
       service: row.service.name,
@@ -215,6 +217,8 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
       online: a.source === "online",
       member: null,
       allergies: client?.allergies ?? null,
+      bundle: row.bundle?.name ?? null,
+      bundleId: row.bundle_id,
     });
     appointments[a.id] ??= {
       id: a.id,
@@ -264,6 +268,9 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
       id: row.id,
       serviceId: row.service_id,
       serviceName: row.service.name,
+      steps: item.steps ?? null,
+      bundleId: row.bundle_id,
+      bundleName: row.bundle?.name ?? null,
       staffId: row.staff_id,
       staffName: staffMember ? fullName(staffMember) : "Former staff",
       resourceId: row.resource_id,
@@ -624,6 +631,12 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
         minutes: s.duration_minutes ?? 0,
         priceCents: s.price_cents,
         archived: s.archived_at !== null,
+      })),
+      bundles: bundlesResult.data.map((b) => ({
+        id: b.id,
+        name: b.name,
+        archived: b.archived_at !== null,
+        parts: [...b.parts].sort((x, y) => x.position - y.position).map((p) => ({ serviceId: p.service_id, gapMinutes: p.gap_minutes })),
       })),
       // Each stylist's price for what they offer: their own, else their level's, else the menu's.
       offers: Object.fromEntries(

@@ -21,7 +21,7 @@ export function itemsFor(lines: readonly VisitLine[], date: LocalDate, timeZone:
     const start = fromLocal(date, l.startMinute, timeZone);
     if (!start) return null;
     const resource = l.resource === "any" ? ({ kind: "any" } as const) : l.resource === "none" ? ({ kind: "none" } as const) : ({ kind: "exact", id: l.resource } as const);
-    items.push({ id: ids[n], serviceId: l.serviceId, staffId: l.staffId, start, resource, ...(l.minutes ? { minutes: l.minutes } : {}) });
+    items.push({ id: ids[n], serviceId: l.serviceId, staffId: l.staffId, start, resource, ...(l.minutes ? { minutes: l.minutes } : {}), ...(l.bundleId !== undefined ? { bundleId: l.bundleId } : {}) });
   }
   return items;
 }

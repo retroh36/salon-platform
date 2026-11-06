@@ -133,6 +133,34 @@ test("without Denise reading it, a form from the line finds the best times; Book
   expect(visits![0].appointment_items[0].staff_id).toBe(SEED.staff.bridget);
 });
 
+test("books a service bundle from the line, with its gap free for the stylist", async ({ page }) => {
+  const name = `${PREFIX} Cut and Blowout Duo`;
+  const { data: bundle } = await admin.from("service_bundles").insert({ business_id: B, name, position: 99 }).select("id").single();
+  await admin.from("service_bundle_parts").insert([
+    { bundle_id: bundle!.id, business_id: B, position: 0, service_id: await serviceId("Women's Cut & Style"), gap_minutes: 0 },
+    { bundle_id: bundle!.id, business_id: B, position: 1, service_id: await serviceId("Blowout"), gap_minutes: 15 },
+  ]);
+  const { data: client } = await admin.from("clients").insert({ business_id: B, first_name: `${PREFIX}Bun`, last_name: "Test" }).select("id").single();
+  try {
+    const bubble = await ask(page, `${PREFIX}Bun Test wants the ${name} with Bridget`);
+    const form = bubble.getByTestId("booking-form");
+    await expect(form.getByLabel("Service")).toHaveValue(`bundle:${bundle!.id}`);
+    const card = await findTimes(bubble, { day: DAY, part: "Afternoon" });
+    const first = card.getByTestId("booking-slot").first();
+    await expect(first).toContainText(`${name} with Bridget`);
+    await first.getByRole("button", { name: "Book", exact: true }).click();
+    await card.getByTestId("booking-confirm").getByRole("button", { name: "Confirm booking" }).click();
+    await expect(bubble.getByTestId("booking-outcome").last()).toContainText("Booked");
+
+    const { data: items } = await admin.from("appointment_items").select("starts_at, ends_at, bundle_id, appointment:appointments!inner(client_id)").eq("appointment.client_id", client!.id).order("starts_at");
+    expect(items!.map((i) => i.bundle_id)).toEqual([bundle!.id, bundle!.id]);
+    expect(Date.parse(items![1].starts_at) - Date.parse(items![0].ends_at)).toBe(15 * 60_000);
+  } finally {
+    await admin.from("appointments").delete().eq("client_id", client!.id);
+    await admin.from("service_bundles").delete().eq("id", bundle!.id);
+  }
+});
+
 test("shows the client's alerts on the card", async ({ page }) => {
   const bubble = await ask(page, "Maria Lopez wants a balayage");
   const card = await findTimes(bubble, { stylist: SEED.staff.bridget, day: DAY });

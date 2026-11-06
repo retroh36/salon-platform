@@ -22,8 +22,10 @@ export const PART_WINDOWS: Record<PartOfDay, { from: number; to: number }> = {
 };
 
 export type VisitSearch = {
-  // In the order they're done, one to four.
+  // In the order they're done, one to four (or a bundle's, up to six).
   serviceIds: readonly string[];
+  // A bundle's minutes before each service (the first 0), free for the stylist.
+  gaps?: readonly number[];
   // Who may do it: the stylist asked for, a level's stylists, or null for anyone.
   staffIds: readonly string[] | null;
   dates: readonly LocalDate[];
@@ -53,6 +55,7 @@ function planAt(ctx: BookingContext, s: VisitSearch, start: Date, first: string,
   const lines: PlannedLine[] = [];
   let at = start;
   for (const [n, serviceId] of s.serviceIds.entries()) {
+    if (n > 0) at = new Date(at.getTime() + (s.gaps?.[n] ?? 0) * 60_000);
     const previous = lines.at(-1)?.staffId ?? first;
     const order = n === 0 ? [first] : [previous, ...allowed.filter((id) => id !== previous)];
     let placed: PlannedLine | null = null;

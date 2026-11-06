@@ -18,8 +18,12 @@ export type PhoneRequest = {
   // whether they want the same as last time.
   clientText: string | null;
   sameAsLast: boolean;
-  // In the order they're done, up to four.
+  // In the order they're done, up to four (a bundle's, up to six).
   serviceIds: string[];
+  // A service bundle asked for: its services above, and its gaps (the
+  // minutes before each, the first 0), checked against the menu.
+  bundleId?: string | null;
+  gaps?: number[];
   // A stylist asked for, or a level ("any master stylist"), or neither (anyone).
   staffId: string | null;
   level: StaffLevel | null;
@@ -149,7 +153,11 @@ export function applyChange(current: PhoneRequest, change: BookingParse, today: 
   const stylistSaid = change.anyStylist || change.staffId !== null || change.level !== null;
   return {
     ...current,
-    serviceIds: change.serviceIds.length ? change.serviceIds.slice(0, MAX_PHONE_SERVICES) : current.serviceIds,
+    ...(change.bundle
+      ? { serviceIds: change.bundle.serviceIds, bundleId: change.bundle.id, gaps: change.bundle.gaps }
+      : change.serviceIds.length
+        ? { serviceIds: change.serviceIds.slice(0, MAX_PHONE_SERVICES), bundleId: null, gaps: undefined }
+        : {}),
     staffId: stylistSaid ? change.staffId : current.staffId,
     level: stylistSaid ? (change.staffId ? null : change.level) : current.level,
     from: dates ? (dates.from < today ? today : dates.from) : current.from,
@@ -166,7 +174,12 @@ const DAY_WORDS: Record<string, number> = { monday: 1, mon: 1, tuesday: 2, tue: 
 // Without Denise: what our code can tell from the line by itself, to start
 // the form with (a stylist or service named in full, a weekday, a part of
 // the day, "earliest", "tomorrow", "next week").
-export function guessRequest(line: string, menu: { services: readonly { id: string; name: string }[]; stylists: readonly { id: string; firstName: string }[] }, clientText: string | null, today: LocalDate): PhoneRequest {
+export function guessRequest(
+  line: string,
+  menu: { services: readonly { id: string; name: string }[]; stylists: readonly { id: string; firstName: string }[]; bundles?: readonly PhoneBundle[] },
+  clientText: string | null,
+  today: LocalDate,
+): PhoneRequest {
   const lower = ` ${line.toLowerCase().replace(/[^\p{L}\p{N}'’&/ ]+/gu, " ")} `;
   const has = (words: string) => lower.includes(` ${words.toLowerCase()} `);
   const words = lower.trim().split(/\s+/);
@@ -181,11 +194,13 @@ export function guessRequest(line: string, menu: { services: readonly { id: stri
           ? { kind: "weekday", weekday: day, next: has("next") }
           : { kind: "soon" };
   const part = (["morning", "afternoon", "evening"] as const).find((p) => has(p) || has(`${p}s`)) ?? null;
-  const serviceIds = menu.services.filter((s) => has(s.name)).map((s) => s.id);
+  const bundle = menu.bundles?.find((b) => has(b.name)) ?? null;
+  const serviceIds = bundle ? [] : menu.services.filter((s) => has(s.name)).map((s) => s.id);
   return requestFrom(
     {
       sameAsLast: has("same as last time"),
       serviceIds,
+      bundle,
       staffId: menu.stylists.find((s) => has(s.firstName))?.id ?? null,
       level: null,
       when,
@@ -201,7 +216,18 @@ export function guessRequest(line: string, menu: { services: readonly { id: stri
 
 // Denise's reading of the line (or nothing, without her) as the fields.
 export function requestFrom(
-  parse: { sameAsLast: boolean; serviceIds: string[]; staffId: string | null; level: StaffLevel | null; when: When | null; part: PartOfDay | null; after: number | null; before: number | null; earliest: boolean } | null,
+  parse: {
+    sameAsLast: boolean;
+    serviceIds: string[];
+    bundle?: PhoneBundle | null;
+    staffId: string | null;
+    level: StaffLevel | null;
+    when: When | null;
+    part: PartOfDay | null;
+    after: number | null;
+    before: number | null;
+    earliest: boolean;
+  } | null,
   clientText: string | null,
   today: LocalDate,
 ): PhoneRequest {
@@ -210,6 +236,7 @@ export function requestFrom(
     clientText,
     sameAsLast: parse?.sameAsLast ?? false,
     serviceIds: (parse?.serviceIds ?? []).slice(0, MAX_PHONE_SERVICES),
+    ...(parse?.bundle ? { serviceIds: parse.bundle.serviceIds, bundleId: parse.bundle.id, gaps: parse.bundle.gaps } : {}),
     staffId: parse?.staffId ?? null,
     level: parse?.staffId ? null : (parse?.level ?? null),
     from: dates.from < today ? today : dates.from,
@@ -222,6 +249,8 @@ export function requestFrom(
 }
 
 export type PhoneStylist = { id: string; firstName: string; level: StaffLevel | null };
+// A service bundle on the menu: its services in order and the gap before each (the first 0).
+export type PhoneBundle = { id: string; name: string; serviceIds: string[]; gaps: number[] };
 
 export type PhoneTimes = {
   options: Ranked[];
@@ -249,7 +278,7 @@ export function phoneTimes(
   const shownUpTo = deps.laterThan ?? null;
   const after = (c: Candidate) => !shownUpTo || c.date > shownUpTo.date || (c.date === shownUpTo.date && c.minute > shownUpTo.minute);
   const search = (staffIds: readonly string[], dates: LocalDate[]) =>
-    searchVisits(ctx, { serviceIds: r.serviceIds, staffIds, dates, from: window.from, to: window.to, notBefore: deps.now, timingOf: deps.timingOf }).filter(after);
+    searchVisits(ctx, { serviceIds: r.serviceIds, gaps: r.gaps, staffIds, dates, from: window.from, to: window.to, notBefore: deps.now, timingOf: deps.timingOf }).filter(after);
   const rank = (found: Candidate[], count = 3, earliest = r.earliest) => rankVisits(ctx, found, deps.habits, names, { earliest, count });
 
   const options = rank(search(who, datesBetween(r.from, r.to)));

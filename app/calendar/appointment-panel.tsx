@@ -33,6 +33,7 @@ import type { Scope } from "@/lib/scheduling/series";
 import { useNow } from "./now-line";
 import type { AppointmentDetail, BoardData } from "./types";
 import { UndoFix } from "./undo-fix";
+import { ItemSteps } from "./item-steps";
 import { reach } from "@/lib/reach";
 import { useKeepOnScreen } from "@/components/ui/keep-on-screen";
 
@@ -328,6 +329,11 @@ export function AppointmentPanel({
           <p className="text-base font-semibold text-ink tabular-nums" data-testid="visit-when">
             <span data-testid="visit-date">{date === today ? "Today" : formatLongDay(date, false)}</span> · {shortRange(first, last)}
           </p>
+          {[...new Set(items.flatMap((i) => (i.bundleName ? [i.bundleName] : [])))].map((name) => (
+            <p key={name} className="-mt-2 text-ink-muted" data-testid="visit-bundle">
+              Booked as {name}
+            </p>
+          ))}
           <ul className="flex flex-col gap-2.5">
             {items.map((i) => {
               const state = timerState(i.times);
@@ -346,6 +352,7 @@ export function AppointmentPanel({
                     {/* Several services: each one's own time (the visit's is above). */}
                     {several && <span className="whitespace-nowrap tabular-nums">· {shortRange(i.start, i.end)}</span>}
                   </p>
+                  {i.steps && <ItemSteps itemId={i.id} start={i.start} steps={i.steps} canEdit={me.canBook && isEditable(status)} />}
                   {several && state !== "waiting" && (
                     <p className="text-xs text-ink-muted" aria-live="polite">
                       {timerStatus(i.times, i.bookedMinutes, timeZone)}

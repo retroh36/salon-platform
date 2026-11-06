@@ -77,6 +77,8 @@ export function BookingFlow({
   const [step, setStep] = useState<Step>(startIds.length ? (startStaff ? "time" : "stylist") : "services");
   const [direction, setDirection] = useState<1 | -1>(1);
   const [serviceIds, setServiceIds] = useState<string[]>(startIds);
+  // A service bundle chosen whole (its services, in its order, with its gaps).
+  const [bundleId, setBundleId] = useState<string | null>(null);
   const [staffId, setStaffId] = useState<string | null | undefined>(startStaff);
   const [slot, setSlot] = useState<Slot | null>(null);
   const [identity, setIdentity] = useState<Identity>(signedIn ? { phase: "done", session: "account", known: true, firstName: signedIn.firstName } : { phase: "enter" });
@@ -154,7 +156,8 @@ export function BookingFlow({
   const selected = serviceIds.map((id) => services.get(id)!);
   const able = site.stylists.filter((s) => serviceIds.every((id) => id in s.prices));
   const stylist = staffId ? site.stylists.find((s) => s.id === staffId) ?? null : null;
-  const totalMinutes = selected.reduce((sum, s) => sum + s.minutes, 0);
+  const bundle = bundleId ? site.bundles.find((b) => b.id === bundleId) ?? null : null;
+  const totalMinutes = bundle ? bundle.minutes : selected.reduce((sum, s) => sum + s.minutes, 0);
 
   // What the visit costs: exact once there's a time (each service with its
   // stylist) or a chosen stylist, else the range across who could do each
@@ -192,15 +195,15 @@ export function BookingFlow({
   }, [step]);
 
   // The policy is worked out for this exact visit when it's reviewed.
-  const review = identity.phase === "done" && slot && step === "confirm" ? `${identity.session}|${serviceIds.join(",")}|${staffId}|${slot.date}|${slot.minute}` : null;
+  const review = identity.phase === "done" && slot && step === "confirm" ? `${identity.session}|${bundleId}|${serviceIds.join(",")}|${staffId}|${slot.date}|${slot.minute}` : null;
   useEffect(() => {
     if (!review || identity.phase !== "done" || !slot) return;
     let live = true;
-    reviewTerms(site.business.slug, identity.session, serviceIds, staffId ?? null, slot.date, slot.minute).then((t) => {
+    reviewTerms(site.business.slug, identity.session, serviceIds, staffId ?? null, slot.date, slot.minute, bundleId).then((t) => {
       if (!live) return;
       setLoaded({ key: review, terms: t });
     });
-    reviewPromotion(site.business.slug, identity.session, serviceIds, staffId ?? null, slot.date, slot.minute, null, slot.special?.id ?? null).then(
+    reviewPromotion(site.business.slug, identity.session, serviceIds, staffId ?? null, slot.date, slot.minute, null, slot.special?.id ?? null, bundleId).then(
       (result) => live && setPromo({ key: review, code: null, result }),
     );
     return () => {
@@ -216,7 +219,7 @@ export function BookingFlow({
   const offer = shownPromo?.result.ok ? shownPromo.result.promo : null;
   const applyCode = async (code: string | null) => {
     if (identity.phase !== "done" || !slot || !review) return null;
-    const result = await reviewPromotion(site.business.slug, identity.session, serviceIds, staffId ?? null, slot.date, slot.minute, code, slot.special?.id ?? null);
+    const result = await reviewPromotion(site.business.slug, identity.session, serviceIds, staffId ?? null, slot.date, slot.minute, code, slot.special?.id ?? null, bundleId);
     // A code that can't be used leaves what was there.
     if (result.ok) setPromo({ key: review, code, result });
     return result.ok ? null : result.message;
@@ -240,6 +243,7 @@ export function BookingFlow({
   const bookPatchFirst = () => {
     setColorAfter(serviceIds.filter((id) => id !== site.patchTest.serviceId));
     setServiceIds([site.patchTest.serviceId!]);
+    setBundleId(null);
     setStaffId(undefined);
     setSlot(null);
     setPatchAnswer(null);
@@ -250,9 +254,26 @@ export function BookingFlow({
   const toggleService = (id: string) => {
     setBlockedServices([]);
     setSlot(null);
-    setServiceIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : ids.length >= MAX_SERVICES ? ids : [...ids, id]));
+    // A bundle is chosen whole: picking a single service starts again from it.
+    if (bundle) {
+      setBundleId(null);
+      setServiceIds([id]);
+    } else setServiceIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : ids.length >= MAX_SERVICES ? ids : [...ids, id]));
     // A stylist who doesn't do the new set is no longer a choice.
     setStaffId(undefined);
+  };
+
+  const toggleBundle = (id: string) => {
+    setBlockedServices([]);
+    setSlot(null);
+    setStaffId(undefined);
+    if (bundleId === id) {
+      setBundleId(null);
+      setServiceIds([]);
+    } else {
+      setBundleId(id);
+      setServiceIds(site.bundles.find((b) => b.id === id)!.serviceIds);
+    }
   };
 
   const submit = () => {
@@ -268,6 +289,7 @@ export function BookingFlow({
       const sent = await book(site.business.slug, {
         session: identity.session,
         serviceIds,
+        bundleId,
         staffId: staffId ?? null,
         date: slot.date,
         minute: slot.minute,
@@ -361,15 +383,18 @@ export function BookingFlow({
         {step === "services" && (
           <ServicesStep
             site={site}
-            selected={serviceIds}
+            selected={bundle ? [] : serviceIds}
+            bundleId={bundleId}
             blocked={blockedServices}
             onToggle={toggleService}
+            onBundle={toggleBundle}
             onConsultation={() => {
               const id = site.settings.consultationServiceId!;
               setBlockedServices([]);
               setSlot(null);
               setStaffId(undefined);
-              setServiceIds((ids) => (ids.includes(id) ? ids : [...ids, id].slice(-MAX_SERVICES)));
+              setBundleId(null);
+              setServiceIds((ids) => (bundle ? [id] : ids.includes(id) ? ids : [...ids, id].slice(-MAX_SERVICES)));
             }}
           />
         )}
@@ -381,10 +406,11 @@ export function BookingFlow({
 
         {step === "time" && (
           <TimeStep
-            key={`${serviceIds.join(",")}:${staffId}`}
+            key={`${bundleId}:${serviceIds.join(",")}:${staffId}`}
             slug={site.business.slug}
             today={today}
             serviceIds={serviceIds}
+            bundleId={bundleId}
             staffId={staffId ?? null}
             stylists={site.stylists}
             slot={slot}
@@ -453,7 +479,7 @@ export function BookingFlow({
         {serviceIds.length > 0 && step !== "confirm" && (
           <p className="mb-2 flex justify-between gap-3 text-sm text-ink-muted" data-testid="summary">
             <span>
-              {serviceIds.length} {serviceIds.length === 1 ? "service" : "services"} · {formatDuration(totalMinutes)}
+              {bundle ? bundle.name : `${serviceIds.length} ${serviceIds.length === 1 ? "service" : "services"}`} · {formatDuration(totalMinutes)}
               {slot && ` · ${longDate(slot.date, true)}, ${formatMinute(slot.minute)}`}
             </span>
             <span className="font-medium text-ink tabular-nums">{formatPriceRange(prices)}</span>
@@ -484,20 +510,60 @@ function detailsComplete(d: { firstName: string; phone: string; email: string },
 function ServicesStep({
   site,
   selected,
+  bundleId,
   blocked,
   onToggle,
+  onBundle,
   onConsultation,
 }: {
   site: BookingSite;
   selected: string[];
+  bundleId: string | null;
   blocked: string[];
   onToggle: (id: string) => void;
+  onBundle: (id: string) => void;
   onConsultation: () => void;
 }) {
   const categories = [...new Set(site.services.map((s) => s.category))];
   const price = (s: SiteService) => fromPrice(site.stylists.filter((st) => s.id in st.prices).map((st) => st.prices[s.id]));
+  const names = new Map(site.services.map((s) => [s.id, s.name]));
+  // A bundle's price: each service on its own, "From" the lowest stylist prices.
+  const range = (id: string) => site.stylists.filter((st) => id in st.prices).map((st) => st.prices[id]);
+  const bundlePrice = (ids: string[]) => fromPrice([ids.reduce((sum, id) => sum + Math.min(...range(id)), 0), ids.reduce((sum, id) => sum + Math.max(...range(id)), 0)]);
   return (
     <div className="flex flex-col gap-8">
+      {site.bundles.length > 0 && (
+        <section aria-labelledby="cat-bundles">
+          <h3 id="cat-bundles" className="mb-2 text-base font-semibold text-ink">
+            Bundles
+          </h3>
+          <ul className="flex flex-col gap-2">
+            {site.bundles.map((b) => {
+              const on = bundleId === b.id;
+              return (
+                <li key={b.id}>
+                  <button type="button" aria-pressed={on} onClick={() => onBundle(b.id)} className={`${choiceClass} items-start! ${on ? chosen : notChosen}`}>
+                    <span
+                      aria-hidden
+                      className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border-[1.5px] text-xs text-white transition-colors duration-(--motion-fast) ${on ? "border-(--accent) bg-(--accent)" : "border-line-strong bg-surface"}`}
+                    >
+                      {on && "✓"}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium text-ink">{b.name}</span>
+                      <span className="mt-0.5 block text-13 text-ink-muted">
+                        {formatDuration(b.minutes)} · {b.serviceIds.map((id) => names.get(id)).join(", then ")}
+                      </span>
+                      {b.description && <span className="mt-1 block text-sm leading-snug text-ink-muted">{b.description}</span>}
+                    </span>
+                    <span className="shrink-0 self-start pt-0.5 text-sm font-medium text-ink tabular-nums">{bundlePrice(b.serviceIds)}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
       {categories.map((category) => (
         <section key={category} aria-labelledby={`cat-${category}`}>
           {site.categoryPhotos[category] && (
@@ -716,6 +782,7 @@ function TimeStep({
   slug,
   today,
   serviceIds,
+  bundleId,
   staffId,
   stylists,
   slot,
@@ -726,6 +793,7 @@ function TimeStep({
   slug: string;
   today: LocalDate;
   serviceIds: string[];
+  bundleId: string | null;
   staffId: string | null;
   stylists: SiteStylist[];
   slot: { date: LocalDate; minute: number } | null;
@@ -742,7 +810,7 @@ function TimeStep({
 
   const load = (from: LocalDate) =>
     startLoading(async () => {
-      const result = await findTimes(slug, serviceIds, staffId, from, undefined, notBefore ?? undefined);
+      const result = await findTimes(slug, serviceIds, staffId, from, undefined, notBefore ?? undefined, bundleId);
       if (!result.ok) {
         setError(result.message);
         return;

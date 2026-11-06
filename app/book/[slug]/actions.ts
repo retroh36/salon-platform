@@ -41,19 +41,25 @@ async function openSite(slug: string): Promise<BookingSite | null> {
   return found.status === "open" ? found.site : null;
 }
 
-// The services and stylist asked for, if the site allows them together.
-function visitRequest(site: BookingSite, serviceIds: unknown, staffId: unknown): VisitRequest | null {
-  if (!Array.isArray(serviceIds) || serviceIds.length === 0 || serviceIds.length > MAX_SERVICES) return null;
+// The services and stylist asked for, if the site allows them together: up
+// to MAX_SERVICES back to back, or a service bundle's services in its order,
+// with its gaps.
+function visitRequest(site: BookingSite, serviceIds: unknown, staffId: unknown, bundleId: unknown = null): VisitRequest | null {
+  const bundle = bundleId ? site.bundles.find((b) => b.id === bundleId) : null;
+  if (bundleId && !bundle) return null;
+  if (!Array.isArray(serviceIds) || serviceIds.length === 0 || (!bundle && serviceIds.length > MAX_SERVICES)) return null;
   const ids = serviceIds.map(String);
+  if (bundle && ids.join(",") !== bundle.serviceIds.join(",")) return null;
+  const extra = bundle ? { bundleId: bundle.id, gaps: bundle.gaps } : {};
   if (new Set(ids).size !== ids.length) return null;
   for (const id of ids) {
     const service = site.services.find((s) => s.id === id);
     if (!service || service.mode !== "bookable") return null;
   }
   const stylistIds = site.stylists.filter((s) => ids.some((id) => id in s.prices)).map((s) => s.id);
-  if (staffId === null) return { serviceIds: ids, staffId: null, stylistIds };
+  if (staffId === null) return { serviceIds: ids, staffId: null, stylistIds, ...extra };
   if (typeof staffId !== "string" || !stylistsFor(site, ids).some((s) => s.id === staffId)) return null;
-  return { serviceIds: ids, staffId, stylistIds };
+  return { serviceIds: ids, staffId, stylistIds, ...extra };
 }
 
 function bookingWindow(site: BookingSite, now = new Date()) {
@@ -79,7 +85,15 @@ export type TimesResult = { ok: true; days: DayTimes[]; lastDay: LocalDate } | {
 
 // Free times for the visit over two weeks from `from` (none before
 // `notBefore`, an ISO time: 48 hours after a patch test they've booked).
-export async function findTimes(slug: string, serviceIds: string[], staffId: string | null, from: string, rescheduleToken?: string, notBefore?: string): Promise<TimesResult> {
+export async function findTimes(
+  slug: string,
+  serviceIds: string[],
+  staffId: string | null,
+  from: string,
+  rescheduleToken?: string,
+  notBefore?: string,
+  bundleId: string | null = null,
+): Promise<TimesResult> {
   const site = await openSite(slug);
   if (!site) return { ok: false, message: "Online booking isn't available right now." };
   const admin = createAdminClient();
@@ -96,7 +110,7 @@ export async function findTimes(slug: string, serviceIds: string[], staffId: str
     request = managed.request;
     replacing = managed.id;
   } else {
-    request = visitRequest(site, serviceIds, staffId);
+    request = visitRequest(site, serviceIds, staffId, bundleId);
   }
   if (!request) return { ok: false, message: "Those services can't be booked together online." };
 
@@ -229,6 +243,7 @@ export async function reviewPromotion(
   minute: number,
   code: string | null,
   specialId: string | null = null,
+  bundleId: string | null = null,
 ): Promise<PromotionResult> {
   const site = await openSite(slug);
   if (!site) return { ok: false, message: "Online booking isn't available right now." };
@@ -237,7 +252,7 @@ export async function reviewPromotion(
   if (code && !(await withinLimits(admin, [{ key: `promo:${ipHash}`, limit: 20, windowSeconds: HOUR }]))) {
     return { ok: false, message: "Too many codes tried. Please wait a while and try again." };
   }
-  const request = visitRequest(site, serviceIds, staffId);
+  const request = visitRequest(site, serviceIds, staffId, bundleId);
   const start = isLocalDate(date) && Number.isInteger(minute) ? fromLocal(date, minute, site.location.timezone) : null;
   if (!request || !start) return { ok: false, message: "Those services can't be booked together online." };
   const who = await whoIsBooking(admin, site, session);
@@ -253,10 +268,18 @@ export type TermsResult =
 
 // The policy for this visit, before the client agrees: its text with this
 // visit's amounts, and whether a card (and a deposit) is needed.
-export async function reviewTerms(slug: string, session: string, serviceIds: string[], staffId: string | null, date: string, minute: number): Promise<TermsResult> {
+export async function reviewTerms(
+  slug: string,
+  session: string,
+  serviceIds: string[],
+  staffId: string | null,
+  date: string,
+  minute: number,
+  bundleId: string | null = null,
+): Promise<TermsResult> {
   const site = await openSite(slug);
   if (!site) return { ok: false, message: "Online booking isn't available right now." };
-  const request = visitRequest(site, serviceIds, staffId);
+  const request = visitRequest(site, serviceIds, staffId, bundleId);
   const start = isLocalDate(date) && Number.isInteger(minute) ? fromLocal(date, minute, site.location.timezone) : null;
   if (!request || !start) return { ok: false, message: "Those services can't be booked together online." };
   const admin = createAdminClient();
@@ -279,6 +302,8 @@ export async function reviewTerms(slug: string, session: string, serviceIds: str
 export type BookInput = {
   session: string;
   serviceIds: string[];
+  // A service bundle booked as one (its services, in order).
+  bundleId?: string | null;
   staffId: string | null;
   date: string;
   minute: number;
@@ -360,7 +385,7 @@ async function bookAttempt(
   ipHash: string,
   userAgent: string | null,
 ): Promise<Attempted> {
-  const request = visitRequest(site, input.serviceIds, input.staffId);
+  const request = visitRequest(site, input.serviceIds, input.staffId, input.bundleId ?? null);
   if (!request) return { ok: false, message: "Those services can't be booked together online." };
   const window = bookingWindow(site);
   const start = isLocalDate(input.date) && Number.isInteger(input.minute) ? fromLocal(input.date, input.minute, site.location.timezone) : null;

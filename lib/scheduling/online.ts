@@ -1,6 +1,6 @@
 // Online booking: when a visit can start, for the salon's public booking
-// site. A visit is one or more services back to back, each starting when
-// the one before ends, with a chosen stylist or "no preference" (anyone who
+// site. A visit is one or more services, each starting when the one before
+// ends (plus its gap, for a service bundle: ./bundles.ts), with a chosen stylist or "no preference" (anyone who
 // offers the service). Every time offered passes the same rules as the
 // calendar (./booking.ts: hours, time off, blocked time, processing gaps),
 // with a free chair for each service, and the visit is planned and checked
@@ -18,6 +18,10 @@ export type VisitRequest = {
   staffId: string | null;
   // Who may be booked online, in the order to try them for "no preference".
   stylistIds: readonly string[];
+  // A service bundle: its id, and the minutes before each service (the
+  // first 0), free time for the stylist.
+  bundleId?: string | null;
+  gaps?: readonly number[];
 };
 
 export type PlannedItem = { serviceId: string; staffId: string; resourceId: string | null; start: Date };
@@ -39,7 +43,8 @@ export function planVisitAt(ctx: BookingContext, request: VisitRequest, start: D
   const planned: PlannedItem[] = [];
   let at = start;
 
-  for (const serviceId of request.serviceIds) {
+  for (const [n, serviceId] of request.serviceIds.entries()) {
+    if (n > 0) at = new Date(at.getTime() + (request.gaps?.[n] ?? 0) * 60_000);
     const service = ctx.services.get(serviceId);
     if (!service || service.archived) return null;
     const previous = planned.at(-1)?.staffId;

@@ -10,6 +10,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { allowedActions, ACTION_STATUS, isEditable, type AppointmentAction, type AppointmentStatus } from "../appointments.ts";
 import { checkItem, durationMinutes, pickResource, stretchTiming, timingFor, type BookedItem, type BookingContext, type BookingProblem, type ServiceTiming } from "./booking.ts";
+import { moveWithBundle } from "./bundles.ts";
+import { stepsProblem, stepsTiming, type Step, type StepsProblem } from "./steps.ts";
 import { loadBookingContext } from "./load.ts";
 import { patchTestState, type PatchSettings } from "./patch-tests.ts";
 import { toLocal } from "./time.ts";
@@ -39,6 +41,9 @@ export type BookingItemInput = {
   // client, outside their hours): the problems in MOVE_ANYWAY are let
   // through, and a chair that isn't free is left off.
   anyway?: boolean;
+  // The service bundle it's booked as part of (./bundles.ts); null takes
+  // it out of its bundle, left out keeps what it had.
+  bundleId?: string | null;
 };
 
 // What staff may override by saying so; anything else (a room service
@@ -80,13 +85,13 @@ export type SaveResult =
 
 const ATTEMPTS = 3;
 
-type ExistingItem = BookedItem & { id: string };
+type ExistingItem = BookedItem & { id: string; bundleId: string | null };
 
 async function loadAppointment(supabase: Supabase, appointmentId: string) {
   const { data, error } = await supabase
     .from("appointments")
     .select(
-      "id, status, client_id, notes, appointment_items(id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes)",
+      "id, status, client_id, notes, appointment_items(id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, bundle_id)",
     )
     .eq("id", appointmentId)
     .maybeSingle();
@@ -102,6 +107,7 @@ async function loadAppointment(supabase: Supabase, appointmentId: string) {
     activeMinutes: i.active_minutes,
     processingMinutes: i.processing_minutes,
     finishingMinutes: i.finishing_minutes,
+    bundleId: i.bundle_id,
   }));
   return { status: data.status as AppointmentStatus, clientId: data.client_id, notes: data.notes, items };
 }
@@ -199,6 +205,7 @@ function planVisit(calendar: BookingContext, input: BookingInput, existing: Exis
       starts_at: item.start.toISOString(),
       // Said for every changed item, so one moved again without it counts again.
       ...(changed[n] ? { anyway: item.anyway === true } : {}),
+      ...(item.bundleId !== undefined ? { bundle_id: item.bundleId } : {}),
       timing: own[n] ? { active: own[n]!.activeMinutes, processing: own[n]!.processingMinutes, finishing: own[n]!.finishingMinutes } : null,
     })),
   };
@@ -315,7 +322,8 @@ export async function saveBookings(
 
 // Moves one item of a visit to a new start time and/or stylist. It keeps
 // its chair if that's free, otherwise takes a free one. The visit's other
-// items stay where they are.
+// items stay where they are, except the rest of its service bundle, which
+// moves with it (moveWithBundle).
 export async function moveItem(
   supabase: Supabase,
   location: Location,
@@ -331,12 +339,50 @@ export async function moveItem(
     appointmentId: data.appointment_id,
     clientId: appointment.clientId,
     notes: appointment.notes,
-    items: appointment.items.map((i) =>
-      i.id === move.itemId
-        ? { id: i.id, serviceId: i.serviceId, staffId: move.staffId, start: move.start, resource: { kind: "any", prefer: i.resourceId }, anyway: move.anyway }
+    items: moveWithBundle(appointment.items, move).map(({ item: i, staffId, start, moved }) =>
+      moved
+        ? { id: i.id, serviceId: i.serviceId, staffId, start, resource: { kind: "any", prefer: i.resourceId }, anyway: move.anyway }
         : { id: i.id, serviceId: i.serviceId, staffId: i.staffId, start: i.start, resource: i.resourceId ? { kind: "exact", id: i.resourceId } : { kind: "none" } },
     ),
   });
+}
+
+// A visit's own steps for one service (a step longer or shorter, one added
+// or taken out): checked against the calendar with its new busy time, then
+// saved through set_item_steps with the calendar version, which moves the
+// item's end and the visit's with it.
+export async function changeItemSteps(
+  supabase: Supabase,
+  location: Location,
+  itemId: string,
+  steps: readonly Step[],
+): Promise<SaveResult | { ok: false; error: "steps"; problem: StepsProblem }> {
+  const problem = stepsProblem(steps);
+  if (problem) return { ok: false, error: "steps", problem };
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    const version = await supabase.from("locations").select("calendar_version").eq("id", location.id).single();
+    if (version.error) throw version.error;
+    const { data, error } = await supabase.from("appointment_items").select("appointment_id").eq("id", itemId).maybeSingle();
+    if (error) throw error;
+    if (!data) return { ok: false, error: "not_found" };
+    const appointment = await loadAppointment(supabase, data.appointment_id);
+    if (!appointment) return { ok: false, error: "not_found" };
+    if (!isEditable(appointment.status)) return { ok: false, error: "not_editable" };
+    const old = appointment.items.find((i) => i.id === itemId)!;
+
+    const ctx = await contextFor(supabase, location, [{ clientId: appointment.clientId, notes: null, items: [{ serviceId: old.serviceId, staffId: old.staffId, start: old.start, resource: { kind: "none" } }] }]);
+    const calendar = { ...ctx, booked: ctx.booked.filter((b) => b.id !== itemId) };
+    const check = checkItem(calendar, { id: itemId, serviceId: old.serviceId, staffId: old.staffId, resourceId: old.resourceId, start: old.start, timing: { ...stepsTiming(steps), steps } });
+    if (!check.valid) return { ok: false, error: "invalid", problems: [check.problems] };
+
+    const saved = await supabase.rpc("set_item_steps", { p_location_id: location.id, p_calendar_version: version.data.calendar_version, p_item_id: itemId, p_steps: steps.map((st) => ({ name: st.name, minutes: st.minutes, processing: st.processing })) });
+    if (saved.error?.code === "40001" || saved.error?.code === "23P01") continue;
+    if (saved.error?.code === "42501") return { ok: false, error: "forbidden" };
+    if (saved.error?.code === "55000") return { ok: false, error: "not_editable" };
+    if (saved.error) throw saved.error;
+    return { ok: true, appointmentId: data.appointment_id };
+  }
+  return { ok: false, error: "busy" };
 }
 
 // "patch_test": the salon blocks visits without a patch test in order, and

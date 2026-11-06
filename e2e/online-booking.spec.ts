@@ -226,6 +226,48 @@ test("a new client books two services back to back on a phone", async ({ page })
   expect(await blanksSeen(page)).toEqual([]);
 });
 
+test("a new client books a bundle as one, with its gap free between the services", async ({ page }) => {
+  const id = async (name: string) => (await admin.from("services").select("id").eq("business_id", B).eq("name", name).single()).data!.id;
+  const name = `Ob${RUN} Cut and blowout`;
+  const { data: bundle } = await admin.from("service_bundles").insert({ business_id: B, name, position: 99 }).select("id").single();
+  await admin.from("service_bundle_parts").insert([
+    { bundle_id: bundle!.id, business_id: B, position: 0, service_id: await id("Women's Cut & Style"), gap_minutes: 0 },
+    { bundle_id: bundle!.id, business_id: B, position: 1, service_id: await id("Blowout"), gap_minutes: 30 },
+  ]);
+  try {
+    await open(page);
+    const choice = flow(page).getByRole("region", { name: "Bundles" }).getByRole("button", { name: new RegExp(`^${name}`) });
+    // An hour, 30 minutes free, then 45 minutes.
+    await expect(choice).toContainText("2 hr 15 min · Women's Cut & Style, then Blowout");
+    await choice.click();
+    await expect(flow(page).getByTestId("summary")).toContainText(`${name} · 2 hr 15 min`);
+    await cont(page).click();
+    await chooseStylist(page, /Shae Morgan/);
+    await chooseFirstTime(page);
+    await verify(page, newPhone());
+    await flow(page).getByLabel("First name").fill(`Ob${RUN}Bundle`);
+    await flow(page).getByLabel("Last name").fill("Client");
+    await flow(page).getByLabel("Email").fill(`ob-b-${RUN}@example.com`);
+    await cont(page).click();
+    await expect(flow(page).getByTestId("line-price")).toHaveText(["$70", "$45"]);
+    await bookIt(page);
+    await expect(page).toHaveURL(/\/manage\/[A-Za-z0-9_-]{43}\?booked=1$/);
+
+    const { data: client } = await admin.from("clients").select("id").eq("business_id", B).eq("first_name", `Ob${RUN}Bundle`).single();
+    created.push(client!.id);
+    const { data: items } = await admin.from("appointment_items").select("starts_at, ends_at, bundle_id, staff_id, appointment:appointments!inner(client_id)").eq("appointment.client_id", client!.id).order("starts_at");
+    expect(items!.map((i) => [i.bundle_id, i.staff_id])).toEqual([
+      [bundle!.id, SEED.staff.shae],
+      [bundle!.id, SEED.staff.shae],
+    ]);
+    expect(Date.parse(items![1].starts_at) - Date.parse(items![0].ends_at)).toBe(30 * 60_000);
+  } finally {
+    const { data: c } = await admin.from("clients").select("id").eq("business_id", B).eq("first_name", `Ob${RUN}Bundle`);
+    if (c?.length) await admin.from("appointments").delete().in("client_id", c.map((x) => x.id));
+    await admin.from("service_bundles").delete().eq("id", bundle!.id);
+  }
+});
+
 test("a returning client confirms with a code and is matched to their profile (and where they came from is kept)", async ({ page }) => {
   // A seeded client (their ids start e0000000-) with a phone number.
   const { data: client } = await admin.from("clients").select("id, first_name, phone").eq("business_id", B).not("phone", "is", null).gte("id", "e0000000-0000-4000-8000-000000000000").lte("id", "e0000000-ffff-4fff-bfff-ffffffffffff").order("id").limit(1).single();

@@ -57,7 +57,7 @@ const item = (svc: typeof CUT, staffId: string, time: string, appointmentId: str
   processingMinutes: svc.processingMinutes,
   finishingMinutes: svc.finishingMinutes,
 });
-const visit = (id: string, items: ReturnType<typeof item>[], extra: Partial<RescueVisit> = {}): RescueVisit => ({
+const visit = (id: string, items: RescueVisit["items"], extra: Partial<RescueVisit> = {}): RescueVisit => ({
   appointmentId: id,
   clientId: `client-${id}`,
   movable: true,
@@ -240,4 +240,37 @@ it("ends each move at its new length", () => {
   const { lines } = plan([visit("a", [item(CUT, "nola", "10:00", "a")])]);
   const mv = chosen(lines[0])!.moves[0];
   expect(itemEnd({ ...mv, ...mv.timing, serviceId: "cut" })).toEqual(at("11:00"));
+});
+
+describe("bundles and services built from steps", () => {
+  it("moves the out stylist's parts of a bundle (a visit with a gap) and keeps the gap, the other stylist's part staying theirs", () => {
+    // Nola's color 9 to 10:45, a 30 minute gap, then Shae's blowout at 11:15.
+    const bundle = visit("bnd", [item(COLOR, "nola", "9:00", "bnd"), item(BLOW, "shae", "11:15", "bnd")]);
+    const { lines } = plan([bundle]);
+    const first = chosen(lines[0])!;
+    expect(first.staffId).toBe("gil");
+    const moves = new Map(first.moves.map((mv) => [mv.itemId, mv]));
+    const [color, blow] = bundle.items;
+    expect(moves.get(color.id)!.staffId).toBe("gil");
+    expect(moves.get(blow.id)!.staffId).toBe("shae");
+    // The same time, so the gap is as booked.
+    expect(hhmm(moves.get(color.id)!.start)).toBe("9:00");
+    expect(hhmm(moves.get(blow.id)!.start)).toBe("11:15");
+  });
+
+  it("keeps a visit's own steps, so another client can sit in a processing step", () => {
+    const steps = [
+      { name: "Highlight", minutes: 45, processing: false },
+      { name: "Processing", minutes: 35, processing: true },
+      { name: "Gloss", minutes: 10, processing: false },
+      { name: "Processing", minutes: 20, processing: true },
+      { name: "Finish", minutes: 15, processing: false },
+    ];
+    // Nola's stepped color at 9 (Highlight to 9:45, processing to 10:20, gloss to 10:30, processing to 10:50).
+    const stepped = visit("st", [{ ...item(COLOR, "nola", "9:00", "st"), activeMinutes: 45, processingMinutes: 55, finishingMinutes: 25, steps }]);
+    // Gil has a client in the second processing step only.
+    const { lines } = plan([stepped], [item({ ...CUT, activeMinutes: 20 }, "gil", "10:30", "g1")]);
+    const toGil = lines[0].options.find((o) => o.staffId === "gil" && o.kind !== "reschedule");
+    expect(toGil && hhmm(toGil.start)).toBe("9:00");
+  });
 });

@@ -13,6 +13,8 @@ import type { StaffLevel } from "@/lib/schedule-forms";
 import type { ItemTimes } from "@/lib/visit-times";
 import type { StaffRole } from "@/lib/staff";
 import type { SegmentKind } from "@/lib/scheduling/booking";
+import type { BundlePart } from "@/lib/scheduling/bundles";
+import type { Step } from "@/lib/scheduling/steps";
 import type { Interval } from "@/lib/scheduling/intervals";
 import type { TimeBlockKind } from "@/lib/scheduling/blocks";
 import type { LocalDate } from "@/lib/scheduling/time";
@@ -49,7 +51,8 @@ export type BlockData = Interval & {
   itemId: string;
   appointmentId: string;
   staffId: string;
-  segments: (Interval & { kind: SegmentKind })[];
+  // A service built from steps names each one ("Gloss").
+  segments: (Interval & { kind: SegmentKind; name?: string })[];
   family: ServiceFamily;
   clientName: string;
   service: string;
@@ -68,12 +71,20 @@ export type BlockData = Interval & {
   member: string | null;
   // The client's allergies and sensitivities, for the tooltip.
   allergies: string | null;
+  // The service bundle this part was booked from ("Highlight + Gloss + Cut").
+  bundle: string | null;
+  bundleId: string | null;
 };
 
 export type ItemDetail = Interval & {
   id: string;
   serviceId: string;
   serviceName: string;
+  // This visit's own steps, for a service built from steps.
+  steps: readonly Step[] | null;
+  // The service bundle it was booked from.
+  bundleId: string | null;
+  bundleName: string | null;
   staffId: string;
   staffName: string;
   resourceId: string | null;
@@ -171,8 +182,12 @@ export type MenuService = {
   archived: boolean;
 };
 
+export type MenuBundle = { id: string; name: string; parts: BundlePart[]; archived: boolean };
+
 export type Menu = {
   services: MenuService[];
+  // Service bundles, booked as their parts with gaps between.
+  bundles: MenuBundle[];
   // Staff id -> service id -> the stylist's price (null: the menu price).
   offers: Record<string, Record<string, number | null>>;
   // Staff id -> service id -> the stylist's own length in minutes, where

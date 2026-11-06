@@ -363,6 +363,7 @@ const change = (patch: Partial<BookingParse>): BookingParse => ({
   intent: "change",
   sameAsLast: false,
   serviceIds: [],
+  bundle: null,
   staffId: null,
   level: null,
   anyStylist: false,
@@ -550,5 +551,36 @@ describe("booking in Denise's chat", () => {
     expect((await bookingTurn("Zoey Park wants a balayage", null, null, chatDeps({ missed: "limit" }).deps))?.text).toBe(MISSED.limit);
     expect(MISSED.limit).toMatch(/^I've reached today's limit/);
     expect((await bookingTurn("Zoey Park wants a balayage", null, null, chatDeps({ missed: "unclear" }).deps))?.text).toMatch(/^I didn't catch that/);
+  });
+});
+
+describe("bundles in Denise's chat", () => {
+  const BUNDLE = { id: "bnd-1", name: "Balayage and Cut", serviceIds: ["svc-balayage", "svc-womens"], gaps: [0, 20] };
+  const WITH_BUNDLE: BookingMenu = { ...MENU, bundles: [BUNDLE] };
+
+  it("lists the salon's bundles for her and reads one by its code, with its services and gaps", async () => {
+    const { client, requests } = fake(answer({ ...blank, bundle_code: "b1", stylist_code: "t1" }));
+    const parse = await readBookingRequest(client, "Balayage and Cut with Bridget", WITH_BUNDLE);
+    expect(JSON.stringify(requests[0])).toContain("b1: Balayage and Cut (Balayage, then Women's Cut & Style)");
+    expect(parse).toMatchObject({ bundle: BUNDLE, serviceIds: [] });
+    expect(requestFrom(read(parse), null, TUE)).toMatchObject({ serviceIds: BUNDLE.serviceIds, bundleId: "bnd-1", gaps: [0, 20], staffId: "st-bridget" });
+    expect(checkedParse({ ...blank, bundle_code: "b2" }, WITH_BUNDLE)).toBeNull();
+    expect((schema(WITH_BUNDLE).properties.bundle_code as { anyOf: { enum?: string[] }[] }).anyOf[0].enum).toEqual(["b1"]);
+  });
+
+  it("our own guess finds a bundle named in full, and a follow-up naming a service drops it", () => {
+    const r = guessRequest("Maria wants the Balayage and Cut on Thursday", WITH_BUNDLE, "Maria", TUE);
+    expect(r).toMatchObject({ bundleId: "bnd-1", serviceIds: BUNDLE.serviceIds, gaps: [0, 20] });
+    const cut = checkedParse({ ...blank, intent: "change", service_codes: ["s3"] }, WITH_BUNDLE)!;
+    expect(applyChange(r, cut, TUE)).toMatchObject({ serviceIds: ["svc-mens"], bundleId: null });
+  });
+
+  it("searches the bundle with its gap free for the stylist", () => {
+    // Balayage 9:00 to 11:35, a 20 minute gap, then the cut at 11:55.
+    const found = search(ctx(), { serviceIds: ["balayage", "cut"], gaps: [0, 20], staffIds: ["bridget"] });
+    expect(found[0].lines.map((l) => hhmm(l.startMinute))).toEqual(["9:00", "11:55"]);
+    // Another client in the gap still leaves the 9:00 start.
+    const c = ctx([booked("t", TRIM, "bridget", "11:35", TUE, "chair-3")]);
+    expect(search(c, { serviceIds: ["balayage", "cut"], gaps: [0, 30], staffIds: ["bridget"] }).map((x) => hhmm(x.minute))).toContain("9:00");
   });
 });

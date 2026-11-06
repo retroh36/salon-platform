@@ -14,7 +14,7 @@
 
 import { DEFAULT_LEVELS } from "@/lib/levels";
 import type Anthropic from "@anthropic-ai/sdk";
-import type { PhoneRequest, When } from "@/lib/phone-booking";
+import type { PhoneBundle, PhoneRequest, When } from "@/lib/phone-booking";
 import type { PartOfDay } from "@/lib/scheduling/phone";
 import { type StaffLevel } from "@/lib/schedule-forms";
 import { formatMinute, weekdayOf } from "@/lib/scheduling/time";
@@ -24,11 +24,14 @@ import { failureKind } from "./errors";
 export type BookingMenu = {
   services: readonly { id: string; name: string; category: string }[];
   stylists: readonly { id: string; firstName: string; level: StaffLevel | null }[];
+  // Service bundles ("Highlight, Gloss and Cut"), booked as their services with gaps.
+  bundles?: readonly PhoneBundle[];
   // The salon's levels (lib/levels.ts); every salon's starting three if left out.
   levels?: readonly { key: string; name: string }[];
 };
 
 const levelsOf = (menu: BookingMenu) => menu.levels ?? DEFAULT_LEVELS;
+const bundlesOf = (menu: BookingMenu) => menu.bundles ?? [];
 
 // "booking": a new request for an appointment. "change": a follow-up that
 // changes the request already on screen. "other": anything else (a
@@ -42,6 +45,8 @@ export type BookingParse = {
   intent: BookingIntent;
   sameAsLast: boolean;
   serviceIds: string[];
+  // A bundle asked for by name (its services, in its order, with its gaps).
+  bundle: PhoneBundle | null;
   staffId: string | null;
   level: StaffLevel | null;
   anyStylist: boolean;
@@ -63,17 +68,22 @@ const WEEKDAYS = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "S
 export function describeCurrent(r: PhoneRequest, menu: BookingMenu): string {
   const code = (prefix: string, list: readonly { id: string }[], id: string) => `${prefix}${list.findIndex((x) => x.id === id) + 1}`;
   const parts = [
+    r.bundleId && bundlesOf(menu).some((b) => b.id === r.bundleId) ? `bundle ${code("b", bundlesOf(menu), r.bundleId)}` : null,
     `services ${r.serviceIds.length ? r.serviceIds.map((id) => code("s", menu.services, id)).join(", ") : "none yet"}`,
     r.staffId ? `stylist ${code("t", menu.stylists, r.staffId)}` : r.level ? `any ${levelsOf(menu).find((l) => l.key === r.level)?.name ?? r.level} stylist` : "any stylist",
     r.from === r.to ? `on ${WEEKDAYS[weekdayOf(r.from)]}` : "over a range of days",
     r.part ? `${r.part}s` : r.after !== null ? `after ${formatMinute(r.after)}` : r.before !== null ? `before ${formatMinute(r.before)}` : "any time of day",
   ];
-  return parts.join("; ");
+  return parts.filter(Boolean).join("; ");
 }
 
 function system(menu: BookingMenu, current: string | null): string {
   const services = menu.services.map((s, n) => `s${n + 1}: ${s.name} (${s.category})`).join("\n");
   const stylists = menu.stylists.map((s, n) => `t${n + 1}: ${s.firstName}${s.level ? ` (${s.level})` : ""}`).join("\n");
+  const names = new Map(menu.services.map((s) => [s.id, s.name]));
+  const bundles = bundlesOf(menu)
+    .map((b, n) => `b${n + 1}: ${b.name} (${b.serviceIds.map((id) => names.get(id)).join(", then ")})`)
+    .join("\n");
   return `You read one line a salon's front desk typed to their assistant, and return what it asks for in the given JSON shape. Only what the line says: leave a field null (or false, or empty) when it isn't said, and never work anything out yourself: don't turn "next week" or "Tuesday" into a date. "[client]" stands for a client's name.
 
 intent: booking when the line asks to book a client or find a time to book (a client and a service, "same as last time", "earliest balayage with any senior next week", "Zoey wants a cut Thursday"). ${
@@ -84,6 +94,8 @@ intent: booking when the line asks to book a client or find a time to book (a cl
 
 service_codes: the services asked for, in the order said, as codes from this menu. "cut" alone is a women's cut unless it says men's, kids or a fade; "color" alone is all-over color; "highlights" alone is full highlights. "same as last time" means same_as_last_time is true and service_codes stays empty unless services are also named.
 ${services}
+
+bundle_code: when the line names one of the salon's bundles (several services booked together), its code from this list, else null; service_codes stays empty then.${bundles ? `\n${bundles}` : " The salon has none."}
 
 stylist_code: the stylist asked for by name, as a code from this list, else null. level: the level's code from this list when the line asks for a level of stylist ("any master stylist"), else null: ${levelsOf(menu).map((l) => `${l.key} (${l.name})`).join(", ")}. "anyone" or "whoever" means both are null.
 ${stylists}
@@ -99,12 +111,14 @@ const intOrNull = { anyOf: [{ type: "integer" }, { type: "null" }] };
 export function schema(menu: BookingMenu) {
   const serviceCodes = menu.services.map((_, n) => `s${n + 1}`);
   const stylistCodes = menu.stylists.map((_, n) => `t${n + 1}`);
+  const bundleCodes = bundlesOf(menu).map((_, n) => `b${n + 1}`);
   return {
     type: "object",
     properties: {
       intent: { type: "string", enum: ["booking", "change", "other"] },
       same_as_last_time: { type: "boolean" },
       service_codes: { type: "array", items: { type: "string", enum: serviceCodes } },
+      bundle_code: oneOrNull(bundleCodes),
       stylist_code: oneOrNull(stylistCodes),
       level: oneOrNull(levelsOf(menu).map((l) => l.key)),
       any_stylist: { type: "boolean" },
@@ -124,6 +138,7 @@ export function schema(menu: BookingMenu) {
       "intent",
       "same_as_last_time",
       "service_codes",
+      "bundle_code",
       "stylist_code",
       "level",
       "any_stylist",
@@ -165,6 +180,9 @@ export function checkedParse(raw: unknown, menu: BookingMenu): BookingParse | nu
   }
   const staffId = code(r.stylist_code, "t", menu.stylists);
   if (staffId === undefined) return null;
+  const bundleId = r.bundle_code === undefined ? null : code(r.bundle_code, "b", bundlesOf(menu));
+  if (bundleId === undefined) return null;
+  const bundle = bundlesOf(menu).find((b) => b.id === bundleId) ?? null;
   const level = levelsOf(menu).find((l) => l.key === r.level)?.key ?? null;
   const kind = WHEN_KINDS.find((k) => k === r.when) ?? null;
   let when: When | null = null;
@@ -183,7 +201,8 @@ export function checkedParse(raw: unknown, menu: BookingMenu): BookingParse | nu
   return {
     intent,
     sameAsLast: r.same_as_last_time === true,
-    serviceIds,
+    serviceIds: bundle ? [] : serviceIds,
+    bundle,
     staffId,
     level,
     anyStylist: r.any_stylist === true,

@@ -27,6 +27,10 @@ export type SiteService = {
   depositAmount: number;
 };
 
+// A service bundle clients can book online: its services in order, the gap
+// before each (the first 0) and its whole length.
+export type SiteBundle = { id: string; name: string; description: string | null; serviceIds: string[]; gaps: number[]; minutes: number };
+
 export type SiteStylist = {
   id: string;
   firstName: string;
@@ -63,6 +67,8 @@ export type BookingSite = {
   // the service a patch test is done at, if it can be booked online.
   patchTest: { validDays: number; minHours: number; serviceId: string | null };
   services: SiteService[];
+  // Bundles whose services can all be booked online.
+  bundles: SiteBundle[];
   // A photo for each category that has one.
   categoryPhotos: Record<string, string>;
   stylists: SiteStylist[];
@@ -90,7 +96,7 @@ export async function loadSite(admin: Admin, slug: string): Promise<SiteLookup> 
   const logoUrl = salonLogoUrl(business.logo_path);
   if (!loc || !settings?.enabled) return { status: "closed", name: business.name, logoUrl, phone: loc?.phone ?? null };
 
-  const [{ data: services, error: serviceError }, { data: staff, error: staffError }, { data: hours, error: hoursError }, { data: photos, error: photoError }, levels] = await Promise.all([
+  const [{ data: services, error: serviceError }, { data: staff, error: staffError }, { data: hours, error: hoursError }, { data: photos, error: photoError }, levels, { data: bundleRows, error: bundleError }] = await Promise.all([
     admin
       .from("services")
       .select("id, name, category, description, duration_minutes, price_cents, online_booking, requires_patch_test, deposit_kind, deposit_amount, service_level_prices(level, price_cents)")
@@ -107,7 +113,9 @@ export async function loadSite(admin: Admin, slug: string): Promise<SiteLookup> 
     admin.from("location_hours").select("weekday, start_minute, end_minute").eq("location_id", loc.id),
     admin.from("service_category_photos").select("category, photo_path").eq("business_id", business.id),
     loadLevels(admin, business.id),
+    admin.from("service_bundles").select("id, name, description, position, parts:service_bundle_parts(position, service_id, gap_minutes)").eq("business_id", business.id).eq("online", true).is("archived_at", null).order("position"),
   ]);
+  if (bundleError) throw bundleError;
   if (serviceError) throw serviceError;
   if (staffError) throw staffError;
   if (hoursError) throw hoursError;
@@ -150,6 +158,23 @@ export async function loadSite(admin: Admin, slug: string): Promise<SiteLookup> 
     }))
     .sort((a, b) => order.indexOf(a.category) - order.indexOf(b.category) || a.name.localeCompare(b.name));
 
+  const bookable = new Map(siteServices.filter((s) => s.mode === "bookable").map((s) => [s.id, s]));
+  const bundles: SiteBundle[] = bundleRows.flatMap((b) => {
+    const parts = [...b.parts].sort((x, y) => x.position - y.position);
+    if (parts.length < 2 || !parts.every((p) => bookable.has(p.service_id))) return [];
+    const gaps = parts.map((p, n) => (n === 0 ? 0 : p.gap_minutes));
+    return [
+      {
+        id: b.id,
+        name: b.name,
+        description: b.description,
+        serviceIds: parts.map((p) => p.service_id),
+        gaps,
+        minutes: parts.reduce((sum, p, n) => sum + gaps[n] + bookable.get(p.service_id)!.minutes, 0),
+      },
+    ];
+  });
+
   const consultation = siteServices.find((s) => s.id === settings.consultation_service_id && s.mode === "bookable");
   const address = [loc.address_line1, [loc.city, loc.region].filter(Boolean).join(", ")].filter(Boolean).join(", ") || null;
   const digits = loc.phone?.replace(/\D/g, "") ?? "";
@@ -183,6 +208,7 @@ export async function loadSite(admin: Admin, slug: string): Promise<SiteLookup> 
         serviceId: siteServices.find((s) => s.id === settings.patch_test_service_id && s.mode === "bookable")?.id ?? null,
       },
       services: siteServices,
+      bundles,
       categoryPhotos: Object.fromEntries(photos.filter((p) => siteServices.some((x) => x.category === p.category)).map((p) => [p.category, salonLogoUrl(p.photo_path)!])),
       stylists,
     },

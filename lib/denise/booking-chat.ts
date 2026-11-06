@@ -18,7 +18,8 @@ import { isMiss, type BookingMenu, type BookingParse, type ReadMiss } from "./bo
 
 export type ClientMatch = { id: string; name: string; phone: string | null; allergies: string | null; lastVisit: string | null };
 
-export type LastVisit = { serviceIds: string[]; staffId: string | null; text: string };
+// A bundle's id and gaps when the visit was booked as one.
+export type LastVisit = { serviceIds: string[]; staffId: string | null; text: string; bundleId?: string | null; gaps?: number[] };
 
 export type ClientAlerts = {
   allergies: string | null;
@@ -38,6 +39,8 @@ export type BookingSlot = {
   reason: string;
   priceCents: number;
   lines: SlotLine[];
+  // Booked as this bundle (each line marked with it).
+  bundleId?: string | null;
 };
 
 export type TimesFound = {
@@ -113,7 +116,7 @@ const WAYS = (n: number) => (n === 1 ? "one client" : n === 2 ? "two clients" : 
 export async function bookingTurn(line: string, current: BookingState | null, pageClientId: string | null, deps: BookingDeps): Promise<BookingReply | null> {
   const text = line.trim().slice(0, 500);
   if (!text || !mightBeBooking(text, deps.menu, Boolean(current))) return null;
-  const vocabulary = vocabularyOf([...deps.menu.services.flatMap((s) => [s.name, s.category]), ...deps.menu.stylists.map((m) => m.firstName)]);
+  const vocabulary = vocabularyOf([...deps.menu.services.flatMap((s) => [s.name, s.category]), ...(deps.menu.bundles ?? []).map((b) => b.name), ...deps.menu.stylists.map((m) => m.firstName)]);
   const named = clientWords(text, vocabulary);
   const parse = await deps.read(maskedLine(text, named), current?.request ?? null);
 
@@ -182,6 +185,7 @@ async function clientFor(
 const menuOf = (deps: BookingDeps): BookingMenu => ({
   services: deps.menu.services.map(({ id, name, category }) => ({ id, name, category })),
   stylists: deps.menu.stylists.map(({ id, firstName, level }) => ({ id, firstName, level })),
+  bundles: deps.menu.bundles,
 });
 
 const capitalise = (w: string) => (w ? w[0].toUpperCase() + w.slice(1) : w);
@@ -209,7 +213,8 @@ export async function withClient(request: PhoneRequest, client: ClientMatch | nu
   if (r.sameAsLast && client) {
     const last = await deps.lastVisit(client.id);
     if (last) {
-      r = { ...r, serviceIds: r.serviceIds.length ? r.serviceIds : last.serviceIds, staffId: r.staffId || r.level ? r.staffId : last.staffId };
+      const services = r.serviceIds.length ? {} : { serviceIds: last.serviceIds, bundleId: last.bundleId ?? null, gaps: last.gaps };
+      r = { ...r, ...services, staffId: r.staffId || r.level ? r.staffId : last.staffId };
       note = `Same as last time: ${last.text}.`;
     } else note = `I couldn't find a finished visit for ${firstOf(client.name)}.`;
   }

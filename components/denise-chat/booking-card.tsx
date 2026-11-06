@@ -246,7 +246,7 @@ function Confirm({ slot, client, onBack, onBooked }: { slot: BookingSlot; client
   function confirm() {
     setMessage(null);
     start(async () => {
-      const r = await reach(bookFromChat({ date: slot.date, clientId: client.id, lines: slot.lines, cardLink: Boolean(policy?.cardNeeded && policy.phone && cardLink) }));
+      const r = await reach(bookFromChat({ date: slot.date, clientId: client.id, lines: slot.lines, bundleId: slot.bundleId ?? null, cardLink: Boolean(policy?.cardNeeded && policy.phone && cardLink) }));
       if (r.ok) onBooked(r.appointmentId, `${r.message} ${firstOf(client.name)}: ${slot.when}.`);
       else setMessage(r.message);
     });
@@ -420,13 +420,32 @@ function BookingForm({ card, index, today }: { card: Extract<BookingCard, { kind
         <ClientPicker client={client} onChange={setClient} query={card.request.clientText ?? undefined} />
         <label className={labelClass}>
           Service
-          <select value={request.serviceIds[0] ?? ""} onChange={(e) => change({ serviceIds: e.target.value ? [e.target.value, ...request.serviceIds.slice(1)] : request.serviceIds.slice(1) })} className={selectClass}>
+          <select
+            value={request.bundleId ? `bundle:${request.bundleId}` : (request.serviceIds[0] ?? "")}
+            onChange={(e) => {
+              const v = e.target.value;
+              const bundle = v.startsWith("bundle:") ? card.menu.bundles?.find((x) => x.id === v.slice(7)) : null;
+              if (bundle) change({ serviceIds: bundle.serviceIds, bundleId: bundle.id, gaps: bundle.gaps });
+              else if (request.bundleId) change({ serviceIds: v ? [v] : [], bundleId: null, gaps: undefined });
+              else change({ serviceIds: v ? [v, ...request.serviceIds.slice(1)] : request.serviceIds.slice(1) });
+            }}
+            className={selectClass}
+          >
             <option value="">Choose a service</option>
             {card.menu.services.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
             ))}
+            {card.menu.bundles?.length ? (
+              <optgroup label="Bundles">
+                {card.menu.bundles.map((b) => (
+                  <option key={b.id} value={`bundle:${b.id}`}>
+                    {b.name}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
           </select>
         </label>
         <label className={labelClass}>

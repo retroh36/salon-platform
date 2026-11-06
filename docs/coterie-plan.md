@@ -495,5 +495,5 @@ The headline was "$74,000 in no-shows not charged". Most of what's needed to sho
 6. Which permission switches Coterie needs beyond today's ten.
 7. Clocked hours or scheduled hours for hourly pay.
 8. The grace rules for no-shows.
-9. Steps in one service done by different people, and how the price splits.
+9. ~~Steps in one service done by different people, and how the price splits.~~ Decided: a service bundle of menu services, each with its own stylist and price; steps stay inside one service.
 10. The bookkeeper's accounting software, for the reconciliation export.

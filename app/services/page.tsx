@@ -8,7 +8,14 @@ import { listClass, nameLinkClass, PageHeader } from "@/components/ui/page";
 import { numClass, TableCard, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { canManage, getCurrentStaff } from "@/lib/auth";
 import { serviceFamily } from "@/lib/calendar";
-import { formatPriceRange, formatServiceTime, groupByCategory, levelPricesFrom, stylistPrice } from "@/lib/services";
+import { formatDuration } from "@/lib/duration";
+import { bundleMinutes } from "@/lib/scheduling/bundles";
+import { formatPrice, formatPriceRange, formatServiceTime, groupByCategory, levelPricesFrom, stylistPrice, totalMinutes } from "@/lib/services";
+
+// "Highlight, then 30 min gap, Gloss, then Cut".
+function bundleText(parts: { service_id: string; gap_minutes: number }[], nameOf: (id: string) => string): string {
+  return parts.map((p, n) => (n === 0 ? nameOf(p.service_id) : `${p.gap_minutes ? `${formatDuration(p.gap_minutes)} gap, ` : ""}${nameOf(p.service_id)}`)).join(", then ");
+}
 
 export const metadata: Metadata = { title: "Services" };
 
@@ -24,21 +31,26 @@ async function Services() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
 
-  const [{ data: services, error }, { data: staff, error: staffError }] = await Promise.all([
+  const [{ data: services, error }, { data: staff, error: staffError }, { data: bundles, error: bundlesError }] = await Promise.all([
     supabase
       .from("services")
       .select(
         "id, name, category, active_minutes, processing_minutes, finishing_minutes, price_cents, archived_at, staff_services(staff_id, price_cents), service_level_prices(level, price_cents)",
       ),
     supabase.from("staff").select("id, first_name, last_name, level, is_active"),
+    supabase.from("service_bundles").select("id, name, archived_at, parts:service_bundle_parts(position, service_id, gap_minutes)").order("position"),
   ]);
   if (error) throw error;
+  if (bundlesError) throw bundlesError;
   if (staffError) throw staffError;
 
   const staffById = new Map(staff.map((s) => [s.id, s]));
   const active = services.filter((s) => !s.archived_at);
   const archived = services.filter((s) => s.archived_at).sort((a, b) => a.name.localeCompare(b.name));
   const manage = canManage(me.role);
+  const serviceById = new Map(services.map((s) => [s.id, s]));
+  const activeBundles = bundles.filter((b) => !b.archived_at);
+  const archivedBundles = bundles.filter((b) => b.archived_at);
 
   return (
     <AppShell section="services" me={me}>
@@ -51,10 +63,15 @@ async function Services() {
         }
         actions={
           manage && (
-            <Link href="/services/new" className={buttonClass("primary", "md")}>
-              <PlusIcon className="size-4" />
-              Add service
-            </Link>
+            <>
+              <Link href="/services/bundles/new" className={buttonClass("secondary", "md")}>
+                Add bundle
+              </Link>
+              <Link href="/services/new" className={buttonClass("primary", "md")}>
+                <PlusIcon className="size-4" />
+                Add service
+              </Link>
+            </>
           )
         }
       />
@@ -116,6 +133,66 @@ async function Services() {
             </TableCard>
           </section>
         ))}
+
+        {activeBundles.length > 0 && (
+          <section className="mb-8" aria-labelledby="bundles-heading">
+            <h2 id="bundles-heading" className="mb-1 text-base font-semibold text-ink">
+              Bundles <span className="text-13 font-normal text-ink-subtle tabular-nums">({activeBundles.length})</span>
+            </h2>
+            <p className="mb-3 text-13 text-ink-muted">Services booked together, with the stylist free in the gaps. Each is its own line at checkout.</p>
+            <TableCard className="mb-0!">
+              <table className={tableClass} aria-label="Bundles">
+                <thead className={theadClass}>
+                  <tr>
+                    <th scope="col" className={thClass}>
+                      Bundle
+                    </th>
+                    <th scope="col" className={`${thClass} hidden sm:table-cell`}>
+                      Time
+                    </th>
+                    <th scope="col" className={`${thClass} text-right`}>
+                      Menu price
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeBundles.map((b) => {
+                    const parts = [...b.parts].sort((x, y) => x.position - y.position);
+                    const minutes = bundleMinutes(
+                      parts.map((p) => ({ serviceId: p.service_id, gapMinutes: p.gap_minutes })),
+                      (id) => totalMinutes(serviceById.get(id) ?? { active_minutes: 0, processing_minutes: 0, finishing_minutes: 0 }),
+                    );
+                    return (
+                      <tr key={b.id} className={trClass}>
+                        <td className={tdClass}>
+                          <Link href={`/services/bundles/${b.id}`} className={nameLinkClass}>
+                            {b.name}
+                          </Link>
+                          <p className="text-13 text-ink-muted">{bundleText(parts, (id) => serviceById.get(id)?.name ?? "a removed service")}</p>
+                        </td>
+                        <td className={`${tdClass} hidden whitespace-nowrap text-ink-muted sm:table-cell`}>{formatDuration(minutes)}</td>
+                        <td className={`${tdClass} ${numClass} text-ink`}>{formatPrice(parts.reduce((sum, p) => sum + (serviceById.get(p.service_id)?.price_cents ?? 0), 0))}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </TableCard>
+          </section>
+        )}
+
+        {archivedBundles.length > 0 && (
+          <ul className={`${listClass} mb-8 border-b border-line`} aria-label="Archived bundles">
+            {archivedBundles.map((b) => (
+              <li key={b.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3">
+                <Link href={`/services/bundles/${b.id}`} className={`${nameLinkClass} text-ink-muted!`}>
+                  {b.name}
+                </Link>
+                <span className="text-13 text-ink-subtle">Archived bundle</span>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {archived.length > 0 && (
           <details className="group">

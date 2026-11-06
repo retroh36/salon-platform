@@ -40,7 +40,7 @@ export async function loadManaged(admin: SupabaseClient<Database>, site: Booking
   const { data, error } = await admin
     .from("appointments")
     .select(
-      "id, client_id, status, notes, starts_at, ends_at, created_at, deposit_cents, deposit_paid_cents, promotion_id, client:clients(first_name), appointment_items(service_id, staff_id, starts_at, price_cents, service:services(name), staff:staff(first_name))",
+      "id, client_id, status, notes, starts_at, ends_at, created_at, deposit_cents, deposit_paid_cents, promotion_id, client:clients(first_name), appointment_items(service_id, staff_id, starts_at, ends_at, bundle_id, price_cents, service:services(name), staff:staff(first_name))",
     )
     .eq("business_id", site.business.id)
     .eq("id", link.appointment_id)
@@ -51,6 +51,11 @@ export async function loadManaged(admin: SupabaseClient<Database>, site: Booking
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
     .map((i) => ({ serviceId: i.service_id, serviceName: i.service.name, staffId: i.staff_id, staffName: i.staff.first_name, start: new Date(i.starts_at), priceCents: i.price_cents }));
   const staffIds = [...new Set(items.map((i) => i.staffId))];
+  // A bundle keeps its gaps when it moves: the minutes between each service
+  // and the one before, as booked.
+  const sorted = [...data.appointment_items].sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  const bundleId = sorted[0]?.bundle_id ?? null;
+  const bundled = bundleId && sorted.every((i) => i.bundle_id === bundleId) ? { bundleId, gaps: sorted.map((i, n) => (n === 0 ? 0 : Math.max(0, Math.round((Date.parse(i.starts_at) - Date.parse(sorted[n - 1].ends_at)) / 60_000)))) } : {};
   return {
     id: data.id,
     clientId: data.client_id,
@@ -68,6 +73,7 @@ export async function loadManaged(admin: SupabaseClient<Database>, site: Booking
       serviceIds: items.map((i) => i.serviceId),
       staffId: staffIds.length === 1 ? staffIds[0] : null,
       stylistIds: site.stylists.map((s) => s.id),
+      ...bundled,
     },
   };
 }

@@ -15,8 +15,9 @@ import { isUuid } from "@/lib/ids";
 import { isZoom, type CalendarZoom } from "@/lib/calendar";
 import { isUsable, loadClientPackages, type ClientPackage } from "@/lib/packages";
 import { loadBackBarProducts } from "@/lib/inventory-load";
-import { changeStatus, checkInPatchOverride, MOVE_ANYWAY, moveItem, saveBooking, saveNotes, undoCheckIn, undoNoShow, type BookingItemInput, type SaveResult, type VisitSeen } from "@/lib/scheduling/book";
+import { changeItemSteps, changeStatus, checkInPatchOverride, MOVE_ANYWAY, moveItem, saveBooking, saveNotes, undoCheckIn, undoNoShow, type BookingItemInput, type SaveResult, type VisitSeen } from "@/lib/scheduling/book";
 import { describeProblem, type BookingProblem } from "@/lib/scheduling/booking";
+import { parseSteps, STEPS_PROBLEM_TEXT, type Step } from "@/lib/scheduling/steps";
 import { bookingIdeas, type BookingIdeas } from "@/lib/denise/ideas";
 import { loadBookingContext, loadCalendarStamp } from "@/lib/scheduling/load";
 import { MAX_VISITS, planSeries, seriesDates, type Scope, type SeriesEnd } from "@/lib/scheduling/series";
@@ -83,6 +84,8 @@ export type VisitLineInput = {
   resource: string;
   // This booking's own length, e.g. the stylist's usual time.
   minutes?: number;
+  // The service bundle it's part of (null for none).
+  bundleId?: string | null;
 };
 
 export type VisitInput = {
@@ -143,7 +146,8 @@ export async function saveVisit(input: VisitInput): Promise<SaveVisitResult> {
     if (resource.kind === "exact" && !isUuid(resource.id)) lineErrors[n].push("Choose a chair.");
     const minutes = line.minutes;
     if (minutes !== undefined && (!Number.isInteger(minutes) || minutes < 5 || minutes > 480 || minutes % 5 !== 0)) lineErrors[n].push("Choose a length in 5-minute steps.");
-    if (start) items.push({ id: line.id, serviceId: line.serviceId, staffId: line.staffId, start, resource, minutes });
+    if (line.bundleId && !isUuid(line.bundleId)) lineErrors[n].push("That bundle is no longer on the menu.");
+    if (start) items.push({ id: line.id, serviceId: line.serviceId, staffId: line.staffId, start, resource, minutes, bundleId: line.bundleId ?? null });
   });
   if (lineErrors.some((e) => e.length)) return { ok: false, message: "Fill in each service.", lineErrors };
 
@@ -227,6 +231,23 @@ export async function moveVisitItem(input: { itemId: string; staffId: string; da
   }
   refresh();
   return { ok: true, moved };
+}
+
+// A visit's own steps for one of its services (booking details' Edit steps).
+export async function changeVisitSteps(itemId: string, steps: Step[]): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(itemId)) return { ok: false, message: "That service is no longer on the visit." };
+  const parsed = parseSteps(steps);
+  if (!parsed) return { ok: false, message: STEPS_PROBLEM_TEXT.count };
+  const result = await changeItemSteps(supabase, me.location, itemId, parsed);
+  if (!result.ok) {
+    if (result.error === "steps") return { ok: false, message: STEPS_PROBLEM_TEXT[result.problem] };
+    if (result.error === "invalid") return { ok: false, message: [...new Set(result.problems.flat().map(describeProblem))].join(" ") };
+    return { ok: false, message: saveErrorMessage(result) };
+  }
+  refresh();
+  return { ok: true };
 }
 
 // The refused move's problems in the board's words, with names.
@@ -483,13 +504,14 @@ function readRepeat(repeat: RepeatInput, first: LocalDate): string | null {
 
 // Each line with the item it was (on an edit) and its own length, if set.
 const toLines = (lines: VisitLineInput[]) =>
-  lines.map(({ id, serviceId, staffId, startMinute, resource, minutes }) => ({
+  lines.map(({ id, serviceId, staffId, startMinute, resource, minutes, bundleId }) => ({
     serviceId,
     staffId,
     startMinute,
     resource,
     ...(id && isUuid(id) ? { itemId: id } : {}),
     ...(Number.isInteger(minutes) && minutes! > 0 ? { minutes } : {}),
+    ...(bundleId === null || (bundleId && isUuid(bundleId)) ? { bundleId } : {}),
   }));
 
 // Every visit of a series, checked against the booking rules, with
