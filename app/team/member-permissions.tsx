@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { checkboxClass, labelClass, selectClass } from "@/components/ui/field";
 import { PERMISSIONS } from "@/lib/permissions";
 import type { LoginResult } from "@/lib/team-logins";
-import { clearMemberPin, setAssistantStylist, setEventRoles, setMemberPermission } from "./actions";
+import { clearMemberPin, setAssistantStylist, setEventRoles, setMemberPermission, setWorkingRoles } from "./actions";
 import { setMemberGroup } from "./permissions/actions";
 
 export type PermissionRow = { permission: string; allowed: boolean; role_default: boolean; inherited: boolean; own: boolean; toggleable: boolean };
@@ -194,6 +194,38 @@ export function EventWorkCard({ staffId, firstName, current }: { staffId: string
               }}
             />
             {role === "hair" ? "Hair" : "Makeup"}
+          </label>
+        ))}
+      </div>
+      <Status result={result} />
+    </section>
+  );
+}
+
+// Which working roles they work (Settings → Working roles).
+export function WorkingRolesCard({ staffId, firstName, roles, current }: { staffId: string; firstName: string; roles: { id: string; name: string }[]; current: string[] }) {
+  const [chosen, setChosen] = useState(current);
+  const [result, setResult] = useState<LoginResult | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <section aria-label="Working roles" className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
+      <h2 className="text-base font-semibold text-ink">Working roles</h2>
+      <p className="text-sm text-ink-muted">The roles {firstName}&apos;s shifts can be given in Scheduling.</p>
+      <div className="flex flex-wrap gap-x-4">
+        {roles.map((role) => (
+          <label key={role.id} className="flex min-h-11 items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              className={checkboxClass}
+              checked={chosen.includes(role.id)}
+              disabled={pending}
+              onChange={(e) => {
+                const next = e.target.checked ? [...chosen, role.id] : chosen.filter((r) => r !== role.id);
+                setChosen(next);
+                start(async () => setResult(await setWorkingRoles(staffId, next)));
+              }}
+            />
+            {role.name}
           </label>
         ))}
       </div>

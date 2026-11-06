@@ -129,6 +129,19 @@ export async function setEventRoles(staffId: string, roles: string[]): Promise<L
   return { ok: true, message: roles.length ? "Saved. They'll be suggested for that event work." : "Saved. They won't be suggested for events." };
 }
 
+// Which working roles someone works (Settings → Working roles): the roles
+// their shifts can be given.
+export async function setWorkingRoles(staffId: string, roleIds: string[]): Promise<LoginResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !isUuid(staffId) || !roleIds.every(isUuid)) return { ok: false, message: NOT_ALLOWED };
+  const { error } = await supabase.rpc("set_staff_working_roles", { p_staff_id: staffId, p_role_ids: roleIds });
+  if (error?.code === "42501") return { ok: false, message: NOT_ALLOWED };
+  if (error?.code === "22023") return { ok: false, message: "That role was just removed. Reload the page." };
+  if (error) throw error;
+  refresh();
+  return { ok: true, message: roleIds.length ? "Saved. Their shifts can be given these roles." : "Saved. They work without a role." };
+}
+
 // Clears someone's PIN for the shared iPad (they set a new one themselves).
 export async function clearMemberPin(staffId: string): Promise<LoginResult> {
   const { supabase, staff: me } = await getCurrentStaff();

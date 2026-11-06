@@ -4005,6 +4005,26 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"staff_role_pay": {
+                  Row: {
+                    "business_id": string,"commission_pct": number | null,"hourly_rate_cents": number | null,"role_id": string,"staff_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"commission_pct"?: number | null,"hourly_rate_cents"?: number | null,"role_id": string,"staff_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"commission_pct"?: number | null,"hourly_rate_cents"?: number | null,"role_id"?: string,"staff_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "staff_role_pay_staff_id_role_id_fkey"
+      columns: ["staff_id","role_id"]
+isOneToOne: true
+      referencedRelation: "staff_working_roles"
+      referencedColumns: ["staff_id","role_id"]
+    }
+                  ]
                 },"staff_schedule_overrides": {
                   Row: {
                     "business_id": string,"created_at": string,"end_minute": number,"id": string,"on_date": string,"staff_id": string,"start_minute": number
@@ -4109,6 +4129,32 @@ isOneToOne: false
                   Relationships: [
                     {
       foreignKeyName: "staff_working_hours_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"staff_working_roles": {
+                  Row: {
+                    "business_id": string,"role_id": string,"staff_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"role_id": string,"staff_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"role_id"?: string,"staff_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "staff_working_roles_role_id_business_id_fkey"
+      columns: ["role_id","business_id"]
+isOneToOne: false
+      referencedRelation: "working_roles"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "staff_working_roles_staff_id_business_id_fkey"
       columns: ["staff_id","business_id"]
 isOneToOne: false
       referencedRelation: "staff"
@@ -4771,6 +4817,72 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"working_role_pay": {
+                  Row: {
+                    "business_id": string,"commission_pct": number | null,"hourly_rate_cents": number | null,"method": string,"role_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"commission_pct"?: number | null,"hourly_rate_cents"?: number | null,"method"?: string,"role_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"commission_pct"?: number | null,"hourly_rate_cents"?: number | null,"method"?: string,"role_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "working_role_pay_role_id_business_id_fkey"
+      columns: ["role_id","business_id"]
+isOneToOne: false
+      referencedRelation: "working_roles"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"working_role_services": {
+                  Row: {
+                    "business_id": string,"role_id": string,"service_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"role_id": string,"service_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"role_id"?: string,"service_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "working_role_services_role_id_business_id_fkey"
+      columns: ["role_id","business_id"]
+isOneToOne: false
+      referencedRelation: "working_roles"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "working_role_services_service_id_business_id_fkey"
+      columns: ["service_id","business_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"working_roles": {
+                  Row: {
+                    "archived_at": string | null,"business_id": string,"created_at": string,"id": string,"name": string,"online": boolean,"position": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "archived_at"?: string | null,"business_id": string,"created_at"?: string,"id"?: string,"name": string,"online"?: boolean,"position"?: number
+                  }
+                  Update: {
+                    "archived_at"?: string | null,"business_id"?: string,"created_at"?: string,"id"?: string,"name"?: string,"online"?: boolean,"position"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "working_roles_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -5308,6 +5420,12 @@ isOneToOne: false
 "save_time_off_types":
 { Args: { "p_business_id": string,"p_types": Json }; Returns: undefined
                            },
+"save_working_role":
+{ Args: { "p_archive"?: boolean,"p_business_id": string,"p_name": string,"p_online": boolean,"p_position"?: number,"p_role_id": string,"p_service_ids": (string)[] }; Returns: string
+                           },
+"save_working_role_pay":
+{ Args: { "p_commission_pct": number,"p_hourly_rate_cents": number,"p_method": string,"p_role_id": string }; Returns: undefined
+                           },
 "scheduled_jobs_status":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
@@ -5437,11 +5555,17 @@ isOneToOne: false
 "set_staff_permission_group":
 { Args: { "p_group_id": string,"p_staff_id": string }; Returns: undefined
                            },
+"set_staff_role_pay":
+{ Args: { "p_commission_pct": number,"p_hourly_rate_cents": number,"p_role_id": string,"p_staff_id": string }; Returns: undefined
+                           },
 "set_staff_timings":
 { Args: { "p_staff_id": string,"p_timings": Json }; Returns: number
                            },
 "set_staff_weekly_hours":
 { Args: { "p_business_id": string,"p_hours": Json,"p_staff_id": string }; Returns: undefined
+                           },
+"set_staff_working_roles":
+{ Args: { "p_role_ids": (string)[],"p_staff_id": string }; Returns: undefined
                            },
 "set_stock_settings":
 { Args: { "p_location_id": string,"p_product_id": string,"p_reorder_point": number,"p_reorder_quantity": number }; Returns: undefined

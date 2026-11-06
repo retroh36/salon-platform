@@ -11,11 +11,13 @@ import { Alert, Card, PageHeader } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
 import { fullName } from "@/lib/staff";
+import { can } from "@/lib/permissions";
 import { canManageMember, canResetPassword, loginState, rolesFor } from "@/lib/team";
 import { ActiveCard, LoginCard } from "../member-access";
 import { serviceGroups } from "../member-data";
 import { MemberForm } from "../member-form";
-import { AssistingCard, EventWorkCard, PermissionsCard, PinCard } from "../member-permissions";
+import { loadWorkingRoles } from "@/lib/working-roles";
+import { AssistingCard, EventWorkCard, PermissionsCard, PinCard, WorkingRolesCard } from "../member-permissions";
 
 export const metadata: Metadata = { title: "Team member" };
 
@@ -52,6 +54,7 @@ async function Member({ params, searchParams }: { params: Promise<{ id: string }
   if (!canManageMember(me, member)) redirect("/team");
 
   const today = new Date().toISOString();
+  const roles = await loadWorkingRoles(supabase, me.business_id);
   const [services, { data: logins }, { count: upcoming }, { data: permissions, error: permError }, { data: pins }, { data: stylists }, { data: groups }] = await Promise.all([
     serviceGroups(supabase),
     supabase.rpc("team_logins", { p_business_id: me.business_id }),
@@ -125,6 +128,9 @@ async function Member({ params, searchParams }: { params: Promise<{ id: string }
           {member.role === "assistant" && <AssistingCard staffId={member.id} current={member.assists_staff_id} stylists={(stylists ?? []).map((s) => ({ id: s.id, name: fullName(s) }))} />}
           {member.role !== "owner" && <PermissionsCard staffId={member.id} firstName={member.first_name} rows={permissions ?? []} canEdit={me.role === "owner" && !isMe} groups={groups ?? []} groupId={member.permission_group_id} />}
           {(member.role === "stylist" || member.event_roles.length > 0) && <EventWorkCard staffId={member.id} firstName={member.first_name} current={member.event_roles} />}
+          {roles.length > 0 && can(me, "team") && (
+            <WorkingRolesCard staffId={member.id} firstName={member.first_name} roles={roles.map((r) => ({ id: r.id, name: r.name }))} current={roles.filter((r) => r.staffIds.includes(member.id)).map((r) => r.id)} />
+          )}
           <PinCard staffId={member.id} firstName={member.first_name} hasPin={(pins ?? []).includes(member.id)} />
           <ActiveCard staffId={member.id} firstName={member.first_name} active={member.is_active} upcoming={upcoming ?? 0} isMe={isMe} />
         </div>
