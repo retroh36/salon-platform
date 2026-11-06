@@ -381,14 +381,14 @@ isOneToOne: false
                   ]
                 },"businesses": {
                   Row: {
-                    "ai_daily_token_limit": number,"auto_lock_minutes": number,"cash_float_cents": number,"created_at": string,"discount_max_percent": number,"discount_roles": (Database["public"]['Enums']["staff_role"])[],"free_text_roles": (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months": number | null,"gift_card_online_reload": boolean,"gift_card_presets_cents": (number)[],"google_review_url": string | null,"id": string,"logo_path": string | null,"messages_live": boolean,"messages_live_at": string | null,"move_message_default": string,"name": string,"next_sale_number": number,"patch_test_enforcement": string,"patch_test_min_hours": number,"patch_test_valid_days": number,"pay_period": string,"pay_period_anchor": string,"payments_live": boolean,"payments_live_at": string | null,"plan": string,"promo_card_expiry_days": number,"receipt_footer": string | null,"receipt_show_stylists": boolean,"settings": NonNullable<Json>,"slug": string | null,"stripe_account_id": string | null,"stripe_charges_enabled": boolean,"stripe_checked_at": string | null,"stripe_details_submitted": boolean,"tax_rate_retail_bp": number,"tax_rate_services_bp": number,"time_off_notice_days": number,"updated_at": string,"yelp_url": string | null
+                    "ai_daily_token_limit": number,"auto_lock_minutes": number,"cash_float_cents": number,"created_at": string,"discount_max_percent": number,"discount_roles": (Database["public"]['Enums']["staff_role"])[],"free_text_roles": (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months": number | null,"gift_card_online_reload": boolean,"gift_card_presets_cents": (number)[],"google_review_url": string | null,"id": string,"logo_path": string | null,"messages_live": boolean,"messages_live_at": string | null,"move_message_default": string,"name": string,"next_sale_number": number,"patch_test_enforcement": string,"patch_test_min_hours": number,"patch_test_valid_days": number,"pay_period": string,"pay_period_anchor": string,"payments_live": boolean,"payments_live_at": string | null,"plan": string,"promo_card_expiry_days": number,"receipt_footer": string | null,"receipt_show_stylists": boolean,"settings": NonNullable<Json>,"slug": string | null,"stripe_account_id": string | null,"stripe_charges_enabled": boolean,"stripe_checked_at": string | null,"stripe_details_submitted": boolean,"tax_rate_retail_bp": number,"tax_rate_services_bp": number,"time_clock": boolean,"time_off_notice_days": number,"updated_at": string,"yelp_url": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "ai_daily_token_limit"?: number,"auto_lock_minutes"?: number,"cash_float_cents"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"free_text_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_online_reload"?: boolean,"gift_card_presets_cents"?: (number)[],"google_review_url"?: string | null,"id"?: string,"logo_path"?: string | null,"messages_live"?: boolean,"messages_live_at"?: string | null,"move_message_default"?: string,"name": string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"pay_period"?: string,"pay_period_anchor"?: string,"payments_live"?: boolean,"payments_live_at"?: string | null,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"stripe_account_id"?: string | null,"stripe_charges_enabled"?: boolean,"stripe_checked_at"?: string | null,"stripe_details_submitted"?: boolean,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"time_off_notice_days"?: number,"updated_at"?: string,"yelp_url"?: string | null
+                    "ai_daily_token_limit"?: number,"auto_lock_minutes"?: number,"cash_float_cents"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"free_text_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_online_reload"?: boolean,"gift_card_presets_cents"?: (number)[],"google_review_url"?: string | null,"id"?: string,"logo_path"?: string | null,"messages_live"?: boolean,"messages_live_at"?: string | null,"move_message_default"?: string,"name": string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"pay_period"?: string,"pay_period_anchor"?: string,"payments_live"?: boolean,"payments_live_at"?: string | null,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"stripe_account_id"?: string | null,"stripe_charges_enabled"?: boolean,"stripe_checked_at"?: string | null,"stripe_details_submitted"?: boolean,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"time_clock"?: boolean,"time_off_notice_days"?: number,"updated_at"?: string,"yelp_url"?: string | null
                   }
                   Update: {
-                    "ai_daily_token_limit"?: number,"auto_lock_minutes"?: number,"cash_float_cents"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"free_text_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_online_reload"?: boolean,"gift_card_presets_cents"?: (number)[],"google_review_url"?: string | null,"id"?: string,"logo_path"?: string | null,"messages_live"?: boolean,"messages_live_at"?: string | null,"move_message_default"?: string,"name"?: string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"pay_period"?: string,"pay_period_anchor"?: string,"payments_live"?: boolean,"payments_live_at"?: string | null,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"stripe_account_id"?: string | null,"stripe_charges_enabled"?: boolean,"stripe_checked_at"?: string | null,"stripe_details_submitted"?: boolean,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"time_off_notice_days"?: number,"updated_at"?: string,"yelp_url"?: string | null
+                    "ai_daily_token_limit"?: number,"auto_lock_minutes"?: number,"cash_float_cents"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"free_text_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_online_reload"?: boolean,"gift_card_presets_cents"?: (number)[],"google_review_url"?: string | null,"id"?: string,"logo_path"?: string | null,"messages_live"?: boolean,"messages_live_at"?: string | null,"move_message_default"?: string,"name"?: string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"pay_period"?: string,"pay_period_anchor"?: string,"payments_live"?: boolean,"payments_live_at"?: string | null,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"stripe_account_id"?: string | null,"stripe_charges_enabled"?: boolean,"stripe_checked_at"?: string | null,"stripe_details_submitted"?: boolean,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"time_clock"?: boolean,"time_off_notice_days"?: number,"updated_at"?: string,"yelp_url"?: string | null
                   }
                   Relationships: [
                     
@@ -4219,6 +4219,96 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"time_clock_entries": {
+                  Row: {
+                    "business_id": string,"clock_in": string,"clock_out": string | null,"created_at": string,"edited": boolean,"id": string,"location_id": string,"missed_out": boolean,"source": string,"staff_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"clock_in": string,"clock_out"?: string | null,"created_at"?: string,"edited"?: boolean,"id"?: string,"location_id": string,"missed_out"?: boolean,"source"?: string,"staff_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"clock_in"?: string,"clock_out"?: string | null,"created_at"?: string,"edited"?: boolean,"id"?: string,"location_id"?: string,"missed_out"?: boolean,"source"?: string,"staff_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "time_clock_entries_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "time_clock_entries_location_id_fkey"
+      columns: ["location_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "time_clock_entries_staff_id_fkey"
+      columns: ["staff_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"time_clock_events": {
+                  Row: {
+                    "business_id": string,"by_staff_id": string | null,"clock_in": string | null,"clock_out": string | null,"created_at": string,"entry_id": string | null,"id": string,"kind": string,"reason": string | null,"source": string | null,"staff_id": string,"was_in": string | null,"was_out": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"by_staff_id"?: string | null,"clock_in"?: string | null,"clock_out"?: string | null,"created_at"?: string,"entry_id"?: string | null,"id"?: string,"kind": string,"reason"?: string | null,"source"?: string | null,"staff_id": string,"was_in"?: string | null,"was_out"?: string | null
+                  }
+                  Update: {
+                    "business_id"?: string,"by_staff_id"?: string | null,"clock_in"?: string | null,"clock_out"?: string | null,"created_at"?: string,"entry_id"?: string | null,"id"?: string,"kind"?: string,"reason"?: string | null,"source"?: string | null,"staff_id"?: string,"was_in"?: string | null,"was_out"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "time_clock_events_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "time_clock_events_by_staff_id_fkey"
+      columns: ["by_staff_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "time_clock_events_entry_id_fkey"
+      columns: ["entry_id"]
+isOneToOne: false
+      referencedRelation: "time_clock_entries"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "time_clock_events_staff_id_fkey"
+      columns: ["staff_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"time_clock_reminders": {
+                  Row: {
+                    "created_at": string,"kind": string,"on_date": string,"shift_start": number,"staff_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"kind": string,"on_date": string,"shift_start": number,"staff_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"kind"?: string,"on_date"?: string,"shift_start"?: number,"staff_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "time_clock_reminders_staff_id_fkey"
+      columns: ["staff_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"time_off_blackouts": {
                   Row: {
                     "business_id": string,"created_at": string,"created_by": string | null,"ends_on": string,"id": string,"label": string | null,"starts_on": string
@@ -4584,6 +4674,15 @@ isOneToOne: false
 "client_rewards":
 { Args: { "p_client_id": string }; Returns: Json
                            },
+"clock_at_desk":
+{ Args: { "p_staff_id": string,"p_token_hash": string }; Returns: Json
+                           },
+"clock_in":
+{ Args: { "p_business_id": string }; Returns: Json
+                           },
+"clock_out":
+{ Args: { "p_business_id": string }; Returns: Json
+                           },
 "commission_rules":
 { Args: { "p_business_id": string,"p_staff_id"?: string }; Returns: Json
                            },
@@ -4746,6 +4845,9 @@ isOneToOne: false
                            },
 "record_ai_usage":
 { Args: { "p_business_id": string,"p_cache_read": number,"p_feature": string,"p_input": number,"p_model": string,"p_output": number }; Returns: undefined
+                           },
+"record_clock_reminder":
+{ Args: { "p_body": string,"p_kind": string,"p_on_date": string,"p_shift_start": number,"p_staff_id": string }; Returns: boolean
                            },
 "record_count":
 { Args: { "p_counted": number,"p_product_id": string,"p_stocktake_id": string }; Returns: number
@@ -4931,6 +5033,9 @@ isOneToOne: false
 "save_team_member":
 { Args: { "p_business_id": string,"p_input": Json,"p_location_id": string,"p_staff_id": string }; Returns: string
                            },
+"save_time_entry":
+{ Args: { "p_business_id": string,"p_clock_in": string,"p_clock_out": string,"p_entry_id": string,"p_reason": string,"p_remove"?: boolean,"p_staff_id": string }; Returns: string
+                           },
 "scheduled_jobs_status":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
@@ -5065,6 +5170,9 @@ isOneToOne: false
                            },
 "set_stripe_account":
 { Args: { "p_account_id": string,"p_business_id": string,"p_charges_enabled": boolean,"p_details_submitted": boolean,"p_staff_id"?: string }; Returns: undefined
+                           },
+"set_time_clock":
+{ Args: { "p_business_id": string,"p_on": boolean }; Returns: undefined
                            },
 "shared_device":
 { Args: { "p_token_hash": string }; Returns: Json

@@ -2,9 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { fieldClass, labelClass, selectClass } from "@/components/ui/field";
+import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
-import { forgetThisDevice, removeDevice, saveAutoLock, shareThisDevice, type DeviceResult } from "./actions";
+import { forgetThisDevice, removeDevice, saveAutoLock, saveTimeClock, shareThisDevice, type DeviceResult } from "./actions";
 
 function Result({ result }: { result: DeviceResult | null }) {
   if (!result) return null;
@@ -91,6 +91,34 @@ export function AutoLockPicker({ value }: { value: number }) {
             </option>
           ))}
         </select>
+      </label>
+      <Result result={result} />
+    </div>
+  );
+}
+
+export function TimeClockSwitch({ value }: { value: boolean }) {
+  const [on, setOn] = useState(value);
+  const [result, setResult] = useState<DeviceResult | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="flex items-start gap-2.5 text-sm text-ink">
+        <input
+          type="checkbox"
+          className={checkboxClass}
+          checked={on}
+          disabled={pending}
+          onChange={(e) => {
+            const v = e.target.checked;
+            setOn(v);
+            start(async () => setResult(await saveTimeClock(v)));
+          }}
+        />
+        <span>
+          <span className="font-medium">The team clocks in and out</span>
+          <span className="block text-13 text-ink-muted">On My day, or here at the front desk with their PIN. Anyone who forgets gets a reminder in the app 10 minutes into or after their shift.</span>
+        </span>
       </label>
       <Result result={result} />
     </div>

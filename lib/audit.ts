@@ -16,6 +16,7 @@ export const AUDIT_TYPES = [
   { key: "fees", label: "Cancellation fees" },
   { key: "points", label: "Rewards points" },
   { key: "pay", label: "Pay rates" },
+  { key: "clock", label: "Clocked hours" },
   { key: "settings", label: "Going live and data downloads" },
 ] as const;
 

@@ -52,3 +52,14 @@ export async function saveAutoLock(minutes: number): Promise<DeviceResult> {
   revalidatePath("/", "layout");
   return { ok: true, message: `Shared devices lock after ${minutes} ${minutes === 1 ? "minute" : "minutes"} with nobody using them.` };
 }
+
+// Turns the time clock on or off: clocking in and out on My day and at the
+// shared iPad, reminders, and clocked hours in Scheduling.
+export async function saveTimeClock(on: boolean): Promise<DeviceResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!can(me, "settings")) return { ok: false, message: NOT_ALLOWED };
+  const { error } = await supabase.rpc("set_time_clock", { p_business_id: me.business_id, p_on: on === true });
+  if (error) throw error;
+  revalidatePath("/", "layout");
+  return { ok: true, message: on ? "The team clocks in and out now." : "The time clock is off." };
+}

@@ -212,14 +212,19 @@ export function ticketsFor(sales: readonly PayrollSale[], staffId: string, from:
   return out.sort((a, b) => a.at.localeCompare(b.at));
 }
 
-// Scheduled minutes on a day: their hours (a one-off change, else their
+// Scheduled shifts on a day: their hours (a one-off change, else their
 // repeating pattern) less approved time off.
-function minutesOn(schedule: StaffSchedule, date: LocalDate): number {
+export function shiftsOn(schedule: StaffSchedule, date: LocalDate) {
   const hours = hoursOn(schedule, date);
   const off = schedule.timeOff
     .filter((t) => t.status === "approved" && date >= t.startsOn && date <= t.endsOn)
     .map((t) => (t.startMinute != null && t.endMinute != null ? { start: t.startMinute, end: t.endMinute } : { start: 0, end: 1440 }));
-  return subtractIntervals(hours, off).reduce((n, i) => n + i.end - i.start, 0);
+  return subtractIntervals(hours, off);
+}
+
+// Scheduled minutes on a day.
+export function minutesOn(schedule: StaffSchedule, date: LocalDate): number {
+  return shiftsOn(schedule, date).reduce((n, i) => n + i.end - i.start, 0);
 }
 
 // Scheduled minutes between two dates (inclusive).

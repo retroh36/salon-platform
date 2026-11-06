@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { landingFor } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
+import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { deviceTokenHash } from "@/lib/shared-device";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -15,9 +16,46 @@ export type SwitchState = { error: string; staffId: string } | undefined;
 // link made on the server, so no password is typed and no email is sent.
 export async function switchUser(_prev: SwitchState, formData: FormData): Promise<SwitchState> {
   const staffId = String(formData.get("staff_id") ?? "");
-  const pin = String(formData.get("pin") ?? "");
   const hash = await deviceTokenHash();
   if (!hash) redirect("/login");
+  const checked = await checkPin(hash, staffId, String(formData.get("pin") ?? ""));
+  if ("error" in checked) return checked;
+
+  const admin = createAdminClient();
+  const { data: link, error: linkError } = await admin.auth.admin.generateLink({ type: "magiclink", email: checked.email });
+  if (linkError) throw linkError;
+  const supabase = await createClient();
+  await supabase.auth.signOut({ scope: "local" });
+  const { data: verified, error: verifyError } = await supabase.auth.verifyOtp({ type: "magiclink", token_hash: link.properties.hashed_token });
+  if (verifyError) throw verifyError;
+  redirect(await landingFor(supabase, verified.user!.id));
+}
+
+export type ClockState = { error: string; staffId: string } | { done: string } | undefined;
+
+// Clocking in or out at the shared iPad: the same PIN check, then they're
+// clocked in (or out, if they're in) without signing anyone in.
+export async function clockAtDesk(_prev: ClockState, formData: FormData): Promise<ClockState> {
+  const staffId = String(formData.get("staff_id") ?? "");
+  const hash = await deviceTokenHash();
+  if (!hash) redirect("/login");
+  const checked = await checkPin(hash, staffId, String(formData.get("pin") ?? ""));
+  if ("error" in checked) return checked;
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("clock_at_desk", { p_token_hash: hash, p_staff_id: staffId });
+  if (error?.hint === "too_long") return { error: "You've been clocked in over 18 hours. Ask a manager to fix your hours.", staffId };
+  if (error?.hint === "clock_off") return { error: "This salon doesn't use the time clock.", staffId: "" };
+  if (error) throw error;
+  const result = data as { clocked_in: boolean; at: string };
+  const { data: place, error: placeError } = await admin.from("staff").select("first_name, location:locations(timezone)").eq("id", staffId).single();
+  if (placeError) throw placeError;
+  const at = formatMinute(toLocal(new Date(result.at), place.location.timezone).minute);
+  return { done: result.clocked_in ? `${place.first_name}, you're clocked in at ${at}.` : `${place.first_name}, you're clocked out at ${at}.` };
+}
+
+// The PIN check shared by both: rate limited per device, then
+// check_staff_pin (five wrong lock that person for five minutes).
+async function checkPin(hash: string, staffId: string, pin: string): Promise<{ error: string; staffId: string } | { email: string }> {
   if (!isUuid(staffId)) return { error: "Choose who you are.", staffId: "" };
   if (!/^[0-9]{4,6}$/.test(pin)) return { error: "Enter your 4 to 6 digit PIN.", staffId };
 
@@ -36,12 +74,5 @@ export async function switchUser(_prev: SwitchState, formData: FormData): Promis
     if (result.reason === "wrong") return { error: result.left === 1 ? "That PIN isn't right. One more try before a short lockout." : "That PIN isn't right.", staffId };
     return { error: "That person can't switch in here.", staffId: "" };
   }
-
-  const { data: link, error: linkError } = await admin.auth.admin.generateLink({ type: "magiclink", email: result.email! });
-  if (linkError) throw linkError;
-  const supabase = await createClient();
-  await supabase.auth.signOut({ scope: "local" });
-  const { data: verified, error: verifyError } = await supabase.auth.verifyOtp({ type: "magiclink", token_hash: link.properties.hashed_token });
-  if (verifyError) throw verifyError;
-  redirect(await landingFor(supabase, verified.user!.id));
+  return { email: result.email! };
 }

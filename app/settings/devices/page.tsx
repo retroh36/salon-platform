@@ -9,7 +9,7 @@ import { formatDay } from "@/lib/schedule-format";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { deviceTokenHash } from "@/lib/shared-device";
 import { SettingsNav } from "../settings-nav";
-import { AutoLockPicker, RemoveDevice, ShareThisDevice } from "./controls";
+import { AutoLockPicker, RemoveDevice, ShareThisDevice, TimeClockSwitch } from "./controls";
 
 export const metadata: Metadata = { title: "Shared devices" };
 
@@ -30,7 +30,7 @@ async function Devices() {
   const hash = await deviceTokenHash();
   const [{ data: devices, error }, { data: b, error: bError }] = await Promise.all([
     supabase.from("shared_devices").select("id, name, token_hash, last_used_at, created_at").eq("business_id", me.business_id).is("revoked_at", null).order("created_at"),
-    supabase.from("businesses").select("auto_lock_minutes").eq("id", me.business_id).single(),
+    supabase.from("businesses").select("auto_lock_minutes, time_clock").eq("id", me.business_id).single(),
   ]);
   if (error) throw error;
   if (bError) throw bError;
@@ -70,6 +70,9 @@ async function Devices() {
       </Card>
       <Card title="Locking" titleId="locking-heading" description="So the next person at the desk can't carry on as whoever was there.">
         <AutoLockPicker value={b.auto_lock_minutes} />
+      </Card>
+      <Card title="Time clock" titleId="time-clock-heading" description="Scheduled against clocked hours shows on each person's month in Scheduling, where managers fix a missed punch.">
+        <TimeClockSwitch value={b.time_clock} />
       </Card>
     </AppShell>
   );

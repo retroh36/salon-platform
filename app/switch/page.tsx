@@ -28,6 +28,8 @@ async function Switch({ searchParams }: { searchParams: Promise<{ idle?: string 
   if (error) throw error;
   if (!data) redirect("/login");
   const device = data as { name: string; salon: string; auto_lock_minutes: number; staff: Person[] };
+  const { data: place, error: placeError } = await createAdminClient().from("shared_devices").select("business:businesses(time_clock)").eq("token_hash", hash).single();
+  if (placeError) throw placeError;
   const { idle } = await searchParams;
   return (
     <AuthScreen
@@ -44,7 +46,7 @@ async function Switch({ searchParams }: { searchParams: Promise<{ idle?: string 
           Locked after {device.auto_lock_minutes} {device.auto_lock_minutes === 1 ? "minute" : "minutes"} with nobody using it.
         </Alert>
       )}
-      {device.staff.length ? <SwitchPad people={device.staff} /> : <p className="text-ink-muted">Nobody here has a PIN yet.</p>}
+      {device.staff.length ? <SwitchPad people={device.staff} clock={place.business.time_clock} /> : <p className="text-ink-muted">Nobody here has a PIN yet.</p>}
     </AuthScreen>
   );
 }

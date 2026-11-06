@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button, buttonClass } from "@/components/ui/button";
 import { fieldClass, labelClass, selectClass } from "@/components/ui/field";
@@ -14,11 +14,13 @@ import { monthLabel, shiftMonth } from "@/lib/calendar-month";
 import { formatDay } from "@/lib/schedule-format";
 import { MAX_COPY_WEEKS, personMonth } from "@/lib/schedule-month";
 import type { MonthGrid } from "@/lib/schedule-month-load";
-import { addDays, type LocalDate } from "@/lib/scheduling/time";
-import { cellKey, changesOf, outside, patternLabel, ROLE_GROUPS, sayShifts, shown, withEdit, type Cell, type DayEdit } from "@/lib/team-schedule";
+import { addDays, toLocal, type LocalDate } from "@/lib/scheduling/time";
+import { clockDays, differenceText, entryDay, entryMinutes, type ClockEntry, type DayHours } from "@/lib/time-clock";
+import { formatDuration } from "@/lib/duration";
+import { cellKey, changesOf, outside, patternLabel, ROLE_GROUPS, sayShifts, scheduledMinutes, shown, withEdit, type Cell, type DayEdit } from "@/lib/team-schedule";
 import type { GridPerson } from "@/lib/team-schedule-load";
 import { trackSave } from "@/lib/unsaved-work";
-import { copyFromPerson, copyWeekForward, publishWeeks, saveDays } from "./actions";
+import { copyFromPerson, copyWeekForward, publishWeeks, saveDays, saveTimeEntry, type TimeEntryInput } from "./actions";
 import { DayEditor } from "./day-editor";
 import { PublishSheet } from "./publish-sheet";
 import { RangeSwitch } from "./scheduling-tabs";
@@ -36,7 +38,15 @@ type Notice = { tone: "error" | "success"; text: string; moves?: { label: string
 // calendar. Owners and managers change days (into the week's draft, as on
 // the week), copy a week forward or copy someone else's days, and publish
 // the month's changed weeks at once.
-export function MonthGridView({ grid, today, editable, person }: { grid: MonthGrid; today: LocalDate; editable: boolean; person: GridPerson | null }) {
+export type ClockData = {
+  entries: { id: string; staffId: string; clockIn: string; clockOut: string | null; edited: boolean; missedOut?: boolean; source: string }[];
+  // Whoever manages the team fixes punches; payroll only reads them.
+  canEdit: boolean;
+  timeZone: string;
+  now: string;
+};
+
+export function MonthGridView({ grid, today, editable, person, clock }: { grid: MonthGrid; today: LocalDate; editable: boolean; person: GridPerson | null; clock: ClockData | null }) {
   const router = useRouter();
   const [base, setBase] = useState(grid);
   const [cells, setCells] = useState(() => new Map(grid.cells.map((c) => [cellKey(c.staffId, c.date), c])));
@@ -88,7 +98,16 @@ export function MonthGridView({ grid, today, editable, person }: { grid: MonthGr
   }
 
   const drafts = changes.length;
-  const editProps = { canEdit, onEdit: (cell: Cell, anchor: HTMLElement) => setEditing({ cell, anchor }) };
+  const [punching, setPunching] = useState<Cell | null>(null);
+  const entries = useMemo(() => (clock?.entries ?? []).map((e) => ({ ...e, clockIn: new Date(e.clockIn), clockOut: e.clockOut ? new Date(e.clockOut) : null })), [clock]);
+  const clockView = clock && { entries, timeZone: clock.timeZone, now: new Date(clock.now) };
+  const editProps = {
+    canEdit,
+    onEdit: (cell: Cell, anchor: HTMLElement) => setEditing({ cell, anchor }),
+    // On someone's month, a day up to today opens their clocked hours.
+    canClock: (date: LocalDate) => Boolean(person && clock?.canEdit && date <= today),
+    onClock: (cell: Cell) => setPunching(cell),
+  };
 
   return (
     <div data-testid="team-month">
@@ -148,9 +167,9 @@ export function MonthGridView({ grid, today, editable, person }: { grid: MonthGr
       )}
 
       {person ? (
-        <PersonMonthView grid={grid} person={person} cells={cells} today={today} {...editProps} />
+        <PersonMonthView grid={grid} person={person} cells={cells} today={today} clock={clockView} {...editProps} />
       ) : (
-        <TeamMonth grid={grid} days={days} cells={cells} today={today} {...editProps} />
+        <TeamMonth grid={grid} days={days} cells={cells} today={today} clock={clockView} {...editProps} />
       )}
 
       <p className="mt-2 text-xs text-ink-muted">
@@ -171,6 +190,21 @@ export function MonthGridView({ grid, today, editable, person }: { grid: MonthGr
             setEditing(null);
             save([{ staffId, date, shifts }]);
           }}
+        />
+      )}
+      {punching && person && clockView && (
+        <PunchSheet
+          person={person}
+          cell={punching}
+          entries={clockView.entries.filter((e) => e.staffId === person.id && entryDay(e, clockView.timeZone) === punching.date)}
+          timeZone={clockView.timeZone}
+          pending={pending}
+          onClose={() => setPunching(null)}
+          onSave={(input) => run(async () => {
+            const r = await saveTimeEntry(input);
+            if (r.ok) setPunching(null);
+            return r;
+          })}
         />
       )}
       {copying === "week" && (
@@ -204,7 +238,13 @@ export function MonthGridView({ grid, today, editable, person }: { grid: MonthGr
   );
 }
 
-type EditProps = { canEdit: (date: LocalDate) => boolean; onEdit: (cell: Cell, anchor: HTMLElement) => void };
+type EditProps = {
+  canEdit: (date: LocalDate) => boolean;
+  onEdit: (cell: Cell, anchor: HTMLElement) => void;
+  canClock: (date: LocalDate) => boolean;
+  onClock: (cell: Cell) => void;
+};
+type ClockView = { entries: ClockEntry[]; timeZone: string; now: Date } | null;
 
 // One day's hours, small: each shift on its own line, or time off.
 function DayHours({ cell, open, size = "sm" }: { cell: Cell; open: { start: number; end: number }[]; size?: "sm" | "lg" }) {
@@ -230,7 +270,7 @@ function DayHours({ cell, open, size = "sm" }: { cell: Cell; open: { start: numb
 }
 
 // A day's cell, as a button when it can be changed.
-function DayCell({ cell, person, open, canEdit, onEdit, className, children }: EditProps & { cell: Cell; person: GridPerson; open: { start: number; end: number }[]; className: string; children: React.ReactNode }) {
+function DayCell({ cell, person, open, canEdit, onEdit, canClock, onClock, className, children }: EditProps & { cell: Cell; person: GridPerson; open: { start: number; end: number }[]; className: string; children: React.ReactNode }) {
   const draft = cell.draft !== null;
   const left = outside(cell, shown(cell)).length;
   const closed = open.length === 0;
@@ -241,8 +281,19 @@ function DayCell({ cell, person, open, canEdit, onEdit, className, children }: E
       <WarningIcon className="size-3" />
     </span>
   );
-  return canEdit(cell.date) && !closed ? (
-    <button type="button" className={`${look} text-left hover:bg-sunken/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus`} aria-label={`Edit ${label}`} title={label} data-cell data-staff={cell.staffId} data-date={cell.date} data-draft={draft || undefined} onClick={(e) => onEdit(cell, e.currentTarget)}>
+  const clocking = canClock(cell.date);
+  return clocking || (canEdit(cell.date) && !closed) ? (
+    <button
+      type="button"
+      className={`${look} text-left hover:bg-sunken/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus`}
+      aria-label={clocking ? `Clocked hours, ${person.firstName}, ${formatDay(cell.date)}` : `Edit ${label}`}
+      title={label}
+      data-cell
+      data-staff={cell.staffId}
+      data-date={cell.date}
+      data-draft={draft || undefined}
+      onClick={(e) => (clocking ? onClock(cell) : onEdit(cell, e.currentTarget))}
+    >
       {children}
       {flag}
     </button>
@@ -255,7 +306,7 @@ function DayCell({ cell, person, open, canEdit, onEdit, className, children }: E
 }
 
 // Everyone's month: a row per person, a column per day.
-function TeamMonth({ grid, days, cells, today, ...edit }: EditProps & { grid: MonthGrid; days: LocalDate[]; cells: Map<string, Cell>; today: LocalDate }) {
+function TeamMonth({ grid, days, cells, today, clock, ...edit }: EditProps & { grid: MonthGrid; days: LocalDate[]; cells: Map<string, Cell>; today: LocalDate; clock: ClockView }) {
   const scroller = useRef<HTMLDivElement>(null);
   const groups = ROLE_GROUPS.map((g) => ({
     ...g,
@@ -309,6 +360,7 @@ function TeamMonth({ grid, days, cells, today, ...edit }: EditProps & { grid: Mo
                         </Link>
                         <p className="text-xs text-ink-muted tabular-nums" data-testid="month-hours">
                           {hours(totals.scheduled)}
+                          {clock && ` · ${hours(clocked(clock, cells, p.id, days))} clocked`}
                           {p.cycleWeeks > 1 ? ` · ${p.cycleWeeks}-week pattern` : ""}
                         </p>
                       </div>
@@ -334,10 +386,18 @@ function TeamMonth({ grid, days, cells, today, ...edit }: EditProps & { grid: Mo
 }
 
 // One person's month as a calendar, Monday to Sunday, with their totals.
-function PersonMonthView({ grid, person, cells, today, ...edit }: EditProps & { grid: MonthGrid; person: GridPerson; cells: Map<string, Cell>; today: LocalDate }) {
+function PersonMonthView({ grid, person, cells, today, clock, ...edit }: EditProps & { grid: MonthGrid; person: GridPerson; cells: Map<string, Cell>; today: LocalDate; clock: ClockView }) {
   const totals = personMonth([...cells.values()], person.id, grid.month);
+  const monthDays = grid.weeks.flat().filter((d) => d.startsWith(grid.month));
+  const clockedDays = clock
+    ? new Map(clockDays(person.id, monthDays.map((d) => ({ date: d, minutes: scheduledMinutes(cells.get(cellKey(person.id, d))!) })), clock.entries, clock.timeZone, clock.now).map((d) => [d.date, d]))
+    : null;
+  // Scheduled against clocked, up to today (the rest isn't worked yet).
+  const sofar = clockedDays ? [...clockedDays.values()].filter((d) => d.date <= today) : [];
+  const worked = sofar.reduce((n, d) => n + d.worked, 0);
   const facts = [
     { label: "Scheduled", value: hours(totals.scheduled) },
+    ...(clockedDays ? [{ label: "Clocked so far", value: `${hours(worked)} · ${differenceText(worked, sofar.reduce((n, d) => n + d.scheduled, 0))}` }] : []),
     { label: "Days working", value: String(totals.days) },
     { label: "Days with time off", value: String(totals.timeOffDays) },
     { label: "Clients booked", value: String(totals.clients) },
@@ -357,7 +417,7 @@ function PersonMonthView({ grid, person, cells, today, ...edit }: EditProps & { 
           Everyone&rsquo;s month
         </Link>
       </div>
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="person-month-totals">
+      <dl className={`grid grid-cols-2 gap-3 ${clockedDays ? "sm:grid-cols-5" : "sm:grid-cols-4"}`} data-testid="person-month-totals">
         {facts.map((f) => (
           <div key={f.label} className="rounded-lg border border-line bg-surface px-4 py-3">
             <dt className="text-xs text-ink-muted">{f.label}</dt>
@@ -385,6 +445,7 @@ function PersonMonthView({ grid, person, cells, today, ...edit }: EditProps & { 
                 <span className={`text-13 tabular-nums ${d === today ? "inline-flex size-6 items-center justify-center rounded-full bg-active font-semibold text-white" : "font-medium text-ink"}`}>{dayNumber(d)}</span>
                 {open.length === 0 ? <span className="text-xs text-ink-subtle">Closed</span> : <DayHours cell={cell} open={open} size="lg" />}
                 {clients > 0 && <span className="text-2xs text-ink-muted">{clients === 1 ? "1 client" : `${clients} clients`}</span>}
+                {clockedDays && d <= today && <ClockLine day={clockedDays.get(d)!} />}
               </DayCell>
             );
           })}
@@ -502,6 +563,108 @@ function CopyPersonSheet({ grid, person, today, pending, onClose, onCopy }: { gr
           </Button>
         </div>
       </form>
+    </Sheet>
+  );
+}
+
+// Minutes someone clocked on these days.
+function clocked(clock: NonNullable<ClockView>, cells: Map<string, Cell>, staffId: string, days: LocalDate[]): number {
+  const set = new Set(days);
+  return clock.entries.filter((e) => e.staffId === staffId && set.has(entryDay(e, clock.timeZone))).reduce((n, e) => n + entryMinutes(e, clock.now), 0);
+}
+
+// Under a past day on someone's month: what they clocked, or what's wrong.
+function ClockLine({ day }: { day: DayHours }) {
+  if (day.missedOut)
+    return (
+      <span className="text-2xs font-medium text-warning" data-testid="clock-line" data-problem="missed_out">
+        No clock-out
+      </span>
+    );
+  if (day.noPunch)
+    return (
+      <span className="text-2xs font-medium text-warning" data-testid="clock-line" data-problem="no_punch">
+        Didn&rsquo;t clock in
+      </span>
+    );
+  if (!day.entries.length) return null;
+  return (
+    <span className="text-2xs text-ink-muted tabular-nums" data-testid="clock-line">
+      Clocked {formatDuration(day.worked)}
+    </span>
+  );
+}
+
+const SOURCES: Record<string, string> = { own: "On their phone", front_desk: "At the front desk", manager: "Added by a manager" };
+const hhmm = (d: Date, tz: string) => {
+  const m = toLocal(d, tz).minute;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+};
+
+// A day's punches for someone, for a manager to fix: change a time, remove
+// one, or add one they missed, always with a reason (logged with who).
+function PunchSheet({ person, cell, entries, timeZone, pending, onClose, onSave }: { person: GridPerson; cell: Cell; entries: ClockEntry[]; timeZone: string; pending: boolean; onClose: () => void; onSave: (input: TimeEntryInput) => void }) {
+  const [reason, setReason] = useState("");
+  const [times, setTimes] = useState(() => Object.fromEntries(entries.map((e) => [e.id, { in: hhmm(e.clockIn, timeZone), out: e.clockOut ? hhmm(e.clockOut, timeZone) : "" }])));
+  const [add, setAdd] = useState({ in: "", out: "" });
+  const save = (input: Omit<TimeEntryInput, "staffId" | "date" | "reason">) => onSave({ ...input, staffId: person.id, date: cell.date, reason });
+  const shifts = shown(cell);
+  return (
+    <Sheet title={`${person.firstName} · ${formatDay(cell.date)}`} onClose={onClose}>
+      <div className="flex flex-col gap-4" data-testid="punch-sheet">
+        <p className="text-13 text-ink-muted">Scheduled: {sayShifts(shifts)}{cell.timeOff.length ? " · approved time off" : ""}</p>
+        <label className={labelClass}>
+          Reason for the change
+          <input className={fieldClass} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Forgot to clock out" maxLength={300} />
+        </label>
+        {entries.length === 0 && <p className="text-sm text-ink-muted">No punches this day.</p>}
+        <ul className="flex flex-col gap-3">
+          {entries.map((e, i) => (
+            <li key={e.id} className="flex flex-col gap-2 rounded-lg border border-line p-3" data-testid="punch">
+              <p className="text-13 text-ink-muted">
+                {SOURCES[(e as ClockEntry & { source?: string }).source ?? "own"] ?? ""}
+                {e.edited ? " · changed by a manager" : ""}
+                {e.clockOut ? "" : e.missedOut ? " · clock-out missed" : " · still clocked in"}
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <label className={labelClass}>
+                  In
+                  <input type="time" className={fieldClass} value={times[e.id].in} onChange={(ev) => setTimes({ ...times, [e.id]: { ...times[e.id], in: ev.target.value } })} aria-label={`Punch ${i + 1} in`} />
+                </label>
+                <label className={labelClass}>
+                  Out
+                  <input type="time" className={fieldClass} value={times[e.id].out} onChange={(ev) => setTimes({ ...times, [e.id]: { ...times[e.id], out: ev.target.value } })} aria-label={`Punch ${i + 1} out`} />
+                </label>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="quiet" size="sm" disabled={pending} onClick={() => save({ entryId: e.id, clockIn: times[e.id].in, clockOut: null, remove: true })}>
+                  Remove
+                </Button>
+                <Button variant="secondary" size="sm" disabled={pending} onClick={() => save({ entryId: e.id, clockIn: times[e.id].in, clockOut: times[e.id].out || null })}>
+                  Save change
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <div className="flex flex-col gap-2 border-t border-line pt-4">
+          <p className="text-sm font-semibold text-ink">Add a punch</p>
+          <div className="grid grid-cols-2 gap-3">
+            <label className={labelClass}>
+              In
+              <input type="time" className={fieldClass} value={add.in} onChange={(e) => setAdd({ ...add, in: e.target.value })} aria-label="New punch in" />
+            </label>
+            <label className={labelClass}>
+              Out
+              <input type="time" className={fieldClass} value={add.out} onChange={(e) => setAdd({ ...add, out: e.target.value })} aria-label="New punch out" />
+            </label>
+          </div>
+          <Button className="self-end" disabled={pending || !add.in} onClick={() => save({ entryId: null, clockIn: add.in, clockOut: add.out || null })}>
+            Add punch
+          </Button>
+        </div>
+        <p className="text-xs text-ink-muted">Every change is kept with who made it and why, in the Audit trail.</p>
+      </div>
     </Sheet>
   );
 }

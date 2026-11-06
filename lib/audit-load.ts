@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { AUDIT_LIMIT, mergeAudit, type AuditFilters, type AuditRow, type AuditType } from "@/lib/audit";
 import type { Database } from "@/lib/database.types";
 import { formatDay } from "@/lib/schedule-format";
-import { addDays, fromLocal, toLocal } from "@/lib/scheduling/time";
+import { addDays, formatMinute, fromLocal, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { fullName } from "@/lib/staff";
 import { changeWhat, changeWho, type VisitChange } from "@/lib/visit-changes";
@@ -281,6 +281,46 @@ export async function loadAudit(supabase: Supabase, businessId: string, timeZone
             e.plan_id ? "on a commission plan" : null,
           ].filter(Boolean);
           return { id: e.id, at: e.created_at, type: "pay", staffId: e.changed_by, who: who(e.changed_by), what: `Pay rates for ${staffName(e.staff_id) ?? "a former team member"}: ${parts.join(", ")}, from ${formatDay(e.effective_from)}`, href: `/payroll` } satisfies AuditRow;
+        });
+      })(),
+    );
+  }
+
+  if (want("clock")) {
+    tasks.push(
+      (async () => {
+        let q = supabase
+          .from("time_clock_events")
+          .select("id, staff_id, kind, was_in, was_out, clock_in, clock_out, reason, by_staff_id, created_at")
+          .eq("business_id", businessId)
+          .in("kind", ["added", "changed", "removed"])
+          .gte("created_at", fromIso)
+          .lt("created_at", toIso)
+          .order("created_at", { ascending: false })
+          .limit(AUDIT_LIMIT + 1);
+        if (f.staffId) q = q.eq("by_staff_id", f.staffId);
+        const { data, error } = await q;
+        if (error) throw error;
+        const time = (iso: string | null) => (iso ? formatMinute(toLocal(new Date(iso), timeZone).minute) : "still in");
+        const span = (a: string | null, b: string | null) => `${time(a)}–${time(b)}`;
+        return data.map((e) => {
+          const name = staffName(e.staff_id) ?? "a former team member";
+          const on = day(e.clock_in ?? e.was_in ?? e.created_at);
+          const what =
+            e.kind === "added"
+              ? `Punch added for ${name} on ${on}: ${span(e.clock_in, e.clock_out)}`
+              : e.kind === "removed"
+                ? `Punch removed for ${name} on ${on}: ${span(e.was_in, e.was_out)}`
+                : `Hours changed for ${name} on ${on}: ${span(e.was_in, e.was_out)} to ${span(e.clock_in, e.clock_out)}`;
+          return {
+            id: e.id,
+            at: e.created_at,
+            type: "clock",
+            staffId: e.by_staff_id,
+            who: who(e.by_staff_id),
+            what: `${what}${e.reason ? `. ${e.reason}` : ""}`,
+            href: `/scheduling/month?month=${toLocal(new Date(e.clock_in ?? e.was_in ?? e.created_at), timeZone).date.slice(0, 7)}&staff=${e.staff_id}`,
+          } satisfies AuditRow;
         });
       })(),
     );

@@ -1684,3 +1684,36 @@ insert into public.shift_swap_events (business_id, swap_id, kind, by_staff_id, r
 select business_id, id, 'asked', from_staff_id, note, created_at from public.shift_swaps
 union all
 select business_id, id, 'accepted', to_staff_id, null, answered_at from public.shift_swaps where status = 'accepted';
+
+-- The time clock: Maple & Ash's team clocks in and out. The last two
+-- weeks' punches, a few minutes either side of each shift (a split shift
+-- is two; days with approved time off left out), the front desk and the
+-- manager at the front-desk iPad and the rest on their phones, and today's
+-- shifts already started as of the seed's clock. Jordan's last clock-out
+-- was missed, for a manager to fix.
+update public.businesses set time_clock = true where id = 'b0000000-0000-4000-8000-000000000001';
+
+insert into public.time_clock_entries (business_id, location_id, staff_id, clock_in, clock_out, source, created_at)
+select s.business_id, s.location_id, s.id, w.clock_in,
+       case when w.clock_out < now() then w.clock_out end,
+       case when s.role in ('front_desk', 'manager') then 'front_desk' else 'own' end, w.clock_in
+from public.staff s
+cross join generate_series((now() at time zone 'America/Chicago')::date - 14, (now() at time zone 'America/Chicago')::date, interval '1 day') g(d)
+cross join lateral jsonb_array_elements(private.live_hours(s.id, g.d::date)) h
+cross join lateral (
+  select ((g.d::date + make_interval(mins => (h ->> 'start')::int + pg_temp.rnd('in' || s.id || g.d) % 11 - 7)) at time zone 'America/Chicago') as clock_in,
+         ((g.d::date + make_interval(mins => (h ->> 'end')::int + pg_temp.rnd('out' || s.id || g.d) % 16 - 3)) at time zone 'America/Chicago') as clock_out
+) w
+where s.business_id = 'b0000000-0000-4000-8000-000000000001' and s.is_active and s.role not in ('owner', 'bookkeeper')
+  and w.clock_in < now()
+  and not exists (
+    select 1 from public.staff_time_off t
+    where t.staff_id = s.id and t.status = 'approved' and g.d::date between t.starts_on and t.ends_on
+  );
+
+update public.time_clock_entries set clock_out = null, missed_out = true
+where id = (
+  select id from public.time_clock_entries
+  where staff_id = 'd0000000-0000-4000-8000-000000000012' and clock_in < (now() at time zone 'America/Chicago')::date at time zone 'America/Chicago'
+  order by clock_in desc limit 1
+);

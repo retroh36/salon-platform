@@ -32,6 +32,10 @@ import { averageTipPct, pctText } from "@/lib/tips";
 import { loadLiveEarnings } from "@/lib/earnings-load";
 import { LiveEarningsCard } from "./live-earnings";
 import { Notices } from "./notices";
+import { ClockCard } from "./clock";
+import { clockStatus } from "@/lib/time-clock";
+import { clockOn, loadEntries } from "@/lib/time-clock-load";
+import { shiftsOn } from "@/lib/payroll";
 import { firstLetter } from "@/lib/initial";
 
 export const metadata: Metadata = { title: "My day" };
@@ -117,6 +121,7 @@ async function MyDay({ searchParams }: Pick<PageProps<"/my-day">, "searchParams"
       <div className="max-w-2xl">
       {/* Keyed by what's in it, so a new notice arriving live shows. */}
       <Notices key={(notices ?? []).map((n) => n.id).join()} notices={(notices ?? []).map((n) => ({ id: n.id, body: n.body, when: noticeTime(new Date(n.created_at), tz, today) }))} />
+      <MyClock supabase={supabase} me={me} />
       {me.role === "assistant" ? (
         <p className="mb-4 text-sm text-ink-muted" data-testid="assisting">
           {stylist ? `You're assisting ${stylist.first_name}: here's their day, as it's booked.` : "You're not assigned to a stylist yet. Ask a manager to choose one on your Team page."}
@@ -342,5 +347,22 @@ async function MyEarnings({ supabase, me, last }: { supabase: Awaited<ReturnType
         </details>
       )}
     </Section>
+  );
+}
+
+// The time clock, for salons that use it: where they stand and the button.
+async function MyClock({ supabase, me }: { supabase: Awaited<ReturnType<typeof getCurrentStaff>>["supabase"]; me: NonNullable<Awaited<ReturnType<typeof getCurrentStaff>>["staff"]> }) {
+  if (!(await clockOn(supabase, me.business_id))) return null;
+  const tz = me.location.timezone;
+  const today = todayIn(tz);
+  const [entries, schedules] = await Promise.all([loadEntries(supabase, me.location, today, today, me.id), loadStaffSchedules(supabase, [me.id], today, today)]);
+  const status = clockStatus(entries, tz, new Date());
+  const shifts = shiftsOn(schedules.get(me.id)!, today);
+  return (
+    <ClockCard
+      since={status.since ? formatMinute(toLocal(status.since, tz).minute) : null}
+      todayMinutes={status.todayMinutes}
+      shiftText={shifts.length ? `Today ${formatIntervals(shifts)}` : "No shift today"}
+    />
   );
 }

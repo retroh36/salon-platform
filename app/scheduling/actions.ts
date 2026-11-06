@@ -7,7 +7,7 @@ import { isUuid } from "@/lib/ids";
 import { formatDay } from "@/lib/schedule-format";
 import { patternHours } from "@/lib/scheduling/availability";
 import { loadStaffSchedules } from "@/lib/scheduling/load";
-import { addDays, daysBetween, isLocalDate, startOfWeek, todayIn, WEEKDAYS, type LocalDate, type Weekday } from "@/lib/scheduling/time";
+import { addDays, daysBetween, fromLocal, isLocalDate, startOfWeek, todayIn, WEEKDAYS, type LocalDate, type Weekday } from "@/lib/scheduling/time";
 import { outPanelHref, outside, sameShifts, shiftProblem, sortShifts, type DayEdit, type Shift } from "@/lib/team-schedule";
 import { loadWeekGrid } from "@/lib/team-schedule-load";
 import { copyForward, copyPerson, MAX_COPY_DAYS, MAX_COPY_WEEKS } from "@/lib/schedule-month";
@@ -197,4 +197,39 @@ export async function savePattern(input: PatternInput, anyway = false): Promise<
   if (error) throw error;
   done();
   return { ok: true, message: "Pattern saved. The weeks ahead follow it." };
+}
+
+// A manager's change to someone's clocked hours: add a punch (entryId null),
+// change one or remove it, always with a reason. Times are the location's
+// wall clock on `date` ("HH:MM"); an end before the start is the next day.
+export type TimeEntryInput = { entryId: string | null; staffId: string; date: LocalDate; clockIn: string; clockOut: string | null; reason: string; remove?: boolean };
+
+export async function saveTimeEntry(input: TimeEntryInput): Promise<ScheduleResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me) return { ok: false, message: NOT_ALLOWED };
+  const minute = (t: string | null) => (t && /^\d{2}:\d{2}$/.test(t) ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3)) : null);
+  const start = minute(input.clockIn);
+  const end = minute(input.clockOut);
+  if ((input.entryId !== null && !isUuid(input.entryId)) || !isUuid(input.staffId) || !isLocalDate(input.date) || (!input.remove && start === null)) {
+    return { ok: false, message: "Check the times." };
+  }
+  if ((input.reason ?? "").trim().length < 3) return { ok: false, message: "Say why you're changing it." };
+  const tz = me.location.timezone;
+  const clockIn = start === null ? null : fromLocal(input.date, start, tz);
+  const clockOut = end === null ? null : fromLocal(end > start! ? input.date : addDays(input.date, 1), end, tz);
+  const { error } = await supabase.rpc("save_time_entry", {
+    p_business_id: me.business_id,
+    p_entry_id: input.entryId as string,
+    p_staff_id: input.staffId,
+    p_clock_in: clockIn?.toISOString() as string,
+    p_clock_out: clockOut?.toISOString() as string,
+    p_reason: input.reason.trim().slice(0, 300),
+    p_remove: input.remove ?? false,
+  });
+  if (error?.code === "42501") return { ok: false, message: error.message.includes("owner") ? "Only owners can change an owner's hours." : "Only managers can change clocked hours." };
+  if (error?.hint === "overlap") return { ok: false, message: "That overlaps another punch that day." };
+  if (error?.hint === "times") return { ok: false, message: "Check the times: they can't be in the future, and a shift is 18 hours at most." };
+  if (error) throw error;
+  done();
+  return { ok: true, message: input.remove ? "Punch removed." : input.entryId ? "Hours changed." : "Punch added." };
 }
