@@ -247,6 +247,38 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"appointment_reminders": {
+                  Row: {
+                    "appointment_id": string,"business_id": string,"channel": string,"held": boolean,"id": string,"outbox_id": string | null,"sent_at": string,"starts_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "appointment_id": string,"business_id": string,"channel": string,"held"?: boolean,"id"?: string,"outbox_id"?: string | null,"sent_at"?: string,"starts_at": string
+                  }
+                  Update: {
+                    "appointment_id"?: string,"business_id"?: string,"channel"?: string,"held"?: boolean,"id"?: string,"outbox_id"?: string | null,"sent_at"?: string,"starts_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "appointment_reminders_appointment_id_fkey"
+      columns: ["appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "appointment_reminders_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "appointment_reminders_outbox_id_fkey"
+      columns: ["outbox_id"]
+isOneToOne: false
+      referencedRelation: "outbox_messages"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"appointment_series": {
                   Row: {
                     "business_id": string,"client_id": string | null,"created_at": string,"created_by": string | null,"ends_on": string | null,"id": string,"interval_weeks": number,"location_id": string,"occurrences": number | null
@@ -387,14 +419,14 @@ isOneToOne: false
                   ]
                 },"businesses": {
                   Row: {
-                    "ai_daily_token_limit": number,"auto_lock_minutes": number,"cash_float_cents": number,"created_at": string,"discount_max_percent": number,"discount_roles": (Database["public"]['Enums']["staff_role"])[],"free_text_roles": (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months": number | null,"gift_card_online_reload": boolean,"gift_card_presets_cents": (number)[],"google_review_url": string | null,"id": string,"logo_path": string | null,"messages_live": boolean,"messages_live_at": string | null,"move_message_default": string,"name": string,"next_sale_number": number,"patch_test_enforcement": string,"patch_test_min_hours": number,"patch_test_valid_days": number,"pay_period": string,"pay_period_anchor": string,"payments_live": boolean,"payments_live_at": string | null,"payroll_hours": string,"plan": string,"promo_card_expiry_days": number,"receipt_footer": string | null,"receipt_show_stylists": boolean,"settings": NonNullable<Json>,"slug": string | null,"stripe_account_id": string | null,"stripe_charges_enabled": boolean,"stripe_checked_at": string | null,"stripe_details_submitted": boolean,"tax_rate_retail_bp": number,"tax_rate_services_bp": number,"time_clock": boolean,"time_off_notice_days": number,"updated_at": string,"yelp_url": string | null
+                    "ai_daily_token_limit": number,"auto_lock_minutes": number,"cash_float_cents": number,"created_at": string,"discount_max_percent": number,"discount_roles": (Database["public"]['Enums']["staff_role"])[],"free_text_roles": (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months": number | null,"gift_card_online_reload": boolean,"gift_card_presets_cents": (number)[],"google_review_url": string | null,"id": string,"logo_path": string | null,"messages_live": boolean,"messages_live_at": string | null,"move_message_default": string,"name": string,"next_sale_number": number,"patch_test_enforcement": string,"patch_test_min_hours": number,"patch_test_valid_days": number,"pay_period": string,"pay_period_anchor": string,"payments_live": boolean,"payments_live_at": string | null,"payroll_hours": string,"plan": string,"promo_card_expiry_days": number,"receipt_footer": string | null,"receipt_show_stylists": boolean,"reminder_hours": number,"reminders_on": boolean,"settings": NonNullable<Json>,"slug": string | null,"stripe_account_id": string | null,"stripe_charges_enabled": boolean,"stripe_checked_at": string | null,"stripe_details_submitted": boolean,"tax_rate_retail_bp": number,"tax_rate_services_bp": number,"time_clock": boolean,"time_off_notice_days": number,"updated_at": string,"yelp_url": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "ai_daily_token_limit"?: number,"auto_lock_minutes"?: number,"cash_float_cents"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"free_text_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_online_reload"?: boolean,"gift_card_presets_cents"?: (number)[],"google_review_url"?: string | null,"id"?: string,"logo_path"?: string | null,"messages_live"?: boolean,"messages_live_at"?: string | null,"move_message_default"?: string,"name": string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"pay_period"?: string,"pay_period_anchor"?: string,"payments_live"?: boolean,"payments_live_at"?: string | null,"payroll_hours"?: string,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"stripe_account_id"?: string | null,"stripe_charges_enabled"?: boolean,"stripe_checked_at"?: string | null,"stripe_details_submitted"?: boolean,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"time_clock"?: boolean,"time_off_notice_days"?: number,"updated_at"?: string,"yelp_url"?: string | null
+                    "ai_daily_token_limit"?: number,"auto_lock_minutes"?: number,"cash_float_cents"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"free_text_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_online_reload"?: boolean,"gift_card_presets_cents"?: (number)[],"google_review_url"?: string | null,"id"?: string,"logo_path"?: string | null,"messages_live"?: boolean,"messages_live_at"?: string | null,"move_message_default"?: string,"name": string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"pay_period"?: string,"pay_period_anchor"?: string,"payments_live"?: boolean,"payments_live_at"?: string | null,"payroll_hours"?: string,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"reminder_hours"?: number,"reminders_on"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"stripe_account_id"?: string | null,"stripe_charges_enabled"?: boolean,"stripe_checked_at"?: string | null,"stripe_details_submitted"?: boolean,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"time_clock"?: boolean,"time_off_notice_days"?: number,"updated_at"?: string,"yelp_url"?: string | null
                   }
                   Update: {
-                    "ai_daily_token_limit"?: number,"auto_lock_minutes"?: number,"cash_float_cents"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"free_text_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_online_reload"?: boolean,"gift_card_presets_cents"?: (number)[],"google_review_url"?: string | null,"id"?: string,"logo_path"?: string | null,"messages_live"?: boolean,"messages_live_at"?: string | null,"move_message_default"?: string,"name"?: string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"pay_period"?: string,"pay_period_anchor"?: string,"payments_live"?: boolean,"payments_live_at"?: string | null,"payroll_hours"?: string,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"stripe_account_id"?: string | null,"stripe_charges_enabled"?: boolean,"stripe_checked_at"?: string | null,"stripe_details_submitted"?: boolean,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"time_clock"?: boolean,"time_off_notice_days"?: number,"updated_at"?: string,"yelp_url"?: string | null
+                    "ai_daily_token_limit"?: number,"auto_lock_minutes"?: number,"cash_float_cents"?: number,"created_at"?: string,"discount_max_percent"?: number,"discount_roles"?: (Database["public"]['Enums']["staff_role"])[],"free_text_roles"?: (Database["public"]['Enums']["staff_role"])[],"gift_card_expiry_months"?: number | null,"gift_card_online_reload"?: boolean,"gift_card_presets_cents"?: (number)[],"google_review_url"?: string | null,"id"?: string,"logo_path"?: string | null,"messages_live"?: boolean,"messages_live_at"?: string | null,"move_message_default"?: string,"name"?: string,"next_sale_number"?: number,"patch_test_enforcement"?: string,"patch_test_min_hours"?: number,"patch_test_valid_days"?: number,"pay_period"?: string,"pay_period_anchor"?: string,"payments_live"?: boolean,"payments_live_at"?: string | null,"payroll_hours"?: string,"plan"?: string,"promo_card_expiry_days"?: number,"receipt_footer"?: string | null,"receipt_show_stylists"?: boolean,"reminder_hours"?: number,"reminders_on"?: boolean,"settings"?: NonNullable<Json>,"slug"?: string | null,"stripe_account_id"?: string | null,"stripe_charges_enabled"?: boolean,"stripe_checked_at"?: string | null,"stripe_details_submitted"?: boolean,"tax_rate_retail_bp"?: number,"tax_rate_services_bp"?: number,"time_clock"?: boolean,"time_off_notice_days"?: number,"updated_at"?: string,"yelp_url"?: string | null
                   }
                   Relationships: [
                     

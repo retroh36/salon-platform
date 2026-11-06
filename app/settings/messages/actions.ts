@@ -7,6 +7,7 @@ import { liveGate, resendKeys, twilioKeys } from "@/lib/live";
 import { e164, sendEmail, sendText } from "@/lib/messaging/providers";
 import { messagingStatus } from "@/lib/messaging/status";
 import { can } from "@/lib/permissions";
+import { isReminderHours } from "@/lib/reminders";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function saveFreeTextRoles(roles: string[]) {
@@ -25,6 +26,17 @@ export async function saveMoveMessageDefault(value: string) {
   if (!me || !can(me, "settings")) return { ok: false, message: "Only those who can change settings can change this." };
   if (value !== "send" && value !== "skip") return { ok: false, message: "Choose one." };
   const { data, error } = await supabase.from("businesses").update({ move_message_default: value }).eq("id", me.business_id).select("id");
+  if (error || !data.length) return { ok: false, message: "That didn't save. Try again." };
+  revalidatePath("/settings/messages");
+  return { ok: true, message: "Saved." };
+}
+
+// Appointment reminders: on or off, and how long before the visit.
+export async function saveReminders(on: boolean, hours: number) {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !can(me, "settings")) return { ok: false, message: "Only those who can change settings can change this." };
+  if (typeof on !== "boolean" || !isReminderHours(hours)) return { ok: false, message: "Choose when." };
+  const { data, error } = await supabase.from("businesses").update({ reminders_on: on, reminder_hours: hours }).eq("id", me.business_id).select("id");
   if (error || !data.length) return { ok: false, message: "That didn't save. Try again." };
   revalidatePath("/settings/messages");
   return { ok: true, message: "Saved." };

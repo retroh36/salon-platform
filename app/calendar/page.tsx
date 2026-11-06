@@ -346,7 +346,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
   const checkedOut = Object.values(appointments).filter((a) => a.status === "completed").map((a) => a.id);
   const visitIds = Object.keys(appointments);
   const clientIds = [...new Set(Object.values(appointments).flatMap((a) => (a.client ? [a.client.id] : [])))];
-  const [warnings, policies, salesResult, eventsLog, changesLog, insights, packages, past, pastFormulas, memberships, fixesResult] = await Promise.all([
+  const [warnings, policies, salesResult, eventsLog, changesLog, insights, packages, past, pastFormulas, memberships, fixesResult, remindersLog] = await Promise.all([
     visitWarnings(supabase, me.business_id, toCheck, tz),
     policyVisits ? loadVisitPolicies(supabase, me.business_id, me.role, policyVisits) : Promise.resolve(null),
     // The sale each checked-out visit was paid on (front of house only: RLS).
@@ -400,6 +400,10 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
           .like("subject", `${date}:%`)
           .in("status", ["approved", "undone"])
           .order("decided_at")
+      : Promise.resolve({ data: [], error: null }),
+    // Reminders written for each visit (front of house: RLS).
+    visitIds.length
+      ? supabase.from("appointment_reminders").select("appointment_id, channel, held, sent_at").in("appointment_id", visitIds).order("sent_at")
       : Promise.resolve({ data: [], error: null }),
   ]);
   if (fixesResult.error) throw fixesResult.error;
@@ -459,6 +463,11 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
     visit.log.push(changeLine(c as VisitChange, names));
     // The full log says who changed it, so "Last changed by" isn't needed.
     visit.changedBy = null;
+  }
+  if (remindersLog.error) throw remindersLog.error;
+  for (const r of remindersLog.data) {
+    const by = r.channel === "sms" ? "text" : "email";
+    appointments[r.appointment_id].log.push(r.held ? `Reminder by ${by} kept in the outbox: messages aren't live yet · ${when(r.sent_at)}` : `Reminder sent by ${by} · ${when(r.sent_at)}`);
   }
   if (past.error) throw past.error;
   if (pastFormulas.error) throw pastFormulas.error;

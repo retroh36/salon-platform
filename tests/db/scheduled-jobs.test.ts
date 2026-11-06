@@ -38,6 +38,7 @@ describe("scheduled jobs", () => {
       ["maestra-messages", "* * * * *", true],
       ["maestra-photo-backup", "0 7 * * *", true],
       ["maestra-policy-fees", "*/15 * * * *", true],
+      ["maestra-reminders", "*/15 * * * *", true],
       ["maestra-risk-check", "0 9 * * *", true],
       ["maestra-risk-check-morning", "0 12 * * *", true],
     ]);

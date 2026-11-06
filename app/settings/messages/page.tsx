@@ -10,6 +10,8 @@ import { SettingsNav } from "../settings-nav";
 import { MessagesConnection } from "./connection";
 import { FreeTextRoles } from "./free-text-roles";
 import { MoveMessageDefault } from "./move-default";
+import { ReminderSettings } from "./reminders";
+import { DEFAULT_REMINDER_HOURS, isReminderHours } from "@/lib/reminders";
 
 export const metadata: Metadata = { title: "Messages" };
 
@@ -28,7 +30,11 @@ async function MessagesSettings() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
   if (!can(me, "settings")) redirect("/dashboard");
-  const { data: b, error } = await supabase.from("businesses").select("free_text_roles, move_message_default, messages_live").eq("id", me.business_id).single();
+  const { data: b, error } = await supabase
+    .from("businesses")
+    .select("name, free_text_roles, move_message_default, messages_live, reminders_on, reminder_hours, online_booking_settings(enabled), locations(id, phone)")
+    .eq("id", me.business_id)
+    .single();
   if (error) throw error;
   return (
     <AppShell section="settings" me={me}>
@@ -54,6 +60,19 @@ async function MessagesSettings() {
         description="When someone drags or edits a visit's time, stylist or date, the calendar asks whether to let the client know, with the message. Choose which answer comes first. Nothing goes to a client until someone taps Send."
       >
         <MoveMessageDefault value={b.move_message_default === "skip" ? "skip" : "send"} />
+      </Card>
+      <Card
+        title="Appointment reminders"
+        titleId="reminders-heading"
+        description="A reminder before each visit, in the words below, filled in for the visit. It goes by text or email, whichever the client gets messages about their visits on, once for each visit, between 9am and 8pm."
+      >
+        <ReminderSettings
+          on={b.reminders_on}
+          hours={isReminderHours(b.reminder_hours) ? b.reminder_hours : DEFAULT_REMINDER_HOURS}
+          salon={b.name}
+          online={Boolean(b.online_booking_settings?.enabled)}
+          phone={b.locations.find((l) => l.id === me.location.id)?.phone ?? null}
+        />
       </Card>
     </AppShell>
   );
