@@ -71,6 +71,11 @@ async function Inventory({ searchParams }: Pick<PageProps<"/inventory">, "search
               </Link>
             )}
             {manage && (
+              <Link href="/inventory/usage" className={buttonClass("secondary", "md")}>
+                Usage
+              </Link>
+            )}
+            {manage && (
               <Link href="/inventory/new" className={buttonClass("primary", "md")}>
                 <PlusIcon className="size-4" />
                 Add product

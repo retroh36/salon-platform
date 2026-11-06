@@ -4707,6 +4707,11 @@ isOneToOne: false
               "cost_cents": number,"product_id": string
             }[]
                            },
+"product_usage":
+{ Args: { "p_from": string,"p_location_id": string,"p_to": string }; Returns: {
+              "change": number,"product_id": string,"reason": Database["public"]['Enums']["stock_reason"]
+            }[]
+                           },
 "publish_schedule_week":
 { Args: { "p_location_id": string,"p_week_start": string }; Returns: Json
                            },

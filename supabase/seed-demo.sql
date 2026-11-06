@@ -627,6 +627,36 @@ update public.stock_movements m set created_at = a.checked_out_at, created_by = 
 from public.appointments a
 where m.reason = 'sale' and m.appointment_id = a.id;
 
+-- Color and back bar used in services over the history, as checkout takes
+-- it (the visit's formula, else the service's recipe), on each visit's
+-- day, for the usage report. Deliveries at the start cover it, so stock
+-- ends where it was counted.
+do $$
+declare
+  v_item uuid;
+begin
+  for v_item in
+    select i.id from public.appointment_items i join public.appointments a on a.id = i.appointment_id
+    where a.business_id = 'b0000000-0000-4000-8000-000000000001' and a.status = 'completed'
+    order by a.checked_out_at, i.starts_at, i.id
+  loop
+    perform private.deduct_item_stock(v_item);
+  end loop;
+end;
+$$;
+update public.stock_movements m set created_at = a.checked_out_at, created_by = 'd0000000-0000-4000-8000-000000000003'
+from public.appointments a
+where m.reason = 'service_use' and m.appointment_id = a.id and a.business_id = 'b0000000-0000-4000-8000-000000000001';
+select private.move_stock('c0000000-0000-4000-8000-000000000001', u.product_id, u.used, 'order_received', 'Deliveries over the history')
+from (
+  select product_id, -sum(change) as used from public.stock_movements
+  where business_id = 'b0000000-0000-4000-8000-000000000001' and reason = 'service_use'
+  group by product_id
+) u
+where u.used > 0;
+update public.stock_movements set created_at = now() - interval '113 days', created_by = 'd0000000-0000-4000-8000-000000000002'
+where reason = 'order_received' and note = 'Deliveries over the history';
+
 -- Checkout: retail is taxed (Chicago's 10.25%), services aren't. Every
 -- checked-out visit gets its sale: the services at their booked prices,
 -- the retail bought then, tips for about 60% of visits, and card or cash.

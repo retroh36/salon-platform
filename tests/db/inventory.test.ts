@@ -88,9 +88,15 @@ describe("the seeded stock", () => {
 
   it("keeps every stock level equal to the sum of its movements, with some already low", async () => {
     const { data: levels } = await admin.from("stock_levels").select("product_id, on_hand, reorder_point").eq("location_id", L);
-    const { data: moves } = await admin.from("stock_movements").select("product_id, change").eq("location_id", L);
+    // Every movement, a page at a time (a read returns at most 1,000 rows).
+    const moves: { product_id: string; change: number }[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data } = await admin.from("stock_movements").select("product_id, change").eq("location_id", L).order("id").range(from, from + 999);
+      moves.push(...data!);
+      if (data!.length < 1000) break;
+    }
     const sums = new Map<string, number>();
-    for (const m of moves!) sums.set(m.product_id, Math.round(((sums.get(m.product_id) ?? 0) + m.change) * 100) / 100);
+    for (const m of moves) sums.set(m.product_id, Math.round(((sums.get(m.product_id) ?? 0) + m.change) * 100) / 100);
     for (const l of levels!) expect(sums.get(l.product_id) ?? 0).toBeCloseTo(l.on_hand, 2);
     expect(levels!.filter((l) => l.on_hand < l.reorder_point).length).toBeGreaterThanOrEqual(3);
   });
