@@ -45,12 +45,17 @@ async function Clients({ searchParams }: Pick<PageProps<"/clients">, "searchPara
         title="Clients"
         description="Search by name or phone to find a client's details, allergies and color history. Tap a column to sort."
         actions={
-          canEditClients(me.role) && (
-            <Link href="/clients/new" className={buttonClass("primary", "md")}>
-              <PlusIcon className="size-4" />
-              Add client
+          <>
+            <Link href="/clients/reports" className={buttonClass("secondary", "md")}>
+              Client reports
             </Link>
-          )
+            {canEditClients(me.role) && (
+              <Link href="/clients/new" className={buttonClass("primary", "md")}>
+                <PlusIcon className="size-4" />
+                Add client
+              </Link>
+            )}
+          </>
         }
       />
 

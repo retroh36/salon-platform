@@ -125,7 +125,7 @@ async function MeetDenise() {
           eyebrow="Answers questions"
           title="Ask about the salon, or about Maestra"
           text="Ask Denise anything about your business, and she answers from your own data. Ask how to do something in Maestra, and she answers from the help guide with a button to the right screen."
-          points={["“Who's cancelled late this month?” “Who's working this afternoon?” “Who has unused packages?”", "“How much PTO do I have?” “Who's off next week?” “How many sick days has Nola taken this year?”", "“How do I sell a gift card?” “How do I ask for time off?”", "Each person only gets answers their role is allowed to see: their own time off and PTO, or everyone's for owners and managers."]}
+          points={["“Who's cancelled late this month?” “Who's working this afternoon?” “Who has unused packages?”", "“How much PTO do I have?” “Who's off next week?” “How many sick days has Nola taken this year?”", "“How do I sell a gift card?” “How do I ask for time off?”", "“Hair clients with 3+ visits since June 2024 who haven't been in this year”: she builds the list, the same columns every time, to save or download.", "Each person only gets answers their role is allowed to see: their own time off and PTO, or everyone's for owners and managers."]}
           example={<QuestionsExample />}
         />
 

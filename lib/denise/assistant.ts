@@ -90,6 +90,10 @@ function stem(word: string): string {
 
 const nullable = (type: "string" | "integer") => ({ type: [type, "null"] });
 
+// Dates for a client report, as words our code works out when it runs.
+const DATE_WORDS =
+  "As words, never a worked-out date: today, this_week, this_month, last_month, this_year or last_year (the start of each), \"6 months ago\" (days, weeks, months or years ago), a month as YYYY-MM (\"since June 2024\" is 2024-06) or a day as YYYY-MM-DD. Null for any time.";
+
 const TOOLS: Anthropic.Tool[] = [
   {
     name: "list_services",
@@ -149,7 +153,32 @@ const TOOLS: Anthropic.Tool[] = [
 const noInput = { type: "object" as const, properties: {}, required: [], additionalProperties: false as const };
 
 // Read-only lookups of what Denise has learned, and her fixes.
-const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes" | "giftCards" | "packages" | "rewards" | "policy" | "events" | "eventBalance" | "team" | "dayOff" | "pto" | "timeOff", Anthropic.Tool> = {
+const KNOWLEDGE_TOOLS: Record<"clients" | "overdue" | "durations" | "salon" | "schedule" | "stock" | "sales" | "fixes" | "giftCards" | "packages" | "rewards" | "policy" | "events" | "eventBalance" | "team" | "dayOff" | "pto" | "timeOff" | "report", Anthropic.Tool> = {
+  report: {
+    name: "client_report",
+    description:
+      "Build a list of clients from fixed filters: the visits counted (service categories or services, stylists, from and until when, at least or at most how many), their last visit of any kind (none since, or one since), whether a next visit is booked, and lifetime spend (owners, managers and the front desk). Returns how many clients match, the first few by first name, and the list in words; a button under your answer opens the whole list, to sort, save or download. Use it for any 'clients who…' or 'a list of clients' question, not for one client. A stylist only gets their own clients.",
+    strict: true,
+    input_schema: {
+      type: "object",
+      properties: {
+        categories: { type: "array", items: { type: "string" }, description: "Service categories as list_services gives them (\"Color\"); \"hair clients\" means every hair category. Empty for any service." },
+        service_ids: { type: "array", items: { type: "string" }, description: "Particular services, from list_services. Empty for any." },
+        staff_ids: { type: "array", items: { type: "string" }, description: "Visits with these stylists, from list_stylists. Empty for anyone." },
+        counted_from: { ...nullable("string"), description: `First day the visits count from. ${DATE_WORDS}` },
+        counted_until: { ...nullable("string"), description: `Day the visits stop counting (not included). ${DATE_WORDS}` },
+        min_visits: { ...nullable("integer"), description: "At least this many counted visits (\"3+ visits\" is 3). Null: at least one when services, stylists or dates are given." },
+        max_visits: { ...nullable("integer"), description: "At most this many counted visits; 0 for clients who had none of them." },
+        no_visit_since: { ...nullable("string"), description: `No visit of any kind since this day ("haven't been in this year" is this_year). ${DATE_WORDS}` },
+        visited_since: { ...nullable("string"), description: `A visit of any kind since this day. ${DATE_WORDS}` },
+        next_visit: { ...nullable("string"), description: "booked, none (nothing booked), or null for either." },
+        min_spend_dollars: { ...nullable("integer"), description: "Lifetime spend of at least this many dollars." },
+        sort: { ...nullable("string"), description: "last_visit (default), visits, next_visit, spend or name." },
+      },
+      required: ["categories", "service_ids", "staff_ids", "counted_from", "counted_until", "min_visits", "max_visits", "no_visit_since", "visited_since", "next_visit", "min_spend_dollars", "sort"],
+      additionalProperties: false,
+    },
+  },
   team: {
     name: "who_is_working",
     description:
@@ -319,6 +348,8 @@ Voice: you speak for yourself. Never mention tools or their names, "the tool", "
 Availability: free times are checked with each stylist's usual time for the service when it's known (length_basis says which length was used). Say which you used, e.g. "I checked with Bridget's usual 3 hours" or "with the booked length".
 
 Actions: you can't book, move or cancel anything yourself. propose_booking and propose_fixes only put suggestions on screen for staff to approve; after proposing, say what you suggested in one sentence and that they can approve it below. If nothing fits, say so and offer the nearest options. You never contact clients or write messages to them; staff do that.
+
+Lists of clients ("clients who…", "a list of everyone who…"): build them with client_report, never from other lookups. Say how many match and the list in its words, name up to 3 by first name, and say the button below opens the whole list to sort, save or download. If something was left out (left_out, spend_left_out), say so.
 
 Style: keep it scannable. Two to four sentences unless they ask for more. For lists, give the top 3, each with a short reason, then offer the rest ("Want the rest?"). End with one useful next step (e.g. "Want me to look for a time?"). Clients by first name only. Times are the salon's local time; say them like "1:15pm".
 
@@ -492,6 +523,7 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
         ...(k.dayOff ? [KNOWLEDGE_TOOLS.dayOff] : []),
         KNOWLEDGE_TOOLS.pto,
         KNOWLEDGE_TOOLS.timeOff,
+        KNOWLEDGE_TOOLS.report,
       ]
     : [];
 
@@ -547,6 +579,13 @@ export function assistantTools(c: AssistantContext): ToolRunner & { suggestions:
         return JSON.stringify(await k.pto(str(input.first_name)));
       case "time_off_between":
         return JSON.stringify(await k.timeOff(String(input.from ?? ""), String(input.to ?? "")));
+      case "client_report": {
+        const result = await k.report(input);
+        // The button under her answer opens the whole list.
+        links.length = 0;
+        if (result.path) links.push({ path: result.path, label: "Open the report" });
+        return JSON.stringify(result.facts);
+      }
       case "propose_fixes": {
         if (!k.fixes) return "Only the front desk, managers and owners can approve fixes.";
         const date = dayOf(input.date);
@@ -636,6 +675,8 @@ export function toolStatus(name: string, input: unknown, c: Pick<AssistantContex
       return typeof i.first_name === "string" ? `Checking ${i.first_name}'s time off…` : "Checking your time off…";
     case "time_off_between":
       return "Checking who's off…";
+    case "client_report":
+      return "Building the list…";
     default:
       return "Looking that up…";
   }

@@ -24,6 +24,8 @@ import { loadGiftCardLiability, loadUnusedPackages } from "@/lib/reports-load";
 import { FEE_KIND_LABELS, FEE_STATUS_LABELS, type FeeStatus } from "@/lib/policy";
 import { loadPolicy } from "@/lib/policy-load";
 import { repeatOffenders } from "@/lib/policy-report";
+import { describeReport, encodeReport, readReport, reportFacts, reportProblem } from "@/lib/client-reports";
+import { knownOf, loadReportMenu, namesOf, runClientReport } from "@/lib/client-reports-load";
 import { scanDay, type Viewer } from "./scan";
 import { eventKnowledge } from "./events";
 import { ptoKnowledge } from "./pto";
@@ -69,6 +71,10 @@ export type Knowledge = {
   // (team or payroll).
   pto: (firstName: string | null) => Promise<unknown>;
   timeOff: (from: string, to: string) => Promise<unknown>;
+  // A list of clients from fixed filters (lib/client-reports.ts), run as
+  // the asker: how many, the first few by first name, the list in words,
+  // and the page that opens it.
+  report: (input: Record<string, unknown>) => Promise<{ facts: unknown; path: string | null }>;
 };
 
 export type PolicyPeriod = "this_month" | "last_month" | "last_30_days";
@@ -456,6 +462,41 @@ export function knowledgeFor(supabase: Supabase, me: Asker): Knowledge {
     dayOff: team.dayOff,
     pto: (firstName) => pto.balance(firstName),
     timeOff: (from, to) => pto.off(from, to),
+    report: async (input) => {
+      const menu = await loadReportMenu(supabase, me.businessId);
+      const list = (v: unknown) => (Array.isArray(v) ? v : []);
+      const dollarsIn = typeof input.min_spend_dollars === "number" ? Math.round(input.min_spend_dollars * 100) : null;
+      const { report, dropped } = readReport(
+        {
+          categories: list(input.categories),
+          serviceIds: list(input.service_ids),
+          staffIds: frontOfHouse ? list(input.staff_ids) : [],
+          from: input.counted_from,
+          to: input.counted_until,
+          minVisits: input.min_visits,
+          maxVisits: input.max_visits,
+          noVisitSince: input.no_visit_since,
+          visitedSince: input.visited_since,
+          nextVisit: input.next_visit,
+          minSpendCents: frontOfHouse ? dollarsIn : null,
+          sort: input.sort ?? undefined,
+        },
+        knownOf(menu),
+      );
+      const problem = reportProblem(report, me.today);
+      if (problem) return { facts: { error: problem }, path: null };
+      const { rows, total } = await runClientReport(supabase, { businessId: me.businessId, timezone: tz, today: me.today }, report, { spend: frontOfHouse, limit: 5 });
+      return {
+        facts: {
+          ...reportFacts(rows, total, (d) => sayDate(d, me.today)),
+          report: describeReport(report, namesOf(menu)),
+          ...(dropped.length ? { left_out: dropped } : {}),
+          ...(isStylist ? { only_your_clients: true } : {}),
+          ...(!frontOfHouse && dollarsIn ? { spend_left_out: "Spend is for owners, managers and the front desk." } : {}),
+        },
+        path: `/clients/reports?r=${encodeReport(report)}`,
+      };
+    },
 
     fixes: frontOfHouse
       ? async (date) => {

@@ -242,6 +242,14 @@ const CASES: Case[] = [
     check: (a, f) => (has(a, f.top, f.total) ? null : `should name ${f.top} or the total ${f.total}`),
   },
   {
+    question: "Make me a list of color clients who haven't been in for 3 months",
+    as: "front_desk",
+    tools: ["client_report"],
+    facts: async () => ({}),
+    checkTools: (outputs) => (outputs.some((o) => /"clients":\d+/.test(o) && /"report":"Clients with/.test(o)) ? null : "should build the list with client_report"),
+    check: (a) => (/\d/.test(a) && /below|button|report/i.test(a) ? null : "should say how many match and point to the report below"),
+  },
+  {
     question: "How many clients are due back and not booked?",
     as: "front_desk",
     tools: ["overdue_clients"],

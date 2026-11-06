@@ -363,6 +363,15 @@ describe("Ask Denise's knowledge", () => {
     expect(await desk.run("day_off_check", { date: "2026-11-06", first_name: "Nola" })).toBe("Checking a day off is for owners and managers.");
   });
 
+  it("builds a client report from the question, with its page as the button under her answer", async () => {
+    const report = vi.fn(async () => ({ facts: { clients: 14, first_few: [{ first_name: "Ava" }], report: "Clients with 3 or more Color visits since June 2024." }, path: "/clients/reports?r=abc" }));
+    const runner = assistantTools(context({ knowledge: knowledge({ report }) }));
+    const input = { categories: ["Color"], service_ids: [], staff_ids: [], counted_from: "2024-06", counted_until: null, min_visits: 3, max_visits: null, no_visit_since: "this_year", visited_since: null, next_visit: null, min_spend_dollars: null, sort: null };
+    expect(JSON.parse(await runner.run("client_report", input))).toMatchObject({ clients: 14, report: "Clients with 3 or more Color visits since June 2024." });
+    expect(report).toHaveBeenCalledWith(input);
+    expect(runner.links).toEqual([{ path: "/clients/reports?r=abc", label: "Open the report" }]);
+  });
+
   it("refuses sales to those who can't see them, even if asked for by name", async () => {
     const runner = assistantTools(context({ knowledge: knowledge({ sales: null }) }));
     expect(await runner.run("sales_summary", { period: "today" })).toBe("Sales figures are for owners and managers.");

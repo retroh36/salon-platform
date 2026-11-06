@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
-import { Badge, EmptyState, PageHeader, Section, nameLinkClass } from "@/components/ui/page";
+import { Badge, EmptyState, PageHeader, Section, nameLinkClass, textLinkClass } from "@/components/ui/page";
 import { buttonClass } from "@/components/ui/button";
 import { TableCard, numClass, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
@@ -133,6 +133,16 @@ async function Reports({ searchParams }: Pick<PageProps<"/reports">, "searchPara
         description={
           <>
             What you owe in gift cards and packages, gift card activity, memberships, rewards, bridal and events, where online bookings came from, rebooking, and closing out the day.
+            {me.role !== "bookkeeper" && (
+              <>
+                {" "}
+                Lists of clients are in{" "}
+                <Link href="/clients/reports" className={textLinkClass}>
+                  Client reports
+                </Link>
+                .
+              </>
+            )}
             <span className="mt-1 block text-13 text-ink-subtle" data-testid="report-period">
               Showing {between}
             </span>

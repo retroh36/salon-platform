@@ -384,7 +384,7 @@ export async function loadAudit(supabase: Supabase, businessId: string, timeZone
     tasks.push(
       (async () => {
         let live = supabase.from("go_live_events").select("id, kind, turned_on, staff_id, created_at").eq("business_id", businessId).gte("created_at", fromIso).lt("created_at", toIso).order("created_at", { ascending: false }).limit(AUDIT_LIMIT + 1);
-        let exports = supabase.from("data_exports").select("id, staff_id, created_at").eq("business_id", businessId).gte("created_at", fromIso).lt("created_at", toIso).order("created_at", { ascending: false }).limit(AUDIT_LIMIT + 1);
+        let exports = supabase.from("data_exports").select("id, staff_id, created_at, row_counts").eq("business_id", businessId).gte("created_at", fromIso).lt("created_at", toIso).order("created_at", { ascending: false }).limit(AUDIT_LIMIT + 1);
         if (f.staffId) {
           live = live.eq("staff_id", f.staffId);
           exports = exports.eq("staff_id", f.staffId);
@@ -394,7 +394,13 @@ export async function loadAudit(supabase: Supabase, businessId: string, timeZone
         if (x.error) throw x.error;
         return [
           ...l.data.map((e) => ({ id: e.id, at: e.created_at, type: "settings", staffId: e.staff_id, who: who(e.staff_id), what: `${e.kind === "payments" ? "Real card payments" : "Texts and email to clients"} turned ${e.turned_on ? "on" : "off"}`, href: e.kind === "payments" ? "/settings/payments" : "/settings/messages" }) satisfies AuditRow),
-          ...x.data.map((e) => ({ id: e.id, at: e.created_at, type: "settings", staffId: e.staff_id, who: who(e.staff_id), what: "Downloaded the salon's data", href: "/settings/data" }) satisfies AuditRow),
+          ...x.data.map((e) => {
+            // A client report's CSV (/clients/reports), or the whole salon's data.
+            const report = (e.row_counts as Record<string, unknown> | null)?.client_report;
+            return typeof report === "number"
+              ? ({ id: e.id, at: e.created_at, type: "settings", staffId: e.staff_id, who: who(e.staff_id), what: `Downloaded a client report (${report} ${report === 1 ? "client" : "clients"})`, href: "/clients/reports" } satisfies AuditRow)
+              : ({ id: e.id, at: e.created_at, type: "settings", staffId: e.staff_id, who: who(e.staff_id), what: "Downloaded the salon's data", href: "/settings/data" } satisfies AuditRow);
+          }),
         ];
       })(),
     );

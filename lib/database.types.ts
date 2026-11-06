@@ -3303,6 +3303,32 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"saved_reports": {
+                  Row: {
+                    "business_id": string,"created_at": string,"definition": NonNullable<Json>,"id": string,"kind": string,"name": string,"shared": boolean,"staff_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"definition": NonNullable<Json>,"id"?: string,"kind"?: string,"name": string,"shared"?: boolean,"staff_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"definition"?: NonNullable<Json>,"id"?: string,"kind"?: string,"name"?: string,"shared"?: boolean,"staff_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "saved_reports_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "saved_reports_staff_id_fkey"
+      columns: ["staff_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"schedule_disruptions": {
                   Row: {
                     "appointment_id": string | null,"business_id": string,"created_at": string,"ends_at": string | null,"id": string,"item_id": string | null,"kind": Database["public"]['Enums']["disruption_kind"],"location_id": string,"minutes": number | null,"on_date": string,"reported_by": string | null,"resolved_by_action": string | null,"staff_id": string | null,"starts_at": string | null,"time_off_id": string | null,"updated_at": string
@@ -4870,6 +4896,11 @@ isOneToOne: false
                            },
 "client_policy_standing":
 { Args: { "p_client_id": string }; Returns: Json
+                           },
+"client_report":
+{ Args: { "p_business_id": string,"p_categories": (string)[],"p_from": string,"p_limit": number,"p_max": number,"p_min": number,"p_min_spend": number,"p_next": string,"p_no_visit_since": string,"p_service_ids": (string)[],"p_sort": string,"p_staff_ids": (string)[],"p_to": string,"p_visited_since": string }; Returns: {
+              "first_name": string,"id": string,"last_name": string,"last_visit_at": string,"next_visit_at": string,"phone": string,"spend_cents": number,"total": number,"usual_staff_name": string,"visits": number
+            }[]
                            },
 "client_rewards":
 { Args: { "p_client_id": string }; Returns: Json
