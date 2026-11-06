@@ -1,3 +1,5 @@
+import { formatDay } from "@/lib/schedule-format";
+import { addDays, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
@@ -5,7 +7,12 @@ import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 // which roles they work. Each run makes its own role and removes it after.
 const NAME = "E2E Wash House";
 
+// Five weeks out, a Thursday: Jordan's on the front desk, with no clients.
+const week = addDays(startOfWeek(todayIn("America/Chicago")), 35);
+const thursday = addDays(week, 3);
+
 async function putBack() {
+  await admin.from("schedule_drafts").delete().eq("staff_id", SEED.staff.jordan).gte("on_date", week).lte("on_date", addDays(week, 6));
   await admin.from("working_roles").delete().eq("business_id", SEED.business).like("name", "E2E %");
 }
 
@@ -45,6 +52,37 @@ test.describe("owners", () => {
     await ui(page).getByRole("button", { name: "Remove role" }).click();
     await expect(ui(page).getByText("Removed.")).toBeVisible();
     await expect(ui(page).getByRole("button", { name: `Edit ${NAME}` })).toHaveCount(0);
+  });
+});
+
+test.describe("Scheduling", () => {
+  test.use({ storageState: AUTH.manager });
+  test.beforeAll(putBack);
+  test.afterAll(putBack);
+
+  test("give a shift its working role, shown on the week", async ({ page }) => {
+    const { data: role } = await admin.from("working_roles").insert({ business_id: SEED.business, name: "E2E Front of house" }).select("id").single();
+    await admin.from("staff_working_roles").insert({ business_id: SEED.business, staff_id: SEED.staff.jordan, role_id: role!.id });
+
+    await page.goto(`/scheduling?week=${week}`);
+    await waitForHydration(page, "[data-testid=team-schedule] button[data-shift]");
+    const grid = ui(page).getByTestId("team-schedule");
+    await grid.getByRole("button", { name: new RegExp(`^Edit Jordan's hours on ${formatDay(thursday)}`) }).click({ position: { x: 4, y: 4 } });
+    const editor = ui(page).getByRole("dialog", { name: `Jordan · ${formatDay(thursday)}` });
+    await editor.getByLabel(/shift 1 role/).selectOption({ label: "E2E Front of house" });
+    await editor.getByRole("button", { name: "Save" }).click();
+    await expect(editor).toHaveCount(0);
+
+    const cell = grid.locator(`[data-staff="${SEED.staff.jordan}"][data-date="${thursday}"]`);
+    await expect(cell).toHaveAttribute("data-draft", "true");
+    await expect(cell).toContainText("E2E Front of house");
+    // Saved to the draft (the week shows it at once, before the save is back).
+    await expect
+      .poll(async () => {
+        const { data } = await admin.from("schedule_drafts").select("shifts").eq("staff_id", SEED.staff.jordan).eq("on_date", thursday).maybeSingle();
+        return (data?.shifts as { role?: string }[] | undefined)?.[0]?.role;
+      })
+      .toBe(role!.id);
   });
 });
 

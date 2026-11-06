@@ -70,6 +70,7 @@ export function PatternEditor({ person, week, onClose }: { person: GridPerson; w
                     label={`${weeks.length > 1 ? `${WEEK_NAMES[n]} ` : ""}${WEEKDAY_NAMES[d]}`}
                     shifts={w[d] ?? []}
                     open={[]}
+                    roles={person.roles}
                     onChange={(shifts) => setWeeks((all) => all.map((x, i) => (i === n ? { ...x, [d]: shifts } : x)))}
                   />
                 </div>

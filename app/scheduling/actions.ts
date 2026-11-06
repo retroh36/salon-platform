@@ -46,10 +46,13 @@ async function saveDrafts(supabase: Supabase, locationId: string, days: DayEdit[
     p_days: days.map((d) => ({ staff_id: d.staffId, on_date: d.date, shifts: sortShifts(d.shifts) })) as unknown as Json,
   });
   if (error?.code === "42501") return { ok: false, message: NOT_ALLOWED };
+  if (error?.hint === "not_their_role") return { ok: false, message: ROLE_GONE };
   if (error?.code === "22023") return { ok: false, message: error.message };
   if (error) throw error;
   return done(message);
 }
+
+const ROLE_GONE = "One of those roles isn't theirs any more. Reload the page and choose again.";
 
 const daysText = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
 
@@ -189,10 +192,11 @@ export async function savePattern(input: PatternInput, anyway = false): Promise<
     p_weeks: weeks.length,
     p_starts_on: input.startsOn,
     p_hours: weeks.flatMap((w, n) =>
-      WEEKDAYS.flatMap((d) => sortShifts(w[d] ?? []).map((s) => ({ cycle_week: n, weekday: d, start_minute: s.start, end_minute: s.end }))),
+      WEEKDAYS.flatMap((d) => sortShifts(w[d] ?? []).map((s) => ({ cycle_week: n, weekday: d, start_minute: s.start, end_minute: s.end, role_id: s.role ?? null }))),
     ) as unknown as Json,
   });
   if (error?.code === "42501") return { ok: false, message: NOT_ALLOWED };
+  if (error?.hint === "not_their_role") return { ok: false, message: ROLE_GONE };
   if (error?.code === "22023" || error?.code === "23P01") return { ok: false, message: "Shifts on one day can't overlap." };
   if (error) throw error;
   done();

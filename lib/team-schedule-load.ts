@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { staffPhotoUrl } from "@/lib/branding";
-import { dayView, hoursOn, type WeeklyHours } from "@/lib/scheduling/availability";
+import { dayView, shiftsOn, type WeeklyHours } from "@/lib/scheduling/availability";
 import { FREE_STATUSES, loadLocationSchedule, loadStaffSchedules, startOfLocalDay } from "@/lib/scheduling/load";
 import { addDays, datesBetween, MINUTES_PER_DAY, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import { fullName, sortForCalendar, type StaffRole } from "@/lib/staff";
@@ -22,6 +22,8 @@ export type GridPerson = {
   pattern: { startsOn: LocalDate | null; weeks: WeeklyHours[] };
   // Their home chair's name.
   chair: string | null;
+  // The working roles their shifts can be given (Settings → Working roles).
+  roles: { id: string; name: string }[];
 };
 
 export type WeekGrid = {
@@ -57,7 +59,7 @@ export async function loadWeekGrid(supabase: Supabase, location: { id: string; t
   const team = sortForCalendar(staff);
   const ids = team.map((s) => s.id);
 
-  const [locationSchedule, schedules, draftRows, items, publish, resources, lent] = await Promise.all([
+  const [locationSchedule, schedules, draftRows, items, publish, resources, lent, workRoles] = await Promise.all([
     loadLocationSchedule(supabase, location),
     loadStaffSchedules(supabase, ids, from, to),
     drafts
@@ -80,7 +82,9 @@ export async function loadWeekGrid(supabase: Supabase, location: { id: string; t
       .limit(1),
     supabase.from("resources").select("id, name").eq("location_id", location.id),
     supabase.from("station_assignments").select("resource_id, staff_id, on_date").eq("location_id", location.id).gte("on_date", week).lte("on_date", to),
+    supabase.from("staff_working_roles").select("staff_id, role:working_roles!inner(id, name, position, archived_at)").in("staff_id", ids).is("role.archived_at", null),
   ]);
+  if (workRoles.error) throw workRoles.error;
   if (resources.error) throw resources.error;
   if (lent.error) throw lent.error;
   const resourceName = new Map(resources.data.map((r) => [r.id, r.name]));
@@ -108,7 +112,7 @@ export async function loadWeekGrid(supabase: Supabase, location: { id: string; t
     return {
       staffId: id,
       date,
-      live: hoursOn(schedule, date),
+      live: shiftsOn(schedule, date),
       draft: draftOf.get(cellKey(id, date)) ?? null,
       timeOff: day.timeOff
         .filter((t) => t.status === "approved")
@@ -131,6 +135,11 @@ export async function loadWeekGrid(supabase: Supabase, location: { id: string; t
       cycleWeeks: s.hours_cycle_weeks,
       pattern: { startsOn: s.hours_cycle_starts_on, weeks: schedules.get(s.id)!.cycle?.weeks ?? [schedules.get(s.id)!.weekly] },
       chair: s.home_resource_id ? (resourceName.get(s.home_resource_id) ?? null) : null,
+      roles: workRoles.data
+        .filter((r) => r.staff_id === s.id)
+        .map((r) => r.role)
+        .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
+        .map((r) => ({ id: r.id, name: r.name })),
     })),
     cells: ids.flatMap((id) => dates.map((d) => cellFor(id, d))),
     lastWeek: ids.flatMap((id) => lastDates.map((d) => cellFor(id, d))),

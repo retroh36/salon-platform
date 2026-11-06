@@ -15,6 +15,7 @@ A working role is what someone is doing in a stretch of their day, like Wash Hou
 6. Under **Pay**, choose how this time is paid: **Their usual pay**, **Hourly** (with the rate) or **Commission** (with the percent).
 7. Tap **Save role**.
 8. To choose who works it, open **Team**, tap the person's name, and tick their roles under **Working roles**.
+9. To give a shift its role, open **Scheduling**, tap the shift, choose its role, and publish the week as usual. A repeating pattern's shifts can have roles too.
 
 ## Good to know
 
@@ -22,4 +23,5 @@ A working role is what someone is doing in a stretch of their day, like Wash Hou
 - Only people who run payroll see and change **Pay**. Someone can have their own rate in a role, set by payroll.
 - An hourly role pays each hour at the rate and no commission on its services. A commission role pays its services at the percent and not its hours.
 - **Remove role** takes it out of use. Shifts that already had it keep it as history.
-- Shifts can't be given a role yet: that's coming next, in Scheduling. Until then, roles don't change booking or pay.
+- Roles on shifts don't change booking or pay yet: that's coming next.
+- Taking someone off a role takes it off their shifts still to come.

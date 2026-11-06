@@ -46,6 +46,9 @@ export const short = (m: number) => {
   return m % 60 ? `${h}:${String(m % 60).padStart(2, "0")}` : String(h);
 };
 export const pillText = (s: Shift) => `${short(s.start)}–${short(s.end)}`;
+
+// The shift's working role, by name, when it has one they still work.
+export const roleOf = (s: Shift, person: Pick<GridPerson, "roles">) => (s.role ? (person.roles.find((r) => r.id === s.role)?.name ?? null) : null);
 // A day's total, to the nearest hour: "54 hr".
 export const hours = (m: number) => (m < 30 ? "0 hr" : formatDuration(Math.round(m / 60) * 60));
 // Approved time off in a day: "Time off" when it covers the day's hours,
@@ -373,13 +376,15 @@ export function WeekGridView({ grid, today, editable }: { grid: WeekGrid; today:
                               shows through the gaps. */}
                           <div className={`pointer-events-none relative flex min-h-14 flex-wrap content-center items-center gap-1 py-1.5 pl-1.5 ${left.length ? "pr-5" : "pr-1.5"}`}>
                             {shifts.map((s, i) => {
-                              const label = `${p.firstName}, ${formatDay(cell.date)}, ${formatMinute(s.start)}–${formatMinute(s.end)}${draft ? ", draft" : ""}`;
+                              const role = roleOf(s, p);
+                              const label = `${p.firstName}, ${formatDay(cell.date)}, ${formatMinute(s.start)}–${formatMinute(s.end)}${role ? `, ${role}` : ""}${draft ? ", draft" : ""}`;
                               const pillClass = `inline-flex h-7 max-w-full min-w-0 items-center rounded-md border px-2 text-xs font-medium tabular-nums whitespace-nowrap ${
                                 draft ? "border-dashed border-active bg-active-soft text-active-ink" : "border-navy-200 bg-navy-100 text-navy-900"
                               }`;
                               const text = (
                                 <span aria-hidden className="truncate">
                                   {pillText(s)}
+                                  {role && <span className="font-normal"> · {role}</span>}
                                 </span>
                               );
                               return editableDay ? (

@@ -4027,17 +4027,23 @@ isOneToOne: true
                   ]
                 },"staff_schedule_overrides": {
                   Row: {
-                    "business_id": string,"created_at": string,"end_minute": number,"id": string,"on_date": string,"staff_id": string,"start_minute": number
+                    "business_id": string,"created_at": string,"end_minute": number,"id": string,"on_date": string,"role_id": string | null,"staff_id": string,"start_minute": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"created_at"?: string,"end_minute": number,"id"?: string,"on_date": string,"staff_id": string,"start_minute": number
+                    "business_id": string,"created_at"?: string,"end_minute": number,"id"?: string,"on_date": string,"role_id"?: string | null,"staff_id": string,"start_minute": number
                   }
                   Update: {
-                    "business_id"?: string,"created_at"?: string,"end_minute"?: number,"id"?: string,"on_date"?: string,"staff_id"?: string,"start_minute"?: number
+                    "business_id"?: string,"created_at"?: string,"end_minute"?: number,"id"?: string,"on_date"?: string,"role_id"?: string | null,"staff_id"?: string,"start_minute"?: number
                   }
                   Relationships: [
                     {
+      foreignKeyName: "staff_schedule_overrides_role_id_fkey"
+      columns: ["role_id"]
+isOneToOne: false
+      referencedRelation: "working_roles"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "staff_schedule_overrides_staff_id_business_id_fkey"
       columns: ["staff_id","business_id"]
 isOneToOne: false
@@ -4117,17 +4123,23 @@ isOneToOne: false
                   ]
                 },"staff_working_hours": {
                   Row: {
-                    "business_id": string,"cycle_week": number,"end_minute": number,"id": string,"staff_id": string,"start_minute": number,"weekday": number
+                    "business_id": string,"cycle_week": number,"end_minute": number,"id": string,"role_id": string | null,"staff_id": string,"start_minute": number,"weekday": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"cycle_week"?: number,"end_minute": number,"id"?: string,"staff_id": string,"start_minute": number,"weekday": number
+                    "business_id": string,"cycle_week"?: number,"end_minute": number,"id"?: string,"role_id"?: string | null,"staff_id": string,"start_minute": number,"weekday": number
                   }
                   Update: {
-                    "business_id"?: string,"cycle_week"?: number,"end_minute"?: number,"id"?: string,"staff_id"?: string,"start_minute"?: number,"weekday"?: number
+                    "business_id"?: string,"cycle_week"?: number,"end_minute"?: number,"id"?: string,"role_id"?: string | null,"staff_id"?: string,"start_minute"?: number,"weekday"?: number
                   }
                   Relationships: [
                     {
+      foreignKeyName: "staff_working_hours_role_id_fkey"
+      columns: ["role_id"]
+isOneToOne: false
+      referencedRelation: "working_roles"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "staff_working_hours_staff_id_business_id_fkey"
       columns: ["staff_id","business_id"]
 isOneToOne: false

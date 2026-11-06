@@ -17,7 +17,11 @@
 import { containsSpan, intersectIntervals, mergeIntervals, overlapsSpan, subtractIntervals, type Interval } from "./intervals.ts";
 import { daysBetween, MINUTES_PER_DAY, startOfWeek, toLocal, weekdayOf, type LocalDate, type Weekday } from "./time.ts";
 
-export type WeeklyHours = Partial<Record<Weekday, Interval[]>>;
+// A stretch of someone's working day, with the working role they work it
+// in, when it has one (Settings → Working roles).
+export type Shift = Interval & { role?: string | null };
+
+export type WeeklyHours = Partial<Record<Weekday, Shift[]>>;
 
 export type TimeOffStatus = "requested" | "approved" | "declined";
 
@@ -42,7 +46,7 @@ export type StaffSchedule = {
   cycle?: { startsOn: LocalDate; weeks: WeeklyHours[] } | null;
   // One-off changes: on these dates, these hours replace the pattern (an
   // empty list is a day off).
-  overrides: Record<LocalDate, Interval[]>;
+  overrides: Record<LocalDate, Shift[]>;
   timeOff: TimeOff[];
 };
 
@@ -54,9 +58,15 @@ export function cycleWeek(cycle: { startsOn: LocalDate; weeks: readonly unknown[
 }
 
 // Their repeating pattern's hours on a date.
-export function patternHours(staff: Pick<StaffSchedule, "weekly" | "cycle">, date: LocalDate): Interval[] {
+export function patternHours(staff: Pick<StaffSchedule, "weekly" | "cycle">, date: LocalDate): Shift[] {
   const weekly = staff.cycle && staff.cycle.weeks.length > 1 ? staff.cycle.weeks[cycleWeek(staff.cycle, date)] : staff.weekly;
   return weekly[weekdayOf(date)] ?? [];
+}
+
+// Their shifts on a date as published, each with its role, earliest
+// first: the one-off change, else the pattern.
+export function shiftsOn(staff: Pick<StaffSchedule, "weekly" | "cycle" | "overrides">, date: LocalDate): Shift[] {
+  return [...(staff.overrides[date] ?? patternHours(staff, date))].sort((a, b) => a.start - b.start);
 }
 
 // Their hours on a date: the one-off change, else the pattern.

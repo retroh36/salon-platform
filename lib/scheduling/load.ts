@@ -1,21 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import type { LocationSchedule, StaffSchedule, TimeOff, WeeklyHours } from "./availability.ts";
+import type { LocationSchedule, Shift, StaffSchedule, TimeOff, WeeklyHours } from "./availability.ts";
 import { occurrences, occurrenceSpan, type BlockOccurrence, type TimeBlock } from "./blocks.ts";
 import type { BlockedTime, BookedItem, BookingContext, ServiceTiming } from "./booking.ts";
 import { parseSteps } from "./steps.ts";
-import type { Interval } from "./intervals.ts";
 import { addDays, fromLocal, MINUTES_PER_DAY, type LocalDate, type Weekday } from "./time.ts";
 
 type Supabase = SupabaseClient<Database>;
 
-type HourRow = { weekday: number; start_minute: number; end_minute: number; cycle_week?: number };
+type HourRow = { weekday: number; start_minute: number; end_minute: number; cycle_week?: number; role_id?: string | null };
 
 export function toWeekly(rows: HourRow[]): WeeklyHours {
   const weekly: WeeklyHours = {};
   for (const r of rows) {
     const day = r.weekday as Weekday;
-    (weekly[day] ??= []).push({ start: r.start_minute, end: r.end_minute });
+    (weekly[day] ??= []).push(r.role_id ? { start: r.start_minute, end: r.end_minute, role: r.role_id } : { start: r.start_minute, end: r.end_minute });
   }
   // Earliest shift first, whatever order the rows came back in: pages show
   // them as they are ("9am–1pm, 2pm–6pm").
@@ -51,11 +50,11 @@ export async function loadStaffSchedules(
   to: LocalDate,
 ): Promise<Map<string, StaffSchedule>> {
   const [hours, cycles, overrides, daysOff, timeOff] = await Promise.all([
-    supabase.from("staff_working_hours").select("staff_id, cycle_week, weekday, start_minute, end_minute").in("staff_id", staffIds),
+    supabase.from("staff_working_hours").select("staff_id, cycle_week, weekday, start_minute, end_minute, role_id").in("staff_id", staffIds),
     supabase.from("staff").select("id, hours_cycle_weeks, hours_cycle_starts_on").in("id", staffIds),
     supabase
       .from("staff_schedule_overrides")
-      .select("staff_id, on_date, start_minute, end_minute")
+      .select("staff_id, on_date, start_minute, end_minute, role_id")
       .in("staff_id", staffIds)
       .gte("on_date", from)
       .lte("on_date", to),
@@ -85,14 +84,14 @@ export async function loadStaffSchedules(
           cycleOf.get(id)?.hours_cycle_weeks ?? 1,
           cycleOf.get(id)?.hours_cycle_starts_on ?? null,
         ),
-        overrides: {} as Record<LocalDate, Interval[]>,
+        overrides: {} as Record<LocalDate, Shift[]>,
         timeOff: [] as TimeOff[],
       },
     ]),
   );
 
   for (const o of overrides.data) {
-    (schedules.get(o.staff_id)!.overrides[o.on_date] ??= []).push({ start: o.start_minute, end: o.end_minute });
+    (schedules.get(o.staff_id)!.overrides[o.on_date] ??= []).push(o.role_id ? { start: o.start_minute, end: o.end_minute, role: o.role_id } : { start: o.start_minute, end: o.end_minute });
   }
   // A day off in a published week: no hours that day.
   for (const d of daysOff.data) schedules.get(d.staff_id)!.overrides[d.on_date] = [];

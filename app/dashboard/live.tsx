@@ -151,7 +151,7 @@ function TeamToday({ team }: { team: StylistCard[] }) {
                 <span className="h-1 overflow-hidden rounded-full bg-sunken" aria-hidden>
                   <span className="block h-full rounded-full bg-navy-700 transition-[width] duration-(--motion-slow)" style={{ width: `${Math.min(100, s.percent ?? 0)}%` }} />
                 </span>
-                <span className="text-xs text-ink-muted">{s.next ? `Next: ${s.next.client}, ${formatMinute(s.next.start)}` : "No one else today"}</span>
+                <span className="text-xs text-ink-muted wrap-anywhere">{s.next ? `Next: ${s.next.client}, ${formatMinute(s.next.start)}` : "No one else today"}</span>
                 <Badge tone={STATUS[s.status].tone} className="self-start">
                   {STATUS[s.status].label}
                 </Badge>

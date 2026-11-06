@@ -24,7 +24,7 @@ import { copyFromPerson, copyWeekForward, publishWeeks, saveDays, saveTimeEntry,
 import { DayEditor } from "./day-editor";
 import { PublishSheet } from "./publish-sheet";
 import { RangeSwitch } from "./scheduling-tabs";
-import { hours, offText, pillText } from "./week-grid";
+import { hours, offText, pillText, roleOf } from "./week-grid";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const dayNumber = (d: LocalDate) => Number(d.slice(8));
@@ -247,15 +247,16 @@ type EditProps = {
 type ClockView = { entries: ClockEntry[]; timeZone: string; now: Date } | null;
 
 // One day's hours, small: each shift on its own line, or time off.
-function DayHours({ cell, open, size = "sm" }: { cell: Cell; open: { start: number; end: number }[]; size?: "sm" | "lg" }) {
+function DayHours({ cell, person, open, size = "sm" }: { cell: Cell; person: GridPerson; open: { start: number; end: number }[]; size?: "sm" | "lg" }) {
   const shifts = shown(cell);
   const text = size === "sm" ? "text-2xs" : "text-xs";
   if (open.length === 0) return null;
   return (
     <span className={`flex flex-col items-start gap-0.5 ${text} leading-tight tabular-nums`}>
       {shifts.map((s, i) => (
-        <span key={i} className="font-medium whitespace-nowrap text-ink">
+        <span key={i} className="font-medium whitespace-nowrap text-ink" title={roleOf(s, person) ? `${pillText(s)} · ${roleOf(s, person)}` : undefined}>
           {pillText(s)}
+          {size === "lg" && roleOf(s, person) && <span className="font-normal text-ink-muted"> · {roleOf(s, person)}</span>}
         </span>
       ))}
       {cell.timeOff.map((t, i) => (
@@ -369,7 +370,7 @@ function TeamMonth({ grid, days, cells, today, clock, ...edit }: EditProps & { g
                       const cell = cells.get(cellKey(p.id, d))!;
                       return (
                         <DayCell key={d} cell={cell} person={p} open={grid.open[d] ?? []} className="min-h-12 min-w-0 overflow-hidden border-b border-l border-line px-1 py-1" {...edit}>
-                          <DayHours cell={cell} open={grid.open[d] ?? []} />
+                          <DayHours cell={cell} person={p} open={grid.open[d] ?? []} />
                         </DayCell>
                       );
                     })}
@@ -443,7 +444,7 @@ function PersonMonthView({ grid, person, cells, today, clock, ...edit }: EditPro
             return (
               <DayCell key={d} cell={cell} person={person} open={open} className="flex min-h-20 flex-col gap-1 border-r border-b border-line px-2 py-1.5 [&:nth-child(7n)]:border-r-0" {...edit}>
                 <span className={`text-13 tabular-nums ${d === today ? "inline-flex size-6 items-center justify-center rounded-full bg-active font-semibold text-white" : "font-medium text-ink"}`}>{dayNumber(d)}</span>
-                {open.length === 0 ? <span className="text-xs text-ink-subtle">Closed</span> : <DayHours cell={cell} open={open} size="lg" />}
+                {open.length === 0 ? <span className="text-xs text-ink-subtle">Closed</span> : <DayHours cell={cell} person={person} open={open} size="lg" />}
                 {clients > 0 && <span className="text-2xs text-ink-muted">{clients === 1 ? "1 client" : `${clients} clients`}</span>}
                 {clockedDays && d <= today && <ClockLine day={clockedDays.get(d)!} />}
               </DayCell>

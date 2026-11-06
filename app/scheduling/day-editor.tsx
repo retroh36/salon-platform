@@ -29,7 +29,7 @@ export function DayEditor({ anchor, cell, person, open, pending, onClose, onSave
           Published: {sayShifts(cell.live)}
           {open.length === 0 && " · The salon is closed this day."}
         </p>
-        <ShiftsField label={title} shifts={shifts} open={open} onChange={setShifts} compact />
+        <ShiftsField label={title} shifts={shifts} open={open} onChange={setShifts} roles={person.roles} compact />
         {cell.timeOff.length > 0 && <p className="text-13 text-ink-muted">{person.firstName} has approved time off this day; those hours can&rsquo;t be booked.</p>}
         {problem && (
           <p className="text-sm text-danger" role="alert">

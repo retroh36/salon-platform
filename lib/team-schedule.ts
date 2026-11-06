@@ -6,11 +6,12 @@
 // app/scheduling/actions.ts (save_schedule_drafts, publish_schedule_week).
 
 import { formatIntervals } from "./schedule-format.ts";
+import type { Shift } from "./scheduling/availability.ts";
 import { containsSpan, mergeIntervals, subtractIntervals, type Interval } from "./scheduling/intervals.ts";
 import { MINUTES_PER_DAY, type LocalDate } from "./scheduling/time.ts";
 import type { StaffRole } from "./staff.ts";
 
-export type Shift = Interval;
+export type { Shift };
 
 // The groups down the side, in order. Owners and managers show only when
 // they have hours that week.
@@ -47,7 +48,7 @@ export const shown = (cell: Pick<Cell, "live" | "draft">): Shift[] => cell.draft
 export const minutesIn = (shifts: readonly Interval[]) => shifts.reduce((n, s) => n + s.end - s.start, 0);
 
 export const sameShifts = (a: readonly Shift[], b: readonly Shift[]) =>
-  a.length === b.length && a.every((s, i) => s.start === b[i].start && s.end === b[i].end);
+  a.length === b.length && a.every((s, i) => s.start === b[i].start && s.end === b[i].end && (s.role ?? null) === (b[i].role ?? null));
 
 // Why a day's shifts can't be saved (the same rules as
 // private.clean_shifts), or null.
@@ -175,11 +176,11 @@ export function dragShift(
   if (mode === "move") {
     const len = s.end - s.start;
     const start = Math.max(range.start, Math.min(range.end - len, s.start + step));
-    next = { start, end: start + len };
+    next = { ...s, start, end: start + len };
   } else if (mode === "start") {
-    next = { start: Math.max(range.start, Math.min(s.end - MIN_SHIFT, s.start + step)), end: s.end };
+    next = { ...s, start: Math.max(range.start, Math.min(s.end - MIN_SHIFT, s.start + step)) };
   } else {
-    next = { start: s.start, end: Math.min(range.end, Math.max(s.start + MIN_SHIFT, s.end + step)) };
+    next = { ...s, end: Math.min(range.end, Math.max(s.start + MIN_SHIFT, s.end + step)) };
   }
   const out = sortShifts(shifts.map((x, i) => (i === index ? next : x)));
   return shiftProblem(out) ? null : out;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cycleWeek, hoursOn, patternHours } from "@/lib/scheduling/availability";
+import { cycleWeek, hoursOn, patternHours, shiftsOn } from "@/lib/scheduling/availability";
 import {
   changesOf,
   clearWeek,
@@ -10,6 +10,7 @@ import {
   newShift,
   outPanelHref,
   outside,
+  sameShifts,
   scheduledMinutes,
   shiftProblem,
   trackRange,
@@ -129,5 +130,29 @@ describe("the week", () => {
     expect(outPanelHref({ staffId: "s1", date: "2026-11-03", before: [nineToFive], after: [{ start: h(9), end: h(13) }] })).toBe("/calendar?date=2026-11-03&out=s1&leaves=13%3A00");
     expect(outPanelHref({ staffId: "s1", date: "2026-11-03", before: [nineToFive], after: [] })).toBe("/calendar?date=2026-11-03&out=s1");
     expect(outPanelHref({ staffId: "s1", date: "2026-11-03", before: [nineToFive], after: [{ start: h(12), end: h(17) }] })).toBe("/calendar?date=2026-11-03&out=s1");
+  });
+});
+
+describe("working roles on shifts", () => {
+  const wash = { start: 540, end: 780, role: "wash" };
+  const bar = { start: 840, end: 1080, role: "bar" };
+
+  it("are part of what makes two days the same", () => {
+    expect(sameShifts([wash], [{ start: 540, end: 780, role: "wash" }])).toBe(true);
+    expect(sameShifts([wash], [{ start: 540, end: 780 }])).toBe(false);
+    expect(sameShifts([{ start: 540, end: 780 }], [{ start: 540, end: 780, role: null }])).toBe(true);
+  });
+
+  it("stay with a shift that's moved or stretched", () => {
+    const range = { start: 420, end: 1260 };
+    expect(dragShift([wash, bar], 0, "move", 30, range)).toEqual([{ start: 570, end: 810, role: "wash" }, bar]);
+    expect(dragShift([wash, bar], 1, "end", 60, range)).toEqual([wash, { start: 840, end: 1140, role: "bar" }]);
+  });
+
+  it("come back from the published schedule in order", () => {
+    const schedule = { weekly: { 2: [bar, wash] }, cycle: null, overrides: {} };
+    expect(shiftsOn(schedule, "2026-11-10")).toEqual([wash, bar]);
+    // hoursOn, for booking, is the times.
+    expect(hoursOn(schedule, "2026-11-10").map(({ start, end }) => ({ start, end }))).toEqual([{ start: 540, end: 780 }, { start: 840, end: 1080 }]);
   });
 });
