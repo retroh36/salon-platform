@@ -124,6 +124,37 @@ describe("purchase orders", () => {
   });
 });
 
+describe("the expected date", () => {
+  it("is today plus the supplier's lead time when it's sent, and owners and managers change it until it's all in", async () => {
+    const { data: id } = await save(manager, [{ product_id: tube, quantity: 2 }]);
+    const expected = async () => (await admin.from("purchase_orders").select("expected_on").eq("id", id!).single()).data!.expected_on;
+    expect(await expected()).toBeNull();
+    expect((await manager.rpc("send_purchase_order", { p_order_id: id! })).error).toBeNull();
+    expect(await expected()).toBe(addDays(todayIn(TZ), 2));
+
+    const later = addDays(todayIn(TZ), 9);
+    expect((await frontDesk.rpc("set_order_expected", { p_order_id: id!, p_expected_on: later })).error?.code).toBe("42501");
+    expect((await otherOwner.rpc("set_order_expected", { p_order_id: id!, p_expected_on: later })).error?.code).toBe("42501");
+    expect((await manager.rpc("set_order_expected", { p_order_id: id!, p_expected_on: later })).error).toBeNull();
+    expect(await expected()).toBe(later);
+    expect((await manager.rpc("set_order_expected", { p_order_id: id!, p_expected_on: "2020-01-01" })).error?.code).toBe("22023");
+    expect((await manager.rpc("set_order_expected", { p_order_id: id!, p_expected_on: null as never })).error).toBeNull();
+    expect(await expected()).toBeNull();
+
+    const line = (await order(id!))!.purchase_order_lines[0].id;
+    await frontDesk.rpc("receive_purchase_order", { p_order_id: id!, p_lines: [{ line_id: line, quantity: 2 }] });
+    expect((await manager.rpc("set_order_expected", { p_order_id: id!, p_expected_on: later })).error?.code).toBe("55000");
+  });
+
+  it("keeps a date set on the draft when it's sent", async () => {
+    const { data: id } = await save(manager, [{ product_id: tube, quantity: 1 }]);
+    const set = addDays(todayIn(TZ), 5);
+    expect((await manager.rpc("set_order_expected", { p_order_id: id!, p_expected_on: set })).error).toBeNull();
+    await manager.rpc("send_purchase_order", { p_order_id: id! });
+    expect((await admin.from("purchase_orders").select("expected_on").eq("id", id!).single()).data!.expected_on).toBe(set);
+  });
+});
+
 describe("Denise's reorders", () => {
   // Four color appointments over the next few days, each with a formula
   // using 30 g of the test 7N (one tube, 60 g, on hand).

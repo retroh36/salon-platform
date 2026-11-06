@@ -16,4 +16,5 @@ When a delivery arrives, check it against the order to add it to stock.
 
 - Stock goes up straight away, and the cost on the order becomes the product's cost.
 - If only part arrived, the order shows **Partly received**. Receive the rest the same way when it comes.
+- Orders still to come show when they're **Expected**, and **Late** once that day has passed.
 - You can't receive more than was ordered, or receive an order that hasn't been marked as sent.

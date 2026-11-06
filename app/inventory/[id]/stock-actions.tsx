@@ -130,7 +130,7 @@ export function SettingsForm({
         />
       </label>
       <label className={labelClass}>
-        Order ({containerWord}s at a time)
+        Order at least ({containerWord}s)
         <input
           type="number"
           min={1}

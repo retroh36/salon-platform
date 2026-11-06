@@ -1,6 +1,6 @@
 ---
 title: Create and send a purchase order
-keywords: purchase order, PO, new order, order stock, order products, supplier order, restock, place an order, send order, order from supplier, order color, order more product
+keywords: purchase order, PO, new order, order stock, order products, supplier order, restock, place an order, send order, order from supplier, order color, order more product, expected date, when will it arrive, delivery date, late order, overdue order
 who: owner, manager
 open: /inventory/orders/new | Open new order
 ---
@@ -18,6 +18,8 @@ Put together an order for a supplier and mark it as sent.
 ## Good to know
 
 - Maestra doesn't send the order to the supplier for you; **Mark as sent** only records that it's been placed.
+- Once it's sent, the order is **Expected** in the supplier's usual delivery time. To change it, pick a date under **Expected** on the order and tap **Save** (empty clears it).
+- An order past its expected date and not all in shows **Late**, on the order and on the Orders list.
 - A draft can be changed (**Save draft**) or deleted (**Delete draft**) until it's sent.
 - When the delivery arrives, see "Receive an order".
 - Denise can draft orders for you. See "Review Denise's reorder drafts".

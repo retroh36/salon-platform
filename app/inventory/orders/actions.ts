@@ -5,7 +5,8 @@ import { getCurrentStaff } from "@/lib/auth";
 import { suggestReorders, type ReorderSuggestion } from "@/lib/denise/reorder";
 import { isUuid } from "@/lib/ids";
 import { canManageInventory, canReceiveOrders } from "@/lib/inventory";
-import { orderNumber, parseOrderLines, parseReceipt } from "@/lib/purchase-orders";
+import { orderNumber, parseExpected, parseOrderLines, parseReceipt } from "@/lib/purchase-orders";
+import { formatDay } from "@/lib/schedule-format";
 
 const MANAGERS_ONLY = "Only owners and managers can write and send orders.";
 type Result = { ok: true; message: string; orderId?: string } | { ok: false; message: string };
@@ -53,7 +54,25 @@ export async function sendOrder(orderId: string): Promise<Result> {
   if (known) return { ok: false, message: known };
   if (error) throw error;
   refresh();
-  return { ok: true, message: "Marked as sent. Receive it here when it arrives." };
+  const { data } = await supabase.from("purchase_orders").select("expected_on").eq("id", orderId).maybeSingle();
+  return { ok: true, message: data?.expected_on ? `Marked as sent. Expected ${formatDay(data.expected_on)}: receive it here when it arrives.` : "Marked as sent. Receive it here when it arrives." };
+}
+
+// When the order should arrive (owners and managers); empty clears it.
+export async function setOrderExpected(orderId: string, raw: string): Promise<Result> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canManageInventory(me.role)) return { ok: false, message: MANAGERS_ONLY };
+  if (!isUuid(orderId)) return { ok: false, message: "That order doesn't exist." };
+  const parsed = parseExpected(raw);
+  if (!parsed.ok) return { ok: false, message: parsed.error };
+  const { error } = await supabase.rpc("set_order_expected", { p_order_id: orderId, p_expected_on: parsed.date as string });
+  if (error?.code === "22023") return { ok: false, message: "That's before the order was started." };
+  if (error?.code === "55000") return { ok: false, message: "It's all been received." };
+  const known = errorMessage(error?.code);
+  if (known) return { ok: false, message: known };
+  if (error) throw error;
+  refresh();
+  return { ok: true, message: parsed.date ? `Expected ${formatDay(parsed.date)}.` : "No expected date." };
 }
 
 export async function deleteOrder(orderId: string): Promise<Result> {

@@ -111,6 +111,23 @@ test.describe("owner", () => {
     await adjust.getByRole("button", { name: "Adjust" }).click();
     await expect(ui(page).getByTestId("on-hand")).toHaveText("135 g");
     await expect(ui(page).getByRole("list", { name: "Stock history" })).toContainText("Samples from the rep");
+
+    // Another size of it: everything but the size, cost and codes comes along.
+    await ui(page).getByRole("link", { name: "Copy to a new size" }).click();
+    await expect(ui(page).getByRole("heading", { name: "Add another size", level: 1 })).toBeVisible();
+    await waitForHydration(page, "input[name=brand]");
+    const copy = ui(page).getByRole("form", { name: "New product" });
+    await expect(copy.getByLabel("Brand")).toHaveValue(`${RUN} Color`);
+    await expect(copy.getByLabel("Shade or name")).toHaveValue("6.66");
+    await expect(copy.getByLabel("Supplier")).toHaveValue(/[0-9a-f-]{36}/);
+    await expect(copy.getByLabel(/Container size/)).toHaveValue("");
+    await expect(copy.getByLabel(/Cost per container/)).toHaveValue("");
+    await copy.getByLabel(/Container size/).fill("60");
+    await copy.getByLabel(/Cost per container/).fill("8.40");
+    await copy.getByRole("button", { name: "Add product" }).click();
+    await expect(ui(page).getByRole("heading", { name: `${RUN} Color Test Line 6.66` })).toBeVisible();
+    await expect(ui(page).getByText("$8.40 per 60 g")).toBeVisible();
+    await expect(ui(page).getByTestId("on-hand")).toHaveText("0 g");
   });
 });
 

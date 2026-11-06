@@ -69,7 +69,7 @@ export async function saveStockSettings(productId: string, reorderPoint: string,
   const point = reorderPoint.trim() === "0" ? 0 : parseAmount(reorderPoint);
   const quantity = Number(reorderQuantity);
   if (!isUuid(productId) || point === null) return { ok: false, message: "Enter the reorder point, e.g. 120." };
-  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 1000) return { ok: false, message: "Order at least 1 at a time." };
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 1000) return { ok: false, message: "Order at least 1, up to 1,000." };
   const { error } = await supabase.rpc("set_stock_settings", { p_location_id: me.location.id, p_product_id: productId, p_reorder_point: point, p_reorder_quantity: quantity });
   if (error?.code === "42501") return { ok: false, message: MANAGERS_ONLY };
   if (error) throw error;

@@ -7,12 +7,12 @@ import { Badge, Card, listClass, PageHeader, rowClass } from "@/components/ui/pa
 import { getCurrentStaff } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
 import { canManageInventory, canReceiveOrders, containerName, productName } from "@/lib/inventory";
-import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES, orderNumber } from "@/lib/purchase-orders";
+import { isLate, ORDER_STATUS_LABELS, ORDER_STATUS_TONES, orderNumber } from "@/lib/purchase-orders";
 import { formatDay } from "@/lib/schedule-format";
 import { toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { orderProducts } from "../load";
-import { DraftActions, ReceiveForm } from "../order-actions";
+import { DraftActions, ExpectedForm, ReceiveForm } from "../order-actions";
 import { OrderEditor } from "../order-editor";
 
 export const metadata: Metadata = { title: "Order" };
@@ -46,6 +46,7 @@ async function Order({ params }: Pick<PageProps<"/inventory/orders/[id]">, "para
   const lines = [...order.purchase_order_lines].sort((a, b) => productName(a.product).localeCompare(productName(b.product), "en", { numeric: true }));
   const total = lines.reduce((sum, l) => sum + l.quantity * l.unit_cost_cents, 0);
   const day = (at: string) => formatDay(toLocal(new Date(at), me.location.timezone).date);
+  const late = isLate(order.status, order.expected_on, toLocal(new Date(), me.location.timezone).date);
   const describe = (p: (typeof lines)[number]["product"]) => (p.unit === "unit" ? productName(p) : `${productName(p)} (${p.size} ${p.unit})`);
   const [{ data: suppliers }, products] = draft && manage ? await Promise.all([supabase.from("suppliers").select("id, name").order("name"), orderProducts(supabase)]) : [{ data: [] }, []];
 
@@ -57,9 +58,11 @@ async function Order({ params }: Pick<PageProps<"/inventory/orders/[id]">, "para
         description={
           <span className="flex flex-wrap items-center gap-2">
             <Badge tone={ORDER_STATUS_TONES[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Badge>
+            {late && <Badge tone="danger">Late</Badge>}
             {order.ai_action_id && <span className="text-denise-700">Drafted by Denise</span>}
             <span>
               {order.sent_at ? `Sent ${day(order.sent_at)}` : `Started ${day(order.created_at)}${order.creator ? ` by ${order.creator.first_name}` : ""}`}
+              {order.expected_on && order.status !== "received" && ` · Expected ${formatDay(order.expected_on)}`}
               {order.received_at && ` · Received ${day(order.received_at)}`}
               {` · usually ${order.supplier.lead_time_days} days to deliver`}
             </span>
@@ -92,6 +95,11 @@ async function Order({ params }: Pick<PageProps<"/inventory/orders/[id]">, "para
         </>
       ) : (
         <>
+          {manage && (order.status === "sent" || order.status === "partly_received") && (
+            <div className="mb-6">
+              <ExpectedForm orderId={order.id} expectedOn={order.expected_on} />
+            </div>
+          )}
           {(order.status === "sent" || order.status === "partly_received") && (
             <ReceiveForm
               orderId={order.id}

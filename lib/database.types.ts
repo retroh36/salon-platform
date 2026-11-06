@@ -2715,14 +2715,14 @@ isOneToOne: false
                   ]
                 },"purchase_orders": {
                   Row: {
-                    "ai_action_id": string | null,"business_id": string,"created_at": string,"created_by": string | null,"id": string,"location_id": string,"notes": string | null,"number": number,"received_at": string | null,"sent_at": string | null,"sent_by": string | null,"status": Database["public"]['Enums']["purchase_order_status"],"supplier_id": string,"updated_at": string
+                    "ai_action_id": string | null,"business_id": string,"created_at": string,"created_by": string | null,"expected_on": string | null,"id": string,"location_id": string,"notes": string | null,"number": number,"received_at": string | null,"sent_at": string | null,"sent_by": string | null,"status": Database["public"]['Enums']["purchase_order_status"],"supplier_id": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "ai_action_id"?: string | null,"business_id": string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id": string,"notes"?: string | null,"number"?: never,"received_at"?: string | null,"sent_at"?: string | null,"sent_by"?: string | null,"status"?: Database["public"]['Enums']["purchase_order_status"],"supplier_id": string,"updated_at"?: string
+                    "ai_action_id"?: string | null,"business_id": string,"created_at"?: string,"created_by"?: string | null,"expected_on"?: string | null,"id"?: string,"location_id": string,"notes"?: string | null,"number"?: never,"received_at"?: string | null,"sent_at"?: string | null,"sent_by"?: string | null,"status"?: Database["public"]['Enums']["purchase_order_status"],"supplier_id": string,"updated_at"?: string
                   }
                   Update: {
-                    "ai_action_id"?: string | null,"business_id"?: string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id"?: string,"notes"?: string | null,"number"?: never,"received_at"?: string | null,"sent_at"?: string | null,"sent_by"?: string | null,"status"?: Database["public"]['Enums']["purchase_order_status"],"supplier_id"?: string,"updated_at"?: string
+                    "ai_action_id"?: string | null,"business_id"?: string,"created_at"?: string,"created_by"?: string | null,"expected_on"?: string | null,"id"?: string,"location_id"?: string,"notes"?: string | null,"number"?: never,"received_at"?: string | null,"sent_at"?: string | null,"sent_by"?: string | null,"status"?: Database["public"]['Enums']["purchase_order_status"],"supplier_id"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -4983,6 +4983,9 @@ isOneToOne: false
                            },
 "set_my_pin":
 { Args: { "p_business_id": string,"p_pin": string }; Returns: undefined
+                           },
+"set_order_expected":
+{ Args: { "p_expected_on": string,"p_order_id": string }; Returns: undefined
                            },
 "set_payroll_settings":
 { Args: { "p_anchor": string,"p_business_id": string,"p_pay_period": string }; Returns: undefined

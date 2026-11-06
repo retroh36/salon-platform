@@ -100,9 +100,14 @@ async function Product({ params }: Pick<PageProps<"/inventory/[id]">, "params">)
         }
         actions={
           manage && (
-            <Link href={`/inventory/${product.id}/edit`} className={buttonClass("secondary", "md")}>
-              Edit product
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link href={`/inventory/new?copy=${product.id}`} className={buttonClass("secondary", "md")}>
+                Copy to a new size
+              </Link>
+              <Link href={`/inventory/${product.id}/edit`} className={buttonClass("secondary", "md")}>
+                Edit product
+              </Link>
+            </div>
           )
         }
       />
@@ -123,7 +128,7 @@ async function Product({ params }: Pick<PageProps<"/inventory/[id]">, "params">)
             <dt className="text-13 text-ink-muted">Reorder below</dt>
             <dd className="mt-1 text-2xl font-semibold text-ink tabular-nums">{reorderPoint > 0 ? formatAmount(reorderPoint, product.unit) : "Not set"}</dd>
             <dd className="mt-0.5 text-xs text-ink-subtle">
-              Orders {level?.reorder_quantity ?? 1} {containerName(product, (level?.reorder_quantity ?? 1) !== 1)} at a time
+              Orders at least {level?.reorder_quantity ?? 1} {containerName(product, (level?.reorder_quantity ?? 1) !== 1)}
             </dd>
           </div>
           {frontOfHouse && (

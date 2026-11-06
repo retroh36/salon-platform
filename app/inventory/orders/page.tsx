@@ -10,7 +10,7 @@ import { Badge, EmptyState, nameLinkClass, PageHeader } from "@/components/ui/pa
 import { numClass, TableCard, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
 import { canManageInventory, canReceiveOrders } from "@/lib/inventory";
-import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES, orderNumber } from "@/lib/purchase-orders";
+import { isLate, ORDER_STATUS_LABELS, ORDER_STATUS_TONES, orderNumber } from "@/lib/purchase-orders";
 import { formatDay } from "@/lib/schedule-format";
 import { toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
@@ -31,12 +31,16 @@ async function Orders() {
   if (!canReceiveOrders(me.role)) redirect("/inventory");
   const { data: orders, error } = await supabase
     .from("purchase_orders")
-    .select("id, number, status, created_at, sent_at, ai_action_id, supplier:suppliers(name), purchase_order_lines(quantity, unit_cost_cents)")
+    .select("id, number, status, created_at, sent_at, received_at, expected_on, ai_action_id, supplier:suppliers(name), purchase_order_lines(quantity, unit_cost_cents)")
     .eq("location_id", me.location.id)
     .order("created_at", { ascending: false })
     .limit(100);
   if (error) throw error;
   const day = (at: string) => formatDay(toLocal(new Date(at), me.location.timezone).date);
+  const today = toLocal(new Date(), me.location.timezone).date;
+  // Where each order is: received, else when it's expected, else when it went.
+  const when = (o: (typeof orders)[number]) =>
+    o.received_at ? `Received ${day(o.received_at)}` : o.expected_on && o.sent_at ? `Expected ${formatDay(o.expected_on)}` : o.sent_at ? `Sent ${day(o.sent_at)}` : `Started ${day(o.created_at)}`;
 
   return (
     <AppShell section="inventory" me={me}>
@@ -90,9 +94,12 @@ async function Orders() {
                     {o.ai_action_id && <span className="block text-xs text-denise-700">Drafted by Denise</span>}
                   </td>
                   <td className={tdClass}>
-                    <Badge tone={ORDER_STATUS_TONES[o.status]}>{ORDER_STATUS_LABELS[o.status]}</Badge>
+                    <span className="flex flex-wrap gap-1.5">
+                      <Badge tone={ORDER_STATUS_TONES[o.status]}>{ORDER_STATUS_LABELS[o.status]}</Badge>
+                      {isLate(o.status, o.expected_on, today) && <Badge tone="danger">Late</Badge>}
+                    </span>
                   </td>
-                  <td className={`${tdClass} hidden whitespace-nowrap text-ink-muted sm:table-cell`}>{o.sent_at ? `Sent ${day(o.sent_at)}` : `Started ${day(o.created_at)}`}</td>
+                  <td className={`${tdClass} hidden whitespace-nowrap text-ink-muted sm:table-cell`}>{when(o)}</td>
                   <td className={`${tdClass} ${numClass} font-medium text-ink`}>{formatPrice(o.purchase_order_lines.reduce((sum, l) => sum + l.quantity * l.unit_cost_cents, 0))}</td>
                 </tr>
               ))}

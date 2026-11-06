@@ -2,6 +2,7 @@
 // receiving them. Pure, shared by pages, actions and tests.
 
 import type { Enums } from "@/lib/database.types";
+import { isLocalDate } from "@/lib/scheduling/time";
 
 export type OrderStatus = Enums<"purchase_order_status">;
 
@@ -21,6 +22,20 @@ export const ORDER_STATUS_TONES: Record<OrderStatus, "neutral" | "blue" | "amber
 
 export function orderNumber(n: number): string {
   return `PO-${n}`;
+}
+
+// Sent (or partly in) and past the day it was expected: today counts as on
+// time.
+export function isLate(status: OrderStatus, expectedOn: string | null, today: string): boolean {
+  return (status === "sent" || status === "partly_received") && expectedOn !== null && expectedOn < today;
+}
+
+// The expected date from its field: empty clears it.
+export function parseExpected(raw: string): { ok: true; date: string | null } | { ok: false; error: string } {
+  const value = raw.trim();
+  if (!value) return { ok: true, date: null };
+  if (!isLocalDate(value)) return { ok: false, error: "Choose a date." };
+  return { ok: true, date: value };
 }
 
 export type OrderLineInput = { productId: string; quantity: number; unitCostCents: number };

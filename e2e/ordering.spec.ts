@@ -1,3 +1,5 @@
+import { formatDay } from "@/lib/schedule-format";
+import { addDays, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED, throwawayStylist } from "../tests/db/helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
@@ -22,6 +24,7 @@ let deliveryId: string;
 let clientId: string;
 let stylist: Awaited<ReturnType<typeof throwawayStylist>>;
 
+const today = () => todayIn("America/Chicago");
 const check = <T>(r: { data: T; error: unknown }): NonNullable<T> => {
   if (r.error) throw r.error;
   return r.data as NonNullable<T>;
@@ -112,6 +115,23 @@ test.describe("owner", () => {
     await waitForHydration(page, "form[aria-label='Edit order'] select");
     await ui(page).getByRole("button", { name: "Mark as sent" }).click();
     await expect(ui(page).getByRole("form", { name: "Receive delivery" })).toBeVisible();
+
+    // Expected in the supplier's 3 days; a new date can be set, and once it
+    // passes the order shows as late.
+    await expect(ui(page).getByText(`Expected ${formatDay(addDays(today(), 3))}`)).toBeVisible();
+    const expected = ui(page).getByRole("form", { name: "Expected date" });
+    await waitForHydration(page, "form[aria-label='Expected date'] input");
+    await expected.getByLabel("Expected").fill(addDays(today(), 9));
+    await expected.getByRole("button", { name: "Save" }).click();
+    await expect(expected.getByRole("status")).toHaveText(`Expected ${formatDay(addDays(today(), 9))}.`);
+    const orderId = page.url().split("/").pop()!;
+    check(await admin.from("purchase_orders").update({ expected_on: addDays(today(), -1) }).eq("id", orderId).select("id"));
+    await page.reload();
+    await expect(ui(page).getByText("Late", { exact: true })).toBeVisible();
+    await page.goto("/inventory/orders");
+    const row = ui(page).getByRole("table", { name: "Orders" }).getByRole("row").filter({ hasText: SUPPLIER });
+    await expect(row).toContainText("Late");
+    await expect(row).toContainText(`Expected ${formatDay(addDays(today(), -1))}`);
   });
 
   test("writes an order by hand", async ({ page }) => {

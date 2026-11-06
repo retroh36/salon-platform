@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { dayWord, headlineFor, plannedUses } from "@/lib/denise/reorder";
 import { containersToOrder, draftReorders, outlook, type PlannedUse, type StockInfo } from "@/lib/inventory-forecast";
 import type { StockRow } from "@/lib/inventory-load";
-import { parseOrderLines, parseReceipt } from "@/lib/purchase-orders";
+import { isLate, parseExpected, parseOrderLines, parseReceipt } from "@/lib/purchase-orders";
 import { fromLocal } from "@/lib/scheduling";
 
 const TZ = "America/Chicago";
@@ -138,5 +138,22 @@ describe("order forms", () => {
     expect(parseReceipt({ l1: "7" }, due)).toEqual({ ok: false, error: "That's more than was ordered." });
     expect(parseReceipt({ l1: "0", l2: "0" }, due)).toEqual({ ok: false, error: "Enter what arrived." });
     expect(parseReceipt({ nope: "1" }, due).ok).toBe(false);
+  });
+});
+
+describe("the expected date", () => {
+  it("is late once it's past and the order isn't all in; today is on time", () => {
+    expect(isLate("sent", "2026-11-04", "2026-11-05")).toBe(true);
+    expect(isLate("partly_received", "2026-11-04", "2026-11-05")).toBe(true);
+    expect(isLate("sent", "2026-11-05", "2026-11-05")).toBe(false);
+    expect(isLate("received", "2026-11-04", "2026-11-05")).toBe(false);
+    expect(isLate("draft", "2026-11-04", "2026-11-05")).toBe(false);
+    expect(isLate("sent", null, "2026-11-05")).toBe(false);
+  });
+
+  it("reads the field: a date, or empty to clear it", () => {
+    expect(parseExpected("2026-11-12")).toEqual({ ok: true, date: "2026-11-12" });
+    expect(parseExpected(" ")).toEqual({ ok: true, date: null });
+    expect(parseExpected("2026-02-30")).toEqual({ ok: false, error: "Choose a date." });
   });
 });

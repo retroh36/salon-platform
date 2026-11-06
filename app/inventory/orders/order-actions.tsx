@@ -3,9 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { fieldClass } from "@/components/ui/field";
+import { fieldClass, labelClass } from "@/components/ui/field";
 import { Alert, Card } from "@/components/ui/page";
-import { deleteOrder, receiveOrder, sendOrder, undoReorder } from "./actions";
+import { deleteOrder, receiveOrder, sendOrder, setOrderExpected, undoReorder } from "./actions";
 
 type Message = { text: string; error: boolean } | null;
 
@@ -102,5 +102,41 @@ export function ReceiveForm({ orderId, lines }: { orderId: string; lines: Receiv
         </Button>
       </form>
     </Card>
+  );
+}
+
+// When the order should arrive; set by itself when it's sent, from the
+// supplier's usual lead time.
+export function ExpectedForm({ orderId, expectedOn }: { orderId: string; expectedOn: string | null }) {
+  const [value, setValue] = useState(expectedOn ?? "");
+  const [message, setMessage] = useState<Message>(null);
+  const [pending, start] = useTransition();
+  return (
+    <form
+      aria-label="Expected date"
+      className="flex flex-col gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        start(async () => {
+          const r = await setOrderExpected(orderId, value);
+          setMessage({ text: r.message, error: !r.ok });
+        });
+      }}
+    >
+      <div className="flex flex-wrap items-end gap-3">
+        <label className={labelClass}>
+          Expected
+          <input type="date" value={value} onChange={(e) => setValue(e.target.value)} className={`${fieldClass} w-44`} />
+        </label>
+        <Button type="submit" disabled={pending}>
+          Save
+        </Button>
+      </div>
+      {message && (
+        <p role="status" className={`text-sm ${message.error ? "text-danger" : "text-ink-muted"}`}>
+          {message.text}
+        </p>
+      )}
+    </form>
   );
 }
