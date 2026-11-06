@@ -1040,6 +1040,10 @@ export function CalendarBoard({ data }: { data: BoardData }) {
   const dayLink = (d: string) => (d === data.today ? "/calendar" : `/calendar?date=${d}`);
   const closeDetails = () => setSelection({ kind: "none" });
   const goTo = (d: string) => leave(() => router.push(dayLink(d), { transitionTypes: [d > data.date ? "nav-forward" : "nav-back"] }), closeDetails);
+  // The month this day is in (`/calendar/month`).
+  const onView = (v: string) => {
+    if (v === "month") leave(() => router.push(`/calendar/month?month=${data.date.slice(0, 7)}`), closeDetails);
+  };
   // A form's own Cancel.
   const cancel = () => leave(closeDetails);
   // The toolbar's pieces, shared by its row and a phone's options sheet.
@@ -1152,7 +1156,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
           )}
           <div className="ml-auto flex items-center gap-2 max-sm:hidden">
             <ViewMenu zoom={zoom} onZoom={setZoom} fitAll={fitAll} onFitAll={setFitAll} />
-            <Segmented label="View" value="day" onChange={() => {}} options={DAY_WEEK} />
+            <Segmented label="View" value="day" onChange={onView} options={DAY_WEEK} />
           </div>
           <button type="button" aria-label="Calendar options" title="Calendar options" onClick={() => setPhoneMenu(true)} className={`${buttonClass("secondary", "md", `ml-auto ${TOOL_OUTLINE}`, { square: true })} sm:hidden`}>
             <MoreIcon className="size-5" />
@@ -1173,7 +1177,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
               <DisplayOptions zoom={zoom} onZoom={setZoom} fitAll={fitAll} onFitAll={setFitAll} />
               <div className="flex flex-col gap-2">
                 <span className="text-13 font-medium text-ink-muted">View</span>
-                <Segmented label="View" value="day" onChange={() => {}} options={DAY_WEEK} />
+                <Segmented label="View" value="day" onChange={onView} options={DAY_WEEK} />
               </div>
               <div className="flex flex-col gap-1 border-t border-line pt-4">
                 {me.canBook && <NewSaleLink variant="secondary" className="w-full justify-start!" />}
@@ -2748,9 +2752,10 @@ const TOOL_OUTLINE = "border-line!";
 const TOOL_GROUP = "inline-flex items-stretch divide-x divide-line overflow-hidden rounded-md border border-line bg-surface";
 const TOOL_SEGMENT =
   "touch-target inline-flex h-9 items-center justify-center text-sm font-medium text-ink transition-colors duration-(--motion-fast) select-none hover:bg-sunken active:bg-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus";
-const DAY_WEEK: { value: "day" | "week"; label: string; disabled?: boolean; title?: string }[] = [
+const DAY_WEEK: { value: "day" | "week" | "month"; label: string; disabled?: boolean; title?: string }[] = [
   { value: "day", label: "Day" },
   { value: "week", label: "Week", disabled: true, title: "Week view is coming soon" },
+  { value: "month", label: "Month" },
 ];
 
 // "More" in the toolbar: Waitlist, Walk-ins and Block time, so New booking
