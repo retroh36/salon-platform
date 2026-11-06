@@ -126,16 +126,20 @@ test.describe("at 10pm", () => {
     const { data: off } = await admin.from("staff_time_off").select("*").eq("staff_id", GIL).lte("starts_on", today).gte("ends_on", today);
     await admin.from("staff_time_off").delete().in("id", (off ?? []).map((t) => t.id));
     // Shifting the zone can leave some of his demo visits not over by 10pm
-    // there (later ones, or a client in his chair right now): those are set
-    // aside (canceled) and put back after too.
-    const { data: later } = await admin
-      .from("appointment_items")
-      .select("appointment:appointments!inner(id, status, canceled_at, cancel_reason)")
-      .eq("staff_id", GIL)
-      .gt("ends_at", new Date().toISOString())
-      .lt("starts_at", fromLocal(addDays(today, 1), 0, zone)!.toISOString())
-      .in("appointment.status", ["booked", "confirmed", "checked_in"]);
-    const setAside = [...new Map((later ?? []).map((i) => [i.appointment.id, i.appointment])).values()];
+    // there (later ones), and a client can still be in his chair (the demo's
+    // planted moment, checked in when the seed loaded, its booked time long
+    // past): those are set aside (canceled) and put back after too.
+    const items = () =>
+      admin
+        .from("appointment_items")
+        .select("appointment:appointments!inner(id, status, canceled_at, cancel_reason)")
+        .eq("staff_id", GIL)
+        .lt("starts_at", fromLocal(addDays(today, 1), 0, zone)!.toISOString());
+    const [{ data: later }, { data: inChair }] = await Promise.all([
+      items().gt("ends_at", new Date().toISOString()).in("appointment.status", ["booked", "confirmed", "checked_in"]),
+      items().gte("starts_at", fromLocal(today, 0, zone)!.toISOString()).eq("appointment.status", "checked_in"),
+    ]);
+    const setAside = [...new Map([...(later ?? []), ...(inChair ?? [])].map((i) => [i.appointment.id, i.appointment])).values()];
     for (const a of setAside) await admin.from("appointments").update({ status: "canceled", canceled_at: new Date().toISOString(), cancel_reason: "Test" }).eq("id", a.id);
     await admin.from("locations").update({ timezone: zone }).eq("id", L);
     // Gil works today there, whatever day it is (the salon may be closed).

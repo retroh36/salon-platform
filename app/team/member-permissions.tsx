@@ -40,6 +40,13 @@ export function PermissionsCard({
   const [allowed, setAllowed] = useState(() => new Map(rows.map((r) => [r.permission, r.allowed])));
   const [result, setResult] = useState<LoginResult | null>(null);
   const [pending, start] = useTransition();
+  // A new group brings new starting switches; the card stays mounted, so
+  // its "Saved" stays on screen through the page's refresh.
+  const [shownGroup, setShownGroup] = useState(groupId);
+  if (shownGroup !== groupId) {
+    setShownGroup(groupId);
+    setAllowed(new Map(rows.map((r) => [r.permission, r.allowed])));
+  }
   const shown = PERMISSIONS.filter((p) => rows.some((r) => r.permission === p.key && r.toggleable));
   if (!shown.length) return null;
   const group = groups.find((g) => g.id === groupId) ?? null;

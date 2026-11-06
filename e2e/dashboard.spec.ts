@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { startOfLocalDay } from "@/lib/scheduling/load";
 import { addDays, todayIn } from "@/lib/scheduling/time";
 import { admin, countFor, SEED } from "../tests/db/helpers";
-import { AUTH, busyToday, expect, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, busyToday, expect, settleAnimations, test, ui, waitForHydration } from "./fixtures";
 
 // Today is a busy demo day, whatever day this runs.
 let putBack: () => void;
@@ -15,7 +15,7 @@ test.afterAll(() => putBack());
 // e2e/screenshots/ (not committed).
 async function shot(page: Page, name: string) {
   // After the entrance animations (not the endless ones, like the live dot).
-  await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished)));
+  await settleAnimations(page);
   await page.screenshot({ path: `e2e/screenshots/dashboard-${name}.png`, fullPage: true });
 }
 

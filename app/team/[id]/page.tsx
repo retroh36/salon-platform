@@ -115,7 +115,7 @@ async function Member({ params, searchParams }: { params: Promise<{ id: string }
             </Card>
           )}
           {member.role === "assistant" && <AssistingCard staffId={member.id} current={member.assists_staff_id} stylists={(stylists ?? []).map((s) => ({ id: s.id, name: fullName(s) }))} />}
-          {member.role !== "owner" && <PermissionsCard key={member.permission_group_id ?? "none"} staffId={member.id} firstName={member.first_name} rows={permissions ?? []} canEdit={me.role === "owner" && !isMe} groups={groups ?? []} groupId={member.permission_group_id} />}
+          {member.role !== "owner" && <PermissionsCard staffId={member.id} firstName={member.first_name} rows={permissions ?? []} canEdit={me.role === "owner" && !isMe} groups={groups ?? []} groupId={member.permission_group_id} />}
           {(member.role === "stylist" || member.event_roles.length > 0) && <EventWorkCard staffId={member.id} firstName={member.first_name} current={member.event_roles} />}
           <PinCard staffId={member.id} firstName={member.first_name} hasPin={(pins ?? []).includes(member.id)} />
           <ActiveCard staffId={member.id} firstName={member.first_name} active={member.is_active} upcoming={upcoming ?? 0} isMe={isMe} />

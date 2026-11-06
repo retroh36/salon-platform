@@ -232,7 +232,7 @@ test.describe("front desk", () => {
     await expect(detail.getByRole("menu", { name: "More actions" }).getByRole("menuitem")).toHaveText(["Reverse checkout…"]);
     await page.keyboard.press("Escape");
     await visitTab(detail, "History");
-    await expect(detail).toContainText("Last changed by Sam Rivera");
+    await expect(detail).toContainText("Checked out by Sam Rivera");
     expect(await appointment(id)).toMatchObject({ status: "completed", updated_by: FRONT_DESK });
   });
 

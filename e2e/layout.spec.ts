@@ -10,7 +10,7 @@ import { EMPTY_TICKET, type Ticket } from "@/lib/ticket";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal } from "@/lib/scheduling/time";
 import { admin, busyDay, makeRoom, SEED, signIn } from "../tests/db/helpers";
-import { AUTH, expect, putBackSales, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, putBackSales, settleAnimations, test, ui, waitForHydration } from "./fixtures";
 import { expectTidyLayout, expectWholeHeaders } from "./layout";
 
 const B = SEED.business;
@@ -212,7 +212,7 @@ for (const size of WIDTHS) {
       await page.getByRole("complementary", { name: "Payment" }).getByRole("button", { name: "Cash", exact: true }).click();
       await expect(page.getByRole("dialog")).toBeVisible();
       // Measured once it has faded in.
-      await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+      await settleAnimations(page, { all: true });
       await expectTidyLayout(page, "taking cash");
     });
 
@@ -221,7 +221,7 @@ for (const size of WIDTHS) {
       await page.goto("/dashboard");
       await expect(ui(page).getByTestId("dashboard-brief")).toBeVisible();
       await waitForHydration(page, "form[aria-label='Ask Denise']");
-      await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished)));
+      await settleAnimations(page);
       await expectTidyLayout(page, "on the owner's Dashboard");
 
       const stylist = await browser.newContext({ viewport: size, hasTouch: size.width < 1440, isMobile: size.width < 500, storageState: AUTH.stylist });
@@ -229,11 +229,11 @@ for (const size of WIDTHS) {
         const own = await stylist.newPage();
         await own.goto("/dashboard");
         await expect(ui(own).getByRole("heading", { level: 1 })).toHaveText(/Bridget$/);
-        await own.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished)));
+        await settleAnimations(own);
         await expectTidyLayout(own, "on a stylist's Dashboard");
         await own.goto("/my-day");
         await expect(ui(own).getByTestId("my-earnings")).toBeVisible();
-        await own.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished)));
+        await settleAnimations(own);
         await expectTidyLayout(own, "on My day");
       } finally {
         await stylist.close();
@@ -248,7 +248,7 @@ for (const size of WIDTHS) {
       const panel = ui(page).getByTestId("side-panel");
       await expect(panel.getByTestId("membership-info")).toBeVisible();
       await expect(panel.getByTestId("latest-formula")).toBeVisible();
-      await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished)));
+      await settleAnimations(page);
       const sideways = await panel.evaluate((p) =>
         [p, ...p.querySelectorAll("*")].filter((e) => getComputedStyle(e).overflowX !== "visible" && e.scrollWidth > e.clientWidth).map((e) => `${e.tagName} ${e.scrollWidth}/${e.clientWidth}`),
       );
@@ -260,7 +260,7 @@ for (const size of WIDTHS) {
     // Meet Denise, for an owner and a stylist, and with her open beside it
     // after a sample question.
     test("Meet Denise", async ({ page, browser }) => {
-      const settle = (p: Page) => p.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished)));
+      const settle = (p: Page) => settleAnimations(p);
       await page.goto("/settings/denise");
       await expect(ui(page).getByTestId("meet-denise-intro")).toBeVisible();
       await waitForHydration(page, "[data-testid=meet-denise-try]");
@@ -286,7 +286,7 @@ for (const size of WIDTHS) {
     // The list, the long-named client's profile (with an allergy and their
     // visit), their details form, and Maria's profile as her stylist.
     test("Clients and the client profile", async ({ page, browser }) => {
-      const settle = (p: Page) => p.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished)));
+      const settle = (p: Page) => settleAnimations(p);
       await page.goto("/clients");
       await expect(ui(page).getByRole("table", { name: "Clients" })).toBeVisible();
       await settle(page);

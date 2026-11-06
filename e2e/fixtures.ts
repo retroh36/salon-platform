@@ -339,3 +339,21 @@ export async function setAsideDay(staffIds: string[], date: string, timeZone = "
     }
   };
 }
+
+// Waits for the page's animations to finish (leaving out ones that run
+// forever, unless `all`). An animation canceled part-way (its element
+// re-rendered or removed) rejects its \`finished\` with an AbortError ("The
+// user aborted a request."), which once failed layout checks at random:
+// canceled counts as settled.
+export function settleAnimations(page: Page, { all = false } = {}) {
+  return page.evaluate(
+    (all) =>
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((a) => all || a.effect?.getComputedTiming().iterations !== Infinity)
+          .map((a) => a.finished.catch(() => undefined)),
+      ),
+    all,
+  );
+}

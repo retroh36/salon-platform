@@ -353,7 +353,7 @@ async function ClientRecords({ id }: { id: string }) {
         <div className="flex items-start gap-4">
           <Avatar name={fullName(client)} size="lg" />
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-semibold tracking-[-0.015em] text-ink">{fullName(client)}</h1>
+            <h1 className="text-2xl font-semibold tracking-[-0.015em] text-ink wrap-anywhere">{fullName(client)}</h1>
             <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm" data-testid="client-contact">
               {client.phone && (
                 <a href={`tel:${client.phone}`} className={nameLinkClass}>

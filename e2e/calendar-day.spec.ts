@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { addDays, fromLocal, toLocal, todayIn } from "@/lib/scheduling/time";
 import { admin, busyDay, openAllDay, SEED, throwawayStylist } from "../tests/db/helpers";
-import { AUTH, checkIn, expect, moreAction, openChecklist, openDisplayMenu, pxPerMinute, showDenise, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, checkIn, expect, moreAction, openChecklist, openDisplayMenu, pxPerMinute, settleAnimations, showDenise, test, ui, waitForHydration } from "./fixtures";
 
 // The calendar's day: undoing a check-in, the patch test notice in booking
 // details, zoom, opening at the current time, and Denise's late-arrivals
@@ -468,7 +468,7 @@ for (const viewport of [
           return { scroll: el.scrollWidth - el.clientWidth, wide: wide.slice(0, 3) };
         });
       // Measured once the panel has finished coming in (its content slides as it fades).
-      const settled = () => page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished)));
+      const settled = () => settleAnimations(page);
       const expectNone = async (state: string) => {
         await settled();
         expect(await overflow(), state).toEqual({ scroll: 0, wide: [] });
