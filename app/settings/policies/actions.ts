@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentStaff } from "@/lib/auth";
-import { parseFeeRule, parsePolicyForm, type PolicyErrors } from "@/lib/policy";
+import { graceProblem, parseFeeRule, parsePolicyForm, type GraceSettings, type PolicyErrors } from "@/lib/policy";
 import { runPolicyCharges } from "@/lib/policy-billing";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { can } from "@/lib/permissions";
@@ -78,4 +78,25 @@ export async function chargeDueFeesNow(): Promise<{ ok: boolean; message: string
   revalidatePath("/policy");
   const parts = [`${s.charged} charged`, s.failed && `${s.failed} didn't go through`, s.refunded && `${s.refunded} refunded`].filter(Boolean);
   return { ok: true, message: s.charged || s.failed || s.refunded ? `${parts.join(", ")}.` : "Nothing was due." };
+}
+
+// Grace for a client's first no-show (or late cancellation), with the
+// message they get.
+export async function saveGrace(grace: GraceSettings): Promise<PolicyResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!can(me, "settings")) return { ok: false, message: ONLY_OWNERS };
+  const problem = graceProblem(grace);
+  if (problem) return { ok: false, message: problem };
+  const { error } = await supabase.rpc("save_grace_settings", {
+    p_business_id: me.business_id,
+    p_on: grace.on,
+    p_kinds: grace.kinds,
+    p_months: grace.months,
+    p_rebook_days: grace.rebookDays!,
+    p_message: grace.message.trim(),
+  });
+  if (error?.code === "42501") return { ok: false, message: ONLY_OWNERS };
+  if (error) throw error;
+  revalidatePath("/settings/policies");
+  return { ok: true, message: grace.on ? "Saved. Grace applies to fees from now on." : "Saved. Grace is off." };
 }

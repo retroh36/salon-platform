@@ -4,6 +4,7 @@ import { ShieldIcon, WalletIcon } from "@/components/ui/icons";
 import type { Database } from "@/lib/database.types";
 import { FEE_KIND_LABELS, type FeeStatus } from "@/lib/policy";
 import { clientStanding, loadPolicy } from "@/lib/policy-load";
+import { FEE_GRACE_COLUMNS, graceOf } from "@/lib/policy-visits";
 import { formatDay } from "@/lib/schedule-format";
 import { toLocal } from "@/lib/scheduling/time";
 import { CardLinkForm } from "./card-link-form";
@@ -19,7 +20,7 @@ export async function PolicyCards({ supabase, businessId, role, client, tz }: { 
     loadPolicy(supabase, businessId),
     clientStanding(supabase, client.id),
     supabase.from("client_cards").select("label, created_at, consent:policy_consents(policy_text, agreed_at, channel)").eq("client_id", client.id).is("removed_at", null).maybeSingle(),
-    supabase.from("policy_fees").select("id, kind, fee_cents, from_deposit_cents, status, card_label, failure_reason, waive_reason, created_at, appointment:appointments(starts_at)").eq("client_id", client.id).order("created_at", { ascending: false }).limit(20),
+    supabase.from("policy_fees").select(`id, kind, fee_cents, from_deposit_cents, status, card_label, failure_reason, waive_reason, created_at, appointment:appointments(starts_at), ${FEE_GRACE_COLUMNS}`).eq("client_id", client.id).order("created_at", { ascending: false }).limit(20),
     supabase.from("card_requests").select("id").eq("client_id", client.id).eq("status", "open").gt("expires_at", new Date().toISOString()).limit(1),
   ]);
   if (fees.error) throw fees.error;
@@ -82,7 +83,7 @@ export async function PolicyCards({ supabase, businessId, role, client, tz }: { 
                   {FEE_KIND_LABELS[f.kind as "late_cancel" | "no_show"]} · visit on {day(f.appointment.starts_at)}
                 </p>
                 <FeeControls
-                  fee={{ id: f.id, kind: f.kind as "late_cancel" | "no_show", feeCents: f.fee_cents, fromDepositCents: f.from_deposit_cents, status: f.status as FeeStatus, cardLabel: f.card_label, failureReason: f.failure_reason, waiveReason: f.waive_reason }}
+                  fee={{ id: f.id, kind: f.kind as "late_cancel" | "no_show", feeCents: f.fee_cents, fromDepositCents: f.from_deposit_cents, status: f.status as FeeStatus, cardLabel: f.card_label, failureReason: f.failure_reason, waiveReason: f.waive_reason, grace: graceOf(f) }}
                   canWaive={policy.waiveRoles.includes(role)}
                   canRetry
                 />

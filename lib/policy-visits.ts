@@ -5,7 +5,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types.ts";
-import { cardRequired, depositNeeded, standingOf, strikesSince, visitTerms, type FeeStatus, type RepeatAction, type VisitTerms } from "./policy.ts";
+import { cardRequired, depositNeeded, graceLine, standingOf, strikesSince, visitTerms, type FeeStatus, type RepeatAction, type VisitTerms } from "./policy.ts";
+import { toLocal } from "./scheduling/time.ts";
 import { loadPolicy } from "./policy-load.ts";
 
 type Supabase = SupabaseClient<Database>;
@@ -33,6 +34,7 @@ export type VisitPolicy = {
     cardLabel: string | null;
     failureReason: string | null;
     waiveReason: string | null;
+    grace: string | null;
   } | null;
   canWaive: boolean;
 };
@@ -50,6 +52,16 @@ export type PolicyVisit = {
   startsAt: string;
 };
 
+// The columns that say a fee is held under the salon's grace, and how it reads.
+export const FEE_GRACE_COLUMNS = "grace_until, grace_staff:staff!policy_fees_grace_staff_id_fkey(first_name), grace_location:locations(timezone)";
+
+export function graceOf(f: { grace_until: string | null; grace_staff: { first_name: string } | null; grace_location: { timezone: string } | null }): string | null {
+  if (!f.grace_until) return null;
+  const [y, m, d] = toLocal(new Date(f.grace_until), f.grace_location?.timezone ?? "UTC").date.split("-").map(Number);
+  const by = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
+  return graceLine(f.grace_staff?.first_name ?? null, by);
+}
+
 export async function loadVisitPolicies(supabase: Supabase, businessId: string, role: string, visits: readonly PolicyVisit[]): Promise<Map<string, VisitPolicy>> {
   const out = new Map<string, VisitPolicy>();
   if (!visits.length) return out;
@@ -59,7 +71,7 @@ export async function loadVisitPolicies(supabase: Supabase, businessId: string, 
     loadPolicy(supabase, businessId),
     supabase.from("client_cards").select("client_id, label").in("client_id", clientIds).is("removed_at", null),
     supabase.from("policy_fees").select("client_id, kind, status, created_at").in("client_id", clientIds),
-    supabase.from("policy_fees").select("id, appointment_id, kind, fee_cents, from_deposit_cents, status, card_label, failure_reason, waive_reason").in("appointment_id", visitIds),
+    supabase.from("policy_fees").select(`id, appointment_id, kind, fee_cents, from_deposit_cents, status, card_label, failure_reason, waive_reason, ${FEE_GRACE_COLUMNS}`).in("appointment_id", visitIds),
     supabase.from("card_requests").select("client_id, appointment_id").in("client_id", clientIds).eq("status", "open").gt("expires_at", new Date().toISOString()),
     supabase.from("appointments").select("client_id").in("client_id", clientIds).eq("status", "completed"),
   ]);
@@ -101,6 +113,7 @@ export async function loadVisitPolicies(supabase: Supabase, businessId: string, 
             cardLabel: fee.card_label,
             failureReason: fee.failure_reason,
             waiveReason: fee.waive_reason,
+            grace: graceOf(fee),
           }
         : null,
       canWaive: policy.waiveRoles.includes(role),

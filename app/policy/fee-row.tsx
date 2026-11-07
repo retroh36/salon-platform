@@ -30,12 +30,15 @@ export type FeeRowData = {
   cardLabel: string | null;
   failureReason: string | null;
   waiveReason: string | null;
+  // Held under the salon's grace: "waived if they rebook with Gil by Fri, Nov 20".
+  grace?: string | null;
 };
 
 const KIND = { late_cancel: "Late cancel", no_show: "No-show" } as const;
 
 // The tag and the muted detail after it.
 function statusOf(f: FeeRowData): { tone: Tone; label: string; detail: string | null } {
+  if (f.grace && (f.status === "pending" || f.status === "no_card")) return { tone: "info", label: "Grace", detail: f.grace };
   switch (f.status) {
     case "charged":
       if (f.fromDepositCents >= f.feeCents) return { tone: "info", label: "Kept from deposit", detail: null };

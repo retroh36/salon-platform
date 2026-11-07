@@ -4,11 +4,11 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types.ts";
-import { policyFromRow, staffPolicyFromRow, type PolicySettings, type RepeatAction, type StaffPolicy } from "./policy.ts";
+import { graceFromRow, policyFromRow, staffPolicyFromRow, type GraceSettings, type PolicySettings, type RepeatAction, type StaffPolicy } from "./policy.ts";
 
 type Supabase = SupabaseClient<Database>;
 
-export type LoadedPolicy = { settings: PolicySettings; stylists: StaffPolicy[]; extra: string; waiveRoles: string[] };
+export type LoadedPolicy = { settings: PolicySettings; stylists: StaffPolicy[]; extra: string; waiveRoles: string[]; grace: GraceSettings };
 
 export async function loadPolicy(supabase: Supabase, businessId: string): Promise<LoadedPolicy> {
   const [settings, stylists, online] = await Promise.all([
@@ -23,6 +23,7 @@ export async function loadPolicy(supabase: Supabase, businessId: string): Promis
     stylists: stylists.data.map(staffPolicyFromRow),
     extra: online.data?.cancellation_policy ?? "",
     waiveRoles: settings.data?.waive_roles ?? ["owner", "manager"],
+    grace: graceFromRow(settings.data),
   };
 }
 

@@ -2619,14 +2619,14 @@ isOneToOne: false
                   ]
                 },"policy_fees": {
                   Row: {
-                    "appointment_id": string,"attempts": number,"business_id": string,"card_label": string | null,"charge_after": string | null,"charged_at": string | null,"client_id": string,"created_at": string,"failure_reason": string | null,"fee_cents": number,"from_deposit_cents": number,"id": string,"kind": string,"location_id": string,"provider": string | null,"provider_reference": string | null,"receipt_sent_at": string | null,"refund_due": boolean,"refunded_at": string | null,"status": string,"updated_at": string,"waive_reason": string | null,"waived_at": string | null,"waived_by": string | null
+                    "appointment_id": string,"attempts": number,"business_id": string,"card_label": string | null,"charge_after": string | null,"charged_at": string | null,"client_id": string,"created_at": string,"failure_reason": string | null,"fee_cents": number,"from_deposit_cents": number,"grace_at": string | null,"grace_message_at": string | null,"grace_staff_id": string | null,"grace_until": string | null,"id": string,"kind": string,"location_id": string,"provider": string | null,"provider_reference": string | null,"receipt_sent_at": string | null,"refund_due": boolean,"refunded_at": string | null,"status": string,"updated_at": string,"waive_reason": string | null,"waived_at": string | null,"waived_by": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_id": string,"attempts"?: number,"business_id": string,"card_label"?: string | null,"charge_after"?: string | null,"charged_at"?: string | null,"client_id": string,"created_at"?: string,"failure_reason"?: string | null,"fee_cents": number,"from_deposit_cents"?: number,"id"?: string,"kind": string,"location_id": string,"provider"?: string | null,"provider_reference"?: string | null,"receipt_sent_at"?: string | null,"refund_due"?: boolean,"refunded_at"?: string | null,"status": string,"updated_at"?: string,"waive_reason"?: string | null,"waived_at"?: string | null,"waived_by"?: string | null
+                    "appointment_id": string,"attempts"?: number,"business_id": string,"card_label"?: string | null,"charge_after"?: string | null,"charged_at"?: string | null,"client_id": string,"created_at"?: string,"failure_reason"?: string | null,"fee_cents": number,"from_deposit_cents"?: number,"grace_at"?: string | null,"grace_message_at"?: string | null,"grace_staff_id"?: string | null,"grace_until"?: string | null,"id"?: string,"kind": string,"location_id": string,"provider"?: string | null,"provider_reference"?: string | null,"receipt_sent_at"?: string | null,"refund_due"?: boolean,"refunded_at"?: string | null,"status": string,"updated_at"?: string,"waive_reason"?: string | null,"waived_at"?: string | null,"waived_by"?: string | null
                   }
                   Update: {
-                    "appointment_id"?: string,"attempts"?: number,"business_id"?: string,"card_label"?: string | null,"charge_after"?: string | null,"charged_at"?: string | null,"client_id"?: string,"created_at"?: string,"failure_reason"?: string | null,"fee_cents"?: number,"from_deposit_cents"?: number,"id"?: string,"kind"?: string,"location_id"?: string,"provider"?: string | null,"provider_reference"?: string | null,"receipt_sent_at"?: string | null,"refund_due"?: boolean,"refunded_at"?: string | null,"status"?: string,"updated_at"?: string,"waive_reason"?: string | null,"waived_at"?: string | null,"waived_by"?: string | null
+                    "appointment_id"?: string,"attempts"?: number,"business_id"?: string,"card_label"?: string | null,"charge_after"?: string | null,"charged_at"?: string | null,"client_id"?: string,"created_at"?: string,"failure_reason"?: string | null,"fee_cents"?: number,"from_deposit_cents"?: number,"grace_at"?: string | null,"grace_message_at"?: string | null,"grace_staff_id"?: string | null,"grace_until"?: string | null,"id"?: string,"kind"?: string,"location_id"?: string,"provider"?: string | null,"provider_reference"?: string | null,"receipt_sent_at"?: string | null,"refund_due"?: boolean,"refunded_at"?: string | null,"status"?: string,"updated_at"?: string,"waive_reason"?: string | null,"waived_at"?: string | null,"waived_by"?: string | null
                   }
                   Relationships: [
                     {
@@ -2648,6 +2648,12 @@ isOneToOne: false
       referencedRelation: "clients"
       referencedColumns: ["id","business_id"]
     },{
+      foreignKeyName: "policy_fees_grace_staff_id_fkey"
+      columns: ["grace_staff_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "policy_fees_location_id_fkey"
       columns: ["location_id"]
 isOneToOne: false
@@ -2657,14 +2663,14 @@ isOneToOne: false
                   ]
                 },"policy_settings": {
                   Row: {
-                    "business_id": string,"cancel_window_hours": number,"card_required": string,"card_service_ids": (string)[],"card_staff_ids": (string)[],"late_cancel_fee_amount": number,"late_cancel_fee_kind": Database["public"]['Enums']["fee_kind"],"long_hold_days": number | null,"no_show_fee_amount": number,"no_show_fee_kind": Database["public"]['Enums']["fee_kind"],"repeat_action": string,"repeat_count": number,"repeat_deposit_percent": number,"repeat_months": number,"updated_at": string,"updated_by": string | null,"waive_roles": (Database["public"]['Enums']["staff_role"])[]
+                    "business_id": string,"cancel_window_hours": number,"card_required": string,"card_service_ids": (string)[],"card_staff_ids": (string)[],"grace_kinds": (string)[],"grace_message": string,"grace_months": number,"grace_on": boolean,"grace_rebook_days": number | null,"late_cancel_fee_amount": number,"late_cancel_fee_kind": Database["public"]['Enums']["fee_kind"],"long_hold_days": number | null,"no_show_fee_amount": number,"no_show_fee_kind": Database["public"]['Enums']["fee_kind"],"repeat_action": string,"repeat_count": number,"repeat_deposit_percent": number,"repeat_months": number,"updated_at": string,"updated_by": string | null,"waive_roles": (Database["public"]['Enums']["staff_role"])[]
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"cancel_window_hours"?: number,"card_required"?: string,"card_service_ids"?: (string)[],"card_staff_ids"?: (string)[],"late_cancel_fee_amount"?: number,"late_cancel_fee_kind"?: Database["public"]['Enums']["fee_kind"],"long_hold_days"?: number | null,"no_show_fee_amount"?: number,"no_show_fee_kind"?: Database["public"]['Enums']["fee_kind"],"repeat_action"?: string,"repeat_count"?: number,"repeat_deposit_percent"?: number,"repeat_months"?: number,"updated_at"?: string,"updated_by"?: string | null,"waive_roles"?: (Database["public"]['Enums']["staff_role"])[]
+                    "business_id": string,"cancel_window_hours"?: number,"card_required"?: string,"card_service_ids"?: (string)[],"card_staff_ids"?: (string)[],"grace_kinds"?: (string)[],"grace_message"?: string,"grace_months"?: number,"grace_on"?: boolean,"grace_rebook_days"?: number | null,"late_cancel_fee_amount"?: number,"late_cancel_fee_kind"?: Database["public"]['Enums']["fee_kind"],"long_hold_days"?: number | null,"no_show_fee_amount"?: number,"no_show_fee_kind"?: Database["public"]['Enums']["fee_kind"],"repeat_action"?: string,"repeat_count"?: number,"repeat_deposit_percent"?: number,"repeat_months"?: number,"updated_at"?: string,"updated_by"?: string | null,"waive_roles"?: (Database["public"]['Enums']["staff_role"])[]
                   }
                   Update: {
-                    "business_id"?: string,"cancel_window_hours"?: number,"card_required"?: string,"card_service_ids"?: (string)[],"card_staff_ids"?: (string)[],"late_cancel_fee_amount"?: number,"late_cancel_fee_kind"?: Database["public"]['Enums']["fee_kind"],"long_hold_days"?: number | null,"no_show_fee_amount"?: number,"no_show_fee_kind"?: Database["public"]['Enums']["fee_kind"],"repeat_action"?: string,"repeat_count"?: number,"repeat_deposit_percent"?: number,"repeat_months"?: number,"updated_at"?: string,"updated_by"?: string | null,"waive_roles"?: (Database["public"]['Enums']["staff_role"])[]
+                    "business_id"?: string,"cancel_window_hours"?: number,"card_required"?: string,"card_service_ids"?: (string)[],"card_staff_ids"?: (string)[],"grace_kinds"?: (string)[],"grace_message"?: string,"grace_months"?: number,"grace_on"?: boolean,"grace_rebook_days"?: number | null,"late_cancel_fee_amount"?: number,"late_cancel_fee_kind"?: Database["public"]['Enums']["fee_kind"],"long_hold_days"?: number | null,"no_show_fee_amount"?: number,"no_show_fee_kind"?: Database["public"]['Enums']["fee_kind"],"repeat_action"?: string,"repeat_count"?: number,"repeat_deposit_percent"?: number,"repeat_months"?: number,"updated_at"?: string,"updated_by"?: string | null,"waive_roles"?: (Database["public"]['Enums']["staff_role"])[]
                   }
                   Relationships: [
                     {
@@ -5295,6 +5301,9 @@ isOneToOne: false
 "record_fee_refund":
 { Args: { "p_detail": string,"p_fee_id": string,"p_ok": boolean }; Returns: undefined
                            },
+"record_grace_message":
+{ Args: { "p_fee_id": string }; Returns: undefined
+                           },
 "record_item_time":
 { Args: { "p_event": string,"p_item_id": string }; Returns: undefined
                            },
@@ -5415,6 +5424,9 @@ isOneToOne: false
                            },
 "save_event_settings":
 { Args: { "p_input": Json }; Returns: undefined
+                           },
+"save_grace_settings":
+{ Args: { "p_business_id": string,"p_kinds": (string)[],"p_message": string,"p_months": number,"p_on": boolean,"p_rebook_days": number }; Returns: undefined
                            },
 "save_membership_plan":
 { Args: { "p_business_id": string,"p_input": Json,"p_plan_id": string }; Returns: string

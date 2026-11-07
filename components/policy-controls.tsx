@@ -22,6 +22,8 @@ export type FeeView = {
   cardLabel: string | null;
   failureReason: string | null;
   waiveReason: string | null;
+  // Held under the salon's grace: "waived if they rebook with Gil by Fri, Nov 20".
+  grace?: string | null;
 };
 
 // "No-show fee $50 · Charging soon (Visa …4242)".
@@ -30,6 +32,7 @@ export function feeText(f: FeeView): string {
   if (f.status === "none") return `${FEE_KIND_LABELS[f.kind]} · no fee under the policy`;
   if (f.status === "charged")
     return `${what} · ${f.fromDepositCents >= f.feeCents ? "kept from the deposit" : `charged to ${f.cardLabel ?? "the card on file"}${f.fromDepositCents ? ` (with the ${formatPrice(f.fromDepositCents)} deposit)` : ""}`}`;
+  if (f.grace && (f.status === "pending" || f.status === "no_card")) return `${what} · ${f.grace}`;
   if (f.status === "pending") return `${what} · charging ${f.cardLabel ?? "the card on file"} in a few minutes`;
   if (f.status === "failed") return `${what} · didn't go through${f.failureReason ? ` (${f.failureReason.toLowerCase()})` : ""}`;
   if (f.status === "waived") return `${what} · waived${f.waiveReason ? `: ${f.waiveReason}` : ""}`;

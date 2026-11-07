@@ -216,3 +216,33 @@ test("Denise flags a repeat offender when the desk books them", async ({ page })
   await form.getByRole("list", { name: "Matching clients" }).getByRole("button", { name: new RegExp(`${PREFIX}Remy Test`) }).click();
   await expect(form.getByTestId("denise-policy")).toHaveText(/^Heads up: \w+Remy has 2 late cancellations or no-shows since \w+, so the salon asks for a 50% deposit\./, { timeout: 15_000 });
 });
+
+test.describe("grace", () => {
+  test.use({ storageState: AUTH.owner });
+  let saved: { grace_on: boolean; grace_kinds: string[]; grace_months: number; grace_rebook_days: number | null; grace_message: string } | null = null;
+  test.beforeAll(async () => {
+    saved = (await admin.from("policy_settings").select("grace_on, grace_kinds, grace_months, grace_rebook_days, grace_message").eq("business_id", B).single()).data;
+  });
+  test.afterAll(async () => {
+    if (saved) await admin.from("policy_settings").update(saved).eq("business_id", B);
+  });
+
+  test("turn on grace for a rebooking, with the message as clients will read it", async ({ page }) => {
+    await page.goto("/settings/policies");
+    const form = ui(page).getByRole("form", { name: "Grace" });
+    await waitForHydration(page, "form[aria-label=Grace] input[type=checkbox]");
+    await form.getByLabel("Give clients grace for their first missed visit").check();
+    await form.getByLabel(/Waive it if they rebook with the same stylist/).check();
+    await form.getByLabel("Days to rebook").fill("21");
+    await form.getByLabel("Message to the client").fill("Hi {first_name}, no charge if you rebook with {stylist} by {by}: {booking_link}");
+    await expect(form.getByTestId("grace-preview")).toContainText("Hi Ava, no charge if you rebook with Bridget by Fri, Nov 20: http");
+    // A field it can't fill stops the save.
+    await form.getByLabel("Message to the client").fill("Hi {name}");
+    await expect(form.getByRole("button", { name: "Save grace" })).toBeDisabled();
+    await form.getByLabel("Message to the client").fill("Hi {first_name}, no charge this time if you rebook with {stylist} by {by}.");
+    await form.getByRole("button", { name: "Save grace" }).click();
+    await expect(form).toContainText("Saved. Grace applies to fees from now on.");
+    const { data } = await admin.from("policy_settings").select("grace_on, grace_rebook_days").eq("business_id", B).single();
+    expect(data).toEqual({ grace_on: true, grace_rebook_days: 21 });
+  });
+});

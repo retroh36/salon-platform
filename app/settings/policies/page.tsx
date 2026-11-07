@@ -7,7 +7,9 @@ import { getCurrentStaff } from "@/lib/auth";
 import { loadPolicy } from "@/lib/policy-load";
 import { fullName, sortStaff } from "@/lib/staff";
 import { SettingsNav } from "../settings-nav";
+import { GraceForm } from "./grace-form";
 import { PolicyForm, StaffPolicies } from "./policy-settings";
+import { siteUrl } from "@/lib/branding";
 import { can } from "@/lib/permissions";
 
 export const metadata: Metadata = { title: "Policies" };
@@ -28,7 +30,7 @@ async function Policies() {
     loadPolicy(supabase, me.business_id),
     supabase.from("services").select("id, name, category").eq("business_id", me.business_id).is("archived_at", null).order("category").order("name"),
     supabase.from("staff").select("id, first_name, last_name, role, is_active").eq("business_id", me.business_id).eq("is_active", true).eq("role", "stylist"),
-    supabase.from("businesses").select("name").eq("id", me.business_id).single(),
+    supabase.from("businesses").select("name, slug").eq("id", me.business_id).single(),
   ]);
   if (sError) throw sError;
   if (tError) throw tError;
@@ -47,6 +49,12 @@ async function Policies() {
             services={services.map((s) => ({ id: s.id, name: s.name }))}
             stylists={stylists}
           />
+        </Card>
+        <Card
+          title="Grace"
+          description="Forgive a client's first no-show, once in a while, and tell them so in your own words. Charged as usual after that."
+        >
+          <GraceForm initial={policy.grace} salon={business?.name ?? "the salon"} bookingUrl={`${siteUrl()}/book/${business?.slug ?? ""}`} />
         </Card>
         <Card title="Stricter rules for a stylist" description="A stylist can have a longer window or higher fees than the salon's. A visit always takes the strictest rule of everyone on it.">
           <StaffPolicies stylists={stylists} policies={policy.stylists} />

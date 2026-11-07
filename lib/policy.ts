@@ -359,3 +359,62 @@ export const staffPolicyFromRow = (r: StaffPolicyRow): StaffPolicy => ({
   lateCancel: r.late_cancel_fee_kind ? { kind: r.late_cancel_fee_kind as FeeKind, amount: r.late_cancel_fee_amount ?? 0 } : null,
   noShow: r.no_show_fee_kind ? { kind: r.no_show_fee_kind as FeeKind, amount: r.no_show_fee_amount ?? 0 } : null,
 });
+
+// Grace (Settings → Policies → Grace): a client's first no-show (or late
+// cancellation, if chosen) in `months` is forgiven, at once or, with
+// `rebookDays`, once they rebook with the same stylist in that time
+// (else it's charged). The database decides (private.assess_policy_fee,
+// private.waive_fee_on_rebook); the client hears it in the salon's own
+// words, a fixed template it edits (`message`), never Denise's.
+export type GraceSettings = { on: boolean; kinds: ("no_show" | "late_cancel")[]; months: number; rebookDays: number | null; message: string };
+
+export const DEFAULT_GRACE_MESSAGE = "Hi {first_name}, we missed you today at {salon}. No charge this time. We'd love to see you again: {booking_link}";
+
+export const DEFAULT_GRACE: GraceSettings = { on: false, kinds: ["no_show"], months: 12, rebookDays: null, message: DEFAULT_GRACE_MESSAGE };
+
+// What the message can say: {stylist} is the visit's stylist, {by} the day
+// the rebooking window ends ("Fri, Nov 20"), {booking_link} the booking
+// site with that stylist.
+export const GRACE_FIELDS = ["first_name", "salon", "stylist", "by", "booking_link"] as const;
+
+export const MAX_GRACE_MESSAGE = 600;
+
+export type GraceRow = { grace_on: boolean; grace_kinds: string[]; grace_months: number; grace_rebook_days: number | null; grace_message: string };
+
+export const graceFromRow = (row: Partial<GraceRow> | null | undefined): GraceSettings =>
+  row?.grace_on === undefined
+    ? DEFAULT_GRACE
+    : {
+        on: row.grace_on,
+        kinds: (row.grace_kinds ?? ["no_show"]) as GraceSettings["kinds"],
+        months: row.grace_months ?? 12,
+        rebookDays: row.grace_rebook_days ?? null,
+        message: row.grace_message ?? DEFAULT_GRACE_MESSAGE,
+      };
+
+// What's wrong with grace settings, if anything.
+export function graceProblem(g: GraceSettings): string | null {
+  if (!g.kinds.length) return "Choose no-shows, late cancellations or both.";
+  if (!Number.isInteger(g.months) || g.months < 1 || g.months > 36) return "Give a window of 1 to 36 months.";
+  if (g.rebookDays !== null && (!Number.isInteger(g.rebookDays) || g.rebookDays < 1 || g.rebookDays > 90)) return "Give 1 to 90 days to rebook.";
+  const message = g.message.trim();
+  if (!message) return "Write the message clients get.";
+  if (message.length > MAX_GRACE_MESSAGE) return `Keep the message to ${MAX_GRACE_MESSAGE} characters.`;
+  const unknown = [...new Set([...message.matchAll(/\{([^}]*)\}/g)].map((m) => m[1]).filter((f) => !(GRACE_FIELDS as readonly string[]).includes(f)))];
+  if (unknown.length) return `The message can't use {${unknown[0]}}. It can use ${GRACE_FIELDS.map((f) => `{${f}}`).join(", ")}.`;
+  if (g.rebookDays === null && message.includes("{by}")) return "{by} needs a number of days to rebook.";
+  return null;
+}
+
+// The message with its fields filled in (our code, never Denise).
+export function graceMessage(template: string, values: { firstName: string; salon: string; stylist: string; by: string; bookingLink: string }): string {
+  const fields: Record<string, string> = { first_name: values.firstName, salon: values.salon, stylist: values.stylist, by: values.by, booking_link: values.bookingLink };
+  return template
+    .replace(/\{([a-z_]+)\}/g, (_, f: string) => fields[f] ?? "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/ +([.,!?])/g, "$1")
+    .trim();
+}
+
+// How a held fee reads on a visit: "waived if they rebook with Gil by Fri, Nov 20".
+export const graceLine = (stylist: string | null, by: string) => `waived if they rebook${stylist ? ` with ${stylist}` : ""} by ${by}`;

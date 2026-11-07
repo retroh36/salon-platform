@@ -17,6 +17,7 @@ import { ChargeNowButton } from "./charge-now";
 import { FeeRow } from "./fee-row";
 import { cents } from "./money";
 import { can } from "@/lib/permissions";
+import { FEE_GRACE_COLUMNS, graceOf } from "@/lib/policy-visits";
 import { canBook } from "@/lib/appointments";
 
 export const metadata: Metadata = { title: "Policy" };
@@ -66,7 +67,7 @@ async function Policy({ searchParams }: Pick<PageProps<"/policy">, "searchParams
   const since = new Date();
   since.setUTCMonth(since.getUTCMonth() - policy.settings.repeatMonths);
   const upcomingEnd = fromLocal(addDays(today, 30), 0, tz)!;
-  const select = "id, kind, fee_cents, from_deposit_cents, status, card_label, failure_reason, waive_reason, created_at, client_id, client:clients(first_name, last_name), appointment:appointments(starts_at)";
+  const select = `id, kind, fee_cents, from_deposit_cents, status, card_label, failure_reason, waive_reason, created_at, client_id, client:clients(first_name, last_name), appointment:appointments(starts_at), ${FEE_GRACE_COLUMNS}`;
   const [monthFees, recentFees, upcoming, cards] = await Promise.all([
     supabase.from("policy_fees").select(select).eq("business_id", me.business_id).gte("created_at", from.toISOString()).lt("created_at", to.toISOString()).order("created_at", { ascending: false }),
     supabase.from("policy_fees").select("id, kind, fee_cents, from_deposit_cents, status, created_at, client_id, client:clients(first_name, last_name)").eq("business_id", me.business_id).gte("created_at", since.toISOString()),
@@ -182,6 +183,7 @@ async function Policy({ searchParams }: Pick<PageProps<"/policy">, "searchParams
                       cardLabel: f.card_label,
                       failureReason: f.failure_reason,
                       waiveReason: f.waive_reason,
+                      grace: graceOf(f),
                     }}
                   />
                 ))}

@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   cancelFee,
   cardRequired,
+  DEFAULT_GRACE,
   DEFAULT_POLICY,
+  graceFromRow,
+  graceLine,
+  graceMessage,
+  graceProblem,
   depositNeeded,
   feeFor,
   isClientCancel,
@@ -159,5 +164,27 @@ describe("the policy page's numbers", () => {
   it("says how many upcoming bookings have a card on file", () => {
     expect(cardShare([{ clientId: "a" }, { clientId: "b" }, { clientId: null }, { clientId: "a" }], new Set(["a"]))).toEqual({ withCard: 2, total: 4, percent: 50 });
     expect(cardShare([], new Set())).toEqual({ withCard: 0, total: 0, percent: 0 });
+  });
+});
+
+describe("grace", () => {
+  const ok = { ...DEFAULT_GRACE, on: true };
+  it("checks the settings and the message's fields", () => {
+    expect(graceProblem(ok)).toBeNull();
+    expect(graceProblem({ ...ok, kinds: [] })).toMatch(/Choose/);
+    expect(graceProblem({ ...ok, months: 0 })).toMatch(/1 to 36/);
+    expect(graceProblem({ ...ok, rebookDays: 91 })).toMatch(/1 to 90/);
+    expect(graceProblem({ ...ok, message: "  " })).toMatch(/Write/);
+    expect(graceProblem({ ...ok, message: "Hi {name}" })).toMatch(/can't use \{name\}/);
+    expect(graceProblem({ ...ok, message: "Rebook by {by}" })).toMatch(/needs a number of days/);
+    expect(graceProblem({ ...ok, rebookDays: 14, message: "Rebook by {by}" })).toBeNull();
+  });
+
+  it("fills in the message with our values", () => {
+    expect(graceMessage("Hi {first_name}, rebook with {stylist} by {by} at {salon}: {booking_link}", { firstName: "Ava", salon: "Maple & Ash", stylist: "Gil", by: "Fri, Nov 20", bookingLink: "https://x.test/book/m" })).toBe(
+      "Hi Ava, rebook with Gil by Fri, Nov 20 at Maple & Ash: https://x.test/book/m",
+    );
+    expect(graceFromRow(null)).toEqual(DEFAULT_GRACE);
+    expect(graceLine("Gil", "Fri, Nov 20")).toBe("waived if they rebook with Gil by Fri, Nov 20");
   });
 });
