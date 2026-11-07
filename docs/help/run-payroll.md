@@ -10,7 +10,7 @@ See what each person is owed for a pay period, check the tickets behind it, and 
 1. In the sidebar, under **Sales**, tap **Payroll**. It opens on the last pay period that's over.
 2. To pick another period, tap the arrows either side of the dates (‹ and ›), or enter dates under **From** and **To** and tap **Show**.
 3. Check the **Pay due** table: service and retail sales, commission, tips, hours and **Total pay** for each person, with **Everyone** at the bottom.
-4. Under **Hours**, see scheduled hours, clocked hours and the difference for everyone paid by the hour, and which of them is paid.
+4. Under **Hours**, see scheduled hours, clocked hours and the difference for everyone paid by the hour or working a role, and which of them is paid. Under **By working role**, see what each role paid.
 5. Under **Tips**, see each person's tips, **Average tip** and top tipper.
 6. Tap a person's name to see every tip (date, client, services, tip %, how it was paid, with totals by week and day) and the **Tickets behind** their pay. Tap **Close** when you're done.
 7. Tap **Export CSV** for one row per person (including scheduled and clocked hours, back-bar fees and plan), in dollars, for your payroll provider, or **Export tips CSV** for every tip.
@@ -20,6 +20,8 @@ See what each person is owed for a pay period, check the tickets behind it, and 
 - Commission is on sales after discounts, before tax, at the rate or plan each person had when each sale was made. Under each commission you'll see the plan and any back-bar fees taken off.
 - Refunds and voids are taken back in the period they happen, at the same rate.
 - Hours paid are scheduled hours (their schedule, less approved time off) unless an owner chose clocked hours. See "Choose which hours pay hourly staff".
+- Time in a working role is paid as the role pays. An hourly role pays its hours at its rate and no commission on its services. A commission role pays its services at its percent and doesn't pay its hours. **By working role** shows each person's hours, pay, services and commission in each role, and the CSV has a "By working role" column.
+- A service's role is the role of the shift its visit started in, recorded when it's sold, so changing a role's pay or the schedule later doesn't change past pay.
 - A period that hasn't ended yet says "(still running)" and counts up to today.
 - The average tip is tips as a share of service sales, untipped visits included.
 - Maestra works out the numbers; paying people still happens through your payroll provider.

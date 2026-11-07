@@ -3,7 +3,9 @@
 // rate and plan version recorded when it was sold), from the start of any
 // tier window the period is part of, the plans' rules (commission_rules),
 // their pay history, and scheduled and clocked hours for anyone paid by
-// the hour (which pays is the salon's choice, businesses.payroll_hours).
+// the hour (which pays is the salon's choice, businesses.payroll_hours),
+// and how working roles paid each day (working_role_pay_history) for
+// anyone with shifts in them.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
@@ -26,7 +28,10 @@ import {
   type PayrollSale,
   type PlanVersion,
   type RateHistory,
+  type RoleNames,
+  type RolePayOn,
 } from "./payroll";
+import type { PayMethod } from "./working-roles";
 
 type Supabase = SupabaseClient<Database>;
 
@@ -58,6 +63,23 @@ async function clockedByDay(supabase: Supabase, staffIds: string[], from: LocalD
   return out;
 }
 
+type RolePayRow = { role_id: string; staff_id: string | null; effective_from: string; method: string | null; hourly_rate_cents: number | null };
+
+// How a role paid one person on a day: the role's pay in effect then, with
+// their own rate in it (set after the role's) over the role's. Roles not
+// in use (`inUse`) pay as no role.
+export function rolePayOn(rows: readonly RolePayRow[], staffId: string, dayOf: (iso: string) => LocalDate, inUse: ReadonlySet<string>): RolePayOn {
+  const fromOf = (r: RolePayRow) => (r.effective_from === "-infinity" ? null : dayOf(r.effective_from));
+  const latest = (list: RolePayRow[], date: LocalDate) => list.filter((r) => fromOf(r) === null || fromOf(r)! <= date).at(-1);
+  return (roleId, date) => {
+    if (!inUse.has(roleId)) return null;
+    const role = latest(rows.filter((r) => r.role_id === roleId && r.staff_id === null), date);
+    if (!role?.method) return null;
+    const own = latest(rows.filter((r) => r.role_id === roleId && r.staff_id === staffId), date);
+    return { method: role.method as PayMethod, hourlyRateCents: own?.hourly_rate_cents ?? role.hourly_rate_cents };
+  };
+}
+
 // Pay for a period: everyone (owners and managers), or one person (staffId;
 // anyone may load their own). Hours count only up to today.
 export async function loadPayroll(
@@ -84,16 +106,30 @@ export async function loadPayroll(
     .lt("effective_from", to.toISOString())
     .order("effective_from");
   if (staffId) historyQuery = historyQuery.eq("staff_id", staffId);
-  const [sales, staff, history, rules] = await Promise.all([
+  let rolePeopleQuery = supabase.from("staff_working_roles").select("staff_id").eq("business_id", businessId);
+  if (staffId) rolePeopleQuery = rolePeopleQuery.eq("staff_id", staffId);
+  const [sales, staff, history, rules, roles, rolePay, rolePeople] = await Promise.all([
     supabase.rpc("payroll_sales", { p_business_id: businessId, p_from: windowStart.toISOString(), p_to: to.toISOString(), p_staff_id: staffId }),
     staffQuery.order("first_name"),
     historyQuery,
     supabase.rpc("commission_rules", { p_business_id: businessId, p_staff_id: staffId }),
+    supabase.from("working_roles").select("id, name, archived_at").eq("business_id", businessId),
+    supabase
+      .from("working_role_pay_history")
+      .select("role_id, staff_id, effective_from, method, hourly_rate_cents")
+      .eq("business_id", businessId)
+      .lt("effective_from", to.toISOString())
+      .order("effective_from")
+      .order("id"),
+    rolePeopleQuery,
   ]);
   if (sales.error) throw sales.error;
   if (staff.error) throw staff.error;
   if (history.error) throw history.error;
   if (rules.error) throw rules.error;
+  if (roles.error) throw roles.error;
+  if (rolePay.error) throw rolePay.error;
+  if (rolePeople.error) throw rolePeople.error;
   const list = sales.data as unknown as PayrollSale[];
   const versions = planVersions(rules.data);
   const dayOf = (iso: string) => toLocal(new Date(iso), timeZone).date;
@@ -104,7 +140,15 @@ export async function loadPayroll(
     histories.set(h.staff_id, [...(histories.get(h.staff_id) ?? []), { from: fromDate, hourlyRateCents: h.hourly_rate_cents }]);
   }
 
-  const hourly = [...histories.entries()].filter(([, h]) => h.some((x) => x.hourlyRateCents !== null)).map(([id]) => id);
+  const inUse = new Set(roles.data.filter((r) => !r.archived_at).map((r) => r.id));
+  // How each role pays now, for its name on the page.
+  const nowPay = new Map<string, PayMethod>();
+  for (const r of rolePay.data) if (r.staff_id === null && r.method) nowPay.set(r.role_id, r.method as PayMethod);
+  const roleNames: RoleNames = new Map(roles.data.map((r) => [r.id, { name: r.name, method: nowPay.get(r.id) ?? "usual" }]));
+  // Hours for anyone paid by the hour, or working a role.
+  const hourly = [
+    ...new Set([...[...histories.entries()].filter(([, h]) => h.some((x) => x.hourlyRateCents !== null)).map(([id]) => id), ...rolePeople.data.map((r) => r.staff_id)]),
+  ];
   const through = period.to < today ? period.to : today;
   const [schedules, clocked] = await Promise.all([
     hourly.length ? loadStaffSchedules(supabase, hourly, period.from, period.to) : new Map(),
@@ -126,8 +170,15 @@ export async function loadPayroll(
         line: payLine(
           { staffId: s.id, name: `${s.first_name} ${s.last_name}`, role: roleLabel(s.role) },
           tickets,
-          schedule ? hourlyPay(schedule, period.from, through, histories.get(s.id)!, { clocked: clocked?.get(s.id) ?? null, basis: settings.hours }) : null,
+          schedule
+            ? hourlyPay(schedule, period.from, through, histories.get(s.id) ?? [], {
+                clocked: clocked?.get(s.id) ?? null,
+                basis: settings.hours,
+                roles: rolePayOn(rolePay.data, s.id, dayOf, inUse),
+              })
+            : null,
           context,
+          roleNames,
         ),
       };
     })

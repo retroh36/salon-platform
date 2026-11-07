@@ -86,6 +86,20 @@ test.describe("Scheduling", () => {
   });
 });
 
+test.describe("Payroll", () => {
+  test.use({ storageState: AUTH.owner });
+
+  test("pays the demo's roles their own way, by working role", async ({ page }) => {
+    // The demo: Lois on Wash House (hourly) Friday mornings and Beauty Bar (commission) after.
+    await page.goto("/payroll");
+    const table = ui(page).getByRole("table", { name: "Pay by working role" });
+    const wash = table.getByRole("row").filter({ hasText: "Lois" }).filter({ hasText: "Wash House" });
+    await expect(wash).toContainText("Hourly");
+    await expect(wash).toContainText(/\$\d/);
+    await expect(table.getByRole("row").filter({ hasText: "Lois" }).filter({ hasText: "Beauty Bar" })).toContainText("Commission");
+  });
+});
+
 test.describe("the front desk", () => {
   test.use({ storageState: AUTH.frontDesk });
 

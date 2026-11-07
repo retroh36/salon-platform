@@ -8,6 +8,7 @@ import {
   previousPeriod,
   hourlyPay,
   rateOn,
+  roleText,
   requestedPeriod,
   scheduledMinutes,
   ticketsFor,
@@ -149,7 +150,7 @@ describe("pay", () => {
     // The second sale was made after a raise to 50%.
     const raised = sale({ id: "s2", number: 1002, lines: sale().lines.map((l) => (l.kind === "service" ? { ...l, commission_pct: 50 } : l)) });
     const tickets = ticketsFor([sale(), raised], A, from, to);
-    const pay = payLine({ staffId: A, name: "Ana Test", role: "Stylist" }, tickets, { minutes: 600, scheduledMinutes: 600, clockedMinutes: null, basis: "scheduled", payCents: 15000, rates: [1500] });
+    const pay = payLine({ staffId: A, name: "Ana Test", role: "Stylist" }, tickets, { minutes: 600, scheduledMinutes: 600, clockedMinutes: null, basis: "scheduled", payCents: 15000, rates: [1500], byRole: [] });
     expect(pay).toMatchObject({
       serviceCents: 16000,
       serviceCommissionCents: 3600 + 4000,
@@ -174,7 +175,7 @@ describe("pay", () => {
       { from: "2026-10-13", hourlyRateCents: 2000 },
     ];
     // Mon 5th, Tue 6th, Mon 12th at $18; Tue 13th at $20 (8h each).
-    expect(hourlyPay(schedule, "2026-10-05", "2026-10-13", history)).toEqual({ minutes: 4 * 480, scheduledMinutes: 4 * 480, clockedMinutes: null, basis: "scheduled", payCents: 3 * 8 * 1800 + 8 * 2000, rates: [1800, 2000] });
+    expect(hourlyPay(schedule, "2026-10-05", "2026-10-13", history)).toEqual({ minutes: 4 * 480, scheduledMinutes: 4 * 480, clockedMinutes: null, basis: "scheduled", payCents: 3 * 8 * 1800 + 8 * 2000, rates: [1800, 2000], byRole: [] });
     expect(rateOn(history, "2026-10-12")).toBe(1800);
     // Moved to commission on the 13th: only the days before are hourly.
     expect(hourlyPay(schedule, "2026-10-05", "2026-10-13", [history[0], { from: "2026-10-13", hourlyRateCents: null }])).toMatchObject({ minutes: 3 * 480, payCents: 3 * 8 * 1800, rates: [1800] });
@@ -196,6 +197,7 @@ describe("pay", () => {
       basis: "clocked",
       payCents: (930 * 1800) / 60,
       rates: [1800],
+      byRole: [],
     });
     // Scheduled pays by default, with clocked hours shown beside them.
     expect(hourlyPay(schedule, "2026-10-05", "2026-10-06", history, { clocked })).toMatchObject({ minutes: 960, clockedMinutes: 930, basis: "scheduled", payCents: 16 * 1800 });
@@ -219,14 +221,69 @@ describe("pay", () => {
     expect(scheduledMinutes(schedule, "2026-10-14", "2026-10-13")).toBe(0);
   });
 
+  describe("working roles", () => {
+    // Mondays: Wash House 9–1 (hourly), Beauty Bar 2–6 (commission).
+    const WASH = "role-wash";
+    const BAR = "role-bar";
+    const schedule = {
+      weekly: { 1: [{ start: 540, end: 780, role: WASH }, { start: 840, end: 1080, role: BAR }] },
+      overrides: {},
+      timeOff: [],
+    };
+    const pays = (r: string) => (r === WASH ? { method: "hourly" as const, hourlyRateCents: 1800 } : r === BAR ? { method: "commission" as const, hourlyRateCents: null } : null);
+
+    it("pays an hourly role's hours at its rate and leaves a commission role's unpaid", () => {
+      // Two Mondays, someone on commission the rest of the time.
+      const hours = hourlyPay(schedule, "2026-10-05", "2026-10-12", [{ from: null, hourlyRateCents: null }], { roles: pays })!;
+      expect(hours).toMatchObject({ minutes: 2 * 240, scheduledMinutes: 2 * 480, payCents: 2 * 4 * 1800, rates: [] });
+      expect(hours.byRole).toEqual([
+        { roleId: WASH, method: "hourly", minutes: 480, payCents: 8 * 1800, rates: [1800] },
+        { roleId: BAR, method: "commission", minutes: 480, payCents: 0, rates: [] },
+      ]);
+      // Without roles in use (all removed), someone not paid by the hour has no hours.
+      expect(hourlyPay(schedule, "2026-10-05", "2026-10-12", [{ from: null, hourlyRateCents: null }], { roles: () => null })).toBeNull();
+    });
+
+    it("pays a usual role as the person usually is, and shares clocked hours by shift length", () => {
+      const usual = (r: string) => (r === WASH ? { method: "hourly" as const, hourlyRateCents: 2000 } : { method: "usual" as const, hourlyRateCents: null });
+      // Hourly at $15 the rest of the time: Wash House at $20, Beauty Bar at $15.
+      expect(hourlyPay(schedule, "2026-10-05", "2026-10-05", [{ from: null, hourlyRateCents: 1500 }], { roles: usual })).toMatchObject({ minutes: 480, payCents: 4 * 2000 + 4 * 1500, rates: [1500] });
+      // Clocked 7 hours: 3.5 in each shift.
+      const clocked = new Map([["2026-10-05", 420]]);
+      expect(hourlyPay(schedule, "2026-10-05", "2026-10-05", [{ from: null, hourlyRateCents: 1500 }], { roles: usual, clocked, basis: "clocked" })).toMatchObject({
+        minutes: 420,
+        payCents: 210 * (2000 / 60) + 210 * (1500 / 60),
+        byRole: [{ roleId: WASH, minutes: 210, payCents: 7000 }],
+      });
+    });
+
+    it("adds up hours and services by role on the pay line, and in the CSV", () => {
+      const roleSale = sale({ lines: [{ id: "i1", kind: "service", staff_id: A, description: "Cut", quantity: 1, net_cents: 10000, commission_pct: 40, working_role_id: BAR }] });
+      const hours = hourlyPay(schedule, "2026-10-05", "2026-10-05", [{ from: null, hourlyRateCents: null }], { roles: pays });
+      const names = new Map([
+        [WASH, { name: "Wash House", method: "hourly" as const }],
+        [BAR, { name: "Beauty Bar", method: "commission" as const }],
+      ]);
+      const pay = payLine({ staffId: A, name: "Kat Test", role: "Stylist" }, ticketsFor([roleSale], A, from, to), hours, undefined, names);
+      expect(pay.roles).toEqual([
+        { roleId: BAR, name: "Beauty Bar", method: "commission", minutes: 240, hourlyPayCents: 0, serviceCents: 10000, commissionCents: 4000 },
+        { roleId: WASH, name: "Wash House", method: "hourly", minutes: 240, hourlyPayCents: 7200, serviceCents: 0, commissionCents: 0 },
+      ]);
+      expect(pay).toMatchObject({ serviceCommissionCents: 4000, hourlyPayCents: 7200, totalCents: 4000 + 7200 + 1000 });
+      expect(roleText(pay.roles[0])).toBe("Beauty Bar: $100.00 services, $40.00 commission, 4 hr unpaid");
+      expect(roleText(pay.roles[1])).toBe("Wash House: 4 hr, hourly $72.00");
+      expect(payrollCsv([pay], { from: "2026-10-05", to: "2026-10-18" })).toContain('"Beauty Bar: $100.00 services, $40.00 commission, 4 hr unpaid; Wash House: 4 hr, hourly $72.00"');
+    });
+  });
+
   it("exports a row per person in dollars, safe for spreadsheets", () => {
-    const pay = payLine({ staffId: A, name: '=Evil "Ana", Jr', role: "Stylist" }, ticketsFor([sale()], A, from, to), { minutes: 450, scheduledMinutes: 480, clockedMinutes: 450, basis: "clocked", payCents: 13500, rates: [1800] });
+    const pay = payLine({ staffId: A, name: '=Evil "Ana", Jr', role: "Stylist" }, ticketsFor([sale()], A, from, to), { minutes: 450, scheduledMinutes: 480, clockedMinutes: 450, basis: "clocked", payCents: 13500, rates: [1800], byRole: [] });
     const csv = payrollCsv([pay], { from: "2026-10-05", to: "2026-10-18" });
     const [header, row] = csv.trimEnd().split("\r\n");
     expect(header).toBe(
-      "Period start,Period end,Staff,Role,Service sales,Service commission %,Service commission,Retail sales,Retail commission %,Retail commission,Tips,Average tip %,Hours paid,Hours paid from,Scheduled hours,Clocked hours,Clocked less scheduled,Hourly rate,Hourly pay,Back-bar fees,Plan,Total pay",
+      "Period start,Period end,Staff,Role,Service sales,Service commission %,Service commission,Retail sales,Retail commission %,Retail commission,Tips,Average tip %,Hours paid,Hours paid from,Scheduled hours,Clocked hours,Clocked less scheduled,Hourly rate,Hourly pay,Back-bar fees,Plan,By working role,Total pay",
     );
-    expect(row).toBe(`2026-10-05,2026-10-18,"'=Evil ""Ana"", Jr",Stylist,80.00,45,36.00,20.00,15,3.00,10.00,12.5,7.5,clocked,8,7.5,-0.5,18.00,135.00,0.00,,184.00`);
+    expect(row).toBe(`2026-10-05,2026-10-18,"'=Evil ""Ana"", Jr",Stylist,80.00,45,36.00,20.00,15,3.00,10.00,12.5,7.5,clocked,8,7.5,-0.5,18.00,135.00,0.00,,,184.00`);
   });
 });
 

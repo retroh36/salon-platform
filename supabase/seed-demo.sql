@@ -85,6 +85,57 @@ select business_id, staff_id, 1, weekday, start_minute, end_minute
 from public.staff_working_hours
 where staff_id = 'd0000000-0000-4000-8000-000000000010' and cycle_week = 0 and weekday <> 6;
 
+-- Working roles, as a salon with a wash house would set them up: on
+-- Fridays Lois is on Wash House in the morning (blowouts and treatments,
+-- hourly) and Beauty Bar in the afternoon (her own services, on commission
+-- at her own 45%), and Beauty Bar on Wednesdays and Thursdays; Hannah is
+-- on Beauty Bar Thursday and Friday and Wash House on Saturdays. The
+-- visits below follow them.
+insert into public.working_roles (id, business_id, name, online, position) values
+  ('e1000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'Wash House', true, 0),
+  ('e1000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'Beauty Bar', true, 1);
+insert into public.working_role_services (business_id, role_id, service_id)
+select business_id, 'e1000000-0000-4000-8000-000000000001', id from public.services
+where business_id = 'b0000000-0000-4000-8000-000000000001'
+  and name in ('Blowout', 'Blowout (Long/Thick Hair)', 'Curls / Beach Waves', 'Silk Press', 'Deep Conditioning', 'Hydrating Mask Add-On', 'Scalp Treatment', 'Bond Repair Treatment');
+insert into public.working_role_pay (role_id, business_id, method, hourly_rate_cents, commission_pct) values
+  ('e1000000-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000001', 'hourly', 1800, null),
+  ('e1000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000001', 'commission', null, 40);
+insert into public.staff_working_roles (business_id, staff_id, role_id)
+select 'b0000000-0000-4000-8000-000000000001', s, r
+from unnest(array['d0000000-0000-4000-8000-000000000010', 'd0000000-0000-4000-8000-000000000006']::uuid[]) s,
+     unnest(array['e1000000-0000-4000-8000-000000000001', 'e1000000-0000-4000-8000-000000000002']::uuid[]) r;
+insert into public.staff_role_pay (business_id, staff_id, role_id, commission_pct)
+values ('b0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000010', 'e1000000-0000-4000-8000-000000000002', 45);
+-- Set up this way from the start.
+update public.working_role_pay_history set effective_from = '-infinity'
+where role_id in ('e1000000-0000-4000-8000-000000000001', 'e1000000-0000-4000-8000-000000000002');
+-- Lois's Fridays (9 to 5) become 9 to 1 and 1:30 to 5, in both weeks of her pattern.
+update public.staff_working_hours set end_minute = 780, role_id = 'e1000000-0000-4000-8000-000000000001'
+where staff_id = 'd0000000-0000-4000-8000-000000000010' and weekday = 5;
+insert into public.staff_working_hours (business_id, staff_id, cycle_week, weekday, start_minute, end_minute, role_id)
+select business_id, staff_id, cycle_week, 5, 810, 1020, 'e1000000-0000-4000-8000-000000000002'
+from public.staff_working_hours where staff_id = 'd0000000-0000-4000-8000-000000000010' and weekday = 5;
+update public.staff_working_hours h
+set role_id = case when h.weekday = 6 then 'e1000000-0000-4000-8000-000000000001' else 'e1000000-0000-4000-8000-000000000002' end::uuid
+where (h.staff_id = 'd0000000-0000-4000-8000-000000000010' and h.weekday in (3, 4))
+   or h.staff_id = 'd0000000-0000-4000-8000-000000000006';
+
+-- Whether the role of the shift a service would start in takes it (a role
+-- that lists no services takes all of the person's).
+create function pg_temp.role_allows(p_staff uuid, d date, p_from int, p_service uuid) returns boolean
+language sql stable as $$
+  select not exists (
+    select 1 from jsonb_array_elements(private.live_hours(p_staff, d)) h
+    join public.working_role_services w on w.role_id = (h ->> 'role')::uuid
+    where (h ->> 'start')::int <= p_from and p_from < (h ->> 'end')::int
+  ) or exists (
+    select 1 from jsonb_array_elements(private.live_hours(p_staff, d)) h
+    join public.working_role_services w on w.role_id = (h ->> 'role')::uuid and w.service_id = p_service
+    where (h ->> 'start')::int <= p_from and p_from < (h ->> 'end')::int
+  )
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Appointments: 16 weeks back to nine days ahead (and the next visits
 -- booked at checkout, further out: see "Rebooked at checkout"), about 60% of the
@@ -302,6 +353,7 @@ begin
           from public.staff_services ss
           join public.services sv on sv.id = ss.service_id
           where ss.staff_id = st.staff_id and sv.archived_at is null and cur + sv.duration_minutes <= sh.end_minute
+            and pg_temp.role_allows(st.staff_id, d, cur, sv.id)
           order by -ln((pg_temp.rnd(key || sv.id) + 1) / 10001.0)
                    / case when sv.name in ('Women''s Cut & Style', 'Men''s Cut', 'Skin Fade', 'Root Touch-Up', 'Balayage',
                                            'Partial Highlights', 'Full Highlights', 'Blowout', 'Gloss / Toner', 'All-Over Color')
@@ -341,6 +393,7 @@ begin
             join public.staff_services ss on ss.staff_id = o.staff_id
             join public.services sv on sv.id = ss.service_id and sv.name in ('Blowout', 'Blowout (Long/Thick Hair)', 'Women''s Cut & Style', 'Curls / Beach Waves')
             where pg_temp.staff_free(o.staff_id, d, cur + svc.duration_minutes, cur + svc.duration_minutes + sv.duration_minutes)
+              and pg_temp.role_allows(o.staff_id, d, cur + svc.duration_minutes, sv.id)
               and not pg_temp.staff_clash(o.staff_id, v_end, sv.active_minutes, sv.processing_minutes, sv.finishing_minutes)
               and pg_temp.pick_resource(array[o.home] || v_spares, v_end, v_end + make_interval(mins => sv.duration_minutes)) is not null
             order by pg_temp.rnd(key || o.staff_id || sv.id)
@@ -360,6 +413,7 @@ begin
             join public.services sv on sv.id = ss.service_id
             where ss.staff_id = st.staff_id and sv.archived_at is null and sv.processing_minutes = 0
               and sv.duration_minutes <= svc.processing_minutes
+              and pg_temp.role_allows(st.staff_id, d, cur + svc.active_minutes, sv.id)
               and pg_temp.pick_resource(v_spares, v_start + make_interval(mins => svc.active_minutes),
                                         v_start + make_interval(mins => svc.active_minutes + sv.duration_minutes)) is not null
             order by pg_temp.rnd(key || ':fill' || sv.id)
@@ -424,7 +478,8 @@ begin
     v_from := (v_minute + 20 - c.color_minutes) / 15 * 15;
     v_mid := v_from + c.color_minutes;
     v_to := v_mid + c.next_minutes + 20;
-    exit when v_from < v_minute and pg_temp.staff_free(c.staff_id, v_today, v_from, v_to);
+    exit when v_from < v_minute and pg_temp.staff_free(c.staff_id, v_today, v_from, v_to)
+      and pg_temp.role_allows(c.staff_id, v_today, v_from, c.color_id) and pg_temp.role_allows(c.staff_id, v_today, v_mid, c.next_id);
     c := null;
   end loop;
   if c is null then
@@ -899,6 +954,7 @@ begin
         while m + svc.duration_minutes <= hrs.end_minute loop
           v_start := pg_temp.at_local(d, m);
           if pg_temp.staff_free(r.staff_id, d, m, m + svc.duration_minutes)
+             and pg_temp.role_allows(r.staff_id, d, m, svc.id)
              and not pg_temp.staff_clash(r.staff_id, v_start, svc.active_minutes, svc.processing_minutes, svc.finishing_minutes) then
             v_resource := pg_temp.pick_resource(
               case when svc.name in ('Keratin Smoothing', 'Brazilian Blowout') then array[v_room] else array[r.home] || v_spares end,

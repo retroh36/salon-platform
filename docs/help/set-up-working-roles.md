@@ -25,5 +25,5 @@ A working role is what someone is doing in a stretch of their day, like Wash Hou
 - While someone is on a shift in a role, only the role's services can be booked with them, at the desk, online and by Denise. A role that isn't online keeps that time off the booking site; the desk can still book it.
 - Dragging a visit onto someone in a role without that service asks first, like any other move that doesn't fit.
 - **Remove role** takes it out of use: shifts that had it book as if they had no role.
-- Pay by role isn't in Payroll yet: that's coming next.
+- Payroll pays each shift as its role pays, with a **By working role** table. Each service records the role it was done in when it's sold, and a change to a role's pay counts from then on.
 - Taking someone off a role takes it off their shifts still to come.

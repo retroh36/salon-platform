@@ -69,7 +69,7 @@ test("an owner adds a stylist with services and hours, and the invite lets them 
   await form.getByLabel("First name").fill(`${TAG}Rae`);
   await form.getByLabel("Last name").fill("Lin");
   await form.locator("input[name=email]").fill(EMAIL);
-  await form.getByLabel("Role").selectOption("stylist");
+  await form.getByRole("combobox", { name: /^Role/ }).selectOption("stylist");
   await form.getByLabel("Level").selectOption("senior");
   await form.getByLabel("Blowout", { exact: true }).check();
   await form.getByLabel("Women's Cut & Style").check();
@@ -172,10 +172,10 @@ test.describe("roles", () => {
     await expect(page).toHaveURL("/team");
     await page.goto("/team/new");
     await waitForHydration(page, "select[name=role]");
-    await expect(ui(page).getByLabel("Role").locator("option")).toHaveText(["Manager", "Front desk", "Stylist", "Assistant", "Bookkeeper"]);
+    await expect(ui(page).getByRole("combobox", { name: /^Role/ }).locator("option")).toHaveText(["Manager", "Front desk", "Stylist", "Assistant", "Bookkeeper"]);
     // Their own role is fixed, and there's no reset for them to send.
     await page.goto(`/team/${SEED.staff.manager}`);
-    await expect(ui(page).getByLabel("Role")).toBeDisabled();
+    await expect(ui(page).getByRole("combobox", { name: /^Role/ })).toBeDisabled();
     await expect(ui(page).getByRole("region", { name: "Leaving" })).toContainText("You can't deactivate yourself.");
     await page.goto(`/team/${SEED.staff.bridget}`);
     await expect(ui(page).getByRole("button", { name: "Send a password reset" })).toHaveCount(0);

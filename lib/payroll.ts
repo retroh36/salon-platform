@@ -15,12 +15,19 @@
 // the plan version it was sold under (./commission.ts: tiers, back-bar
 // fees, marginal or retroactive tiers); hourly pay at the rate in effect each day. Changing a
 // rate or a plan never changes past pay.
+//
+// Working roles (./working-roles.ts) pay their own way: a service line
+// records the role of the shift it was done in, at the role's rate then
+// (no commission in an hourly role); each hour in a shift with a role is
+// paid as the role pays that day (hourly at its rate, unpaid in a
+// commission role, else as the person usually is).
 
 import { monthStart, payLines, type Basis, type LinePay, type PayInput, type PlanRules } from "./commission.ts";
 import { csvTable, dollars } from "./csv.ts";
 import { averageTipPct } from "./tips.ts";
+import type { PayMethod } from "./working-roles.ts";
 import { subtractIntervals } from "./scheduling/intervals.ts";
-import { hoursOn, type StaffSchedule } from "./scheduling/availability.ts";
+import { shiftsOn as scheduledShifts, type Shift, type StaffSchedule } from "./scheduling/availability.ts";
 import { addDays, datesBetween, type LocalDate } from "./scheduling/time.ts";
 
 export type PayPeriodKind = "weekly" | "biweekly" | "semi_monthly" | "custom";
@@ -73,7 +80,18 @@ export type PayrollSale = {
   client: string | null;
   // commission_pct: the rate recorded on the line when it was sold.
   // commission_version_id: the plan version it was sold under, if any.
-  lines: { id?: string; kind: "service" | "product"; staff_id: string; description: string; quantity: number; net_cents: number; commission_pct: number; commission_version_id?: string | null }[];
+  // working_role_id: the role of the shift a service was done in.
+  lines: {
+    id?: string;
+    kind: "service" | "product";
+    staff_id: string;
+    description: string;
+    quantity: number;
+    net_cents: number;
+    commission_pct: number;
+    commission_version_id?: string | null;
+    working_role_id?: string | null;
+  }[];
   tips: { staff_id: string; amount_cents: number }[];
   // The tenders that took money (card, cash, gift card), for itemized tips.
   payments?: { method: "card" | "cash" | "other" | "gift_card"; online: boolean }[];
@@ -98,7 +116,7 @@ export type Ticket = {
   tipCents: number;
   // soldCents: what the whole line sold for (to share a back-bar fee);
   // pay: what it earned, once a pay line has worked it out.
-  lines: { description: string; kind: "service" | "product"; quantity: number; cents: number; pct: number; versionId: string | null; soldCents: number; pay?: LinePay }[];
+  lines: { description: string; kind: "service" | "product"; quantity: number; cents: number; pct: number; versionId: string | null; roleId?: string | null; soldCents: number; pay?: LinePay }[];
 };
 
 const PAID_WITH = { card: "Card", card_online: "Card online", cash: "Cash", other: "Other", gift_card: "Gift card" } as const;
@@ -123,6 +141,7 @@ function ownShare(sale: PayrollSale, staffId: string): Amounts {
       cents: l.net_cents,
       pct: Number(l.commission_pct),
       versionId: l.commission_version_id ?? null,
+      roleId: l.working_role_id ?? null,
       soldCents: l.net_cents,
     }));
   return {
@@ -213,13 +232,12 @@ export function ticketsFor(sales: readonly PayrollSale[], staffId: string, from:
 }
 
 // Scheduled shifts on a day: their hours (a one-off change, else their
-// repeating pattern) less approved time off.
-export function shiftsOn(schedule: StaffSchedule, date: LocalDate) {
-  const hours = hoursOn(schedule, date);
+// repeating pattern) less approved time off, each keeping its role.
+export function shiftsOn(schedule: StaffSchedule, date: LocalDate): Shift[] {
   const off = schedule.timeOff
     .filter((t) => t.status === "approved" && date >= t.startsOn && date <= t.endsOn)
     .map((t) => (t.startMinute != null && t.endMinute != null ? { start: t.startMinute, end: t.endMinute } : { start: 0, end: 1440 }));
-  return subtractIntervals(hours, off);
+  return scheduledShifts(schedule, date).flatMap((s) => subtractIntervals([{ start: s.start, end: s.end }], off).map((i) => (s.role ? { ...i, role: s.role } : i)));
 }
 
 // Scheduled minutes on a day.
@@ -241,48 +259,87 @@ export const rateOn = (history: RateHistory, date: LocalDate) => [...history].re
 // Which hours pay people paid by the hour (businesses.payroll_hours).
 export type HoursBasis = "scheduled" | "clocked";
 
+// How a role pays on a day (the person's own rate in it first), for
+// hourlyPay; null for a role no longer in use, paid as no role.
+export type RolePayOn = (roleId: string, date: LocalDate) => { method: PayMethod; hourlyRateCents: number | null } | null;
+
+// The hours someone worked in one role, and what they paid (nothing in a
+// commission role).
+export type RoleHours = { roleId: string; method: PayMethod; minutes: number; payCents: number; rates: number[] };
+
 // Hours in a period: scheduled (their shifts less approved time off),
 // clocked (null without the time clock), and the minutes paid, from the
-// salon's choice.
-export type Hours = { minutes: number; scheduledMinutes: number; clockedMinutes: number | null; basis: HoursBasis; payCents: number; rates: number[] };
+// salon's choice. byRole: the hours in shifts with a role that pays its
+// own way (hourly or commission), counted apart from the rest.
+export type Hours = { minutes: number; scheduledMinutes: number; clockedMinutes: number | null; basis: HoursBasis; payCents: number; rates: number[]; byRole: RoleHours[] };
 
 // Hourly pay between two dates: each day's minutes (scheduled, or clocked
-// where the salon pays clocked hours) at the rate in effect that day. Null
-// for someone never paid by the hour in the period. `clocked` is minutes
-// clocked by day; without it, scheduled hours pay.
+// where the salon pays clocked hours) at the rate in effect that day. A
+// shift in a role that pays hourly or by commission is paid as the role
+// pays (`roles`); clocked minutes on a day with roles are shared across
+// its shifts by their length. Null for someone neither paid by the hour
+// nor working such a role in the period. `clocked` is minutes clocked by
+// day; without it, scheduled hours pay.
 export function hourlyPay(
   schedule: StaffSchedule,
   from: LocalDate,
   to: LocalDate,
   history: RateHistory,
-  { clocked, basis = "scheduled" }: { clocked?: ReadonlyMap<LocalDate, number> | null; basis?: HoursBasis } = {},
+  { clocked, basis = "scheduled", roles }: { clocked?: ReadonlyMap<LocalDate, number> | null; basis?: HoursBasis; roles?: RolePayOn } = {},
 ): Hours | null {
   if (to < from) return null;
   const paidFrom: HoursBasis = basis === "clocked" && clocked ? "clocked" : "scheduled";
   let scheduled = 0;
   let clockedTotal = 0;
+  let minutes = 0;
   let pay = 0;
   const rates = new Set<number>();
-  let hourly = false;
+  const byRole = new Map<string, { method: PayMethod; minutes: number; pay: number; rates: Set<number> }>();
+  let counted = false;
   for (const date of datesBetween(from, to)) {
     const rate = rateOn(history, date);
-    if (rate === null) continue;
-    hourly = true;
-    rates.add(rate);
-    const s = minutesOn(schedule, date);
+    const shifts = shiftsOn(schedule, date).map((sh) => ({ minutes: sh.end - sh.start, pay: sh.role ? (roles?.(sh.role, date) ?? null) : null, role: sh.role ?? null }));
+    const own = shifts.filter((sh) => sh.pay && sh.pay.method !== "usual");
+    if (rate === null && own.length === 0) continue;
+    counted = true;
+    const s = shifts.reduce((n, sh) => n + sh.minutes, 0);
     const c = clocked?.get(date) ?? 0;
     scheduled += s;
     clockedTotal += c;
-    pay += ((paidFrom === "clocked" ? c : s) * rate) / 60;
+    // Each shift's share of the day's paid minutes.
+    const paidOf = (m: number) => (paidFrom === "scheduled" ? m : s > 0 ? (c * m) / s : 0);
+    let usual = paidFrom === "clocked" && s === 0 ? c : 0;
+    for (const sh of shifts) {
+      if (!sh.pay || sh.pay.method === "usual") {
+        usual += paidOf(sh.minutes);
+        continue;
+      }
+      const r = byRole.get(sh.role!) ?? { method: sh.pay.method, minutes: 0, pay: 0, rates: new Set<number>() };
+      const m = paidOf(sh.minutes);
+      r.minutes += m;
+      if (sh.pay.method === "hourly" && sh.pay.hourlyRateCents != null) {
+        r.pay += (m * sh.pay.hourlyRateCents) / 60;
+        r.rates.add(sh.pay.hourlyRateCents);
+        minutes += m;
+        pay += (m * sh.pay.hourlyRateCents) / 60;
+      }
+      byRole.set(sh.role!, r);
+    }
+    if (rate !== null) {
+      rates.add(rate);
+      minutes += usual;
+      pay += (usual * rate) / 60;
+    }
   }
-  if (!hourly) return null;
+  if (!counted) return null;
   return {
-    minutes: paidFrom === "clocked" ? clockedTotal : scheduled,
+    minutes: Math.round(minutes),
     scheduledMinutes: scheduled,
     clockedMinutes: clocked ? clockedTotal : null,
     basis: paidFrom,
     payCents: Math.round(pay),
     rates: [...rates].sort((a, b) => a - b),
+    byRole: [...byRole.entries()].map(([roleId, r]) => ({ roleId, method: r.method, minutes: Math.round(r.minutes), payCents: Math.round(r.pay), rates: [...r.rates].sort((a, b) => a - b) })),
   };
 }
 
@@ -309,9 +366,15 @@ export type PayLine = {
   clockedMinutes: number | null;
   hoursBasis: HoursBasis | null;
   hourlyPayCents: number;
+  // Pay by working role: each role they worked or sold services in, with
+  // its hours and their pay (in hourlyPayCents too) and its services and
+  // their commission (in serviceCommissionCents too).
+  roles: RoleLine[];
   totalCents: number;
   tickets: Ticket[];
 };
+
+export type RoleLine = { roleId: string; name: string; method: PayMethod; minutes: number; hourlyPayCents: number; serviceCents: number; commissionCents: number };
 
 // How plan lines are paid (./commission.ts payLines).
 export type PlanContext = {
@@ -372,7 +435,10 @@ const NO_PLANS: PlanContext = { rulesFor: () => null, windowOf: () => "" };
 
 const unique = (values: number[]) => [...new Set(values)].sort((a, b) => a - b);
 
-export function payLine(person: { staffId: string; name: string; role: string }, tickets: Ticket[], hours: Hours | null, plans: PlanContext = NO_PLANS): PayLine {
+// The salon's roles by id: name and how each pays now.
+export type RoleNames = ReadonlyMap<string, { name: string; method: PayMethod }>;
+
+export function payLine(person: { staffId: string; name: string; role: string }, tickets: Ticket[], hours: Hours | null, plans: PlanContext = NO_PLANS, roleNames: RoleNames = new Map()): PayLine {
   const inputs: PayInput[] = tickets.flatMap((t) => t.lines.map((l) => ({ at: t.at, kind: l.kind, cents: l.cents, soldCents: l.soldCents, quantity: l.quantity, pct: l.pct, versionId: l.versionId })));
   const paid = payLines(inputs, plans.rulesFor, plans.windowOf, plans.prior);
   let n = 0;
@@ -388,6 +454,20 @@ export function payLine(person: { staffId: string; name: string; role: string },
   const retailCommissionCents = Math.round(of("product").reduce((n, l) => n + l.pay!.commissionCents, 0));
   const feeCents = Math.round(lines.reduce((n, l) => n + l.pay!.feeCents, 0));
   const hourly = hours?.payCents ?? 0;
+  const roles = new Map<string, RoleLine>();
+  const roleLine = (roleId: string) => {
+    const known = roleNames.get(roleId);
+    const r = roles.get(roleId) ?? { roleId, name: known?.name ?? "A removed role", method: known?.method ?? "usual", minutes: 0, hourlyPayCents: 0, serviceCents: 0, commissionCents: 0 };
+    roles.set(roleId, r);
+    return r;
+  };
+  for (const h of hours?.byRole ?? []) Object.assign(roleLine(h.roleId), { method: h.method, minutes: h.minutes, hourlyPayCents: h.payCents });
+  for (const l of of("service")) {
+    if (!l.roleId) continue;
+    const r = roleLine(l.roleId);
+    r.serviceCents += l.cents;
+    r.commissionCents += l.pay!.commissionCents;
+  }
   const planNames = [...new Set(lines.map((l) => (l.versionId ? (plans.planName?.(l.versionId) ?? null) : null)).filter((x): x is string => x !== null))];
   return {
     ...person,
@@ -403,6 +483,7 @@ export function payLine(person: { staffId: string; name: string; role: string },
     clockedMinutes: hours?.clockedMinutes ?? null,
     hoursBasis: hours?.basis ?? null,
     hourlyPayCents: hourly,
+    roles: [...roles.values()].map((r) => ({ ...r, commissionCents: Math.round(r.commissionCents) })).sort((a, b) => a.name.localeCompare(b.name)),
     totalCents: serviceCommissionCents + retailCommissionCents + tipCents + hourly,
     tickets: priced,
   };
@@ -412,6 +493,15 @@ export function payLine(person: { staffId: string; name: string; role: string },
 export const ratesText = (values: number[], format: (v: number) => string) => values.map(format).join(", ");
 
 export const formatHours = (minutes: number) => (minutes / 60).toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+
+// "Wash House: 4 hr, hourly $72.00", "Beauty Bar: $300.00 services, $120.00 commission, 3 hr unpaid".
+export function roleText(r: RoleLine): string {
+  const money = (cents: number) => `${cents < 0 ? "-" : ""}$${dollars(Math.abs(cents))}`;
+  const parts: string[] = [];
+  if (r.serviceCents || r.commissionCents) parts.push(`${money(r.serviceCents)} services, ${money(r.commissionCents)} commission`);
+  if (r.minutes) parts.push(r.method === "hourly" ? `${formatHours(r.minutes)} hr, hourly ${money(r.hourlyPayCents)}` : r.method === "commission" ? `${formatHours(r.minutes)} hr unpaid` : `${formatHours(r.minutes)} hr`);
+  return `${r.name}: ${parts.join(", ") || "nothing yet"}`;
+}
 
 // One row per person, in dollars, for a payroll provider.
 export function payrollCsv(lines: readonly PayLine[], period: PayPeriod): string {
@@ -437,6 +527,7 @@ export function payrollCsv(lines: readonly PayLine[], period: PayPeriod): string
     "Hourly pay",
     "Back-bar fees",
     "Plan",
+    "By working role",
     "Total pay",
   ];
   const rows = lines.map((l) => [
@@ -461,6 +552,7 @@ export function payrollCsv(lines: readonly PayLine[], period: PayPeriod): string
     dollars(l.hourlyPayCents),
     dollars(l.feeCents),
     l.rates.plans.join("/"),
+    l.roles.map(roleText).join("; "),
     dollars(l.totalCents),
   ]);
   return csvTable(header, rows);

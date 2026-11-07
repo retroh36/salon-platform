@@ -154,3 +154,96 @@ describe("booking a shift in a working role", () => {
     expect((await book(cut)).ok).toBe(true);
   });
 });
+
+describe("paying a shift in a working role", () => {
+  // A Tuesday far from the demo: Wash House 9–1 at $18 an hour, then Beauty
+  // Bar 2–6 on commission (40%, the stylist's own 45%).
+  const DAY = "2031-06-17";
+  const at = (hour: number) => fromLocal(DAY, hour * 60, "America/Chicago")!;
+  const made: string[] = [];
+  let washPay: string;
+  let barPay: string;
+  let saleId: string;
+  let desk: Client;
+  let owner: Client;
+
+  beforeAll(async () => {
+    desk = await signIn("frontdesk@mapleandash.test");
+    owner = await signIn("owner@mapleandash.test");
+    const role = async (name: string) => (await manager.rpc("save_working_role", { p_business_id: B, p_role_id: null!, p_name: name, p_online: true, p_service_ids: [] })).data!;
+    [washPay, barPay] = [await role("Wash House Pay Test"), await role("Beauty Bar Pay Test")];
+    await owner.rpc("save_working_role_pay", { p_role_id: washPay, p_method: "hourly", p_hourly_rate_cents: 1800, p_commission_pct: null! });
+    await owner.rpc("save_working_role_pay", { p_role_id: barPay, p_method: "commission", p_hourly_rate_cents: null!, p_commission_pct: 40 });
+    await manager.rpc("set_staff_working_roles", { p_staff_id: stylist.id, p_role_ids: [washPay, barPay] });
+    await owner.rpc("set_staff_role_pay", { p_staff_id: stylist.id, p_role_id: barPay, p_hourly_rate_cents: null!, p_commission_pct: 45 });
+    await admin.from("staff_schedule_overrides").insert([
+      { business_id: B, staff_id: stylist.id, on_date: DAY, start_minute: 540, end_minute: 780, role_id: washPay },
+      { business_id: B, staff_id: stylist.id, on_date: DAY, start_minute: 840, end_minute: 1080, role_id: barPay },
+    ]);
+  });
+
+  afterAll(async () => {
+    if (saleId) await admin.from("sales").delete().eq("id", saleId);
+    if (made.length) await admin.from("appointments").delete().in("id", made);
+    await admin.from("staff_schedule_overrides").delete().eq("staff_id", stylist.id).eq("on_date", DAY);
+    await admin.from("staff_services").delete().eq("staff_id", stylist.id);
+    await admin.from("working_roles").delete().in("id", [washPay, barPay]);
+  });
+
+  it("records each service's role at the rate that pays it, and pays the hours by role", async () => {
+    const blowout = (await admin.from("services").select("id").eq("business_id", B).eq("name", "Blowout").single()).data!.id;
+    await admin.from("staff_services").insert({ business_id: B, staff_id: stylist.id, service_id: blowout });
+    const clientId = (await admin.from("clients").select("id").eq("business_id", B).limit(1).single()).data!.id;
+    const items: string[] = [];
+    for (const hour of [10, 15]) {
+      const r = await saveBooking(desk, { id: L, timezone: "America/Chicago" }, { clientId, notes: null, items: [{ serviceId: blowout, staffId: stylist.id, start: at(hour), resource: { kind: "any" } }] });
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      made.push(r.appointmentId);
+      items.push((await admin.from("appointment_items").select("id").eq("appointment_id", r.appointmentId).single()).data!.id);
+    }
+    const { data: sale } = await admin
+      .from("sales")
+      .insert({ business_id: B, location_id: L, number: 900000 + Math.floor(Math.random() * 99999), subtotal_cents: 10000, total_cents: 10000 })
+      .select("id")
+      .single();
+    saleId = sale!.id;
+    const line = (position: number, appointment_item_id: string) => ({
+      sale_id: saleId,
+      business_id: B,
+      position,
+      kind: "service" as const,
+      service_id: blowout,
+      appointment_item_id,
+      staff_id: stylist.id,
+      description: "Blowout",
+      unit_price_cents: 5000,
+      total_cents: 5000,
+    });
+    await admin.from("sale_items").insert([line(0, items[0]), line(1, items[1])]);
+    const { data: lines } = await admin.from("sale_items").select("working_role_id, commission_pct, commission_version_id").eq("sale_id", saleId).order("position");
+    // Wash House pays hourly: no commission. Beauty Bar: their own 45%.
+    expect(lines).toEqual([
+      { working_role_id: washPay, commission_pct: 0, commission_version_id: null },
+      { working_role_id: barPay, commission_pct: 45, commission_version_id: null },
+    ]);
+
+    // A rate changed now doesn't change what was recorded, and is kept as history.
+    await owner.rpc("save_working_role_pay", { p_role_id: barPay, p_method: "commission", p_hourly_rate_cents: null!, p_commission_pct: 50 });
+    // (It started as the person's usual pay, then 40%, now 50%.)
+    expect((await admin.from("working_role_pay_history").select("method, commission_pct").eq("role_id", barPay).is("staff_id", null).order("effective_from")).data).toEqual([
+      { method: "usual", commission_pct: null },
+      { method: "commission", commission_pct: 40 },
+      { method: "commission", commission_pct: 50 },
+    ]);
+
+    // Payroll for that week: 4 hours at $18, 4 hours unpaid, and the services by role.
+    const { loadPayroll } = await import("@/lib/payroll-load");
+    const [pay] = await loadPayroll(owner, B, "America/Chicago", { from: "2031-06-16", to: "2031-06-22" }, "2031-06-30", stylist.id);
+    expect(pay.roles).toEqual([
+      { roleId: barPay, name: "Beauty Bar Pay Test", method: "commission", minutes: 240, hourlyPayCents: 0, serviceCents: 0, commissionCents: 0 },
+      { roleId: washPay, name: "Wash House Pay Test", method: "hourly", minutes: 240, hourlyPayCents: 7200, serviceCents: 0, commissionCents: 0 },
+    ]);
+    expect(pay.hourlyPayCents).toBe(7200);
+  });
+});

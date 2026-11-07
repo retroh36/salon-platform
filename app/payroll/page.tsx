@@ -18,6 +18,7 @@ import { formatPrice } from "@/lib/services";
 import { averageTipPct, pctText, tipItems, topTippers } from "@/lib/tips";
 import { TipDetails } from "@/components/tip-details";
 import { can } from "@/lib/permissions";
+import { PAY_METHODS } from "@/lib/working-roles";
 
 export const metadata: Metadata = { title: "Payroll" };
 
@@ -48,6 +49,7 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
   const sum = (f: (l: (typeof lines)[number]) => number) => lines.reduce((n, l) => n + f(l), 0);
   const running = period.to >= today;
   const hourly = lines.filter((l) => l.minutes !== null);
+  const byRole = lines.flatMap((l) => l.roles.map((r) => ({ line: l, role: r })));
   const paidClocked = settings.hours === "clocked" && settings.timeClock;
   // People with services or tips: what they were tipped, on average and by whom.
   const tips = lines
@@ -170,7 +172,7 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
           Commission is on sales after discounts, before tax, at the rate each person had when each sale was made (changing a rate on Team → Schedule only affects sales
           from then on). Refunds and voids are taken back at the same rate, in the period they happen. Hours paid are{" "}
           {paidClocked ? "the hours they clocked" : "their scheduled hours, less approved time off"}
-          {running ? ", up to today" : ""}, at the hourly rate in effect each day.
+          {running ? ", up to today" : ""}, at the hourly rate in effect each day. Time in a working role is paid as the role pays.
           {can(me, "payroll") && (
             <>
               {" "}
@@ -188,8 +190,8 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
           titleId="hours-heading"
           description={
             settings.timeClock
-              ? `Scheduled and clocked hours for everyone paid by the hour. ${paidClocked ? "Clocked" : "Scheduled"} hours pay, as set on Settings → Payroll.`
-              : "Scheduled hours for everyone paid by the hour. Turn on the time clock (Settings → Shared devices) to compare clocked hours."
+              ? `Scheduled and clocked hours for everyone paid by the hour or working a role. ${paidClocked ? "Clocked" : "Scheduled"} hours pay, as set on Settings → Payroll.`
+              : "Scheduled hours for everyone paid by the hour or working a role. Turn on the time clock (Settings → Shared devices) to compare clocked hours."
           }
         >
           <TableCard>
@@ -225,6 +227,43 @@ async function Payroll({ searchParams }: Pick<PageProps<"/payroll">, "searchPara
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </TableCard>
+        </Section>
+      )}
+
+      {byRole.length > 0 && (
+        <Section
+          title="By working role"
+          titleId="roles-heading"
+          description="Hours in an hourly role are paid at its rate, with no commission on its services. Services in a commission role are paid at its percent, and its hours aren't paid. Included in the totals above."
+        >
+          <TableCard>
+            <table className={`${tableClass} tabular-nums`} aria-label="Pay by working role">
+              <thead className={theadClass}>
+                <tr>
+                  <th className={thClass}>Staff</th>
+                  <th className={thClass}>Role</th>
+                  <th className={thClass}>Paid as</th>
+                  <th className={`${thClass} text-right`}>Hours</th>
+                  <th className={`${thClass} text-right`}>Hourly pay</th>
+                  <th className={`${thClass} text-right`}>Services</th>
+                  <th className={`${thClass} text-right`}>Commission</th>
+                </tr>
+              </thead>
+              <tbody>
+                {byRole.map(({ line, role }) => (
+                  <tr key={`${line.staffId}:${role.roleId}`} className={trClass} data-testid="role-line" data-staff-id={line.staffId}>
+                    <td className={tdClass}>{line.name}</td>
+                    <td className={tdClass}>{role.name}</td>
+                    <td className={tdClass}>{PAY_METHODS.find((m) => m.value === role.method)!.label}</td>
+                    <td className={`${tdClass} ${numClass}`}>{role.minutes ? `${formatHours(role.minutes)} hr` : "—"}</td>
+                    <td className={`${tdClass} ${numClass}`}>{role.method === "hourly" ? payMoney(role.hourlyPayCents) : role.method === "commission" && role.minutes ? "Unpaid" : "—"}</td>
+                    <td className={`${tdClass} ${numClass}`}>{payMoney(role.serviceCents)}</td>
+                    <td className={`${tdClass} ${numClass}`}>{payMoney(role.commissionCents)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </TableCard>
