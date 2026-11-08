@@ -35,14 +35,26 @@ export async function onlineTerms(admin: Admin, site: BookingSite, clientId: str
 }
 
 export async function termsFor(admin: Admin, site: BookingSite, clientId: string | null, items: readonly PlannedItem[]): Promise<OnlineTerms> {
-  const policy = await loadPolicy(admin, site.business.id);
   const priceOf = (i: PlannedItem) => site.stylists.find((s) => s.id === i.staffId)?.prices[i.serviceId] ?? 0;
-  const visitCents = items.reduce((sum, i) => sum + priceOf(i), 0);
-  const serviceDeposit = items.reduce((sum, i) => {
+  const lines = items.map((i) => {
     const s = site.services.find((x) => x.id === i.serviceId);
-    return sum + (s ? depositFor(s.depositKind, s.depositAmount, priceOf(i)) : 0);
-  }, 0);
-  const staffIds = [...new Set(items.map((i) => i.staffId))];
+    return { serviceId: i.serviceId, staffId: i.staffId, priceCents: priceOf(i), depositCents: s ? depositFor(s.depositKind, s.depositAmount, priceOf(i)) : 0 };
+  });
+  return clientTerms(admin, { id: site.business.id, name: site.business.name }, clientId, lines);
+}
+
+// The same for any visit's lines, each with its price and its service's
+// own deposit (a waitlist offer's, which isn't from the booking site).
+export async function clientTerms(
+  admin: Admin,
+  business: { id: string; name: string },
+  clientId: string | null,
+  lines: readonly { serviceId: string; staffId: string; priceCents: number; depositCents: number }[],
+): Promise<OnlineTerms> {
+  const policy = await loadPolicy(admin, business.id);
+  const visitCents = lines.reduce((sum, l) => sum + l.priceCents, 0);
+  const serviceDeposit = lines.reduce((sum, l) => sum + l.depositCents, 0);
+  const staffIds = [...new Set(lines.map((l) => l.staffId))];
   const stylists = policy.stylists.filter((p) => staffIds.includes(p.staffId));
 
   let strikes = 0;
@@ -62,9 +74,9 @@ export async function termsFor(admin: Admin, site: BookingSite, clientId: string
   const standing = standingOf(policy.settings, strikes);
   const depositCents = depositNeeded(policy.settings, standing, visitCents, serviceDeposit);
   const cardNeeded =
-    depositCents > 0 || cardRequired(policy.settings, { serviceIds: items.map((i) => i.serviceId), staffIds, newClient, repeatOffender: standing.action !== "off" });
+    depositCents > 0 || cardRequired(policy.settings, { serviceIds: lines.map((l) => l.serviceId), staffIds, newClient, repeatOffender: standing.action !== "off" });
   return {
-    lines: policyText(policy.settings, { stylists, visitCents, depositCents, extra: policy.extra, salon: site.business.name }),
+    lines: policyText(policy.settings, { stylists, visitCents, depositCents, extra: policy.extra, salon: business.name }),
     terms: visitTerms(policy.settings, stylists, visitCents, depositCents),
     cardNeeded,
     depositCents,

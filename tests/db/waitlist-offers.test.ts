@@ -107,7 +107,9 @@ describe("waitlist offers", () => {
     const w = await waiting();
     const start = soon();
     const sent = await offer(frontDesk, w.entryId, start);
-    const result = await answerOffer(sent.token, true);
+    // A new client: the demo's policy asks for a card, agreed to first.
+    expect(await answerOffer(sent.token, true)).toMatchObject({ ok: false, message: "Please agree to the cancellation policy first." });
+    const result = await answerOffer(sent.token, true, { cardRef: "test_visa_4242", agreed: true });
     expect(result).toMatchObject({ ok: true, taken: true });
     const o = await loadOffer(admin, sent.token);
     expect(o!.status).toBe("taken");
@@ -121,7 +123,7 @@ describe("waitlist offers", () => {
     // The same time offered to someone else is gone now; they stay waiting.
     const other = await waiting();
     const second = await offer(frontDesk, other.entryId, start);
-    expect(await answerOffer(second.token, true)).toMatchObject({ ok: false, message: expect.stringContaining("just been taken") });
+    expect(await answerOffer(second.token, true, { cardRef: "test_visa_4242", agreed: true })).toMatchObject({ ok: false, message: expect.stringContaining("just been taken") });
     expect((await admin.from("waitlist_entries").select("status").eq("id", other.entryId).single()).data!.status).toBe("waiting");
   });
 

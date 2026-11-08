@@ -11,7 +11,7 @@ When time opens up, Denise suggests waitlist clients who fit it. You choose who 
 2. Find the waitlist card. It shows the opening and the clients who fit, best first: those who asked for that stylist, then whoever has waited longest.
 3. To book someone after you've spoken to them, tap **Book** next to their name. The visit is booked and the client comes off the waitlist.
 4. To let them choose, tap **Offer** instead. They get the salon's message with a link, and the row says **Offered · until** the time it's held to.
-5. The client taps **Take it** or **No thanks** on their phone. Either way you get a notice on the Dashboard's For you card, and a visit they take is on the calendar.
+5. The client taps **Take it** or **No thanks** on their phone. If the cancellation policy needs a card for that visit (or a deposit), the page shows the policy first: they agree and add a card (or use the one on file), and any deposit is paid before it's booked. If their card doesn't go through, nothing is booked and they stay on the waitlist. Either way you get a notice on the Dashboard's For you card, and a visit they take is on the calendar.
 
 ## Good to know
 

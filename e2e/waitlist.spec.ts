@@ -24,6 +24,8 @@ test.afterAll(async () => {
   await admin.from("walk_ins").delete().like("name", `${PREFIX}%`);
   await admin.from("waitlist_entries").delete().in("client_id", ids);
   await admin.from("outbox_messages").delete().like("body", `%${PREFIX}%`);
+  await admin.from("policy_fees").delete().in("client_id", ids);
+  await admin.from("client_cards").delete().in("client_id", ids);
   for (const id of ids) await admin.from("appointments").delete().eq("client_id", id);
   await admin.from("clients").delete().in("id", ids);
 });
@@ -120,7 +122,7 @@ test("when a visit is canceled, Denise suggests who on the waitlist fits, and st
   await expect(opening).toHaveCount(0);
 });
 
-test("offers the opening with one tap, and the client takes it from the text", async ({ page, browser }) => {
+test("offers the opening with one tap, and the client takes it from the text, paying the deposit the policy asks", async ({ page, browser }) => {
   const cut = await mensCut();
   const regular = await newClient("Regular");
   for (const [h, m] of [[9, 0], [9, 30], [10, 0], [10, 30], [11, 0], [11, 30], [14, 0], [14, 30], [15, 0], [15, 30], [16, 0], [16, 30]]) await book(regular, cut, h, m);
@@ -131,6 +133,17 @@ test("offers the opening with one tap, and the client takes it from the text", a
     .from("waitlist_entries")
     .insert({ business_id: B, location_id: L, client_id: tia, service_ids: [cut], staff_ids: [NOLA], from_date: addDays(DAY, -3), to_date: addDays(DAY, 3) });
   expect(error).toBeNull();
+  // Two late cancels in six months: the demo's policy asks a repeat
+  // offender for half the visit as a deposit.
+  for (const hour of [7, 8]) {
+    const { data: past } = await admin
+      .from("appointments")
+      .insert({ business_id: B, location_id: L, client_id: tia, starts_at: at(hour).toISOString(), ends_at: at(hour, 30).toISOString(), status: "canceled", canceled_at: at(hour).toISOString() })
+      .select("id")
+      .single();
+    const { error: feeError } = await admin.from("policy_fees").insert({ business_id: B, location_id: L, appointment_id: past!.id, client_id: tia, kind: "late_cancel", fee_cents: 2000, status: "charged" });
+    expect(feeError).toBeNull();
+  }
 
   await openDay(page);
   await ui(page).getByRole("region", { name: "Nola Brennan", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Gone Test`) }).click();
@@ -161,7 +174,20 @@ test("offers the opening with one tap, and the client takes it from the text", a
     await client.goto(link);
     await expect(client.getByRole("heading", { name: `Hi ${PREFIX}Tia, a spot opened up` })).toBeVisible();
     await expect(client.getByText("Men's Cut with Nola")).toBeVisible();
-    await client.getByRole("button", { name: "Take it" }).click();
+    // The policy first, the deposit, and the card.
+    await expect(client.getByTestId("policy")).toBeVisible();
+    await expect(client.getByTestId("deposit")).toContainText("Deposit, paid now");
+    const take = client.getByRole("button", { name: /^Pay \$[\d.]+ and take it$/ });
+    await expect(take).toBeDisabled();
+    await waitForHydration(client, "[data-testid=test-card]");
+    await client.getByLabel(/I agree to the cancellation policy/).check();
+    // A card that's declined: nothing booked, still on the waitlist.
+    await client.getByTestId("test-card").selectOption({ label: "Visa …0002 (declined)" });
+    await take.click();
+    await expect(client.getByRole("alert").filter({ hasText: "declined" })).toContainText("The card was declined. You haven't been charged, and you're still on");
+    expect((await admin.from("waitlist_entries").select("status").eq("client_id", tia).single()).data!.status).toBe("waiting");
+    await client.getByTestId("test-card").selectOption({ label: "Visa …4242 (always works)" });
+    await take.click();
     await expect(client).toHaveURL(/\/manage\/[\w-]+\?booked=1$/);
     // The link now says it's booked.
     await client.goto(link);
@@ -170,8 +196,10 @@ test("offers the opening with one tap, and the client takes it from the text", a
     await phone.close();
   }
 
-  const { data: booked } = await admin.from("appointments").select("starts_at, status, online_source").eq("client_id", tia);
-  expect(booked).toEqual([{ starts_at: expect.any(String), status: "booked", online_source: "waitlist" }]);
+  const { data: booked } = await admin.from("appointments").select("starts_at, status, online_source, deposit_paid_cents").eq("client_id", tia).neq("status", "canceled");
+  expect(booked).toEqual([{ starts_at: expect.any(String), status: "booked", online_source: "waitlist", deposit_paid_cents: expect.any(Number) }]);
+  expect(booked![0].deposit_paid_cents).toBeGreaterThan(0);
+  expect((await admin.from("client_cards").select("label").eq("client_id", tia).is("removed_at", null).single()).data!.label).toBe("Visa …4242");
   expect(new Date(booked![0].starts_at)).toEqual(at(12, 30));
   expect((await admin.from("waitlist_entries").select("status").eq("client_id", tia).single()).data!.status).toBe("booked");
 });

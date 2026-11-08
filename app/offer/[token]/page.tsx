@@ -5,11 +5,13 @@ import { Suspense } from "react";
 import { BookingFrame } from "@/app/book/[slug]/frame";
 import { pageLead, pageTitle } from "@/app/book/[slug]/styles";
 import { salonLogoUrl } from "@/lib/branding";
+import { offerTerms } from "@/lib/offer-terms";
 import { DEFAULT_ACCENT } from "@/lib/online-booking/settings";
+import { salonProvider } from "@/lib/payments";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadOffer, offerWhen } from "@/lib/waitlist-offers";
-import { OfferButtons } from "./buttons";
+import { OfferButtons, type OfferPay } from "./buttons";
 
 export const metadata: Metadata = { title: { absolute: "A spot opened up" }, robots: { index: false } };
 
@@ -22,15 +24,26 @@ export default function OfferPage({ params }: PageProps<"/offer/[token]">) {
 }
 
 // The client's page from a waitlist offer: the time, and Take it or No
-// thanks. Public, with the service role, by the link's token (only its
+// thanks; when the cancellation policy needs a card (or a deposit) for it,
+// the policy to agree to and the card come first, as online. Public, with the service role, by the link's token (only its
 // hash is stored).
 async function Offer({ params }: { params: Promise<{ token: string }> }) {
   await connection();
   const { token } = await params;
-  const offer = await loadOffer(createAdminClient(), token);
+  const admin = createAdminClient();
+  const offer = await loadOffer(admin, token);
   if (!offer) notFound();
   const tz = offer.location.timezone;
   const open = offer.status === "open" && !offer.expired;
+  const terms = open ? await offerTerms(admin, offer) : null;
+  const pay: OfferPay | null = terms?.cardNeeded
+    ? {
+        lines: terms.lines,
+        depositCents: terms.depositCents,
+        cardOnFile: terms.cardOnFile?.label ?? null,
+        cardForm: terms.cardOnFile ? { kind: "unavailable", reason: "Card on file" } : await (await salonProvider(admin, offer.businessId)).cardForm(),
+      }
+    : null;
   return (
     <BookingFrame name={offer.salon.name} logoUrl={salonLogoUrl(offer.salon.logoPath)} accent={offer.salon.accent ?? DEFAULT_ACCENT}>
       {offer.status === "taken" ? (
@@ -61,7 +74,7 @@ async function Offer({ params }: { params: Promise<{ token: string }> }) {
               {offer.services.join(", ")} with {offer.stylist}
             </p>
           </div>
-          <OfferButtons token={token} salon={offer.salon.name}/>
+          <OfferButtons token={token} salon={offer.salon.name} pay={pay} />
         </div>
       )}
     </BookingFrame>
