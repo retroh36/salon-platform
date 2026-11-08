@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { DeniseAvatar, DeniseFace, DenisePose, type Pose } from "@/components/denise";
 import { formatDuration } from "@/lib/duration";
@@ -12,6 +13,7 @@ import { noFixAdvice } from "@/lib/denise/respond";
 import type { ConflictView, DeniseNotice, DeniseState, FixView, Moved, OpeningMatch, WaitlistOpening } from "@/lib/denise/types";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
+import { GracePrompt } from "./grace-prompt";
 import { MovedMessages } from "./moved-messages";
 import { UndoFix } from "./undo-fix";
 import { useNow } from "./now-line";
@@ -89,6 +91,8 @@ export function DenisePanel({
   const conflicts = state?.conflicts ?? [];
   const notices = state?.notices ?? [];
   const openings = state?.openings ?? [];
+  const graceToSend = data.me.canBook ? data.graceToSend : [];
+  const router = useRouter();
   const pose: Pose = working ? "think" : conflicts.length ? "point" : "wave";
   const isToday = data.date === data.today;
   // A not-arrived client whose "Mark no-show" was tapped: asked first.
@@ -101,9 +105,10 @@ export function DenisePanel({
   else if (conflicts.length) says = conflicts.length === 1 ? "I spotted something." : `I spotted ${conflicts.length} things.`;
   else if (notices.length) says = "Nothing's clashing, but keep an eye on this:";
   else if (openings.length) says = "Some time opened up, and your waitlist could use it:";
+  else if (graceToSend.length) says = "Nothing's clashing. One thing to follow up on:";
   else if (state.reorders.length) says = state.reorders.length === 1 ? "The calendar's clear. One thing about stock:" : "The calendar's clear. A few things about stock:";
   else says = isToday ? "All clear today." : "All clear for this day.";
-  const allClear = pose === "wave" && Boolean(state) && !notices.length && !openings.length && !state?.reorders.length && !outcome;
+  const allClear = pose === "wave" && Boolean(state) && !notices.length && !openings.length && !state?.reorders.length && !graceToSend.length && !outcome;
 
   return (
     <div className="flex min-h-full flex-col gap-4 py-2 text-sm">
@@ -141,6 +146,14 @@ export function DenisePanel({
       {outcome?.moved && <MovedMessages moved={outcome.moved} />}
       {outcome?.corrected && <MovedMessages moved={outcome.corrected} template="visit_move_undone" />}
       {data.me.canBook && <FixesApplied data={data} hide={outcome?.undoActionId ?? null} working={working} onUndo={onUndo} />}
+
+      {/* Grace forgave a fee and the client hasn't been told: only Send tells them. */}
+      {graceToSend.length > 0 && (
+        <section aria-label="Grace messages" data-testid="denise-grace" className="flex animate-fade-in flex-col gap-2 rounded-lg border border-denise-200 bg-surface p-4">
+          <p className="font-semibold text-denise-900">{graceToSend.length === 1 ? "Grace message not sent" : `${graceToSend.length} grace messages not sent`}</p>
+          <GracePrompt feeIds={graceToSend.map((g) => g.feeId)} onDone={() => router.refresh()} />
+        </section>
+      )}
 
       {conflicts.map((c, i) => (
         <ConflictCard

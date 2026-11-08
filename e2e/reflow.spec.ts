@@ -264,6 +264,9 @@ test("Clients keeps Spend on screen at iPad width", async ({ page }) => {
 });
 
 test("Denise's bubble never covers a page's own buttons, and the sidebar opens her too", async ({ page }) => {
+  // Short enough that the list scrolls under her whatever the day (Denise's
+  // ideas for open time are one line on a day with none).
+  await page.setViewportSize({ width: 1180, height: 560 });
   await page.goto("/promotions");
   const bubble = page.getByTestId("denise-bubble-launcher");
   await waitForHydration(page, "[data-testid=denise-bubble-launcher]");

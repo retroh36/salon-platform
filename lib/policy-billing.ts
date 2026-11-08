@@ -6,29 +6,23 @@
 // (record_fee_charge: charged, or failed with a notice to the front of
 // house). Then: receipts for fees charged (a fixed template, through the
 // outbox), refunds for fees waived after charging, and deposits to give
-// back (a visit the salon canceled, or the client canceled in good time),
-// and the grace message to clients whose fee the salon's grace forgave or
-// is holding (its own template, filled in by our code, once the fee's 10
-// minutes to undo have passed).
+// back (a visit the salon canceled, or the client canceled in good time).
+// The grace message is never sent from here: staff send it (lib/grace-message.ts).
 
 import { channelFor, consentOf } from "./messaging/consent.ts";
 import { withStopLine } from "./messaging/templates.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types.ts";
 import { providerFor } from "./payments/index.ts";
-import { siteUrl } from "./branding.ts";
-import { feeReceipt, graceFromRow, graceMessage } from "./policy.ts";
+import { feeReceipt } from "./policy.ts";
 import { toLocal } from "./scheduling/time.ts";
 
 type Admin = SupabaseClient<Database>;
 
-export type FeeRunSummary = { charged: number; failed: number; receipts: number; refunded: number; depositsRefunded: number; graceMessages: number };
+export type FeeRunSummary = { charged: number; failed: number; receipts: number; refunded: number; depositsRefunded: number };
 
-// How long a no-show can still be taken back before its fee (or grace) stands.
-export const UNDO_MINUTES = 10;
-
-export async function runPolicyCharges(admin: Admin, options: { businessId?: string; feeId?: string; now?: Date } = {}): Promise<FeeRunSummary> {
-  const summary: FeeRunSummary = { charged: 0, failed: 0, receipts: 0, refunded: 0, depositsRefunded: 0, graceMessages: 0 };
+export async function runPolicyCharges(admin: Admin, options: { businessId?: string; feeId?: string } = {}): Promise<FeeRunSummary> {
+  const summary: FeeRunSummary = { charged: 0, failed: 0, receipts: 0, refunded: 0, depositsRefunded: 0 };
 
   const { data: due, error } = await admin.rpc("claim_policy_fees", { p_business_id: options.businessId ?? null!, p_fee_id: options.feeId ?? null!, p_limit: 100 });
   if (error) throw error;
@@ -57,54 +51,7 @@ export async function runPolicyCharges(admin: Admin, options: { businessId?: str
   summary.receipts = await sendReceipts(admin, options);
   summary.refunded = await refundWaived(admin, options);
   summary.depositsRefunded = await refundDeposits(admin, options);
-  summary.graceMessages = await sendGraceMessages(admin, options);
   return summary;
-}
-
-async function sendGraceMessages(admin: Admin, options: { businessId?: string; feeId?: string; now?: Date }): Promise<number> {
-  const before = new Date((options.now ?? new Date()).getTime() - UNDO_MINUTES * 60_000).toISOString();
-  let query = admin
-    .from("policy_fees")
-    .select(
-      "id, business_id, grace_until, grace_staff:staff!policy_fees_grace_staff_id_fkey(id, first_name), client:clients(first_name, email, phone, appointment_sms_ok, appointment_email_ok, sms_opt_in, email_opt_in, sms_stopped_at), business:businesses(name, slug, online_booking_settings(enabled), policy_settings(grace_on, grace_kinds, grace_months, grace_rebook_days, grace_message)), location:locations(timezone, phone)",
-    )
-    .not("grace_at", "is", null)
-    .is("grace_message_at", null)
-    .lte("grace_at", before)
-    .in("status", ["waived", "pending", "no_card"]);
-  if (options.businessId) query = query.eq("business_id", options.businessId);
-  if (options.feeId) query = query.eq("id", options.feeId);
-  const { data, error } = await query;
-  if (error) throw error;
-  let sent = 0;
-  for (const f of data) {
-    const grace = graceFromRow(f.business.policy_settings);
-    const dest = channelFor(consentOf(f.client), "appointment", "sms");
-    if (dest) {
-      const online = Boolean(f.business.online_booking_settings?.enabled && f.business.slug);
-      const stylist = f.grace_staff;
-      const by = f.grace_until ? new Date(f.grace_until).toLocaleDateString("en-US", { timeZone: f.location.timezone, weekday: "short", month: "short", day: "numeric" }) : "";
-      const body = graceMessage(grace.message, {
-        firstName: f.client.first_name,
-        salon: f.business.name,
-        stylist: stylist?.first_name ?? "us",
-        by,
-        bookingLink: online ? `${siteUrl()}/book/${f.business.slug}?src=grace${stylist ? `&staff=${stylist.id}` : ""}` : (f.location.phone ?? ""),
-      });
-      const { error: outError } = await admin.from("outbox_messages").insert({
-        business_id: f.business_id,
-        channel: dest.channel,
-        to_address: dest.to,
-        subject: dest.channel === "email" ? f.business.name : null,
-        body: dest.channel === "sms" ? withStopLine(body) : body,
-      });
-      if (outError) throw outError;
-    }
-    const { error: markError } = await admin.rpc("record_grace_message", { p_fee_id: f.id });
-    if (markError) throw markError;
-    sent += 1;
-  }
-  return sent;
 }
 
 async function sendReceipts(admin: Admin, options: { businessId?: string; feeId?: string }): Promise<number> {

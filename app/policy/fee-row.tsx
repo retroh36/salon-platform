@@ -32,6 +32,8 @@ export type FeeRowData = {
   waiveReason: string | null;
   // Held under the salon's grace: "waived if they rebook with Gil by Fri, Nov 20".
   grace?: string | null;
+  // Its grace message neither sent nor skipped yet.
+  graceUnsent?: boolean;
 };
 
 const KIND = { late_cancel: "Late cancel", no_show: "No-show" } as const;
@@ -87,6 +89,7 @@ export function FeeRow({ fee, canWaive, canRetry }: { fee: FeeRowData; canWaive:
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <Badge tone={status.tone}>{status.label}</Badge>
             {status.detail && <span className="text-13 text-ink-muted">{status.detail}</span>}
+            {fee.graceUnsent && <Badge tone="warning">Grace message not sent</Badge>}
           </span>
           {result && !waiving && (
             <p className={`mt-1 text-13 ${result.ok ? "text-ink-muted" : "text-danger"}`} role={result.ok ? "status" : "alert"}>

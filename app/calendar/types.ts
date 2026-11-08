@@ -246,6 +246,9 @@ export type BoardData = {
   // Denise's fixes still applied on this day, each with Undo (her card's
   // "Fixes applied"; front of house, by RLS).
   fixesApplied: { actionId: string; summary: string; names: string[]; appliedBy: string | null; at: string }[];
+  // Fees grace forgave (or holds) whose message to the client nobody has
+  // sent or skipped yet: her card asks about each (front of house).
+  graceToSend: { feeId: string; clientName: string }[];
   // The location whose calendar changes it listens for (useCalendarChanges).
   locationId: string;
   // What a link asked to show (from the Dashboard): a stylist's column,

@@ -6,6 +6,7 @@ import {
   DEFAULT_POLICY,
   graceFromRow,
   graceLine,
+  graceMessageDue,
   graceMessage,
   graceProblem,
   depositNeeded,
@@ -168,6 +169,17 @@ describe("the policy page's numbers", () => {
 });
 
 describe("grace", () => {
+  it("asks about the message until it's sent or skipped, and not once a held fee can't be forgiven", () => {
+    const now = new Date("2026-11-10T12:00:00Z");
+    const f = { grace_at: "2026-11-09T12:00:00Z", grace_message_at: null, grace_message_skipped_at: null, status: "waived", grace_until: null };
+    expect(graceMessageDue(f, now)).toBe(true);
+    expect(graceMessageDue({ ...f, grace_message_at: "2026-11-09T13:00:00Z" }, now)).toBe(false);
+    expect(graceMessageDue({ ...f, grace_message_skipped_at: "2026-11-09T13:00:00Z" }, now)).toBe(false);
+    expect(graceMessageDue({ ...f, grace_at: null }, now)).toBe(false);
+    expect(graceMessageDue({ ...f, status: "pending", grace_until: "2026-11-20T12:00:00Z" }, now)).toBe(true);
+    expect(graceMessageDue({ ...f, status: "no_card", grace_until: "2026-11-01T12:00:00Z" }, now)).toBe(false);
+    expect(graceMessageDue({ ...f, status: "charged", grace_until: "2026-11-20T12:00:00Z" }, now)).toBe(false);
+  });
   const ok = { ...DEFAULT_GRACE, on: true };
   it("checks the settings and the message's fields", () => {
     expect(graceProblem(ok)).toBeNull();

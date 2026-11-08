@@ -8,7 +8,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
 import { EmptyState, PageHeader, Section, nameLinkClass, textLinkClass } from "@/components/ui/page";
 import { TableCard, numClass, tableClass, tdClass, thClass, theadClass, trClass } from "@/components/ui/table";
 import { getCurrentStaff } from "@/lib/auth";
-import { type FeeStatus } from "@/lib/policy";
+import { graceMessageDue, type FeeStatus } from "@/lib/policy";
 import { loadPolicy } from "@/lib/policy-load";
 import { cardShare, policySummary, repeatOffenders, type ReportFee } from "@/lib/policy-report";
 import { formatDay } from "@/lib/schedule-format";
@@ -184,6 +184,7 @@ async function Policy({ searchParams }: Pick<PageProps<"/policy">, "searchParams
                       failureReason: f.failure_reason,
                       waiveReason: f.waive_reason,
                       grace: graceOf(f),
+                      graceUnsent: graceMessageDue(f),
                     }}
                   />
                 ))}

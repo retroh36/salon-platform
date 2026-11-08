@@ -80,7 +80,7 @@ export function GraceForm({ initial, salon, bookingUrl }: { initial: GraceSettin
             Message to the client
             <textarea value={message} maxLength={MAX_GRACE_MESSAGE} onChange={(e) => (setMessage(e.target.value), setResult(null))} rows={3} className={`${fieldClass} field-sizing-content`} />
             <span className="text-13 font-normal text-ink-muted">
-              Sent by itself once the fee can&rsquo;t be taken back (10 minutes), on the client&rsquo;s channel for visit messages. It can use {GRACE_FIELDS.map((f) => `{${f}}`).join(", ")}.
+              Never sent by itself: booking details and Denise ask the front desk to send it or not, on the client&rsquo;s channel for visit messages. It can use {GRACE_FIELDS.map((f) => `{${f}}`).join(", ")}.
             </span>
           </label>
           <div className="flex flex-col gap-1">

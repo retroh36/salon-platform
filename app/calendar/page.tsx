@@ -35,6 +35,7 @@ import { movedVisits } from "@/lib/denise/fixes";
 import { CalendarBoard } from "./board";
 import { CalendarSkeleton } from "./skeleton";
 import { loadVisitPolicies } from "@/lib/policy-visits";
+import { graceMessageDue } from "@/lib/policy";
 import type { AppointmentDetail, BlockData, BoardData, ColumnData } from "./types";
 import { can } from "@/lib/permissions";
 import { EmptyState } from "@/components/ui/page";
@@ -348,7 +349,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
   const checkedOut = Object.values(appointments).filter((a) => a.status === "completed").map((a) => a.id);
   const visitIds = Object.keys(appointments);
   const clientIds = [...new Set(Object.values(appointments).flatMap((a) => (a.client ? [a.client.id] : [])))];
-  const [warnings, policies, salesResult, eventsLog, changesLog, insights, packages, past, pastFormulas, memberships, fixesResult, remindersLog] = await Promise.all([
+  const [warnings, policies, salesResult, eventsLog, changesLog, insights, packages, past, pastFormulas, memberships, fixesResult, remindersLog, graceResult] = await Promise.all([
     visitWarnings(supabase, me.business_id, toCheck, tz),
     policyVisits ? loadVisitPolicies(supabase, me.business_id, me.role, policyVisits) : Promise.resolve(null),
     // The sale each checked-out visit was paid on (front of house only: RLS).
@@ -407,7 +408,22 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
     visitIds.length
       ? supabase.from("appointment_reminders").select("appointment_id, channel, held, sent_at").in("appointment_id", visitIds).order("sent_at")
       : Promise.resolve({ data: [], error: null }),
+    // Grace messages nobody has sent or skipped yet, on any day (Denise's card).
+    canBook(me.role)
+      ? supabase
+          .from("policy_fees")
+          .select("id, status, grace_at, grace_until, grace_message_at, grace_message_skipped_at, client:clients(first_name, last_name)")
+          .eq("location_id", me.location.id)
+          .not("grace_at", "is", null)
+          .is("grace_message_at", null)
+          .is("grace_message_skipped_at", null)
+          .in("status", ["waived", "pending", "no_card"])
+          .order("grace_at", { ascending: false })
+          .limit(20)
+      : Promise.resolve({ data: [], error: null }),
   ]);
+  if (graceResult.error) throw graceResult.error;
+  const graceToSend: BoardData["graceToSend"] = graceResult.data.filter((f) => graceMessageDue(f)).map((f) => ({ feeId: f.id, clientName: `${f.client.first_name} ${f.client.last_name ?? ""}`.trim() }));
   if (fixesResult.error) throw fixesResult.error;
   const fixesApplied: BoardData["fixesApplied"] = [];
   for (const f of fixesResult.data) {
@@ -595,6 +611,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
   const data: BoardData = {
     stamp,
     fixesApplied,
+    graceToSend,
     locationId: me.location.id,
     focus: {
       staffId: typeof params.staff === "string" && isUuid(params.staff) ? params.staff : null,

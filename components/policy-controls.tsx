@@ -24,6 +24,8 @@ export type FeeView = {
   waiveReason: string | null;
   // Held under the salon's grace: "waived if they rebook with Gil by Fri, Nov 20".
   grace?: string | null;
+  // Grace forgave or holds it and the client's message is neither sent nor skipped.
+  graceUnsent?: boolean;
 };
 
 // "No-show fee $50 · Charging soon (Visa …4242)".
@@ -53,6 +55,11 @@ export function FeeControls({ fee, canWaive, canRetry }: { fee: FeeView; canWaiv
         {flag && <>{flag} </>}
         <FeeLine text={feeText(fee)} card={fee.cardLabel} />
       </p>
+      {fee.graceUnsent && (
+        <span className="inline-flex" data-testid="grace-unsent">
+          <Badge tone="warning">Grace message not sent</Badge>
+        </span>
+      )}
       {waiving ? (
         <form
           aria-label="Waive fee"

@@ -418,3 +418,13 @@ export function graceMessage(template: string, values: { firstName: string; salo
 
 // How a held fee reads on a visit: "waived if they rebook with Gil by Fri, Nov 20".
 export const graceLine = (stylist: string | null, by: string) => `waived if they rebook${stylist ? ` with ${stylist}` : ""} by ${by}`;
+
+// Whether a fee is still waiting for staff to send or skip its message,
+// as private.grace_message_due decides it.
+export function graceMessageDue(
+  f: { grace_at: string | null; grace_message_at: string | null; grace_message_skipped_at: string | null; status: string; grace_until: string | null },
+  now = new Date(),
+): boolean {
+  if (!f.grace_at || f.grace_message_at || f.grace_message_skipped_at) return false;
+  return f.status === "waived" || ((f.status === "pending" || f.status === "no_card") && Boolean(f.grace_until) && Date.parse(f.grace_until!) > now.getTime());
+}

@@ -1,7 +1,7 @@
 import { admin, busyDay, makeRoom, SEED } from "../tests/db/helpers";
 import { runPolicyCharges } from "../lib/policy-billing";
 import { todayIn } from "../lib/scheduling/time";
-import { AUTH, expect, moreAction, test, ui, waitForHydration } from "./fixtures";
+import { AUTH, expect, moreAction, showDenise, test, ui, waitForHydration } from "./fixtures";
 
 // The cancellation policy at the desk (the demo salon: a card for new
 // clients, 48 hours' notice, $40 to cancel late, half the visit for a
@@ -244,5 +244,53 @@ test.describe("grace", () => {
     await expect(form).toContainText("Saved. Grace applies to fees from now on.");
     const { data } = await admin.from("policy_settings").select("grace_on, grace_rebook_days").eq("business_id", B).single();
     expect(data).toEqual({ grace_on: true, grace_rebook_days: 21 });
+  });
+});
+
+// The waiver applies by itself; the client hears about it only when the
+// desk sends the message (booking details, or Denise's card).
+test.describe("grace at the desk", () => {
+  let saved: { grace_on: boolean; grace_kinds: string[]; grace_months: number; grace_rebook_days: number | null; grace_message: string } | null = null;
+  test.beforeAll(async () => {
+    saved = (await admin.from("policy_settings").select("grace_on, grace_kinds, grace_months, grace_rebook_days, grace_message").eq("business_id", B).single()).data;
+    await admin
+      .from("policy_settings")
+      .update({ grace_on: true, grace_kinds: ["no_show"], grace_months: 12, grace_rebook_days: null, grace_message: "Hi {first_name}, no charge this time at {salon}." })
+      .eq("business_id", B);
+  });
+  test.afterAll(async () => {
+    if (saved) await admin.from("policy_settings").update(saved).eq("business_id", B);
+  });
+
+  test("a forgiven no-show asks before telling the client: Send in booking details, Don't send in Denise's card", async ({ page }) => {
+    const gia = await newClient("Gia", "(312) 555-0191");
+    const v = await visit(gia, -1, "confirmed");
+    const panel = await openVisit(page, v);
+    await moreAction(panel, "Mark no-show");
+    await panel.getByRole("group", { name: "Mark no-show" }).getByRole("button", { name: "Mark no-show" }).click();
+    await expect(panel.getByTestId("policy-fee")).toHaveAttribute("data-fee-status", "waived");
+    await expect(panel.getByTestId("grace-unsent")).toHaveText("Grace message not sent");
+    const prompt = panel.getByTestId("grace-prompt");
+    await expect(prompt).toContainText(`Let ${PREFIX}Gia know their fee was waived?`);
+    await expect(prompt.getByLabel(`Message to ${PREFIX}Gia Test`)).toHaveValue(`Hi ${PREFIX}Gia, no charge this time at Maple & Ash Hair Studio.`);
+    // Nothing went out by itself.
+    const outbox = () => admin.from("outbox_messages").select("body").eq("to_address", "3125550191").like("body", `%${PREFIX}Gia%`);
+    expect((await outbox()).data).toEqual([]);
+    await prompt.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(panel.getByTestId("grace-unsent")).toHaveCount(0);
+    await expect.poll(async () => (await outbox()).data?.length).toBe(1);
+
+    // Another, left unsent: Denise's card asks, and Don't send settles it.
+    const hal = await newClient("Hal", "(312) 555-0192");
+    const w = await visit(hal, -3, "confirmed");
+    await admin.from("appointments").update({ status: "no_show" }).eq("id", w.id);
+    await page.goto(`/calendar?date=${w.date}`);
+    await waitForHydration(page, "section[data-staff-id]");
+    await showDenise(page);
+    const card = page.getByRole("complementary", { name: "Denise" }).getByTestId("denise-grace");
+    await expect(card).toContainText(`${PREFIX}Hal Test`);
+    await card.getByRole("listitem").filter({ hasText: `${PREFIX}Hal` }).getByRole("button", { name: "Don\u2019t send" }).click();
+    await expect.poll(async () => (await admin.from("policy_fees").select("grace_message_skipped_at").eq("appointment_id", w.id).single()).data?.grace_message_skipped_at).not.toBeNull();
+    expect((await admin.from("outbox_messages").select("id").eq("to_address", "3125550192").like("body", `%${PREFIX}Hal%`)).data).toEqual([]);
   });
 });

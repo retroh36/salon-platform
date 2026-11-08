@@ -2619,14 +2619,14 @@ isOneToOne: false
                   ]
                 },"policy_fees": {
                   Row: {
-                    "appointment_id": string,"attempts": number,"business_id": string,"card_label": string | null,"charge_after": string | null,"charged_at": string | null,"client_id": string,"created_at": string,"failure_reason": string | null,"fee_cents": number,"from_deposit_cents": number,"grace_at": string | null,"grace_message_at": string | null,"grace_staff_id": string | null,"grace_until": string | null,"id": string,"kind": string,"location_id": string,"provider": string | null,"provider_reference": string | null,"receipt_sent_at": string | null,"refund_due": boolean,"refunded_at": string | null,"status": string,"updated_at": string,"waive_reason": string | null,"waived_at": string | null,"waived_by": string | null
+                    "appointment_id": string,"attempts": number,"business_id": string,"card_label": string | null,"charge_after": string | null,"charged_at": string | null,"client_id": string,"created_at": string,"failure_reason": string | null,"fee_cents": number,"from_deposit_cents": number,"grace_at": string | null,"grace_message_at": string | null,"grace_message_by": string | null,"grace_message_skipped_at": string | null,"grace_staff_id": string | null,"grace_until": string | null,"id": string,"kind": string,"location_id": string,"provider": string | null,"provider_reference": string | null,"receipt_sent_at": string | null,"refund_due": boolean,"refunded_at": string | null,"status": string,"updated_at": string,"waive_reason": string | null,"waived_at": string | null,"waived_by": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_id": string,"attempts"?: number,"business_id": string,"card_label"?: string | null,"charge_after"?: string | null,"charged_at"?: string | null,"client_id": string,"created_at"?: string,"failure_reason"?: string | null,"fee_cents": number,"from_deposit_cents"?: number,"grace_at"?: string | null,"grace_message_at"?: string | null,"grace_staff_id"?: string | null,"grace_until"?: string | null,"id"?: string,"kind": string,"location_id": string,"provider"?: string | null,"provider_reference"?: string | null,"receipt_sent_at"?: string | null,"refund_due"?: boolean,"refunded_at"?: string | null,"status": string,"updated_at"?: string,"waive_reason"?: string | null,"waived_at"?: string | null,"waived_by"?: string | null
+                    "appointment_id": string,"attempts"?: number,"business_id": string,"card_label"?: string | null,"charge_after"?: string | null,"charged_at"?: string | null,"client_id": string,"created_at"?: string,"failure_reason"?: string | null,"fee_cents": number,"from_deposit_cents"?: number,"grace_at"?: string | null,"grace_message_at"?: string | null,"grace_message_by"?: string | null,"grace_message_skipped_at"?: string | null,"grace_staff_id"?: string | null,"grace_until"?: string | null,"id"?: string,"kind": string,"location_id": string,"provider"?: string | null,"provider_reference"?: string | null,"receipt_sent_at"?: string | null,"refund_due"?: boolean,"refunded_at"?: string | null,"status": string,"updated_at"?: string,"waive_reason"?: string | null,"waived_at"?: string | null,"waived_by"?: string | null
                   }
                   Update: {
-                    "appointment_id"?: string,"attempts"?: number,"business_id"?: string,"card_label"?: string | null,"charge_after"?: string | null,"charged_at"?: string | null,"client_id"?: string,"created_at"?: string,"failure_reason"?: string | null,"fee_cents"?: number,"from_deposit_cents"?: number,"grace_at"?: string | null,"grace_message_at"?: string | null,"grace_staff_id"?: string | null,"grace_until"?: string | null,"id"?: string,"kind"?: string,"location_id"?: string,"provider"?: string | null,"provider_reference"?: string | null,"receipt_sent_at"?: string | null,"refund_due"?: boolean,"refunded_at"?: string | null,"status"?: string,"updated_at"?: string,"waive_reason"?: string | null,"waived_at"?: string | null,"waived_by"?: string | null
+                    "appointment_id"?: string,"attempts"?: number,"business_id"?: string,"card_label"?: string | null,"charge_after"?: string | null,"charged_at"?: string | null,"client_id"?: string,"created_at"?: string,"failure_reason"?: string | null,"fee_cents"?: number,"from_deposit_cents"?: number,"grace_at"?: string | null,"grace_message_at"?: string | null,"grace_message_by"?: string | null,"grace_message_skipped_at"?: string | null,"grace_staff_id"?: string | null,"grace_until"?: string | null,"id"?: string,"kind"?: string,"location_id"?: string,"provider"?: string | null,"provider_reference"?: string | null,"receipt_sent_at"?: string | null,"refund_due"?: boolean,"refunded_at"?: string | null,"status"?: string,"updated_at"?: string,"waive_reason"?: string | null,"waived_at"?: string | null,"waived_by"?: string | null
                   }
                   Relationships: [
                     {
@@ -2647,6 +2647,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "clients"
       referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "policy_fees_grace_message_by_fkey"
+      columns: ["grace_message_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
     },{
       foreignKeyName: "policy_fees_grace_staff_id_fkey"
       columns: ["grace_staff_id"]
@@ -5301,9 +5307,6 @@ isOneToOne: false
 "record_fee_refund":
 { Args: { "p_detail": string,"p_fee_id": string,"p_ok": boolean }; Returns: undefined
                            },
-"record_grace_message":
-{ Args: { "p_fee_id": string }; Returns: undefined
-                           },
 "record_item_time":
 { Args: { "p_event": string,"p_item_id": string }; Returns: undefined
                            },
@@ -5649,6 +5652,9 @@ isOneToOne: false
                            },
 "skip_drawer_count":
 { Args: { "p_asked_by"?: string,"p_location_id": string,"p_reason": string }; Returns: undefined
+                           },
+"skip_grace_message":
+{ Args: { "p_fee_id": string }; Returns: undefined
                            },
 "sms_keyword":
 { Args: { "p_body": string,"p_phone_digits": string }; Returns: string

@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { FeeControls } from "@/components/policy-controls";
 import { ShieldIcon, WalletIcon } from "@/components/ui/icons";
 import type { Database } from "@/lib/database.types";
-import { FEE_KIND_LABELS, type FeeStatus } from "@/lib/policy";
+import { FEE_KIND_LABELS, graceMessageDue, type FeeStatus } from "@/lib/policy";
 import { clientStanding, loadPolicy } from "@/lib/policy-load";
 import { FEE_GRACE_COLUMNS, graceOf } from "@/lib/policy-visits";
 import { formatDay } from "@/lib/schedule-format";
@@ -83,7 +83,7 @@ export async function PolicyCards({ supabase, businessId, role, client, tz }: { 
                   {FEE_KIND_LABELS[f.kind as "late_cancel" | "no_show"]} · visit on {day(f.appointment.starts_at)}
                 </p>
                 <FeeControls
-                  fee={{ id: f.id, kind: f.kind as "late_cancel" | "no_show", feeCents: f.fee_cents, fromDepositCents: f.from_deposit_cents, status: f.status as FeeStatus, cardLabel: f.card_label, failureReason: f.failure_reason, waiveReason: f.waive_reason, grace: graceOf(f) }}
+                  fee={{ id: f.id, kind: f.kind as "late_cancel" | "no_show", feeCents: f.fee_cents, fromDepositCents: f.from_deposit_cents, status: f.status as FeeStatus, cardLabel: f.card_label, failureReason: f.failure_reason, waiveReason: f.waive_reason, grace: graceOf(f), graceUnsent: graceMessageDue(f) }}
                   canWaive={policy.waiveRoles.includes(role)}
                   canRetry
                 />

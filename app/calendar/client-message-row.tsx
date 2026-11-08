@@ -51,7 +51,14 @@ export function ClientMessageRow({
         {m.sent ? <Badge tone="success">Sent</Badge> : m.channel ? <Badge>{m.channel === "sms" ? "Text" : "Email"}</Badge> : <Badge tone="warning">No messages: call</Badge>}
       </div>
       {m.sent || !m.channel ? (
-        <p className="text-sm whitespace-pre-line text-ink-muted">{m.body}</p>
+        <>
+          <p className="text-sm whitespace-pre-line text-ink-muted">{m.body}</p>
+          {!m.sent && onSkip && (
+            <Button size="sm" variant="secondary" className="mt-2" onClick={onSkip}>
+              Done
+            </Button>
+          )}
+        </>
       ) : (
         <>
           <label className="sr-only" htmlFor={`msg-${m.appointmentId}`}>

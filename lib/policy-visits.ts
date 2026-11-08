@@ -5,7 +5,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types.ts";
-import { cardRequired, depositNeeded, graceLine, standingOf, strikesSince, visitTerms, type FeeStatus, type RepeatAction, type VisitTerms } from "./policy.ts";
+import { cardRequired, depositNeeded, graceLine, graceMessageDue, standingOf, strikesSince, visitTerms, type FeeStatus, type RepeatAction, type VisitTerms } from "./policy.ts";
 import { toLocal } from "./scheduling/time.ts";
 import { loadPolicy } from "./policy-load.ts";
 
@@ -35,6 +35,8 @@ export type VisitPolicy = {
     failureReason: string | null;
     waiveReason: string | null;
     grace: string | null;
+    // Grace forgave or holds it, and nobody has sent or skipped the client's message yet.
+    graceUnsent: boolean;
   } | null;
   canWaive: boolean;
 };
@@ -52,8 +54,9 @@ export type PolicyVisit = {
   startsAt: string;
 };
 
-// The columns that say a fee is held under the salon's grace, and how it reads.
-export const FEE_GRACE_COLUMNS = "grace_until, grace_staff:staff!policy_fees_grace_staff_id_fkey(first_name), grace_location:locations(timezone)";
+// The columns that say a fee is held under the salon's grace, how it reads,
+// and whether its message is still to send (with the fee's status).
+export const FEE_GRACE_COLUMNS = "grace_at, grace_until, grace_message_at, grace_message_skipped_at, grace_staff:staff!policy_fees_grace_staff_id_fkey(first_name), grace_location:locations(timezone)";
 
 export function graceOf(f: { grace_until: string | null; grace_staff: { first_name: string } | null; grace_location: { timezone: string } | null }): string | null {
   if (!f.grace_until) return null;
@@ -114,6 +117,7 @@ export async function loadVisitPolicies(supabase: Supabase, businessId: string, 
             failureReason: fee.failure_reason,
             waiveReason: fee.waive_reason,
             grace: graceOf(fee),
+            graceUnsent: graceMessageDue(fee),
           }
         : null,
       canWaive: policy.waiveRoles.includes(role),

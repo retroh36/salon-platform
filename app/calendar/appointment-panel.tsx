@@ -34,6 +34,7 @@ import { useNow } from "./now-line";
 import type { AppointmentDetail, BoardData } from "./types";
 import { UndoFix } from "./undo-fix";
 import { ItemSteps } from "./item-steps";
+import { GracePrompt } from "./grace-prompt";
 import { reach } from "@/lib/reach";
 import { useKeepOnScreen } from "@/components/ui/keep-on-screen";
 
@@ -1340,6 +1341,7 @@ function CheckInWarning({
 // `part`: the card (first of the rows), or their standing and any fee
 // (after the package and membership).
 function PolicyInfo({ appointment, firstName, part }: { appointment: AppointmentDetail; firstName: string; part: "card" | "standing" }) {
+  const router = useRouter();
   const p = appointment.policy!;
   const client = appointment.client!;
   const strikes = p.strikes > 0 && `${p.strikes} late cancel${p.strikes === 1 ? "" : "s"} or no-show${p.strikes === 1 ? "" : "s"} in ${p.months} months`;
@@ -1377,6 +1379,13 @@ function PolicyInfo({ appointment, firstName, part }: { appointment: Appointment
         <FactRow label="Fee">
           <FeeControls fee={p.fee} canWaive={p.canWaive} canRetry />
         </FactRow>
+      )}
+      {part === "standing" && p.fee?.graceUnsent && (
+        <div>
+          <dd className="min-w-0">
+            <GracePrompt feeIds={[p.fee.id]} onDone={() => router.refresh()} />
+          </dd>
+        </div>
       )}
     </div>
   );

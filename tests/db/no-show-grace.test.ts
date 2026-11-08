@@ -2,7 +2,8 @@
 // in the salon's window is forgiven, at once or once they rebook with the
 // same stylist in time (charged otherwise, and never before the window
 // ends), taking the no-show back takes the grace back, and the client gets
-// the salon's own message once the 10 minutes to undo have passed.
+// the salon's own message only when staff send it
+// (…_grace_message_asks_first.sql).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runPolicyCharges } from "@/lib/policy-billing";
 import { admin, type Client, SEED, signIn, throwawayStylist } from "./helpers";
@@ -127,22 +128,43 @@ describe("grace at once", () => {
     expect((await feeOf(late)).grace_at).toBeNull();
   });
 
-  it("tells the client in the salon's words, once, after the 10 minutes to undo", async () => {
+  it("never tells the client by itself: only staff's Send does, once, and Don't send settles it too", async () => {
     await grace(owner, null);
     const c = await client();
     const a = await visit(c, await newStylist(), -2);
     await status(a, "no_show");
     const fee = await feeOf(a);
     const outbox = () => admin.from("outbox_messages").select("body").eq("to_address", `${TAG.toLowerCase()}${clients.length - 1}@example.com`);
-    // Within the 10 minutes, nothing yet.
+    // The fee run sends nothing, however late it is.
     await runPolicyCharges(admin, { feeId: fee.id });
     expect((await outbox()).data).toEqual([]);
-    const later = new Date(Date.now() + 11 * 60_000);
-    expect((await runPolicyCharges(admin, { feeId: fee.id, now: later })).graceMessages).toBe(1);
-    const { data } = await outbox();
-    expect(data).toHaveLength(1);
-    expect(data![0].body).toMatch(new RegExp(`^Hi ${TAG}Ivy, no charge this time at Maple & Ash`));
-    expect((await runPolicyCharges(admin, { feeId: fee.id, now: later })).graceMessages).toBe(0);
+
+    const send = () =>
+      frontDesk.rpc("send_client_message", { p_appointment_id: a, p_purpose: "appointment", p_template: "grace", p_channel: "email", p_subject: "Maple & Ash", p_body: `Hi ${TAG}Ivy, no charge this time.`, p_opt_out_hash: null! });
+    expect((await send()).error).toBeNull();
+    expect((await outbox()).data).toHaveLength(1);
+    expect(await feeOf(a)).toMatchObject({ grace_message_skipped_at: null });
+    expect((await feeOf(a)).grace_message_at).not.toBeNull();
+    // Once only.
+    expect((await send()).error?.hint).toBe("grace_done");
+    expect((await frontDesk.rpc("skip_grace_message", { p_fee_id: fee.id })).error?.hint).toBe("grace_done");
+    // A no-show without grace still takes no messages.
+    const plain = await visit(c, await newStylist(), -1);
+    await status(plain, "no_show");
+    expect((await frontDesk.rpc("send_client_message", { p_appointment_id: plain, p_purpose: "appointment", p_template: "custom", p_channel: "email", p_subject: "x", p_body: "Hello", p_opt_out_hash: null! })).error?.code).toBe("55000");
+  });
+
+  it("Don't send is the front of house's, and nothing goes out", async () => {
+    await grace(owner, null);
+    const c = await client();
+    const a = await visit(c, await newStylist(), -2);
+    await status(a, "no_show");
+    const fee = await feeOf(a);
+    const stylist = await signIn("gil@mapleandash.test");
+    expect((await stylist.rpc("skip_grace_message", { p_fee_id: fee.id })).error?.code).toBe("42501");
+    expect((await frontDesk.rpc("skip_grace_message", { p_fee_id: fee.id })).error).toBeNull();
+    expect((await feeOf(a)).grace_message_skipped_at).not.toBeNull();
+    expect((await admin.from("outbox_messages").select("id").eq("to_address", `${TAG.toLowerCase()}${clients.length - 1}@example.com`)).data).toEqual([]);
   });
 });
 
