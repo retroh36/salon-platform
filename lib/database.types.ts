@@ -469,6 +469,56 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"card_authorizations": {
+                  Row: {
+                    "agreed_text": string | null,"answered_at": string | null,"business_id": string,"card_id": string,"channel": string,"client_id": string,"created_at": string,"created_by": string,"end_reason": string | null,"ended_at": string | null,"ended_by": string | null,"expires_at": string,"id": string,"ip_hash": string | null,"payer_client_id": string,"sent_to": string,"signed_name": string | null,"status": string,"token_hash": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "agreed_text"?: string | null,"answered_at"?: string | null,"business_id": string,"card_id": string,"channel": string,"client_id": string,"created_at"?: string,"created_by": string,"end_reason"?: string | null,"ended_at"?: string | null,"ended_by"?: string | null,"expires_at": string,"id"?: string,"ip_hash"?: string | null,"payer_client_id": string,"sent_to": string,"signed_name"?: string | null,"status"?: string,"token_hash": string
+                  }
+                  Update: {
+                    "agreed_text"?: string | null,"answered_at"?: string | null,"business_id"?: string,"card_id"?: string,"channel"?: string,"client_id"?: string,"created_at"?: string,"created_by"?: string,"end_reason"?: string | null,"ended_at"?: string | null,"ended_by"?: string | null,"expires_at"?: string,"id"?: string,"ip_hash"?: string | null,"payer_client_id"?: string,"sent_to"?: string,"signed_name"?: string | null,"status"?: string,"token_hash"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "card_authorizations_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "card_authorizations_card_id_fkey"
+      columns: ["card_id"]
+isOneToOne: false
+      referencedRelation: "client_cards"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "card_authorizations_client_id_business_id_fkey"
+      columns: ["client_id","business_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "card_authorizations_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "card_authorizations_ended_by_fkey"
+      columns: ["ended_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "card_authorizations_payer_client_id_business_id_fkey"
+      columns: ["payer_client_id","business_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"card_requests": {
                   Row: {
                     "appointment_id": string | null,"business_id": string,"channel": string,"client_id": string,"created_at": string,"created_by": string | null,"deposit_cents": number,"done_at": string | null,"expires_at": string,"from_account": boolean,"id": string,"location_id": string,"sent_to": string,"status": string,"token_hash": string
@@ -573,17 +623,23 @@ isOneToOne: false
                   ]
                 },"client_cards": {
                   Row: {
-                    "business_id": string,"client_id": string,"consent_id": string,"created_at": string,"id": string,"label": string,"payment_method_ref": string,"provider": string,"removed_at": string | null,"removed_by": string | null
+                    "authorization_id": string | null,"business_id": string,"client_id": string,"consent_id": string,"created_at": string,"id": string,"label": string,"payment_method_ref": string,"provider": string,"removed_at": string | null,"removed_by": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"client_id": string,"consent_id": string,"created_at"?: string,"id"?: string,"label": string,"payment_method_ref": string,"provider": string,"removed_at"?: string | null,"removed_by"?: string | null
+                    "authorization_id"?: string | null,"business_id": string,"client_id": string,"consent_id": string,"created_at"?: string,"id"?: string,"label": string,"payment_method_ref": string,"provider": string,"removed_at"?: string | null,"removed_by"?: string | null
                   }
                   Update: {
-                    "business_id"?: string,"client_id"?: string,"consent_id"?: string,"created_at"?: string,"id"?: string,"label"?: string,"payment_method_ref"?: string,"provider"?: string,"removed_at"?: string | null,"removed_by"?: string | null
+                    "authorization_id"?: string | null,"business_id"?: string,"client_id"?: string,"consent_id"?: string,"created_at"?: string,"id"?: string,"label"?: string,"payment_method_ref"?: string,"provider"?: string,"removed_at"?: string | null,"removed_by"?: string | null
                   }
                   Relationships: [
                     {
+      foreignKeyName: "client_cards_authorization_id_fkey"
+      columns: ["authorization_id"]
+isOneToOne: false
+      referencedRelation: "card_authorizations"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "client_cards_business_id_fkey"
       columns: ["business_id"]
 isOneToOne: false
@@ -5147,6 +5203,9 @@ isOneToOne: false
               "daily_limit": number,"used": number
             }[]
                            },
+"answer_card_authorization":
+{ Args: { "p_agreed_text": string,"p_approve": boolean,"p_ip_hash": string,"p_signed_name": string,"p_terms": Json,"p_token_hash": string }; Returns: string
+                           },
 "answer_shift_swap":
 { Args: { "p_accept": boolean,"p_swap_id": string }; Returns: undefined
                            },
@@ -5294,6 +5353,9 @@ isOneToOne: false
 "count_drawer":
 { Args: { "p_counted_cents": number,"p_kind": string,"p_location_id": string,"p_note"?: string }; Returns: number
                            },
+"create_card_authorization":
+{ Args: { "p_channel": string,"p_client_id": string,"p_hours": number,"p_payer_client_id": string,"p_to": string,"p_token_hash": string }; Returns: string
+                           },
 "create_card_request":
 { Args: { "p_appointment_id": string,"p_channel": string,"p_client_id": string,"p_deposit_cents": number,"p_hours": number,"p_to": string,"p_token_hash": string }; Returns: string
                            },
@@ -5335,6 +5397,9 @@ isOneToOne: false
                            },
 "dismiss_denise_item":
 { Args: { "p_day": string,"p_key": string,"p_location_id": string }; Returns: undefined
+                           },
+"end_card_authorization":
+{ Args: { "p_id": string }; Returns: undefined
                            },
 "event_member_prices":
 { Args: { "p_event_ids": (string)[] }; Returns: {
