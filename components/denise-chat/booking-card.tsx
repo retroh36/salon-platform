@@ -234,6 +234,7 @@ function ClientLine({ client, alerts, onChange }: { client: ClientOption; alerts
 function Confirm({ slot, client, onBack, onBooked }: { slot: BookingSlot; client: ClientOption; onBack: () => void; onBooked: (appointmentId: string, text: string) => void }) {
   const [policy, setPolicy] = useState<BookingPolicy | null | undefined>(undefined);
   const [cardLink, setCardLink] = useState(true);
+  const [formLink, setFormLink] = useState(true);
   const [pending, start] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => {
@@ -249,7 +250,7 @@ function Confirm({ slot, client, onBack, onBooked }: { slot: BookingSlot; client
   function confirm() {
     setMessage(null);
     start(async () => {
-      const r = await reach(bookFromChat({ date: slot.date, clientId: client.id, lines: slot.lines, bundleId: slot.bundleId ?? null, cardLink: Boolean(policy?.cardNeeded && policy.phone && cardLink) }));
+      const r = await reach(bookFromChat({ date: slot.date, clientId: client.id, lines: slot.lines, bundleId: slot.bundleId ?? null, cardLink: Boolean(policy?.cardNeeded && policy.phone && cardLink), formLink: Boolean(policy?.forms.length && policy.phone && formLink) }));
       if (r.ok) onBooked(r.appointmentId, `${r.message} ${firstOf(client.name)}: ${slot.when}.`);
       else setMessage(r.message);
     });
@@ -272,7 +273,7 @@ function Confirm({ slot, client, onBack, onBooked }: { slot: BookingSlot; client
         )}
       </ul>
       <div className="text-13" data-testid="booking-policy">
-        <BookingPolicyCheck policy={policy} firstName={firstOf(client.name)} sendLink={cardLink} onSendLink={setCardLink} />
+        <BookingPolicyCheck policy={policy} firstName={firstOf(client.name)} sendLink={cardLink} onSendLink={setCardLink} sendForms={formLink} onSendForms={setFormLink} />
       </div>
       {message && <Alert>{message}</Alert>}
       <div className="flex flex-wrap gap-2">

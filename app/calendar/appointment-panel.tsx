@@ -34,6 +34,7 @@ import { useNow } from "./now-line";
 import type { AppointmentDetail, BoardData } from "./types";
 import { UndoFix } from "./undo-fix";
 import { ItemSteps } from "./item-steps";
+import { FormLinkButton } from "./form-link";
 import { GracePrompt } from "./grace-prompt";
 import { reach } from "@/lib/reach";
 import { useKeepOnScreen } from "@/components/ui/keep-on-screen";
@@ -116,6 +117,8 @@ export function AppointmentPanel({
   const canReportLate = date >= today && isEditable(status) && (me.canBook || items.some((i) => i.staffId === me.staffId));
   // On the day (or after): the front of house, or a stylist on the visit.
   // Message client: an upcoming visit, from the front of house or a stylist on it.
+  // A visit still to come: its forms can go to the client by link.
+  const canSendForms = me.canBook && date >= today && (status === "booked" || status === "confirmed");
   const canMessage = Boolean(client) && date >= today && isEditable(status) && (me.canBook || items.some((i) => i.staffId === me.staffId));
   const canRecordFormula = date <= today && status !== "canceled" && status !== "no_show" && (me.canBook || items.some((i) => i.staffId === me.staffId));
 
@@ -404,7 +407,7 @@ export function AppointmentPanel({
               </dl>
             )}
             {/* Only while something's outstanding: one row that opens the checklist. */}
-            {client && outstanding.length > 0 && <VisitChecklist items={checklist} override={appointment.patchOverride} clientId={client.id} date={date} today={today} timeZone={timeZone} me={me} team={team} />}
+            {client && outstanding.length > 0 && <VisitChecklist items={checklist} override={appointment.patchOverride} clientId={client.id} appointmentId={appointment.id} contact={canSendForms ? { phone: client.phone, email: client.email } : null} date={date} today={today} timeZone={timeZone} me={me} team={team} />}
             {appointment.insight && (
               // Pulled left so her face lines up with the rows; never past the
               // right edge (the panel never scrolls sideways).
@@ -1175,6 +1178,8 @@ function VisitChecklist({
   items,
   override,
   clientId,
+  appointmentId,
+  contact,
   date,
   today,
   timeZone,
@@ -1184,6 +1189,9 @@ function VisitChecklist({
   items: ChecklistItem[];
   override: AppointmentDetail["patchOverride"];
   clientId: string;
+  appointmentId: string;
+  // Front of house, for a visit still to come: forms can go by link.
+  contact: { phone: string | null; email: string | null } | null;
   date: LocalDate;
   today: LocalDate;
   timeZone: string;
@@ -1246,6 +1254,9 @@ function VisitChecklist({
                     )
                   ))}
               </div>
+              {!c.done && c.action.kind === "form" && contact && items.findIndex((x) => !x.done && x.action.kind === "form") === items.indexOf(c) && (
+                <FormLinkButton appointmentId={appointmentId} phone={contact.phone} email={contact.email} />
+              )}
               {!c.done && c.action.kind === "patch_test" && recordingPatch && <PatchTestForm clientId={clientId} today={today} timeZone={timeZone} me={me.staffId} staff={team} compact />}
             </li>
           ))}

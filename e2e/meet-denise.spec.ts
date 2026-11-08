@@ -1,6 +1,7 @@
 // Meet Denise (Settings → Denise): every role can open it, from Settings
 // and from "What can Denise do?" in her header, and its sample questions
 // open her chat with the question typed in, not sent.
+import { busyDay } from "../tests/db/helpers";
 import { AUTH, expect, test, ui, waitForHydration } from "./fixtures";
 
 test.describe("an owner", () => {
@@ -32,7 +33,8 @@ test.describe("an owner", () => {
   });
 
   test("her card on the calendar links to it", async ({ page }) => {
-    await page.goto("/calendar");
+    // A day with stylists on: today may be a day the salon is closed.
+    await page.goto(`/calendar?date=${(await busyDay()).date}`);
     await waitForHydration(page, "section[data-staff-id]");
     await page.getByTestId("denise-launcher").click();
     await page.getByTestId("denise-card").getByTestId("about-denise").click();

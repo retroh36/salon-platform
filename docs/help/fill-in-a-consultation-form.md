@@ -18,4 +18,5 @@ Have a client fill in and sign a form on the iPad at the front desk.
 - Questions marked with * must be answered. If any are missing, the form lists what's still needed.
 - Signed forms are kept on the client's profile under the **Forms** tab. Tap one to see it.
 - A signed form can't be changed. To correct it, fill in a new one.
+- The client can also sign on their own phone before they come: see Send a client their forms to sign.
 - Owners create the forms and choose when they're needed (see Set up a consultation form).

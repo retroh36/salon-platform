@@ -4,7 +4,17 @@ import { revalidatePath } from "next/cache";
 import { getCurrentStaff } from "@/lib/auth";
 import { checkAnswers, type Answers, type FormField } from "@/lib/forms";
 import { isUuid } from "@/lib/ids";
-import { fromLocal, isLocalDate, parseTime } from "@/lib/scheduling/time";
+import { fromLocal, isLocalDate, parseTime, toLocal } from "@/lib/scheduling/time";
+import { canBook } from "@/lib/appointments";
+import { siteUrl } from "@/lib/branding";
+import { visitWarnings } from "@/lib/client-checks";
+import { FORM_LINK_HOURS, formLinkMessage } from "@/lib/form-links";
+import { blockedReason } from "@/lib/messaging/send";
+import { withStopLine } from "@/lib/messaging/templates";
+import { normalEmail, phoneDigits } from "@/lib/online-booking/contact";
+import { newSecret, sha256 } from "@/lib/online-booking/security";
+import { formatDay } from "@/lib/schedule-format";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type FormResult = { ok: true; formId: string } | { ok: false; message: string; missing?: string[] };
 
@@ -75,4 +85,54 @@ export async function recordPatchTest(clientId: string, _prev: PatchTestState, f
   revalidatePath(`/clients/${clientId}`);
   revalidatePath("/calendar", "layout");
   return { ok: true };
+}
+
+export type FormLinkResult = { ok: true; message: string } | { ok: false; message: string };
+
+// A secure link for the client to fill in and sign, on their own phone,
+// the forms their visit needs and hasn't had signed (a visit booked by
+// phone, say). Front of house; the message is our fixed wording.
+export async function sendFormLink(input: { appointmentId: string; channel: "sms" | "email"; to: string }): Promise<FormLinkResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canBook(me.role)) return { ok: false, message: "Only owners, managers and front desk can send form links." };
+  if (!isUuid(input.appointmentId) || (input.channel !== "sms" && input.channel !== "email")) return { ok: false, message: "That visit no longer exists." };
+  const to = input.channel === "sms" ? phoneDigits(input.to) : normalEmail(input.to);
+  if (!to) return { ok: false, message: input.channel === "sms" ? "Enter a 10-digit mobile number." : "Enter an email address like name@example.com." };
+
+  const { data: a } = await supabase
+    .from("appointments")
+    .select("id, client_id, starts_at, client:clients(first_name), appointment_items(service_id, starts_at)")
+    .eq("id", input.appointmentId)
+    .maybeSingle();
+  if (!a?.client_id || !a.client) return { ok: false, message: "That visit no longer exists." };
+  const checks = await visitWarnings(supabase, me.business_id, [
+    { appointmentId: a.id, clientId: a.client_id, start: new Date(a.starts_at), items: a.appointment_items.map((i) => ({ serviceId: i.service_id, start: new Date(i.starts_at) })) },
+  ]);
+  const unsigned = (checks.get(a.id)?.checklist ?? []).filter((c) => c.action.kind === "form" && !c.done);
+  if (!unsigned.length) return { ok: false, message: `${a.client.first_name} has signed every form this visit needs.` };
+
+  const admin = createAdminClient();
+  const blocked = await blockedReason(admin, input.channel, to, { id: a.client_id, firstName: a.client.first_name });
+  if (blocked) return { ok: false, message: blocked };
+
+  const token = newSecret();
+  const { error } = await supabase.rpc("create_form_request", {
+    p_appointment_id: a.id,
+    p_template_ids: unsigned.map((c) => (c.action as { templateId: string }).templateId),
+    p_token_hash: sha256(token),
+    p_channel: input.channel,
+    p_to: to,
+    p_hours: FORM_LINK_HOURS,
+  });
+  if (error?.code === "42501" || error?.code === "55000" || error?.code === "22023") return { ok: false, message: `${error.message}.` };
+  if (error) throw error;
+  const { data: business } = await supabase.from("businesses").select("name").eq("id", me.business_id).single();
+  const day = formatDay(toLocal(new Date(a.starts_at), me.location.timezone).date);
+  const message = formLinkMessage(business?.name ?? "The salon", a.client.first_name, day, unsigned.map((c) => c.label), `${siteUrl()}/form/${token}`, input.channel);
+  const { error: outError } = await admin
+    .from("outbox_messages")
+    .insert({ business_id: me.business_id, channel: input.channel, to_address: to, subject: message.subject, body: input.channel === "sms" ? withStopLine(message.body) : message.body });
+  if (outError) throw outError;
+  revalidatePath("/calendar", "layout");
+  return { ok: true, message: `Form link sent to ${input.to.trim()}.` };
 }

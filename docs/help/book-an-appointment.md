@@ -20,6 +20,7 @@ Book a visit for a client from the calendar, with one or more services.
 - **Client asked for …** starts ticked when the stylist is the client's preferred one. Denise's fixes never move a service the client asked for to another stylist. Booking details shows **Asked for** by the stylist's name. Online bookings where the client chose a stylist are marked the same way.
 - If the stylist usually takes longer, Denise offers a button (like **Book 1 hr 45 min**) to book their usual length.
 - If the cancellation policy needs a card or a deposit for this booking, it says **Card needed to hold this booking** or **Deposit needed** above the total, with **Text … a card link after booking** (or a deposit link) ticked. Untick it to send the link later from booking details.
+- If the visit needs forms signed (a first-visit consultation, say), it says **Form to sign** with **Text … the form to sign before the visit** ticked (see Send a client their forms to sign).
 - A patch test warning shows if the service needs one. If the salon requires it, you can't book until one is recorded (see Record a patch test).
 - Services usually booked together are under **Bundles** at the top of the **Service** list. See "Book a service bundle".
 - For several people, tap **Book a group instead**. To keep a slot free, tap **Block this time instead**.

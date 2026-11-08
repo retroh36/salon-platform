@@ -637,14 +637,14 @@ isOneToOne: false
                   ]
                 },"client_forms": {
                   Row: {
-                    "answers": NonNullable<Json>,"business_id": string,"client_id": string,"collected_by": string | null,"fields": NonNullable<Json>,"id": string,"signature": string | null,"signed_at": string,"template_id": string | null,"template_name": string
+                    "answers": NonNullable<Json>,"business_id": string,"client_id": string,"collected_by": string | null,"fields": NonNullable<Json>,"form_request_id": string | null,"id": string,"signature": string | null,"signed_at": string,"template_id": string | null,"template_name": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "answers": NonNullable<Json>,"business_id": string,"client_id": string,"collected_by"?: string | null,"fields": NonNullable<Json>,"id"?: string,"signature"?: string | null,"signed_at"?: string,"template_id"?: string | null,"template_name": string
+                    "answers": NonNullable<Json>,"business_id": string,"client_id": string,"collected_by"?: string | null,"fields": NonNullable<Json>,"form_request_id"?: string | null,"id"?: string,"signature"?: string | null,"signed_at"?: string,"template_id"?: string | null,"template_name": string
                   }
                   Update: {
-                    "answers"?: NonNullable<Json>,"business_id"?: string,"client_id"?: string,"collected_by"?: string | null,"fields"?: NonNullable<Json>,"id"?: string,"signature"?: string | null,"signed_at"?: string,"template_id"?: string | null,"template_name"?: string
+                    "answers"?: NonNullable<Json>,"business_id"?: string,"client_id"?: string,"collected_by"?: string | null,"fields"?: NonNullable<Json>,"form_request_id"?: string | null,"id"?: string,"signature"?: string | null,"signed_at"?: string,"template_id"?: string | null,"template_name"?: string
                   }
                   Relationships: [
                     {
@@ -665,6 +665,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "staff"
       referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "client_forms_form_request_id_fkey"
+      columns: ["form_request_id"]
+isOneToOne: false
+      referencedRelation: "form_requests"
+      referencedColumns: ["id"]
     },{
       foreignKeyName: "client_forms_template_id_business_id_fkey"
       columns: ["template_id","business_id"]
@@ -1616,6 +1622,50 @@ isOneToOne: false
       columns: ["sale_id"]
 isOneToOne: false
       referencedRelation: "sales"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"form_requests": {
+                  Row: {
+                    "appointment_id": string,"business_id": string,"channel": string,"client_id": string,"completed_at": string | null,"created_at": string,"created_by": string | null,"expires_at": string,"id": string,"location_id": string,"sent_to": string,"status": string,"template_ids": (string)[],"token_hash": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "appointment_id": string,"business_id": string,"channel": string,"client_id": string,"completed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"expires_at": string,"id"?: string,"location_id": string,"sent_to": string,"status"?: string,"template_ids": (string)[],"token_hash": string
+                  }
+                  Update: {
+                    "appointment_id"?: string,"business_id"?: string,"channel"?: string,"client_id"?: string,"completed_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"expires_at"?: string,"id"?: string,"location_id"?: string,"sent_to"?: string,"status"?: string,"template_ids"?: (string)[],"token_hash"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "form_requests_appointment_id_fkey"
+      columns: ["appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "form_requests_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "form_requests_client_id_business_id_fkey"
+      columns: ["client_id","business_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "form_requests_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "form_requests_location_id_fkey"
+      columns: ["location_id"]
+isOneToOne: false
+      referencedRelation: "locations"
       referencedColumns: ["id"]
     }
                   ]
@@ -5147,6 +5197,9 @@ isOneToOne: false
 "create_card_request":
 { Args: { "p_appointment_id": string,"p_channel": string,"p_client_id": string,"p_deposit_cents": number,"p_hours": number,"p_to": string,"p_token_hash": string }; Returns: string
                            },
+"create_form_request":
+{ Args: { "p_appointment_id": string,"p_channel": string,"p_hours": number,"p_template_ids": (string)[],"p_to": string,"p_token_hash": string }; Returns: string
+                           },
 "create_payment_link":
 { Args: { "p_amount_cents": number,"p_channel": string,"p_draft_id": string,"p_hours": number,"p_snapshot": Json,"p_to": string,"p_token_hash": string }; Returns: string
                            },
@@ -5649,6 +5702,9 @@ isOneToOne: false
                            },
 "shared_device":
 { Args: { "p_token_hash": string }; Returns: Json
+                           },
+"sign_form_from_link":
+{ Args: { "p_answers": Json,"p_request_id": string,"p_signature": string,"p_template_id": string }; Returns: number
                            },
 "skip_drawer_count":
 { Args: { "p_asked_by"?: string,"p_location_id": string,"p_reason": string }; Returns: undefined

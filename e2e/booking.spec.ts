@@ -185,12 +185,17 @@ test.describe("front desk", () => {
     const policy = form.getByTestId("booking-policy-check");
     await expect(policy).toContainText("Card needed to hold this booking");
     await expect(policy.getByLabel(`Text ${PREFIX}Zed a card link after booking`)).toBeChecked();
+    // And the first-visit consultation, by link to sign before they come.
+    const forms = form.getByTestId("booking-forms-check");
+    await expect(forms).toContainText("Form to sign: New client consultation");
+    await expect(forms.getByLabel(`Text ${PREFIX}Zed the form to sign before the visit`)).toBeChecked();
     await form.getByRole("button", { name: "Create booking" }).click();
     await expect(column(page, "Shae Morgan").getByRole("button", { name: new RegExp(`^2pm–2:30pm, ${PREFIX}Zed Newcomer, Men's Cut`) })).toBeVisible();
 
     const { data } = await admin.from("clients").select("id, phone").eq("first_name", `${PREFIX}Zed`).single();
     expect(data!.phone).toBe("(312) 555-0188");
     await expect.poll(async () => (await admin.from("card_requests").select("status, deposit_cents").eq("client_id", data!.id)).data).toEqual([{ status: "open", deposit_cents: 0 }]);
+    await expect.poll(async () => (await admin.from("form_requests").select("status, sent_to").eq("client_id", data!.id)).data).toEqual([{ status: "open", sent_to: "3125550188" }]);
   });
 
   test("explains why a booking breaks the rules, and saves nothing", async ({ page }) => {

@@ -31,6 +31,7 @@ async function serviceId(name: string) {
 
 async function sign(page: Page) {
   const pad = page.getByTestId("signature-pad");
+  await pad.scrollIntoViewIfNeeded();
   const box = (await pad.boundingBox())!;
   await page.mouse.move(box.x + 30, box.y + 100);
   await page.mouse.down();
@@ -150,6 +151,73 @@ test.describe("front desk", () => {
     await page.getByRole("list", { name: "Signed forms" }).getByRole("link", { name: /New client consultation/ }).click();
     await expect(page.getByText("Box dye in spring")).toBeVisible();
     await expect(page.getByRole("img", { name: `Signature of ${PREFIX}Nova Test` })).toBeVisible();
+  });
+
+  test("sends a visit's forms by link, and the client signs them on their phone", async ({ page, browser }) => {
+    const client = await newClient("Ines");
+    const gloss = await serviceId("Gloss / Toner");
+    const start = at(16);
+    const end = new Date(start.getTime() + 50 * 60_000);
+    const { data: a } = await admin.from("appointments").insert({ business_id: B, location_id: L, client_id: client, starts_at: start.toISOString(), ends_at: end.toISOString() }).select("id").single();
+    await admin.from("appointment_items").insert({
+      business_id: B,
+      location_id: L,
+      appointment_id: a!.id,
+      service_id: gloss,
+      staff_id: SEED.staff.bridget,
+      starts_at: start.toISOString(),
+      ends_at: end.toISOString(),
+      active_minutes: 15,
+      processing_minutes: 20,
+      finishing_minutes: 15,
+      price_cents: 0,
+    });
+
+    await page.goto(`/calendar?date=${DAY}`);
+    await waitForHydration(page, "section[data-staff-id]");
+    await ui(page).getByRole("region", { name: "Bridget Callahan", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Ines Test`) }).click();
+    const before = await openChecklist(page.getByRole("complementary", { name: "Booking details" }));
+    await before.getByRole("button", { name: "Send form link" }).click();
+    const send = before.getByRole("form", { name: "Send form link" });
+    await expect(send.getByLabel("Mobile number")).toHaveValue("(312) 555-0198");
+    await send.getByRole("button", { name: "Send link" }).click();
+    await expect(before.getByRole("status")).toHaveText("Form link sent to (312) 555-0198.");
+
+    const { data: sent } = await admin.from("outbox_messages").select("body").eq("to_address", "3125550198").like("body", `%Hi ${PREFIX}Ines,%`).single();
+    expect(sent!.body).toContain("please fill in and sign 2 short forms here:");
+    const url = new URL(sent!.body.match(/https?:\/\/\S+\/form\/[A-Za-z0-9_-]{43}/)![0]);
+
+    // On the client's phone, signed out.
+    const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: { cookies: [], origins: [] } });
+    const p = await phone.newPage();
+    await p.goto(url.pathname);
+    await expect(p.getByRole("heading", { name: `Hi ${PREFIX}Ines` })).toBeVisible();
+    await expect(p.getByText("Form 1 of 2")).toBeVisible();
+    const consent = p.getByRole("form", { name: "Color consent" });
+    await waitForHydration(p, "[data-testid=signature-pad]");
+    await consent.getByRole("group", { name: "Have you had a patch test in the last six months?" }).getByText("Yes", { exact: true }).click();
+    await consent.getByRole("group", { name: "Have you ever reacted to hair dye?" }).getByText("No", { exact: true }).click();
+    await consent.getByRole("checkbox").check();
+    await sign(p);
+    await consent.getByRole("button", { name: "Sign and submit" }).click();
+    await expect(p.getByText("Form 2 of 2")).toBeVisible();
+    const consult = p.getByRole("form", { name: "New client consultation" });
+    await waitForHydration(p, "[data-testid=signature-pad]");
+    await consult.getByRole("group", { name: "Do you have a sensitive scalp or skin allergies?" }).getByText("No", { exact: true }).click();
+    await consult.getByRole("group", { name: "Are you pregnant or breastfeeding?" }).getByText("No", { exact: true }).click();
+    await sign(p);
+    await consult.getByRole("button", { name: "Sign and submit" }).click();
+    await expect(p.getByTestId("forms-done")).toContainText(`Thank you, ${PREFIX}Ines`);
+    // The link is done.
+    await p.reload();
+    await expect(p.getByTestId("forms-done")).toBeVisible();
+    await phone.close();
+
+    const { data: forms } = await admin.from("client_forms").select("template_name, collected_by").eq("client_id", client).order("template_name");
+    expect(forms).toEqual([
+      { template_name: "Color consent", collected_by: null },
+      { template_name: "New client consultation", collected_by: null },
+    ]);
   });
 
   test("records a patch test, and is warned or blocked when booking color without one", async ({ page }) => {

@@ -3,10 +3,13 @@
 // waitlist, a group, a rebook at checkout) and the same rules as booking
 // details and the booking site: a card on file (the salon's rule, or a
 // repeat offender), and a deposit (the services' own, or a repeat
-// offender's). With the staff member's own login (front of house).
+// offender's). And the consultation forms the visit will need that the
+// client hasn't signed, to send by link once it's booked. With the staff
+// member's own login (front of house).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types.ts";
+import { visitWarnings } from "./client-checks.ts";
 import { depositFor, type DepositKind } from "./online-booking/settings.ts";
 import { loadVisitPolicies } from "./policy-visits.ts";
 import { formatPrice } from "./services.ts";
@@ -19,6 +22,8 @@ export type BookingPolicy = {
   cardNeeded: boolean;
   depositCents: number;
   phone: string | null;
+  // Forms to sign before the visit ("Color consent").
+  forms: string[];
 };
 
 export type PolicyLine = { serviceId: string; staffId: string; priceCents: number };
@@ -39,11 +44,17 @@ export async function serviceDeposit(supabase: Supabase, lines: readonly PolicyL
 
 export async function policyForBooking(supabase: Supabase, businessId: string, role: string, clientId: string, lines: readonly PolicyLine[]): Promise<BookingPolicy | null> {
   if (!lines.length) return null;
-  const [{ data: client }, deposit] = await Promise.all([supabase.from("clients").select("phone").eq("id", clientId).maybeSingle(), serviceDeposit(supabase, lines)]);
-  if (!client) return null;
-  const now = new Date().toISOString();
   // The visit isn't booked yet: a stand-in id for it.
   const visitId = "00000000-0000-4000-8000-000000000000";
+  const at = new Date();
+  const now = at.toISOString();
+  const [{ data: client }, deposit, checks] = await Promise.all([
+    supabase.from("clients").select("phone").eq("id", clientId).maybeSingle(),
+    serviceDeposit(supabase, lines),
+    visitWarnings(supabase, businessId, [{ appointmentId: visitId, clientId, start: at, items: lines.map((l) => ({ serviceId: l.serviceId, start: at })) }]),
+  ]);
+  if (!client) return null;
+  const forms = (checks.get(visitId)?.checklist ?? []).filter((c) => c.action.kind === "form" && !c.done).map((c) => c.label);
   const policies = await loadVisitPolicies(supabase, businessId, role, [
     {
       id: visitId,
@@ -60,7 +71,7 @@ export async function policyForBooking(supabase: Supabase, businessId: string, r
   ]);
   const p = policies.get(visitId);
   if (!p) return null;
-  return { cardLabel: p.cardLabel, cardNeeded: p.cardNeeded || p.depositNeededCents > 0, depositCents: p.depositNeededCents, phone: client.phone };
+  return { cardLabel: p.cardLabel, cardNeeded: p.cardNeeded || p.depositNeededCents > 0, depositCents: p.depositNeededCents, phone: client.phone, forms };
 }
 
 // What a visit just booked still needs under the policy, said in the

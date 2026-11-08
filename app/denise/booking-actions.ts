@@ -13,6 +13,7 @@ import { bookingDeps, bookingMenu, cleanRequest, clientById } from "@/lib/denise
 import { isUuid } from "@/lib/ids";
 import { requestFrom } from "@/lib/phone-booking";
 import { isLocalDate, todayIn, type LocalDate } from "@/lib/scheduling/time";
+import { sendFormLink } from "@/app/clients/forms-actions";
 import { bookingPolicy, sendCardLink } from "@/app/policy/actions";
 import { clientPolicyNote, quickAddClient, saveVisit } from "@/app/calendar/actions";
 import { addToWaitlist } from "@/app/calendar/waitlist-actions";
@@ -51,8 +52,9 @@ export async function bookingForm(clientId: string | null): Promise<ReplyResult>
 export type ChatBookResult = { ok: true; appointmentId: string; message: string } | { ok: false; message: string };
 
 // Books a time from the chat, at the lengths it was found with, and sends
-// the card link when the policy needs one and staff left it ticked.
-export async function bookFromChat(input: { date: LocalDate; clientId: string; lines: SlotLine[]; cardLink: boolean; bundleId?: string | null }): Promise<ChatBookResult> {
+// the card link when the policy needs one and the form link when the visit
+// has forms to sign, each when staff left it ticked.
+export async function bookFromChat(input: { date: LocalDate; clientId: string; lines: SlotLine[]; cardLink: boolean; formLink?: boolean; bundleId?: string | null }): Promise<ChatBookResult> {
   const s = await booker();
   if (!s) return { ok: false, message: NOT_ALLOWED };
   if (!isLocalDate(input.date) || !isUuid(input.clientId) || !Array.isArray(input.lines) || !input.lines.length) return { ok: false, message: "Choose a time again." };
@@ -64,12 +66,14 @@ export async function bookFromChat(input: { date: LocalDate; clientId: string; l
   });
   if (!saved.ok) return { ok: false, message: saved.message };
   let message = "Booked.";
-  if (input.cardLink) {
-    const policy = await bookingPolicy(input.clientId, input.lines);
-    if (policy?.cardNeeded && policy.phone) {
-      const sent = await sendCardLink({ clientId: input.clientId, appointmentId: saved.appointmentId, channel: "sms", to: policy.phone });
-      message = sent.ok ? "Booked, and the card link is on its way." : `Booked. The card link didn't go: ${sent.message}`;
-    }
+  const policy = input.cardLink || input.formLink ? await bookingPolicy(input.clientId, input.lines) : null;
+  if (input.cardLink && policy?.cardNeeded && policy.phone) {
+    const sent = await sendCardLink({ clientId: input.clientId, appointmentId: saved.appointmentId, channel: "sms", to: policy.phone });
+    message = sent.ok ? "Booked, and the card link is on its way." : `Booked. The card link didn't go: ${sent.message}`;
+  }
+  if (input.formLink && policy?.forms.length && policy.phone) {
+    const sent = await sendFormLink({ appointmentId: saved.appointmentId, channel: "sms", to: policy.phone });
+    message += sent.ok ? " The form link is on its way." : ` The form link didn't go: ${sent.message}`;
   }
   return { ok: true, appointmentId: saved.appointmentId, message };
 }

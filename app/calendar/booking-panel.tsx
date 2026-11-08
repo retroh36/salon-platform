@@ -26,6 +26,7 @@ import { reach } from "@/lib/reach";
 import { useUnsavedChanges } from "@/components/unsaved";
 import { BookingPolicyCheck } from "@/components/booking-policy-check";
 import { bookingPolicy, sendCardLink } from "@/app/policy/actions";
+import { sendFormLink } from "@/app/clients/forms-actions";
 import type { BookingPolicy } from "@/lib/booking-policy";
 
 export type BookingStart = { staffId: string; startMinute: number };
@@ -268,6 +269,7 @@ export function BookingPanel({
   const policyKey = JSON.stringify([client?.id, policyLines]);
   const [policy, setPolicy] = useState<{ key: string; policy: BookingPolicy | null } | null>(null);
   const [cardLink, setCardLink] = useState(true);
+  const [formLink, setFormLink] = useState(true);
   useEffect(() => {
     if (appointment || !client || !policyLines.length) return;
     let live = true;
@@ -284,10 +286,18 @@ export function BookingPanel({
   const policyNow = !appointment && client && policy?.key === policyKey ? policy.policy : null;
 
   async function withCardLink(appointmentId: string, said: string | undefined): Promise<string | undefined> {
-    if (!client || !policyNow?.cardNeeded || !policyNow.phone || !cardLink) return said;
-    const sent = await reach(sendCardLink({ clientId: client.id, appointmentId, channel: "sms", to: policyNow.phone }));
-    const link = policyNow.depositCents > 0 ? "deposit link" : "card link";
-    return sent.ok ? `${said ?? "Booked."} The ${link} is on its way.` : `${said ?? "Booked."} The ${link} didn't go: ${sent.message}`;
+    if (!client || !policyNow?.phone) return said;
+    let out = said ?? "Booked.";
+    if (policyNow.cardNeeded && cardLink) {
+      const sent = await reach(sendCardLink({ clientId: client.id, appointmentId, channel: "sms", to: policyNow.phone }));
+      const link = policyNow.depositCents > 0 ? "deposit link" : "card link";
+      out = sent.ok ? `${out} The ${link} is on its way.` : `${out} The ${link} didn't go: ${sent.message}`;
+    }
+    if (policyNow.forms.length && formLink) {
+      const sent = await reach(sendFormLink({ appointmentId, channel: "sms", to: policyNow.phone }));
+      out = sent.ok ? `${out} The form link is on its way.` : `${out} The form link didn't go: ${sent.message}`;
+    }
+    return out === (said ?? "Booked.") ? said : out;
   }
 
   // Patch tests: warn as soon as the client and a service that needs one
@@ -562,7 +572,7 @@ export function BookingPanel({
         </label>
 
         {client && policyNow && (
-          <BookingPolicyCheck policy={policyNow} firstName={client.name.split(" ")[0]} sendLink={cardLink} onSendLink={setCardLink} quiet />
+          <BookingPolicyCheck policy={policyNow} firstName={client.name.split(" ")[0]} sendLink={cardLink} onSendLink={setCardLink} sendForms={formLink} onSendForms={setFormLink} quiet />
         )}
 
         <div className="flex items-center justify-between border-t border-line pt-3 font-medium text-ink tabular-nums" aria-live="polite" data-testid="visit-total">

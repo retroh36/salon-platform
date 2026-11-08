@@ -7,20 +7,26 @@ import { Button } from "@/components/ui/button";
 import { checkboxClass, fieldClass } from "@/components/ui/field";
 import { Alert } from "@/components/ui/page";
 import type { Answers, FormField } from "@/lib/forms";
-import { submitForm } from "../../forms-actions";
+import { submitForm, type FormResult } from "../../forms-actions";
 
 // A form for the client to fill in and sign on the front desk iPad: large
-// controls, one column, then a thank-you screen to hand the iPad back.
+// controls, one column, then a thank-you screen to hand the iPad back. The
+// client's own phone uses it too, from a form link (`submit` and `onSigned`
+// instead of the desk's save and hand-back screen).
 export function FillForm({
   clientId,
   clientName,
   template,
   back,
+  submit: send,
+  onSigned,
 }: {
   clientId: string;
   clientName: string;
   template: { id: string; name: string; intro: string | null; fields: FormField[] };
   back: string;
+  submit?: (answers: Answers, signature: string | null) => Promise<FormResult>;
+  onSigned?: () => void;
 }) {
   const router = useRouter();
   const [answers, setAnswers] = useState<Answers>({});
@@ -51,8 +57,9 @@ export function FillForm({
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const r = await submitForm(clientId, template.id, answers, signature);
-      if (r.ok) setDone(true);
+      const r = await (send ? send(answers, signature) : submitForm(clientId, template.id, answers, signature));
+      if (r.ok && onSigned) onSigned();
+      else if (r.ok) setDone(true);
       else setError({ message: r.message, missing: r.missing ?? [] });
     });
   }
