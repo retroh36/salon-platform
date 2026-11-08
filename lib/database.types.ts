@@ -953,14 +953,14 @@ isOneToOne: false
                   ]
                 },"clients": {
                   Row: {
-                    "allergies": string | null,"appointment_email_ok": boolean,"appointment_sms_ok": boolean,"birth_day": number | null,"birth_month": number | null,"business_id": string,"consent_signed_on": string | null,"created_at": string,"email": string | null,"email_opt_in": boolean,"first_name": string,"id": string,"last_name": string,"notes": string | null,"notes_updated_at": string | null,"notes_updated_by": string | null,"only_sees_preferred": boolean,"phone": string | null,"phone_digits": string | null,"photo_consent_by": string | null,"photo_consent_on": string | null,"preferences": string | null,"preferred_staff_id": string | null,"referral_code": string | null,"referred_by": string | null,"search_name": string | null,"sms_opt_in": boolean,"sms_stopped_at": string | null,"updated_at": string
+                    "allergies": string | null,"appointment_email_ok": boolean,"appointment_sms_ok": boolean,"birth_day": number | null,"birth_month": number | null,"business_id": string,"consent_signed_on": string | null,"created_at": string,"email": string | null,"email_opt_in": boolean,"family_id": string | null,"first_name": string,"id": string,"last_name": string,"notes": string | null,"notes_updated_at": string | null,"notes_updated_by": string | null,"only_sees_preferred": boolean,"phone": string | null,"phone_digits": string | null,"photo_consent_by": string | null,"photo_consent_on": string | null,"preferences": string | null,"preferred_staff_id": string | null,"referral_code": string | null,"referred_by": string | null,"search_name": string | null,"sms_opt_in": boolean,"sms_stopped_at": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id": string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"first_name": string,"id"?: string,"last_name"?: string,"notes"?: string | null,"notes_updated_at"?: string | null,"notes_updated_by"?: string | null,"only_sees_preferred"?: boolean,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"referral_code"?: string | null,"referred_by"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
+                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id": string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"family_id"?: string | null,"first_name": string,"id"?: string,"last_name"?: string,"notes"?: string | null,"notes_updated_at"?: string | null,"notes_updated_by"?: string | null,"only_sees_preferred"?: boolean,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"referral_code"?: string | null,"referred_by"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id"?: string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"first_name"?: string,"id"?: string,"last_name"?: string,"notes"?: string | null,"notes_updated_at"?: string | null,"notes_updated_by"?: string | null,"only_sees_preferred"?: boolean,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"referral_code"?: string | null,"referred_by"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
+                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id"?: string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"family_id"?: string | null,"first_name"?: string,"id"?: string,"last_name"?: string,"notes"?: string | null,"notes_updated_at"?: string | null,"notes_updated_by"?: string | null,"only_sees_preferred"?: boolean,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"referral_code"?: string | null,"referred_by"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -969,6 +969,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "businesses"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "clients_family_id_business_id_fkey"
+      columns: ["family_id","business_id"]
+isOneToOne: false
+      referencedRelation: "families"
+      referencedColumns: ["id","business_id"]
     },{
       foreignKeyName: "clients_notes_updated_by_business_id_fkey"
       columns: ["notes_updated_by","business_id"]
@@ -1623,6 +1629,38 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "sales"
       referencedColumns: ["id"]
+    }
+                  ]
+                },"families": {
+                  Row: {
+                    "business_id": string,"created_at": string,"created_by": string | null,"id": string,"name": string,"payer_client_id": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"name": string,"payer_client_id"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"created_at"?: string,"created_by"?: string | null,"id"?: string,"name"?: string,"payer_client_id"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "families_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "families_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "families_payer_client_id_business_id_fkey"
+      columns: ["payer_client_id","business_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id","business_id"]
     }
                   ]
                 },"form_requests": {
@@ -5277,6 +5315,9 @@ isOneToOne: false
 "delete_calendar_view":
 { Args: { "p_view_id": string }; Returns: undefined
                            },
+"delete_family":
+{ Args: { "p_family_id": string }; Returns: undefined
+                           },
 "delete_permission_group":
 { Args: { "p_id": string }; Returns: undefined
                            },
@@ -5545,6 +5586,9 @@ isOneToOne: false
                            },
 "save_event_settings":
 { Args: { "p_input": Json }; Returns: undefined
+                           },
+"save_family":
+{ Args: { "p_business_id": string,"p_client_ids": (string)[],"p_family_id": string,"p_name": string,"p_payer_client_id": string }; Returns: string
                            },
 "save_grace_settings":
 { Args: { "p_business_id": string,"p_kinds": (string)[],"p_message": string,"p_months": number,"p_on": boolean,"p_rebook_days": number }; Returns: undefined

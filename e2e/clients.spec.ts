@@ -235,7 +235,7 @@ test.describe("front desk", () => {
 
       // A card each, in order, 8px corners like every card, with the action in the corner.
       const aside = ui(page).getByRole("complementary", { name: "About this client" });
-      const order = ["client-glance", "client-details", "client-packages", "client-memberships", "client-rewards", "client-card", "client-policy", "client-messages"];
+      const order = ["client-glance", "client-details", "client-family", "client-packages", "client-memberships", "client-rewards", "client-card", "client-policy", "client-messages"];
       const shown = await aside.locator(":scope > section").evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")));
       expect(shown.slice(0, 2)).toEqual(["client-glance", "client-details"]);
       expect(shown).toEqual(order.filter((t) => shown.includes(t)));

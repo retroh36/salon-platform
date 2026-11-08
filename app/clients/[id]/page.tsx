@@ -16,6 +16,7 @@ import { getCurrentStaff } from "@/lib/auth";
 import { patchSettings } from "@/lib/client-checks";
 import { checkoutVisit, clientSince, clientTags, editedLine, PROFILE_TAB_COOKIE, profileTab, saleTotals, splitVisits, visitsSummary, type ProfileVisit } from "@/lib/client-profile";
 import { canEditClients, formatDate, MONTHS } from "@/lib/clients";
+import { canBook } from "@/lib/appointments";
 import type { Database } from "@/lib/database.types";
 import { isUuid } from "@/lib/ids";
 import { describeClient } from "@/lib/insights/describe";
@@ -26,6 +27,7 @@ import { historyText } from "@/lib/memberships";
 import { loadClientMemberships } from "@/lib/memberships-load";
 import { allowedChannels, consentOf, noTextsFlag } from "@/lib/messaging/consent";
 import { loadClientPackages, withPackages } from "@/lib/packages";
+import { loadFamily } from "@/lib/families";
 import { cardOnFile, salonProvider, staffCards } from "@/lib/payments";
 import { loadPhotos } from "@/lib/photos-load";
 import { canTakePayments } from "@/lib/sales";
@@ -48,6 +50,7 @@ import { PolicyCards } from "./policy-card";
 import { ProfileTabs } from "./profile-tabs";
 import { QuickActions } from "./quick-actions";
 import { Row, SideCard } from "./side-card";
+import { FamilyCard } from "./family-card";
 
 export const metadata: Metadata = { title: "Client" };
 
@@ -137,7 +140,7 @@ async function ClientRecords({ id }: { id: string }) {
     patchSettings(supabase, me.business_id),
     loadClientInsights(supabase, me.business_id, [id]),
   ]);
-  const [packages, gallery, memberships, { data: onlineAccount }, vipCents, { data: business }] = await Promise.all([
+  const [packages, gallery, memberships, { data: onlineAccount }, vipCents, { data: business }, family] = await Promise.all([
     loadClientPackages(supabase, id),
     loadPhotos(supabase, me, { clientId: id }),
     loadClientMemberships(supabase, id),
@@ -145,6 +148,7 @@ async function ClientRecords({ id }: { id: string }) {
     supabase.from("client_accounts").select("last_sign_in_at").eq("client_id", id).maybeSingle(),
     vipSpend(supabase, me.business_id),
     supabase.from("businesses").select("free_text_roles").eq("id", me.business_id).single(),
+    loadFamily(supabase, client?.family_id ?? null),
   ]);
   const membershipHistory = await loadMembershipHistory(supabase, memberships.map((m) => m.id), tz);
   if (patchError) throw patchError;
@@ -457,6 +461,8 @@ async function ClientRecords({ id }: { id: string }) {
                 )}
               </dl>
             </SideCard>
+
+            <FamilyCard client={{ id: client.id, firstName: client.first_name, lastName: client.last_name }} family={family} editable={canBook(me.role)} />
 
             {packages.length > 0 && (
               <SideCard title="Packages" icon={<BoxIcon />} testId="client-packages" note="Uses left are offered at checkout.">
