@@ -6,16 +6,14 @@
 // any booking), a new client, and the waitlist. Our code throughout; Denise
 // only ever reads the line (app/api/denise). Front of house only.
 
-import { randomUUID } from "node:crypto";
 import { canBook } from "@/lib/appointments";
 import { getCurrentStaff } from "@/lib/auth";
 import { withClient, type BookingReply, type ClientMatch, type SlotLine } from "@/lib/denise/booking-chat";
 import { bookingDeps, bookingMenu, cleanRequest, clientById } from "@/lib/denise/booking-load";
 import { isUuid } from "@/lib/ids";
-import { loadVisitPolicies } from "@/lib/policy-visits";
 import { requestFrom } from "@/lib/phone-booking";
 import { isLocalDate, todayIn, type LocalDate } from "@/lib/scheduling/time";
-import { sendCardLink } from "@/app/policy/actions";
+import { bookingPolicy, sendCardLink } from "@/app/policy/actions";
 import { clientPolicyNote, quickAddClient, saveVisit } from "@/app/calendar/actions";
 import { addToWaitlist } from "@/app/calendar/waitlist-actions";
 
@@ -48,37 +46,6 @@ export async function bookingForm(clientId: string | null): Promise<ReplyResult>
   const s = await booker();
   if (!s) return { ok: false, message: NOT_ALLOWED };
   return bookingTimes(requestFrom(null, null, todayIn(s.me.location.timezone)), clientId);
-}
-
-export type BookingPolicy = { cardLabel: string | null; cardNeeded: boolean; depositCents: number; phone: string | null };
-
-// What the cancellation policy asks of this booking before it's made: a
-// card on file, or a deposit (the same rules as booking details).
-export async function bookingPolicy(clientId: string, lines: SlotLine[]): Promise<BookingPolicy | null> {
-  const s = await booker();
-  if (!s || !isUuid(clientId) || !Array.isArray(lines) || !lines.length) return null;
-  const { data: client } = await s.supabase.from("clients").select("phone").eq("id", clientId).maybeSingle();
-  if (!client) return null;
-  const now = new Date().toISOString();
-  // The visit isn't booked yet: a stand-in id for it.
-  const visitId = randomUUID();
-  const policies = await loadVisitPolicies(s.supabase, s.me.business_id, s.me.role, [
-    {
-      id: visitId,
-      clientId,
-      status: "booked",
-      serviceIds: lines.map((l) => String(l.serviceId)),
-      staffIds: [...new Set(lines.map((l) => String(l.staffId)))],
-      visitCents: lines.reduce((n, l) => n + (Number.isInteger(l.priceCents) ? l.priceCents : 0), 0),
-      serviceDepositCents: 0,
-      depositPaidCents: 0,
-      bookedAt: now,
-      startsAt: now,
-    },
-  ]);
-  const p = policies.get(visitId);
-  if (!p) return null;
-  return { cardLabel: p.cardLabel, cardNeeded: p.cardNeeded, depositCents: p.depositNeededCents, phone: client.phone };
 }
 
 export type ChatBookResult = { ok: true; appointmentId: string; message: string } | { ok: false; message: string };

@@ -6,10 +6,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { ClientPicker } from "@/app/calendar/booking-panel";
 import type { ClientOption } from "@/app/calendar/actions";
-import { addChatClient, bookFromChat, bookingPolicy, bookingTimes, waitlistFromChat, type BookingPolicy } from "@/app/denise/booking-actions";
+import { addChatClient, bookFromChat, bookingTimes, waitlistFromChat } from "@/app/denise/booking-actions";
+import { bookingPolicy } from "@/app/policy/actions";
+import type { BookingPolicy } from "@/lib/booking-policy";
+import { BookingPolicyCheck } from "@/components/booking-policy-check";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
 import { CloseIcon } from "@/components/ui/icons";
-import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
+import { fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { Alert, Badge, textLinkClass } from "@/components/ui/page";
 import { Segmented } from "@/components/ui/segmented";
 import type { BookingCard, BookingSlot, ClientMatch } from "@/lib/denise/booking-chat";
@@ -269,25 +272,7 @@ function Confirm({ slot, client, onBack, onBooked }: { slot: BookingSlot; client
         )}
       </ul>
       <div className="text-13" data-testid="booking-policy">
-        {policy === undefined ? (
-          <p className="text-ink-muted">Checking the cancellation policy…</p>
-        ) : policy?.cardNeeded ? (
-          <div className="flex flex-col gap-1.5">
-            <Badge tone="warning">{policy.depositCents > 0 ? `Deposit needed: ${formatPrice(policy.depositCents)}` : "Card needed to hold this booking"}</Badge>
-            {policy.phone ? (
-              <label className="flex items-center gap-2 text-ink">
-                <input type="checkbox" checked={cardLink} onChange={(e) => setCardLink(e.target.checked)} className={checkboxClass} />
-                Text {firstOf(client.name)} a card link after booking
-              </label>
-            ) : (
-              <p className="text-ink-muted">No mobile number on file: send the card link from the booking.</p>
-            )}
-          </div>
-        ) : policy?.cardLabel ? (
-          <p className="text-ink-muted">{policy.cardLabel} on file.</p>
-        ) : (
-          <p className="text-ink-muted">No card needed for this booking.</p>
-        )}
+        <BookingPolicyCheck policy={policy} firstName={firstOf(client.name)} sendLink={cardLink} onSendLink={setCardLink} />
       </div>
       {message && <Alert>{message}</Alert>}
       <div className="flex flex-wrap gap-2">

@@ -18,6 +18,7 @@ import { isUuid } from "@/lib/ids";
 import { CARD_LINK_HOURS, cardLinkMessage } from "@/lib/policy";
 import { runPolicyCharges } from "@/lib/policy-billing";
 import { loadVisitPolicies } from "@/lib/policy-visits";
+import { policyForBooking, type BookingPolicy } from "@/lib/booking-policy";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type PolicyActionResult = { ok: true; message: string } | { ok: false; message: string };
@@ -28,6 +29,20 @@ function refresh() {
   revalidatePath("/calendar", "layout");
   revalidatePath("/policy");
   revalidatePath("/clients", "layout");
+}
+
+// What the cancellation policy asks of a booking before it's made (a card
+// on file, a deposit), for the booking form and Denise's chat. The prices
+// only size the deposit shown; the link works its amount out again from
+// the visit once it's booked.
+export async function bookingPolicy(clientId: string, lines: { serviceId: string; staffId: string; priceCents: number }[]): Promise<BookingPolicy | null> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canBook(me.role) || !isUuid(clientId) || !Array.isArray(lines)) return null;
+  const clean = lines
+    .filter((l) => l && isUuid(String(l.serviceId)) && isUuid(String(l.staffId)))
+    .slice(0, 12)
+    .map((l) => ({ serviceId: String(l.serviceId), staffId: String(l.staffId), priceCents: Number.isInteger(l.priceCents) && l.priceCents > 0 ? l.priceCents : 0 }));
+  return policyForBooking(supabase, me.business_id, me.role, clientId, clean);
 }
 
 // A link for the client to add a card (and pay the deposit this visit

@@ -1,5 +1,6 @@
 "use server";
 
+import { policyNeedFor } from "@/lib/booking-policy";
 import { blockedReason } from "@/lib/messaging/send";
 import { createHash, randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
@@ -141,7 +142,9 @@ export async function bookRebook(draftId: string, ticket: Ticket, choice: Rebook
   const items = lines.map((l) => ({ serviceId: l.serviceId, staffId: l.staffId, start: fromLocal(choice.date, l.startMinute, s.me.location.timezone)!, resource: { kind: "any" as const } }));
   const result = await saveBooking(s.supabase, s.me.location, { clientId: draft.client_id, notes: "Rebooked at checkout", items });
   if (!result.ok) return { ok: false, message: "That time was just taken. Pick another." };
-  const next: Ticket = { ...ticket, rebook: { appointmentId: result.appointmentId, label: `${formatDay(choice.date)} at ${formatMinute(choice.startMinute)}` } };
+  // What the policy still asks of it shows with it ("· Deposit needed: $50").
+  const need = await policyNeedFor(s.supabase, s.me.business_id, s.me.role, result.appointmentId);
+  const next: Ticket = { ...ticket, rebook: { appointmentId: result.appointmentId, label: `${formatDay(choice.date)} at ${formatMinute(choice.startMinute)}${need ? ` · ${need}` : ""}` } };
   await saveTicket(draftId, next);
   revalidatePath("/calendar", "layout");
   return { ok: true, ticket: next };

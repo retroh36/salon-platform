@@ -181,11 +181,16 @@ test.describe("front desk", () => {
     await expect(form.getByRole("region", { name: "Client" })).toContainText("(312) 555-0188");
 
     await form.getByLabel("Service").selectOption({ label: "Men's Cut" });
+    // The demo's policy asks new clients for a card: the link goes once it's booked.
+    const policy = form.getByTestId("booking-policy-check");
+    await expect(policy).toContainText("Card needed to hold this booking");
+    await expect(policy.getByLabel(`Text ${PREFIX}Zed a card link after booking`)).toBeChecked();
     await form.getByRole("button", { name: "Create booking" }).click();
     await expect(column(page, "Shae Morgan").getByRole("button", { name: new RegExp(`^2pm–2:30pm, ${PREFIX}Zed Newcomer, Men's Cut`) })).toBeVisible();
 
-    const { data } = await admin.from("clients").select("phone").eq("first_name", `${PREFIX}Zed`).single();
+    const { data } = await admin.from("clients").select("id, phone").eq("first_name", `${PREFIX}Zed`).single();
     expect(data!.phone).toBe("(312) 555-0188");
+    await expect.poll(async () => (await admin.from("card_requests").select("status, deposit_cents").eq("client_id", data!.id)).data).toEqual([{ status: "open", deposit_cents: 0 }]);
   });
 
   test("explains why a booking breaks the rules, and saves nothing", async ({ page }) => {

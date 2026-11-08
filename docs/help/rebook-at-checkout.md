@@ -16,6 +16,7 @@ Book the client's next visit before they leave, right from checkout.
 
 ## Good to know
 
+- If the cancellation policy needs a card or a deposit for the next visit, it shows by the date (**Deposit needed: $50**). Send the link from booking details.
 - The suggestion books the same main services with the same stylist, and follows all the booking rules.
 - With no visit history, Denise suggests about six weeks out.
 - Rebooking only shows when you're checking out a visit, not a walk-in sale.

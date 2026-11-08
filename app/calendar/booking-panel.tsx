@@ -24,6 +24,9 @@ import { clientPackagesFor, clientPolicyNote, patchTestWarnings, findClients, pr
 import type { AppointmentDetail, BoardData, ColumnData } from "./types";
 import { reach } from "@/lib/reach";
 import { useUnsavedChanges } from "@/components/unsaved";
+import { BookingPolicyCheck } from "@/components/booking-policy-check";
+import { bookingPolicy, sendCardLink } from "@/app/policy/actions";
+import type { BookingPolicy } from "@/lib/booking-policy";
 
 export type BookingStart = { staffId: string; startMinute: number };
 // A new booking already filled in (a time from Denise's booking card, to change
@@ -238,12 +241,13 @@ export function BookingPanel({
           return [{ date: alt.date, lines: alt.lines }];
         });
         const r = await reach(saveSeries(input, repeatInput(), visits));
-        if (r.ok) onSaved(r.appointmentId, r.message);
+        if (r.ok) onSaved(r.appointmentId, await withCardLink(r.appointmentId, r.message));
         else setMessage(r.message);
         return;
       }
       const result = await reach(appointment?.series && scope !== "this" ? saveVisitScoped(input, scope) : saveVisit(input));
-      if (result.ok) onSaved(result.appointmentId, (result as { message?: string }).message ?? (date !== data.date ? `Moved to ${formatLongDay(date, false)}.` : undefined), date, result.moved);
+      if (result.ok && !appointment) onSaved(result.appointmentId, await withCardLink(result.appointmentId, (result as { message?: string }).message), date, result.moved);
+      else if (result.ok) onSaved(result.appointmentId, (result as { message?: string }).message ?? (date !== data.date ? `Moved to ${formatLongDay(date, false)}.` : undefined), date, result.moved);
       else {
         setMessage(result.message);
         setLineErrors(("lineErrors" in result && result.lineErrors) || []);
@@ -253,6 +257,38 @@ export function BookingPanel({
   }
 
   const booking = preview?.filter((v) => choices[v.date] !== "skip").length ?? 0;
+
+  // The cancellation policy on a new booking (the same check as Denise's
+  // chat and booking details): a card or deposit needed, and the link texted
+  // straight after booking unless staff untick it.
+  const policyLines = lines.flatMap((l) => {
+    const info = lineInfo(l);
+    return info && l.staffId ? [{ serviceId: l.serviceId, staffId: l.staffId, priceCents: info.priceCents }] : [];
+  });
+  const policyKey = JSON.stringify([client?.id, policyLines]);
+  const [policy, setPolicy] = useState<{ key: string; policy: BookingPolicy | null } | null>(null);
+  const [cardLink, setCardLink] = useState(true);
+  useEffect(() => {
+    if (appointment || !client || !policyLines.length) return;
+    let live = true;
+    bookingPolicy(client.id, policyLines).then(
+      (p) => live && setPolicy({ key: policyKey, policy: p }),
+      () => live && setPolicy({ key: policyKey, policy: null }),
+    );
+    return () => {
+      live = false;
+    };
+    // policyKey covers the client and lines.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [policyKey, appointment]);
+  const policyNow = !appointment && client && policy?.key === policyKey ? policy.policy : null;
+
+  async function withCardLink(appointmentId: string, said: string | undefined): Promise<string | undefined> {
+    if (!client || !policyNow?.cardNeeded || !policyNow.phone || !cardLink) return said;
+    const sent = await reach(sendCardLink({ clientId: client.id, appointmentId, channel: "sms", to: policyNow.phone }));
+    const link = policyNow.depositCents > 0 ? "deposit link" : "card link";
+    return sent.ok ? `${said ?? "Booked."} The ${link} is on its way.` : `${said ?? "Booked."} The ${link} didn't go: ${sent.message}`;
+  }
 
   // Patch tests: warn as soon as the client and a service that needs one
   // are chosen.
@@ -524,6 +560,10 @@ export function BookingPanel({
           Notes
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} maxLength={MAX_NOTES} className={fieldClass} />
         </label>
+
+        {client && policyNow && (
+          <BookingPolicyCheck policy={policyNow} firstName={client.name.split(" ")[0]} sendLink={cardLink} onSendLink={setCardLink} quiet />
+        )}
 
         <div className="flex items-center justify-between border-t border-line pt-3 font-medium text-ink tabular-nums" aria-live="polite" data-testid="visit-total">
           {summary ? (

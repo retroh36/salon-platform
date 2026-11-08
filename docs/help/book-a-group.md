@@ -16,6 +16,7 @@ Book several people as one party, all at once or one after another.
 
 ## Good to know
 
+- If any guest needs a card or a deposit under the cancellation policy, the confirmation says how many: send each link from their booking details.
 - Everyone is booked together or no one is. If one guest doesn't fit, nothing is booked and that guest's problem is shown. Moving the group works the same way: everyone moves, or no one does.
 - In booking details, a group visit lists the other guests; tap a name to open their visit.
 - Dragging or canceling a group visit asks whether it's for this visit only or the whole group. **Move to another day** in **⋯** moves the whole group.

@@ -143,7 +143,8 @@ test.describe("patterns", () => {
 
   test("show someone's two-week pattern: every other Saturday off", async ({ page }) => {
     await page.goto("/scheduling");
-    await waitForHydration(page, "[data-testid=team-schedule] button[data-shift]");
+    // The pattern buttons, not a shift: on a Sunday every shift this week is past.
+    await waitForHydration(page, "[data-testid=team-schedule] button[aria-label$='repeating pattern, repeats every 2 weeks']");
     await expect(grid(page).locator(`[data-person="${SEED.staff.lois}"]`).getByTestId("pattern-weeks")).toHaveText("2 wk");
     await grid(page).getByRole("button", { name: "Lois's repeating pattern, repeats every 2 weeks" }).click();
     const sheet = ui(page).getByRole("dialog", { name: "Lois's repeating pattern" });

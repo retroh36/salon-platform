@@ -1,5 +1,6 @@
 "use server";
 
+import { policyNeedFor } from "@/lib/booking-policy";
 import { revalidatePath } from "next/cache";
 import { toldAboutFix, type Told } from "@/lib/denise/applied";
 import { approveFix, rejectFix, undoFix } from "@/lib/denise/fixes";
@@ -30,7 +31,9 @@ export async function bookFromWaitlist(entryId: string, staffId: string, date: s
   if (!s) return { ok: false, message: NOT_SIGNED_IN };
   if (!s.viewer.canBook) return { ok: false, message: "Only the front desk, managers and owners can book." };
   if (!isUuid(entryId) || !isUuid(staffId) || !isLocalDate(date)) return { ok: false, message: "That opening isn't there any more." };
-  const result = await bookWaitlistEntry(s.supabase, s.viewer.location, entryId, staffId, date, startMinute);
+  const booked = await bookWaitlistEntry(s.supabase, s.viewer.location, entryId, staffId, date, startMinute);
+  const need = booked.ok ? await policyNeedFor(s.supabase, s.me.business_id, s.me.role, booked.appointmentId) : null;
+  const result = need && booked.ok ? { ...booked, message: `${booked.message} ${need}: send the link from booking details.` } : booked;
   refresh();
   return { ...result, state: await look(s, date) };
 }

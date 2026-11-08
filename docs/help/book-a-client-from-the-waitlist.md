@@ -14,6 +14,7 @@ When time opens up, Denise suggests waitlist clients who fit it. You choose who 
 
 ## Good to know
 
+- If the cancellation policy needs a card or a deposit for the visit, the confirmation says so: send the link from booking details.
 - Denise doesn't contact anyone. Get in touch with the client yourself.
 - Each match shows the services and the time it would be.
 - To add someone to the list, see Add a client to the waitlist.

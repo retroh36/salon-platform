@@ -31,6 +31,7 @@ import { addDays, daysBetween, formatMinute, fromLocal, isLocalDate, MINUTES_PER
 import { fullName } from "@/lib/staff";
 import type { TimeEvent } from "@/lib/visit-times";
 import { repeatOffenderNote } from "@/lib/policy";
+import { policyNeedFor } from "@/lib/booking-policy";
 import { anywayQuestion, type DropIssue } from "@/lib/move-anyway";
 import { clientStanding, loadPolicy } from "@/lib/policy-load";
 
@@ -716,7 +717,9 @@ export async function saveGroup(input: GroupInput): Promise<GroupSaveResult> {
   });
   if (result.ok) {
     refresh();
-    return { ok: true, appointmentId: result.appointmentIds[0], message: `Booked ${input.guests.length} guests for ${label}.` };
+    const needs = (await Promise.all(result.appointmentIds.map((id) => policyNeedFor(supabase, me.business_id, me.role, id)))).filter(Boolean).length;
+    const policy = needs ? ` ${needs === 1 ? "One guest needs" : `${needs} guests need`} a card or deposit: send the link from booking details.` : "";
+    return { ok: true, appointmentId: result.appointmentIds[0], message: `Booked ${input.guests.length} guests for ${label}.${policy}` };
   }
   if (result.error === "invalid") {
     return { ok: false, message: "Not everyone fits as planned. Change the highlighted guests.", guestErrors: result.problems.map((g) => g.map((line) => line.map(describeProblem)).flat()).map((g) => [...new Set(g)]) };
