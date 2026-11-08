@@ -120,8 +120,16 @@ export async function expectTidyLayout(page: Page, where: string) {
 // cut mid-word with "…"; the day keeps its label ("6 visits", not "6"). The
 // name has all the room beside the photo, and is shortened only when the
 // full name doesn't fit there.
+// Checked until it holds for up to 3 seconds: opening booking details
+// narrows the columns over a short transition (the calendar's right
+// padding), and FitText refits as they go, so a single look mid-slide can
+// catch a summary a moment before it's shortened.
 export async function expectWholeHeaders(page: Page, where: string) {
-  const problems = await page.evaluate(() => {
+  await expect(async () => expect(await headerProblems(page), `column headers ${where}`).toEqual([])).toPass({ timeout: 3_000 });
+}
+
+async function headerProblems(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
     const out: string[] = [];
     const cut = (el: Element | null) => !!el && (el.scrollWidth > el.clientWidth + 0.5 || (el.textContent ?? "").includes("…"));
     for (const header of document.querySelectorAll<HTMLElement>("main [data-column-header]")) {
@@ -159,5 +167,4 @@ export async function expectWholeHeaders(page: Page, where: string) {
     }
     return out;
   });
-  expect(problems, `column headers ${where}`).toEqual([]);
 }

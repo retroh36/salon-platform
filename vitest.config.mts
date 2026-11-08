@@ -2,6 +2,7 @@ import path from "node:path";
 import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 import { requireLocal } from "./scripts/local-only.ts";
+import { stayAwake } from "./scripts/stay-awake.ts";
 
 export default defineConfig(({ mode }) => ({
   resolve: {
@@ -43,5 +44,6 @@ export default defineConfig(({ mode }) => ({
 
 function localEnv(mode: string, env: Record<string, string>): Record<string, string> {
   requireLocal("The tests", loadEnv(mode, process.cwd(), ""));
+  stayAwake();
   return env;
 }

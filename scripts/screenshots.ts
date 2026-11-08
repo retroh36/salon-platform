@@ -34,6 +34,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../lib/database.types.ts";
 import { addDays, fromLocal, startOfWeek, todayIn, toLocal, weekdayOf, type LocalDate } from "../lib/scheduling/time.ts";
 import { requireLocal } from "./local-only.ts";
+import { stayAwake } from "./stay-awake.ts";
 
 try {
   process.loadEnvFile(".env.local");
@@ -65,6 +66,7 @@ const HIDE = `[class*="animate-toast-in"], [data-testid$="-toast"], a[href^="/de
 
 // It resets and reloads the database: only ever the local one.
 requireLocal("npm run screenshots");
+stayAwake();
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SECRET_KEY;
 if (!url || !key) {

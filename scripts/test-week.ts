@@ -10,6 +10,7 @@
 import { execFileSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { requireLocal } from "./local-only.ts";
+import { stayAwake } from "./stay-awake.ts";
 
 try {
   process.loadEnvFile(".env.local");
@@ -17,6 +18,7 @@ try {
   // The shell's settings, then.
 }
 requireLocal("npm run test:week");
+stayAwake();
 
 if (!process.argv.includes("--yes")) {
   if (!process.stdin.isTTY) {

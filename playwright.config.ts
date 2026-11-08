@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { requireLocal } from "./scripts/local-only.ts";
+import { stayAwake } from "./scripts/stay-awake.ts";
 
 // Supabase URL and keys, for the tests' cleanup client.
 try {
@@ -12,6 +13,7 @@ delete process.env.ANTHROPIC_API_KEY;
 
 // Never a hosted database (scripts/local-only.ts).
 requireLocal("The browser tests");
+stayAwake();
 
 // Its own server, apart from `npm run dev` on 3000 (which may have the API
 // key), with its own build folder. A production build by default: the dev
