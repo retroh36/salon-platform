@@ -101,6 +101,8 @@ export function waitlistOpenings(
   entries: readonly WaitlistRow[],
   staffNames: ReadonlyMap<string, string>,
   notBefore: number,
+  // Open offers by "<entry>:<staff>:<start minute>", with when they lapse.
+  offered: ReadonlyMap<string, string> = new Map(),
 ): WaitlistOpening[] {
   const seen = new Set<string>();
   const out: WaitlistOpening[] = [];
@@ -130,6 +132,7 @@ export function waitlistOpenings(
         endMinute: m.end,
         preferred: m.preferred,
         waitingSince: row.get(m.entryId)!.createdAt.toISOString(),
+        offeredUntil: offered.get(`${m.entryId}:${opening.staffId}:${m.start}`) ?? null,
       })),
     });
   }

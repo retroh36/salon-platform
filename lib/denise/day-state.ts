@@ -7,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { canReceiveOrders } from "@/lib/inventory";
 import { loadBookingContext } from "@/lib/scheduling/load";
-import { toLocal, type LocalDate } from "@/lib/scheduling/time";
+import { formatMinute, toLocal, type LocalDate } from "@/lib/scheduling/time";
 import type { StaffRole } from "@/lib/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { freedOn, loadWaitlist, waitlistOpenings } from "@/lib/waitlist-load";
@@ -47,14 +47,24 @@ export async function openingsOn(a: DeniseAsker, date: LocalDate): Promise<Waitl
   const tz = a.viewer.location.timezone;
   const entries = (await loadWaitlist(a.supabase, a.viewer.location.id, date)).filter((e) => e.fromDate <= date);
   if (!entries.length) return [];
-  const [freed, ctx, { data: staff, error }] = await Promise.all([
+  const [freed, ctx, { data: staff, error }, { data: offers, error: oError }] = await Promise.all([
     freedOn(a.supabase, a.viewer.location.id, date, tz),
     loadBookingContext(a.supabase, a.viewer.location, date, date),
     a.supabase.from("staff").select("id, first_name"),
+    a.supabase
+      .from("waitlist_offers")
+      .select("entry_id, staff_id, starts_at, expires_at")
+      .eq("status", "open")
+      .gt("expires_at", new Date().toISOString())
+      .in("entry_id", entries.map((e) => e.id)),
   ]);
   if (error) throw error;
+  if (oError) throw oError;
+  const offered = new Map(
+    offers.filter((o) => toLocal(new Date(o.starts_at), tz).date === date).map((o) => [`${o.entry_id}:${o.staff_id}:${toLocal(new Date(o.starts_at), tz).minute}`, formatMinute(toLocal(new Date(o.expires_at), tz).minute)]),
+  );
   const notBefore = date === a.today ? toLocal(new Date(), tz).minute : 0;
-  return waitlistOpenings(ctx, date, freed, entries, new Map(staff.map((x) => [x.id, x.first_name])), notBefore);
+  return waitlistOpenings(ctx, date, freed, entries, new Map(staff.map((x) => [x.id, x.first_name])), notBefore, offered);
 }
 
 // `brief`: also work out the morning brief (today, for the front of house:

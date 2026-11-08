@@ -66,7 +66,7 @@ export type ReorderNotice = {
 };
 
 // Time that opened up, with waitlist clients who'd fit it, best first.
-export type OpeningMatch = { entryId: string; clientName: string; services: string; startMinute: number; endMinute: number; preferred: boolean; waitingSince: string };
+export type OpeningMatch = { entryId: string; clientName: string; services: string; startMinute: number; endMinute: number; preferred: boolean; waitingSince: string; offeredUntil: string | null };
 export type WaitlistOpening = { key: string; staffId: string; staffName: string; startMinute: number; endMinute: number; headline: string; matches: OpeningMatch[] };
 
 export type DeniseState = {

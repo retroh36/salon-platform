@@ -23,6 +23,7 @@ test.afterAll(async () => {
   const ids = (data ?? []).map((c) => c.id);
   await admin.from("walk_ins").delete().like("name", `${PREFIX}%`);
   await admin.from("waitlist_entries").delete().in("client_id", ids);
+  await admin.from("outbox_messages").delete().like("body", `%${PREFIX}%`);
   for (const id of ids) await admin.from("appointments").delete().eq("client_id", id);
   await admin.from("clients").delete().in("id", ids);
 });
@@ -117,6 +118,62 @@ test("when a visit is canceled, Denise suggests who on the waitlist fits, and st
   expect(new Date(booked![0].starts_at)).toEqual(at(12, 30));
   // The canceled time is filled, so Denise has nothing more to offer.
   await expect(opening).toHaveCount(0);
+});
+
+test("offers the opening with one tap, and the client takes it from the text", async ({ page, browser }) => {
+  const cut = await mensCut();
+  const regular = await newClient("Regular");
+  for (const [h, m] of [[9, 0], [9, 30], [10, 0], [10, 30], [11, 0], [11, 30], [14, 0], [14, 30], [15, 0], [15, 30], [16, 0], [16, 30]]) await book(regular, cut, h, m);
+  const gone = await newClient("Gone");
+  await book(gone, cut, 12, 30);
+  const tia = await newClient("Tia");
+  const { error } = await admin
+    .from("waitlist_entries")
+    .insert({ business_id: B, location_id: L, client_id: tia, service_ids: [cut], staff_ids: [NOLA], from_date: addDays(DAY, -3), to_date: addDays(DAY, 3) });
+  expect(error).toBeNull();
+
+  await openDay(page);
+  await ui(page).getByRole("region", { name: "Nola Brennan", exact: true }).getByRole("button", { name: new RegExp(`${PREFIX}Gone Test`) }).click();
+  const panel = page.getByRole("complementary", { name: "Booking details" });
+  await moreAction(panel, "Cancel booking");
+  const cancel = panel.getByRole("form", { name: "Cancel booking" });
+  await cancel.getByLabel("Reason").selectOption("Client canceled");
+  await cancel.getByRole("button", { name: "Cancel booking" }).click();
+
+  await page.getByTestId("denise-launcher").click();
+  const opening = page.getByTestId("denise-opening");
+  await expect(opening).toContainText("opening with Nola at 12:30pm", { timeout: 15_000 });
+  const match = opening.getByRole("listitem").filter({ hasText: `${PREFIX}Tia Test` });
+  await match.getByRole("button", { name: "Offer" }).click();
+  await expect(page.getByRole("status").filter({ hasText: `Offered to ${PREFIX}Tia, held for them until` })).toBeVisible();
+  await expect(match.getByTestId("waitlist-offered")).toContainText("Offered · until");
+
+  // The salon's fixed message, with the link (in the outbox until texts are live).
+  const { data: sent } = await admin.from("outbox_messages").select("body").like("body", `%Hi ${PREFIX}Tia, a spot opened up%`);
+  expect(sent).toHaveLength(1);
+  expect(sent![0].body).toContain("for your Men's Cut with Nola on");
+  const link = new URL(sent![0].body.match(/https?:\/\/\S+\/offer\/[\w-]+/)![0]).pathname;
+
+  // The client, on their phone, signed out.
+  const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: { cookies: [], origins: [] } });
+  try {
+    const client = await phone.newPage();
+    await client.goto(link);
+    await expect(client.getByRole("heading", { name: `Hi ${PREFIX}Tia, a spot opened up` })).toBeVisible();
+    await expect(client.getByText("Men's Cut with Nola")).toBeVisible();
+    await client.getByRole("button", { name: "Take it" }).click();
+    await expect(client).toHaveURL(/\/manage\/[\w-]+\?booked=1$/);
+    // The link now says it's booked.
+    await client.goto(link);
+    await expect(client.getByTestId("offer-taken")).toBeVisible();
+  } finally {
+    await phone.close();
+  }
+
+  const { data: booked } = await admin.from("appointments").select("starts_at, status, online_source").eq("client_id", tia);
+  expect(booked).toEqual([{ starts_at: expect.any(String), status: "booked", online_source: "waitlist" }]);
+  expect(new Date(booked![0].starts_at)).toEqual(at(12, 30));
+  expect((await admin.from("waitlist_entries").select("status").eq("client_id", tia).single()).data!.status).toBe("booked");
 });
 
 test("queues walk-ins with an estimated wait and books them in one click", async ({ page }) => {

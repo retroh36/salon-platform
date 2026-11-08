@@ -35,7 +35,7 @@ import { LatePanel } from "./late-panel";
 import { OutPanel, type OutPreview } from "./out-panel";
 import { lateTarget } from "@/lib/running-late";
 import type { OutWhen } from "@/lib/rescue";
-import { approveDeniseFix, bookFromWaitlist, dismissDeniseItem, rejectDeniseFix, scanDenise, undoDeniseFix } from "./denise-actions";
+import { approveDeniseFix, bookFromWaitlist, dismissDeniseItem, offerWaitlistSpot, rejectDeniseFix, scanDenise, undoDeniseFix } from "./denise-actions";
 import { appendDenise, askDenise, focusDenise, hydrateDenise, startDenise, takeAdjust, useDenise } from "@/components/denise-chat/store";
 import { useDeniseShortcut } from "@/components/denise-chat/bubble";
 import { AboutDeniseLink, MinimizedBar, MinimizeButton } from "@/components/denise-chat/card";
@@ -1773,6 +1773,7 @@ export function CalendarBoard({ data }: { data: BoardData }) {
                 });
               }}
               onBookWaitlist={(o, m) => decide(() => bookFromWaitlist(m.entryId, o.staffId, data.date, m.startMinute), null)}
+              onOfferWaitlist={(o, m) => decide(() => offerWaitlistSpot(m.entryId, o.staffId, data.date, m.startMinute), null)}
             >
               <DeniseChat
                 box={false}

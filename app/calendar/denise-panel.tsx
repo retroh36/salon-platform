@@ -54,6 +54,7 @@ export function DenisePanel({
   onDismissNotice,
   onNoShow,
   onBookWaitlist,
+  onOfferWaitlist,
   run,
   stuck = false,
   onRetry,
@@ -85,6 +86,8 @@ export function DenisePanel({
   onNoShow: (notice: DeniseNotice) => void;
   // Book a waitlist client into time that opened up.
   onBookWaitlist: (opening: WaitlistOpening, match: OpeningMatch) => void;
+  // Text them the salon's offer, to take it or say no thanks themselves.
+  onOfferWaitlist: (opening: WaitlistOpening, match: OpeningMatch) => void;
   // The conversation with her (components/denise-chat/), at the foot.
   children: React.ReactNode;
 }) {
@@ -252,14 +255,25 @@ export function DenisePanel({
                         </span>
                       </span>
                       {data.me.canBook && (
-                        <Button size="sm" disabled={working} onClick={() => onBookWaitlist(o, m)}>
-                          Book
-                        </Button>
+                        <span className="flex items-center gap-2">
+                          {m.offeredUntil ? (
+                            <span data-testid="waitlist-offered" className="text-xs text-ink-muted">
+                              Offered · until {m.offeredUntil}
+                            </span>
+                          ) : (
+                            <Button size="sm" variant="secondary" disabled={working} onClick={() => onOfferWaitlist(o, m)}>
+                              Offer
+                            </Button>
+                          )}
+                          <Button size="sm" disabled={working} onClick={() => onBookWaitlist(o, m)}>
+                            Book
+                          </Button>
+                        </span>
                       )}
                     </li>
                   ))}
                 </ol>
-                <p className="text-xs text-ink-muted">You pick who to book; get in touch with them yourself.</p>
+                <p className="text-xs text-ink-muted">Book them after a call, or Offer to text them the time to take or turn down. You pick who.</p>
               </div>
             </div>
           ))}

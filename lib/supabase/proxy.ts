@@ -11,7 +11,7 @@ const PUBLIC_PATHS = ["/login"];
 // password reset emails (which signs them in), and the shared iPad's PIN
 // screen (which checks the device itself), and error reports from the
 // error page (which log only).
-const OPEN_PATHS = ["/book", "/b", "/api/client-error", "/dev/outbox", "/api/demo", "/api/cron", "/api/messages/inbound", "/api/messages/status", "/api/messages/email-events", "/api/payments/stripe", "/unsubscribe", "/pay", "/card", "/form", "/event", "/auth/confirm", "/switch"];
+const OPEN_PATHS = ["/book", "/b", "/api/client-error", "/dev/outbox", "/api/demo", "/api/cron", "/api/messages/inbound", "/api/messages/status", "/api/messages/email-events", "/api/payments/stripe", "/unsubscribe", "/pay", "/card", "/form", "/offer", "/event", "/auth/confirm", "/switch"];
 // Set on a device marked as shared (lib/shared-device.ts).
 const DEVICE_COOKIE = "maestra_device";
 

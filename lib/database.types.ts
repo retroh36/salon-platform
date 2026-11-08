@@ -4847,6 +4847,62 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"waitlist_offers": {
+                  Row: {
+                    "answered_at": string | null,"appointment_id": string | null,"business_id": string,"channel": string,"client_id": string,"created_at": string,"created_by": string | null,"entry_id": string,"expires_at": string,"id": string,"location_id": string,"sent_to": string,"staff_id": string,"starts_at": string,"status": string,"token_hash": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "answered_at"?: string | null,"appointment_id"?: string | null,"business_id": string,"channel": string,"client_id": string,"created_at"?: string,"created_by"?: string | null,"entry_id": string,"expires_at": string,"id"?: string,"location_id": string,"sent_to": string,"staff_id": string,"starts_at": string,"status"?: string,"token_hash": string
+                  }
+                  Update: {
+                    "answered_at"?: string | null,"appointment_id"?: string | null,"business_id"?: string,"channel"?: string,"client_id"?: string,"created_at"?: string,"created_by"?: string | null,"entry_id"?: string,"expires_at"?: string,"id"?: string,"location_id"?: string,"sent_to"?: string,"staff_id"?: string,"starts_at"?: string,"status"?: string,"token_hash"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "waitlist_offers_appointment_id_fkey"
+      columns: ["appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "waitlist_offers_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "waitlist_offers_client_id_business_id_fkey"
+      columns: ["client_id","business_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "waitlist_offers_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "waitlist_offers_entry_id_fkey"
+      columns: ["entry_id"]
+isOneToOne: false
+      referencedRelation: "waitlist_entries"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "waitlist_offers_location_id_fkey"
+      columns: ["location_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "waitlist_offers_staff_id_business_id_fkey"
+      columns: ["staff_id","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"walk_ins": {
                   Row: {
                     "appointment_id": string | null,"arrived_at": string,"business_id": string,"client_id": string | null,"created_by": string | null,"id": string,"location_id": string,"name": string,"phone": string | null,"service_id": string,"status": Database["public"]['Enums']["walk_in_status"],"updated_at": string
@@ -5056,6 +5112,9 @@ isOneToOne: false
 "answer_shift_swap":
 { Args: { "p_accept": boolean,"p_swap_id": string }; Returns: undefined
                            },
+"answer_waitlist_offer":
+{ Args: { "p_appointment_id": string,"p_notice": string,"p_offer_id": string,"p_take": boolean }; Returns: undefined
+                           },
 "apply_ai_action":
 { Args: { "p_action_id": string,"p_client_id"?: string,"p_expected_version": number }; Returns: undefined
                            },
@@ -5117,6 +5176,9 @@ isOneToOne: false
                            },
 "cancel_stocktake":
 { Args: { "p_stocktake_id": string }; Returns: undefined
+                           },
+"cancel_waitlist_offer":
+{ Args: { "p_offer_id": string }; Returns: undefined
                            },
 "check_in_patch_override":
 { Args: { "p_appointment_id": string,"p_reason": string }; Returns: undefined
@@ -5202,6 +5264,9 @@ isOneToOne: false
                            },
 "create_payment_link":
 { Args: { "p_amount_cents": number,"p_channel": string,"p_draft_id": string,"p_hours": number,"p_snapshot": Json,"p_to": string,"p_token_hash": string }; Returns: string
+                           },
+"create_waitlist_offer":
+{ Args: { "p_channel": string,"p_entry_id": string,"p_minutes": number,"p_staff_id": string,"p_starts_at": string,"p_to": string,"p_token_hash": string }; Returns: string
                            },
 "decide_shift_swap":
 { Args: { "p_approve": boolean,"p_reason"?: string,"p_swap_id": string }; Returns: undefined

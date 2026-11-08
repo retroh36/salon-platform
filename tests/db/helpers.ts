@@ -141,9 +141,10 @@ export async function throwawayStylist(firstName: string, level: "artisan" | "se
 // would otherwise depend on when they run (the salon is closed Sundays and
 // Mondays, and in the evening): the salon open all day on today's weekday
 // and these stylists working all day today, on top of whatever the demo
-// has today. Returns the undo, which puts the hours back as they were.
-export async function openAllDay(staffIds: string[], { location = SEED.location, business = SEED.business, timeZone = "America/Chicago" } = {}) {
-  const today = todayIn(timeZone);
+// has today (or on `date`). Returns the undo, which puts the hours back as
+// they were.
+export async function openAllDay(staffIds: string[], { location = SEED.location, business = SEED.business, timeZone = "America/Chicago", date = "" } = {}) {
+  const today = date || todayIn(timeZone);
   const weekday = weekdayOf(today);
   const check = <T>(r: { data: T | null; error: unknown }): T => {
     if (r.error) throw r.error;
