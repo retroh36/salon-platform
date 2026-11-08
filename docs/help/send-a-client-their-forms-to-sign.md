@@ -16,7 +16,7 @@ Text or email a client a secure link to fill in and sign the forms their visit n
 
 ## Good to know
 
-- When you book a new visit that needs forms (a first-visit consultation, or consent for some services), the booking form and Denise's booking card show **Form to sign** with **Text … the form to sign before the visit** ticked. The link goes as soon as it's booked. Untick it to skip.
+- When you book a new visit that needs forms (a first-visit consultation, or consent for some services), the booking form and Denise's booking card show **Form to sign** with **Text … a link to sign the form** ticked. The link goes as soon as it's booked. When the policy also needs a card or a deposit, it's the same text: one "Finish your booking" link where they add the card first, then sign. Untick it to skip.
 - One link holds every form the visit still needs. Sending again replaces the earlier link.
 - The link works until the visit starts, for 2 weeks at most. A form signed at the desk in the meantime counts on the link too.
 - Signed forms are kept on the client's profile under the **Forms** tab, the same as forms signed on the iPad.

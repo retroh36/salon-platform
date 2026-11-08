@@ -20,8 +20,10 @@ import { runPolicyCharges } from "@/lib/policy-billing";
 import { loadVisitPolicies } from "@/lib/policy-visits";
 import { policyForBooking, type BookingPolicy } from "@/lib/booking-policy";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { partToken } from "@/lib/finish-links";
 
 export type PolicyActionResult = { ok: true; message: string } | { ok: false; message: string };
+export type CardLinkSent = { ok: true; message: string; depositCents: number } | { ok: false; message: string };
 
 const NOT_ALLOWED = "You don't have permission to do that.";
 
@@ -46,8 +48,10 @@ export async function bookingPolicy(clientId: string, lines: { serviceId: string
 }
 
 // A link for the client to add a card (and pay the deposit this visit
-// needs), by text or email.
-export async function sendCardLink(input: { clientId: string; appointmentId: string | null; channel: "sms" | "email"; to: string }): Promise<PolicyActionResult> {
+// needs), by text or email. With finishToken it's the card part of a
+// "Finish your booking" link (lib/finish-links.ts): its token comes from
+// that one and nothing is sent here.
+export async function sendCardLink(input: { clientId: string; appointmentId: string | null; channel: "sms" | "email"; to: string; finishToken?: string }): Promise<CardLinkSent> {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
   if (!isUuid(input.clientId) || (input.appointmentId && !isUuid(input.appointmentId))) return { ok: false, message: "That client no longer exists." };
@@ -85,7 +89,7 @@ export async function sendCardLink(input: { clientId: string; appointmentId: str
     deposit = policies.get(a.id)?.depositNeededCents ?? 0;
   }
 
-  const token = newSecret();
+  const token = input.finishToken ? partToken(input.finishToken, "card") : newSecret();
   const { error } = await supabase.rpc("create_card_request", {
     p_client_id: input.clientId,
     p_appointment_id: input.appointmentId ?? (null as never),
@@ -98,6 +102,7 @@ export async function sendCardLink(input: { clientId: string; appointmentId: str
   if (error?.code === "42501") return { ok: false, message: NOT_ALLOWED };
   if (error?.code === "55000") return { ok: false, message: error.message };
   if (error) throw error;
+  if (input.finishToken) return { ok: true, message: "Card link made.", depositCents: deposit };
   const { data: business } = await supabase.from("businesses").select("name").eq("id", me.business_id).single();
   const message = cardLinkMessage(business?.name ?? "The salon", `${siteUrl()}/card/${token}`, deposit, input.channel);
   // The outbox is written with the service role (texts and email aren't
@@ -105,7 +110,7 @@ export async function sendCardLink(input: { clientId: string; appointmentId: str
   const { error: outError } = await createAdminClient().from("outbox_messages").insert({ business_id: me.business_id, channel: input.channel, to_address: input.to.trim(), subject: message.subject, body: message.body });
   if (outError) throw outError;
   refresh();
-  return { ok: true, message: `${deposit > 0 ? "Deposit and card link" : "Card link"} sent to ${input.to.trim()}.` };
+  return { ok: true, message: `${deposit > 0 ? "Deposit and card link" : "Card link"} sent to ${input.to.trim()}.`, depositCents: deposit };
 }
 
 export async function waiveFee(feeId: string, reason: string): Promise<PolicyActionResult> {

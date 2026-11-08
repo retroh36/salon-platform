@@ -25,8 +25,8 @@ import type { AppointmentDetail, BoardData, ColumnData } from "./types";
 import { reach } from "@/lib/reach";
 import { useUnsavedChanges } from "@/components/unsaved";
 import { BookingPolicyCheck } from "@/components/booking-policy-check";
-import { bookingPolicy, sendCardLink } from "@/app/policy/actions";
-import { sendFormLink } from "@/app/clients/forms-actions";
+import { bookingPolicy } from "@/app/policy/actions";
+import { sendFinishLink } from "@/app/policy/finish-actions";
 import type { BookingPolicy } from "@/lib/booking-policy";
 
 export type BookingStart = { staffId: string; startMinute: number };
@@ -242,12 +242,12 @@ export function BookingPanel({
           return [{ date: alt.date, lines: alt.lines }];
         });
         const r = await reach(saveSeries(input, repeatInput(), visits));
-        if (r.ok) onSaved(r.appointmentId, await withCardLink(r.appointmentId, r.message));
+        if (r.ok) onSaved(r.appointmentId, await withFinishLink(r.appointmentId, r.message));
         else setMessage(r.message);
         return;
       }
       const result = await reach(appointment?.series && scope !== "this" ? saveVisitScoped(input, scope) : saveVisit(input));
-      if (result.ok && !appointment) onSaved(result.appointmentId, await withCardLink(result.appointmentId, (result as { message?: string }).message), date, result.moved);
+      if (result.ok && !appointment) onSaved(result.appointmentId, await withFinishLink(result.appointmentId, (result as { message?: string }).message), date, result.moved);
       else if (result.ok) onSaved(result.appointmentId, (result as { message?: string }).message ?? (date !== data.date ? `Moved to ${formatLongDay(date, false)}.` : undefined), date, result.moved);
       else {
         setMessage(result.message);
@@ -268,8 +268,7 @@ export function BookingPanel({
   });
   const policyKey = JSON.stringify([client?.id, policyLines]);
   const [policy, setPolicy] = useState<{ key: string; policy: BookingPolicy | null } | null>(null);
-  const [cardLink, setCardLink] = useState(true);
-  const [formLink, setFormLink] = useState(true);
+  const [finishLink, setFinishLink] = useState(true);
   useEffect(() => {
     if (appointment || !client || !policyLines.length) return;
     let live = true;
@@ -285,19 +284,12 @@ export function BookingPanel({
   }, [policyKey, appointment]);
   const policyNow = !appointment && client && policy?.key === policyKey ? policy.policy : null;
 
-  async function withCardLink(appointmentId: string, said: string | undefined): Promise<string | undefined> {
-    if (!client || !policyNow?.phone) return said;
-    let out = said ?? "Booked.";
-    if (policyNow.cardNeeded && cardLink) {
-      const sent = await reach(sendCardLink({ clientId: client.id, appointmentId, channel: "sms", to: policyNow.phone }));
-      const link = policyNow.depositCents > 0 ? "deposit link" : "card link";
-      out = sent.ok ? `${out} The ${link} is on its way.` : `${out} The ${link} didn't go: ${sent.message}`;
-    }
-    if (policyNow.forms.length && formLink) {
-      const sent = await reach(sendFormLink({ appointmentId, channel: "sms", to: policyNow.phone }));
-      out = sent.ok ? `${out} The form link is on its way.` : `${out} The form link didn't go: ${sent.message}`;
-    }
-    return out === (said ?? "Booked.") ? said : out;
+  async function withFinishLink(appointmentId: string, said: string | undefined): Promise<string | undefined> {
+    // One "Finish your booking" message for the card and the forms.
+    if (!client || !policyNow?.phone || !finishLink || !(policyNow.cardNeeded || policyNow.forms.length)) return said;
+    const sent = await reach(sendFinishLink({ clientId: client.id, appointmentId, to: policyNow.phone, card: policyNow.cardNeeded, forms: policyNow.forms.length > 0 }));
+    const out = said ?? "Booked.";
+    return sent.ok ? `${out} The link to finish their booking is on its way.` : `${out} The link to finish their booking didn't go: ${sent.message}`;
   }
 
   // Patch tests: warn as soon as the client and a service that needs one
@@ -572,7 +564,7 @@ export function BookingPanel({
         </label>
 
         {client && policyNow && (
-          <BookingPolicyCheck policy={policyNow} firstName={client.name.split(" ")[0]} sendLink={cardLink} onSendLink={setCardLink} sendForms={formLink} onSendForms={setFormLink} quiet />
+          <BookingPolicyCheck policy={policyNow} firstName={client.name.split(" ")[0]} sendLink={finishLink} onSendLink={setFinishLink} quiet />
         )}
 
         <div className="flex items-center justify-between border-t border-line pt-3 font-medium text-ink tabular-nums" aria-live="polite" data-testid="visit-total">

@@ -3,7 +3,7 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
 import { onCheckout } from "./checkout-helpers";
-import { allowOfflineLogs, AUTH, checkIn, checkOut, expect, moreAction, putBackSales, pxPerMinute, slotAt, test, ui, visitTab, waitForHydration } from "./fixtures";
+import { allowOfflineLogs, AUTH, checkIn, checkOut, expect, moreAction, putBackSales, pxPerMinute, sign, slotAt, test, ui, visitTab, waitForHydration } from "./fixtures";
 
 // Stock and sales this file uses are put back afterwards.
 putBackSales();
@@ -27,6 +27,7 @@ async function clearDay() {
 test.beforeEach(clearDay);
 test.afterAll(async () => {
   await clearDay();
+  await admin.from("outbox_messages").delete().like("body", `%${PREFIX}%`);
   await admin.from("clients").delete().like("first_name", `${PREFIX}%`);
 });
 
@@ -164,7 +165,7 @@ test.describe("front desk", () => {
     ]);
   });
 
-  test("adds a new client while booking", async ({ page }) => {
+  test("adds a new client while booking, who finishes the booking from one text", async ({ page, browser }) => {
     await openDay(page);
     await clickSlot(page, "Shae Morgan", 14);
     const form = panel(page).getByRole("form", { name: "New booking" });
@@ -181,14 +182,12 @@ test.describe("front desk", () => {
     await expect(form.getByRole("region", { name: "Client" })).toContainText("(312) 555-0188");
 
     await form.getByLabel("Service").selectOption({ label: "Men's Cut" });
-    // The demo's policy asks new clients for a card: the link goes once it's booked.
+    // The demo's policy asks new clients for a card, and their first visit
+    // needs the consultation signed: one tick, for one text once it's booked.
     const policy = form.getByTestId("booking-policy-check");
     await expect(policy).toContainText("Card needed to hold this booking");
-    await expect(policy.getByLabel(`Text ${PREFIX}Zed a card link after booking`)).toBeChecked();
-    // And the first-visit consultation, by link to sign before they come.
-    const forms = form.getByTestId("booking-forms-check");
-    await expect(forms).toContainText("Form to sign: New client consultation");
-    await expect(forms.getByLabel(`Text ${PREFIX}Zed the form to sign before the visit`)).toBeChecked();
+    await expect(policy).toContainText("Form to sign: New client consultation");
+    await expect(policy.getByLabel(`Text ${PREFIX}Zed a link to add a card and sign the form`)).toBeChecked();
     await form.getByRole("button", { name: "Create booking" }).click();
     await expect(column(page, "Shae Morgan").getByRole("button", { name: new RegExp(`^2pm–2:30pm, ${PREFIX}Zed Newcomer, Men's Cut`) })).toBeVisible();
 
@@ -196,6 +195,42 @@ test.describe("front desk", () => {
     expect(data!.phone).toBe("(312) 555-0188");
     await expect.poll(async () => (await admin.from("card_requests").select("status, deposit_cents").eq("client_id", data!.id)).data).toEqual([{ status: "open", deposit_cents: 0 }]);
     await expect.poll(async () => (await admin.from("form_requests").select("status, sent_to").eq("client_id", data!.id)).data).toEqual([{ status: "open", sent_to: "3125550188" }]);
+    // One message, not two.
+    const { data: sent } = await admin.from("outbox_messages").select("body").like("body", `%Hi ${PREFIX}Zed,%`);
+    expect(sent).toHaveLength(1);
+    expect(sent![0].body).toContain("to finish your booking for");
+    expect(sent![0].body).toContain("please add a card to hold it and sign your New client consultation here:");
+    const url = new URL(sent![0].body.match(/https?:\/\/\S+\/finish\/[A-Za-z0-9_-]{43}/)![0]);
+
+    // On their phone, signed out: the card, then the form, on one page.
+    const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: { cookies: [], origins: [] } });
+    const p = await phone.newPage();
+    try {
+      await p.goto(url.pathname);
+      await expect(p.getByRole("heading", { name: `Hi ${PREFIX}Zed` })).toBeVisible();
+      const card = p.getByTestId("finish-card");
+      await expect(card).toContainText("Step 1 of 2");
+      await waitForHydration(p, "[data-testid=finish-card] button[type=submit]");
+      await card.getByLabel(/I agree to the cancellation policy/).check();
+      await card.getByRole("button", { name: "Save card" }).click();
+      await expect(p.getByTestId("finish-card-saved")).toContainText("is saved");
+      await expect(p.getByText("Step 2 of 2")).toBeVisible();
+      const consult = p.getByRole("form", { name: "New client consultation" });
+      await waitForHydration(p, "[data-testid=signature-pad]");
+      await consult.getByRole("group", { name: "Do you have a sensitive scalp or skin allergies?" }).getByText("No", { exact: true }).click();
+      await consult.getByRole("group", { name: "Are you pregnant or breastfeeding?" }).getByText("No", { exact: true }).click();
+      await sign(p);
+      await consult.getByRole("button", { name: "Sign and submit" }).click();
+      await expect(p.getByTestId("forms-done")).toContainText(`Thank you, ${PREFIX}Zed`);
+      // Done: the link says so.
+      await p.reload();
+      await expect(p.getByTestId("finish-done")).toBeVisible();
+    } finally {
+      await phone.close();
+    }
+    expect((await admin.from("card_requests").select("status").eq("client_id", data!.id)).data).toEqual([{ status: "done" }]);
+    expect((await admin.from("form_requests").select("status").eq("client_id", data!.id)).data).toEqual([{ status: "done" }]);
+    expect((await admin.from("client_cards").select("id").eq("client_id", data!.id)).data).toHaveLength(1);
   });
 
   test("explains why a booking breaks the rules, and saves nothing", async ({ page }) => {

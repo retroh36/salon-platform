@@ -1,8 +1,7 @@
-import type { Page } from "@playwright/test";
 import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, fromLocal, startOfWeek, todayIn } from "@/lib/scheduling/time";
 import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, clientTab, expect, test, ui, waitForHydration, openChecklist, slotAt } from "./fixtures";
+import { AUTH, clientTab, expect, sign, test, ui, waitForHydration, openChecklist, slotAt } from "./fixtures";
 
 const B = SEED.business;
 const L = SEED.location;
@@ -27,17 +26,6 @@ async function newClient(first: string) {
 
 async function serviceId(name: string) {
   return (await admin.from("services").select("id").eq("business_id", B).eq("name", name).single()).data!.id;
-}
-
-async function sign(page: Page) {
-  const pad = page.getByTestId("signature-pad");
-  await pad.scrollIntoViewIfNeeded();
-  const box = (await pad.boundingBox())!;
-  await page.mouse.move(box.x + 30, box.y + 100);
-  await page.mouse.down();
-  await page.mouse.move(box.x + 120, box.y + 40, { steps: 8 });
-  await page.mouse.move(box.x + 220, box.y + 110, { steps: 8 });
-  await page.mouse.up();
 }
 
 test.describe("owner", () => {

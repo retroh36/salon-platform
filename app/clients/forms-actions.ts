@@ -15,6 +15,7 @@ import { normalEmail, phoneDigits } from "@/lib/online-booking/contact";
 import { newSecret, sha256 } from "@/lib/online-booking/security";
 import { formatDay } from "@/lib/schedule-format";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { partToken } from "@/lib/finish-links";
 
 export type FormResult = { ok: true; formId: string } | { ok: false; message: string; missing?: string[] };
 
@@ -87,12 +88,12 @@ export async function recordPatchTest(clientId: string, _prev: PatchTestState, f
   return { ok: true };
 }
 
-export type FormLinkResult = { ok: true; message: string } | { ok: false; message: string };
+export type FormLinkResult = { ok: true; message: string; forms: string[] } | { ok: false; message: string };
 
 // A secure link for the client to fill in and sign, on their own phone,
 // the forms their visit needs and hasn't had signed (a visit booked by
 // phone, say). Front of house; the message is our fixed wording.
-export async function sendFormLink(input: { appointmentId: string; channel: "sms" | "email"; to: string }): Promise<FormLinkResult> {
+export async function sendFormLink(input: { appointmentId: string; channel: "sms" | "email"; to: string; finishToken?: string }): Promise<FormLinkResult> {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me || !canBook(me.role)) return { ok: false, message: "Only owners, managers and front desk can send form links." };
   if (!isUuid(input.appointmentId) || (input.channel !== "sms" && input.channel !== "email")) return { ok: false, message: "That visit no longer exists." };
@@ -115,7 +116,9 @@ export async function sendFormLink(input: { appointmentId: string; channel: "sms
   const blocked = await blockedReason(admin, input.channel, to, { id: a.client_id, firstName: a.client.first_name });
   if (blocked) return { ok: false, message: blocked };
 
-  const token = newSecret();
+  // Part of a "Finish your booking" link: its token comes from that one,
+  // and nothing is sent here (lib/finish-links.ts).
+  const token = input.finishToken ? partToken(input.finishToken, "forms") : newSecret();
   const { error } = await supabase.rpc("create_form_request", {
     p_appointment_id: a.id,
     p_template_ids: unsigned.map((c) => (c.action as { templateId: string }).templateId),
@@ -126,6 +129,8 @@ export async function sendFormLink(input: { appointmentId: string; channel: "sms
   });
   if (error?.code === "42501" || error?.code === "55000" || error?.code === "22023") return { ok: false, message: `${error.message}.` };
   if (error) throw error;
+  const forms = unsigned.map((c) => c.label);
+  if (input.finishToken) return { ok: true, message: "Form link made.", forms };
   const { data: business } = await supabase.from("businesses").select("name").eq("id", me.business_id).single();
   const day = formatDay(toLocal(new Date(a.starts_at), me.location.timezone).date);
   const message = formLinkMessage(business?.name ?? "The salon", a.client.first_name, day, unsigned.map((c) => c.label), `${siteUrl()}/form/${token}`, input.channel);
@@ -134,5 +139,5 @@ export async function sendFormLink(input: { appointmentId: string; channel: "sms
     .insert({ business_id: me.business_id, channel: input.channel, to_address: to, subject: message.subject, body: input.channel === "sms" ? withStopLine(message.body) : message.body });
   if (outError) throw outError;
   revalidatePath("/calendar", "layout");
-  return { ok: true, message: `Form link sent to ${input.to.trim()}.` };
+  return { ok: true, message: `Form link sent to ${input.to.trim()}.`, forms };
 }

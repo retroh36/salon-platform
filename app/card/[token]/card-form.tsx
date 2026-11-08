@@ -10,8 +10,9 @@ import { completeCardLink, type CardLinkResult } from "./actions";
 import { CLIENT_NO_CONNECTION, reach } from "@/lib/reach";
 
 // The policy to agree to, the card, and save (paying the deposit first,
-// when there is one). Big targets, for a phone.
-export function CardForm({ token, lines, depositCents, cardForm }: { token: string; lines: string[]; depositCents: number; cardForm: CardFormData }) {
+// when there is one). Big targets, for a phone. With onSaved (the finish
+// page) it hands on to the next step instead of saying it's done.
+export function CardForm({ token, lines, depositCents, cardForm, onSaved }: { token: string; lines: string[]; depositCents: number; cardForm: CardFormData; onSaved?: (result: { label: string; depositCents: number }) => void }) {
   const card = useRef<CardFieldHandle>(null);
   const [agreed, setAgreed] = useState(false);
   const [result, setResult] = useState<CardLinkResult | null>(null);
@@ -35,7 +36,9 @@ export function CardForm({ token, lines, depositCents, cardForm }: { token: stri
         start(async () => {
           const chosen = await card.current!.cardRef();
           if (!chosen.ok) return setResult(chosen);
-          setResult(await reach(completeCardLink(token, chosen.ref, agreed), CLIENT_NO_CONNECTION));
+          const saved = await reach(completeCardLink(token, chosen.ref, agreed), CLIENT_NO_CONNECTION);
+          if (saved.ok && onSaved) return onSaved(saved);
+          setResult(saved);
         });
       }}
     >

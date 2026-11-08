@@ -12,7 +12,7 @@ Type what a client asks for in Denise's chat, on any page, and book one of the b
 3. If Denise asks **Which one is it?**, tap the right client. If they aren't on file, check their name and **Mobile** and tap **Add client**.
 4. Read the client's alerts on the card: allergies, **Card on file** or **No card on file**, and **Repeat no-show**.
 5. Read the best times and why each one suits, then tap **Book** on the one the client wants.
-6. Check the service, stylist, time and price, and whether the cancellation policy needs a card or a deposit (with **Text … a card link after booking** ticked) and any forms to sign (with **Text … the form to sign before the visit** ticked), then tap **Confirm booking**. To change anything first, tap **Open in booking form** instead.
+6. Check the service, stylist, time and price, and whether the cancellation policy needs a card or a deposit and any forms to sign (with **Text … a link to …** ticked, one text for all of it), then tap **Confirm booking**. To change anything first, tap **Open in booking form** instead.
 7. Not quite right? Just ask: "anything later?", "what about Friday?" or "with Bridget instead?".
 
 ## Good to know

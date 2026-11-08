@@ -5,7 +5,7 @@ import { siteUrl } from "@/lib/branding";
 // and each client's own booking page aren't.
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [{ userAgent: "*", allow: "/book/", disallow: ["/", "/book/*/manage/", "/pay/", "/card/", "/form/", "/offer/", "/event/", "/unsubscribe/"] }],
+    rules: [{ userAgent: "*", allow: "/book/", disallow: ["/", "/book/*/manage/", "/pay/", "/card/", "/form/", "/offer/", "/finish/", "/event/", "/unsubscribe/"] }],
     sitemap: `${siteUrl()}/sitemap.xml`,
   };
 }

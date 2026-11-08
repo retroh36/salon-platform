@@ -360,3 +360,15 @@ export function settleAnimations(page: Page, { all = false } = {}) {
     all,
   );
 }
+
+// Signs a form's signature pad with a stroke of the mouse.
+export async function sign(page: Page) {
+  const pad = page.getByTestId("signature-pad");
+  await pad.scrollIntoViewIfNeeded();
+  const box = (await pad.boundingBox())!;
+  await page.mouse.move(box.x + 30, box.y + 100);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 120, box.y + 40, { steps: 8 });
+  await page.mouse.move(box.x + 220, box.y + 110, { steps: 8 });
+  await page.mouse.up();
+}
