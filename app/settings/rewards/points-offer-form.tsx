@@ -23,6 +23,7 @@ function inputOf(o: PointsOffer | null): PointsOfferInput {
     startsOn: o?.startsOn ?? "",
     endsOn: o?.endsOn ?? "",
     multiplier: o?.multiplier ? String(o.multiplier) : "2",
+    giftBonus: o?.kind === "gift_card_bonus" && o.multiplier ? "multiple" : "points",
     services: o?.services ?? true,
     retail: o?.retail ?? true,
     minSpend: dollars(o?.minSpendCents ?? null),
@@ -100,9 +101,29 @@ export function PointsOfferForm({ offer }: { offer: PointsOffer | null }) {
       ) : (
         <div className="flex flex-wrap items-end gap-4">
           <label className={labelClass}>
-            Bonus points
-            <input value={v.bonusPoints} onChange={(e) => set({ bonusPoints: e.target.value })} inputMode="numeric" className={`${fieldClass} w-32!`} />
+            Bonus
+            <select value={v.giftBonus} onChange={(e) => set({ giftBonus: e.target.value as PointsOfferInput["giftBonus"] })} className={`${selectClass} w-52!`}>
+              <option value="points">A fixed number of points</option>
+              <option value="multiple">A multiple of the earn rate</option>
+            </select>
           </label>
+          {v.giftBonus === "points" ? (
+            <label className={labelClass}>
+              Bonus points
+              <input value={v.bonusPoints} onChange={(e) => set({ bonusPoints: e.target.value })} inputMode="numeric" className={`${fieldClass} w-32!`} />
+            </label>
+          ) : (
+            <label className={labelClass}>
+              Times the services rate
+              <select value={v.multiplier} onChange={(e) => set({ multiplier: e.target.value })} className={`${selectClass} w-28!`}>
+                {MULTIPLIERS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}x
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className={labelClass}>
             Gift cards bought on the sale, at least ($)
             <input value={v.minGiftCard} onChange={(e) => set({ minGiftCard: e.target.value })} inputMode="decimal" className={`${fieldClass} w-40!`} />

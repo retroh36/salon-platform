@@ -8,6 +8,7 @@ import { Badge, Card, PageHeader, type Tone } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { METHOD_LABELS } from "@/lib/checkout";
 import { isUuid } from "@/lib/ids";
+import { points } from "@/lib/rewards";
 import { canTakePayments, loadSale, receiptGroups, receiptSalon, type ReceiptSalon, type SaleView } from "@/lib/sales";
 import { formatDay } from "@/lib/schedule-format";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
@@ -205,6 +206,9 @@ function Receipt({ sale, salon, when }: { sale: SaleView; salon: ReceiptSalon; w
           />
         ))}
         {change > 0 && <Line label="Change given" value={formatPrice(change)} />}
+        {sale.pointBonuses.map((b) => (
+          <Line key={b.name} label={b.name} value={`+${points(b.points)}`} />
+        ))}
       </dl>
       {sale.status === "voided" && (
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1">

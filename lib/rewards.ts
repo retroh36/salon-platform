@@ -139,13 +139,20 @@ export const POINTS_OFFER_COLUMNS = "id, name, kind, enabled, starts_on, ends_on
 export const offersOn = (offers: readonly PointsOffer[], date: string) => offers.filter((o) => o.enabled && date >= o.startsOn && date <= o.endsOn);
 
 // The bonus for gift cards bought on one sale (offers: offersOn the day).
-export function giftCardBonus(giftCardCents: number, offers: readonly PointsOffer[]): number {
-  return Math.max(0, ...offers.filter((o) => o.kind === "gift_card_bonus" && giftCardCents > 0 && giftCardCents >= o.minGiftCardCents!).map((o) => o.bonusPoints!));
+// A fixed number of points, or a multiple of the services earn rate on the
+// gift card amount; the offer worth most counts.
+export function giftCardBonus(giftCardCents: number, offers: readonly PointsOffer[], program: Pick<Program, "servicePoints">): number {
+  return Math.max(
+    0,
+    ...offers
+      .filter((o) => o.kind === "gift_card_bonus" && giftCardCents > 0 && giftCardCents >= o.minGiftCardCents!)
+      .map((o) => o.bonusPoints ?? Math.floor((giftCardCents * program.servicePoints * o.multiplier!) / 100)),
+  );
 }
 
 // "Double points on services and retail · $100+ spend".
 export function pointsOfferSummary(o: PointsOffer): string {
-  if (o.kind === "gift_card_bonus") return `${points(o.bonusPoints!)} for buying $${(o.minGiftCardCents! / 100).toLocaleString("en-US")}+ in gift cards`;
+  if (o.kind === "gift_card_bonus") return `${o.bonusPoints ? points(o.bonusPoints) : `${o.multiplier}x points`} on $${(o.minGiftCardCents! / 100).toLocaleString("en-US")}+ in gift cards`;
   const what = o.services && o.retail ? "services and retail" : o.services ? "services" : "retail";
   return [`${o.multiplier}x points on ${what}`, o.minSpendCents ? `$${(o.minSpendCents / 100).toLocaleString("en-US")}+ spend` : null].filter(Boolean).join(" · ");
 }

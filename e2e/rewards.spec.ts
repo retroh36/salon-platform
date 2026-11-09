@@ -141,6 +141,26 @@ test.describe("owner", () => {
 test.describe("points offers", () => {
   test.use({ storageState: AUTH.owner });
 
+  test("a gift card bonus can be a multiple of the earn rate", async ({ page }) => {
+    const name = `Rw${RUN} Black Friday bonus`;
+    try {
+      await page.goto("/settings/rewards");
+      const form = ui(page).getByRole("form", { name: "New points offer" });
+      await waitForHydration(page, "form[aria-label='New points offer'] input");
+      await form.getByRole("radio", { name: "Gift card bonus" }).click();
+      await form.getByLabel("Name").fill(name);
+      await form.getByLabel("Starts").fill("2027-11-26");
+      await form.getByLabel("Ends").fill("2027-11-26");
+      await form.getByRole("combobox").first().selectOption("multiple");
+      await form.getByLabel(/^Gift cards bought/).fill("100");
+      await form.getByRole("button", { name: "Add offer" }).click();
+      await expect(form.getByRole("status")).toHaveText("Saved. It's off.");
+      await expect(ui(page).getByRole("region", { name: name })).toContainText("2x points on $100+ in gift cards");
+    } finally {
+      await admin.from("points_offers").delete().eq("business_id", B).eq("name", name);
+    }
+  });
+
   test("an owner adds one, off until it's turned on", async ({ page }) => {
     const name = `Rw${RUN} Double`;
     try {

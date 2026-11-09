@@ -21,5 +21,5 @@ Choose how clients earn points, the tiers they can reach and the rewards they ca
 - A refund takes back its share of the points earned; a void takes them all back and gives back any reward used.
 - Points expire only when a client earns nothing for the months you set.
 - When a family member pays for someone's visit, the points go to whoever pays unless you choose the client who had the visit.
-- Owners can add **Points offers** at the bottom of the page: **Multiply points** for a date range, or a **Gift card bonus** for buying gift cards of at least an amount on one sale. Each is off until **Offer is on** is ticked. If two multipliers run at once, the one worth most counts. Returning the gift card takes the bonus back.
+- Owners can add **Points offers** at the bottom of the page: **Multiply points** for a date range, or a **Gift card bonus** for buying or reloading gift cards of at least an amount on one sale: a fixed number of points, or a multiple of your services rate on the gift card amount (2x on $100 at 1 point a dollar is 200 points). The offer's name shows on the receipt and in the client's points history. Each is off until **Offer is on** is ticked. If two multipliers run at once, the one worth most counts. Returning the gift card takes the bonus back.
 - To stop offering a reward, open it, untick **In the catalog** and save.

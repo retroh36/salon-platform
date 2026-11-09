@@ -151,6 +151,8 @@ export type PointsOfferInput = {
   startsOn: string;
   endsOn: string;
   multiplier: string;
+  // A gift card bonus: a fixed number of points, or a multiple of the earn rate.
+  giftBonus: "points" | "multiple";
   services: boolean;
   retail: boolean;
   minSpend: string;
@@ -170,9 +172,10 @@ export async function savePointsOffer(id: string | null, input: PointsOfferInput
   if (multiplier && !input.services && !input.retail) return { ok: false, message: "Choose services, retail or both." };
   const minSpend = input.minSpend.trim() ? parseDollars(input.minSpend) : null;
   if (multiplier && input.minSpend.trim() && !minSpend) return { ok: false, message: "Give the minimum spend in dollars." };
-  const bonus = multiplier ? null : whole(input.bonusPoints, 1, 100000);
+  const fixed = !multiplier && input.giftBonus === "points";
+  const bonus = fixed ? whole(input.bonusPoints, 1, 100000) : null;
   const minGift = multiplier ? null : parseDollars(input.minGiftCard);
-  if (!multiplier && !bonus) return { ok: false, message: "Give the bonus as 1 to 100,000 points." };
+  if (fixed && !bonus) return { ok: false, message: "Give the bonus as 1 to 100,000 points." };
   if (!multiplier && !minGift) return { ok: false, message: "Give the minimum gift card amount in dollars." };
   const { error } = await supabase.rpc("save_points_offer", {
     p_business_id: me!.business_id,
@@ -183,7 +186,7 @@ export async function savePointsOffer(id: string | null, input: PointsOfferInput
       enabled: input.enabled,
       starts_on: input.startsOn,
       ends_on: input.endsOn,
-      multiplier: multiplier ? input.multiplier : null,
+      multiplier: fixed ? null : input.multiplier,
       applies_services: input.services,
       applies_retail: input.retail,
       min_spend_cents: minSpend,

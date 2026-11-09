@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { productName } from "@/lib/inventory";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { points } from "@/lib/rewards";
 import { formatPrice } from "@/lib/services";
 import { fullName, type StaffRole } from "@/lib/staff";
 import { METHOD_LABELS, type PaymentMethod } from "./checkout";
@@ -110,6 +111,8 @@ export type SaleView = {
   voidReason: string | null;
   receiptEmail: string | null;
   soldBy: string | null;
+  // Gift card bonuses this sale earned and still holds, by their offer's name.
+  pointBonuses: { name: string; points: number }[];
 };
 
 export async function loadSale(supabase: Supabase, saleId: string): Promise<SaleView | null> {
@@ -122,6 +125,9 @@ export async function loadSale(supabase: Supabase, saleId: string): Promise<Sale
     .maybeSingle();
   if (error) throw error;
   if (!s) return null;
+  const { data: bonusRows } = await supabase.from("reward_points").select("delta, kind, bonus, reason").eq("sale_id", saleId).in("kind", ["bonus", "reverse"]);
+  const bonuses = bonusRows ?? [];
+  const bonusKept = s.status !== "voided" && s.refunded_cents < s.total_cents && !bonuses.some((r) => r.kind === "reverse" && r.reason?.startsWith("Gift card returned"));
   const { data: payer } = s.payer_client_id ? await supabase.from("clients").select("id, first_name, last_name, email").eq("id", s.payer_client_id).maybeSingle() : { data: null };
   return {
     id: s.id,
@@ -129,6 +135,7 @@ export async function loadSale(supabase: Supabase, saleId: string): Promise<Sale
     status: s.status,
     createdAt: s.created_at,
     client: s.client ? { id: s.client.id, name: fullName(s.client), email: s.client.email } : null,
+    pointBonuses: bonusKept ? bonuses.filter((r) => r.bonus === "gift_card").map((r) => ({ name: r.reason ?? "Gift card bonus", points: r.delta })) : [],
     payer: payer ? { id: payer.id, name: fullName(payer), email: payer.email } : null,
     employee: s.employee ? fullName(s.employee) : null,
     appointmentId: s.appointment_id,
@@ -215,6 +222,8 @@ export function receiptText(sale: SaleView, salon: ReceiptSalon, when: string): 
   const change = sale.payments.reduce((n, p) => n + (p.changeCents ?? 0), 0);
   if (change) paid.push(["Change", formatPrice(change)]);
 
+  const earned: [string, string][] = sale.pointBonuses.map((b) => [b.name, `+${points(b.points)}`]);
+
   const subject = `Your receipt from ${salon.name}`;
   const text = [
     salon.name,
@@ -226,6 +235,7 @@ export function receiptText(sale: SaleView, salon: ReceiptSalon, when: string): 
     "",
     ...totals.map(([a, b]) => `${a}  ${b}`),
     ...paid.map(([a, b]) => `${a}  ${b}`),
+    ...earned.map(([a, b]) => `${a}  ${b}`),
     sale.status === "voided" ? "\nThis sale was voided." : "",
     salon.footer ? `\n${salon.footer}` : "",
   ]
@@ -242,7 +252,7 @@ export function receiptText(sale: SaleView, salon: ReceiptSalon, when: string): 
 <p style="margin:0 0 12px;color:#565E6B">Receipt #${sale.number} · ${escape(when)}${sale.client ? `<br>For ${escape(sale.client.name)}${sale.payer ? `, paid by ${escape(sale.payer.name)}` : ""}` : ""}</p>
 <table style="width:100%;border-collapse:collapse">${lines.map((l, i) => row(l, heads.has(i))).join("")}</table>
 <hr style="border:0;border-top:1px solid #EBE4DD;margin:12px 0">
-<table style="width:100%;border-collapse:collapse">${totals.map((l) => row(l, l[0] === "Total")).join("")}${paid.map((l) => row(l)).join("")}</table>
+<table style="width:100%;border-collapse:collapse">${totals.map((l) => row(l, l[0] === "Total")).join("")}${paid.map((l) => row(l)).join("")}${earned.map((l) => row(l)).join("")}</table>
 ${sale.status === "voided" ? '<p style="color:#B42318">This sale was voided.</p>' : ""}
 ${salon.footer ? `<p style="margin:16px 0 0;color:#565E6B">${escape(salon.footer)}</p>` : ""}
 </div></div>

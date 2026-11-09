@@ -136,7 +136,7 @@ export async function loadAccountRewards(admin: Admin, account: Account): Promis
   if (!settings.program.enabled) return null;
   const [summary, history] = await Promise.all([
     admin.rpc("account_rewards", { p_client_id: account.clientId }),
-    admin.from("reward_points").select("created_at, delta, kind, bonus, reward:rewards(name)").eq("client_id", account.clientId).eq("business_id", account.businessId).order("created_at", { ascending: false }).limit(10),
+    admin.from("reward_points").select("created_at, delta, kind, bonus, reason, reward:rewards(name)").eq("client_id", account.clientId).eq("business_id", account.businessId).order("created_at", { ascending: false }).limit(10),
   ]);
   if (summary.error) throw summary.error;
   if (history.error) throw history.error;
@@ -147,7 +147,7 @@ export async function loadAccountRewards(admin: Admin, account: Account): Promis
     tier: settings.tiers.find((t) => t.id === s.tierId)?.name ?? null,
     next: next ? `${settings.program.tierBasis === "spend" ? `$${Math.ceil(next.toGo / 100).toLocaleString("en-US")} more` : `${next.toGo} more ${next.toGo === 1 ? "visit" : "visits"}`} this year to reach ${next.tier.name}` : null,
     rewards: settings.catalog.map((r) => ({ name: r.name, points: r.points, ready: !rewardProblem(r, s, settings.program, settings.tiers) })),
-    history: history.data.map((h) => ({ at: h.created_at, label: entryLabel(h.kind as never, h.bonus, h.reward?.name ?? null), delta: h.delta })),
+    history: history.data.map((h) => ({ at: h.created_at, label: entryLabel(h.kind as never, h.bonus, h.reward?.name ?? null, h.reason), delta: h.delta })),
     referralCode: s.referralCode,
     referralPoints: settings.program.referralPoints,
   };

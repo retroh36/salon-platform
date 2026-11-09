@@ -103,14 +103,16 @@ export async function loadPointsHistory(supabase: Supabase, clientId: string, li
     at: r.created_at,
     delta: r.delta,
     kind: r.kind as PointsKind,
-    label: entryLabel(r.kind as PointsKind, r.bonus, r.reward?.name ?? null),
-    reason: r.reason,
+    label: entryLabel(r.kind as PointsKind, r.bonus, r.reward?.name ?? null, r.reason),
+    reason: r.bonus === "gift_card" ? null : r.reason,
     saleId: r.sale_id,
     by: r.staff?.first_name ?? null,
   }));
 }
 
-export function entryLabel(kind: PointsKind, bonus: string | null, reward: string | null): string {
+export function entryLabel(kind: PointsKind, bonus: string | null, reward: string | null, reason: string | null = null): string {
+  // A gift card bonus goes by its offer's name ("Black Friday bonus").
+  if (bonus === "gift_card" && reason) return reason;
   if (kind === "bonus" && bonus) return BONUS_LABEL[bonus] ?? KIND_LABEL.bonus;
   if ((kind === "redeem" || kind === "restore") && reward) return `${KIND_LABEL[kind]}: ${reward}`;
   return KIND_LABEL[kind];

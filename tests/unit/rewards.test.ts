@@ -150,8 +150,14 @@ describe("points offers", () => {
   });
   it("give a gift card bonus only from the minimum", () => {
     const bonus: PointsOffer = { ...OFFER, kind: "gift_card_bonus", multiplier: null, bonusPoints: 250, minGiftCardCents: 10_000 };
-    expect(giftCardBonus(9_999, [bonus])).toBe(0);
-    expect(giftCardBonus(10_000, [bonus])).toBe(250);
-    expect(giftCardBonus(10_000, [])).toBe(0);
+    expect(giftCardBonus(9_999, [bonus], PROGRAM)).toBe(0);
+    expect(giftCardBonus(10_000, [bonus], PROGRAM)).toBe(250);
+    expect(giftCardBonus(10_000, [], PROGRAM)).toBe(0);
+  });
+  it("can be a multiple of the services rate on the gift card amount, the best one winning", () => {
+    const double: PointsOffer = { ...OFFER, kind: "gift_card_bonus", multiplier: 2, minGiftCardCents: 10_000 };
+    expect(giftCardBonus(10_000, [double], PROGRAM)).toBe(200);
+    expect(giftCardBonus(10_000, [double], { servicePoints: 3 })).toBe(600);
+    expect(giftCardBonus(10_000, [double, { ...double, id: "f", multiplier: null, bonusPoints: 250 }], PROGRAM)).toBe(250);
   });
 });

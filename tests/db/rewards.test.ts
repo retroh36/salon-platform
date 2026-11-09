@@ -10,6 +10,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { rewardRatesFor } from "@/lib/rewards-load";
 import { pointsBack } from "@/lib/rewards";
 import { promoRatesFor } from "@/lib/promotions-load";
+import { loadPointsHistory } from "@/lib/rewards-load";
+import { loadSale, receiptSalon, receiptText } from "@/lib/sales";
 import { addDays, todayIn } from "@/lib/scheduling/time";
 import { EMPTY_TICKET, saleInput, ticketProblems, totalsOf, type Rates, type Ticket, type TicketLine } from "@/lib/ticket";
 import { admin, SEED, signIn, throwawayStylist, type Client } from "./helpers";
@@ -327,6 +329,31 @@ describe("points offers", () => {
     const refund = await manager.rpc("refund_sale", { p_sale_id: saleId!, p_input: { reason: "Changed mind", payments: [{ method: "card", amount_cents: 77_700 }], returns: [{ sale_item_id: line!.id, quantity: 1 }] } as never });
     expect(refund.error).toBeNull();
     expect((await earned(c))!.filter((r) => r.kind === "reverse").map((r) => r.delta)).toContain(-250);
+  });
+});
+
+describe("a gift card bonus as a multiple", () => {
+  it("is the earn rate times the amount, named on the receipt and the history, and gone once the card is returned", async () => {
+    const today = todayIn(TZ);
+    const name = `${TAG} Black Friday bonus`;
+    const { data: id, error: saved } = await owner.rpc("save_points_offer", { p_business_id: B, p_offer_id: null as never, p_input: { name, kind: "gift_card_bonus", enabled: true, starts_on: today, ends_on: today, multiplier: 2, min_gift_card_cents: 88_800 } as never });
+    expect(saved).toBeNull();
+    try {
+      const c = await client("Multiple");
+      const card = { key: "gm", kind: "gift_card", amountCents: 88_800, physical: false, code: "", recipientName: "", recipientEmail: "friend@example.test" } as TicketLine;
+      const { saleId, error } = await sell(frontDesk, c, [card, service(8_000)]);
+      expect(error).toBeNull();
+      // $888 at 2 a dollar, doubled.
+      expect((await loadPointsHistory(frontDesk, c)).find((e) => e.kind === "bonus")).toMatchObject({ label: name, delta: 3552, reason: null });
+      const sale = await loadSale(frontDesk, saleId!);
+      expect(sale!.pointBonuses).toEqual([{ name, points: 3552 }]);
+      expect(receiptText(sale!, await receiptSalon(B, L), "today").text).toContain(`${name}  +3,552 points`);
+      const { data: line } = await admin.from("sale_items").select("id").eq("sale_id", saleId!).eq("kind", "gift_card").single();
+      expect((await manager.rpc("refund_sale", { p_sale_id: saleId!, p_input: { reason: "Changed mind", payments: [{ method: "card", amount_cents: 88_800 }], returns: [{ sale_item_id: line!.id, quantity: 1 }] } as never })).error).toBeNull();
+      expect((await loadSale(frontDesk, saleId!))!.pointBonuses).toEqual([]);
+    } finally {
+      await admin.from("points_offers").delete().eq("id", id as string);
+    }
   });
 });
 
