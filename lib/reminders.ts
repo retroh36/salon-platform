@@ -41,9 +41,10 @@ export const stylistsText = (names: readonly string[]) => {
   return unique.length > 1 ? `${unique.slice(0, -1).join(", ")} and ${unique.at(-1)}` : (unique[0] ?? "");
 };
 
-export function reminderMessage(o: { salon: string; firstName: string; when: string; stylists: string; manageUrl: string | null; phone: string | null }): { subject: string; body: string } {
+export function reminderMessage(o: { salon: string; firstName: string; dependent?: string | null; when: string; stylists: string; manageUrl: string | null; phone: string | null }): { subject: string; body: string } {
   const who = o.stylists ? ` with ${o.stylists}` : "";
   const change = o.manageUrl ? ` View, change or cancel: ${o.manageUrl}` : o.phone ? ` To change it, call ${o.phone}.` : "";
   const hi = o.firstName ? `Hi ${o.firstName}, a` : "A";
-  return { subject: `Your visit at ${o.salon}`, body: `${o.salon}: ${hi} reminder of your visit ${o.when}${who}.${change}` };
+  const whose = o.dependent ? `${o.dependent}'s` : "your";
+  return { subject: `${o.dependent ? `${o.dependent}'s` : "Your"} visit at ${o.salon}`, body: `${o.salon}: ${hi} reminder of ${whose} visit ${o.when}${who}.${change}` };
 }

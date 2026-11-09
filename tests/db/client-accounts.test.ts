@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { accountForToken } from "@/lib/online-booking/account";
-import { loadAccount, ownsVisit } from "@/lib/online-booking/account-data";
+import { loadAccount, managedVisitClient } from "@/lib/online-booking/account-data";
 import { verifyLink } from "@/lib/online-booking/codes";
 import { newSecret, sha256 } from "@/lib/online-booking/security";
 import { admin, createOtherSalon, SEED, signIn, type Client } from "./helpers";
@@ -78,8 +78,8 @@ describe("a client's session", () => {
     const a = (await accountForToken(admin, B, tokens.a))!;
     const { data: theirs } = await admin.from("appointments").select("id").eq("client_id", clientB).limit(1).single();
     const { data: mine } = await admin.from("appointments").select("id").eq("client_id", clientA).limit(1).single();
-    expect(await ownsVisit(admin, a, theirs!.id)).toBe(false);
-    expect(await ownsVisit(admin, a, mine!.id)).toBe(true);
+    expect(await managedVisitClient(admin, a, theirs!.id)).toBeNull();
+    expect(await managedVisitClient(admin, a, mine!.id)).toBe(a.clientId);
   });
 });
 

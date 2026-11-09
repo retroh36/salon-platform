@@ -10,7 +10,7 @@ import { bookingSource } from "@/lib/online-booking/sources";
 import { todayIn } from "@/lib/scheduling/time";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { currentAccount } from "@/lib/online-booking/account";
-import { loadRebook } from "@/lib/online-booking/account-data";
+import { loadDependent, loadRebook } from "@/lib/online-booking/account-data";
 import { BookingFlow } from "./booking-flow";
 import { BookingFrame } from "./frame";
 import { SalonIntro, SalonTop } from "./intro";
@@ -81,7 +81,10 @@ async function Booking({ params, searchParams }: { params: Promise<{ slug: strin
   // Color after a patch test they've booked: no times before ?after= (ISO).
   const after = typeof query.after === "string" && !Number.isNaN(Date.parse(query.after)) ? new Date(query.after).toISOString() : null;
   // A signed-in client's last visit, at the top, when it can still be booked online.
-  const last = account && !services.length ? await loadRebook(admin, account) : null;
+  // A guardian booking for their dependent: ?for= (checked here and on
+  // every step on the server).
+  const bookingFor = account && typeof query.for === "string" ? await loadDependent(admin, account, query.for) : null;
+  const last = account && !services.length && !bookingFor ? await loadRebook(admin, account) : null;
   const rebook =
     last && last.serviceIds.every((id) => site.services.some((s) => s.id === id && s.mode === "bookable"))
       ? { href: `/book/${slug}?${new URLSearchParams({ services: last.serviceIds.join(","), ...(last.staffId ? { staff: last.staffId } : {}) })}#book`, label: last.label, firstName: account!.firstName }
@@ -107,14 +110,19 @@ async function Booking({ params, searchParams }: { params: Promise<{ slug: strin
         />
         <section id="book" aria-label="Book a visit" className="flex scroll-mt-4 flex-col lg:pt-10">
           <LevelsProvider levels={site.levels}>
+          {bookingFor && (
+            <p className="mb-3 text-sm font-medium text-ink" data-testid="booking-for">
+              Booking for {bookingFor.firstName}
+            </p>
+          )}
           <BookingFlow
-            key={`${services.join(",")}:${staff}`}
+            key={`${services.join(",")}:${staff}:${bookingFor?.id ?? ""}`}
             site={site}
             today={today}
             source={source}
             referral={referral}
             quiz={typeof query.quiz === "string" && /^[0-9a-f-]{36}$/.test(query.quiz) ? query.quiz : null}
-            signedIn={account ? { firstName: account.firstName } : null}
+            signedIn={account ? { firstName: bookingFor?.firstName ?? account.firstName, forClientId: bookingFor?.id } : null}
             start={services.length ? { serviceIds: services, staffId: staff, after } : null}
           />
           </LevelsProvider>

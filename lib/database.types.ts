@@ -1073,14 +1073,14 @@ isOneToOne: false
                   ]
                 },"clients": {
                   Row: {
-                    "allergies": string | null,"appointment_email_ok": boolean,"appointment_sms_ok": boolean,"birth_day": number | null,"birth_month": number | null,"business_id": string,"consent_signed_on": string | null,"created_at": string,"email": string | null,"email_opt_in": boolean,"family_id": string | null,"first_name": string,"id": string,"import_id": string | null,"last_name": string,"notes": string | null,"notes_updated_at": string | null,"notes_updated_by": string | null,"only_sees_preferred": boolean,"phone": string | null,"phone_digits": string | null,"photo_consent_by": string | null,"photo_consent_on": string | null,"preferences": string | null,"preferred_staff_id": string | null,"referral_code": string | null,"referred_by": string | null,"search_name": string | null,"sms_opt_in": boolean,"sms_stopped_at": string | null,"updated_at": string
+                    "allergies": string | null,"appointment_email_ok": boolean,"appointment_sms_ok": boolean,"birth_day": number | null,"birth_month": number | null,"business_id": string,"consent_signed_on": string | null,"created_at": string,"email": string | null,"email_opt_in": boolean,"family_id": string | null,"first_name": string,"guardian_client_id": string | null,"guardian_set_at": string | null,"guardian_set_by": string | null,"id": string,"import_id": string | null,"last_name": string,"notes": string | null,"notes_updated_at": string | null,"notes_updated_by": string | null,"only_sees_preferred": boolean,"phone": string | null,"phone_digits": string | null,"photo_consent_by": string | null,"photo_consent_on": string | null,"preferences": string | null,"preferred_staff_id": string | null,"referral_code": string | null,"referred_by": string | null,"search_name": string | null,"sms_opt_in": boolean,"sms_stopped_at": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id": string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"family_id"?: string | null,"first_name": string,"id"?: string,"import_id"?: string | null,"last_name"?: string,"notes"?: string | null,"notes_updated_at"?: string | null,"notes_updated_by"?: string | null,"only_sees_preferred"?: boolean,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"referral_code"?: string | null,"referred_by"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
+                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id": string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"family_id"?: string | null,"first_name": string,"guardian_client_id"?: string | null,"guardian_set_at"?: string | null,"guardian_set_by"?: string | null,"id"?: string,"import_id"?: string | null,"last_name"?: string,"notes"?: string | null,"notes_updated_at"?: string | null,"notes_updated_by"?: string | null,"only_sees_preferred"?: boolean,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"referral_code"?: string | null,"referred_by"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id"?: string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"family_id"?: string | null,"first_name"?: string,"id"?: string,"import_id"?: string | null,"last_name"?: string,"notes"?: string | null,"notes_updated_at"?: string | null,"notes_updated_by"?: string | null,"only_sees_preferred"?: boolean,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"referral_code"?: string | null,"referred_by"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
+                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id"?: string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"family_id"?: string | null,"first_name"?: string,"guardian_client_id"?: string | null,"guardian_set_at"?: string | null,"guardian_set_by"?: string | null,"id"?: string,"import_id"?: string | null,"last_name"?: string,"notes"?: string | null,"notes_updated_at"?: string | null,"notes_updated_by"?: string | null,"only_sees_preferred"?: boolean,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"referral_code"?: string | null,"referred_by"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -1095,6 +1095,18 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "families"
       referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "clients_guardian_client_id_business_id_fkey"
+      columns: ["guardian_client_id","business_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "clients_guardian_set_by_fkey"
+      columns: ["guardian_set_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
     },{
       foreignKeyName: "clients_import_id_fkey"
       columns: ["import_id"]
@@ -5935,6 +5947,9 @@ isOneToOne: false
                            },
 "set_client_consent":
 { Args: { "p_changes": Json,"p_client_id": string,"p_detail"?: string,"p_source": string }; Returns: undefined
+                           },
+"set_client_guardian":
+{ Args: { "p_client_id": string,"p_guardian_id": string }; Returns: undefined
                            },
 "set_event_status":
 { Args: { "p_event_id": string,"p_reason": string,"p_status": Database["public"]['Enums']["event_status"] }; Returns: undefined

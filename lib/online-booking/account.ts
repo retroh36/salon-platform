@@ -76,6 +76,8 @@ export async function endAccountSession(admin: Admin, businessId: string, slug: 
 // Booking while signed in: the browser sends this instead of a code
 // session, and the booking is for the account's own client.
 export const ACCOUNT_SESSION = "account";
+// A guardian booking for their dependent: "account:<client id>".
+export const isDependentSession = (session: string) => /^account:[0-9a-f-]{36}$/.test(session);
 
 // How to reach them: email if they have one, else their phone.
 export async function accountContact(admin: Admin, account: Account): Promise<{ channel: "sms" | "email"; destination: string } | null> {

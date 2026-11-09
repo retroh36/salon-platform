@@ -139,10 +139,18 @@ export async function appointmentChannel(
   admin: Client,
   clientId: string,
   prefer: Channel = "sms",
-): Promise<{ channel: Channel; to: string } | null> {
-  const { data } = await admin.from("clients").select(CONSENT_COLUMNS).eq("id", clientId).maybeSingle();
+): Promise<{ channel: Channel; to: string; dependent: string | null; firstName: string } | null> {
+  const { data } = await admin.from("clients").select(`first_name, guardian_client_id, ${CONSENT_COLUMNS}`).eq("id", clientId).maybeSingle();
   if (!data) return null;
-  return channelFor(consentOf(data), "appointment", prefer);
+  // A dependent's messages go to their guardian, by the guardian's choices;
+  // to their own contact only when the guardian can't be reached.
+  if (data.guardian_client_id) {
+    const { data: guardian } = await admin.from("clients").select(`first_name, ${CONSENT_COLUMNS}`).eq("id", data.guardian_client_id).maybeSingle();
+    const to = guardian ? channelFor(consentOf(guardian), "appointment", prefer) : null;
+    if (to && guardian) return { ...to, dependent: data.first_name, firstName: guardian.first_name };
+  }
+  const to = channelFor(consentOf(data), "appointment", prefer);
+  return to ? { ...to, dependent: null, firstName: data.first_name } : null;
 }
 
 // Whether a message staff send to an address they typed (a card or payment

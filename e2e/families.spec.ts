@@ -1,3 +1,5 @@
+import { ACCOUNT_COOKIE } from "@/lib/online-booking/account";
+import { newSecret, sha256 } from "@/lib/online-booking/security";
 import { admin, SEED, signIn } from "../tests/db/helpers";
 import { checkout } from "./checkout-helpers";
 import { AUTH, expect, putBackSales, test, waitForHydration } from "./fixtures";
@@ -147,5 +149,41 @@ test.describe("families", () => {
     expect(sale!.payer_client_id).toBe(mom);
     const earned = (await admin.from("reward_points").select("client_id, delta").eq("sale_id", sale!.id).eq("kind", "earn")).data!;
     expect(earned).toEqual([{ client_id: mom, delta: expect.any(Number) }]);
+  });
+});
+
+test.describe("dependents", () => {
+  test.use({ storageState: AUTH.frontDesk });
+
+  test("a guardian manages their dependent's visits from their own account", async ({ page, browser, baseURL }) => {
+    const parent = await client("Guard", `${PREFIX}g@example.com`.toLowerCase());
+    const child = await client("Kid");
+    const saved = await admin.from("families").insert({ business_id: SEED.business, name: `${PREFIX} family` }).select("id").single();
+    if (saved.error) throw saved.error;
+    await admin.from("clients").update({ family_id: saved.data.id }).in("id", [parent, child]);
+
+    // The front desk says whose dependent they are.
+    await page.goto(`/clients/${child}`);
+    const card = page.getByTestId("client-family");
+    await waitForHydration(page, "[data-testid=client-family] select");
+    await card.getByLabel("Dependent of").selectOption(parent);
+    await expect(card.getByText("Their guardian can now manage their visits")).toBeVisible();
+
+    // Signed in as the guardian (an account session of their own).
+    const account = await admin.from("client_accounts").upsert({ business_id: SEED.business, client_id: parent, verified_channel: "email" }, { onConflict: "business_id,client_id" }).select("id").single();
+    if (account.error) throw account.error;
+    const token = newSecret();
+    await admin.from("client_sessions").insert({ business_id: SEED.business, account_id: account.data.id, token_hash: sha256(token), expires_at: new Date(Date.now() + 86_400_000).toISOString() });
+    const guardian = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    await guardian.addCookies([{ name: ACCOUNT_COOKIE, value: token, url: `${baseURL}/book/maple-and-ash` }]);
+    const mine = await guardian.newPage();
+    await mine.goto("/book/maple-and-ash/account");
+    const visits = mine.getByTestId("dependent-visits");
+    await expect(visits).toContainText(`${PREFIX}Kid`);
+    await visits.getByRole("link", { name: `Book for ${PREFIX}Kid` }).click();
+    await expect(mine.getByTestId("booking-for")).toHaveText(`Booking for ${PREFIX}Kid`);
+    await guardian.close();
+    await admin.from("client_sessions").delete().eq("account_id", account.data.id);
+    await admin.from("client_accounts").delete().eq("id", account.data.id);
   });
 });

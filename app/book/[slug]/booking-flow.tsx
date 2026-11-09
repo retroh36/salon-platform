@@ -71,7 +71,7 @@ export function BookingFlow({
   referral?: string | null;
   // The "Find my stylist" answers this booking came from.
   quiz?: string | null;
-  signedIn?: { firstName: string } | null;
+  signedIn?: { firstName: string; forClientId?: string } | null;
   start?: { serviceIds: string[]; staffId: string | null; after?: string | null } | null;
 }) {
   const router = useRouter();
@@ -84,7 +84,7 @@ export function BookingFlow({
   const [bundleId, setBundleId] = useState<string | null>(null);
   const [staffId, setStaffId] = useState<string | null | undefined>(startStaff);
   const [slot, setSlot] = useState<Slot | null>(null);
-  const [identity, setIdentity] = useState<Identity>(signedIn ? { phase: "done", session: "account", known: true, firstName: signedIn.firstName } : { phase: "enter" });
+  const [identity, setIdentity] = useState<Identity>(signedIn ? { phase: "done", session: signedIn.forClientId ? `account:${signedIn.forClientId}` : "account", known: true, firstName: signedIn.firstName } : { phase: "enter" });
   const [remember, setRemember] = useState(false);
   // Texts about their appointments (on unless they untick it) and offers (off unless they tick it).
   const [appointmentTexts, setAppointmentTexts] = useState(true);

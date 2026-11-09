@@ -29,6 +29,20 @@ export async function saveFamily(input: { familyId: string | null; name: string;
   return { ok: true, message: "Family saved." };
 }
 
+// Makes a family member a dependent of another (null: no longer one).
+export async function setGuardian(clientId: string, guardianId: string | null): Promise<FamilyResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !canBook(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(clientId) || (guardianId && !isUuid(guardianId))) return { ok: false, message: "That family no longer exists." };
+  const { error } = await supabase.rpc("set_client_guardian", { p_client_id: clientId, p_guardian_id: guardianId as string });
+  if (error) {
+    if (error.code === "22023") return { ok: false, message: `${error.message}.` };
+    return { ok: false, message: NOT_ALLOWED };
+  }
+  revalidatePath(`/clients/${clientId}`);
+  return { ok: true, message: guardianId ? "Saved. Their guardian can now manage their visits." : "Saved. They're no longer a dependent." };
+}
+
 // Unlinks everyone; each keeps their own profile.
 export async function deleteFamily(familyId: string, clientIds: string[]): Promise<FamilyResult> {
   const { supabase, staff: me } = await getCurrentStaff();

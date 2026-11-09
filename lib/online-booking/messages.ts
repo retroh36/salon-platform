@@ -5,13 +5,13 @@
 
 import { formatPrice } from "@/lib/services";
 
-export function rescheduledMessage(o: { salon: string; when: string; manageUrl: string }): string {
-  return `${o.salon}: your visit is moved to ${o.when}. View, change or cancel: ${o.manageUrl}`;
+export function rescheduledMessage(o: { salon: string; when: string; manageUrl: string; dependent?: string | null }): string {
+  return `${o.salon}: ${o.dependent ? `${o.dependent}'s` : "your"} visit is moved to ${o.when}. View, change or cancel: ${o.manageUrl}`;
 }
 
 // The fee is what canceling cost under the policy (the database records it
 // as the visit is canceled), taken first from a deposit they paid.
-export function canceledMessage(o: { salon: string; when: string; bookUrl: string; feeCents: number; depositPaidCents: number; cardLabel: string | null }): string {
+export function canceledMessage(o: { salon: string; when: string; bookUrl: string; feeCents: number; depositPaidCents: number; cardLabel: string | null; dependent?: string | null }): string {
   const card = o.cardLabel ?? "your card on file";
   let money = "";
   if (o.feeCents > 0) {
@@ -22,5 +22,5 @@ export function canceledMessage(o: { salon: string; when: string; bookUrl: strin
   } else if (o.depositPaidCents > 0) {
     money = ` Your ${formatPrice(o.depositPaidCents)} deposit is being refunded to your card.`;
   }
-  return `${o.salon}: your visit on ${o.when} is canceled.${money} Book again any time: ${o.bookUrl}`;
+  return `${o.salon}: ${o.dependent ? `${o.dependent}'s` : "your"} visit on ${o.when} is canceled.${money} Book again any time: ${o.bookUrl}`;
 }

@@ -85,7 +85,8 @@ export async function runReminders(admin: Admin, options: { businessId?: string;
         const first = [...v.appointment_items].sort((a, b) => a.starts_at.localeCompare(b.starts_at));
         const message = reminderMessage({
           salon: salon.name,
-          firstName: v.client?.first_name ?? "",
+          firstName: to.firstName ?? v.client?.first_name ?? "",
+          dependent: to.dependent,
           when: reminderWhen(local.date, local.minute, todayIn(location.timezone, now)),
           stylists: stylistsText(first.map((i) => i.staff?.first_name ?? "")),
           manageUrl,

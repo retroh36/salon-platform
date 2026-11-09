@@ -7,7 +7,7 @@ import type { Database } from "./database.types.ts";
 
 type Supabase = SupabaseClient<Database>;
 
-export type FamilyMember = { id: string; firstName: string; lastName: string };
+export type FamilyMember = { id: string; firstName: string; lastName: string; guardianId?: string | null };
 export type Family = { id: string; name: string; payerId: string | null; members: FamilyMember[] };
 
 export const MAX_FAMILY = 12;
@@ -16,7 +16,7 @@ export async function loadFamily(supabase: Supabase, familyId: string | null): P
   if (!familyId) return null;
   const [family, members] = await Promise.all([
     supabase.from("families").select("id, name, payer_client_id").eq("id", familyId).maybeSingle(),
-    supabase.from("clients").select("id, first_name, last_name").eq("family_id", familyId).order("first_name"),
+    supabase.from("clients").select("id, first_name, last_name, guardian_client_id").eq("family_id", familyId).order("first_name"),
   ]);
   if (family.error) throw family.error;
   if (members.error) throw members.error;
@@ -25,7 +25,7 @@ export async function loadFamily(supabase: Supabase, familyId: string | null): P
     id: family.data.id,
     name: family.data.name,
     payerId: family.data.payer_client_id,
-    members: members.data.map((m) => ({ id: m.id, firstName: m.first_name, lastName: m.last_name })),
+    members: members.data.map((m) => ({ id: m.id, firstName: m.first_name, lastName: m.last_name, guardianId: m.guardian_client_id })),
   };
 }
 

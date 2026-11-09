@@ -31,7 +31,8 @@ import { onlineTerms, type OnlineTerms } from "@/lib/online-booking/terms";
 import { onlinePromotion, onlineSpecials, plannedItems, specialAt, type OnlinePromotion, type OnlinePromo } from "@/lib/online-booking/promotions";
 import { loadPromotions } from "@/lib/promotions-load";
 import { providerFor, salonProvider, type CardForm, type PaymentProvider } from "@/lib/payments";
-import { ACCOUNT_SESSION, accountContact, currentAccount, startAccountSession } from "@/lib/online-booking/account";
+import { ACCOUNT_SESSION, accountContact, currentAccount, isDependentSession, startAccountSession } from "@/lib/online-booking/account";
+import { loadDependent } from "@/lib/online-booking/account-data";
 
 const MAX_SERVICES = 4;
 const DAYS_PER_PAGE = 14;
@@ -209,10 +210,14 @@ export async function confirmCode(slug: string, verificationId: string, code: st
 // Who's booking: a client signed in to their account (the booking is for
 // their own record), or whoever confirmed a code.
 async function whoIsBooking(admin: ReturnType<typeof createAdminClient>, site: BookingSite, session: string) {
-  if (session === ACCOUNT_SESSION) {
+  if (session === ACCOUNT_SESSION || isDependentSession(session)) {
     const account = await currentAccount(admin, site.business.id);
     const contact = account ? await accountContact(admin, account) : null;
-    return account && contact ? { contact, clientId: account.clientId as string | null, signedIn: true } : null;
+    if (!account || !contact) return null;
+    if (session === ACCOUNT_SESSION) return { contact, clientId: account.clientId as string | null, signedIn: true };
+    // A guardian booking for their dependent: checked on every step.
+    const dependent = await loadDependent(admin, account, session.slice(ACCOUNT_SESSION.length + 1));
+    return dependent ? { contact, clientId: dependent.id as string | null, signedIn: true } : null;
   }
   const contact = await sessionContact(admin, site.business.id, session);
   return contact ? { contact, clientId: await findClient(admin, site, contact.channel, contact.destination), signedIn: false } : null;
@@ -529,7 +534,8 @@ async function bookCharged(
       user_agent: userAgent,
       source: isBookingSource(input.source) ? input.source : "direct",
     }),
-    recordConsent(admin, clientId!, input),
+    // A guardian's ticks at review are their own, not the child's.
+    isDependentSession(input.session) ? null : recordConsent(admin, clientId!, input),
     // Both earn their referral points once this client's first visit is checked out.
     input.referral ? admin.rpc("set_referred_by", { p_client_id: clientId!, p_code: input.referral.slice(0, 12) }) : null,
   ]);
@@ -570,7 +576,7 @@ async function confirmationMessage(
   manageUrl: string,
   terms: OnlineTerms,
 ) {
-  const body = `${site.business.name}: you're booked for ${whenText(site, start)}.${terms.depositCents ? ` Deposit paid: $${(terms.depositCents / 100).toFixed(2)}.` : ""} View, change or cancel: ${siteUrl()}${manageUrl}\n\nOur cancellation policy: ${terms.lines.join(" ")}`;
+  const body = (who: string | null) => `${site.business.name}: ${who ? `${who} is` : "you're"} booked for ${whenText(site, start)}.${terms.depositCents ? ` Deposit paid: $${(terms.depositCents / 100).toFixed(2)}.` : ""} View, change or cancel: ${siteUrl()}${manageUrl}\n\nOur cancellation policy: ${terms.lines.join(" ")}`;
   await sendToClient(admin, site, clientId, contact.channel, `You're booked at ${site.business.name}`, body);
 }
 
@@ -582,9 +588,10 @@ function whenText(site: BookingSite, start: Date): string {
 
 // A message about the client's own visit, on a channel they get those on
 // (the preferred one if allowed, else the other), through the outbox.
-async function sendToClient(admin: ReturnType<typeof createAdminClient>, site: BookingSite, clientId: string, prefer: Channel, subject: string, body: string) {
+async function sendToClient(admin: ReturnType<typeof createAdminClient>, site: BookingSite, clientId: string, prefer: Channel, subject: string, words: string | ((dependent: string | null) => string)) {
   const to = await appointmentChannel(admin, clientId, prefer);
   if (!to) return;
+  const body = typeof words === "string" ? words : words(to.dependent);
   const { error } = await admin.from("outbox_messages").insert({
     business_id: site.business.id,
     channel: to.channel,
@@ -646,13 +653,14 @@ export async function cancelBooking(slug: string, token: string): Promise<Manage
   if (!result.ok) return { ok: false, message: "This booking can't be canceled online." };
   await admin.from("online_booking_log").insert({ business_id: site.business.id, appointment_id: managed.id, client_id: managed.clientId, action: "canceled", ip_hash: ipHash, user_agent: userAgent });
   // The client canceled it, so they get the confirmation (with any fee).
-  const body = canceledMessage({
+  const body = (dependent: string | null) => canceledMessage({
     salon: site.business.name,
     when: whenText(site, managed.start),
     bookUrl: `${siteUrl()}/book/${site.business.slug}`,
     feeCents: terms.feeCents,
     depositPaidCents: managed.depositPaidCents,
     cardLabel: terms.cardLabel,
+    dependent,
   });
   await sendToClient(admin, site, managed.clientId, "sms", `Your visit at ${site.business.name} is canceled`, body);
   return { ok: true };
@@ -686,7 +694,7 @@ export async function reschedule(slug: string, token: string, date: string, minu
   }
   await admin.from("online_booking_log").insert({ business_id: site.business.id, appointment_id: managed.id, client_id: managed.clientId, action: "rescheduled", ip_hash: ipHash, user_agent: userAgent });
   // The client moved it, so they get the confirmation.
-  const body = rescheduledMessage({ salon: site.business.name, when: whenText(site, start), manageUrl: `${siteUrl()}/book/${site.business.slug}/manage/${token}` });
+  const body = (dependent: string | null) => rescheduledMessage({ salon: site.business.name, when: whenText(site, start), manageUrl: `${siteUrl()}/book/${site.business.slug}/manage/${token}`, dependent });
   await sendToClient(admin, site, managed.clientId, "sms", `Your visit at ${site.business.name} has moved`, body);
   return { ok: true };
 }

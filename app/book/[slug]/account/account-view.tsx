@@ -203,6 +203,26 @@ export function AccountView({
       router.refresh();
     });
 
+  const visitRow = (v: AccountVisit) => (
+              <li key={v.id} className="flex items-start gap-3 py-3" data-testid="upcoming-visit">
+                {v.items[0] && <StylistPhoto name={v.items[0].stylist} url={v.items[0].photoUrl} className="size-12" />}
+                {/* Change or cancel under the visit, so the date keeps the row's width. */}
+                <div className="flex min-w-0 flex-1 flex-col items-start">
+                  <p className="font-medium text-ink">{when(v)}</p>
+                  <p className="text-sm text-ink-muted">{what(v)}</p>
+                  <p className="text-sm text-ink-muted">
+                    <span className="font-medium text-ink tabular-nums">{formatPrice(v.totalCents)}</span>
+                    {v.offer && ` · ${v.offer.label}, taken off at your visit`}
+                  </p>
+                  {v.status !== "checked_in" && (
+                    <button type="button" className={`${linkButton} mt-0.5`} disabled={pending} onClick={() => run(() => openVisit(slug, v.id))}>
+                      Change or cancel
+                    </button>
+                  )}
+                </div>
+              </li>
+  );
+
   return (
     <div className="flex flex-col gap-6" data-testid="client-account">
       <div className="flex items-start justify-between gap-3">
@@ -229,25 +249,7 @@ export function AccountView({
         </h2>
         {data.upcoming.length ? (
           <ul className="-my-1 flex flex-col divide-y divide-line">
-            {data.upcoming.map((v) => (
-              <li key={v.id} className="flex items-start gap-3 py-3" data-testid="upcoming-visit">
-                {v.items[0] && <StylistPhoto name={v.items[0].stylist} url={v.items[0].photoUrl} className="size-12" />}
-                {/* Change or cancel under the visit, so the date keeps the row's width. */}
-                <div className="flex min-w-0 flex-1 flex-col items-start">
-                  <p className="font-medium text-ink">{when(v)}</p>
-                  <p className="text-sm text-ink-muted">{what(v)}</p>
-                  <p className="text-sm text-ink-muted">
-                    <span className="font-medium text-ink tabular-nums">{formatPrice(v.totalCents)}</span>
-                    {v.offer && ` · ${v.offer.label}, taken off at your visit`}
-                  </p>
-                  {v.status !== "checked_in" && (
-                    <button type="button" className={`${linkButton} mt-0.5`} disabled={pending} onClick={() => run(() => openVisit(slug, v.id))}>
-                      Change or cancel
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
+            {data.upcoming.map(visitRow)}
           </ul>
         ) : (
           <p className="text-sm text-ink-muted">Nothing booked.</p>
@@ -269,6 +271,20 @@ export function AccountView({
           </Link>
         )}
       </section>
+      {data.dependents.map((d) => (
+        <section key={d.id} aria-label={`${d.firstName}'s visits`} className={sectionClass} data-testid="dependent-visits">
+          <h2 className={headingClass}>{d.firstName}&rsquo;s visits</h2>
+          {d.upcoming.length ? <ul className="-my-1 flex flex-col divide-y divide-line">{d.upcoming.map(visitRow)}</ul> : <p className="text-sm text-ink-muted">Nothing booked.</p>}
+          {d.past.length > 0 && (
+            <p className="text-sm text-ink-muted">
+              Last visit: {when(d.past[0])}, {what(d.past[0])}
+            </p>
+          )}
+          <Link href={`/book/${slug}?for=${d.id}#book`} className={`${primaryButton} mt-1`}>
+            Book for {d.firstName}
+          </Link>
+        </section>
+      ))}
 
       {data.past.length > 0 && (
         <section aria-labelledby="past-heading" className={`${sectionClass} max-lg:order-1`}>

@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { findClients, type ClientOption } from "@/app/calendar/actions";
-import { deleteFamily, saveFamily } from "@/app/clients/family-actions";
+import { deleteFamily, saveFamily, setGuardian } from "@/app/clients/family-actions";
 import { Button } from "@/components/ui/button";
-import { checkboxClass, fieldClass, labelClass } from "@/components/ui/field";
+import { checkboxClass, fieldClass, labelClass, selectClass } from "@/components/ui/field";
 import { HomeIcon } from "@/components/ui/icons";
 import { Alert, Badge, nameLinkClass } from "@/components/ui/page";
 import { MAX_FAMILY, suggestedName, type Family, type FamilyMember } from "@/lib/families";
@@ -33,15 +33,54 @@ export function FamilyCard({ client, family, editable }: { client: FamilyMember;
                     {`${m.firstName} ${m.lastName}`.trim()}
                   </Link>
                 )}
-                {family.payerId === m.id && <Badge tone="neutral">Usually pays</Badge>}
+                <span className="flex gap-1.5">
+                  {m.guardianId && <Badge tone="neutral">Dependent</Badge>}
+                  {family.payerId === m.id && <Badge tone="neutral">Usually pays</Badge>}
+                </span>
               </li>
             ))}
           </ul>
+          {editable && <GuardianField client={client} family={family} />}
         </div>
       ) : (
         <p className="text-13 text-ink-muted">Not linked to a family. Link a parent and their children, or a couple, to see them together.</p>
       )}
     </SideCard>
+  );
+}
+
+// Staff choose who's a dependent, and whose: the guardian sees, books,
+// changes and cancels their visits online and gets their messages.
+function GuardianField({ client, family }: { client: FamilyMember; family: Family }) {
+  const me = family.members.find((m) => m.id === client.id);
+  const options = family.members.filter((m) => m.id !== client.id && !m.guardianId);
+  const [note, setNote] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  if (family.members.some((m) => m.guardianId === client.id)) return <p className="text-13 text-ink-muted">Guardian: manages their dependents&rsquo; visits from their online account.</p>;
+  return (
+    <label className={labelClass}>
+      Dependent of
+      <select
+        className={selectClass}
+        value={me?.guardianId ?? ""}
+        disabled={pending}
+        onChange={(e) => {
+          const value = e.target.value || null;
+          start(async () => {
+            const r = await reach(setGuardian(client.id, value));
+            setNote(r && "message" in r ? r.message : "That didn't save. Try again.");
+          });
+        }}
+      >
+        <option value="">Nobody (manages their own visits)</option>
+        {options.map((m) => (
+          <option key={m.id} value={m.id}>
+            {`${m.firstName} ${m.lastName}`.trim()}
+          </option>
+        ))}
+      </select>
+      {note && <span className="font-normal text-ink-muted">{note}</span>}
+    </label>
   );
 }
 

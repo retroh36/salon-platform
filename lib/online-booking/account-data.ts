@@ -27,7 +27,10 @@ export type AccountVisit = {
 
 export type MessagePrefs = { sms: boolean; email: boolean; visitSms: boolean; visitEmail: boolean; stopped: boolean };
 
+export type AccountDependent = { id: string; firstName: string; upcoming: AccountVisit[]; past: AccountVisit[] };
+
 export type AccountData = {
+  dependents: AccountDependent[];
   firstName: string;
   contact: { email: string | null; phone: string | null };
   upcoming: AccountVisit[];
@@ -60,7 +63,7 @@ const PAST_SHOWN = 10;
 
 export async function loadAccount(admin: Admin, account: Account, now = new Date()): Promise<AccountData> {
   const { clientId, businessId } = account;
-  const visitColumns = "id, status, starts_at, ends_at, promotion_id, appointment_items(service_id, staff_id, starts_at, price_cents, service:services(name), staff:staff(first_name, photo_path))";
+  const visitColumns = "id, client_id, status, starts_at, ends_at, promotion_id, appointment_items(service_id, staff_id, starts_at, price_cents, service:services(name), staff:staff(first_name, photo_path))";
   const [client, upcoming, past, cards, packages, card, rewards, salon] = await Promise.all([
     admin.from("clients").select("first_name, email, phone, sms_opt_in, email_opt_in, appointment_sms_ok, appointment_email_ok, sms_stopped_at").eq("id", clientId).eq("business_id", businessId).single(),
     admin
@@ -106,11 +109,29 @@ export async function loadAccount(admin: Admin, account: Account, now = new Date
       return { ...v, offer, totalCents: v.totalCents - (offer?.discountCents ?? 0) };
     }),
   );
+  // Those this client is the guardian of, with their visits (nothing of
+  // anyone else's in the family).
+  const { data: kids, error: kidsError } = await admin.from("clients").select("id, first_name").eq("guardian_client_id", clientId).eq("business_id", businessId).order("first_name");
+  if (kidsError) throw kidsError;
+  const kidIds = kids.map((k) => k.id);
+  const [kidUpcoming, kidPast] = await Promise.all([
+    admin.from("appointments").select(visitColumns).in("client_id", kidIds).eq("business_id", businessId).in("status", ["booked", "confirmed", "checked_in"]).gte("ends_at", now.toISOString()).order("starts_at"),
+    admin.from("appointments").select(visitColumns).in("client_id", kidIds).eq("business_id", businessId).eq("status", "completed").order("starts_at", { ascending: false }).limit(PAST_SHOWN * Math.max(kidIds.length, 1)),
+  ]);
+  if (kidUpcoming.error) throw kidUpcoming.error;
+  if (kidPast.error) throw kidPast.error;
+  const dependents = kids.map((k) => ({
+    id: k.id,
+    firstName: k.first_name,
+    upcoming: kidUpcoming.data.filter((a) => a.client_id === k.id).map(visit),
+    past: kidPast.data.filter((a) => a.client_id === k.id).slice(0, 3).map(visit),
+  }));
   const last = pastVisits[0];
   const stylists = last ? [...new Set(last.items.map((i) => i.staffId))] : [];
   const c = client.data!;
 
   return {
+    dependents,
     firstName: c.first_name,
     contact: { email: c.email, phone: c.phone },
     upcoming: upcomingVisits,
@@ -188,9 +209,18 @@ export function rebookLabel(visit: Pick<AccountVisit, "items">): string {
   return stylists.length === 1 ? `${what} with ${stylists[0]}` : what;
 }
 
-// Whether this visit is the account's own (before changing or canceling it).
-export async function ownsVisit(admin: Admin, account: Account, appointmentId: string): Promise<boolean> {
-  const { data, error } = await admin.from("appointments").select("id").eq("id", appointmentId).eq("client_id", account.clientId).eq("business_id", account.businessId).maybeSingle();
+export async function loadDependent(admin: Admin, account: Account, clientId: string): Promise<{ id: string; firstName: string } | null> {
+  if (!/^[0-9a-f-]{36}$/.test(clientId)) return null;
+  const { data, error } = await admin.from("clients").select("id, first_name").eq("id", clientId).eq("guardian_client_id", account.clientId).eq("business_id", account.businessId).maybeSingle();
   if (error) throw error;
-  return Boolean(data);
+  return data ? { id: data.id, firstName: data.first_name } : null;
+}
+
+// The client of a visit this account may manage (their own, or a dependent's).
+export async function managedVisitClient(admin: Admin, account: Account, appointmentId: string): Promise<string | null> {
+  const { data, error } = await admin.from("appointments").select("client_id").eq("id", appointmentId).eq("business_id", account.businessId).maybeSingle();
+  if (error) throw error;
+  if (!data?.client_id) return null;
+  if (data.client_id === account.clientId) return data.client_id;
+  return (await loadDependent(admin, account, data.client_id)) ? data.client_id : null;
 }

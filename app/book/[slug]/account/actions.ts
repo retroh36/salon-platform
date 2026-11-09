@@ -11,7 +11,7 @@ import { siteUrl } from "@/lib/branding";
 import { isDemo } from "@/lib/demo";
 import { accountContact, currentAccount, endAccountSession, startAccountSession, type Account } from "@/lib/online-booking/account";
 import { afterVerified, PENDING_COOKIE } from "@/lib/online-booking/account-signin";
-import { ownsVisit } from "@/lib/online-booking/account-data";
+import { managedVisitClient } from "@/lib/online-booking/account-data";
 import { sendCode, sessionContact, verifyCode, type Channel } from "@/lib/online-booking/codes";
 import { formatPhone, normalEmail, phoneDigits } from "@/lib/online-booking/contact";
 import { hashKey, newSecret, requestInfo, sha256, withinLimits } from "@/lib/online-booking/security";
@@ -129,9 +129,10 @@ export async function signOut(slug: string): Promise<void> {
 // one in their confirmation keeps working too).
 export async function openVisit(slug: string, appointmentId: string): Promise<{ ok: false; message: string } | never> {
   const s = await signedIn(slug);
-  if (!s || !/^[0-9a-f-]{36}$/.test(appointmentId) || !(await ownsVisit(s.admin, s.account, appointmentId))) return { ok: false, message: "Please sign in again." };
+  const clientId = s && /^[0-9a-f-]{36}$/.test(appointmentId) ? await managedVisitClient(s.admin, s.account, appointmentId) : null;
+  if (!s || !clientId) return { ok: false, message: "Please sign in again." };
   const token = newSecret();
-  const { error } = await s.admin.rpc("add_manage_link", { p_appointment_id: appointmentId, p_client_id: s.account.clientId, p_business_id: s.site.business.id, p_token_hash: sha256(token) });
+  const { error } = await s.admin.rpc("add_manage_link", { p_appointment_id: appointmentId, p_client_id: clientId, p_business_id: s.site.business.id, p_token_hash: sha256(token) });
   if (error) throw error;
   redirect(`/book/${slug}/manage/${token}`);
 }
