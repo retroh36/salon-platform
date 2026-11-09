@@ -132,6 +132,21 @@ describe("at checkout", () => {
     expect(r).toEqual({ source: "code", discount_cents: 1275, applied_by: SEED.staff.frontDesk, first_visit: true });
   });
 
+  it("sets a price per unit, kept to its level and window, matching the screen to the cent", async () => {
+    const isoToday = ((new Date(`${todayIn(TZ)}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+    const on = await promo("Set", { kind: "automatic", discount_kind: "price", amount_cents: 3000, levels: ["artisan"], applies_retail: true, days: [isoToday], from_minute: 0, to_minute: 1440 });
+    const c = await client("Set");
+    const { error, totals, saleId } = await sell(frontDesk, c, [service(SEED.staff.shae, 7_000), service(SEED.staff.gil, 9_000), product(2)], [on]);
+    expect(error).toBeNull();
+    // Shae's $70 to $30; Gil isn't an Artisan; the $20 products are already under.
+    expect(totals.promoDiscountCents).toBe(4000);
+    expect((await admin.from("sales").select("total_cents").eq("id", saleId!).single()).data!.total_cents).toBe(totals.totalCents);
+
+    const off = await promo("Off day", { kind: "automatic", discount_kind: "price", amount_cents: 3000, days: [(isoToday % 7) + 1] });
+    const refused = await frontDesk.rpc("complete_sale", { p_location_id: L, p_input: { ...saleInput({ ...EMPTY_TICKET, lines: [service(SEED.staff.shae, 7_000)], promotions: [off] }, { draftId: "", appointmentId: null, clientId: c }), payments: [{ method: "card", amount_cents: 3000 }] } as never });
+    expect(refused.error?.message).toContain("isn't on at this day and time");
+  });
+
   it("spreads an amount off over the lines it covers, in order", async () => {
     const id = await promo("Amt", { code: `${TAG}A30`, discount_kind: "amount", amount_cents: 3000, applies_retail: true });
     const { saleId, error, totals } = await sell(frontDesk, null, [product(), service(SEED.staff.hannah, 2_500)], [id]);
@@ -243,6 +258,14 @@ describe("last-minute specials", () => {
     const c3 = await client("Spec3");
     const v3 = await visit(c3, "senior", cutId, 72);
     expect((await sell(frontDesk, c3, [line(v3, cutId)], [special], {}, v3.appointmentId)).error?.message).toBe(`${TAG} Late is for visits booked within 48 hours of starting.`);
+  });
+
+  it("from online booking: an automatic promotion holds a visit only when it has a window", async () => {
+    const plain = await promo("Plain auto", { kind: "automatic", percent: 10 });
+    const windowed = await promo("Window auto", { kind: "automatic", discount_kind: "price", amount_cents: 3000, days: [1, 2, 3, 4, 5, 6, 7], from_minute: 0, to_minute: 1440 });
+    const v = await visit(await client("Auto"), "senior", cutId, 1);
+    expect((await admin.rpc("attach_online_promotion", { p_appointment_id: v.appointmentId, p_promotion_id: plain })).error).not.toBeNull();
+    expect((await admin.rpc("attach_online_promotion", { p_appointment_id: v.appointmentId, p_promotion_id: windowed })).error).toBeNull();
   });
 
   it("from online booking: held on the visit, counted in the limits, and taken off at checkout", async () => {

@@ -3,7 +3,7 @@
 // private.promotion_applies), and these mirror it for the checkout screen,
 // the online booking review and the reports.
 //
-// A promotion takes a percent or an amount off the services and/or retail
+// A promotion takes a percent or an amount off, or sets the price of, the services and/or retail
 // it covers (by service, category, stylist, level or product; never
 // gift cards, packages, memberships or services already paid with a
 // package or membership). It's a code (given at the desk or entered
@@ -19,7 +19,8 @@ export type PromoKind = "code" | "automatic" | "last_minute";
 export type Level = string;
 export type Exclusion = { level: Level | null; category: string | null };
 // "line": the first line it covers, in full (a reward's free service).
-export type PromoDiscount = { kind: "percent"; pct: number } | { kind: "amount"; cents: number } | { kind: "line" };
+// "price": each unit costs this, never more than it was.
+export type PromoDiscount = { kind: "percent"; pct: number } | { kind: "amount"; cents: number } | { kind: "price"; cents: number } | { kind: "line" };
 
 export type PromoRule = {
   id: string;
@@ -53,6 +54,11 @@ export type PromoRule = {
   online: boolean;
   // Last-minute specials: open time starting within this many hours.
   hoursAhead: number | null;
+  // When it's on (null: any time): weekdays (1 Monday to 7 Sunday) and
+  // minutes at the salon, against when the visit starts.
+  days: number[] | null;
+  fromMinute: number | null;
+  toMinute: number | null;
 };
 
 // The stored row (promotions) to ours.
@@ -82,10 +88,13 @@ export type PromotionRow = {
   stackable: boolean;
   online: boolean;
   hours_ahead: number | null;
+  days: number[] | null;
+  from_minute: number | null;
+  to_minute: number | null;
 };
 
 export const PROMOTION_COLUMNS =
-  "id, name, kind, code, discount_kind, percent, amount_cents, applies_services, applies_retail, service_ids, categories, staff_ids, levels, exclusions, product_ids, starts_on, ends_on, max_uses, max_uses_per_client, new_clients_only, first_visit_only, min_spend_cents, stackable, online, hours_ahead";
+  "id, name, kind, code, discount_kind, percent, amount_cents, applies_services, applies_retail, service_ids, categories, staff_ids, levels, exclusions, product_ids, starts_on, ends_on, max_uses, max_uses_per_client, new_clients_only, first_visit_only, min_spend_cents, stackable, online, hours_ahead, days, from_minute, to_minute";
 
 export function ruleOf(r: PromotionRow): PromoRule {
   return {
@@ -93,7 +102,7 @@ export function ruleOf(r: PromotionRow): PromoRule {
     name: r.name,
     kind: r.kind as PromoKind,
     code: r.code,
-    discount: r.discount_kind === "amount" ? { kind: "amount", cents: Number(r.amount_cents) } : { kind: "percent", pct: Number(r.percent) },
+    discount: r.discount_kind === "amount" ? { kind: "amount", cents: Number(r.amount_cents) } : r.discount_kind === "price" ? { kind: "price", cents: Number(r.amount_cents) } : { kind: "percent", pct: Number(r.percent) },
     services: r.applies_services,
     retail: r.applies_retail,
     serviceIds: r.service_ids,
@@ -112,6 +121,9 @@ export function ruleOf(r: PromotionRow): PromoRule {
     stackable: r.stackable,
     online: r.online,
     hoursAhead: r.hours_ahead,
+    days: r.days,
+    fromMinute: r.from_minute,
+    toMinute: r.to_minute,
   };
 }
 
@@ -128,8 +140,8 @@ const excluded = (e: Exclusion, level: Level | null, category: string | null) =>
 
 // A line a promotion might cover: what's left of it after member prices.
 export type PromoLine =
-  | { kind: "service"; serviceId: string; category: string | null; staffId: string; level: Level | null; cents: number }
-  | { kind: "product"; productId: string; cents: number }
+  | { kind: "service"; serviceId: string; category: string | null; staffId: string; level: Level | null; cents: number; quantity?: number }
+  | { kind: "product"; productId: string; cents: number; quantity?: number }
   // Not covered by any promotion (gift cards, packages, memberships, services paid with a package).
   | { kind: "other"; cents: number };
 
@@ -148,7 +160,8 @@ export function promotionApplies(rule: PromoRule, line: PromoLine): boolean {
 
 // What each promotion takes off each line, in order: a percent of what's
 // left of the line; an amount once per sale, spread over the lines it
-// covers in order until it's used up.
+// covers in order until it's used up; a set price down to that price per
+// unit (nothing off a line already at or under it).
 export function applyPromotions(rules: readonly PromoRule[], lines: readonly PromoLine[]): { perLine: number[]; perPromotion: Record<string, number> } {
   const pool = new Map(rules.map((r) => [r.id, r.discount.kind === "amount" ? r.discount.cents : Infinity]));
   const done = new Set<string>();
@@ -158,7 +171,12 @@ export function applyPromotions(rules: readonly PromoRule[], lines: readonly Pro
     let taken = 0;
     for (const rule of rules) {
       if (left <= 0 || done.has(rule.id) || !promotionApplies(rule, line)) continue;
-      const amount = rule.discount.kind === "percent" ? Math.round((left * rule.discount.pct) / 100) : Math.min(left, pool.get(rule.id)!);
+      const amount =
+        rule.discount.kind === "percent"
+          ? Math.round((left * rule.discount.pct) / 100)
+          : rule.discount.kind === "price"
+            ? Math.max(0, left - rule.discount.cents * (line.kind === "other" ? 1 : (line.quantity ?? 1)))
+            : Math.min(left, pool.get(rule.id)!);
       if (rule.discount.kind === "amount") pool.set(rule.id, pool.get(rule.id)! - amount);
       if (rule.discount.kind === "line") done.add(rule.id);
       perPromotion[rule.id] += amount;
@@ -181,7 +199,17 @@ export type PromoContext = {
   subtotalCents: number;
   // For last-minute specials: when the visit starts and when it was booked (ms).
   visit: { startsAt: number; bookedAt: number } | null;
+  // When it counts for a weekday and time window: the visit's start at the
+  // salon, or now for a sale without a visit.
+  when: Moment;
 };
+
+export type Moment = { weekday: number; minute: number };
+
+export const hasWindow = (rule: Pick<PromoRule, "days" | "fromMinute">) => rule.days !== null || rule.fromMinute !== null;
+
+export const inWindow = (rule: Pick<PromoRule, "days" | "fromMinute" | "toMinute">, at: Moment) =>
+  (!rule.days || rule.days.includes(at.weekday)) && (rule.fromMinute === null || (at.minute >= rule.fromMinute && at.minute < rule.toMinute!));
 
 // Why a promotion can't be used here (null: it can).
 export function promotionProblem(rule: PromoRule, ctx: PromoContext): string | null {
@@ -194,6 +222,7 @@ export function promotionProblem(rule: PromoRule, ctx: PromoContext): string | n
   if (rule.newClientsOnly && ctx.client && rule.startsOn && ctx.client.createdOn < rule.startsOn) return `${rule.name} is for new clients only.`;
   if (rule.firstVisitOnly && ctx.client?.visitedBefore) return `${rule.name} is for a client's first visit only.`;
   if (rule.minSpendCents !== null && ctx.subtotalCents < rule.minSpendCents) return `${rule.name} needs a spend of ${dollars(rule.minSpendCents)} or more.`;
+  if (!inWindow(rule, ctx.when)) return `${rule.name} isn't on at this day and time.`;
   if (rule.kind === "last_minute") {
     if (!ctx.visit) return `${rule.name} is for visits booked at the last minute.`;
     if (ctx.visit.startsAt - ctx.visit.bookedAt > (rule.hoursAhead ?? 0) * 3_600_000) return `${rule.name} is for visits booked within ${rule.hoursAhead} hours of starting.`;
@@ -211,26 +240,45 @@ export function stackingProblem(rules: readonly PromoRule[], staffDiscount: bool
   return null;
 }
 
-// A special's badge on the booking site: open time starting within its
-// hours, for a visit it covers. The best percent wins.
+// What shows on the booking site's times: a last-minute special, or an
+// automatic promotion with a weekday or time window.
+export const showsOnTimes = (r: PromoRule) => r.online && (r.kind === "last_minute" || (r.kind === "automatic" && hasWindow(r)));
+
+// A special's badge on the booking site: a time it's on for, for a visit
+// where it takes something off (so a level or stylist limit keeps it to
+// theirs). The biggest saving wins.
 export function specialFor(
   rules: readonly PromoRule[],
-  slot: { startsAt: number; now: number; today: LocalDate },
+  slot: { startsAt: number; now: number; today: LocalDate; when: Moment },
   lines: readonly PromoLine[],
 ): PromoRule | null {
   const live = rules.filter(
     (r) =>
-      r.kind === "last_minute" &&
-      r.online &&
+      showsOnTimes(r) &&
       (!r.startsOn || slot.today >= r.startsOn) &&
       (!r.endsOn || slot.today <= r.endsOn) &&
-      slot.startsAt - slot.now <= (r.hoursAhead ?? 0) * 3_600_000 &&
-      lines.some((l) => promotionApplies(r, l)),
+      inWindow(r, slot.when) &&
+      (r.kind !== "last_minute" || slot.startsAt - slot.now <= (r.hoursAhead ?? 0) * 3_600_000) &&
+      applyPromotions([r], lines).perLine.some((n) => n > 0),
   );
   return live.sort((a, b) => applyPromotions([b], lines).perLine.reduce((x, y) => x + y, 0) - applyPromotions([a], lines).perLine.reduce((x, y) => x + y, 0))[0] ?? null;
 }
 
-export const discountText = (d: PromoDiscount) => (d.kind === "percent" ? `${d.pct}% off` : d.kind === "line" ? "Free" : `${dollars(d.cents)} off`);
+export const discountText = (d: PromoDiscount) => (d.kind === "percent" ? `${d.pct}% off` : d.kind === "line" ? "Free" : d.kind === "price" ? dollars(d.cents) : `${dollars(d.cents)} off`);
+
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const clock = (minute: number) => {
+  const h = Math.floor(minute / 60) % 24;
+  const m = minute % 60;
+  return `${h % 12 || 12}${m ? `:${String(m).padStart(2, "0")}` : ""}${h < 12 ? "am" : "pm"}`;
+};
+
+// "Tue, Thu 12pm–3pm".
+export function windowText(rule: Pick<PromoRule, "days" | "fromMinute" | "toMinute">): string {
+  const days = rule.days ? [...rule.days].sort((a, b) => a - b).map((d) => WEEKDAYS[d - 1]).join(", ") : "";
+  const time = rule.fromMinute !== null ? `${clock(rule.fromMinute)}–${clock(rule.toMinute!)}` : "";
+  return [days, time].filter(Boolean).join(" ");
+}
 
 // "15% off services · open time in the next 48 hours · never Master color".
 export function promotionSummary(rule: PromoRule, names: { services?: Record<string, string>; staff?: Record<string, string>; products?: Record<string, string>; levels?: Record<string, string> } = {}): string {
@@ -239,6 +287,7 @@ export function promotionSummary(rule: PromoRule, names: { services?: Record<str
     rule.services && rule.retail ? "services and retail" : rule.services ? "services" : "retail";
   const parts = [`${discountText(rule.discount)} ${rule.serviceIds?.length ? rule.serviceIds.map((id) => names.services?.[id] ?? "a service").join(", ") : rule.categories?.length ? rule.categories.join(", ") : what}`];
   if (rule.kind === "last_minute") parts.push(`open time in the next ${rule.hoursAhead} hours`);
+  if (hasWindow(rule)) parts.push(windowText(rule));
   if (rule.staffIds?.length) parts.push(`with ${rule.staffIds.map((id) => names.staff?.[id] ?? "a stylist").join(", ")}`);
   if (rule.levels?.length) parts.push(`${rule.levels.map(levelName).join(" or ")} stylists`);
   if (rule.exclusions.length) parts.push(`never ${rule.exclusions.map((e) => (e.level && e.category ? `${levelName(e.level)} ${e.category.toLowerCase()}` : e.level ? `${levelName(e.level)} stylists` : e.category)).join(" or ")}`);
@@ -260,7 +309,7 @@ export type PromotionInput = {
   name: string;
   kind: PromoKind;
   code: string;
-  discountKind: "percent" | "amount";
+  discountKind: "percent" | "amount" | "price";
   value: string;
   services: boolean;
   retail: boolean;
@@ -280,6 +329,10 @@ export type PromotionInput = {
   stackable: boolean;
   online: boolean;
   hoursAhead: string;
+  days: number[];
+  // "HH:MM", both or neither.
+  fromTime: string;
+  toTime: string;
 };
 
 export const NEW_PROMOTION: PromotionInput = {
@@ -306,10 +359,15 @@ export const NEW_PROMOTION: PromotionInput = {
   stackable: false,
   online: true,
   hoursAhead: "48",
+  days: [],
+  fromTime: "",
+  toTime: "",
 };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const money = (v: string) => (/^\d+(\.\d{1,2})?$/.test(v.trim().replace(/[$,]/g, "")) ? Math.round(Number(v.trim().replace(/[$,]/g, "")) * 100) : null);
+const timeMinute = (v: string) => (/^\d{2}:\d{2}$/.test(v) ? Number(v.slice(0, 2)) * 60 + Number(v.slice(3)) : null);
+const timeText = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
 const whole = (v: string) => (/^\d+$/.test(v.trim()) ? Number(v.trim()) : null);
 
 export const normalCode = (code: string) => code.trim().toUpperCase().replace(/\s+/g, "");
@@ -329,13 +387,17 @@ export function parsePromotionInput(p: PromotionInput): { ok: true; row: Omit<Pr
     percent = v;
   } else {
     amount = money(p.value);
-    if (!amount || amount > 100_000) return { ok: false, message: "Give the discount as $0.01 to $1,000." };
+    if (!amount || amount > 100_000) return { ok: false, message: p.discountKind === "price" ? "Give the set price as $0.01 to $1,000." : "Give the discount as $0.01 to $1,000." };
   }
   if (!p.services && !p.retail) return { ok: false, message: "Choose services, retail or both." };
   if (p.kind === "last_minute" && !p.services) return { ok: false, message: "A last-minute special is for services." };
   if ((p.startsOn && !DATE.test(p.startsOn)) || (p.endsOn && !DATE.test(p.endsOn))) return { ok: false, message: "Enter the dates as dates." };
   if (p.startsOn && p.endsOn && p.endsOn < p.startsOn) return { ok: false, message: "It ends before it starts." };
   if (p.newClientsOnly && !p.startsOn) return { ok: false, message: "New clients only needs a start date (clients added from then)." };
+  const fromMinute = p.fromTime ? timeMinute(p.fromTime) : null;
+  const toMinute = p.toTime ? timeMinute(p.toTime) : null;
+  if ((p.fromTime && fromMinute === null) || (p.toTime && toMinute === null) || Boolean(p.fromTime) !== Boolean(p.toTime)) return { ok: false, message: "Give both a from and an until time, or neither." };
+  if (fromMinute !== null && fromMinute >= toMinute!) return { ok: false, message: "The time it's on ends before it starts." };
   const maxUses = p.maxUses.trim() ? whole(p.maxUses) : null;
   const maxPerClient = p.maxPerClient.trim() ? whole(p.maxPerClient) : null;
   if ((p.maxUses.trim() && !maxUses) || (p.maxPerClient.trim() && !maxPerClient)) return { ok: false, message: "Give the limits as whole numbers." };
@@ -371,6 +433,9 @@ export function parsePromotionInput(p: PromotionInput): { ok: true; row: Omit<Pr
       stackable: p.stackable,
       online: p.kind === "last_minute" ? true : p.online,
       hours_ahead: hours,
+      days: p.days.length && p.days.length < 7 ? [...p.days].sort((a, b) => a - b) : null,
+      from_minute: fromMinute,
+      to_minute: toMinute,
     },
   };
 }
@@ -380,8 +445,8 @@ export function promotionInput(r: PromotionRow): PromotionInput {
     name: r.name,
     kind: r.kind as PromoKind,
     code: r.code ?? "",
-    discountKind: r.discount_kind === "amount" ? "amount" : "percent",
-    value: r.discount_kind === "amount" ? String(Number(r.amount_cents) / 100) : String(Number(r.percent)),
+    discountKind: r.discount_kind === "amount" || r.discount_kind === "price" ? r.discount_kind : "percent",
+    value: r.amount_cents !== null ? String(Number(r.amount_cents) / 100) : String(Number(r.percent)),
     services: r.applies_services,
     retail: r.applies_retail,
     serviceIds: r.service_ids ?? [],
@@ -400,6 +465,9 @@ export function promotionInput(r: PromotionRow): PromotionInput {
     stackable: r.stackable,
     online: r.online,
     hoursAhead: r.hours_ahead ? String(r.hours_ahead) : "48",
+    days: r.days ?? [],
+    fromTime: r.from_minute !== null ? timeText(r.from_minute) : "",
+    toTime: r.to_minute !== null ? timeText(r.to_minute) : "",
   };
 }
 

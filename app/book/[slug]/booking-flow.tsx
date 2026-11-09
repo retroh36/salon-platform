@@ -850,7 +850,7 @@ function TimeStep({
       />
       {days.some((d) => d.times.some((t) => t.special)) && (
         <p className="rounded-lg bg-(--accent-soft) px-3 py-2.5 text-sm text-ink" data-testid="specials-note">
-          Last-minute specials: times marked with a discount have it taken off when you pay.
+          Specials: times marked with a price or discount have it taken off when you pay.
         </p>
       )}
       {day && (

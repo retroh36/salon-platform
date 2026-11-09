@@ -197,6 +197,9 @@ export function rewardRule(r: Reward): PromoRule {
     stackable: true,
     online: false,
     hoursAhead: null,
+    days: null,
+    fromMinute: null,
+    toMinute: null,
   };
 }
 

@@ -50,6 +50,30 @@ test.afterAll(async () => {
 test.describe("owner", () => {
   test.use({ storageState: AUTH.owner });
 
+  test("sets up a set price for one level on certain days and hours", async ({ page }) => {
+    await page.goto("/promotions/new");
+    const form = ui(page).getByRole("form", { name: "Promotion" });
+    await waitForHydration(page, "form[aria-label=Promotion] input");
+    await form.getByLabel("Name").fill(`Pr${RUN} Tuesday`);
+    await form.getByRole("radio", { name: "Automatic" }).click();
+    await form.getByLabel("Discount type").selectOption("price");
+    await form.getByLabel("Set price ($)").fill("30");
+    // The salon's own levels, Junior stylist among them.
+    await expect(form.getByRole("checkbox", { name: "Junior stylist" })).toBeVisible();
+    await form.getByRole("checkbox", { name: "Artisan" }).check();
+    await form.getByRole("checkbox", { name: "Tue" }).check();
+    await form.getByLabel("From (blank: all day)").fill("12:00");
+    await form.getByLabel("Until").fill("15:00");
+    await expect(form.getByRole("checkbox", { name: "Show on matching times on the booking site" })).toBeChecked();
+    await expect(form.getByTestId("promotion-summary")).toHaveText("$30 services · Tue 12pm–3pm · Artisan stylists · not with other discounts");
+    await form.getByRole("button", { name: "Create promotion" }).click();
+    await expect(page).toHaveURL(/\/promotions$/);
+    await expect(ui(page).getByTestId("promotion-row").filter({ hasText: `Pr${RUN} Tuesday` })).toBeVisible();
+    const { data } = await admin.from("promotions").select("discount_kind, amount_cents, levels, days, from_minute, to_minute").eq("business_id", B).eq("name", `Pr${RUN} Tuesday`).single();
+    expect(data).toEqual({ discount_kind: "price", amount_cents: 3000, levels: ["artisan"], days: [2], from_minute: 720, to_minute: 900 });
+    await admin.from("promotions").delete().eq("business_id", B).eq("name", `Pr${RUN} Tuesday`);
+  });
+
   test("sets up a promo code for retail", async ({ page }) => {
     await page.goto("/promotions/new");
     const form = ui(page).getByRole("form", { name: "Promotion" });
@@ -163,6 +187,33 @@ test.describe("booking site", () => {
 
   test.beforeEach(async () => {
     await admin.from("rate_limits").delete().neq("key", "");
+  });
+
+  test("shows a set price on an Artisan's matching times, and on nobody else's", async ({ page }) => {
+    const { data: set } = await admin
+      .from("promotions")
+      .insert({ business_id: B, name: `Pr${RUN} Set`, kind: "automatic", discount_kind: "price", amount_cents: 3000, applies_services: true, levels: ["artisan"], days: [1, 2, 3, 4, 5, 6, 7], from_minute: 0, to_minute: 1440, online: true })
+      .select("id")
+      .single();
+    try {
+      const timesWith = async (stylist: RegExp) => {
+        await page.goto("/book/maple-and-ash");
+        await waitForHydration(page, "[data-testid=booking-flow] button[aria-pressed]");
+        await flow(page).getByRole("button", { name: /^Women's Cut & Style\s*\d/ }).click();
+        await cont(page).click();
+        await flow(page).getByRole("button", { name: stylist }).click();
+        await cont(page).click();
+        await flow(page).getByRole("radiogroup", { name: "Date" }).getByRole("radio", { name: /\d+ times?$/ }).first().click();
+      };
+      await timesWith(/Shae Morgan/);
+      await expect(flow(page).getByRole("radio", { name: /, \$30$/ }).first()).toContainText("$30");
+      await timesWith(/Gil /);
+      // Their times are showing (the week's special covers them).
+      await expect(flow(page).getByRole("radio", { name: /, 20% off$/ }).first()).toBeVisible();
+      await expect(flow(page).getByRole("radio", { name: /, \$30$/ })).toHaveCount(0);
+    } finally {
+      await admin.from("promotions").delete().eq("id", set!.id);
+    }
   });
 
   test("marks last-minute special times, applies it at review, and checks a code", async ({ page }) => {

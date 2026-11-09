@@ -6,8 +6,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import { PROMOTION_COLUMNS, ruleOf, type Level, type PromoRule, type PromotionRow } from "@/lib/promotions";
-import { toLocal, type LocalDate } from "@/lib/scheduling/time";
+import { PROMOTION_COLUMNS, ruleOf, type Level, type Moment, type PromoRule, type PromotionRow } from "@/lib/promotions";
+import { toLocal, weekdayOf, type LocalDate } from "@/lib/scheduling/time";
 import type { PromoRates } from "@/lib/ticket";
 
 type Supabase = SupabaseClient<Database>;
@@ -38,6 +38,12 @@ export async function promotionUses(supabase: Supabase, ids: readonly string[], 
   return uses;
 }
 
+// When an instant falls at the salon, for a promotion's window.
+export function momentAt(instant: Date, timezone: string): Moment {
+  const { date, minute } = toLocal(instant, timezone);
+  return { weekday: weekdayOf(date), minute };
+}
+
 export async function promoRatesFor(
   supabase: Supabase,
   o: { businessId: string; timezone: string; today: LocalDate; clientId: string | null; appointmentId: string | null; where?: "checkout" | "online" },
@@ -60,6 +66,7 @@ export async function promoRatesFor(
       where: o.where ?? "checkout",
       client: client.data ? { createdOn: toLocal(new Date(client.data.created_at), o.timezone).date, visitedBefore: (visited.data ?? []).length > 0 } : null,
       visit: visit.data ? { startsAt: Date.parse(visit.data.starts_at), bookedAt: Date.parse(visit.data.created_at) } : null,
+      when: momentAt(visit.data ? new Date(visit.data.starts_at) : new Date(), o.timezone),
     },
     uses,
   };

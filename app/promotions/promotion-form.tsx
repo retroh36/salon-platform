@@ -15,20 +15,19 @@ import { parsePromotionInput, promotionSummary, ruleOf, type Level, type PromoKi
 import { savePromotion } from "./actions";
 
 export type FormOptions = {
+  levels: { value: Level; label: string }[];
   services: { id: string; name: string; category: string }[];
   staff: { id: string; name: string }[];
   products: { id: string; name: string }[];
 };
 
-const LEVELS: { value: Level; label: string }[] = [
-  { value: "artisan", label: "Artisan" },
-  { value: "senior", label: "Senior" },
-  { value: "master", label: "Master" },
-];
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label, i) => ({ value: String(i + 1), label }));
+
+const DISCOUNT_LABEL = { percent: "Percent off", amount: "Amount off ($)", price: "Set price ($)" };
 
 const KIND_HELP: Record<PromoKind, string> = {
   code: "The client gives a code, at the desk or when booking online.",
-  automatic: "Offered by itself at checkout whenever its rules are met.",
+  automatic: "Offered by itself at checkout whenever its rules are met. Give it days or times to show it on those times on your booking site.",
   last_minute: "Open time starting soon: a badge on those times on your booking site, and taken off at checkout.",
 };
 
@@ -49,6 +48,7 @@ export function PromotionForm({ id, initial, options }: { id: string | null; ini
     ? promotionSummary(ruleOf({ id: "preview", ...parsed.row } as never), {
         services: Object.fromEntries(options.services.map((s) => [s.id, s.name])),
         staff: Object.fromEntries(options.staff.map((s) => [s.id, s.name])),
+        levels: Object.fromEntries(options.levels.map((l) => [l.value, l.label])),
       })
     : null;
 
@@ -102,12 +102,14 @@ export function PromotionForm({ id, initial, options }: { id: string | null; ini
       <fieldset>
         <legend className="mb-3 text-base font-semibold text-ink">Discount</legend>
         <div className="grid max-w-sm grid-cols-[minmax(0,10rem)_minmax(0,7rem)] gap-3">
-        <select aria-label="Discount type" value={p.discountKind} onChange={(e) => set({ discountKind: e.target.value as "percent" | "amount" })} className={selectClass}>
+        <select aria-label="Discount type" value={p.discountKind} onChange={(e) => set({ discountKind: e.target.value as PromotionInput["discountKind"] })} className={selectClass}>
           <option value="percent">Percent off</option>
           <option value="amount">Amount off</option>
+          <option value="price">Set price</option>
         </select>
-        <input aria-label={p.discountKind === "percent" ? "Percent off" : "Amount off ($)"} value={p.value} onChange={(e) => set({ value: e.target.value })} inputMode="decimal" className={fieldClass} placeholder={p.discountKind === "percent" ? "15" : "10.00"} />
+        <input aria-label={DISCOUNT_LABEL[p.discountKind]} value={p.value} onChange={(e) => set({ value: e.target.value })} inputMode="decimal" className={fieldClass} placeholder={p.discountKind === "percent" ? "15" : p.discountKind === "price" ? "30.00" : "10.00"} />
         </div>
+        {p.discountKind === "price" && <p className="mt-2 text-sm text-ink-muted">Each service or product it covers costs this. Anything already less stays as it is.</p>}
       </fieldset>
 
       <fieldset className="flex flex-col gap-3">
@@ -136,8 +138,8 @@ export function PromotionForm({ id, initial, options }: { id: string | null; ini
               </select>
             </label>
             <CheckGroup label="Only with these stylists (none ticked: anyone)" items={options.staff.map((s) => ({ value: s.id, label: s.name }))} selected={p.staffIds} onToggle={(v) => toggle("staffIds", v)} />
-            <CheckGroup label="Only these levels (none ticked: any)" items={LEVELS} selected={p.levels} onToggle={(v) => toggle("levels", v as Level)} />
-            <Exclusions value={p.exclusions} categories={categories} onChange={(exclusions) => set({ exclusions })} />
+            <CheckGroup label="Only these levels (none ticked: any)" items={options.levels} selected={p.levels} onToggle={(v) => toggle("levels", v as Level)} />
+            <Exclusions value={p.exclusions} categories={categories} levels={options.levels} onChange={(exclusions) => set({ exclusions })} />
           </>
         )}
         {p.retail && (
@@ -176,6 +178,17 @@ export function PromotionForm({ id, initial, options }: { id: string | null; ini
           Minimum spend ($, blank: none)
           <input value={p.minSpend} onChange={(e) => set({ minSpend: e.target.value })} inputMode="decimal" className={fieldClass} />
         </label>
+        <div className="sm:col-span-2">
+          <CheckGroup label="Only on these days (none ticked: every day)" items={DAYS} selected={p.days.map(String)} onToggle={(v) => set({ days: p.days.includes(Number(v)) ? p.days.filter((d) => d !== Number(v)) : [...p.days, Number(v)] })} />
+        </div>
+        <label className={labelClass}>
+          From (blank: all day)
+          <input type="time" step={300} value={p.fromTime} onChange={(e) => set({ fromTime: e.target.value })} className={fieldClass} />
+        </label>
+        <label className={labelClass}>
+          Until
+          <input type="time" step={300} value={p.toTime} onChange={(e) => set({ toTime: e.target.value })} className={fieldClass} />
+        </label>
       </fieldset>
 
       <fieldset className="flex flex-col gap-2">
@@ -192,10 +205,10 @@ export function PromotionForm({ id, initial, options }: { id: string | null; ini
           <input type="checkbox" className={checkboxClass} checked={p.stackable} onChange={(e) => set({ stackable: e.target.checked })} />
           Can be used with other promotions and discounts
         </label>
-        {p.kind === "code" && (
+        {(p.kind === "code" || (p.kind === "automatic" && (p.days.length > 0 || p.fromTime !== ""))) && (
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" className={checkboxClass} checked={p.online} onChange={(e) => set({ online: e.target.checked })} />
-            Can be used on the booking site
+            {p.kind === "code" ? "Can be used on the booking site" : "Show on matching times on the booking site"}
           </label>
         )}
       </fieldset>
@@ -234,7 +247,7 @@ function CheckGroup({ label, items, selected, onToggle }: { label: string; items
 
 // "Never": a level, a category, or a level's work in a category (never
 // Master color).
-function Exclusions({ value, categories, onChange }: { value: PromotionInput["exclusions"]; categories: string[]; onChange: (v: PromotionInput["exclusions"]) => void }) {
+function Exclusions({ value, categories, levels, onChange }: { value: PromotionInput["exclusions"]; categories: string[]; levels: FormOptions["levels"]; onChange: (v: PromotionInput["exclusions"]) => void }) {
   return (
     <fieldset className="flex flex-col gap-2">
       <legend className="mb-2 text-13 font-medium text-ink">Never (for example, never Master stylists&rsquo; color)</legend>
@@ -242,7 +255,7 @@ function Exclusions({ value, categories, onChange }: { value: PromotionInput["ex
         <div key={i} className="flex flex-wrap items-center gap-2" data-testid="exclusion">
           <select aria-label="Never this level" value={e.level ?? ""} onChange={(x) => onChange(value.map((v, j) => (j === i ? { ...v, level: (x.target.value || null) as Level | null } : v)))} className={`${selectClass} w-40`}>
             <option value="">Any level</option>
-            {LEVELS.map((l) => (
+            {levels.map((l) => (
               <option key={l.value} value={l.value}>
                 {l.label}
               </option>

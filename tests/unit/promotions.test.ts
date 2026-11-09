@@ -43,6 +43,9 @@ const rule = (over: Partial<PromoRule> = {}): PromoRule => ({
   stackable: false,
   online: true,
   hoursAhead: null,
+  days: null,
+  fromMinute: null,
+  toMinute: null,
   ...over,
 });
 
@@ -59,7 +62,52 @@ const ctx = (over: Partial<PromoContext> = {}): PromoContext => ({
   client: { createdOn: "2026-10-01", visitedBefore: false },
   subtotalCents: 10_000,
   visit: null,
+  when: { weekday: 2, minute: 13 * 60 },
   ...over,
+});
+
+describe("a set price", () => {
+  const blowout = rule({ discount: { kind: "price", cents: 3000 }, levels: ["artisan"], days: [2], fromMinute: 12 * 60, toMinute: 15 * 60 });
+  const artisanCut: PromoLine = { ...cut, level: "artisan" };
+
+  it("brings each unit down to the price, and never raises one", () => {
+    expect(applyPromotions([blowout], [artisanCut]).perLine).toEqual([7000]);
+    expect(applyPromotions([blowout], [{ ...artisanCut, cents: 2500 }]).perLine).toEqual([0]);
+    const twoBottles: PromoLine = { ...shampoo, cents: 6000, quantity: 2 };
+    expect(applyPromotions([rule({ retail: true, services: false, discount: { kind: "price", cents: 2000 } })], [twoBottles]).perLine).toEqual([2000]);
+  });
+
+  it("keeps to its level, and says so", () => {
+    expect(applyPromotions([blowout], [cut]).perLine).toEqual([0]);
+    expect(promotionSummary(blowout)).toBe("$30 services · Tue 12pm–3pm · Artisan stylists · not with other discounts");
+  });
+
+  it("is on only in its days and hours (the end isn't)", () => {
+    expect(promotionProblem(blowout, ctx({ when: { weekday: 2, minute: 12 * 60 } }))).toBeNull();
+    expect(promotionProblem(blowout, ctx({ when: { weekday: 2, minute: 15 * 60 } }))).toBe("Spring isn't on at this day and time.");
+    expect(promotionProblem(blowout, ctx({ when: { weekday: 3, minute: 13 * 60 } }))).toBe("Spring isn't on at this day and time.");
+  });
+
+  it("shows on the booking site's matching times only, when it's automatic and saves something", () => {
+    const shown = { ...blowout, kind: "automatic" as const };
+    const now = Date.parse("2026-10-27T12:00:00Z");
+    const tuesday = { startsAt: now + 30 * 86_400_000, now, today: "2026-10-24", when: { weekday: 2, minute: 13 * 60 } };
+    expect(specialFor([shown], tuesday, [artisanCut])?.id).toBe("p1");
+    expect(specialFor([shown], tuesday, [cut])).toBeNull();
+    expect(specialFor([shown], tuesday, [{ ...artisanCut, cents: 3000 }])).toBeNull();
+    expect(specialFor([shown], { ...tuesday, when: { weekday: 2, minute: 16 * 60 } }, [artisanCut])).toBeNull();
+    expect(specialFor([blowout], tuesday, [artisanCut])).toBeNull();
+    expect(specialFor([{ ...shown, days: null, fromMinute: null, toMinute: null }], tuesday, [artisanCut])).toBeNull();
+  });
+
+  it("reads back from the form", () => {
+    const input = { ...NEW_PROMOTION, name: "Tuesday blowout", kind: "automatic" as const, discountKind: "price" as const, value: "30", levels: ["artisan"], days: [2], fromTime: "12:00", toTime: "15:00" };
+    const parsed = parsePromotionInput(input);
+    expect(parsed).toMatchObject({ ok: true, row: { discount_kind: "price", amount_cents: 3000, percent: null, days: [2], from_minute: 720, to_minute: 900 } });
+    expect(parsed.ok && promotionInput({ id: "x", ...parsed.row })).toEqual(input);
+    expect(parsePromotionInput({ ...input, toTime: "" })).toEqual({ ok: false, message: "Give both a from and an until time, or neither." });
+    expect(parsePromotionInput({ ...input, toTime: "11:00" })).toEqual({ ok: false, message: "The time it's on ends before it starts." });
+  });
 });
 
 describe("what a promotion covers", () => {
@@ -148,7 +196,7 @@ describe("on the checkout ticket", () => {
     rules,
     categoryOf: { cut: "Cuts", color: "Color" },
     levelOf: { gil: "master", lois: "senior" },
-    context: { today: "2026-10-24", where: "checkout", client: { createdOn: "2026-10-01", visitedBefore: false }, visit: null },
+    context: { today: "2026-10-24", where: "checkout", client: { createdOn: "2026-10-01", visitedBefore: false }, visit: null, when: { weekday: 2, minute: 13 * 60 } },
     uses: {},
     ...over,
   });
@@ -202,10 +250,10 @@ describe("specials on the booking site", () => {
   const now = Date.parse("2026-10-24T15:00:00Z");
   const special = rule({ id: "s", kind: "last_minute", code: null, hoursAhead: 48, discount: { kind: "percent", pct: 15 }, exclusions: [{ level: "master", category: "Color" }] });
   it("badges open time within its hours that it covers", () => {
-    expect(specialFor([special], { startsAt: now + 24 * 3_600_000, now, today: "2026-10-24" }, [cut])?.id).toBe("s");
-    expect(specialFor([special], { startsAt: now + 49 * 3_600_000, now, today: "2026-10-24" }, [cut])).toBeNull();
-    expect(specialFor([special], { startsAt: now + 3_600_000, now, today: "2026-10-24" }, [color])).toBeNull();
-    expect(specialFor([special, { ...special, id: "t", discount: { kind: "percent", pct: 20 } }], { startsAt: now + 3_600_000, now, today: "2026-10-24" }, [cut])?.id).toBe("t");
+    expect(specialFor([special], { startsAt: now + 24 * 3_600_000, now, today: "2026-10-24", when: { weekday: 2, minute: 13 * 60 } }, [cut])?.id).toBe("s");
+    expect(specialFor([special], { startsAt: now + 49 * 3_600_000, now, today: "2026-10-24", when: { weekday: 2, minute: 13 * 60 } }, [cut])).toBeNull();
+    expect(specialFor([special], { startsAt: now + 3_600_000, now, today: "2026-10-24", when: { weekday: 2, minute: 13 * 60 } }, [color])).toBeNull();
+    expect(specialFor([special, { ...special, id: "t", discount: { kind: "percent", pct: 20 } }], { startsAt: now + 3_600_000, now, today: "2026-10-24", when: { weekday: 2, minute: 13 * 60 } }, [cut])?.id).toBe("t");
   });
   it("is described in plain words", () => {
     expect(promotionSummary(special)).toBe("15% off services · open time in the next 48 hours · never Master color · not with other discounts");

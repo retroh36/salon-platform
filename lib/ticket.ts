@@ -219,8 +219,8 @@ function promoLines(ticket: Ticket, rates: Rates): PromoLine[] {
   return ticket.lines.map((l) => {
     const cents = grossOf(l) - memberDiscountOf(l, rates);
     if (l.kind === "service" && !isCovered(l))
-      return { kind: "service", serviceId: l.serviceId, category: rates.promo?.categoryOf[l.serviceId] ?? null, staffId: l.staffId, level: rates.promo?.levelOf[l.staffId] ?? null, cents };
-    if (l.kind === "product") return { kind: "product", productId: l.productId, cents };
+      return { kind: "service", serviceId: l.serviceId, category: rates.promo?.categoryOf[l.serviceId] ?? null, staffId: l.staffId, level: rates.promo?.levelOf[l.staffId] ?? null, cents, quantity: l.quantity };
+    if (l.kind === "product") return { kind: "product", productId: l.productId, cents, quantity: l.quantity };
     return { kind: "other", cents };
   });
 }

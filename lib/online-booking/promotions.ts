@@ -8,8 +8,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import { applyPromotions, discountText, normalCode, PROMOTION_COLUMNS, promotionApplies, promotionProblem, ruleOf, specialFor, type PromoLine, type PromoRule, type PromotionRow } from "@/lib/promotions";
-import { promoRatesFor } from "@/lib/promotions-load";
+import { applyPromotions, discountText, normalCode, PROMOTION_COLUMNS, promotionApplies, promotionProblem, ruleOf, showsOnTimes, specialFor, type PromoLine, type PromoRule, type PromotionRow } from "@/lib/promotions";
+import { momentAt, promoRatesFor } from "@/lib/promotions-load";
 import { loadBookingContext } from "@/lib/scheduling/load";
 import { planVisitAt, type PlannedItem, type VisitRequest } from "@/lib/scheduling/online";
 import { todayIn, toLocal, type LocalDate } from "@/lib/scheduling/time";
@@ -46,12 +46,12 @@ export function promoLinesFor(site: BookingSite, items: readonly Pick<PlannedIte
   });
 }
 
-export const onlineSpecials = (rules: readonly PromoRule[]) => rules.filter((r) => r.kind === "last_minute" && r.online);
+export const onlineSpecials = (rules: readonly PromoRule[]) => rules.filter(showsOnTimes);
 
 // The special for a time, if one covers it (its badge is `text`, "15% off").
 export function specialAt(site: BookingSite, specials: readonly PromoRule[], items: readonly PlannedItem[], start: Date, now: Date, today: LocalDate): OnlinePromo | null {
   const lines = promoLinesFor(site, items);
-  const rule = specialFor(specials, { startsAt: start.getTime(), now: now.getTime(), today }, lines);
+  const rule = specialFor(specials, { startsAt: start.getTime(), now: now.getTime(), today, when: momentAt(start, site.location.timezone) }, lines);
   return rule ? offerOf(rule, lines) : null;
 }
 
@@ -87,8 +87,9 @@ export async function onlinePromotion(
   const rates = await promoRatesFor(admin, { businessId: site.business.id, timezone: tz, today, clientId, appointmentId: null, where: "online" });
   const lines = promoLinesFor(site, items);
   const spend = lines.reduce((n, l) => n + l.cents, 0);
+  const when = momentAt(start, tz);
   const problemOf = (rule: PromoRule) =>
-    promotionProblem(rule, { ...rates.context, ...(rates.uses[rule.id] ?? { uses: 0, clientUses: 0 }), subtotalCents: spend, visit: { startsAt: start.getTime(), bookedAt: now.getTime() } });
+    promotionProblem(rule, { ...rates.context, ...(rates.uses[rule.id] ?? { uses: 0, clientUses: 0 }), subtotalCents: spend, visit: { startsAt: start.getTime(), bookedAt: now.getTime() }, when });
 
   const code = choice.code?.trim();
   if (code) {
@@ -103,7 +104,7 @@ export async function onlinePromotion(
   const rule = onlineSpecials(rates.rules).find((r) => r.id === choice.specialId);
   if (!rule) return { ok: true, promo: null, lost: "That last-minute offer has ended." };
   const label = offerLabel(rule);
-  const problem = problemOf(rule) ?? (specialFor([rule], { startsAt: start.getTime(), now: now.getTime(), today }, lines) ? null : `${rule.name} is for visits booked within ${rule.hoursAhead} hours of starting.`);
+  const problem = problemOf(rule) ?? (specialFor([rule], { startsAt: start.getTime(), now: now.getTime(), today, when }, lines) || !lines.some((l) => promotionApplies(rule, l)) ? null : rule.kind === "last_minute" ? `${rule.name} is for visits booked within ${rule.hoursAhead} hours of starting.` : `${rule.name} isn't on at this day and time.`);
   if (problem) return { ok: true, promo: null, lost: `${label} doesn't apply${lostReason(rule, problem)}` };
   const missed = items.filter((_, n) => !promotionApplies(rule, lines[n]));
   if (missed.length === items.length) {
