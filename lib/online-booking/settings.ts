@@ -54,6 +54,7 @@ export type BookingSettingsInput = {
   window_days: number;
   notice_minutes: number;
   allow_new_clients: boolean;
+  quiz_on: boolean;
   cancel_cutoff_hours: number;
   cancellation_policy: string;
   consultation_service_id: string | null;
@@ -109,6 +110,7 @@ export function parseBookingSettings(
       window_days: window!,
       notice_minutes: noticeHours! * 60,
       allow_new_clients: form.get("allow_new_clients") !== null,
+      quiz_on: form.get("quiz_on") !== null,
       cancel_cutoff_hours: cutoff!,
       cancellation_policy: policy,
       consultation_service_id: text(form, "consultation_service_id") || null,

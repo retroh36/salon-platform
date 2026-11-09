@@ -61,6 +61,7 @@ async function BookingSettings() {
               window_days: String(s?.window_days ?? 60),
               notice_hours: String((s?.notice_minutes ?? 120) / 60),
               allow_new_clients: s?.allow_new_clients ?? true,
+              quiz_on: s?.quiz_on ?? false,
               cancel_cutoff_hours: String(s?.cancel_cutoff_hours ?? 24),
               cancellation_policy: s?.cancellation_policy ?? "",
               consultation_service_id: s?.consultation_service_id ?? "",

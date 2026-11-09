@@ -7,6 +7,7 @@
 // a honeypot field for bots. Every booking, change and cancellation is
 // logged.
 
+import { isUuid } from "@/lib/ids";
 import { APPOINTMENT_TEXTS_CONSENT, MARKETING_CONSENT } from "@/lib/messaging/consent";
 import { appointmentChannel } from "@/lib/messaging/send";
 import { withStopLine } from "@/lib/messaging/templates";
@@ -317,6 +318,8 @@ export type BookInput = {
   honeypot: string;
   // Where they came from (?src= on the link they followed).
   source?: string;
+  // The "Find my stylist" answers it came from, to join the visit.
+  quiz?: string;
   // A friend's referral code (from ?ref=): recorded for a client with no visit yet.
   referral?: string;
   // The card entered on the provider's form, when one is needed.
@@ -498,6 +501,9 @@ async function bookCharged(
   // rules no longer allow it, say because the last use just went, the
   // booking stands without it).
   if (promotion.ok && promotion.promo) await admin.rpc("attach_online_promotion", { p_appointment_id: result.appointmentId, p_promotion_id: promotion.promo.id });
+  if (input.quiz && isUuid(input.quiz)) {
+    await admin.from("stylist_quizzes").update({ appointment_id: result.appointmentId, client_id: clientId }).eq("id", input.quiz).eq("business_id", site.business.id).is("appointment_id", null);
+  }
   // What they agreed to and when, the card, and the deposit.
   const { error: consentError } = await admin.rpc("record_online_card", {
     p_appointment_id: result.appointmentId,

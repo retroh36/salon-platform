@@ -68,6 +68,7 @@ type RulesFields = {
   window_days: string;
   notice_hours: string;
   allow_new_clients: boolean;
+  quiz_on: boolean;
   cancel_cutoff_hours: string;
   cancellation_policy: string;
   consultation_service_id: string;
@@ -154,6 +155,14 @@ export function BookingRulesForm({ initial, services }: { initial: RulesFields; 
         <span>
           <span className="font-medium text-ink">New clients can book online</span>
           <span className="block text-13 font-normal text-ink-muted">Otherwise only clients already on file can book; new clients are asked to call.</span>
+        </span>
+      </label>
+
+      <label className="flex items-start gap-3">
+        <input type="checkbox" name="quiz_on" defaultChecked={initial.quiz_on} className={`${checkboxClass} mt-0.5`} />
+        <span>
+          <span className="font-medium text-ink">Show Find my stylist on the booking site</span>
+          <span className="block text-13 font-normal text-ink-muted">A few questions that suggest a service and stylists, by your own menu and team.</span>
         </span>
       </label>
 

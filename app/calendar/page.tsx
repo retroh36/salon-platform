@@ -1,3 +1,4 @@
+import { loadVisitQuizzes } from "@/lib/visit-quiz";
 import { changeLine, type ChangeNames, type VisitChange } from "@/lib/visit-changes";
 import { lateChoice } from "@/lib/running-late";
 import { allowedChannels, consentOf, noTextsFlag } from "@/lib/messaging/consent";
@@ -261,6 +262,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
       log: [],
       fixes: [],
       fixActionId: null,
+      quiz: null,
       group: a.group ? { ...a.group, members: [] } : null,
       series: a.series_id ? { id: a.series_id, index: a.series_index!, count: seriesCounts.get(a.series_id) ?? 1, intervalWeeks: a.series?.interval_weeks ?? 1 } : null,
     };
@@ -348,6 +350,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
 
   const checkedOut = Object.values(appointments).filter((a) => a.status === "completed").map((a) => a.id);
   const visitIds = Object.keys(appointments);
+  const quizzesLoading = loadVisitQuizzes(supabase, visitIds);
   const clientIds = [...new Set(Object.values(appointments).flatMap((a) => (a.client ? [a.client.id] : [])))];
   const [warnings, policies, salesResult, eventsLog, changesLog, insights, packages, past, pastFormulas, memberships, fixesResult, remindersLog, graceResult] = await Promise.all([
     visitWarnings(supabase, me.business_id, toCheck, tz),
@@ -447,6 +450,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
       if (f.status === "approved") visit.fixActionId = f.id;
     }
   }
+  for (const [id, q] of await quizzesLoading) appointments[id].quiz = q;
   for (const [id, w] of warnings) appointments[id].warnings = w;
   if (policies) for (const [id, p] of policies) appointments[id].policy = p;
   if (salesResult.error) throw salesResult.error;

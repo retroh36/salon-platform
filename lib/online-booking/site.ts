@@ -62,6 +62,8 @@ export type BookingSite = {
     consultationServiceId: string | null;
     accent: string;
     welcome: string | null;
+    // "Find my stylist" is on the site.
+    quizOn: boolean;
   };
   // The salon's patch test rules (see lib/scheduling/patch-tests.ts), and
   // the service a patch test is done at, if it can be booked online.
@@ -196,6 +198,7 @@ export async function loadSite(admin: Admin, slug: string): Promise<SiteLookup> 
         windowDays: settings.window_days,
         noticeMinutes: settings.notice_minutes,
         allowNewClients: settings.allow_new_clients,
+        quizOn: settings.quiz_on,
         cancelCutoffHours: settings.cancel_cutoff_hours,
         cancellationPolicy: settings.cancellation_policy,
         consultationServiceId: consultation?.id ?? null,

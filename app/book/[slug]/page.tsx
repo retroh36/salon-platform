@@ -94,6 +94,7 @@ async function Booking({ params, searchParams }: { params: Promise<{ slug: strin
             coverUrl={site.business.coverUrl}
             account={{ href: `/book/${slug}/account`, label: account ? `${account.firstName}'s account` : "My account" }}
             eventsLink={events.data?.inquiries_enabled ? `/book/${slug}/event` : null}
+            quizLink={site.settings.quizOn ? `/book/${slug}/find-my-stylist` : null}
           />
         ),
       }}>
@@ -112,6 +113,7 @@ async function Booking({ params, searchParams }: { params: Promise<{ slug: strin
             today={today}
             source={source}
             referral={referral}
+            quiz={typeof query.quiz === "string" && /^[0-9a-f-]{36}$/.test(query.quiz) ? query.quiz : null}
             signedIn={account ? { firstName: account.firstName } : null}
             start={services.length ? { serviceIds: services, staffId: staff, after } : null}
           />

@@ -1,6 +1,7 @@
 // What the server page hands the interactive calendar. Times are minutes
 // since midnight on the day shown, at the location.
 
+import type { VisitQuiz } from "@/lib/visit-quiz";
 import type { Channel } from "@/lib/messaging/consent";
 import type { DurationBasis } from "@/lib/insights/durations";
 import type { VisitPolicy } from "@/lib/policy-visits";
@@ -160,6 +161,8 @@ export type AppointmentDetail = {
   // the one still applied, to undo from here.
   fixes: { line: string; undone: string | null }[];
   fixActionId: string | null;
+  // The "Find my stylist" answers it was booked from.
+  quiz: VisitQuiz | null;
   // Patch tests and forms the visit needs, done or not.
   warnings: VisitWarnings | null;
   // The sale a checked-out visit was paid on (reversing it means voiding

@@ -13,6 +13,7 @@ import { CheckCircleIcon, ChevronDownIcon, GlobeIcon, MoreIcon, PhoneIcon, Warni
 import { Tabs } from "@/components/ui/tabs";
 import { PatchTestForm } from "@/app/clients/patch-test-form";
 import { ClientInsightLine } from "@/components/client-insight-line";
+import { QuizCard } from "./quiz-card";
 import { VisitPhotosTab } from "@/components/visit-photos";
 import { ACTION_LABELS, ACTION_STATUS, allowedActions, CANCEL_REASONS, canEditNotes, cancelReason, isEditable, MAX_NOTES, STATUS_LABELS, type AppointmentAction, type AppointmentStatus } from "@/lib/appointments";
 import type { ChecklistItem } from "@/lib/client-checks";
@@ -408,6 +409,7 @@ export function AppointmentPanel({
             )}
             {/* Only while something's outstanding: one row that opens the checklist. */}
             {client && outstanding.length > 0 && <VisitChecklist items={checklist} override={appointment.patchOverride} clientId={client.id} appointmentId={appointment.id} contact={canSendForms ? { phone: client.phone, email: client.email } : null} date={date} today={today} timeZone={timeZone} me={me} team={team} />}
+            {appointment.quiz && <QuizCard quiz={appointment.quiz} canDecide={me.canBook && isEditable(status)} />}
             {appointment.insight && (
               // Pulled left so her face lines up with the rows; never past the
               // right edge (the panel never scrolls sideways).

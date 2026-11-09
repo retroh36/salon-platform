@@ -859,12 +859,12 @@ update public.businesses set slug = 'maple-and-ash' where id = 'b0000000-0000-40
 
 insert into public.online_booking_settings (
   business_id, enabled, window_days, notice_minutes, allow_new_clients, cancel_cutoff_hours,
-  cancellation_policy, consultation_service_id, accent_color, welcome
+  cancellation_policy, consultation_service_id, accent_color, welcome, quiz_on
 )
 select 'b0000000-0000-4000-8000-000000000001', true, 60, 120, true, 24,
        'Plans change, we understand. You can cancel or reschedule online, with the link in your confirmation, or by phone.',
        (select id from public.services where business_id = 'b0000000-0000-4000-8000-000000000001' and name = 'Color Consultation'),
-       '#6b3f2a', 'Book your next visit with our team. We can''t wait to see you.';
+       '#6b3f2a', 'Book your next visit with our team. We can''t wait to see you.', true;
 
 -- The demo's photos ship with the app (public/demo/, credited in
 -- public/demo/CREDITS.md), stored as paths from the site's root: the salon's

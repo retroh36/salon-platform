@@ -67,6 +67,7 @@ describe("booking site settings", () => {
         window_days: 60,
         notice_minutes: 120,
         allow_new_clients: true,
+        quiz_on: false,
         cancel_cutoff_hours: 24,
         cancellation_policy: "Please give us 24 hours.",
         consultation_service_id: null,

@@ -61,6 +61,7 @@ export function BookingFlow({
   today,
   source,
   referral = null,
+  quiz = null,
   signedIn = null,
   start = null,
 }: {
@@ -68,6 +69,8 @@ export function BookingFlow({
   today: LocalDate;
   source: BookingSource;
   referral?: string | null;
+  // The "Find my stylist" answers this booking came from.
+  quiz?: string | null;
   signedIn?: { firstName: string } | null;
   start?: { serviceIds: string[]; staffId: string | null; after?: string | null } | null;
 }) {
@@ -299,6 +302,7 @@ export function BookingFlow({
         honeypot: honeypot.current?.value ?? "",
         source,
         referral: referral ?? undefined,
+        quiz: quiz ?? undefined,
         cardRef,
         remember: !signedIn && remember,
         appointmentTexts,

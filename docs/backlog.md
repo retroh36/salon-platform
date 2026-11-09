@@ -35,6 +35,9 @@ Known gaps to pick up later. Move an item into a task when it's scheduled.
 - [ ] **AI action log page.** Owners can't browse the log yet (it's in `ai_actions`).
 - [ ] **Run scans in the background.** Denise looks over the day when the calendar loads or changes; with no one on the calendar, nothing watches it.
 
+- [ ] **Clear out unbooked quizzes.** "Find my stylist" answers and photos with no booking are anonymous but stay in `stylist_quizzes` and `quiz-photos`; remove them after a month.
+- [ ] **Denise reviews photos (with client consent).** A future opt-in salon setting: with the client's consent recorded, a quiz's photos could be read by her AI service to help match a stylist or flag extra time. Until then photos never reach it, and the match and the flag are our own rules.
+
 ## Inventory
 
 - [ ] **Sales through the point of sale.** "Record sale" only takes retail out of stock; payments, prices and receipts come with the point of sale (phase 4).

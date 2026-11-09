@@ -2415,14 +2415,14 @@ isOneToOne: false
                   ]
                 },"online_booking_settings": {
                   Row: {
-                    "accent_color": string | null,"allow_new_clients": boolean,"business_id": string,"cancel_cutoff_hours": number,"cancellation_policy": string,"consultation_service_id": string | null,"cover_path": string | null,"enabled": boolean,"notice_minutes": number,"patch_test_service_id": string | null,"updated_at": string,"welcome": string | null,"window_days": number
+                    "accent_color": string | null,"allow_new_clients": boolean,"business_id": string,"cancel_cutoff_hours": number,"cancellation_policy": string,"consultation_service_id": string | null,"cover_path": string | null,"enabled": boolean,"notice_minutes": number,"patch_test_service_id": string | null,"quiz_on": boolean,"updated_at": string,"welcome": string | null,"window_days": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "accent_color"?: string | null,"allow_new_clients"?: boolean,"business_id": string,"cancel_cutoff_hours"?: number,"cancellation_policy"?: string,"consultation_service_id"?: string | null,"cover_path"?: string | null,"enabled"?: boolean,"notice_minutes"?: number,"patch_test_service_id"?: string | null,"updated_at"?: string,"welcome"?: string | null,"window_days"?: number
+                    "accent_color"?: string | null,"allow_new_clients"?: boolean,"business_id": string,"cancel_cutoff_hours"?: number,"cancellation_policy"?: string,"consultation_service_id"?: string | null,"cover_path"?: string | null,"enabled"?: boolean,"notice_minutes"?: number,"patch_test_service_id"?: string | null,"quiz_on"?: boolean,"updated_at"?: string,"welcome"?: string | null,"window_days"?: number
                   }
                   Update: {
-                    "accent_color"?: string | null,"allow_new_clients"?: boolean,"business_id"?: string,"cancel_cutoff_hours"?: number,"cancellation_policy"?: string,"consultation_service_id"?: string | null,"cover_path"?: string | null,"enabled"?: boolean,"notice_minutes"?: number,"patch_test_service_id"?: string | null,"updated_at"?: string,"welcome"?: string | null,"window_days"?: number
+                    "accent_color"?: string | null,"allow_new_clients"?: boolean,"business_id"?: string,"cancel_cutoff_hours"?: number,"cancellation_policy"?: string,"consultation_service_id"?: string | null,"cover_path"?: string | null,"enabled"?: boolean,"notice_minutes"?: number,"patch_test_service_id"?: string | null,"quiz_on"?: boolean,"updated_at"?: string,"welcome"?: string | null,"window_days"?: number
                   }
                   Relationships: [
                     {
@@ -4645,6 +4645,50 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"stylist_quizzes": {
+                  Row: {
+                    "answers": NonNullable<Json>,"appointment_id": string | null,"business_id": string,"client_id": string | null,"created_at": string,"flag_at": string | null,"flag_by": string | null,"flag_minutes": number | null,"flag_reasons": (string)[],"flag_status": string | null,"id": string,"photo_paths": (string)[],"service_id": string | null,"staff_ids": (string)[]
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "answers": NonNullable<Json>,"appointment_id"?: string | null,"business_id": string,"client_id"?: string | null,"created_at"?: string,"flag_at"?: string | null,"flag_by"?: string | null,"flag_minutes"?: number | null,"flag_reasons"?: (string)[],"flag_status"?: string | null,"id"?: string,"photo_paths"?: (string)[],"service_id"?: string | null,"staff_ids"?: (string)[]
+                  }
+                  Update: {
+                    "answers"?: NonNullable<Json>,"appointment_id"?: string | null,"business_id"?: string,"client_id"?: string | null,"created_at"?: string,"flag_at"?: string | null,"flag_by"?: string | null,"flag_minutes"?: number | null,"flag_reasons"?: (string)[],"flag_status"?: string | null,"id"?: string,"photo_paths"?: (string)[],"service_id"?: string | null,"staff_ids"?: (string)[]
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "stylist_quizzes_appointment_id_fkey"
+      columns: ["appointment_id"]
+isOneToOne: false
+      referencedRelation: "appointments"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "stylist_quizzes_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "stylist_quizzes_client_id_fkey"
+      columns: ["client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "stylist_quizzes_flag_by_fkey"
+      columns: ["flag_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "stylist_quizzes_service_id_fkey"
+      columns: ["service_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"suppliers": {
                   Row: {
                     "account_number": string | null,"business_id": string,"created_at": string,"email": string | null,"id": string,"is_active": boolean,"lead_time_days": number,"name": string,"notes": string | null,"phone": string | null,"updated_at": string
@@ -5431,6 +5475,9 @@ isOneToOne: false
                            },
 "create_waitlist_offer":
 { Args: { "p_channel": string,"p_entry_id": string,"p_minutes": number,"p_staff_id": string,"p_starts_at": string,"p_to": string,"p_token_hash": string }; Returns: string
+                           },
+"decide_quiz_flag":
+{ Args: { "p_decision": string,"p_quiz_id": string }; Returns: undefined
                            },
 "decide_shift_swap":
 { Args: { "p_approve": boolean,"p_reason"?: string,"p_swap_id": string }; Returns: undefined

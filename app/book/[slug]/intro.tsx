@@ -7,10 +7,15 @@ import { accentLink, primaryButton, secondaryButton } from "./styles";
 
 // The top of the page: the client's links on the right (an event inquiry,
 // their account), then the cover photo across the top when there is one.
-export function SalonTop({ coverUrl, account, eventsLink }: { coverUrl: string | null; account: { href: string; label: string }; eventsLink: string | null }) {
+export function SalonTop({ coverUrl, account, eventsLink, quizLink = null }: { coverUrl: string | null; account: { href: string; label: string }; eventsLink: string | null; quizLink?: string | null }) {
   return (
     <>
       <nav aria-label="Your visit" className="mx-auto flex w-full max-w-5xl flex-wrap justify-end gap-x-5 gap-y-1 px-4 py-3 text-sm md:px-8" data-testid="site-links">
+        {quizLink && (
+          <Link href={quizLink} className={accentLink}>
+            Find my stylist
+          </Link>
+        )}
         {eventsLink && (
           <Link href={eventsLink} className={accentLink}>
             Weddings and events
