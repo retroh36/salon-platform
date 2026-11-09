@@ -5702,7 +5702,7 @@ isOneToOne: false
 { Args: { "p_membership_id": string,"p_result": Json,"p_today": string }; Returns: Json
                            },
 "record_online_card":
-{ Args: { "p_appointment_id": string,"p_card": Json,"p_consent": Json,"p_deposit": Json }; Returns: undefined
+{ Args: { "p_appointment_id": string,"p_card": Json,"p_card_client_id"?: string,"p_consent": Json,"p_deposit": Json }; Returns: undefined
                            },
 "record_outbox_result":
 { Args: { "p_error": string,"p_id": string,"p_provider": string,"p_provider_id": string,"p_status": string }; Returns: undefined
@@ -6119,6 +6119,11 @@ isOneToOne: false
                            },
 "update_membership_card":
 { Args: { "p_label": string,"p_membership_id": string,"p_provider": string,"p_ref": string }; Returns: undefined
+                           },
+"visit_message_recipients":
+{ Args: { "p_appointment_ids": (string)[] }; Returns: {
+              "appointment_id": string,"channels": (string)[],"dependent_first_name": string,"guardian_first_name": string
+            }[]
                            },
 "void_gift_card":
 { Args: { "p_card_id": string,"p_reason": string }; Returns: undefined

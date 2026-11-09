@@ -121,7 +121,9 @@ export async function startCheckout(supabase: Supabase, me: Me, options: { appoi
 
 // Who usually pays for the client, when it's someone else in their family.
 export async function usualPayer(supabase: Supabase, clientId: string): Promise<string | null> {
-  const { data: c } = await supabase.from("clients").select("family_id").eq("id", clientId).maybeSingle();
+  const { data: c } = await supabase.from("clients").select("family_id, guardian_client_id").eq("id", clientId).maybeSingle();
+  // A dependent's guardian pays, unless changed on the ticket.
+  if (c?.guardian_client_id) return c.guardian_client_id;
   if (!c?.family_id) return null;
   const { data: f } = await supabase.from("families").select("payer_client_id").eq("id", c.family_id).maybeSingle();
   return f?.payer_client_id && f.payer_client_id !== clientId ? f.payer_client_id : null;

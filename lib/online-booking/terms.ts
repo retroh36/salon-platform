@@ -26,21 +26,21 @@ export type OnlineTerms = {
   visitCents: number;
 };
 
-export async function onlineTerms(admin: Admin, site: BookingSite, clientId: string | null, request: VisitRequest, start: Date): Promise<OnlineTerms | null> {
+export async function onlineTerms(admin: Admin, site: BookingSite, clientId: string | null, request: VisitRequest, start: Date, cardHolderId: string | null = null): Promise<OnlineTerms | null> {
   const date = toLocal(start, site.location.timezone).date;
   const ctx = await loadBookingContext(admin, { id: site.location.id, timezone: site.location.timezone }, date, date);
   const items = planVisitAt(ctx, request, start);
   if (!items) return null;
-  return termsFor(admin, site, clientId, items);
+  return termsFor(admin, site, clientId, items, cardHolderId);
 }
 
-export async function termsFor(admin: Admin, site: BookingSite, clientId: string | null, items: readonly PlannedItem[]): Promise<OnlineTerms> {
+export async function termsFor(admin: Admin, site: BookingSite, clientId: string | null, items: readonly PlannedItem[], cardHolderId: string | null = null): Promise<OnlineTerms> {
   const priceOf = (i: PlannedItem) => site.stylists.find((s) => s.id === i.staffId)?.prices[i.serviceId] ?? 0;
   const lines = items.map((i) => {
     const s = site.services.find((x) => x.id === i.serviceId);
     return { serviceId: i.serviceId, staffId: i.staffId, priceCents: priceOf(i), depositCents: s ? depositFor(s.depositKind, s.depositAmount, priceOf(i)) : 0 };
   });
-  return clientTerms(admin, { id: site.business.id, name: site.business.name }, clientId, lines);
+  return clientTerms(admin, { id: site.business.id, name: site.business.name }, clientId, lines, cardHolderId);
 }
 
 // The same for any visit's lines, each with its price and its service's
@@ -50,6 +50,8 @@ export async function clientTerms(
   business: { id: string; name: string },
   clientId: string | null,
   lines: readonly { serviceId: string; staffId: string; priceCents: number; depositCents: number }[],
+  // A guardian booking for their dependent: whose card it is.
+  cardHolderId: string | null = null,
 ): Promise<OnlineTerms> {
   const policy = await loadPolicy(admin, business.id);
   const visitCents = lines.reduce((sum, l) => sum + l.priceCents, 0);
@@ -63,7 +65,7 @@ export async function clientTerms(
   if (clientId) {
     const [{ data: standing, error }, { data: card }, fresh] = await Promise.all([
       admin.rpc("client_policy_standing", { p_client_id: clientId }),
-      admin.from("client_cards").select("payment_method_ref, label, provider").eq("client_id", clientId).is("removed_at", null).maybeSingle(),
+      admin.from("client_cards").select("payment_method_ref, label, provider").eq("client_id", cardHolderId ?? clientId).is("removed_at", null).maybeSingle(),
       isNewClient(admin, clientId),
     ]);
     if (error) throw error;

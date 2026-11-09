@@ -15,7 +15,7 @@ import { failureMessage } from "@/lib/denise/fixes";
 import { describeProblem } from "@/lib/scheduling/booking";
 import { isUuid } from "@/lib/ids";
 import { channelFor, consentOf, type Channel } from "@/lib/messaging/consent";
-import { CONSENT_COLUMNS, previewRescue, previewTemplate, sendStaffMessage } from "@/lib/messaging/send";
+import { CONSENT_COLUMNS, previewRescue, previewTemplate, sendStaffMessage, guardianChannel, guardianRecipients } from "@/lib/messaging/send";
 import { messageFor, outWindow, type OutWhen, type RescueChoice } from "@/lib/rescue";
 import { applyRescuePlan, type RescueMoveInput } from "@/lib/rescue-apply";
 import { loadRescue, type RescuePlan } from "@/lib/rescue-load";
@@ -137,12 +137,14 @@ export async function rescueMessages(staffId: string, lines: { appointmentId: st
       : Promise.resolve({ data: [] as { appointment_id: string | null }[] }),
   ]);
   const done = new Set((sent ?? []).map((m) => m.appointment_id));
+  const guardians = await guardianRecipients(s.supabase, lines.map((l) => l.appointmentId));
   const out: RescueMessage[] = [];
   for (const l of lines) {
     const template = messageFor(l.kind);
     const visit = visits?.find((v) => v.id === l.appointmentId);
     if (!template || !visit?.client) continue;
-    const channel = channelFor(consentOf(visit.client), "appointment")?.channel ?? null;
+    const guardian = guardians.get(l.appointmentId);
+    const channel = guardian ? guardianChannel(guardian) : (channelFor(consentOf(visit.client), "appointment")?.channel ?? null);
     const shown = channel ?? "sms";
     const rendered =
       template === "need_to_move"

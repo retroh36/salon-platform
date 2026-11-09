@@ -70,9 +70,12 @@ export async function loadVisitPolicies(supabase: Supabase, businessId: string, 
   if (!visits.length) return out;
   const clientIds = [...new Set(visits.map((v) => v.clientId))];
   const visitIds = visits.map((v) => v.id);
+  // A dependent's visits count the guardian's card first.
+  const { data: dependents } = await supabase.from("clients").select("id, guardian_client_id").in("id", clientIds).not("guardian_client_id", "is", null);
+  const guardianOf = new Map((dependents ?? []).map((c) => [c.id, c.guardian_client_id!]));
   const [policy, cards, incidents, fees, links, completed] = await Promise.all([
     loadPolicy(supabase, businessId),
-    supabase.from("client_cards").select("client_id, label").in("client_id", clientIds).is("removed_at", null),
+    supabase.from("client_cards").select("client_id, label").in("client_id", [...clientIds, ...guardianOf.values()]).is("removed_at", null),
     supabase.from("policy_fees").select("client_id, kind, status, created_at").in("client_id", clientIds),
     supabase.from("policy_fees").select(`id, appointment_id, kind, fee_cents, from_deposit_cents, status, card_label, failure_reason, waive_reason, ${FEE_GRACE_COLUMNS}`).in("appointment_id", visitIds),
     supabase.from("card_requests").select("client_id, appointment_id").in("client_id", clientIds).eq("status", "open").gt("expires_at", new Date().toISOString()),
@@ -91,7 +94,7 @@ export async function loadVisitPolicies(supabase: Supabase, businessId: string, 
     const stylists = policy.stylists.filter((p) => v.staffIds.includes(p.staffId));
     const open = v.status === "booked" || v.status === "confirmed";
     const depositDue = open ? Math.max(0, depositNeeded(policy.settings, standing, v.visitCents, v.serviceDepositCents) - v.depositPaidCents) : 0;
-    const cardLabel = cardOf.get(v.clientId) ?? null;
+    const cardLabel = cardOf.get(guardianOf.get(v.clientId) ?? "") ?? cardOf.get(v.clientId) ?? null;
     const needed = cardRequired(policy.settings, { serviceIds: v.serviceIds, staffIds: v.staffIds, newClient: !returning.has(v.clientId), repeatOffender: standing.action !== "off" });
     const fee = feeOf.get(v.id);
     out.set(v.id, {

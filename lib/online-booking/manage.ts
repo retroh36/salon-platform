@@ -93,7 +93,10 @@ export async function cancelTerms(admin: SupabaseClient<Database>, site: Booking
   const visitCents = booking.items.reduce((sum, i) => sum + i.priceCents, 0);
   const terms = visitTerms(policy.settings, stylists, visitCents, booking.depositPaidCents);
   const { feeCents } = cancelFee(terms, { startsAt: booking.start, bookedAt: booking.bookedAt, depositPaidCents: booking.depositPaidCents }, now, "Canceled online by the client");
-  const { data: card } = await admin.from("client_cards").select("label").eq("client_id", booking.clientId).is("removed_at", null).maybeSingle();
+  // A dependent's fee goes on the guardian's card.
+  const { data: who } = await admin.from("clients").select("guardian_client_id").eq("id", booking.clientId).maybeSingle();
+  const { data: cards } = await admin.from("client_cards").select("client_id, label").in("client_id", [booking.clientId, ...(who?.guardian_client_id ? [who.guardian_client_id] : [])]).is("removed_at", null);
+  const card = cards?.find((c) => c.client_id === who?.guardian_client_id) ?? cards?.[0];
   return {
     feeCents,
     lines: policyText(policy.settings, { stylists, visitCents, depositCents: booking.depositPaidCents, extra: policy.extra, salon: site.business.name }),

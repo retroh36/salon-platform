@@ -218,8 +218,8 @@ export const FEE_STATUS_LABELS: Record<FeeStatus, string> = {
 };
 
 // The receipt the client gets when a fee is charged (a fixed template).
-export function feeReceipt(salon: string, kind: "late_cancel" | "no_show", feeCents: number, cardLabel: string | null, fromDepositCents: number, when: string): { subject: string; body: string } {
-  const what = kind === "no_show" ? `missed visit on ${when}` : `late cancellation of your visit on ${when}`;
+export function feeReceipt(salon: string, kind: "late_cancel" | "no_show", feeCents: number, cardLabel: string | null, fromDepositCents: number, when: string, dependent: string | null = null): { subject: string; body: string } {
+  const what = kind === "no_show" ? `missed visit${dependent ? ` for ${dependent}` : ""} on ${when}` : `late cancellation of ${dependent ? `${dependent}'s` : "your"} visit on ${when}`;
   const paid = [
     fromDepositCents > 0 && `${dollars(fromDepositCents)} from your deposit`,
     feeCents - fromDepositCents > 0 && `${dollars(feeCents - fromDepositCents)} charged to ${cardLabel ?? "your card on file"}`,

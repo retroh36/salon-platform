@@ -64,6 +64,55 @@ describe("dependents", () => {
     expect(await appointmentChannel(admin, child, "email")).toMatchObject({ to: `${TAG}c@example.com`.toLowerCase(), dependent: null });
     await admin.from("clients").update({ appointment_email_ok: true }).eq("id", parent);
   });
+  describe("once the guardian hears and pays", () => {
+    let visit: string;
+    beforeAll(async () => {
+      expect((await set(frontDesk, child, parent)).error).toBeNull();
+      const { data: loc } = await admin.from("locations").select("id").eq("business_id", B).limit(1).single();
+      const { data, error } = await admin.from("appointments").insert({ business_id: B, location_id: loc!.id, client_id: child, starts_at: new Date(Date.now() + 864e5).toISOString(), ends_at: new Date(Date.now() + 87e6).toISOString(), status: "booked", source: "front_desk" }).select("id").single();
+      if (error) throw error;
+      visit = data.id;
+    });
+    afterAll(async () => {
+      await admin.from("client_cards").delete().in("client_id", [parent, child]);
+      await admin.from("client_messages").delete().eq("appointment_id", visit);
+      await admin.from("appointments").delete().eq("id", visit);
+    });
+
+    it("sends staff's message to the guardian, saying whose visit", async () => {
+      const sent = await frontDesk.rpc("send_client_message", { p_appointment_id: visit, p_purpose: "appointment", p_template: "custom", p_channel: "email", p_subject: "Hello", p_body: "We can take you at 2.", p_opt_out_hash: null as never });
+      expect(sent.error).toBeNull();
+      const { data } = await admin.from("outbox_messages").select("to_address, body").eq("to_address", `${TAG}p@example.com`.toLowerCase()).order("created_at", { ascending: false }).limit(1).single();
+      expect(data!.body).toContain(`About ${TAG}C's visit:`);
+      const { data: log } = await admin.from("client_messages").select("client_id").eq("appointment_id", visit).single();
+      expect(log!.client_id).toBe(child);
+    });
+
+    it("saves a card on the guardian only, and uses it for the dependent", async () => {
+      const refused = await admin.rpc("record_online_card", { p_appointment_id: visit, p_card: { provider: "test", ref: "tok_x", label: "Visa …4242" } as never, p_consent: { policy_text: "Policy", terms: {} } as never, p_deposit: null as never, p_card_client_id: otherAdult });
+      expect(refused.error?.code).toBe("42501");
+      const saved = await admin.rpc("record_online_card", { p_appointment_id: visit, p_card: { provider: "test", ref: "tok_x", label: "Visa …4242" } as never, p_consent: { policy_text: "Policy", terms: {} } as never, p_deposit: null as never, p_card_client_id: parent });
+      expect(saved.error).toBeNull();
+      const { data } = await admin.from("client_cards").select("client_id").in("client_id", [parent, child]).is("removed_at", null);
+      expect(data!.map((c) => c.client_id)).toEqual([parent]);
+      const standing = await admin.rpc("client_policy_standing", { p_client_id: child });
+      expect((standing.data as { has_card: boolean }).has_card).toBe(true);
+    });
+
+    it("charges the dependent's fee to the guardian's card", async () => {
+      const { data: a } = await admin.from("appointments").select("location_id").eq("id", visit).single();
+      const { data: fee, error } = await admin.from("policy_fees").insert({ business_id: B, location_id: a!.location_id, appointment_id: visit, client_id: child, kind: "no_show", fee_cents: 2500, from_deposit_cents: 0, status: "pending", charge_after: new Date(Date.now() - 1000).toISOString(), attempts: 0 }).select("id").single();
+      if (error) throw error;
+      const { data: claimed, error: claimError } = await admin.rpc("claim_policy_fees", { p_business_id: B, p_fee_id: fee.id, p_limit: 1 });
+      expect(claimError).toBeNull();
+      expect(claimed).toHaveLength(1);
+      expect(claimed![0].payment_method_ref).toBe("tok_x");
+      expect(claimed![0].client_id).toBe(child);
+      await admin.from("policy_fee_events").delete().eq("fee_id", fee.id);
+      await admin.from("policy_fees").delete().eq("id", fee.id);
+    });
+  });
+
   it("end when they leave the family", async () => {
     const saved = await frontDesk.rpc("save_family", { p_business_id: B, p_family_id: family, p_name: TAG, p_client_ids: [parent, otherAdult], p_payer_client_id: null as never });
     expect(saved.error).toBeNull();

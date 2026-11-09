@@ -214,13 +214,13 @@ async function whoIsBooking(admin: ReturnType<typeof createAdminClient>, site: B
     const account = await currentAccount(admin, site.business.id);
     const contact = account ? await accountContact(admin, account) : null;
     if (!account || !contact) return null;
-    if (session === ACCOUNT_SESSION) return { contact, clientId: account.clientId as string | null, signedIn: true };
+    if (session === ACCOUNT_SESSION) return { contact, clientId: account.clientId as string | null, signedIn: true, cardHolderId: null as string | null };
     // A guardian booking for their dependent: checked on every step.
     const dependent = await loadDependent(admin, account, session.slice(ACCOUNT_SESSION.length + 1));
-    return dependent ? { contact, clientId: dependent.id as string | null, signedIn: true } : null;
+    return dependent ? { contact, clientId: dependent.id as string | null, signedIn: true, cardHolderId: account.clientId as string | null } : null;
   }
   const contact = await sessionContact(admin, site.business.id, session);
-  return contact ? { contact, clientId: await findClient(admin, site, contact.channel, contact.destination), signedIn: false } : null;
+  return contact ? { contact, clientId: await findClient(admin, site, contact.channel, contact.destination), signedIn: false, cardHolderId: null as string | null } : null;
 }
 
 async function findClient(admin: ReturnType<typeof createAdminClient>, site: BookingSite, channel: Channel, destination: string, create?: { first: string; last: string; phone: string; email: string }) {
@@ -291,7 +291,7 @@ export async function reviewTerms(
   const admin = createAdminClient();
   const who = await whoIsBooking(admin, site, session);
   if (!who) return { ok: false, message: "Your code has expired. Please confirm your details again." };
-  const terms = await onlineTerms(admin, site, who.clientId, request, start);
+  const terms = await onlineTerms(admin, site, who.clientId, request, start, who.cardHolderId);
   if (!terms) return { ok: false, message: "Sorry, that time was just taken. Please pick another." };
   // Stripe's card form only when a card is needed and none is on file.
   const cardForm: CardForm = terms.cardNeeded && !terms.cardOnFile ? await (await salonProvider(admin, site.business.id)).cardForm() : { kind: "unavailable", reason: "No card needed" };
@@ -420,7 +420,7 @@ async function bookAttempt(
 
   // The policy for this visit, as the client was shown it; the card is
   // saved (and any deposit taken) before the booking is confirmed.
-  const terms = await onlineTerms(admin, site, clientId!, request, start);
+  const terms = await onlineTerms(admin, site, clientId!, request, start, who.cardHolderId);
   if (!terms) return { ok: false, reason: "taken", message: "Sorry, that time was just taken. Please pick another." };
   const items = await plannedItems(admin, site, request, start);
   if (!items) return { ok: false, reason: "taken", message: "Sorry, that time was just taken. Please pick another." };
@@ -446,7 +446,7 @@ async function bookAttempt(
   // From here the deposit has been taken: whatever goes wrong before the
   // booking and its deposit are recorded, it goes back.
   try {
-    return await bookCharged(admin, site, input, { clientId: clientId!, contact, request, start, terms, promotion, card, deposit, token, ipHash, userAgent, signedIn: who.signedIn });
+    return await bookCharged(admin, site, input, { clientId: clientId!, contact, request, start, terms, promotion, card, deposit, token, ipHash, userAgent, signedIn: who.signedIn, cardHolderId: who.cardHolderId });
   } catch (error) {
     if (deposit) await providerFor(deposit.provider).refund(deposit.reference);
     console.error(`[book] booking failed after the card step: ${error instanceof Error ? error.message : "unknown"}`);
@@ -471,6 +471,7 @@ async function bookCharged(
     ipHash,
     userAgent,
     signedIn,
+    cardHolderId,
   }: {
     clientId: string;
     contact: { channel: Channel; destination: string };
@@ -484,6 +485,7 @@ async function bookCharged(
     ipHash: string;
     userAgent: string | null;
     signedIn: boolean;
+    cardHolderId: string | null;
   },
 ): Promise<Attempted> {
   const note = input.note?.trim().slice(0, 500);
@@ -515,6 +517,7 @@ async function bookCharged(
     p_card: (card.save ?? null) as never,
     p_consent: { policy_text: terms.lines.join("\n"), terms: { ...terms.terms, deposit_cents: terms.depositCents, visit_cents: terms.visitCents }, ip_hash: ipHash },
     p_deposit: deposit as never,
+    p_card_client_id: cardHolderId as never,
   });
   if (consentError) {
     // Booked, but the deposit and what they agreed to aren't on it: take the

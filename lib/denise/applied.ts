@@ -6,7 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { channelFor, consentOf } from "@/lib/messaging/consent";
-import { CONSENT_COLUMNS, previewTemplate } from "@/lib/messaging/send";
+import { CONSENT_COLUMNS, previewTemplate, guardianChannel, guardianRecipients } from "@/lib/messaging/send";
 import { proposalFromJson, type Proposal } from "@/lib/scheduling/ai-actions";
 import { formatMinute, toLocal } from "@/lib/scheduling/time";
 import { movedVisits } from "./fixes";
@@ -46,12 +46,14 @@ export async function toldAboutFix(supabase: Supabase, timeZone: string, actionI
       .order("created_at", { ascending: false }),
     supabase.from("appointments").select(`id, client:clients(first_name, ${CONSENT_COLUMNS})`).in("id", ids),
   ]);
+  const guardians = await guardianRecipients(supabase, ids);
   const told: Told[] = [];
   for (const id of ids) {
     const last = sent?.find((m) => m.appointment_id === id);
     const client = visits?.find((v) => v.id === id)?.client;
     if (!last || !client) continue;
-    const channel = channelFor(consentOf(client), "appointment")?.channel ?? "sms";
+    const guardian = guardians.get(id);
+    const channel = guardian ? guardianChannel(guardian) : (channelFor(consentOf(client), "appointment")?.channel ?? "sms");
     const preview = await previewTemplate(supabase, { appointmentId: id, template: "visit_move_undone", channel }, backTo(proposal, id));
     if (!preview) continue;
     told.push({ appointmentId: id, firstName: client.first_name, at: formatMinute(toLocal(new Date(last.created_at), timeZone).minute), preview });

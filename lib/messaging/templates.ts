@@ -28,6 +28,8 @@ export type TemplateFacts = {
   salon: string;
   phone: string | null;
   firstName: string;
+  // A guardian's message: firstName is the guardian, this the dependent.
+  dependent?: string | null;
   // "Friday, October 30 at 2:00pm", or "today at 2:00pm".
   when: string;
   stylist: string | null;
@@ -38,26 +40,33 @@ export type TemplateFacts = {
 
 export const isStaffTemplate = (v: string): v is StaffTemplate => v in STAFF_TEMPLATES;
 
+// "your visit", or "Mia's visit" in a message to Mia's guardian.
+function wordsFor(f: Pick<TemplateFacts, "dependent">) {
+  const whose = f.dependent ? `${f.dependent}'s` : "your";
+  return { whose, Whose: f.dependent ? whose : "Your", you: f.dependent ?? "you" };
+}
+
 export function renderStaffMessage(template: StaffTemplate, f: TemplateFacts, channel: Channel): { subject: string; body: string } {
+  const { whose, Whose, you } = wordsFor(f);
   const call = f.phone ? ` at ${f.phone}` : "";
   const link = f.manageLink ? ` ${f.manageLink}` : "";
   const text = {
-    running_late: `Hi ${f.firstName}, ${f.salon} here. We're running about ${f.minutes ?? 10} minutes behind for your visit ${f.when}. Sorry for the wait.`,
-    please_call: `Hi ${f.firstName}, ${f.salon} here. Please give us a call${call} about your visit ${f.when}.`,
-    need_to_move: `Hi ${f.firstName}, ${f.salon} here. We need to move your visit ${f.when}. Please call us${call}${f.manageLink ? ` or choose a new time:${link}` : "."}`,
-    reminder: `Hi ${f.firstName}, a reminder of your visit at ${f.salon} ${f.when}${f.stylist ? ` with ${f.stylist}` : ""}.${f.manageLink ? ` Change or cancel:${link}` : ""}`,
-    ready_early: `Hi ${f.firstName}, ${f.salon} here. We can take you early, at ${f.time ?? "an earlier time"}, for your visit ${f.when}. Call us${call} if that works.`,
-    visit_moved: `Hi ${f.firstName}, ${f.salon} here. We've moved your visit to ${f.when}${f.stylist ? ` with ${f.stylist}` : ""}. Call us${call} if that doesn't work.`,
-    visit_move_undone: `Hi ${f.firstName}, ${f.salon} here. Sorry, please ignore our last message: your visit is still on for ${f.when}${f.stylist ? ` with ${f.stylist}` : ""}. Call us${call} if that doesn't work.`,
+    running_late: `Hi ${f.firstName}, ${f.salon} here. We're running about ${f.minutes ?? 10} minutes behind for ${whose} visit ${f.when}. Sorry for the wait.`,
+    please_call: `Hi ${f.firstName}, ${f.salon} here. Please give us a call${call} about ${whose} visit ${f.when}.`,
+    need_to_move: `Hi ${f.firstName}, ${f.salon} here. We need to move ${whose} visit ${f.when}. Please call us${call}${f.manageLink ? ` or choose a new time:${link}` : "."}`,
+    reminder: `Hi ${f.firstName}, a reminder of ${whose} visit at ${f.salon} ${f.when}${f.stylist ? ` with ${f.stylist}` : ""}.${f.manageLink ? ` Change or cancel:${link}` : ""}`,
+    ready_early: `Hi ${f.firstName}, ${f.salon} here. We can take ${you} early, at ${f.time ?? "an earlier time"}, for ${whose} visit ${f.when}. Call us${call} if that works.`,
+    visit_moved: `Hi ${f.firstName}, ${f.salon} here. We've moved ${whose} visit to ${f.when}${f.stylist ? ` with ${f.stylist}` : ""}. Call us${call} if that doesn't work.`,
+    visit_move_undone: `Hi ${f.firstName}, ${f.salon} here. Sorry, please ignore our last message: ${whose} visit is still on for ${f.when}${f.stylist ? ` with ${f.stylist}` : ""}. Call us${call} if that doesn't work.`,
   }[template];
   const subject = {
     running_late: `${f.salon} is running a little behind`,
     please_call: `Please call ${f.salon}`,
-    need_to_move: `${f.salon} needs to move your visit`,
-    reminder: `Your visit at ${f.salon}`,
-    ready_early: `${f.salon} can take you early`,
-    visit_moved: `Your visit at ${f.salon} has moved`,
-    visit_move_undone: `Correction: your visit at ${f.salon} hasn't moved`,
+    need_to_move: `${f.salon} needs to move ${whose} visit`,
+    reminder: `${Whose} visit at ${f.salon}`,
+    ready_early: `${f.salon} can take ${you} early`,
+    visit_moved: `${Whose} visit at ${f.salon} has moved`,
+    visit_move_undone: `Correction: ${whose} visit at ${f.salon} hasn't moved`,
   }[template];
   return { subject, body: channel === "sms" ? withStopLine(text) : text };
 }
@@ -75,12 +84,13 @@ export type RescueTemplate = keyof typeof RESCUE_TEMPLATES;
 export const isRescueTemplate = (v: string): v is RescueTemplate => v in RESCUE_TEMPLATES;
 
 export function renderRescueMessage(template: RescueTemplate, f: TemplateFacts & { absent: string }, channel: Channel): { subject: string; body: string } {
+  const { whose, Whose, you } = wordsFor(f);
   const call = f.phone ? ` at ${f.phone}` : "";
   const text = {
-    stylist_out_covered: `Hi ${f.firstName}, ${f.salon} here. ${f.absent} is out, so ${f.stylist ?? "another stylist"} will look after you ${f.when} instead. Call us${call} if you'd rather change it.`,
-    stylist_out_moved: `Hi ${f.firstName}, ${f.salon} here. ${f.absent} is out, so we've moved your visit to ${f.when}${f.stylist ? ` with ${f.stylist}` : ""}. Call us${call} if that doesn't work.`,
+    stylist_out_covered: `Hi ${f.firstName}, ${f.salon} here. ${f.absent} is out, so ${f.stylist ?? "another stylist"} will look after ${you} ${f.when} instead. Call us${call} if you'd rather change it.`,
+    stylist_out_moved: `Hi ${f.firstName}, ${f.salon} here. ${f.absent} is out, so we've moved ${whose} visit to ${f.when}${f.stylist ? ` with ${f.stylist}` : ""}. Call us${call} if that doesn't work.`,
   }[template];
-  const subject = { stylist_out_covered: `A change to your visit at ${f.salon}`, stylist_out_moved: `Your visit at ${f.salon} has moved` }[template];
+  const subject = { stylist_out_covered: `A change to ${whose} visit at ${f.salon}`, stylist_out_moved: `${Whose} visit at ${f.salon} has moved` }[template];
   return { subject, body: channel === "sms" ? withStopLine(text) : text };
 }
 

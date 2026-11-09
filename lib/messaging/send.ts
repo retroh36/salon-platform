@@ -48,7 +48,7 @@ export type SendResult = { ok: true; channel: Channel } | { ok: false; message: 
 async function visitFacts(supabase: Client, appointmentId: string, at?: { start: Date; staffId: string }) {
   const { data: a } = await supabase
     .from("appointments")
-    .select("starts_at, business:businesses(name), location:locations(phone, timezone), client:clients(first_name), items:appointment_items(starts_at, staff:staff(first_name))")
+    .select("starts_at, business:businesses(name), location:locations(phone, timezone), client:clients(first_name, guardian_client_id), items:appointment_items(starts_at, staff:staff(first_name))")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!a?.client || !a.location) return null;
@@ -60,10 +60,12 @@ async function visitFacts(supabase: Client, appointmentId: string, at?: { start:
       : new Date(`${local.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
   const first = [...(a.items ?? [])].sort((x, y) => x.starts_at.localeCompare(y.starts_at))[0];
   const stylist = at ? ((await supabase.from("staff").select("first_name").eq("id", at.staffId).maybeSingle()).data?.first_name ?? null) : (first?.staff?.first_name ?? null);
+  const guardian = a.client.guardian_client_id ? (await guardianRecipients(supabase, [appointmentId])).get(appointmentId) : undefined;
   return {
     salon: a.business?.name ?? "The salon",
     phone: a.location.phone ?? null,
-    firstName: a.client.first_name,
+    firstName: guardian?.guardian ?? a.client.first_name,
+    dependent: guardian?.dependent ?? null,
     when: `${day} at ${formatMinute(local.minute)}`,
     stylist,
     manageLink: null,
@@ -131,6 +133,19 @@ export async function sendStaffMessage(supabase: Client, input: MessageInput): P
   }
   return { ok: true, channel: input.channel };
 }
+
+// Visits whose staff messages go to a guardian (a dependent's), with who
+// and the channels the guardian allows. Read as the staff member.
+export type VisitRecipient = { guardian: string; dependent: string; channels: Channel[] };
+
+export async function guardianRecipients(supabase: Client, appointmentIds: string[]): Promise<Map<string, VisitRecipient>> {
+  if (!appointmentIds.length) return new Map();
+  const { data, error } = await supabase.rpc("visit_message_recipients", { p_appointment_ids: appointmentIds });
+  if (error) throw error;
+  return new Map(data.map((r) => [r.appointment_id, { guardian: r.guardian_first_name, dependent: r.dependent_first_name, channels: r.channels as Channel[] }]));
+}
+
+export const guardianChannel = (r: VisitRecipient, prefer: Channel = "sms"): Channel => (r.channels.includes(prefer) ? prefer : r.channels[0]);
 
 // Where a message about a client's visit goes: the channel asked for if
 // they allow it, else the other (a STOP on texts goes to email); null if

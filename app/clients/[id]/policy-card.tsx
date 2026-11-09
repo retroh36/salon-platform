@@ -39,7 +39,13 @@ export async function PolicyCards({ supabase, businessId, role, client, tz }: { 
     standing.strikes > 0
       ? `${standing.strikes} late cancellation${standing.strikes === 1 ? "" : "s"} or no-show${standing.strikes === 1 ? "" : "s"} in the last ${standing.months} months${standing.action === "deposit" ? ": they pay a deposit to book." : standing.action === "prepay" ? ": they pay for the visit up front." : "."}`
       : null;
-  if (!card.data && !fees.data.length && !strikes && !payers.length && policy.settings.cardRequired === "off") return null;
+  // A dependent's fees go on their guardian's card.
+  const { data: self } = await supabase.from("clients").select("guardian_client_id").eq("id", client.id).maybeSingle();
+  const { data: guardian } = self?.guardian_client_id
+    ? await supabase.from("clients").select("first_name, client_cards!client_cards_client_id_business_id_fkey(label, removed_at)").eq("id", self.guardian_client_id).maybeSingle()
+    : { data: null };
+  const guardianCard = guardian?.client_cards.find((c) => c.removed_at === null)?.label ?? null;
+  if (!card.data && !guardianCard && !fees.data.length && !strikes && !payers.length && policy.settings.cardRequired === "off") return null;
   const sent = (link.data?.length ?? 0) > 0;
   return (
     <>
@@ -49,6 +55,7 @@ export async function PolicyCards({ supabase, businessId, role, client, tz }: { 
         testId="client-card"
         opens={card.data ? undefined : { label: sent ? "Send again" : "Send card link", form: <CardLinkForm clientId={client.id} phone={client.phone} email={client.email} sent={sent} /> }}
       >
+        {guardianCard && <p className="mb-2.5 text-13 text-ink-muted" data-testid="guardian-card">{`Fees for their visits go on ${guardian!.first_name}'s card: ${guardianCard}.`}</p>}
         {card.data ? (
           <>
             <dl className="flex flex-col gap-2.5">

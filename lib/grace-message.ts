@@ -13,7 +13,7 @@ import { channelFor, consentOf, type Channel } from "@/lib/messaging/consent";
 import { withStopLine } from "@/lib/messaging/templates";
 import { graceFromRow, graceMessage, graceMessageDue } from "@/lib/policy";
 import { toLocal } from "@/lib/scheduling/time";
-import { CONSENT_COLUMNS } from "@/lib/messaging/send";
+import { CONSENT_COLUMNS, guardianChannel, guardianRecipients } from "@/lib/messaging/send";
 
 type Supabase = SupabaseClient<Database>;
 
@@ -49,8 +49,10 @@ export async function graceAsks(supabase: Supabase, feeIds: string[]): Promise<G
   ]);
   const grace = graceFromRow(settings);
   const bookOnline = Boolean(online?.enabled && business?.slug);
+  const guardians = await guardianRecipients(supabase, due.map((f) => f.appointment_id));
   return due.map((f) => {
-    const channel = channelFor(consentOf(f.client), "appointment", "sms")?.channel ?? null;
+    const guardian = guardians.get(f.appointment_id);
+    const channel = guardian ? guardianChannel(guardian) : (channelFor(consentOf(f.client), "appointment", "sms")?.channel ?? null);
     const stylist = f.grace_staff;
     const tz = f.location.timezone;
     let by = "";
@@ -58,13 +60,14 @@ export async function graceAsks(supabase: Supabase, feeIds: string[]): Promise<G
       const [y, m, d] = toLocal(new Date(f.grace_until), tz).date.split("-").map(Number);
       by = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
     }
-    const body = graceMessage(grace.message, {
-      firstName: f.client.first_name,
+    const message = graceMessage(grace.message, {
+      firstName: guardian?.guardian ?? f.client.first_name,
       salon: business?.name ?? "The salon",
       stylist: stylist?.first_name ?? "us",
       by,
       bookingLink: bookOnline ? `${siteUrl()}/book/${business!.slug}?src=grace${stylist ? `&staff=${stylist.id}` : ""}` : (f.location.phone ?? ""),
     });
+    const body = guardian ? `About ${guardian.dependent}'s visit: ${message}` : message;
     return {
       feeId: f.id,
       appointmentId: f.appointment_id,

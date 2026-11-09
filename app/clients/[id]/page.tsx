@@ -26,6 +26,7 @@ import { loadBackBarProducts } from "@/lib/inventory-load";
 import { historyText } from "@/lib/memberships";
 import { loadClientMemberships } from "@/lib/memberships-load";
 import { allowedChannels, consentOf, noTextsFlag } from "@/lib/messaging/consent";
+import { guardianRecipients } from "@/lib/messaging/send";
 import { loadClientPackages, withPackages } from "@/lib/packages";
 import { loadFamily } from "@/lib/families";
 import { cardOnFile, salonProvider, staffCards } from "@/lib/payments";
@@ -203,8 +204,9 @@ async function ClientRecords({ id }: { id: string }) {
   // Message: about their next visit, for the front of house or a stylist on it.
   const nextVisit = toCheckOut ?? upcoming[0] ?? null;
   const freeText = me.role === "owner" || Boolean(business?.free_text_roles.includes(me.role));
+  const guardian = nextVisit && client.guardian_client_id ? (await guardianRecipients(supabase, [nextVisit.id])).get(nextVisit.id) : undefined;
   const message = nextVisit
-    ? { appointmentId: nextVisit.id, channels: { appointment: allowedChannels(consent, "appointment"), marketing: allowedChannels(consent, "marketing") }, freeText }
+    ? { appointmentId: nextVisit.id, channels: { appointment: guardian?.channels ?? allowedChannels(consent, "appointment"), marketing: allowedChannels(consent, "marketing") }, freeText }
     : frontOfHouse
       ? { reason: `Messages are about a visit: book ${client.first_name}'s next one first.` }
       : null;

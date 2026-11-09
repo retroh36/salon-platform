@@ -11,7 +11,7 @@ import { canBook } from "@/lib/appointments";
 import { getCurrentStaff } from "@/lib/auth";
 import { isUuid } from "@/lib/ids";
 import { channelFor, consentOf, type Channel } from "@/lib/messaging/consent";
-import { CONSENT_COLUMNS, previewTemplate, sendStaffMessage } from "@/lib/messaging/send";
+import { CONSENT_COLUMNS, previewTemplate, sendStaffMessage, guardianChannel, guardianRecipients } from "@/lib/messaging/send";
 import { absorbedDelay } from "@/lib/denise/fixes";
 import { proposalFromJson } from "@/lib/scheduling/ai-actions";
 
@@ -66,11 +66,13 @@ export async function movedMessages(appointmentIds: string[], since: string, tem
     s.supabase.from("businesses").select("free_text_roles, move_message_default").eq("id", s.me.business_id).maybeSingle(),
   ]);
   const done = new Set((sent ?? []).map((m) => m.appointment_id));
+  const guardians = await guardianRecipients(s.supabase, ids);
   const messages: MovedMessage[] = [];
   for (const id of ids) {
     const visit = visits?.find((v) => v.id === id);
     if (!visit?.client) continue;
-    const channel = channelFor(consentOf(visit.client), "appointment")?.channel ?? null;
+    const guardian = guardians.get(id);
+    const channel = guardian ? guardianChannel(guardian) : (channelFor(consentOf(visit.client), "appointment")?.channel ?? null);
     const behind = template === "running_late" ? await behindFor(s.supabase, actionId, id) : null;
     if (template === "running_late" && !behind) continue;
     const rendered = await previewTemplate(s.supabase, { appointmentId: id, template, channel: channel ?? "sms", minutes: behind?.minutes }, behind?.from);

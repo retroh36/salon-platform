@@ -2,6 +2,7 @@ import { loadVisitQuizzes } from "@/lib/visit-quiz";
 import { changeLine, type ChangeNames, type VisitChange } from "@/lib/visit-changes";
 import { lateChoice } from "@/lib/running-late";
 import { allowedChannels, consentOf, noTextsFlag } from "@/lib/messaging/consent";
+import { guardianRecipients } from "@/lib/messaging/send";
 import type { Metadata } from "next";
 import { isUuid } from "@/lib/ids";
 import { cookies } from "next/headers";
@@ -90,7 +91,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
     supabase
       .from("appointment_items")
       .select(
-        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, steps, bundle_id, requested_staff_id, bundle:service_bundles!appointment_items_bundle(name), price_cents, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, checked_in_at, checked_out_at, created_at, updated_at, created_by, updated_by, deposit_cents, deposit_paid_cents, starts_at, series_id, series_index, series:appointment_series(interval_weeks), group:appointment_groups(id, label), client:clients(id, first_name, last_name, phone, email, allergies, preferences, preferred_staff_id, only_sees_preferred, appointment_sms_ok, appointment_email_ok, sms_opt_in, email_opt_in, sms_stopped_at))",
+        "id, appointment_id, service_id, staff_id, resource_id, starts_at, active_minutes, processing_minutes, finishing_minutes, steps, bundle_id, requested_staff_id, bundle:service_bundles!appointment_items_bundle(name), price_cents, started_at, processing_started_at, processing_ended_at, finished_at, service:services(name, category), resource:resources(name), appointment:appointments!inner(id, status, source, notes, checked_in_at, checked_out_at, created_at, updated_at, created_by, updated_by, deposit_cents, deposit_paid_cents, starts_at, series_id, series_index, series:appointment_series(interval_weeks), group:appointment_groups(id, label), client:clients(id, first_name, last_name, phone, email, allergies, preferences, preferred_staff_id, guardian_client_id, only_sees_preferred, appointment_sms_ok, appointment_email_ok, sms_opt_in, email_opt_in, sms_stopped_at))",
       )
       .eq("location_id", me.location.id)
       // From a day before (no service lasts longer), so the index reads only
@@ -198,6 +199,8 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
 
   const blocks: BlockData[] = [];
   const appointments: Record<string, AppointmentDetail> = {};
+  // A dependent's visit messages go to their guardian, by the guardian's consent.
+  const guardians = await guardianRecipients(supabase, [...new Set(items.filter((i) => i.appointment.client?.guardian_client_id).map((i) => i.appointment_id))]);
   for (const row of items) {
     const item = toBookedItem(row);
     const a = row.appointment;
@@ -239,7 +242,7 @@ async function CalendarDay({ searchParams }: Pick<PageProps<"/calendar">, "searc
             preferences: client.preferences,
             preferredStaffId: client.preferred_staff_id,
             messages: {
-              appointment: allowedChannels(consentOf(client), "appointment"),
+              appointment: guardians.get(a.id)?.channels ?? allowedChannels(consentOf(client), "appointment"),
               marketing: allowedChannels(consentOf(client), "marketing"),
               noTexts: noTextsFlag(consentOf(client)),
             },

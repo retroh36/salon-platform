@@ -57,7 +57,7 @@ export async function runPolicyCharges(admin: Admin, options: { businessId?: str
 async function sendReceipts(admin: Admin, options: { businessId?: string; feeId?: string }): Promise<number> {
   let query = admin
     .from("policy_fees")
-    .select("id, business_id, kind, fee_cents, from_deposit_cents, card_label, appointment:appointments(starts_at), client:clients(email, phone, appointment_sms_ok, appointment_email_ok, sms_opt_in, email_opt_in, sms_stopped_at), business:businesses(name), location:locations(timezone)")
+    .select("id, business_id, kind, fee_cents, from_deposit_cents, card_label, appointment:appointments(starts_at), client:clients(first_name, guardian_client_id, email, phone, appointment_sms_ok, appointment_email_ok, sms_opt_in, email_opt_in, sms_stopped_at), business:businesses(name), location:locations(timezone)")
     .eq("status", "charged")
     .is("receipt_sent_at", null)
     .gt("fee_cents", 0);
@@ -68,12 +68,17 @@ async function sendReceipts(admin: Admin, options: { businessId?: string; feeId?
   let sent = 0;
   for (const f of data) {
     // By email if they get emails about visits, else by text (never after a STOP).
-    const dest = channelFor(consentOf(f.client), "appointment", "email");
+    // A dependent's goes to the guardian whose card paid, if they can be reached.
+    const { data: guardian } = f.client.guardian_client_id
+      ? await admin.from("clients").select("phone, email, appointment_sms_ok, appointment_email_ok, sms_opt_in, email_opt_in, sms_stopped_at").eq("id", f.client.guardian_client_id).maybeSingle()
+      : { data: null };
+    const toGuardian = guardian ? channelFor(consentOf(guardian), "appointment", "email") : null;
+    const dest = toGuardian ?? channelFor(consentOf(f.client), "appointment", "email");
     if (dest) {
       const { channel, to } = dest;
       const local = toLocal(new Date(f.appointment.starts_at), f.location.timezone);
       const when = new Date(`${local.date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
-      const receipt = feeReceipt(f.business.name, f.kind as "late_cancel" | "no_show", f.fee_cents, f.card_label, f.from_deposit_cents, when);
+      const receipt = feeReceipt(f.business.name, f.kind as "late_cancel" | "no_show", f.fee_cents, f.card_label, f.from_deposit_cents, when, toGuardian ? f.client.first_name : null);
       const { error: outError } = await admin
         .from("outbox_messages")
         .insert({ business_id: f.business_id, channel, to_address: to, subject: channel === "email" ? receipt.subject : null, body: channel === "sms" ? withStopLine(receipt.body) : receipt.body });
