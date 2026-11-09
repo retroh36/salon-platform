@@ -27,6 +27,7 @@ import {
   type Tier,
   type TierRow,
 } from "@/lib/rewards";
+import { POINTS_OFFER_COLUMNS, type PointsOffer } from "@/lib/rewards";
 import { todayIn } from "@/lib/scheduling/time";
 import type { RewardRates } from "@/lib/ticket";
 
@@ -147,4 +148,23 @@ export async function runRewardJobs(admin: Supabase, now = new Date()): Promise<
     expired += counts.expired;
   }
   return { birthdays, expired };
+}
+
+export async function loadPointsOffers(supabase: Supabase, businessId: string): Promise<PointsOffer[]> {
+  const { data, error } = await supabase.from("points_offers").select(POINTS_OFFER_COLUMNS).eq("business_id", businessId).order("ends_on", { ascending: false }).order("created_at");
+  if (error) throw error;
+  return data.map((o) => ({
+    id: o.id,
+    name: o.name,
+    kind: o.kind as PointsOffer["kind"],
+    enabled: o.enabled,
+    startsOn: o.starts_on,
+    endsOn: o.ends_on,
+    multiplier: o.multiplier === null ? null : Number(o.multiplier),
+    services: o.applies_services,
+    retail: o.applies_retail,
+    minSpendCents: o.min_spend_cents,
+    bonusPoints: o.bonus_points,
+    minGiftCardCents: o.min_gift_card_cents,
+  }));
 }

@@ -1,6 +1,6 @@
 ---
 title: Set up the rewards program
-keywords: rewards, loyalty, loyalty program, points, points per dollar, tiers, vip tier, gold tier, reward catalog, referral bonus, birthday points, points expire, rewards settings
+keywords: rewards, loyalty, loyalty program, points, points per dollar, tiers, vip tier, gold tier, reward catalog, referral bonus, birthday points, points expire, rewards settings, double points, points multiplier, points offer, gift card bonus
 who: owner, manager
 open: /settings/rewards | Open rewards settings
 ---
@@ -21,4 +21,5 @@ Choose how clients earn points, the tiers they can reach and the rewards they ca
 - A refund takes back its share of the points earned; a void takes them all back and gives back any reward used.
 - Points expire only when a client earns nothing for the months you set.
 - When a family member pays for someone's visit, the points go to whoever pays unless you choose the client who had the visit.
+- Owners can add **Points offers** at the bottom of the page: **Multiply points** for a date range, or a **Gift card bonus** for buying gift cards of at least an amount on one sale. Each is off until **Offer is on** is ticked. If two multipliers run at once, the one worth most counts. Returning the gift card takes the bonus back.
 - To stop offering a reward, open it, untick **In the catalog** and save.

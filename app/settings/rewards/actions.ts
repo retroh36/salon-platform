@@ -143,3 +143,55 @@ export async function saveReward(input: RewardInput): Promise<Result> {
   revalidatePath("/settings/rewards");
   return { ok: true, message: "Saved." };
 }
+
+export type PointsOfferInput = {
+  name: string;
+  kind: "multiplier" | "gift_card_bonus";
+  enabled: boolean;
+  startsOn: string;
+  endsOn: string;
+  multiplier: string;
+  services: boolean;
+  retail: boolean;
+  minSpend: string;
+  bonusPoints: string;
+  minGiftCard: string;
+};
+
+export async function savePointsOffer(id: string | null, input: PointsOfferInput): Promise<Result> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!can(me, "billing")) return { ok: false, message: "Only owners set up points offers." };
+  if (id && !isUuid(id)) return { ok: false, message: "Offer not found." };
+  const name = input.name.trim();
+  if (!name || name.length > 60) return { ok: false, message: "Give the offer a name (up to 60 characters)." };
+  if (!input.startsOn || !input.endsOn) return { ok: false, message: "Choose when the offer starts and ends." };
+  if (input.endsOn < input.startsOn) return { ok: false, message: "The offer ends before it starts." };
+  const multiplier = input.kind === "multiplier";
+  if (multiplier && !input.services && !input.retail) return { ok: false, message: "Choose services, retail or both." };
+  const minSpend = input.minSpend.trim() ? parseDollars(input.minSpend) : null;
+  if (multiplier && input.minSpend.trim() && !minSpend) return { ok: false, message: "Give the minimum spend in dollars." };
+  const bonus = multiplier ? null : whole(input.bonusPoints, 1, 100000);
+  const minGift = multiplier ? null : parseDollars(input.minGiftCard);
+  if (!multiplier && !bonus) return { ok: false, message: "Give the bonus as 1 to 100,000 points." };
+  if (!multiplier && !minGift) return { ok: false, message: "Give the minimum gift card amount in dollars." };
+  const { error } = await supabase.rpc("save_points_offer", {
+    p_business_id: me!.business_id,
+    p_offer_id: id as string,
+    p_input: {
+      name,
+      kind: input.kind,
+      enabled: input.enabled,
+      starts_on: input.startsOn,
+      ends_on: input.endsOn,
+      multiplier: multiplier ? input.multiplier : null,
+      applies_services: input.services,
+      applies_retail: input.retail,
+      min_spend_cents: minSpend,
+      bonus_points: bonus,
+      min_gift_card_cents: minGift,
+    },
+  });
+  if (error) return failed(error);
+  revalidatePath("/settings/rewards");
+  return { ok: true, message: input.enabled ? "Saved. It's on." : "Saved. It's off." };
+}

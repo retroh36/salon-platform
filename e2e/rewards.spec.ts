@@ -137,3 +137,36 @@ test.describe("owner", () => {
     await expect(ui(page).getByRole("table", { name: "Members by tier" })).toContainText("VIP");
   });
 });
+
+test.describe("points offers", () => {
+  test.use({ storageState: AUTH.owner });
+
+  test("an owner adds one, off until it's turned on", async ({ page }) => {
+    const name = `Rw${RUN} Double`;
+    try {
+      await page.goto("/settings/rewards");
+      const form = ui(page).getByRole("form", { name: "New points offer" });
+      await waitForHydration(page, "form[aria-label='New points offer'] input");
+      await form.getByLabel("Name").fill(name);
+      await form.getByLabel("Starts").fill("2027-02-01");
+      await form.getByLabel("Ends").fill("2027-02-07");
+      await form.getByRole("button", { name: "Add offer" }).click();
+      await expect(form.getByRole("status")).toHaveText("Saved. It's off.");
+      await expect(ui(page).getByRole("region", { name: name })).toContainText("2x points on services and retail");
+      const { data } = await admin.from("points_offers").select("enabled, multiplier").eq("business_id", B).eq("name", name).single();
+      expect(data).toEqual({ enabled: false, multiplier: 2 });
+    } finally {
+      await admin.from("points_offers").delete().eq("business_id", B).eq("name", name);
+    }
+  });
+});
+
+test.describe("a manager", () => {
+  test.use({ storageState: AUTH.manager });
+
+  test("doesn't see points offers", async ({ page }) => {
+    await page.goto("/settings/rewards");
+    await expect(ui(page).getByRole("heading", { name: "How clients earn" })).toBeVisible();
+    await expect(ui(page).getByRole("heading", { name: "Points offers" })).toHaveCount(0);
+  });
+});

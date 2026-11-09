@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { rewardRatesFor } from "@/lib/rewards-load";
 import { pointsBack } from "@/lib/rewards";
 import { promoRatesFor } from "@/lib/promotions-load";
-import { todayIn } from "@/lib/scheduling/time";
+import { addDays, todayIn } from "@/lib/scheduling/time";
 import { EMPTY_TICKET, saleInput, ticketProblems, totalsOf, type Rates, type Ticket, type TicketLine } from "@/lib/ticket";
 import { admin, SEED, signIn, throwawayStylist, type Client } from "./helpers";
 
@@ -266,6 +266,67 @@ describe("gift cards", () => {
     const input = { ...saleInput({ ...EMPTY_TICKET, lines: [service(8_000)] }, { draftId: "", appointmentId: null, clientId: spender }), payments: [{ method: "gift_card", amount_cents: 8_000, code: gc!.code }] };
     expect((await frontDesk.rpc("complete_sale", { p_location_id: L, p_input: input as never })).error).toBeNull();
     expect(await balance(spender)).toBe(160);
+  });
+});
+
+describe("points offers", () => {
+  const offers: string[] = [];
+  const today = todayIn(TZ);
+  // Minimums no other test's sale reaches, since these run alongside them.
+  const save = (who: Client, input: Record<string, unknown>) =>
+    who.rpc("save_points_offer", { p_business_id: B, p_offer_id: null as never, p_input: { starts_on: today, ends_on: today, enabled: true, ...input } as never });
+  const add = async (input: Record<string, unknown>) => {
+    const { data, error } = await save(owner, input);
+    expect(error).toBeNull();
+    offers.push(data as string);
+    return data as string;
+  };
+  const earned = async (clientId: string) => (await admin.from("reward_points").select("delta, kind, bonus, reason").eq("client_id", clientId).in("kind", ["earn", "bonus", "reverse"]).order("delta", { ascending: false })).data;
+  afterAll(async () => {
+    await admin.from("points_offers").delete().in("id", offers);
+  });
+
+  it("are for owners only, and read only by those who run settings", async () => {
+    expect((await save(manager, { name: "Nope", kind: "multiplier", multiplier: 2 })).error?.code).toBe("42501");
+    await add({ name: "Readable", kind: "multiplier", multiplier: 2, min_spend_cents: 99_990_000, enabled: false });
+    expect((await frontDesk.from("points_offers").select("id").eq("id", offers[0])).data).toEqual([]);
+    expect((await manager.from("points_offers").select("id").eq("id", offers[0])).data).toHaveLength(1);
+    expect((await frontDesk.from("points_offers").insert({ business_id: B, name: "Direct", kind: "multiplier", multiplier: 2, starts_on: today, ends_on: today })).error).not.toBeNull();
+  });
+
+  it("multiply points inside the dates, the best one winning, named on the earn row; off does nothing", async () => {
+    await add({ name: "Off", kind: "multiplier", multiplier: 5, min_spend_cents: 123_400, enabled: false });
+    await add({ name: "Double", kind: "multiplier", multiplier: 2, min_spend_cents: 123_400 });
+    await add({ name: "Triple", kind: "multiplier", multiplier: 3, min_spend_cents: 123_400 });
+    await add({ name: "Retail five", kind: "multiplier", multiplier: 5, applies_services: false, min_spend_cents: 123_400 });
+    await add({ name: "Tomorrow", kind: "multiplier", multiplier: 4, min_spend_cents: 123_400, starts_on: addDays(today, 1), ends_on: addDays(today, 1) });
+    const c = await client("Triple");
+    expect((await sell(frontDesk, c, [service(123_400)])).error).toBeNull();
+    // $1,234 at 2 a dollar, times 3.
+    expect(await earned(c)).toEqual([{ delta: 7404, kind: "earn", bonus: null, reason: "Triple" }]);
+    const small = await client("Small");
+    expect((await sell(frontDesk, small, [service(123_300)])).error).toBeNull();
+    expect((await earned(small))![0]).toMatchObject({ delta: 2466, reason: null });
+  });
+
+  it("give a one-off bonus for buying gift cards, taken back when the card is returned", async () => {
+    await add({ name: "Gift bonus", kind: "gift_card_bonus", bonus_points: 250, min_gift_card_cents: 77_700 });
+    const card = (amountCents: number): TicketLine => ({ key: `g${amountCents}`, kind: "gift_card", amountCents, physical: false, code: "", recipientName: "", recipientEmail: "friend@example.test" }) as TicketLine;
+    const under = await client("Under");
+    expect((await sell(frontDesk, under, [card(77_600)])).error).toBeNull();
+    expect(await earned(under)).toEqual([]);
+
+    const c = await client("Bonus");
+    const { saleId, error } = await sell(frontDesk, c, [card(77_700), service(8_000)]);
+    expect(error).toBeNull();
+    expect(await earned(c)).toEqual([
+      { delta: 250, kind: "bonus", bonus: "gift_card", reason: "Gift bonus" },
+      { delta: 160, kind: "earn", bonus: null, reason: null },
+    ]);
+    const { data: line } = await admin.from("sale_items").select("id").eq("sale_id", saleId!).eq("kind", "gift_card").single();
+    const refund = await manager.rpc("refund_sale", { p_sale_id: saleId!, p_input: { reason: "Changed mind", payments: [{ method: "card", amount_cents: 77_700 }], returns: [{ sale_item_id: line!.id, quantity: 1 }] } as never });
+    expect(refund.error).toBeNull();
+    expect((await earned(c))!.filter((r) => r.kind === "reverse").map((r) => r.delta)).toContain(-250);
   });
 });
 

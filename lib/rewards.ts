@@ -86,6 +86,7 @@ export const BONUS_LABEL: Record<string, string> = {
   referral: "Referral bonus",
   rebook: "Booked their next visit",
   first_visit: "First visit",
+  gift_card: "Gift card bonus",
 };
 
 // A sale line as earning sees it: what was paid for it after every
@@ -93,8 +94,9 @@ export const BONUS_LABEL: Record<string, string> = {
 export type EarnLine = { kind: "service" | "product" | "package" | "membership" | "gift_card" | "gift_card_reload"; netCents: number; coveredBy: "package" | "membership" | null };
 
 // Points for a sale: services and retail at their own rates per whole
-// dollar of each (rounded down), then the tier's bonus (rounded down).
-export function pointsFor(lines: readonly EarnLine[], program: Program, bonusPct = 0): number {
+// dollar of each (rounded down), times the best points offer running (the
+// offers on the sale's day: offersOn), then the tier's bonus (rounded down).
+export function pointsFor(lines: readonly EarnLine[], program: Program, bonusPct = 0, offers: readonly PointsOffer[] = []): number {
   if (!program.enabled) return 0;
   let services = 0;
   let retail = 0;
@@ -108,8 +110,44 @@ export function pointsFor(lines: readonly EarnLine[], program: Program, bonusPct
     } else if (l.kind === "package" && program.earnOnPackages) services += l.netCents;
     else if (l.kind === "membership" && program.earnOnMemberships) services += l.netCents;
   }
-  const base = Math.floor((services * program.servicePoints) / 100) + Math.floor((retail * program.retailPoints) / 100);
+  const earned = (offer: PointsOffer | null) =>
+    Math.floor((services * program.servicePoints * (offer?.services ? offer.multiplier! : 1)) / 100) + Math.floor((retail * program.retailPoints * (offer?.retail ? offer.multiplier! : 1)) / 100);
+  const multipliers = offers.filter((o) => o.kind === "multiplier" && (o.minSpendCents === null || services + retail >= o.minSpendCents));
+  const base = Math.max(earned(null), ...multipliers.map(earned));
   return base + Math.floor((base * bonusPct) / 100);
+}
+
+// An owner's offer: points multiplied for a date range, or a one-off bonus
+// for buying gift cards. Off until an owner turns it on.
+export type PointsOffer = {
+  id: string;
+  name: string;
+  kind: "multiplier" | "gift_card_bonus";
+  enabled: boolean;
+  startsOn: string;
+  endsOn: string;
+  multiplier: number | null;
+  services: boolean;
+  retail: boolean;
+  minSpendCents: number | null;
+  bonusPoints: number | null;
+  minGiftCardCents: number | null;
+};
+
+export const POINTS_OFFER_COLUMNS = "id, name, kind, enabled, starts_on, ends_on, multiplier, applies_services, applies_retail, min_spend_cents, bonus_points, min_gift_card_cents";
+
+export const offersOn = (offers: readonly PointsOffer[], date: string) => offers.filter((o) => o.enabled && date >= o.startsOn && date <= o.endsOn);
+
+// The bonus for gift cards bought on one sale (offers: offersOn the day).
+export function giftCardBonus(giftCardCents: number, offers: readonly PointsOffer[]): number {
+  return Math.max(0, ...offers.filter((o) => o.kind === "gift_card_bonus" && giftCardCents > 0 && giftCardCents >= o.minGiftCardCents!).map((o) => o.bonusPoints!));
+}
+
+// "Double points on services and retail · $100+ spend".
+export function pointsOfferSummary(o: PointsOffer): string {
+  if (o.kind === "gift_card_bonus") return `${points(o.bonusPoints!)} for buying $${(o.minGiftCardCents! / 100).toLocaleString("en-US")}+ in gift cards`;
+  const what = o.services && o.retail ? "services and retail" : o.services ? "services" : "retail";
+  return [`${o.multiplier}x points on ${what}`, o.minSpendCents ? `$${(o.minSpendCents / 100).toLocaleString("en-US")}+ spend` : null].filter(Boolean).join(" · ");
 }
 
 // Points taken back when part of a sale is refunded: the same share of

@@ -6,9 +6,10 @@ import { buttonClass } from "@/components/ui/button";
 import { Badge, Card, PageHeader, Section } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { can } from "@/lib/permissions";
-import { points, rewardValue } from "@/lib/rewards";
-import { loadRewardSettings } from "@/lib/rewards-load";
+import { points, pointsOfferSummary, rewardValue } from "@/lib/rewards";
+import { loadPointsOffers, loadRewardSettings } from "@/lib/rewards-load";
 import { SettingsNav } from "../settings-nav";
+import { PointsOfferForm } from "./points-offer-form";
 import { ProgramForm, RewardForm, TiersForm } from "./reward-forms";
 
 export const metadata: Metadata = { title: "Rewards" };
@@ -25,8 +26,10 @@ async function RewardsSettings() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
   if (!can(me, "settings")) redirect("/dashboard");
-  const [settings, { data: services, error }] = await Promise.all([
+  const owner = can(me, "billing");
+  const [settings, offers, { data: services, error }] = await Promise.all([
     loadRewardSettings(supabase, me.business_id),
+    owner ? loadPointsOffers(supabase, me.business_id) : [],
     supabase.from("services").select("id, name").eq("business_id", me.business_id).is("archived_at", null).order("name"),
   ]);
   if (error) throw error;
@@ -65,6 +68,23 @@ async function RewardsSettings() {
           </Card>
         ))}
       </Section>
+      {owner && (
+        <Section title="Points offers" titleId="offers-heading" count={offers.length} description="Optional, and off until you turn one on. Points are never earned on buying a gift card unless a gift card bonus is on.">
+          <Card title="New offer" titleId="new-offer-heading" className="mb-3">
+            <PointsOfferForm offer={null} />
+          </Card>
+          {offers.map((o) => (
+            <Card className="mb-3" key={o.id} title={o.name} titleId={`offer-${o.id}`} description={`${pointsOfferSummary(o)} · ${o.startsOn} to ${o.endsOn}`} actions={o.enabled ? <Badge tone="success">On</Badge> : <Badge tone="neutral">Off</Badge>}>
+              <details>
+                <summary className={buttonClass("secondary", "sm", "cursor-pointer list-none")}>Edit</summary>
+                <div className="mt-4 border-t border-line pt-4">
+                  <PointsOfferForm offer={o} />
+                </div>
+              </details>
+            </Card>
+          ))}
+        </Section>
+      )}
     </AppShell>
   );
 }

@@ -2703,6 +2703,32 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"points_offers": {
+                  Row: {
+                    "applies_retail": boolean,"applies_services": boolean,"bonus_points": number | null,"business_id": string,"created_at": string,"created_by": string | null,"enabled": boolean,"ends_on": string,"id": string,"kind": string,"min_gift_card_cents": number | null,"min_spend_cents": number | null,"multiplier": number | null,"name": string,"starts_on": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "applies_retail"?: boolean,"applies_services"?: boolean,"bonus_points"?: number | null,"business_id": string,"created_at"?: string,"created_by"?: string | null,"enabled"?: boolean,"ends_on": string,"id"?: string,"kind": string,"min_gift_card_cents"?: number | null,"min_spend_cents"?: number | null,"multiplier"?: number | null,"name": string,"starts_on": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "applies_retail"?: boolean,"applies_services"?: boolean,"bonus_points"?: number | null,"business_id"?: string,"created_at"?: string,"created_by"?: string | null,"enabled"?: boolean,"ends_on"?: string,"id"?: string,"kind"?: string,"min_gift_card_cents"?: number | null,"min_spend_cents"?: number | null,"multiplier"?: number | null,"name"?: string,"starts_on"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "points_offers_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "points_offers_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"policy_consents": {
                   Row: {
                     "agreed_at": string,"appointment_id": string | null,"business_id": string,"channel": string,"client_id": string,"id": string,"ip_hash": string | null,"policy_text": string,"terms": NonNullable<Json>
@@ -5669,6 +5695,9 @@ isOneToOne: false
                            },
 "save_permission_group":
 { Args: { "p_business_id": string,"p_id": string,"p_name": string,"p_permissions": Json }; Returns: string
+                           },
+"save_points_offer":
+{ Args: { "p_business_id": string,"p_input": Json,"p_offer_id": string }; Returns: string
                            },
 "save_policy_settings":
 { Args: { "p": Json,"p_business_id": string }; Returns: undefined

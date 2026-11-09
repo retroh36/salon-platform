@@ -2,9 +2,10 @@
 // taking a reward, points back on refunds, and Denise's line at checkout.
 import { describe, expect, it } from "vitest";
 import { applyPromotions, type PromoLine } from "@/lib/promotions";
-import { centsPerPoint, closestReward, NO_PROGRAM, nextTier, pointsBack, pointsClient, pointsFor, pointsLine, rewardProblem, rewardRule, rewardsProblem, rewardValue, tierFor, type Program, type Reward, type Tier } from "@/lib/rewards";
+import { centsPerPoint, closestReward, giftCardBonus, NO_PROGRAM, offersOn, nextTier, pointsBack, pointsClient, pointsFor, pointsLine, rewardProblem, rewardRule, rewardsProblem, rewardValue, tierFor, type PointsOffer, type Program, type Reward, type Tier } from "@/lib/rewards";
 
 const PROGRAM: Program = { ...NO_PROGRAM, enabled: true, servicePoints: 1, retailPoints: 2, minRedeemPoints: 100 };
+const OFFER: PointsOffer = { id: "o", name: "Double", kind: "multiplier", enabled: true, startsOn: "2027-02-01", endsOn: "2027-02-07", multiplier: 2, services: true, retail: true, minSpendCents: null, bonusPoints: null, minGiftCardCents: null };
 const TIERS: Tier[] = [
   { id: "silver", name: "Silver", threshold: 50_000, bonusPct: 0, freeAddonServiceId: null, priorityBooking: false },
   { id: "gold", name: "Gold", threshold: 150_000, bonusPct: 25, freeAddonServiceId: null, priorityBooking: false },
@@ -131,5 +132,26 @@ describe("pointsClient", () => {
     expect(pointsClient(NO_PROGRAM, "kid", "mom")).toBe("mom");
     expect(pointsClient(NO_PROGRAM, "kid", null)).toBe("kid");
     expect(pointsClient({ familyPoints: "client" }, "kid", "mom")).toBe("kid");
+  });
+});
+
+describe("points offers", () => {
+  const lines = [
+    { kind: "service" as const, netCents: 10_000, coveredBy: null },
+    { kind: "product" as const, netCents: 2_050, coveredBy: null },
+  ];
+  it("multiply within their dates, the best one winning, before the tier's bonus", () => {
+    expect(offersOn([OFFER], "2027-02-08")).toEqual([]);
+    expect(offersOn([{ ...OFFER, enabled: false }], "2027-02-03")).toEqual([]);
+    expect(pointsFor(lines, PROGRAM, 0, offersOn([OFFER], "2027-02-03"))).toBe(282);
+    expect(pointsFor(lines, PROGRAM, 25, [OFFER])).toBe(352);
+    expect(pointsFor(lines, PROGRAM, 0, [OFFER, { ...OFFER, id: "r", multiplier: 5, services: false }])).toBe(305);
+    expect(pointsFor(lines, PROGRAM, 0, [{ ...OFFER, minSpendCents: 12_051 }])).toBe(141);
+  });
+  it("give a gift card bonus only from the minimum", () => {
+    const bonus: PointsOffer = { ...OFFER, kind: "gift_card_bonus", multiplier: null, bonusPoints: 250, minGiftCardCents: 10_000 };
+    expect(giftCardBonus(9_999, [bonus])).toBe(0);
+    expect(giftCardBonus(10_000, [bonus])).toBe(250);
+    expect(giftCardBonus(10_000, [])).toBe(0);
   });
 });
