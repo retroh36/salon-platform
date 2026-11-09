@@ -773,6 +773,38 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"client_imports": {
+                  Row: {
+                    "added": number,"business_id": string,"created_at": string,"created_by": string | null,"file_name": string,"id": string,"removed": number | null,"skipped": number,"undone_at": string | null,"undone_by": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "added"?: number,"business_id": string,"created_at"?: string,"created_by"?: string | null,"file_name": string,"id"?: string,"removed"?: number | null,"skipped"?: number,"undone_at"?: string | null,"undone_by"?: string | null
+                  }
+                  Update: {
+                    "added"?: number,"business_id"?: string,"created_at"?: string,"created_by"?: string | null,"file_name"?: string,"id"?: string,"removed"?: number | null,"skipped"?: number,"undone_at"?: string | null,"undone_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "client_imports_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_imports_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_imports_undone_by_fkey"
+      columns: ["undone_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"client_memberships": {
                   Row: {
                     "allow_pause": boolean,"anchor_on": string,"business_id": string,"cancel_notice_days": number,"cancel_reason": string | null,"canceled_at": string | null,"cancels_on": string | null,"card_label": string | null,"client_id": string,"created_at": string,"created_by": string | null,"current_period_end": string,"current_period_start": string,"failed_attempts": number,"id": string,"interval_count": number,"interval_unit": string,"location_id": string,"max_pause_periods": number,"min_term_periods": number,"name": string,"next_retry_at": string | null,"pause_from": string | null,"payment_method_ref": string,"periods_paid": number,"plan_id": string | null,"price_cents": number,"provider": string,"resume_on": string | null,"retail_discount_pct": number,"sale_id": string | null,"service_discount_pct": number,"started_on": string,"status": Database["public"]['Enums']["membership_status"]
@@ -1009,14 +1041,14 @@ isOneToOne: false
                   ]
                 },"clients": {
                   Row: {
-                    "allergies": string | null,"appointment_email_ok": boolean,"appointment_sms_ok": boolean,"birth_day": number | null,"birth_month": number | null,"business_id": string,"consent_signed_on": string | null,"created_at": string,"email": string | null,"email_opt_in": boolean,"family_id": string | null,"first_name": string,"id": string,"last_name": string,"notes": string | null,"notes_updated_at": string | null,"notes_updated_by": string | null,"only_sees_preferred": boolean,"phone": string | null,"phone_digits": string | null,"photo_consent_by": string | null,"photo_consent_on": string | null,"preferences": string | null,"preferred_staff_id": string | null,"referral_code": string | null,"referred_by": string | null,"search_name": string | null,"sms_opt_in": boolean,"sms_stopped_at": string | null,"updated_at": string
+                    "allergies": string | null,"appointment_email_ok": boolean,"appointment_sms_ok": boolean,"birth_day": number | null,"birth_month": number | null,"business_id": string,"consent_signed_on": string | null,"created_at": string,"email": string | null,"email_opt_in": boolean,"family_id": string | null,"first_name": string,"id": string,"import_id": string | null,"last_name": string,"notes": string | null,"notes_updated_at": string | null,"notes_updated_by": string | null,"only_sees_preferred": boolean,"phone": string | null,"phone_digits": string | null,"photo_consent_by": string | null,"photo_consent_on": string | null,"preferences": string | null,"preferred_staff_id": string | null,"referral_code": string | null,"referred_by": string | null,"search_name": string | null,"sms_opt_in": boolean,"sms_stopped_at": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id": string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"family_id"?: string | null,"first_name": string,"id"?: string,"last_name"?: string,"notes"?: string | null,"notes_updated_at"?: string | null,"notes_updated_by"?: string | null,"only_sees_preferred"?: boolean,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"referral_code"?: string | null,"referred_by"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
+                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id": string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"family_id"?: string | null,"first_name": string,"id"?: string,"import_id"?: string | null,"last_name"?: string,"notes"?: string | null,"notes_updated_at"?: string | null,"notes_updated_by"?: string | null,"only_sees_preferred"?: boolean,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"referral_code"?: string | null,"referred_by"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id"?: string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"family_id"?: string | null,"first_name"?: string,"id"?: string,"last_name"?: string,"notes"?: string | null,"notes_updated_at"?: string | null,"notes_updated_by"?: string | null,"only_sees_preferred"?: boolean,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"referral_code"?: string | null,"referred_by"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
+                    "allergies"?: string | null,"appointment_email_ok"?: boolean,"appointment_sms_ok"?: boolean,"birth_day"?: number | null,"birth_month"?: number | null,"business_id"?: string,"consent_signed_on"?: string | null,"created_at"?: string,"email"?: string | null,"email_opt_in"?: boolean,"family_id"?: string | null,"first_name"?: string,"id"?: string,"import_id"?: string | null,"last_name"?: string,"notes"?: string | null,"notes_updated_at"?: string | null,"notes_updated_by"?: string | null,"only_sees_preferred"?: boolean,"phone"?: string | null,"phone_digits"?: never,"photo_consent_by"?: string | null,"photo_consent_on"?: string | null,"preferences"?: string | null,"preferred_staff_id"?: string | null,"referral_code"?: string | null,"referred_by"?: string | null,"search_name"?: never,"sms_opt_in"?: boolean,"sms_stopped_at"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -1031,6 +1063,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "families"
       referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "clients_import_id_fkey"
+      columns: ["import_id"]
+isOneToOne: false
+      referencedRelation: "client_imports"
+      referencedColumns: ["id"]
     },{
       foreignKeyName: "clients_notes_updated_by_business_id_fkey"
       columns: ["notes_updated_by","business_id"]
@@ -5452,6 +5490,9 @@ isOneToOne: false
 "hit_rate_limit":
 { Args: { "p_key": string,"p_limit": number,"p_window_seconds": number }; Returns: boolean
                            },
+"import_clients":
+{ Args: { "p_business_id": string,"p_file_name": string,"p_import_id": string,"p_rows": Json }; Returns: Json
+                           },
 "import_gift_card":
 { Args: { "p_balance_cents": number,"p_business_id": string,"p_client_id": string,"p_code": string,"p_expires_at": string,"p_initial_cents": number,"p_issued_at": string }; Returns: string
                            },
@@ -5951,6 +5992,9 @@ isOneToOne: false
                            },
 "undo_check_in":
 { Args: { "p_appointment_id": string }; Returns: undefined
+                           },
+"undo_client_import":
+{ Args: { "p_import_id": string }; Returns: Json
                            },
 "undo_duration_action":
 { Args: { "p_action_id": string }; Returns: undefined
