@@ -9,7 +9,7 @@ import { AUTOMATION_KINDS, automationResults, DEFAULT_AUTOMATIONS, type Automati
 
 type Supabase = SupabaseClient<Database>;
 
-async function paged<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
+export async function paged<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
   const rows: T[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await page(from, from + 999);
@@ -38,7 +38,11 @@ export async function loadAutomationResults(supabase: Supabase, businessId: stri
     supabase.from("marketing_messages").select("id, kind, client_id, sent_at, opted_out_at").eq("business_id", businessId).gte("sent_at", since).order("id").range(from, to),
   );
   const sent: SentMessage[] = messages.map((m) => ({ id: m.id, kind: m.kind as AutomationKind, clientId: m.client_id, sentAt: m.sent_at, optedOut: m.opted_out_at !== null }));
-  const clientIds = [...new Set(sent.map((m) => m.clientId))];
+  return automationResults(sent, await bookingsFor(supabase, [...new Set(sent.map((m) => m.clientId))], since));
+}
+
+// Those clients' visits booked since then, each with what it brought in.
+export async function bookingsFor(supabase: Supabase, clientIds: readonly string[], since: string): Promise<Booking[]> {
   const bookings: Booking[] = [];
   for (let i = 0; i < clientIds.length; i += 200) {
     const { data, error } = await supabase
@@ -53,7 +57,7 @@ export async function loadAutomationResults(supabase: Supabase, businessId: stri
       bookings.push({ appointmentId: a.id, clientId: a.client_id!, createdAt: a.created_at, revenueCents: Math.max(0, revenue) });
     }
   }
-  return automationResults(sent, bookings);
+  return bookings;
 }
 
 // The salon's numbers for Denise's suggestions (only clients who can be

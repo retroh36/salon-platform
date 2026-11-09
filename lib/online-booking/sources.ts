@@ -6,7 +6,7 @@
 // staff send (special) and waitlist offers (waitlist).
 
 export const SHARED_SOURCES = ["google", "instagram", "facebook", "website"] as const;
-export const MESSAGE_SOURCES = ["rebook", "win_back", "birthday", "review", "special", "waitlist"] as const;
+export const MESSAGE_SOURCES = ["rebook", "win_back", "birthday", "review", "special", "waitlist", "campaign"] as const;
 export type BookingSource = (typeof SHARED_SOURCES)[number] | (typeof MESSAGE_SOURCES)[number] | "other" | "direct";
 
 export const SOURCE_LABELS: Record<BookingSource, string> = {
@@ -20,6 +20,7 @@ export const SOURCE_LABELS: Record<BookingSource, string> = {
   review: "Review requests",
   special: "Last-minute specials",
   waitlist: "Waitlist offers",
+  campaign: "Campaigns",
   other: "Other links",
   direct: "No tag (shared link, typed in)",
 };

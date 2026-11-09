@@ -81,6 +81,11 @@ async function ClientReports({ searchParams }: Pick<PageProps<"/clients/reports"
             result.total > 0 && (
               <>
                 {!open && <SaveReport encoded={encoded} canShare={can(me, "reports")} suggested="" />}
+                {can(me, "settings") && (
+                  <Link href={`/campaigns/new?r=${encoded}`} className={buttonClass("secondary")}>
+                    Send a campaign
+                  </Link>
+                )}
                 {can(me, "export_data") && (
                   <form method="post" action="/clients/reports/export">
                     <input type="hidden" name="r" value={encoded} />

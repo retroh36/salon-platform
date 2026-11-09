@@ -217,11 +217,19 @@ export type SentMessage = { id: string; kind: AutomationKind; clientId: string; 
 export type Booking = { appointmentId: string; clientId: string; createdAt: string; revenueCents: number };
 
 export function automationResults(messages: readonly SentMessage[], bookings: readonly Booking[]) {
-  const out = Object.fromEntries(AUTOMATION_KINDS.map((k) => [k, { sent: 0, booked: 0, revenueCents: 0, optedOut: 0 }])) as Record<AutomationKind, { sent: number; booked: number; revenueCents: number; optedOut: number }>;
+  return resultsBy(AUTOMATION_KINDS, messages, bookings) as Record<AutomationKind, Result>;
+}
+
+export type Result = { sent: number; booked: number; revenueCents: number; optedOut: number };
+
+// The same for any set of keys (a campaign's id as `kind`).
+export function resultsBy(keys: readonly string[], messages: readonly (Omit<SentMessage, "kind"> & { kind: string })[], bookings: readonly Booking[]): Record<string, Result> {
+  const out: Record<string, Result> = Object.fromEntries(keys.map((k) => [k, { sent: 0, booked: 0, revenueCents: 0, optedOut: 0 }]));
   const credited = new Set<string>();
   // Oldest first, so a booking counts for the message that led to it.
   for (const m of [...messages].sort((a, b) => a.sentAt.localeCompare(b.sentAt))) {
     const r = out[m.kind];
+    if (!r) continue;
     r.sent += 1;
     if (m.optedOut) r.optedOut += 1;
     const sent = Date.parse(m.sentAt);

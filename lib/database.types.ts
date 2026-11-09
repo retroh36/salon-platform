@@ -469,6 +469,32 @@ isOneToOne: false
       referencedColumns: ["id","business_id"]
     }
                   ]
+                },"campaigns": {
+                  Row: {
+                    "body": string,"business_id": string,"description": string,"id": string,"left_out": number,"name": string,"report": NonNullable<Json>,"sent_at": string,"sent_by": string | null,"sent_count": number,"subject": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "body": string,"business_id": string,"description": string,"id": string,"left_out": number,"name": string,"report": NonNullable<Json>,"sent_at"?: string,"sent_by"?: string | null,"sent_count": number,"subject": string
+                  }
+                  Update: {
+                    "body"?: string,"business_id"?: string,"description"?: string,"id"?: string,"left_out"?: number,"name"?: string,"report"?: NonNullable<Json>,"sent_at"?: string,"sent_by"?: string | null,"sent_count"?: number,"subject"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "campaigns_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "campaigns_sent_by_fkey"
+      columns: ["sent_by"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"card_authorizations": {
                   Row: {
                     "agreed_text": string | null,"answered_at": string | null,"business_id": string,"card_id": string,"channel": string,"client_id": string,"created_at": string,"created_by": string,"end_reason": string | null,"ended_at": string | null,"ended_by": string | null,"expires_at": string,"id": string,"ip_hash": string | null,"payer_client_id": string,"sent_to": string,"signed_name": string | null,"status": string,"token_hash": string
@@ -857,14 +883,14 @@ isOneToOne: false
                   ]
                 },"client_messages": {
                   Row: {
-                    "appointment_id": string | null,"body": string,"business_id": string,"channel": string,"client_id": string,"created_at": string,"id": string,"outbox_id": string | null,"promotion_id": string | null,"purpose": string,"sent_by": string | null,"subject": string | null,"template": string
+                    "appointment_id": string | null,"body": string,"business_id": string,"campaign_id": string | null,"channel": string,"client_id": string,"created_at": string,"id": string,"outbox_id": string | null,"promotion_id": string | null,"purpose": string,"sent_by": string | null,"subject": string | null,"template": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_id"?: string | null,"body": string,"business_id": string,"channel": string,"client_id": string,"created_at"?: string,"id"?: string,"outbox_id"?: string | null,"promotion_id"?: string | null,"purpose": string,"sent_by"?: string | null,"subject"?: string | null,"template": string
+                    "appointment_id"?: string | null,"body": string,"business_id": string,"campaign_id"?: string | null,"channel": string,"client_id": string,"created_at"?: string,"id"?: string,"outbox_id"?: string | null,"promotion_id"?: string | null,"purpose": string,"sent_by"?: string | null,"subject"?: string | null,"template": string
                   }
                   Update: {
-                    "appointment_id"?: string | null,"body"?: string,"business_id"?: string,"channel"?: string,"client_id"?: string,"created_at"?: string,"id"?: string,"outbox_id"?: string | null,"promotion_id"?: string | null,"purpose"?: string,"sent_by"?: string | null,"subject"?: string | null,"template"?: string
+                    "appointment_id"?: string | null,"body"?: string,"business_id"?: string,"campaign_id"?: string | null,"channel"?: string,"client_id"?: string,"created_at"?: string,"id"?: string,"outbox_id"?: string | null,"promotion_id"?: string | null,"purpose"?: string,"sent_by"?: string | null,"subject"?: string | null,"template"?: string
                   }
                   Relationships: [
                     {
@@ -878,6 +904,12 @@ isOneToOne: false
       columns: ["business_id"]
 isOneToOne: false
       referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "client_messages_campaign_id_fkey"
+      columns: ["campaign_id"]
+isOneToOne: false
+      referencedRelation: "campaigns"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "client_messages_client_id_fkey"
@@ -2109,14 +2141,14 @@ isOneToOne: false
                   ]
                 },"marketing_messages": {
                   Row: {
-                    "appointment_id": string | null,"body": string,"business_id": string,"channel": string,"client_id": string,"cycle_key": string,"id": string,"kind": string,"opt_out_token_hash": string,"opted_out_at": string | null,"outbox_message_id": string | null,"sent_at": string,"subject": string | null,"to_address": string
+                    "appointment_id": string | null,"body": string,"business_id": string,"campaign_id": string | null,"channel": string,"client_id": string,"cycle_key": string,"id": string,"kind": string,"opt_out_token_hash": string,"opted_out_at": string | null,"outbox_message_id": string | null,"sent_at": string,"subject": string | null,"to_address": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_id"?: string | null,"body": string,"business_id": string,"channel": string,"client_id": string,"cycle_key": string,"id"?: string,"kind": string,"opt_out_token_hash": string,"opted_out_at"?: string | null,"outbox_message_id"?: string | null,"sent_at"?: string,"subject"?: string | null,"to_address": string
+                    "appointment_id"?: string | null,"body": string,"business_id": string,"campaign_id"?: string | null,"channel": string,"client_id": string,"cycle_key": string,"id"?: string,"kind": string,"opt_out_token_hash": string,"opted_out_at"?: string | null,"outbox_message_id"?: string | null,"sent_at"?: string,"subject"?: string | null,"to_address": string
                   }
                   Update: {
-                    "appointment_id"?: string | null,"body"?: string,"business_id"?: string,"channel"?: string,"client_id"?: string,"cycle_key"?: string,"id"?: string,"kind"?: string,"opt_out_token_hash"?: string,"opted_out_at"?: string | null,"outbox_message_id"?: string | null,"sent_at"?: string,"subject"?: string | null,"to_address"?: string
+                    "appointment_id"?: string | null,"body"?: string,"business_id"?: string,"campaign_id"?: string | null,"channel"?: string,"client_id"?: string,"cycle_key"?: string,"id"?: string,"kind"?: string,"opt_out_token_hash"?: string,"opted_out_at"?: string | null,"outbox_message_id"?: string | null,"sent_at"?: string,"subject"?: string | null,"to_address"?: string
                   }
                   Relationships: [
                     {
@@ -2130,6 +2162,12 @@ isOneToOne: false
       columns: ["business_id"]
 isOneToOne: false
       referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "marketing_messages_campaign_id_fkey"
+      columns: ["campaign_id"]
+isOneToOne: false
+      referencedRelation: "campaigns"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "marketing_messages_client_id_fkey"
@@ -5846,6 +5884,9 @@ isOneToOne: false
                            },
 "seen_goal_alert":
 { Args: { "p_milestones": Json,"p_on": string }; Returns: undefined
+                           },
+"send_campaign":
+{ Args: { "p_body": string,"p_business_id": string,"p_campaign_id": string,"p_description": string,"p_left_out": number,"p_name": string,"p_recipients": Json,"p_report": Json,"p_subject": string }; Returns: Json
                            },
 "send_client_message":
 { Args: { "p_appointment_id": string,"p_body": string,"p_channel": string,"p_opt_out_hash"?: string,"p_purpose": string,"p_subject": string,"p_template": string }; Returns: string
