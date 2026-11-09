@@ -8,7 +8,7 @@ import { buttonClass } from "@/components/ui/button";
 import { Alert, Badge, Card, PageHeader, nameLinkClass, textLinkClass, type Tone } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
 import { eventClashes } from "@/lib/events/clashes";
-import { loadEvent, loadEventSettings, loadEventTeam, loadTaxBp } from "@/lib/events/load";
+import { loadEvent, loadEventSettings, loadEventTeam, loadTaxBp, loadEventStages } from "@/lib/events/load";
 import { PAYMENT_LABELS } from "@/lib/events/messages";
 import { memberShare, paymentSchedule } from "@/lib/events/pricing";
 import { EVENT_STATUS_LABELS, PARTY_ROLE_LABELS } from "@/lib/events/types";
@@ -20,7 +20,8 @@ import { formatPrice } from "@/lib/services";
 import { isFrontOfHouse } from "@/lib/staff";
 import { formatEventDay } from "../format";
 import { CompleteEvent, LookNotes, LookPhotoUpload, TrialBooker } from "./day";
-import { CardLinkSender, MemberLinkSender, ProposalSender, RetryPayment, StatusControls } from "./money";
+import { CardLinkSender, MemberLinkSender, ProposalSender, RetryPayment, StageControl, StatusControls } from "./money";
+import { boardStage } from "@/lib/events/stages";
 
 export const metadata: Metadata = { title: "Event" };
 
@@ -49,6 +50,8 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
   if (!isUuid(id)) notFound();
   const tz = me.location.timezone;
   const desk = isFrontOfHouse(me.role);
+  const stages = desk ? await loadEventStages(supabase, me.business_id) : [];
+  const ownStages = stages.filter((s) => !s.kind);
   const [event, team, photos, links, agreements, payments, settings, taxBp] = await Promise.all([
     loadEvent(supabase, id, tz),
     loadEventTeam(supabase, me.location.id),
@@ -123,6 +126,9 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
           </>
         }
       />
+      {desk && ownStages.length > 0 && event.status !== "lost" && event.status !== "completed" && event.date > today && (
+        <StageControl eventId={id} stageId={event.stageId} stages={ownStages} automatic={`${boardStage({ ...event, stageId: null }, stages, today)?.name ?? "Automatic"} (by its status)`} />
+      )}
       {event.status === "lost" && event.lostReason && <p className="-mt-2 mb-6 flex items-center gap-2 text-sm text-ink-muted"><Badge tone="danger">Lost</Badge><span className="sr-only">:</span> {event.lostReason}</p>}
       {event.status === "completed" && event.saleId && desk && (
         <p className="-mt-2 mb-6 text-sm text-ink-muted">
@@ -328,6 +334,7 @@ const HISTORY_TEXT: Record<string, string> = {
   trial_booked: "Trial booked",
   trial_done: "Trial done",
   look_saved: "Look notes changed",
+  stage_changed: "Stage changed",
   team_released: "Team changed",
   completed: "Completed",
   lost: "Lost",

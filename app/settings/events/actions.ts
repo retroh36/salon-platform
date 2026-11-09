@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentStaff } from "@/lib/auth";
 import { parseDollars } from "@/lib/checkout";
+import { stagesProblem, type EventStage } from "@/lib/events/stages";
 import { PARTY_ROLES } from "@/lib/events/types";
 import { isUuid } from "@/lib/ids";
 import { can } from "@/lib/permissions";
@@ -14,6 +15,19 @@ const minutes = (v: string) => {
   const n = Number(v || 0);
   return Number.isInteger(n) && n >= 0 && n <= 480 && n % 5 === 0 ? n : null;
 };
+
+export async function saveEventStages(stages: { id: string | null; name: string; kind: EventStage["kind"] }[]): Promise<Result> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!can(me, "settings")) return { ok: false, message: "Only owners and managers can change the stages." };
+  const problem = stagesProblem(stages);
+  if (problem) return { ok: false, message: problem };
+  const { error } = await supabase.rpc("save_event_stages", { p_business_id: me!.business_id, p_stages: stages as never });
+  if (error?.code === "22023") return { ok: false, message: `${error.message}.` };
+  if (error) throw error;
+  revalidatePath("/settings/events");
+  revalidatePath("/events");
+  return { ok: true, message: "Stages saved." };
+}
 
 export type EventPackageInput = { id: string | null; name: string; partyRole: string; hairMinutes: string; makeupMinutes: string; price: string; isTrial: boolean; isActive: boolean };
 

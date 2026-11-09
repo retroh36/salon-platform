@@ -5,7 +5,7 @@ who: owner, manager, front_desk
 open: /events | Open events
 ---
 
-**Events** shows every event as a card in its column: **Inquiry**, **Proposal sent**, **Booked**, **Trial done**, **Event day** and **Completed**.
+**Events** shows every event as a card in its column: **Inquiry**, **Proposal sent**, **Booked**, **Trial done**, **Event day** and **Completed**, under your salon's own names and in its order, with any stages you added.
 
 1. Go to **Events**.
 2. Tap a card to open the event.

@@ -128,6 +128,18 @@ export async function retryEventPayment(paymentId: string): Promise<MoneyResult>
   return { ok: true, message: "Paid." };
 }
 
+export async function setEventStage(eventId: string, stageId: string | null): Promise<MoneyResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !isFrontOfHouse(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(eventId) || (stageId !== null && !isUuid(stageId))) return { ok: false, message: "That event no longer exists." };
+  const { error } = await supabase.rpc("set_event_stage", { p_event_id: eventId, p_stage_id: stageId as string });
+  if (error?.code === "42501") return { ok: false, message: NOT_ALLOWED };
+  if (error?.code === "55000" || error?.code === "22023") return { ok: false, message: `${error.message}.` };
+  if (error) throw error;
+  refresh(eventId);
+  return { ok: true, message: "Stage changed." };
+}
+
 export async function setEventStatus(eventId: string, status: "lost" | "inquiry" | "booked" | "trial_done", reason = ""): Promise<MoneyResult> {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me || !isFrontOfHouse(me.role)) return { ok: false, message: NOT_ALLOWED };

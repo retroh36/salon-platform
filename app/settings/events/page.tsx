@@ -4,13 +4,14 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Badge, Card, PageHeader } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
-import { loadEventSettings, loadPackages, loadTerms } from "@/lib/events/load";
+import { loadEventSettings, loadEventStages, loadPackages, loadTerms } from "@/lib/events/load";
 import { packageRoles, PARTY_ROLE_LABELS } from "@/lib/events/types";
 import { can } from "@/lib/permissions";
 import { formatPrice } from "@/lib/services";
 import { formatDuration } from "@/lib/duration";
 import { SettingsNav } from "../settings-nav";
 import { EventPackageForm, EventSettingsForm } from "./forms";
+import { EventStagesEditor } from "./stages-editor";
 
 export const metadata: Metadata = { title: "Bridal and events" };
 
@@ -26,7 +27,8 @@ async function EventSettingsView() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
   if (!can(me, "settings")) redirect("/dashboard");
-  const [packages, settings, terms, { data: services, error }] = await Promise.all([
+  const [stages, packages, settings, terms, { data: services, error }] = await Promise.all([
+    loadEventStages(supabase, me.business_id),
     loadPackages(supabase, me.business_id),
     loadEventSettings(supabase, me.business_id),
     loadTerms(supabase, me.business_id),
@@ -37,6 +39,9 @@ async function EventSettingsView() {
     <AppShell section="settings" me={me}>
       <PageHeader title="Bridal and events" description="The packages parties choose from, and how events are priced, paid and planned." />
       <SettingsNav current="events" me={me} />
+      <Card title="Board stages" titleId="event-stages" description="The columns on the Events board. Rename and reorder them, or add your own. Events move through the six built-in stages by themselves; staff put an event in one of your own.">
+        <EventStagesEditor stages={stages} />
+      </Card>
       <Card title="Event packages" titleId="event-packages" description="Each person in a party gets one. The minutes say how long the hair and the makeup take, and so who can do it.">
         <ul className="-mt-3 mb-6 divide-y divide-line" aria-label="Event packages">
           {packages.map((p) => (

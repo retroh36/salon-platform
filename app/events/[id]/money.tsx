@@ -2,9 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { fieldClass } from "@/components/ui/field";
+import { fieldClass, selectClass } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
-import { retryEventPayment, sendEventCardLink, sendMemberLink, sendProposal, setEventStatus, type MoneyResult } from "../money-actions";
+import { retryEventPayment, sendEventCardLink, sendMemberLink, sendProposal, setEventStage, setEventStatus, type MoneyResult } from "../money-actions";
 
 type Channel = "sms" | "email";
 
@@ -89,6 +89,34 @@ export function RetryPayment({ paymentId }: { paymentId: string }) {
       </Button>
       <Status result={result} />
     </span>
+  );
+}
+
+// Which of the salon's own stages the event sits in, or where its status puts it.
+export function StageControl({ eventId, stageId, stages, automatic }: { eventId: string; stageId: string | null; stages: { id: string; name: string }[]; automatic: string }) {
+  const [result, setResult] = useState<MoneyResult | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <label className="mb-6 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
+      Stage
+      <select
+        className={`${selectClass} w-auto`}
+        value={stageId ?? ""}
+        disabled={pending}
+        onChange={(e) => {
+          const next = e.target.value || null;
+          start(async () => setResult(await setEventStage(eventId, next)));
+        }}
+      >
+        <option value="">{automatic}</option>
+        {stages.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+      {result && !result.ok && <Status result={result} />}
+    </label>
   );
 }
 

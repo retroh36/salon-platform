@@ -1,6 +1,7 @@
 // Loading events and what the builder needs (server, with the signed-in
 // person's client: RLS keeps it to their salon, and stylists to events
 // they're on).
+import type { EventStage } from "./stages";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
@@ -112,12 +113,13 @@ export type EventDetail = {
   depositCents: number;
   createdAt: string;
   statusChangedAt: string;
+  stageId: string | null;
   members: EventMemberRow[];
   tasks: EventTaskRow[];
 };
 
 export const EVENT_COLUMNS =
-  "id, title, status, lost_reason, event_date, ready_by, venue_name, venue_address, on_location, travel_miles, travel_minutes, notes, look_notes, sale_id, source, billing, inquiry_party_size, inquiry_services, created_at, status_changed_at, client:clients(id, first_name, last_name, phone, email), members:event_members(id, position, name, party_role, package_id, package_name, hair_minutes, makeup_minutes, pays_own, email, phone), tasks:event_tasks(id, member_id, kind, role, lane, staff_id, starts_at, ends_at)";
+  "id, title, status, stage_id, lost_reason, event_date, ready_by, venue_name, venue_address, on_location, travel_miles, travel_minutes, notes, look_notes, sale_id, source, billing, inquiry_party_size, inquiry_services, created_at, status_changed_at, client:clients(id, first_name, last_name, phone, email), members:event_members(id, position, name, party_role, package_id, package_name, hair_minutes, makeup_minutes, pays_own, email, phone), tasks:event_tasks(id, member_id, kind, role, lane, staff_id, starts_at, ends_at)";
 
 type EventRow = {
   id: string;
@@ -148,6 +150,7 @@ type EventRow = {
   deposit_cents: number;
   created_at: string;
   status_changed_at: string;
+  stage_id: string | null;
   client: { id: string; first_name: string; last_name: string; phone: string | null; email: string | null } | null;
   members: { id: string; position: number; name: string; party_role: PartyRole; package_id: string | null; package_name: string; price_cents: number; hair_minutes: number; makeup_minutes: number; pays_own: boolean; email: string | null; phone: string | null }[];
   tasks: { id: string; member_id: string | null; kind: string; role: string; lane: number; staff_id: string | null; starts_at: string; ends_at: string }[];
@@ -189,6 +192,7 @@ export function eventFrom(e: EventRow, timeZone: string): EventDetail {
     depositCents: e.deposit_cents,
     createdAt: e.created_at,
     statusChangedAt: e.status_changed_at,
+    stageId: e.stage_id,
     members: [...e.members]
       .sort((a, b) => a.position - b.position)
       .map((m) => ({ id: m.id, position: m.position, name: m.name, partyRole: m.party_role, packageId: m.package_id, packageName: m.package_name, priceCents: m.price_cents, hairMinutes: m.hair_minutes, makeupMinutes: m.makeup_minutes, paysOwn: m.pays_own, email: m.email, phone: m.phone })),
@@ -240,13 +244,21 @@ export type EventSummary = {
   source: string;
   lostReason: string | null;
   statusChangedAt: string;
+  stageId: string | null;
 };
+
+// The salon's board, in order.
+export async function loadEventStages(supabase: Client, businessId: string): Promise<EventStage[]> {
+  const { data, error } = await supabase.from("event_stages").select("id, name, kind").eq("business_id", businessId).order("position");
+  if (error) throw error;
+  return data.map((s) => ({ id: s.id, name: s.name, kind: s.kind as EventStage["kind"] }));
+}
 
 // Every event at the salon from a date on (and recent closed ones).
 export async function loadEventList(supabase: Client, businessId: string, timeZone: string, from: string): Promise<EventSummary[]> {
   const { data, error } = await supabase
     .from("events")
-    .select("id, title, status, lost_reason, event_date, ready_by, on_location, venue_name, source, status_changed_at, inquiry_party_size, client:clients(first_name, last_name), members:event_members(id)")
+    .select("id, title, status, lost_reason, event_date, ready_by, on_location, venue_name, source, status_changed_at, stage_id, inquiry_party_size, client:clients(first_name, last_name), members:event_members(id)")
     .eq("business_id", businessId)
     .gte("event_date", from)
     .order("event_date")
@@ -267,5 +279,6 @@ export async function loadEventList(supabase: Client, businessId: string, timeZo
     source: e.source,
     lostReason: e.lost_reason,
     statusChangedAt: e.status_changed_at,
+    stageId: e.stage_id,
   }));
 }

@@ -7,8 +7,8 @@ import { buttonClass } from "@/components/ui/button";
 import { PlusIcon } from "@/components/ui/icons";
 import { Alert, Badge, EmptyState, PageHeader, nameLinkClass } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
-import { loadEventList, type EventSummary } from "@/lib/events/load";
-import { PIPELINE, pipelineColumn } from "@/lib/events/pipeline";
+import { loadEventList, loadEventStages, type EventSummary } from "@/lib/events/load";
+import { boardStage } from "@/lib/events/stages";
 import { addDays, formatMinute, todayIn } from "@/lib/scheduling/time";
 import { formatPrice } from "@/lib/services";
 import { isFrontOfHouse } from "@/lib/staff";
@@ -30,12 +30,13 @@ async function Events() {
   if (!isFrontOfHouse(me.role)) redirect("/dashboard");
   const tz = me.location.timezone;
   const today = todayIn(tz);
-  const [events, failed] = await Promise.all([
+  const [events, stages, failed] = await Promise.all([
     loadEventList(supabase, me.business_id, tz, addDays(today, -60)),
+    loadEventStages(supabase, me.business_id),
     supabase.from("event_payments").select("event_id, amount_cents").eq("business_id", me.business_id).eq("status", "failed"),
   ]);
   const failedFor = new Map((failed.data ?? []).map((p) => [p.event_id, p.amount_cents]));
-  const column = (e: EventSummary) => pipelineColumn(e.status, e.date, today);
+  const column = (e: EventSummary) => boardStage(e, stages, today)?.id;
   const lost = events.filter((e) => e.status === "lost");
   return (
     <AppShell section="events" me={me} wide>
@@ -79,12 +80,13 @@ async function Events() {
               on a phone), so no stage is ever off the edge. */}
           <div className="@container pb-2">
             <ol className="grid grid-cols-2 gap-x-4 gap-y-6 @2xl:grid-cols-3 @[66rem]:grid-cols-6" aria-label="Pipeline">
-              {PIPELINE.map((col) => {
-                const list = events.filter((e) => column(e) === col.key);
+              {stages.map((col) => {
+                const list = events.filter((e) => column(e) === col.id);
+                const key = col.kind ?? col.id;
                 return (
-                  <li key={col.key} className="flex min-w-0 flex-col gap-3" aria-labelledby={`col-${col.key}`} data-testid={`column-${col.key}`}>
-                    <h2 id={`col-${col.key}`} className="border-b border-line pb-2 text-13 font-medium text-ink">
-                      {col.label} <span className="ml-1 font-normal text-ink-subtle tabular-nums">{list.length}</span>
+                  <li key={col.id} className="flex min-w-0 flex-col gap-3" aria-labelledby={`col-${key}`} data-testid={`column-${key}`}>
+                    <h2 id={`col-${key}`} className="border-b border-line pb-2 text-13 font-medium text-ink">
+                      {col.name} <span className="ml-1 font-normal text-ink-subtle tabular-nums">{list.length}</span>
                     </h2>
                     <ul className="flex flex-col gap-2">
                       {list.map((e) => (
