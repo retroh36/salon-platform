@@ -31,6 +31,13 @@ export function AutomationCard({
   const [channel, setChannel] = useState<Channel>(automation.settings.prefer);
   const [result, setResult] = useState<Result | null>(null);
   const [pending, start] = useTransition();
+  // Turned on or off from the server (Denise's suggestion, its undo): show
+  // that, keeping the card (and its "Saved" message) in place.
+  const [wasEnabled, setWasEnabled] = useState(automation.enabled);
+  if (wasEnabled !== automation.enabled) {
+    setWasEnabled(automation.enabled);
+    setA(automation);
+  }
   const set = (patch: Partial<Automation>) => setA({ ...a, ...patch });
   const setSetting = (patch: Partial<AutomationSettings>) => setA({ ...a, settings: { ...a.settings, ...patch } });
   const here = { ...salon, googleUrl: a.kind === "review" ? google.trim() || null : salon.googleUrl, yelpUrl: a.kind === "review" ? yelp.trim() || null : salon.yelpUrl };

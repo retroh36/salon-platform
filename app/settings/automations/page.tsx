@@ -56,7 +56,7 @@ async function Automations() {
       </Card>
       {automations.map((a) => (
         // Fresh when it's turned on or off elsewhere (a suggestion approved).
-        <AutomationCard key={`${a.kind}:${a.enabled}`} automation={a} salon={salon} results={results[a.kind]} canEdit />
+        <AutomationCard key={a.kind} automation={a} salon={salon} results={results[a.kind]} canEdit />
       ))}
     </AppShell>
   );
