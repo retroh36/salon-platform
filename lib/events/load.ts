@@ -2,6 +2,7 @@
 // person's client: RLS keeps it to their salon, and stylists to events
 // they're on).
 import type { EventStage } from "./stages";
+import type { EventAutomation } from "./automations";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
@@ -280,5 +281,24 @@ export async function loadEventList(supabase: Client, businessId: string, timeZo
     lostReason: e.lost_reason,
     statusChangedAt: e.status_changed_at,
     stageId: e.stage_id,
+  }));
+}
+
+export async function loadEventAutomations(supabase: Client, businessId: string): Promise<EventAutomation[]> {
+  const { data, error } = await supabase.from("event_automations").select("id, name, trigger, days_before, wait_days, action, subject, body, task, stage_id, enabled, approved_at").eq("business_id", businessId).order("position");
+  if (error) throw error;
+  return data.map((a) => ({
+    id: a.id,
+    name: a.name,
+    trigger: a.trigger as EventAutomation["trigger"],
+    daysBefore: a.days_before,
+    waitDays: a.wait_days,
+    action: a.action as EventAutomation["action"],
+    subject: a.subject,
+    body: a.body,
+    task: a.task,
+    stageId: a.stage_id,
+    enabled: a.enabled,
+    approved: a.approved_at !== null,
   }));
 }

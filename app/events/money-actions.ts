@@ -128,6 +128,17 @@ export async function retryEventPayment(paymentId: string): Promise<MoneyResult>
   return { ok: true, message: "Paid." };
 }
 
+export async function setTodoDone(eventId: string, todoId: string, done: boolean): Promise<MoneyResult> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!me || !isFrontOfHouse(me.role)) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(todoId)) return { ok: false, message: "That to-do is gone." };
+  const { error } = await supabase.rpc("set_event_todo_done", { p_todo_id: todoId, p_done: done });
+  if (error?.code === "42501") return { ok: false, message: NOT_ALLOWED };
+  if (error) throw error;
+  refresh(eventId);
+  return { ok: true, message: done ? "Done." : "Back on the list." };
+}
+
 export async function setEventStage(eventId: string, stageId: string | null): Promise<MoneyResult> {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me || !isFrontOfHouse(me.role)) return { ok: false, message: NOT_ALLOWED };

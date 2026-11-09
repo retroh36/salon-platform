@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentStaff } from "@/lib/auth";
 import { parseDollars } from "@/lib/checkout";
 import { stagesProblem, type EventStage } from "@/lib/events/stages";
+import { automationProblem, type EventAutomation } from "@/lib/events/automations";
 import { PARTY_ROLES } from "@/lib/events/types";
 import { isUuid } from "@/lib/ids";
 import { can } from "@/lib/permissions";
@@ -27,6 +28,32 @@ export async function saveEventStages(stages: { id: string | null; name: string;
   revalidatePath("/settings/events");
   revalidatePath("/events");
   return { ok: true, message: "Stages saved." };
+}
+
+export async function saveEventAutomation(a: EventAutomation): Promise<Result> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!can(me, "settings")) return { ok: false, message: "Only owners and managers set up event automations." };
+  const problem = automationProblem(a);
+  if (problem) return { ok: false, message: problem };
+  const { error } = await supabase.rpc("save_event_automation", {
+    p_business_id: me!.business_id,
+    p_id: (isUuid(a.id) ? a.id : null) as string,
+    p_input: { name: a.name, trigger: a.trigger, days_before: a.daysBefore, wait_days: a.waitDays, action: a.action, subject: a.subject, body: a.body, task: a.task, stage_id: a.stageId, enabled: a.enabled } as never,
+  });
+  if (error?.hint === "owner") return { ok: false, message: "Only an owner can turn on a message to clients. Save it turned off, and an owner can turn it on." };
+  if (error?.code === "22023") return { ok: false, message: `${error.message}.` };
+  if (error) throw error;
+  revalidatePath("/settings/events");
+  return { ok: true, message: "Automation saved." };
+}
+
+export async function deleteEventAutomation(id: string): Promise<Result> {
+  const { supabase, staff: me } = await getCurrentStaff();
+  if (!can(me, "settings") || !isUuid(id)) return { ok: false, message: "Only owners and managers set up event automations." };
+  const { error } = await supabase.rpc("delete_event_automation", { p_id: id });
+  if (error) throw error;
+  revalidatePath("/settings/events");
+  return { ok: true, message: "Automation removed." };
 }
 
 export type EventPackageInput = { id: string | null; name: string; partyRole: string; hairMinutes: string; makeupMinutes: string; price: string; isTrial: boolean; isActive: boolean };

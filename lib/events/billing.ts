@@ -19,12 +19,13 @@ import { formatLongDay } from "@/lib/schedule-format";
 import { addDays, toLocal } from "@/lib/scheduling/time";
 import { PAYMENT_LABELS, receiptMessage, reminderMessage, type EventMessage } from "./messages";
 import type { ScheduledKind } from "./pricing";
+import { runEventAutomations } from "./automations-run";
 
 type Admin = SupabaseClient<Database>;
 
 export const REMINDER_DAYS = 3;
 
-export type EventBillingSummary = { reminded: number; charged: number; failed: number; receipts: number };
+export type EventBillingSummary = { reminded: number; charged: number; failed: number; receipts: number; automations?: number };
 
 type Options = { businessId?: string; paymentId?: string; now?: Date };
 
@@ -43,6 +44,7 @@ export async function runEventBilling(admin: Admin, options: Options = {}): Prom
   }
 
   summary.receipts = await sendReceipts(admin, open, options);
+  if (!options.paymentId) summary.automations = await runEventAutomations(admin, open);
   return summary;
 }
 
@@ -94,7 +96,7 @@ async function salonsInHours(admin: Admin, options: Options, now: Date): Promise
 
 type ClientRow = { first_name: string } & Parameters<typeof consentOf>[0];
 
-async function send(admin: Admin, businessId: string, client: ClientRow | null, message: EventMessage): Promise<boolean> {
+export async function send(admin: Admin, businessId: string, client: ClientRow | null, message: EventMessage): Promise<boolean> {
   const dest = client ? channelFor(consentOf(client), "appointment", "email") : null;
   if (!dest) return false;
   const { error } = await admin.from("outbox_messages").insert({

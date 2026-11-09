@@ -20,7 +20,7 @@ import { formatPrice } from "@/lib/services";
 import { isFrontOfHouse } from "@/lib/staff";
 import { formatEventDay } from "../format";
 import { CompleteEvent, LookNotes, LookPhotoUpload, TrialBooker } from "./day";
-import { CardLinkSender, MemberLinkSender, ProposalSender, RetryPayment, StageControl, StatusControls } from "./money";
+import { CardLinkSender, MemberLinkSender, ProposalSender, RetryPayment, StageControl, StatusControls, TodoItem } from "./money";
 import { boardStage } from "@/lib/events/stages";
 
 export const metadata: Metadata = { title: "Event" };
@@ -64,7 +64,7 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
   ]);
   if (!event) notFound();
   const holds = event.status === "booked" || event.status === "trial_done";
-  const [trials, history, clashes] = await Promise.all([
+  const [trials, history, clashes, todos] = await Promise.all([
     supabase.from("appointments").select("id, starts_at, status, items:appointment_items(staff_id)").eq("event_id", id).neq("status", "canceled").order("starts_at"),
     desk ? supabase.from("event_history").select("id, kind, detail, created_at, staff:staff(first_name)").eq("event_id", id).order("created_at", { ascending: false }).limit(30) : Promise.resolve({ data: [] }),
     // Whether the team is still free, by the booking rules (the event's own
@@ -72,6 +72,7 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
     desk && event.date >= todayIn(tz) && event.status !== "completed" && event.status !== "lost"
       ? eventClashes(supabase, me.location, { eventId: id, date: event.date, tasks: event.tasks, travelMinutes: event.onLocation ? event.travelMinutes : 0 })
       : Promise.resolve([]),
+    desk ? supabase.from("event_todos").select("id, text, done_at").eq("event_id", id).order("created_at") : Promise.resolve({ data: [] }),
   ]);
   const nameOf = new Map(event.members.map((m) => [m.id, m.name]));
   const staffName = (sid: string | null) => team.find((t) => t.id === sid)?.firstName ?? null;
@@ -253,6 +254,17 @@ async function EventView({ params }: Pick<PageProps<"/events/[id]">, "params">) 
               )}
             </div>
           </Card>
+          {desk && (todos.data?.length ?? 0) > 0 && (
+            <Card title="To do" titleId="todos" flush>
+              <ul className="divide-y divide-line text-sm" data-testid="todos">
+                {todos.data!.map((t) => (
+                  <li key={t.id}>
+                    <TodoItem eventId={id} todo={{ id: t.id, text: t.text, done: t.done_at !== null }} />
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
           {event.notes && (
             <Card title="Notes" titleId="notes">
               <p className="whitespace-pre-line">{event.notes}</p>
@@ -335,6 +347,7 @@ const HISTORY_TEXT: Record<string, string> = {
   trial_done: "Trial done",
   look_saved: "Look notes changed",
   stage_changed: "Stage changed",
+  automation: "Automation",
   team_released: "Team changed",
   completed: "Completed",
   lost: "Lost",

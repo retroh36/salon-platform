@@ -2,9 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { fieldClass, selectClass } from "@/components/ui/field";
+import { checkboxClass, fieldClass, selectClass } from "@/components/ui/field";
 import { Segmented } from "@/components/ui/segmented";
-import { retryEventPayment, sendEventCardLink, sendMemberLink, sendProposal, setEventStage, setEventStatus, type MoneyResult } from "../money-actions";
+import { retryEventPayment, sendEventCardLink, sendMemberLink, sendProposal, setEventStage, setTodoDone, setEventStatus, type MoneyResult } from "../money-actions";
 
 type Channel = "sms" | "email";
 
@@ -89,6 +89,25 @@ export function RetryPayment({ paymentId }: { paymentId: string }) {
       </Button>
       <Status result={result} />
     </span>
+  );
+}
+
+// A to-do on the event, ticked off by the desk.
+export function TodoItem({ eventId, todo }: { eventId: string; todo: { id: string; text: string; done: boolean } }) {
+  const [done, setDone] = useState(todo.done);
+  const [pending, start] = useTransition();
+  return (
+    <label className="flex min-h-11 items-center gap-3 px-5 py-2">
+      <input type="checkbox" className={checkboxClass} checked={done} disabled={pending} onChange={(e) => {
+        const next = e.target.checked;
+        setDone(next);
+        start(async () => {
+          // Put back if it didn't save.
+          if (!(await setTodoDone(eventId, todo.id, next)).ok) setDone(!next);
+        });
+      }} />
+      <span className={done ? "text-ink-subtle line-through" : "text-ink"}>{todo.text}</span>
+    </label>
   );
 }
 

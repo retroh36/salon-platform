@@ -1443,6 +1443,70 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"event_automation_runs": {
+                  Row: {
+                    "automation_id": string,"business_id": string,"done_at": string | null,"due_at": string,"event_id": string,"id": string,"result": string | null,"status": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "automation_id": string,"business_id": string,"done_at"?: string | null,"due_at": string,"event_id": string,"id"?: string,"result"?: string | null,"status"?: string
+                  }
+                  Update: {
+                    "automation_id"?: string,"business_id"?: string,"done_at"?: string | null,"due_at"?: string,"event_id"?: string,"id"?: string,"result"?: string | null,"status"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_automation_runs_automation_id_business_id_fkey"
+      columns: ["automation_id","business_id"]
+isOneToOne: false
+      referencedRelation: "event_automations"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "event_automation_runs_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_automation_runs_event_id_business_id_fkey"
+      columns: ["event_id","business_id"]
+isOneToOne: false
+      referencedRelation: "events"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
+                },"event_automations": {
+                  Row: {
+                    "action": string,"approved_at": string | null,"approved_by": string | null,"body": string | null,"business_id": string,"created_at": string,"days_before": number | null,"enabled": boolean,"id": string,"name": string,"position": number,"stage_id": string | null,"subject": string | null,"task": string | null,"trigger": string,"updated_at": string,"wait_days": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "action": string,"approved_at"?: string | null,"approved_by"?: string | null,"body"?: string | null,"business_id": string,"created_at"?: string,"days_before"?: number | null,"enabled"?: boolean,"id"?: string,"name": string,"position"?: number,"stage_id"?: string | null,"subject"?: string | null,"task"?: string | null,"trigger": string,"updated_at"?: string,"wait_days"?: number
+                  }
+                  Update: {
+                    "action"?: string,"approved_at"?: string | null,"approved_by"?: string | null,"body"?: string | null,"business_id"?: string,"created_at"?: string,"days_before"?: number | null,"enabled"?: boolean,"id"?: string,"name"?: string,"position"?: number,"stage_id"?: string | null,"subject"?: string | null,"task"?: string | null,"trigger"?: string,"updated_at"?: string,"wait_days"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_automations_approved_by_business_id_fkey"
+      columns: ["approved_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "event_automations_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_automations_stage_id_business_id_fkey"
+      columns: ["stage_id","business_id"]
+isOneToOne: false
+      referencedRelation: "event_stages"
+      referencedColumns: ["id","business_id"]
+    }
+                  ]
                 },"event_history": {
                   Row: {
                     "business_id": string,"created_at": string,"detail": string | null,"event_id": string,"id": string,"kind": string,"staff_id": string | null
@@ -1743,6 +1807,38 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "staff"
       referencedColumns: ["id"]
+    }
+                  ]
+                },"event_todos": {
+                  Row: {
+                    "automation_id": string | null,"business_id": string,"created_at": string,"done_at": string | null,"done_by": string | null,"event_id": string,"id": string,"text": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "automation_id"?: string | null,"business_id": string,"created_at"?: string,"done_at"?: string | null,"done_by"?: string | null,"event_id": string,"id"?: string,"text": string
+                  }
+                  Update: {
+                    "automation_id"?: string | null,"business_id"?: string,"created_at"?: string,"done_at"?: string | null,"done_by"?: string | null,"event_id"?: string,"id"?: string,"text"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_todos_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_todos_done_by_business_id_fkey"
+      columns: ["done_by","business_id"]
+isOneToOne: false
+      referencedRelation: "staff"
+      referencedColumns: ["id","business_id"]
+    },{
+      foreignKeyName: "event_todos_event_id_business_id_fkey"
+      columns: ["event_id","business_id"]
+isOneToOne: false
+      referencedRelation: "events"
+      referencedColumns: ["id","business_id"]
     }
                   ]
                 },"events": {
@@ -5467,6 +5563,11 @@ isOneToOne: false
 "check_staff_pin":
 { Args: { "p_pin": string,"p_staff_id": string,"p_token_hash": string }; Returns: Json
                            },
+"claim_event_automations":
+{ Args: { "p_business_ids": (string)[] }; Returns: {
+              "automation_id": string,"body": string,"business_id": string,"event_id": string,"run_id": string,"subject": string
+            }[]
+                           },
 "claim_event_payments":
 { Args: { "p_business_id": string,"p_limit": number,"p_payment_id": string }; Returns: {
               "amount_cents": number,"attempt": number,"business_id": string,"card_label": string,"event_id": string,"kind": string,"payment_id": string,"payment_method_ref": string,"provider": string
@@ -5564,6 +5665,9 @@ isOneToOne: false
 "delete_calendar_view":
 { Args: { "p_view_id": string }; Returns: undefined
                            },
+"delete_event_automation":
+{ Args: { "p_id": string }; Returns: undefined
+                           },
 "delete_family":
 { Args: { "p_family_id": string }; Returns: undefined
                            },
@@ -5600,6 +5704,9 @@ isOneToOne: false
                            },
 "find_online_client":
 { Args: { "p_business_id": string,"p_email": string,"p_first_name": string,"p_last_name": string,"p_phone": string,"p_phone_digits": string }; Returns: string
+                           },
+"finish_event_automation":
+{ Args: { "p_result": string,"p_run_id": string,"p_sent": boolean }; Returns: undefined
                            },
 "finish_online_booking_attempt":
 { Args: { "p_appointment_id": string,"p_business_id": string,"p_key_hash": string }; Returns: undefined
@@ -5830,6 +5937,9 @@ isOneToOne: false
 "save_event":
 { Args: { "p_event_id": string,"p_input": Json }; Returns: string
                            },
+"save_event_automation":
+{ Args: { "p_business_id": string,"p_id": string,"p_input": Json }; Returns: string
+                           },
 "save_event_inquiry":
 { Args: { "p_business_id": string,"p_input": Json }; Returns: string
                            },
@@ -5985,6 +6095,9 @@ isOneToOne: false
                            },
 "set_event_status":
 { Args: { "p_event_id": string,"p_reason": string,"p_status": Database["public"]['Enums']["event_status"] }; Returns: undefined
+                           },
+"set_event_todo_done":
+{ Args: { "p_done": boolean,"p_todo_id": string }; Returns: undefined
                            },
 "set_free_text_roles":
 { Args: { "p_business_id": string,"p_roles": (string)[] }; Returns: undefined

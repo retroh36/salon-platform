@@ -4,7 +4,8 @@ import { Suspense } from "react";
 import { AppShell, LoadingShell, NotLinked } from "@/components/app-shell";
 import { Badge, Card, PageHeader } from "@/components/ui/page";
 import { getCurrentStaff } from "@/lib/auth";
-import { loadEventSettings, loadEventStages, loadPackages, loadTerms } from "@/lib/events/load";
+import { loadEventAutomations, loadEventSettings, loadEventStages, loadPackages, loadTerms } from "@/lib/events/load";
+import { EventAutomations } from "./automations-editor";
 import { packageRoles, PARTY_ROLE_LABELS } from "@/lib/events/types";
 import { can } from "@/lib/permissions";
 import { formatPrice } from "@/lib/services";
@@ -27,8 +28,9 @@ async function EventSettingsView() {
   const { supabase, staff: me } = await getCurrentStaff();
   if (!me) return <NotLinked />;
   if (!can(me, "settings")) redirect("/dashboard");
-  const [stages, packages, settings, terms, { data: services, error }] = await Promise.all([
+  const [stages, automations, packages, settings, terms, { data: services, error }] = await Promise.all([
     loadEventStages(supabase, me.business_id),
+    loadEventAutomations(supabase, me.business_id),
     loadPackages(supabase, me.business_id),
     loadEventSettings(supabase, me.business_id),
     loadTerms(supabase, me.business_id),
@@ -41,6 +43,9 @@ async function EventSettingsView() {
       <SettingsNav current="events" me={me} />
       <Card title="Board stages" titleId="event-stages" description="The columns on the Events board. Rename and reorder them, or add your own. Events move through the six built-in stages by themselves; staff put an event in one of your own.">
         <EventStagesEditor stages={stages} />
+      </Card>
+      <Card title="Automations" titleId="event-automations" description="When something happens to an event, do something after a wait: send the client your message, add a to-do for the team, or move the event to one of your own stages. A message goes out only once an owner turns it on.">
+        <EventAutomations automations={automations} stages={stages.filter((s) => !s.kind)} isOwner={me.role === "owner"} />
       </Card>
       <Card title="Event packages" titleId="event-packages" description="Each person in a party gets one. The minutes say how long the hair and the makeup take, and so who can do it.">
         <ul className="-mt-3 mb-6 divide-y divide-line" aria-label="Event packages">
