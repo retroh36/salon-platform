@@ -19,7 +19,7 @@ import { formatMinute, fromLocal, isLocalDate, todayIn } from "@/lib/scheduling/
 import { chainLines } from "@/lib/scheduling/waitlist";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { saleInput, type Ticket } from "@/lib/ticket";
-import { startCheckout } from "@/lib/checkout-screen";
+import { startCheckout, usualPayer } from "@/lib/checkout-screen";
 import { siteUrl } from "@/lib/branding";
 import { normalizePhone } from "@/lib/clients";
 import { memberPrices } from "@/lib/memberships";
@@ -70,10 +70,10 @@ export async function completeCheckout(draftId: string, ticket: Ticket): Promise
     if (done?.status === "completed" && done.sale_id) return { ok: true, saleId: done.sale_id };
     return saved;
   }
-  const { data: draft } = await s.supabase.from("sale_drafts").select("appointment_id, client_id").eq("id", draftId).single();
+  const { data: draft } = await s.supabase.from("sale_drafts").select("appointment_id, client_id, payer_client_id").eq("id", draftId).single();
   const { data: saleId, error } = await s.supabase.rpc("complete_sale", {
     p_location_id: s.me.location.id,
-    p_input: saleInput(ticket, { draftId, appointmentId: draft!.appointment_id, clientId: draft!.client_id }) as never,
+    p_input: saleInput(ticket, { draftId, appointmentId: draft!.appointment_id, clientId: draft!.client_id, payerId: draft!.payer_client_id }) as never,
   });
   if (error) return { ok: false, message: message(error, "That didn't go through. Try again.") };
   revalidatePath("/calendar", "layout");
@@ -168,9 +168,28 @@ export async function setSaleClient(draftId: string, clientId: string | null): P
   const s = await session();
   if (!s) return { ok: false, message: NOT_ALLOWED };
   if (!isUuid(draftId) || (clientId !== null && !isUuid(clientId))) return { ok: false, message: "That client doesn't exist." };
-  const { data, error } = await s.supabase.from("sale_drafts").update({ client_id: clientId }).eq("id", draftId).eq("status", "open").is("appointment_id", null).select("id");
+  const payer = clientId ? await usualPayer(s.supabase, clientId) : null;
+  const { data, error } = await s.supabase.from("sale_drafts").update({ client_id: clientId, payer_client_id: payer }).eq("id", draftId).eq("status", "open").is("appointment_id", null).select("id");
   if (error) return { ok: false, message: "That client doesn't exist." };
   if (!data.length) return { ok: false, message: "The client of a visit can't be changed here." };
+  revalidatePath(`/checkout/${draftId}`);
+  return { ok: true };
+}
+
+// Who in the client's family is paying (null: the client). complete_sale
+// checks they're family; the screen reloads with their points and email.
+export async function setSalePayer(draftId: string, payerId: string | null): Promise<Result> {
+  const s = await session();
+  if (!s) return { ok: false, message: NOT_ALLOWED };
+  if (!isUuid(draftId) || (payerId !== null && !isUuid(payerId))) return { ok: false, message: "Choose someone in their family." };
+  const { data: draft } = await s.supabase.from("sale_drafts").select("client_id, client:clients(family_id)").eq("id", draftId).eq("status", "open").maybeSingle();
+  if (!draft?.client_id) return { ok: false, message: "This checkout was already completed." };
+  if (payerId) {
+    const { data: payer } = await s.supabase.from("clients").select("id").eq("id", payerId).eq("family_id", draft.client?.family_id ?? "").neq("id", draft.client_id).maybeSingle();
+    if (!payer || !draft.client?.family_id) return { ok: false, message: "Choose someone in their family." };
+  }
+  const { error } = await s.supabase.from("sale_drafts").update({ payer_client_id: payerId }).eq("id", draftId).eq("status", "open");
+  if (error) throw error;
   revalidatePath(`/checkout/${draftId}`);
   return { ok: true };
 }
@@ -188,9 +207,12 @@ export async function sendPaymentLink(draftId: string, ticket: Ticket, to: { cha
   }
   const saved = await saveTicket(draftId, ticket);
   if (!saved.ok) return saved;
-  const { data: draft } = await s.supabase.from("sale_drafts").select("appointment_id, client_id, client:clients(first_name)").eq("id", draftId).single();
-  // Never a text to a number that replied STOP, or on a channel they turned off.
-  const blocked = await blockedReason(createAdminClient(), to.channel, address, draft!.client_id ? { id: draft!.client_id, firstName: draft!.client?.first_name ?? "The client" } : null);
+  const { data: draft } = await s.supabase.from("sale_drafts").select("appointment_id, client_id, payer_client_id, client:clients(first_name)").eq("id", draftId).single();
+  // Never a text to a number that replied STOP, or on a channel they turned
+  // off (the payer's, when a family member is paying).
+  const payer = draft!.payer_client_id ? (await s.supabase.from("clients").select("id, first_name").eq("id", draft!.payer_client_id).maybeSingle()).data : null;
+  const recipient = payer ? { id: payer.id, firstName: payer.first_name } : draft!.client_id ? { id: draft!.client_id, firstName: draft!.client?.first_name ?? "The client" } : null;
+  const blocked = await blockedReason(createAdminClient(), to.channel, address, recipient);
   if (blocked) return { ok: false, message: blocked };
   const [settings, memberships, staff, business] = await Promise.all([
     loadCheckoutSettings(s.supabase, s.me.business_id),
@@ -201,7 +223,7 @@ export async function sendPaymentLink(draftId: string, ticket: Ticket, to: { cha
   const snapshot = linkSnapshot(
     ticket,
     { taxServicesBp: settings.taxServicesBp, taxRetailBp: settings.taxRetailBp, member: memberPrices(memberships) },
-    { appointmentId: draft!.appointment_id, clientId: draft!.client_id },
+    { appointmentId: draft!.appointment_id, clientId: draft!.client_id, payerId: draft!.payer_client_id },
     (staff.data ?? []).map((x) => ({ id: x.id, firstName: x.first_name })),
     draft!.client?.first_name ?? null,
   );

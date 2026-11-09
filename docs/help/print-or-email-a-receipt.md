@@ -16,5 +16,6 @@ Give the client a receipt straight after the sale.
 ## Good to know
 
 - Receipts list the lines by stylist, any discount and tips, and how it was paid.
+- When a family member paid (**Paid by**), their email is filled in and the receipt says who paid.
 - Email isn't connected yet: for now emailed receipts wait in the outbox and aren't actually delivered.
 - To print or send it again later, see Reprint a receipt.

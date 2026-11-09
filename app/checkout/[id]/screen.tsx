@@ -292,6 +292,7 @@ export function CheckoutScreen({ data, denise }: { data: CheckoutScreenData; den
               onWalkIn={(walkIn) => change((t) => ({ ...asTeamPurchase(t, null), walkIn }))}
               employeeId={ticket.employeeId ?? null}
               onEmployee={(employeeId) => change((t) => asTeamPurchase(t, employeeId))}
+              onPayer={() => change((t) => ({ ...t, rewards: [], tierPerk: false }))}
             />
             <ProductPicker
               data={data}

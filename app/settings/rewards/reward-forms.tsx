@@ -35,6 +35,7 @@ export function ProgramForm({ program }: { program: Program }) {
     minRedeemPoints: String(program.minRedeemPoints),
     stackWithPromotions: program.stackWithPromotions,
     tierBasis: program.tierBasis,
+    familyPoints: program.familyPoints,
   });
   const [result, setResult] = useState<Result | null>(null);
   const [pending, start] = useTransition();
@@ -80,6 +81,14 @@ export function ProgramForm({ program }: { program: Program }) {
         </div>
         <p className="text-13 text-ink-muted">A referral pays both clients once the new client&apos;s first visit is checked out.</p>
       </fieldset>
+      <label className={`${labelClass} max-w-sm`}>
+        When a family member pays for someone&apos;s visit
+        <select value={f.familyPoints} onChange={(e) => setF({ ...f, familyPoints: e.target.value === "client" ? "client" : "payer" })} className={selectClass}>
+          <option value="payer">Points go to whoever pays</option>
+          <option value="client">Points go to the client who had the visit</option>
+        </select>
+        <span className="text-13 font-normal text-ink-muted">Rewards on that sale come from the same points. Bonuses for the visit itself stay with the client.</span>
+      </label>
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-1 text-sm font-medium">Taking rewards</legend>
         <div className="grid gap-3 sm:grid-cols-2">

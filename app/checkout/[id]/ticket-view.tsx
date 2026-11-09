@@ -32,7 +32,7 @@ import {
   type TicketDiscount,
   type TicketLine,
 } from "@/lib/ticket";
-import { setSaleClient } from "../actions";
+import { setSaleClient, setSalePayer } from "../actions";
 import type { DialogState } from "./dialogs";
 
 // The client at the top of the ticket: who, their credit, and what Denise
@@ -43,12 +43,15 @@ export function ClientHeader({
   onWalkIn,
   employeeId,
   onEmployee,
+  onPayer,
 }: {
   data: CheckoutScreenData;
   walkIn: boolean;
   onWalkIn: (walkIn: boolean) => void;
   employeeId: string | null;
   onEmployee: (employeeId: string | null) => void;
+  // Who pays changed: rewards chosen from the old points come off.
+  onPayer: () => void;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -96,6 +99,7 @@ export function ClientHeader({
           )}
         </div>
       </div>
+      {data.family.length > 0 && <PaidBy data={data} onPayer={onPayer} />}
       {(usesLeftTotal > 0 || data.memberships.length > 0 || data.rewards || giftCents > 0) && (
         <div className="flex flex-wrap gap-1.5">
           {usesLeftTotal > 0 && (
@@ -124,6 +128,7 @@ export function ClientHeader({
           {data.rewards && (
             <span data-testid="badge-points">
               <Badge tone="info">
+                {data.pointsHolder ? `${data.pointsHolder}: ` : ""}
                 <span className="tabular-nums">{points(data.rewards.client.balance)}</span>
                 {tierName(data) ? ` · ${tierName(data)}` : ""}
               </Badge>
@@ -149,6 +154,44 @@ export function ClientHeader({
           <ClientInsightCard insight={data.insight as never} />
         </div>
       )}
+    </div>
+  );
+}
+
+// Who pays: the client, or someone in their family (the receipt goes to
+// them, and the points unless the salon gives them to the client).
+function PaidBy({ data, onPayer }: { data: CheckoutScreenData; onPayer: () => void }) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="flex flex-wrap items-center gap-2 text-sm text-ink-soft">
+        Paid by
+        <select
+          value={data.payer?.id ?? ""}
+          disabled={pending}
+          onChange={(e) => {
+            const id = e.target.value || null;
+            setError(null);
+            onPayer();
+            start(async () => {
+              const r = await setSalePayer(data.draft.id, id);
+              if (!r.ok) setError(r.message);
+              router.refresh();
+            });
+          }}
+          className={`${selectClass} w-auto min-w-48`}
+        >
+          <option value="">{`${data.client!.firstName} (themselves)`}</option>
+          {data.family.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {error && <Alert>{error}</Alert>}
     </div>
   );
 }

@@ -21,6 +21,7 @@ Link a parent and their children, or a couple, so you can see them together and 
 - To take someone out, tap **Edit**, then **Remove** by their name, and **Save**. They keep their own profile.
 - **Remove family** (under **Edit**) unlinks everyone. Nobody's profile or history is deleted.
 - Someone new (a child who hasn't visited yet)? Add them as a client first, then link them here.
+- At checkout, whoever usually pays is chosen under **Paid by** (see Have a family member pay at checkout).
 - Stylists see the family on the profiles of their own clients, but can't change it.
 
 ## If it doesn't work

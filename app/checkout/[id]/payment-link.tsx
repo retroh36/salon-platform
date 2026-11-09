@@ -18,8 +18,10 @@ const POLL_MS = 4000;
 // file, editable.
 export function SendLink({ data, ticket, dueCents, onClose }: { data: CheckoutScreenData; ticket: Ticket; dueCents: number; onClose: () => void }) {
   const router = useRouter();
-  const [channel, setChannel] = useState<"sms" | "email">(data.client?.phone || !data.client?.email ? "sms" : "email");
-  const [address, setAddress] = useState(channel === "sms" ? (data.client?.phone ?? "") : (data.client?.email ?? ""));
+  // A family member paying gets the link.
+  const to = data.payer ?? data.client;
+  const [channel, setChannel] = useState<"sms" | "email">(to?.phone || !to?.email ? "sms" : "email");
+  const [address, setAddress] = useState(channel === "sms" ? (to?.phone ?? "") : (to?.email ?? ""));
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   return (
@@ -37,7 +39,7 @@ export function SendLink({ data, ticket, dueCents, onClose }: { data: CheckoutSc
       }}
     >
       <p className="text-sm text-ink">
-        {data.client?.firstName ?? "The client"} gets a link to pay <strong className="tabular-nums">{formatPrice(dueCents)}</strong> on their phone, with a tip for each stylist if
+        {to?.firstName ?? "The client"} gets a link to pay <strong className="tabular-nums">{formatPrice(dueCents)}</strong> on their phone, with a tip for each stylist if
         they like. When they pay, the sale completes by itself.
       </p>
       <Segmented<"sms" | "email">
@@ -45,7 +47,7 @@ export function SendLink({ data, ticket, dueCents, onClose }: { data: CheckoutSc
         value={channel}
         onChange={(c) => {
           setChannel(c);
-          setAddress(c === "sms" ? (data.client?.phone ?? "") : (data.client?.email ?? ""));
+          setAddress(c === "sms" ? (to?.phone ?? "") : (to?.email ?? ""));
         }}
         options={[
           { value: "sms", label: "Text" },
@@ -85,7 +87,7 @@ export function LinkWaiting({ data, link }: { data: CheckoutScreenData; link: No
           A link to pay <strong className="tabular-nums">{formatPrice(link.amountCents)}</strong> went to {link.sentTo} by {link.channel === "sms" ? "text" : "email"} at {link.sentAt}.
         </p>
         <p className="text-sm text-ink-muted">
-          {expired ? "Send a new one, or take payment here." : `When ${data.client?.firstName ?? "the client"} pays, the sale completes by itself. The link expires at ${link.expiresText}.`}
+          {expired ? "Send a new one, or take payment here." : `When ${(data.payer ?? data.client)?.firstName ?? "the client"} pays, the sale completes by itself. The link expires at ${link.expiresText}.`}
         </p>
         <Button
           variant={expired ? "primary" : "secondary"}

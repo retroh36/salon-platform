@@ -2,7 +2,7 @@
 // taking a reward, points back on refunds, and Denise's line at checkout.
 import { describe, expect, it } from "vitest";
 import { applyPromotions, type PromoLine } from "@/lib/promotions";
-import { centsPerPoint, closestReward, NO_PROGRAM, nextTier, pointsBack, pointsFor, pointsLine, rewardProblem, rewardRule, rewardsProblem, rewardValue, tierFor, type Program, type Reward, type Tier } from "@/lib/rewards";
+import { centsPerPoint, closestReward, NO_PROGRAM, nextTier, pointsBack, pointsClient, pointsFor, pointsLine, rewardProblem, rewardRule, rewardsProblem, rewardValue, tierFor, type Program, type Reward, type Tier } from "@/lib/rewards";
 
 const PROGRAM: Program = { ...NO_PROGRAM, enabled: true, servicePoints: 1, retailPoints: 2, minRedeemPoints: 100 };
 const TIERS: Tier[] = [
@@ -123,5 +123,13 @@ describe("words", () => {
     expect(rewardValue(RETAIL20, name)).toBe("20% off retail");
     expect(centsPerPoint(all)).toBe(5);
     expect(centsPerPoint([GLOSS])).toBe(0);
+  });
+});
+
+describe("pointsClient", () => {
+  it("gives a family member's visit to whoever pays, unless the salon gives it to the client", () => {
+    expect(pointsClient(NO_PROGRAM, "kid", "mom")).toBe("mom");
+    expect(pointsClient(NO_PROGRAM, "kid", null)).toBe("kid");
+    expect(pointsClient({ familyPoints: "client" }, "kid", "mom")).toBe("kid");
   });
 });

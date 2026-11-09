@@ -27,7 +27,8 @@ export function Success({
   paidByLink?: { amountCents: number; tipCents: number } | null;
 }) {
   const [receipt, setReceipt] = useState<"choose" | "email" | "done">("choose");
-  const [email, setEmail] = useState(ticket.receiptEmail || data.client?.email || "");
+  // A family member who paid gets the receipt.
+  const [email, setEmail] = useState(ticket.receiptEmail || data.payer?.email || data.client?.email || "");
   const [note, setNote] = useState<string | null>(null);
   const [pending, start] = useTransition();
   // Where they came from (the calendar on that day, Sales...).
@@ -42,7 +43,7 @@ export function Success({
           <h1 className="text-2xl font-semibold text-ink">{paidByLink ? "Paid by link" : "Sale complete"}</h1>
           <p className="text-2xl font-semibold tracking-[-0.015em] text-ink tabular-nums">{formatPrice(paidByLink ? paidByLink.amountCents + paidByLink.tipCents : totals.totalCents)}</p>
           {paidByLink && paidByLink.tipCents > 0 && <p className="text-sm text-ink-muted">Including {formatPrice(paidByLink.tipCents)} in tips</p>}
-          {data.client && <p className="text-sm text-ink-muted">{data.client.name}</p>}
+          {data.client && <p className="text-sm text-ink-muted">{data.payer ? `${data.client.name} · paid by ${data.payer.name}` : data.client.name}</p>}
         </div>
         {totals.changeCents > 0 && (
           <p className="w-full border-y border-line py-3 text-xl font-semibold text-ink tabular-nums" data-testid="success-change">

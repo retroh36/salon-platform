@@ -88,6 +88,8 @@ export type SaleView = {
   status: Database["public"]["Enums"]["sale_status"];
   createdAt: string;
   client: { id: string; name: string; email: string | null } | null;
+  // Someone in the client's family who paid (the receipt goes to them).
+  payer: { id: string; name: string; email: string | null } | null;
   // A team purchase: who on the team bought it.
   employee: string | null;
   appointmentId: string | null;
@@ -114,18 +116,20 @@ export async function loadSale(supabase: Supabase, saleId: string): Promise<Sale
   const { data: s, error } = await supabase
     .from("sales")
     .select(
-      "id, number, status, created_at, appointment_id, subtotal_cents, discount_cents, discount_reason, tax_cents, tip_cents, total_cents, refunded_cents, void_reason, receipt_email, client:clients(id, first_name, last_name, email), seller:staff!sales_created_by_business_id_fkey(first_name), employee:staff!sales_employee_id_fkey(first_name, last_name), sale_items(id, position, kind, description, quantity, unit_price_cents, booked_price_cents, price_reason, discount_cents, line_discount_cents, line_discount_reason, tax_cents, total_cents, returned_quantity, staff:staff(first_name)), sale_tips(amount_cents, staff:staff(first_name)), payments(id, method, amount_cents, tendered_cents, change_cents, reference, reason, created_at, processor, provider_refund), sale_events(kind, amount_cents, detail, created_at, staff:staff(first_name))",
+      "id, number, status, created_at, appointment_id, payer_client_id, subtotal_cents, discount_cents, discount_reason, tax_cents, tip_cents, total_cents, refunded_cents, void_reason, receipt_email, client:clients(id, first_name, last_name, email), seller:staff!sales_created_by_business_id_fkey(first_name), employee:staff!sales_employee_id_fkey(first_name, last_name), sale_items(id, position, kind, description, quantity, unit_price_cents, booked_price_cents, price_reason, discount_cents, line_discount_cents, line_discount_reason, tax_cents, total_cents, returned_quantity, staff:staff(first_name)), sale_tips(amount_cents, staff:staff(first_name)), payments(id, method, amount_cents, tendered_cents, change_cents, reference, reason, created_at, processor, provider_refund), sale_events(kind, amount_cents, detail, created_at, staff:staff(first_name))",
     )
     .eq("id", saleId)
     .maybeSingle();
   if (error) throw error;
   if (!s) return null;
+  const { data: payer } = s.payer_client_id ? await supabase.from("clients").select("id, first_name, last_name, email").eq("id", s.payer_client_id).maybeSingle() : { data: null };
   return {
     id: s.id,
     number: s.number,
     status: s.status,
     createdAt: s.created_at,
     client: s.client ? { id: s.client.id, name: fullName(s.client), email: s.client.email } : null,
+    payer: payer ? { id: payer.id, name: fullName(payer), email: payer.email } : null,
     employee: s.employee ? fullName(s.employee) : null,
     appointmentId: s.appointment_id,
     items: [...s.sale_items]
@@ -216,7 +220,7 @@ export function receiptText(sale: SaleView, salon: ReceiptSalon, when: string): 
     salon.name,
     salon.locationName,
     `Receipt #${sale.number} · ${when}`,
-    sale.client ? `For ${sale.client.name}` : "",
+    sale.client ? `For ${sale.client.name}${sale.payer ? `, paid by ${sale.payer.name}` : ""}` : "",
     "",
     ...lines.map(([a, b], i) => (heads.has(i) ? `${a.toUpperCase()}  ${b}` : `${a}  ${b}`)),
     "",
@@ -235,7 +239,7 @@ export function receiptText(sale: SaleView, salon: ReceiptSalon, when: string): 
 <div style="max-width:420px;margin:24px auto;background:#fff;border:1px solid #EBE4DD;border-radius:12px;overflow:hidden">
 <div style="background:${escape(accent)};color:#fff;padding:20px 24px"><div style="font-size:20px;font-weight:600">${escape(salon.name)}</div><div style="opacity:.85;font-size:14px">${escape(salon.locationName)}</div></div>
 <div style="padding:20px 24px;font-size:14px">
-<p style="margin:0 0 12px;color:#565E6B">Receipt #${sale.number} · ${escape(when)}${sale.client ? `<br>For ${escape(sale.client.name)}` : ""}</p>
+<p style="margin:0 0 12px;color:#565E6B">Receipt #${sale.number} · ${escape(when)}${sale.client ? `<br>For ${escape(sale.client.name)}${sale.payer ? `, paid by ${escape(sale.payer.name)}` : ""}` : ""}</p>
 <table style="width:100%;border-collapse:collapse">${lines.map((l, i) => row(l, heads.has(i))).join("")}</table>
 <hr style="border:0;border-top:1px solid #EBE4DD;margin:12px 0">
 <table style="width:100%;border-collapse:collapse">${totals.map((l) => row(l, l[0] === "Total")).join("")}${paid.map((l) => row(l)).join("")}</table>

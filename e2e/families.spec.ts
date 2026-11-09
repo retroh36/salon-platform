@@ -1,13 +1,15 @@
-import { admin, SEED } from "../tests/db/helpers";
-import { AUTH, expect, test, waitForHydration } from "./fixtures";
+import { admin, SEED, signIn } from "../tests/db/helpers";
+import { checkout } from "./checkout-helpers";
+import { AUTH, expect, putBackSales, test, waitForHydration } from "./fixtures";
 
 // Families on the client profile: the front desk links a parent and child,
 // names who usually pays, and the stylist sees it without changing it.
 const PREFIX = `Fam${crypto.randomUUID().slice(0, 6)}`;
 const made: string[] = [];
+putBackSales();
 
-async function client(first: string) {
-  const { data, error } = await admin.from("clients").insert({ business_id: SEED.business, first_name: `${PREFIX}${first}`, last_name: "Quill", phone: `31255${String(Math.floor(Math.random() * 1e5)).padStart(5, "0")}` }).select("id").single();
+async function client(first: string, email: string | null = null) {
+  const { data, error } = await admin.from("clients").insert({ business_id: SEED.business, first_name: `${PREFIX}${first}`, last_name: "Quill", email, phone: `31255${String(Math.floor(Math.random() * 1e5)).padStart(5, "0")}` }).select("id").single();
   if (error) throw error;
   made.push(data.id);
   return data.id;
@@ -18,6 +20,7 @@ test.afterAll(async () => {
   await admin.from("card_authorizations").delete().in("client_id", made);
   await admin.from("client_cards").delete().in("client_id", made);
   await admin.from("policy_consents").delete().in("client_id", made);
+  await admin.from("reward_points").delete().in("client_id", made);
   await admin.from("outbox_messages").delete().like("body", `%${PREFIX}%`);
   const { data } = await admin.from("clients").select("family_id").in("id", made);
   const families = [...new Set((data ?? []).map((c) => c.family_id).filter(Boolean))] as string[];
@@ -115,5 +118,34 @@ test.describe("families", () => {
     await expect(after.getByRole("status")).toContainText("no longer use that card");
     await page.reload();
     await expect(page.getByTestId("client-card").filter({ visible: true }).getByTestId("no-card")).toBeVisible();
+  });
+
+  test("a parent pays at checkout for their child: the receipt and the points are theirs", async ({ page }) => {
+    const mom = await client("Lee", `${PREFIX.toLowerCase()}lee@example.test`);
+    const kid = await client("Rae");
+    const desk = await signIn("frontdesk@mapleandash.test");
+    const { error } = await desk.rpc("save_family", { p_business_id: SEED.business, p_family_id: null as never, p_name: "The Quills", p_client_ids: [mom, kid], p_payer_client_id: mom });
+    expect(error).toBeNull();
+    const { data: stock } = await admin.from("stock_levels").select("product_id, products!inner(type, price_cents)").eq("location_id", SEED.location).eq("products.type", "retail").gt("on_hand", 5).gt("products.price_cents", 1000).limit(1).single();
+
+    await page.goto(`/checkout/new?product=${stock!.product_id}&client=${kid}&from=/sales`);
+    await expect(page).toHaveURL(/\/checkout\/[0-9a-f-]{36}$/);
+    await waitForHydration(page, "#product-search");
+    const co = checkout(page);
+    // Who usually pays is chosen to start with; the points shown are theirs.
+    const paidBy = co.ticket.getByLabel("Paid by");
+    await expect(paidBy).toHaveValue(mom);
+    await expect(paidBy.locator("option")).toHaveText([`${PREFIX}Rae (themselves)`, `${PREFIX}Lee Quill`]);
+    await expect(co.ticket.getByTestId("badge-points")).toContainText(`${PREFIX}Lee:`);
+    await co.card();
+    const done = await co.complete();
+    await expect(done).toContainText(`${PREFIX}Rae Quill · paid by ${PREFIX}Lee Quill`);
+    await done.getByRole("button", { name: "Email" }).click();
+    await expect(done.getByLabel("Email address")).toHaveValue(`${PREFIX.toLowerCase()}lee@example.test`);
+
+    const { data: sale } = await admin.from("sales").select("id, payer_client_id").eq("client_id", kid).single();
+    expect(sale!.payer_client_id).toBe(mom);
+    const earned = (await admin.from("reward_points").select("client_id, delta").eq("sale_id", sale!.id).eq("kind", "earn")).data!;
+    expect(earned).toEqual([{ client_id: mom, delta: expect.any(Number) }]);
   });
 });

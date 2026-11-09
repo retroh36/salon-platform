@@ -110,7 +110,7 @@ async function Sale({ params, searchParams }: Pick<PageProps<"/sales/[id]">, "pa
         <div>
           {desk && sale.status !== "voided" && (
             <Card title="Receipt" titleId="send-heading" description="Print it, or email it to the client.">
-              <EmailReceipt saleId={sale.id} email={sale.receiptEmail ?? sale.client?.email ?? ""} />
+              <EmailReceipt saleId={sale.id} email={sale.receiptEmail ?? sale.payer?.email ?? sale.client?.email ?? ""} />
             </Card>
           )}
           {manager && cardRefundDue > 0 && (
@@ -148,6 +148,7 @@ function Receipt({ sale, salon, when }: { sale: SaleView; salon: ReceiptSalon; w
         <p className="text-ink-muted">
           Receipt #{sale.number} · {when}
           {sale.client ? ` · ${sale.client.name}` : ""}
+          {sale.payer ? `, paid by ${sale.payer.name}` : ""}
           {sale.employee ? ` · Team purchase · ${sale.employee}` : ""}
           {sale.soldBy ? ` · served by ${sale.soldBy}` : ""}
         </p>

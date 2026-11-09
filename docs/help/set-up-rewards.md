@@ -9,7 +9,7 @@ Choose how clients earn points, the tiers they can reach and the rewards they ca
 
 1. Go to **Settings** and tap **Rewards**.
 2. Under **How clients earn**, tick **Clients earn points** and set the points for every dollar paid **On services** and **On retail**.
-3. Set any bonus points: **First visit**, **Books their next visit before leaving**, **Birthday** and **Referral (each client)**. Use 0 for none.
+3. Set any bonus points: **First visit**, **Books their next visit before leaving**, **Birthday** and **Referral (each client)**. Use 0 for none. Under **When a family member pays for someone's visit**, choose who gets the points.
 4. Under **Taking rewards**, set the points needed before any reward, when points expire, and whether rewards can be used with a promotion. Tap **Save program**.
 5. Under **Tiers**, tap **Add a tier** for each level (like Silver, Gold, VIP): what it takes in the last 12 months, its bonus points, a free add-on and whether they go first on the waitlist. Tap **Save tiers**.
 6. Under **New reward**, add each reward (like "$25 off" for 500 points or "Free gloss"), with how many times a year and which tier it's for. Tap **Add reward**.
@@ -20,4 +20,5 @@ Choose how clients earn points, the tiers they can reach and the rewards they ca
 - A referral pays both clients once the new client's first visit is checked out. There are no points for reviews.
 - A refund takes back its share of the points earned; a void takes them all back and gives back any reward used.
 - Points expire only when a client earns nothing for the months you set.
+- When a family member pays for someone's visit, the points go to whoever pays unless you choose the client who had the visit.
 - To stop offering a reward, open it, untick **In the catalog** and save.

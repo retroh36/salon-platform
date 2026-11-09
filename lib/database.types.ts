@@ -3159,14 +3159,14 @@ isOneToOne: false
                   ]
                 },"reward_programs": {
                   Row: {
-                    "birthday_points": number,"business_id": string,"earn_on_memberships": boolean,"earn_on_packages": boolean,"enabled": boolean,"expiry_months": number | null,"first_visit_points": number,"min_redeem_points": number,"rebook_points": number,"referral_points": number,"retail_points_per_dollar": number,"service_points_per_dollar": number,"stack_with_promotions": boolean,"tier_basis": string,"updated_at": string,"updated_by": string | null
+                    "birthday_points": number,"business_id": string,"earn_on_memberships": boolean,"earn_on_packages": boolean,"enabled": boolean,"expiry_months": number | null,"family_points": string,"first_visit_points": number,"min_redeem_points": number,"rebook_points": number,"referral_points": number,"retail_points_per_dollar": number,"service_points_per_dollar": number,"stack_with_promotions": boolean,"tier_basis": string,"updated_at": string,"updated_by": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "birthday_points"?: number,"business_id": string,"earn_on_memberships"?: boolean,"earn_on_packages"?: boolean,"enabled"?: boolean,"expiry_months"?: number | null,"first_visit_points"?: number,"min_redeem_points"?: number,"rebook_points"?: number,"referral_points"?: number,"retail_points_per_dollar"?: number,"service_points_per_dollar"?: number,"stack_with_promotions"?: boolean,"tier_basis"?: string,"updated_at"?: string,"updated_by"?: string | null
+                    "birthday_points"?: number,"business_id": string,"earn_on_memberships"?: boolean,"earn_on_packages"?: boolean,"enabled"?: boolean,"expiry_months"?: number | null,"family_points"?: string,"first_visit_points"?: number,"min_redeem_points"?: number,"rebook_points"?: number,"referral_points"?: number,"retail_points_per_dollar"?: number,"service_points_per_dollar"?: number,"stack_with_promotions"?: boolean,"tier_basis"?: string,"updated_at"?: string,"updated_by"?: string | null
                   }
                   Update: {
-                    "birthday_points"?: number,"business_id"?: string,"earn_on_memberships"?: boolean,"earn_on_packages"?: boolean,"enabled"?: boolean,"expiry_months"?: number | null,"first_visit_points"?: number,"min_redeem_points"?: number,"rebook_points"?: number,"referral_points"?: number,"retail_points_per_dollar"?: number,"service_points_per_dollar"?: number,"stack_with_promotions"?: boolean,"tier_basis"?: string,"updated_at"?: string,"updated_by"?: string | null
+                    "birthday_points"?: number,"business_id"?: string,"earn_on_memberships"?: boolean,"earn_on_packages"?: boolean,"enabled"?: boolean,"expiry_months"?: number | null,"family_points"?: string,"first_visit_points"?: number,"min_redeem_points"?: number,"rebook_points"?: number,"referral_points"?: number,"retail_points_per_dollar"?: number,"service_points_per_dollar"?: number,"stack_with_promotions"?: boolean,"tier_basis"?: string,"updated_at"?: string,"updated_by"?: string | null
                   }
                   Relationships: [
                     {
@@ -3237,14 +3237,14 @@ isOneToOne: false
                   ]
                 },"sale_drafts": {
                   Row: {
-                    "appointment_id": string | null,"business_id": string,"client_id": string | null,"created_at": string,"created_by": string | null,"id": string,"location_id": string,"return_to": string | null,"sale_id": string | null,"status": string,"ticket": NonNullable<Json>,"updated_at": string
+                    "appointment_id": string | null,"business_id": string,"client_id": string | null,"created_at": string,"created_by": string | null,"id": string,"location_id": string,"payer_client_id": string | null,"return_to": string | null,"sale_id": string | null,"status": string,"ticket": NonNullable<Json>,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_id"?: string | null,"business_id": string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id": string,"return_to"?: string | null,"sale_id"?: string | null,"status"?: string,"ticket"?: NonNullable<Json>,"updated_at"?: string
+                    "appointment_id"?: string | null,"business_id": string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id": string,"payer_client_id"?: string | null,"return_to"?: string | null,"sale_id"?: string | null,"status"?: string,"ticket"?: NonNullable<Json>,"updated_at"?: string
                   }
                   Update: {
-                    "appointment_id"?: string | null,"business_id"?: string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id"?: string,"return_to"?: string | null,"sale_id"?: string | null,"status"?: string,"ticket"?: NonNullable<Json>,"updated_at"?: string
+                    "appointment_id"?: string | null,"business_id"?: string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"location_id"?: string,"payer_client_id"?: string | null,"return_to"?: string | null,"sale_id"?: string | null,"status"?: string,"ticket"?: NonNullable<Json>,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -3425,14 +3425,14 @@ isOneToOne: false
                   ]
                 },"sales": {
                   Row: {
-                    "appointment_id": string | null,"business_id": string,"client_id": string | null,"created_at": string,"created_by": string | null,"discount_cents": number,"discount_reason": string | null,"draft_id": string | null,"employee_id": string | null,"id": string,"location_id": string,"note": string | null,"number": number,"rebook_appointment_id": string | null,"receipt_email": string | null,"refunded_cents": number,"status": Database["public"]['Enums']["sale_status"],"subtotal_cents": number,"tax_cents": number,"tip_cents": number,"total_cents": number,"void_reason": string | null,"voided_at": string | null,"voided_by": string | null
+                    "appointment_id": string | null,"business_id": string,"client_id": string | null,"created_at": string,"created_by": string | null,"discount_cents": number,"discount_reason": string | null,"draft_id": string | null,"employee_id": string | null,"id": string,"location_id": string,"note": string | null,"number": number,"payer_client_id": string | null,"rebook_appointment_id": string | null,"receipt_email": string | null,"refunded_cents": number,"status": Database["public"]['Enums']["sale_status"],"subtotal_cents": number,"tax_cents": number,"tip_cents": number,"total_cents": number,"void_reason": string | null,"voided_at": string | null,"voided_by": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_id"?: string | null,"business_id": string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"discount_cents"?: number,"discount_reason"?: string | null,"draft_id"?: string | null,"employee_id"?: string | null,"id"?: string,"location_id": string,"note"?: string | null,"number": number,"rebook_appointment_id"?: string | null,"receipt_email"?: string | null,"refunded_cents"?: number,"status"?: Database["public"]['Enums']["sale_status"],"subtotal_cents": number,"tax_cents"?: number,"tip_cents"?: number,"total_cents": number,"void_reason"?: string | null,"voided_at"?: string | null,"voided_by"?: string | null
+                    "appointment_id"?: string | null,"business_id": string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"discount_cents"?: number,"discount_reason"?: string | null,"draft_id"?: string | null,"employee_id"?: string | null,"id"?: string,"location_id": string,"note"?: string | null,"number": number,"payer_client_id"?: string | null,"rebook_appointment_id"?: string | null,"receipt_email"?: string | null,"refunded_cents"?: number,"status"?: Database["public"]['Enums']["sale_status"],"subtotal_cents": number,"tax_cents"?: number,"tip_cents"?: number,"total_cents": number,"void_reason"?: string | null,"voided_at"?: string | null,"voided_by"?: string | null
                   }
                   Update: {
-                    "appointment_id"?: string | null,"business_id"?: string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"discount_cents"?: number,"discount_reason"?: string | null,"draft_id"?: string | null,"employee_id"?: string | null,"id"?: string,"location_id"?: string,"note"?: string | null,"number"?: number,"rebook_appointment_id"?: string | null,"receipt_email"?: string | null,"refunded_cents"?: number,"status"?: Database["public"]['Enums']["sale_status"],"subtotal_cents"?: number,"tax_cents"?: number,"tip_cents"?: number,"total_cents"?: number,"void_reason"?: string | null,"voided_at"?: string | null,"voided_by"?: string | null
+                    "appointment_id"?: string | null,"business_id"?: string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"discount_cents"?: number,"discount_reason"?: string | null,"draft_id"?: string | null,"employee_id"?: string | null,"id"?: string,"location_id"?: string,"note"?: string | null,"number"?: number,"payer_client_id"?: string | null,"rebook_appointment_id"?: string | null,"receipt_email"?: string | null,"refunded_cents"?: number,"status"?: Database["public"]['Enums']["sale_status"],"subtotal_cents"?: number,"tax_cents"?: number,"tip_cents"?: number,"total_cents"?: number,"void_reason"?: string | null,"voided_at"?: string | null,"voided_by"?: string | null
                   }
                   Relationships: [
                     {

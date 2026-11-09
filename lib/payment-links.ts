@@ -16,7 +16,7 @@ export type LinkStylist = { staffId: string; firstName: string; servicesCents: n
 
 export type LinkSnapshot = {
   // What complete_sale is sent (without the draft, tips and payments).
-  input: Pick<ReturnType<typeof saleInput>, "appointment_id" | "client_id" | "rebook_appointment_id" | "lines" | "discount" | "receipt_email">;
+  input: Pick<ReturnType<typeof saleInput>, "appointment_id" | "client_id" | "payer_client_id" | "rebook_appointment_id" | "lines" | "discount" | "receipt_email">;
   lines: LinkLine[];
   stylists: LinkStylist[];
   subtotalCents: number;
@@ -35,7 +35,7 @@ export type LinkSnapshot = {
 export function linkSnapshot(
   ticket: Ticket,
   given: Rates,
-  ids: { appointmentId: string | null; clientId: string | null },
+  ids: { appointmentId: string | null; clientId: string | null; payerId?: string | null },
   staff: { id: string; firstName: string }[],
   clientFirstName: string | null,
 ): LinkSnapshot | { problem: string } {
@@ -48,7 +48,7 @@ export function linkSnapshot(
   if (due <= 0) return { problem: "There's nothing left to pay." };
   const name = (id: string | null) => staff.find((s) => s.id === id)?.firstName ?? null;
   const full = saleInput(bare, { draftId: "", ...ids });
-  const input = { appointment_id: full.appointment_id, client_id: full.client_id, rebook_appointment_id: full.rebook_appointment_id, promotion_ids: full.promotion_ids, lines: full.lines, discount: full.discount, receipt_email: full.receipt_email };
+  const input = { appointment_id: full.appointment_id, client_id: full.client_id, payer_client_id: full.payer_client_id, rebook_appointment_id: full.rebook_appointment_id, promotion_ids: full.promotion_ids, lines: full.lines, discount: full.discount, receipt_email: full.receipt_email };
   return {
     input,
     lines: bare.lines.map((l) => ({

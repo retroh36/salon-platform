@@ -33,6 +33,9 @@ export type Program = {
   // Rewards can be used with promotions on the same sale.
   stackWithPromotions: boolean;
   tierBasis: TierBasis;
+  // Who earns when a family member pays for another's visit: the payer
+  // (the default) or the client who had the visit.
+  familyPoints: "payer" | "client";
 };
 
 export type Tier = {
@@ -268,10 +271,11 @@ export type ProgramRow = {
   min_redeem_points: number;
   stack_with_promotions: boolean;
   tier_basis: string;
+  family_points: string;
 };
 
 export const PROGRAM_COLUMNS =
-  "enabled, service_points_per_dollar, retail_points_per_dollar, earn_on_packages, earn_on_memberships, birthday_points, referral_points, rebook_points, first_visit_points, expiry_months, min_redeem_points, stack_with_promotions, tier_basis";
+  "enabled, service_points_per_dollar, retail_points_per_dollar, earn_on_packages, earn_on_memberships, birthday_points, referral_points, rebook_points, first_visit_points, expiry_months, min_redeem_points, stack_with_promotions, tier_basis, family_points";
 
 export const NO_PROGRAM: Program = {
   enabled: false,
@@ -287,7 +291,12 @@ export const NO_PROGRAM: Program = {
   minRedeemPoints: 0,
   stackWithPromotions: false,
   tierBasis: "spend",
+  familyPoints: "payer",
 };
+
+// Whose points a sale earns and spends, as private.points_client.
+export const pointsClient = (program: Pick<Program, "familyPoints">, clientId: string, payerId: string | null): string =>
+  payerId && program.familyPoints === "payer" ? payerId : clientId;
 
 export function programOf(r: ProgramRow | null): Program {
   if (!r) return NO_PROGRAM;
@@ -305,6 +314,7 @@ export function programOf(r: ProgramRow | null): Program {
     minRedeemPoints: r.min_redeem_points,
     stackWithPromotions: r.stack_with_promotions,
     tierBasis: r.tier_basis === "visits" ? "visits" : "spend",
+    familyPoints: r.family_points === "client" ? "client" : "payer",
   };
 }
 

@@ -46,6 +46,29 @@ async function client(name: string, extra: Record<string, unknown> = {}) {
 const balance = async (clientId: string) => ((await admin.from("reward_points").select("delta").eq("client_id", clientId)).data ?? []).reduce((n, r) => n + r.delta, 0);
 const ledger = async (clientId: string) => (await admin.from("reward_points").select("delta, kind, bonus").eq("client_id", clientId).order("created_at")).data!;
 
+const PROGRAM = {
+  enabled: true,
+  service_points_per_dollar: 2,
+  retail_points_per_dollar: 1,
+  first_visit_points: 50,
+  referral_points: 100,
+  rebook_points: 25,
+  birthday_points: 75,
+  min_redeem_points: 100,
+  expiry_months: 12,
+  tier_basis: "spend",
+};
+const families: string[] = [];
+
+// A parent and a child in one family, the parent usually paying.
+async function family() {
+  const [parent, child] = [await client("Jen"), await client("Mia")];
+  const { data, error } = await frontDesk.rpc("save_family", { p_business_id: B, p_family_id: null as never, p_name: `The ${TAG}`, p_client_ids: [parent, child], p_payer_client_id: parent });
+  if (error) throw error;
+  families.push(data as string);
+  return { parent, child };
+}
+
 let n = 0;
 const service = (cents = 10_000, serviceId = cutId, appointmentItemId: string | null = null): TicketLine => ({
   key: `s${++n}`,
@@ -65,14 +88,14 @@ const product = (quantity = 1): TicketLine => ({ key: `p${++n}`, kind: "product"
 
 // Sells a ticket, paying what lib/ticket.ts says it comes to; the database
 // must agree to the cent.
-async function sell(c: Client, clientId: string | null, lines: TicketLine[], over: Partial<Ticket> = {}, appointmentId: string | null = null) {
+async function sell(c: Client, clientId: string | null, lines: TicketLine[], over: Partial<Ticket> = {}, appointmentId: string | null = null, payerId: string | null = null) {
   const today = todayIn(TZ);
-  const [promo, rewards] = await Promise.all([promoRatesFor(admin, { businessId: B, timezone: TZ, today, clientId, appointmentId }), rewardRatesFor(frontDesk, B, clientId)]);
+  const [promo, rewards] = await Promise.all([promoRatesFor(admin, { businessId: B, timezone: TZ, today, clientId, appointmentId }), rewardRatesFor(frontDesk, B, clientId, payerId)]);
   const ticket: Ticket = { ...EMPTY_TICKET, lines, ...over };
   const rates: Rates = { taxServicesBp: 0, taxRetailBp: 1025, promo, rewards };
   const totals = totalsOf(ticket, rates);
   const tips = Object.values(ticket.tips).reduce((a, b) => a + b, 0);
-  const input = { ...saleInput(ticket, { draftId: "", appointmentId, clientId }), payments: totals.totalCents ? [{ method: "card", amount_cents: totals.totalCents }] : [] };
+  const input = { ...saleInput(ticket, { draftId: "", appointmentId, clientId, payerId }), payments: totals.totalCents ? [{ method: "card", amount_cents: totals.totalCents }] : [] };
   const { data, error } = await c.rpc("complete_sale", { p_location_id: L, p_input: input as never });
   return { saleId: data as string | null, error, totals, tips, problems: ticketProblems({ ...ticket, payments: totals.totalCents ? [{ key: "card", method: "card" as const, amountCents: totals.totalCents, reference: "" }] : [] }, rates, Boolean(clientId)) };
 }
@@ -112,25 +135,7 @@ beforeAll(async () => {
   };
   await admin.from("rewards").delete().eq("business_id", B);
   await admin.from("reward_tiers").delete().eq("business_id", B);
-  expect(
-    (
-      await owner.rpc("save_reward_program", {
-        p_business_id: B,
-        p_program: {
-          enabled: true,
-          service_points_per_dollar: 2,
-          retail_points_per_dollar: 1,
-          first_visit_points: 50,
-          referral_points: 100,
-          rebook_points: 25,
-          birthday_points: 75,
-          min_redeem_points: 100,
-          expiry_months: 12,
-          tier_basis: "spend",
-        } as never,
-      })
-    ).error,
-  ).toBeNull();
+  expect((await owner.rpc("save_reward_program", { p_business_id: B, p_program: PROGRAM as never })).error).toBeNull();
   // Gold from $100 in 12 months: half as many points again.
   expect((await owner.rpc("save_reward_tiers", { p_business_id: B, p_tiers: [{ name: `${TAG} Gold`, threshold: 10_000, bonus_pct: 50 }] as never })).error).toBeNull();
   goldId = (await admin.from("reward_tiers").select("id").eq("business_id", B).single()).data!.id;
@@ -144,6 +149,7 @@ afterAll(async () => {
   await admin.from("appointments").delete().in("client_id", clients);
   await admin.from("sales").delete().in("client_id", clients);
   await admin.from("clients").delete().in("id", clients);
+  if (families.length) await admin.from("families").delete().in("id", families);
   await admin.from("stock_levels").delete().eq("product_id", productId);
   await admin.from("products").delete().eq("id", productId);
   for (const st of stylists) await st.remove();
@@ -192,6 +198,74 @@ describe("earning", () => {
     const again = await checkout(c, await visit(c, "checked_in", 1));
     expect(again.error).toBeNull();
     expect((await ledger(c)).filter((r) => r.bonus === "first_visit")).toHaveLength(1);
+  });
+});
+
+describe("a family member paying", () => {
+  it("earns the points for the payer, unless the salon gives them to the client", async () => {
+    const { parent, child } = await family();
+    const { error } = await sell(frontDesk, child, [service(10_000)], {}, null, parent);
+    expect(error).toBeNull();
+    expect(await balance(parent)).toBe(200);
+    expect(await balance(child)).toBe(0);
+    const { data: sale } = await admin.from("sales").select("payer_client_id").eq("client_id", child).single();
+    expect(sale!.payer_client_id).toBe(parent);
+
+    expect((await owner.rpc("save_reward_program", { p_business_id: B, p_program: { ...PROGRAM, family_points: "client" } as never })).error).toBeNull();
+    try {
+      await sell(frontDesk, child, [service(5_000)], {}, null, parent);
+      // 100, and half again: the $100 visit before made the child Gold
+      // (tiers count the visits' own client, whoever paid).
+      expect(await balance(child)).toBe(150);
+      expect(await balance(parent)).toBe(200);
+    } finally {
+      await owner.rpc("save_reward_program", { p_business_id: B, p_program: PROGRAM as never });
+    }
+  });
+
+  it("spends the payer's points on rewards, and a refund takes back from the payer", async () => {
+    const { parent, child } = await family();
+    await sell(frontDesk, parent, [service(10_000)]);
+    expect(await balance(parent)).toBe(200);
+    const sale = await sell(frontDesk, child, [service(10_000)], { rewards: [tenOff] }, null, parent);
+    expect(sale.error).toBeNull();
+    expect(sale.problems).toEqual([]);
+    // 200 − 100 for the reward + 180 for $90 of services (Gold by then: +50%).
+    // (The redeem and the earn share the sale's moment, so sorted by size.)
+    expect((await ledger(parent)).sort((a, b) => a.delta - b.delta)).toEqual([
+      { delta: -100, kind: "redeem", bonus: null },
+      { delta: 200, kind: "earn", bonus: null },
+      { delta: 270, kind: "earn", bonus: null },
+    ]);
+    expect(await balance(child)).toBe(0);
+    const { error } = await manager.rpc("refund_sale", { p_sale_id: sale.saleId!, p_input: { reason: "Not happy", payments: [{ method: "card", amount_cents: 4_500 }] } as never });
+    expect(error).toBeNull();
+    // Half the money back: half the points earned, from the parent.
+    expect(await balance(parent)).toBe(370 - 135);
+    expect(await balance(child)).toBe(0);
+  });
+
+  it("is only someone in the client's family", async () => {
+    const { child } = await family();
+    const stranger = await client("Al");
+    expect((await sell(frontDesk, child, [service(5_000)], {}, null, stranger)).error).toMatchObject({ hint: "payer" });
+    expect((await sell(frontDesk, child, [service(5_000)], {}, null, child)).error).toMatchObject({ hint: "payer" });
+    expect((await sell(frontDesk, null, [product(1)], {}, null, stranger)).error).toMatchObject({ hint: "payer" });
+  });
+});
+
+describe("gift cards", () => {
+  it("earn when they're spent on services, never when they're bought", async () => {
+    const buyer = await client("Buyer");
+    const card: TicketLine = { key: "g2", kind: "gift_card", amountCents: 10_000, physical: false, code: "", recipientName: "", recipientEmail: "friend@example.test" } as TicketLine;
+    const bought = await sell(frontDesk, buyer, [card]);
+    expect(bought.error).toBeNull();
+    expect(await balance(buyer)).toBe(0);
+    const { data: gc } = await admin.from("gift_cards").select("code").eq("sale_id", bought.saleId!).single();
+    const spender = await client("Spender");
+    const input = { ...saleInput({ ...EMPTY_TICKET, lines: [service(8_000)] }, { draftId: "", appointmentId: null, clientId: spender }), payments: [{ method: "gift_card", amount_cents: 8_000, code: gc!.code }] };
+    expect((await frontDesk.rpc("complete_sale", { p_location_id: L, p_input: input as never })).error).toBeNull();
+    expect(await balance(spender)).toBe(160);
   });
 });
 

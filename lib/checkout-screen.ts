@@ -21,7 +21,7 @@ import { addDays, formatMinute, todayIn, toLocal, type LocalDate } from "@/lib/s
 import { levelPricesFrom, stylistPrice } from "@/lib/services";
 import { fullName, sortStaff, type StaffRole } from "@/lib/staff";
 import { promoRatesFor } from "@/lib/promotions-load";
-import { pointsLine, rewardProblem } from "@/lib/rewards";
+import { pointsClient, pointsLine, rewardProblem } from "@/lib/rewards";
 import { rewardRatesFor } from "@/lib/rewards-load";
 import { EMPTY_TICKET, parseTicket, productLine, promotionProblems, type PromoRates, type RewardRates, type ServiceLine, type Ticket } from "@/lib/ticket";
 
@@ -84,9 +84,10 @@ export async function startCheckout(supabase: Supabase, me: Me, options: { appoi
         };
       });
     const promotions = await startingPromotions(supabase, me, { ...EMPTY_TICKET, lines }, a);
+    const payer = a.client_id ? await usualPayer(supabase, a.client_id) : null;
     const { data, error } = await supabase
       .from("sale_drafts")
-      .insert({ business_id: me.business_id, location_id: me.location.id, appointment_id: a.id, client_id: a.client_id, ticket: { ...EMPTY_TICKET, lines, payments: depositPayment(a), promotions } as never, return_to: returnTo, created_by: me.id })
+      .insert({ business_id: me.business_id, location_id: me.location.id, appointment_id: a.id, client_id: a.client_id, payer_client_id: payer, ticket: { ...EMPTY_TICKET, lines, payments: depositPayment(a), promotions } as never, return_to: returnTo, created_by: me.id })
       .select("id")
       .single();
     // Someone else just opened it: use theirs.
@@ -111,11 +112,19 @@ export async function startCheckout(supabase: Supabase, me: Me, options: { appoi
   const client = options.clientId ? (await supabase.from("clients").select("id").eq("id", options.clientId).maybeSingle()).data : null;
   const { data, error } = await supabase
     .from("sale_drafts")
-    .insert({ business_id: me.business_id, location_id: me.location.id, client_id: client?.id ?? null, ticket: ticket as never, return_to: returnTo, created_by: me.id })
+    .insert({ business_id: me.business_id, location_id: me.location.id, client_id: client?.id ?? null, payer_client_id: client ? await usualPayer(supabase, client.id) : null, ticket: ticket as never, return_to: returnTo, created_by: me.id })
     .select("id")
     .single();
   if (error) throw error;
   return data.id;
+}
+
+// Who usually pays for the client, when it's someone else in their family.
+export async function usualPayer(supabase: Supabase, clientId: string): Promise<string | null> {
+  const { data: c } = await supabase.from("clients").select("family_id").eq("id", clientId).maybeSingle();
+  if (!c?.family_id) return null;
+  const { data: f } = await supabase.from("families").select("payer_client_id").eq("id", c.family_id).maybeSingle();
+  return f?.payer_client_id && f.payer_client_id !== clientId ? f.payer_client_id : null;
 }
 
 // Promotions a visit starts with: the code or special the client booked
@@ -139,6 +148,8 @@ function depositPayment(a: { deposit_paid_cents: number; deposit_outcome: string
   return a.deposit_paid_cents > 0 && a.deposit_outcome === null ? [{ key: "deposit", method: "card", amountCents: a.deposit_paid_cents, reference: DEPOSIT_REFERENCE }] : [];
 }
 
+export type FamilyPayerOption = { id: string; name: string; firstName: string; email: string | null; phone: string | null };
+
 export type ScreenStaff = { id: string; firstName: string; name: string; level: StaffLevel | null; color: string | null; photoUrl: string | null };
 export type ScreenService = { id: string; name: string; category: string; priceFor: Record<string, number> };
 
@@ -146,6 +157,13 @@ export type CheckoutScreenData = {
   draft: { id: string; status: "open" | "completed"; saleId: string | null; returnTo: string; appointmentId: string | null };
   ticket: Ticket;
   client: { id: string; name: string; firstName: string; email: string | null; phone: string | null } | null;
+  // The rest of the client's family, and who of them is paying (the
+  // receipt goes to them, and the points, unless the salon gives them to
+  // the client). `pointsHolder`: whose points the sale uses, when not the
+  // client's.
+  family: FamilyPayerOption[];
+  payer: FamilyPayerOption | null;
+  pointsHolder: string | null;
   // The latest payment link sent for this checkout (text-to-pay).
   link: { id: string; status: "open" | "paid" | "canceled"; channel: "sms" | "email"; sentTo: string; expiresAt: string; createdAt: string; sentAt: string; expiresText: string; amountCents: number; tipCents: number | null } | null;
   insight: { summary: string; tags: { label: string; tone: string }[] } | null;
@@ -188,7 +206,7 @@ export type CheckoutScreenData = {
 };
 
 export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: string, now = new Date()): Promise<CheckoutScreenData | null> {
-  const { data: draft, error } = await supabase.from("sale_drafts").select("id, status, sale_id, return_to, appointment_id, client_id, ticket").eq("id", draftId).maybeSingle();
+  const { data: draft, error } = await supabase.from("sale_drafts").select("id, status, sale_id, return_to, appointment_id, client_id, payer_client_id, ticket").eq("id", draftId).maybeSingle();
   if (error) throw error;
   if (!draft) return null;
   const tz = me.location.timezone;
@@ -200,11 +218,11 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     loadRetailProducts(supabase, me.business_id, me.location.id),
     loadTemplates(supabase, me.business_id),
     supabase.from("services").select("id, name, category, price_cents, archived_at, service_level_prices(level, price_cents)").eq("business_id", me.business_id).is("archived_at", null).order("name"),
-    draft.client_id ? supabase.from("clients").select("id, first_name, last_name, email, phone").eq("id", draft.client_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    draft.client_id ? supabase.from("clients").select("id, first_name, last_name, email, phone, family_id").eq("id", draft.client_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("stock_overrides").select("product_id").eq("draft_id", draft.id),
     loadPlans(supabase, me.business_id),
     promoRatesFor(supabase, { businessId: me.business_id, timezone: tz, today, clientId: draft.client_id, appointmentId: draft.appointment_id }),
-    rewardRatesFor(supabase, me.business_id, draft.client_id),
+    rewardRatesFor(supabase, me.business_id, draft.client_id, draft.payer_client_id),
     salonProvider(supabase, me.business_id),
     draft.client_id ? cardOnFile(supabase, draft.client_id) : Promise.resolve(null),
     drawerReadyToday(supabase, me.location.id, today),
@@ -241,6 +259,12 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
   };
 
   const client = clientRow.data ? { id: clientRow.data.id, name: fullName(clientRow.data), firstName: clientRow.data.first_name, email: clientRow.data.email, phone: clientRow.data.phone } : null;
+  const { data: relatives } = clientRow.data?.family_id
+    ? await supabase.from("clients").select("id, first_name, last_name, email, phone").eq("family_id", clientRow.data.family_id).neq("id", clientRow.data.id).order("first_name")
+    : { data: [] };
+  const family: FamilyPayerOption[] = (relatives ?? []).map((r) => ({ id: r.id, name: fullName(r), firstName: r.first_name, email: r.email, phone: r.phone }));
+  const payer = family.find((f) => f.id === draft.payer_client_id) ?? null;
+  const pointsHolder = rewards && client && payer && pointsClient(rewards.program, client.id, payer.id) === payer.id ? payer.firstName : null;
   const { data: link } = await supabase
     .from("payment_links")
     .select("id, status, channel, sent_to, expires_at, created_at, amount_cents, tip_cents")
@@ -327,6 +351,9 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
           tipCents: link.tip_cents,
         }
       : null,
+    family,
+    payer,
+    pointsHolder,
     insight,
     packages,
     memberships,
@@ -336,7 +363,7 @@ export async function loadCheckoutScreen(supabase: Supabase, me: Me, draftId: st
     rewardsLine:
       rewards && client
         ? pointsLine(
-            client.firstName,
+            pointsHolder ?? client.firstName,
             rewards.client.balance,
             rewards.catalog,
             rewards.catalog.filter((r) => !rewardProblem(r, rewards.client, rewards.program, rewards.tiers)),

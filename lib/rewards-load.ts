@@ -8,6 +8,7 @@ import {
   KIND_LABEL,
   BONUS_LABEL,
   PROGRAM_COLUMNS,
+  pointsClient,
   REWARD_COLUMNS,
   TIER_COLUMNS,
   programOf,
@@ -75,11 +76,13 @@ export async function loadClientRewards(supabase: Supabase, clientId: string): P
 }
 
 // What the checkout needs (null when the program is off or there's no client).
-export async function rewardRatesFor(supabase: Supabase, businessId: string, clientId: string | null): Promise<RewardRates | null> {
+// The points a sale earns into and spends from: the client's, or a paying
+// family member's when the salon gives points to whoever pays.
+export async function rewardRatesFor(supabase: Supabase, businessId: string, clientId: string | null, payerId: string | null = null): Promise<RewardRates | null> {
   if (!clientId) return null;
   const settings = await loadRewardSettings(supabase, businessId);
   if (!settings.program.enabled) return null;
-  const client = await loadClientRewards(supabase, clientId);
+  const client = await loadClientRewards(supabase, pointsClient(settings.program, clientId, payerId));
   return { program: settings.program, tiers: settings.tiers, catalog: settings.catalog, client };
 }
 

@@ -396,11 +396,12 @@ export function rewardProblems(ticket: Ticket, rates: Rates, hasClient: boolean)
 const dollars = (cents: number) => (cents % 100 === 0 ? `$${(cents / 100).toLocaleString("en-US")}` : `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 
 // What complete_sale is sent.
-export function saleInput(ticket: Ticket, ids: { draftId: string; appointmentId: string | null; clientId: string | null }) {
+export function saleInput(ticket: Ticket, ids: { draftId: string; appointmentId: string | null; clientId: string | null; payerId?: string | null }) {
   return {
     draft_id: ids.draftId,
     appointment_id: ids.appointmentId,
     client_id: ids.clientId,
+    payer_client_id: ids.payerId ?? null,
     rebook_appointment_id: ticket.rebook?.appointmentId ?? null,
     employee_id: ticket.employeeId ?? null,
     promotion_ids: ticket.promotions,

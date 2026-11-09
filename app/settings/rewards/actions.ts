@@ -29,6 +29,7 @@ export type ProgramInput = {
   minRedeemPoints: string;
   stackWithPromotions: boolean;
   tierBasis: "spend" | "visits";
+  familyPoints: "payer" | "client";
 };
 
 export async function saveProgram(input: ProgramInput): Promise<Result> {
@@ -60,6 +61,7 @@ export async function saveProgram(input: ProgramInput): Promise<Result> {
       min_redeem_points: min,
       stack_with_promotions: input.stackWithPromotions,
       tier_basis: input.tierBasis === "visits" ? "visits" : "spend",
+      family_points: input.familyPoints === "client" ? "client" : "payer",
     },
   });
   if (error) return failed(error);
